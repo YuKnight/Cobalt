@@ -14,14 +14,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to an {@link IqUploadPreKeysRequest}.
- *
- * @implNote {@code WAWebUploadPreKeysJob.uploadPreKeyResParser}
- *           returns one of {@code success}, {@code errorCode 406}
- *           (invalid keys), {@code errorCode >= 500} (server
- *           backoff), or any other code as a generic failure.
- *           Cobalt collapses to the standard
- *           {@code Success}/{@code ClientError}/{@code ServerError}
- *           split.
  */
 @WhatsAppWebModule(moduleName = "WAWebUploadPreKeysJob")
 public sealed interface IqUploadPreKeysResponse extends IqOperation.Response

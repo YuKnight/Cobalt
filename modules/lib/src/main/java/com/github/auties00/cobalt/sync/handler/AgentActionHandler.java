@@ -6,15 +6,11 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
+import com.github.auties00.cobalt.model.business.AgentStateBuilder;
 import com.github.auties00.cobalt.model.sync.action.device.AgentAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
-import java.util.HashMap;
-
 /**
  * Handles agent sync actions for managing business account agents (device agents).
  *
@@ -29,16 +25,11 @@ import java.util.HashMap;
  * merges the agent into the store (even when {@code isDeleted} is {@code true}).
  * On {@code REMOVE}, only the agentId is validated, and the agent is removed
  * from the store.
- *
- * @implNote WAWebAgentSync.default — singleton instance of the agent sync handler
- *           extending {@code WAWebSyncdAction.AccountSyncdActionBase}
  */
 @WhatsAppWebModule(moduleName = "WAWebAgentSync")
 public final class AgentActionHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code AgentActionHandler}.
-     *
-     * @implNote WAWebAgentSync.default — {@code var c = new u(); l.default = c}
      */
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final AgentActionHandler INSTANCE = new AgentActionHandler();
@@ -51,9 +42,6 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      * {@code this.collectionName = WASyncdConst.CollectionName.Regular}. The
      * {@code collectionName} assignment is surfaced in Cobalt via
      * {@link #collectionName()} rather than as an instance field.
-     *
-     * @implNote WAWebAgentSync — constructor of class {@code u} extending
-     *           {@code AccountSyncdActionBase}
      */
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private AgentActionHandler() {
@@ -62,9 +50,6 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebAgentSync.getAction — returns {@code WASyncdConst.Actions.Agent}
-     *           (value: {@code "deviceAgent"})
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
@@ -74,9 +59,6 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebAgentSync — {@code this.collectionName = WASyncdConst.CollectionName.Regular}
-     *           (value: {@code "regular"})
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
@@ -91,25 +73,6 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return AgentAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies an agent mutation and returns whether it succeeded.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and checks if the result state is {@code SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebAgentSync.applyMutations — WA Web returns
-     *           {@code WASyncdConst.SyncActionState.Success} directly; Cobalt wraps
-     *           in {@link MutationApplicationResult} and extracts the boolean here
-     * @param client   the WhatsAppClient instance linked to the mutation
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -137,30 +100,21 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      * is the primary device id {@code 0}). Cobalt stores the raw
      * {@link AgentAction} protobuf with its original {@code name()} and
      * {@code deviceID()} accessors, deferring display formatting to UI layers.
-     *
-     * @implNote WAWebAgentSync.applyMutations — per-mutation logic within
-     *           {@code withValidatedContent} callback, using
-     *           {@code getValidatedContentSet} and {@code getValidatedContentRemove}
-     *           for validation, and {@code WAWebSchemaAgent.getAgentTable().bulkCreateOrMerge} /
-     *           {@code bulkRemove} plus {@code WAWebAgentCollection.AgentCollection.add/remove}
-     *           for persistence
      * @param client   the WhatsApp client
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = {"applyMutations", "getValidatedContentSet", "getValidatedContentRemove"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var agentId = indexArray.getString(1);
         if (agentId == null || agentId.isEmpty()) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
-        var states = new HashMap<>(client.store().agentStates()); // ADAPTED: WAWebAgentCollection/WAWebSchemaAgent — Cobalt uses ConcurrentHashMap store
         if (mutation.operation() == SyncdOperation.REMOVE) {
-            states.remove(agentId);
-            client.store().setAgentStates(states);
+            client.store().removeAgentState(agentId); // ADAPTED: WAWebAgentCollection/WAWebSchemaAgent — Cobalt uses typed store quintet
             return MutationApplicationResult.success();
         }
 
@@ -169,11 +123,15 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().action().orElse(null) instanceof AgentAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        states.put(agentId, action);
-        client.store().setAgentStates(states);
+        client.store().putAgentState(new AgentStateBuilder()
+                .agentId(agentId)
+                .name(action.name().orElse(null))
+                .deviceId(action.deviceID().isPresent() ? action.deviceID().getAsInt() : null)
+                .deleted(action.isDeleted())
+                .build());
         return MutationApplicationResult.success();
     }
 }

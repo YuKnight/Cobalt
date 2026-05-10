@@ -78,13 +78,6 @@ public final class IqIssuePrivateStatsTokenRequest implements IqOperation.Reques
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <sign_credential>} payload
-     *
-     * @implNote {@code WASmaxOutPrivatestatsSignCredentialRequest.makeSignCredentialRequest}
-     *           emits {@code <iq xmlns="privatestats" type="get"
-     *           to=S_WHATSAPP_NET>} carrying a
-     *           {@code <sign_credential version="2">} child with
-     *           {@code <blinded_credential>} and {@code <project_name>}
-     *           grandchildren.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPrivatestatsSignCredentialRequest",

@@ -20,11 +20,6 @@ import java.util.Optional;
  * because both share the same envelope shape — the
  * {@code <membership_approval_request/>} marker is the only
  * discriminator.
- *
- * @implNote {@code WASmaxGroupsJoinLinkedGroupRPC.sendJoinLinkedGroupRPC}
- *           tries the four variants in priority order and throws on
- *           no-match. Cobalt returns {@link Optional#empty()} on
- *           no-match.
  */
 public sealed interface SmaxGroupsJoinLinkedGroupResponse extends SmaxOperation.Response
         permits SmaxGroupsJoinLinkedGroupResponse.GroupJoinRequestSuccess, SmaxGroupsJoinLinkedGroupResponse.Success,
@@ -72,12 +67,6 @@ public sealed interface SmaxGroupsJoinLinkedGroupResponse extends SmaxOperation.
      * sole discriminator versus the plain {@link Success}; no
      * additional payload is exposed because the marker carries no
      * attributes.
-     *
-     * @implNote {@code WASmaxInGroupsJoinLinkedGroupResponseGroupJoinRequestSuccess.parseJoinLinkedGroupResponseGroupJoinRequestSuccess}
-     *           asserts the {@code iq} tag, requires a
-     *           {@code <membership_approval_request/>} child, and then
-     *           runs the result-envelope check. Cobalt mirrors the
-     *           same sequence.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsJoinLinkedGroupResponseGroupJoinRequestSuccess")
     final class GroupJoinRequestSuccess implements SmaxGroupsJoinLinkedGroupResponse {
@@ -138,10 +127,6 @@ public sealed interface SmaxGroupsJoinLinkedGroupResponse extends SmaxOperation.
      * approval.
      *
      * <p>Carries no payload beyond the envelope echo.
-     *
-     * @implNote {@code WASmaxInGroupsJoinLinkedGroupResponseSuccess.parseJoinLinkedGroupResponseSuccess}
-     *           asserts the {@code iq} tag and runs the
-     *           result-envelope check; no other payload is parsed.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsJoinLinkedGroupResponseSuccess")
     final class Success implements SmaxGroupsJoinLinkedGroupResponse {
@@ -194,13 +179,6 @@ public sealed interface SmaxGroupsJoinLinkedGroupResponse extends SmaxOperation.
      * The {@code ClientError} reply variant — the relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent or unjoinable sub-group.
-     *
-     * @implNote {@code WASmaxInGroupsJoinLinkedGroupResponseClientError.parseJoinLinkedGroupResponseClientError}
-     *           parses the {@code <error code text/>} child and
-     *           routes it through
-     *           {@code WASmaxInGroupsJoinLinkedGroupClientErrors}.
-     *           Cobalt collapses to the raw {@code (code, text)}
-     *           pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsJoinLinkedGroupResponseClientError")
     final class ClientError implements SmaxGroupsJoinLinkedGroupResponse {
@@ -293,11 +271,6 @@ public sealed interface SmaxGroupsJoinLinkedGroupResponse extends SmaxOperation.
     /**
      * The {@code ServerError} reply variant — the relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInGroupsJoinLinkedGroupResponseServerError.parseJoinLinkedGroupResponseServerError}
-     *           delegates to {@code WASmaxInGroupsBaseServerErrorMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsJoinLinkedGroupResponseServerError")
     final class ServerError implements SmaxGroupsJoinLinkedGroupResponse {

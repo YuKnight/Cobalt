@@ -104,10 +104,6 @@ public final class FetchNewsletterIsDomainPreviewableMexRequest implements MexOp
 
     /**
      * Writes a list of strings as a JSON array into the given writer.
-     *
-     * @implNote The array is always emitted (possibly empty) so the on-wire
-     * shape always contains the {@code url_domains} key, mirroring the JS
-     * object literal {@code {url_domains: e}} which never omits the key.
      * @param writer the JSON writer to emit into
      * @param values the string values to serialise, may be {@code null}
      */

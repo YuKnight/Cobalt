@@ -73,13 +73,6 @@ public final class FetchGroupInfoMexResponse implements MexOperation.Response.Js
 
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
-     *
-     * @implNote WA Web's post-processing step (synthesising domain
-     * {@code groupInfo} via {@code WAWebWidFactory.createWid}, computing
-     * {@code __typename} branches and projecting {@code XWA2CommunityGroup},
-     * {@code XWA2CommunityDefaultSubGroup} and {@code XWA2CommunitySubGroup}
-     * variants) is not performed here. Cobalt exposes the raw GraphQL envelope
-     * and lets domain-layer consumers project it.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
      * @return the parsed response, or {@code Optional.empty()} if the
      *         expected JSON shape is absent

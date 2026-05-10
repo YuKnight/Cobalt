@@ -53,17 +53,6 @@ import java.util.logging.Logger;
  * <li>Store the new key locally (or send first, depending on AB prop gating)
  * <li>Share the new key with companion devices via {@code AppStateSyncKeyShare}
  * </ol>
- *
- * @implNote WAWebSyncdKeyManagement, WAWebSyncdRotateKey, WAWebSyncdKeyCallbacksApi, WAWebSyncdHandleKeyShare.
- *           The WA Web {@code WAWebSyncdKeyCallbacksApi} module is a pure callback-registration
- *           facade exporting three bindings: {@code getDeviceFingerprint} (implemented by
- *           {@link #getCurrentDeviceFingerprint()}), {@code sendSyncdKeyRotation} (implemented
- *           by {@link #shareKeyWithCompanionDevices(AppStateSyncKey)}), and
- *           {@code sendSyncdKeyRequest} which is a direct alias of
- *           {@code WAWebKeyManagementSendKeyRequestApi.sendAppStateSyncKeyRequest}
- *           implemented in {@link MissingSyncKeyRequestService}.
- *           In Cobalt the callback-registration indirection collapses to direct method calls
- *           via constructor-based dependency injection.
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdKeyManagement")
 @WhatsAppWebModule(moduleName = "WAWebSyncdRotateKey")
@@ -77,37 +66,27 @@ public final class SyncKeyRotationService {
 
     /**
      * Minimum value for the key max use days threshold.
-     *
-     * @implNote WAWebSyncdRotateKey: var e = 1
      */
     private static final int MIN_KEY_MAX_USE_DAYS = 1;
 
     /**
      * Maximum value for the key max use days threshold.
-     *
-     * @implNote WAWebSyncdRotateKey: var s = 90
      */
     private static final int MAX_KEY_MAX_USE_DAYS = 90;
 
     /**
      * Per WhatsApp Web {@code WAWebTasksDefinitions}: the periodic key rotation
      * check runs every 27 days.
-     *
-     * @implNote WAWebTasksDefinitions: RotateKeyTask interval
      */
     private static final Duration PERIODIC_ROTATION_INTERVAL = Duration.ofDays(27);
 
     /**
      * Secure random instance for generating key data.
-     *
-     * @implNote WAWebSyncdRotateKey: WACryptoDependencies.getCrypto().getRandomValues
      */
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     /**
      * Lock object used to serialize access to the active key rotation flow.
-     *
-     * @implNote WAWebSyncdKeyManagement: var m = new PromiseQueue; function p(e) { return m.enqueue(...) }
      */
     private final Object rotationLock = new Object();
 
@@ -120,8 +99,6 @@ public final class SyncKeyRotationService {
      * Reference to the web app-state service used for missing-key follow-up
      * scheduling, covering both the all-devices-responded grace period and
      * the missing-key timeout rescheduling.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys (missing-key follow-ups).
      */
     private final WebAppStateService webAppStateService;
 
@@ -149,7 +126,6 @@ public final class SyncKeyRotationService {
      *                           schedule missing-key follow-ups
      * @param abPropsService     the AB props service for threshold configuration
      * @param wamService         the WAM telemetry service for committing key rotation events
-     * @implNote WAWebSyncdKeyManagement (module-level dependencies)
      */
     public SyncKeyRotationService(WhatsAppClient whatsapp, WebAppStateService webAppStateService, ABPropsService abPropsService, WamService wamService) {
         this.whatsapp = whatsapp;
@@ -179,10 +155,6 @@ public final class SyncKeyRotationService {
      *
      * @param senderDeviceId the device ID of the peer that sent the key share
      * @param keys           the list of shared keys from the {@code AppStateSyncKeyShare} message
-     * @implNote WAWebSyncdHandleKeyShare.handleKeyShare — inlines the aggregate
-     *           {@code WAWebSyncdStoreMissingKeys.updateMissingKeys} call into the
-     *           per-key loop, coalescing WA Web's two-pass (store + bulk update)
-     *           into one pass with the same observable effects.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdHandleKeyShare",
             exports = "handleKeyShare",
@@ -298,9 +270,6 @@ public final class SyncKeyRotationService {
      * {@link #handleKeyShare} (storage); this method is exposed so the caller-side
      * validator can fire the emission at the WA Web position, regardless of whether
      * any key survives validation.
-     *
-     * @implNote WAWebKeyManagementHandleKeyShareApi.handleAppStateSyncKeyShare,
-     *           WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary
      */
     @WhatsAppWebExport(moduleName = "WAWebKeyManagementHandleKeyShareApi", exports = "handleAppStateSyncKeyShare", adaptation = WhatsAppAdaptation.ADAPTED)
     public void logMissingKeysReceived() {
@@ -318,8 +287,6 @@ public final class SyncKeyRotationService {
      * global state machine is approximated by checking whether the
      * {@link SyncPatchType#CRITICAL_BLOCK} collection has been bootstrapped yet,
      * mirroring {@link WebAppStateService}.
-     *
-     * @implNote WAWebSyncdCriticalBootstrapProcessingApi.logCriticalBootstrapStageIfNecessary
      * @param stage the bootstrap stage reached; never {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCriticalBootstrapProcessingApi", exports = "logCriticalBootstrapStageIfNecessary", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -340,8 +307,6 @@ public final class SyncKeyRotationService {
      * collections in the {@code Blocked} state from the state machine, transitions them
      * to {@code Dirty}, and triggers a sync round. This is called after missing sync
      * keys are received to resume syncing collections that were waiting for key material.
-     *
-     * @implNote WAWebSyncd.syncBlockedCollections (J), called from WAWebSyncdHandleKeyShare.handleKeyShare
      */
     private void syncBlockedCollections() {
         var blockedCollections = new ArrayList<SyncPatchType>(); // WAWebSyncd.J: var t = getCollectionsInStateBlocked()
@@ -364,7 +329,6 @@ public final class SyncKeyRotationService {
      *
      * @param triggerRotation whether to trigger rotation if the key is stale
      *                        (set to {@code false} for read-only checks)
-     * @implNote WAWebSyncdKeyManagement.getActiveKey (function p wrapping _)
      */
     public void ensureActiveKey(boolean triggerRotation) {
         getActiveKey(triggerRotation);
@@ -383,12 +347,6 @@ public final class SyncKeyRotationService {
      *                        (set to {@code false} for read-only checks)
      * @return the active sync key
      * @throws IllegalStateException if no sync key is available
-     * @implNote WAWebSyncdKeyManagement.getActiveKey (function p wrapping _).
-     *           The WA Web {@code PromiseQueue.enqueue} serialization is mapped
-     *           to a {@code synchronized} block on {@link #rotationLock}; the
-     *           trailing recursive {@code _(t)} call collapses to returning the
-     *           freshly-rotated key directly (semantically equivalent because
-     *           the rotated key was just stored and is therefore the newest).
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdKeyManagement",
             exports = "getActiveKey",
@@ -409,7 +367,6 @@ public final class SyncKeyRotationService {
      * @param triggerRotation whether to trigger rotation if the key is stale
      * @return the active sync key
      * @throws IllegalStateException if no sync key is available
-     * @implNote WAWebSyncdKeyManagement.getActiveKey (function _)
      */
     private AppStateSyncKey getActiveKeyInternal(boolean triggerRotation) {
         var newestKey = getNewestKeyPair(); // WAWebSyncdKeyManagement._: var n = yield g()
@@ -475,11 +432,6 @@ public final class SyncKeyRotationService {
      * picks the one with the minimum device ID.
      *
      * @return the newest key, or {@code null} if no keys exist
-     * @implNote WAWebSyncdKeyManagement.getNewestKeyPair (function g/h).
-     *           The {@code getAllSyncKeysInTransaction} call collapses to
-     *           a direct read of {@link com.github.auties00.cobalt.store.AbstractWhatsAppStore#appStateKeys()};
-     *           the max-epoch/min-deviceId selection is delegated to
-     *           {@link SyncKeyUtils#findNewestKey(java.util.Collection)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdKeyManagement",
             exports = "getNewestKeyPair",
@@ -498,10 +450,6 @@ public final class SyncKeyRotationService {
      *
      * @param key the key to check
      * @return {@code true} if the key has expired
-     * @implNote WAWebSyncdRotateKey.hasKeyExpired (function u).
-     *           WA Web reads {@code t.timestamp} from the flat in-memory key shape;
-     *           Cobalt reads {@code key.keyData().timestamp()} because the protobuf
-     *           model nests the timestamp inside {@link AppStateSyncKeyData}.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdRotateKey",
             exports = "hasKeyExpired",
@@ -536,11 +484,6 @@ public final class SyncKeyRotationService {
      * @param key                the key whose fingerprint to check
      * @param currentFingerprint the current device fingerprint snapshot
      * @return {@code true} if a device has been removed since the key was created
-     * @implNote WAWebSyncdRotateKey.hasADeviceBeenRemoved (function c).
-     *           WA Web reads {@code e.fingerprint} from the flat in-memory key shape;
-     *           Cobalt reads {@code key.keyData().fingerprint()} because the protobuf
-     *           model nests the fingerprint inside {@link AppStateSyncKeyData}.
-     *           The {@code equalsSet} utility call is mapped to {@link Set#equals(Object)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdRotateKey",
             exports = "hasADeviceBeenRemoved",
@@ -582,13 +525,6 @@ public final class SyncKeyRotationService {
      * values), and rawId.
      *
      * @return the current fingerprint, or {@code null} if unavailable
-     * @implNote WAWebSyncdKeyCallbacksApi.getDeviceFingerprint (function s).
-     *           Cobalt collapses the callback registration indirection into a direct
-     *           method call: WA Web routes this via the
-     *           {@code WAWebSyncdKeyCallbacksApi} facade exporting {@code getDeviceFingerprint = s},
-     *           which wraps {@code WAWebApiDeviceList.getMyDeviceList()}. Cobalt reads
-     *           the same device list state from the store (see
-     *           {@link com.github.auties00.cobalt.store.AbstractWhatsAppStore#findDeviceList}).
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdKeyCallbacksApi",
             exports = "getDeviceFingerprint",
@@ -640,13 +576,6 @@ public final class SyncKeyRotationService {
      * @param currentFingerprint the current device fingerprint snapshot
      * @param previousKey        the key being rotated out
      * @return the new key, or {@code null} if rotation cannot proceed
-     * @implNote WAWebSyncdRotateKey.rotateKey (function d), WAWebSyncdRotateKey (function m, function p).
-     *           WA Web {@code m(e)} tolerates a {@code null} previous key by seeding the
-     *           epoch from a random 16-byte buffer; in Cobalt this path is unreachable because
-     *           the sole caller {@link #getActiveKeyInternal(boolean)} throws
-     *           {@code IllegalStateException} when no prior key exists (matching the WA Web
-     *           {@code throw err("syncd: No sync key available")} above), so the null branch
-     *           is intentionally omitted.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdRotateKey",
             exports = "rotateKey",
@@ -716,13 +645,6 @@ public final class SyncKeyRotationService {
      * {@code WAWebKeyManagementSendKeyShareApi.sendAppStateSyncKeyShare}.
      *
      * @param key the new key to share
-     * @implNote WAWebSyncdKeyCallbacksApi.sendSyncdKeyRotation (function u).
-     *           The WA Web callback-registration pattern
-     *           {@code l.sendSyncdKeyRotation = t -> sendAppStateSyncKeyShare({type:"key_rotation",keys:t})}
-     *           collapses in Cobalt to a direct method call: constructor DI eliminates
-     *           the module-level callback facade and the key share is sent via
-     *           {@link #sendAppStateSyncKeyShare(List, List, List, String)} with the
-     *           {@code "key_rotation"} reason literal preserved verbatim.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdKeyCallbacksApi",
             exports = "sendSyncdKeyRotation",
@@ -747,7 +669,6 @@ public final class SyncKeyRotationService {
      * @param keys           the found keys with full key data
      * @param orphanKeyIds   the key IDs that were not found locally (sent with {@code null} key data)
      * @param peerDeviceJid  the JID of the peer device that requested the keys
-     * @implNote WAWebKeyManagementSendKeyShareApi.sendAppStateSyncKeyShare (missing_key branch)
      */
     public void sendMissingKeyShare(List<AppStateSyncKey> keys, List<byte[]> orphanKeyIds, Jid peerDeviceJid) {
         sendAppStateSyncKeyShare(keys, orphanKeyIds, List.of(peerDeviceJid), "missing_key"); // WAWebKeyManagementSendKeyShareApi.sendAppStateSyncKeyShare: type === "missing_key"
@@ -771,7 +692,6 @@ public final class SyncKeyRotationService {
      * @param orphanKeyIds  key IDs without data (empty list if none; non-empty for missing_key responses)
      * @param targetDevices the list of target device JIDs to send the share to
      * @param reason        the reason string for logging ({@code "key_rotation"} or {@code "missing_key"})
-     * @implNote WAWebKeyManagementSendKeyShareApi.sendAppStateSyncKeyShare (function c)
      */
     private void sendAppStateSyncKeyShare(List<AppStateSyncKey> keys, List<byte[]> orphanKeyIds, List<Jid> targetDevices, String reason) {
         if (targetDevices.isEmpty()) { // ADAPTED: defensive guard
@@ -853,7 +773,6 @@ public final class SyncKeyRotationService {
      * the primary device (device 0) if the device list cannot be retrieved.
      *
      * @return the list of companion device JIDs
-     * @implNote WAWebKeyManagementUtils.getPeerDevices
      */
     private List<Jid> getCompanionDevices() {
         var myJid = whatsapp.store().jid().orElse(null); // WAWebKeyManagementUtils.getPeerDevices: getMeDevicePnOrThrow()
@@ -887,8 +806,6 @@ public final class SyncKeyRotationService {
      * {@code RotateKeyTask} runs every 27 days as a background check
      * independent of mutation push. This ensures expired keys are rotated
      * even if no mutations are pushed for extended periods.
-     *
-     * @implNote WAWebTasksDefinitions: RotateKeyTask
      */
     public void startPeriodicRotationJob() {
         stopPeriodicRotationJob();
@@ -897,8 +814,6 @@ public final class SyncKeyRotationService {
 
     /**
      * Schedules the next periodic rotation check after the configured interval.
-     *
-     * @implNote WAWebTasksDefinitions: RotateKeyTask scheduling
      */
     private void scheduleNextPeriodicRotation() {
         periodicRotationJob = SchedulerUtils.scheduleDelayed(
@@ -917,8 +832,6 @@ public final class SyncKeyRotationService {
 
     /**
      * Stops the periodic key rotation background job.
-     *
-     * @implNote WAWebTasksDefinitions: RotateKeyTask cancellation
      */
     public void stopPeriodicRotationJob() {
         var job = periodicRotationJob;
@@ -934,7 +847,6 @@ public final class SyncKeyRotationService {
      * @param currentIndex  the current device index counter
      * @param deviceIndexes the set of active device key indexes
      * @param rawId         the raw fingerprint ID
-     * @implNote WAWebSyncdKeyCallbacksApi.getDeviceFingerprint: return {currentIndex, deviceIndexes, rawId}
      */
     private record DeviceFingerprint(int currentIndex, Set<Integer> deviceIndexes, int rawId) {
     }

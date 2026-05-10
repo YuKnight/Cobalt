@@ -17,11 +17,6 @@ import java.util.Optional;
 /**
  * Sealed family of payload variants. Either a {@link Config}
  * registration or a {@link Clear} de-registration.
- *
- * @implNote {@code WASmaxOutPushConfigSetSetConfigOrSetClearMixinGroup.mergeSetSetConfigOrSetClearMixinGroup}
- *           switches over the {@code (setSetConfig, setClear)}
- *           pair. Cobalt models the disjunction as a sealed
- *           interface.
  */
 public sealed interface SmaxPushConfigSetSetVariant
         permits SmaxPushConfigSetSetVariant.Config, SmaxPushConfigSetSetVariant.Clear {

@@ -100,14 +100,6 @@ public final class SmaxGroupsRemoveParticipantsRequest implements SmaxOperation.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <remove>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsRemoveParticipantsRequest.makeRemoveParticipantsRequest}
-     *           composes
-     *           {@code <remove linked_groups=OPTIONAL_LITERAL("true", r)>
-     *           REPEATED_CHILD(participant, 1, 1024)</remove>}.
-     *           Cobalt emits {@code linked_groups="true"} only when
-     *           the flag is set; absence of the attribute is the
-     *           default per the WA Web mixin.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsRemoveParticipantsRequest",

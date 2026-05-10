@@ -30,12 +30,6 @@ import java.util.stream.Stream;
  * {@link DeviceADVValidator}, filters devices whose keyIndex is not in the cryptographically
  * signed {@code validIndexes} set, and produces a list of typed {@link DeviceListResult}
  * instances that {@link com.github.auties00.cobalt.device.DeviceService} consumes.
- *
- * @implNote WAWebUsyncDevice.deviceParser: parses device lists, key indices, and hosting
- * status from USync response elements.
- * WAWebUsync.usyncParser: parses the USync IQ response envelope.
- * WAWebHandleAdvForUsyncApi.handleADVSyncResultSync: routes results to full or omitted handlers.
- * WAWebUsyncUsername.usernameParser: optional username co-query co-read with device data.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 @WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
@@ -49,17 +43,11 @@ public final class DeviceUSyncResponseParser {
 
     /**
      * ADV validator service for key index validation and hosted device gating.
-     *
-     * @implNote WAWebHandleAdvDeviceNotificationUtils: used for verifying signed key index lists.
-     * WAWebBizCoexGatingUtils: used for hosted device feature gating.
      */
     private final DeviceADVValidator advValidatorService;
 
     /**
      * Creates a new USync response parser.
-     *
-     * @implNote WAWebHandleAdvForUsyncApi: the handler uses WAWebHandleAdvDeviceNotificationUtils
-     * for key index validation, which is provided here via the ADV validator service.
      * @param advValidatorService the ADV validator service for key index validation and
      *                            hosted device gating
      */
@@ -78,10 +66,6 @@ public final class DeviceUSyncResponseParser {
      *   <li>{@code <result>} - protocol-level status with error/refresh per protocol</li>
      *   <li>{@code <list>} - per-user data with protocol-specific children</li>
      * </ul>
-     *
-     * @implNote WAWebUsync.usyncParser: parses the USync IQ response, extracting protocol-level
-     * errors from {@code usync > result > devices > error}, and per-user device data from
-     * {@code usync > list > user > devices} via WAWebUsyncDevice.deviceParser.
      * @param responseNode the IQ response node
      * @return list of device list results (full, omitted, or error)
      */
@@ -134,12 +118,6 @@ public final class DeviceUSyncResponseParser {
 
     /**
      * Parses the username map from the USync list.
-     *
-     * @implNote WAWebUsync.usyncParser.m: WA Web dispatches each registered protocol parser
-     * against the matching child element of every {@code <user>} node in {@code usync > list}.
-     * Cobalt inlines the dispatch for the username protocol into this helper.
-     * WAWebUsyncUsername.usernameParser: extracts a username string from every
-     * {@code usync > list > user > username} node.
      * @param usync the usync node
      * @return map of user JID to username
      */
@@ -159,10 +137,6 @@ public final class DeviceUSyncResponseParser {
      * <p>The user node may contain a {@code <devices>} child (from the device protocol)
      * which itself contains {@code <device-list>}, {@code <key-index-list>}, and optionally
      * an {@code <error>} element.
-     *
-     * @implNote WAWebUsync.usyncParser.m: for each user in the list, extracts the devices child
-     * and passes it to WAWebUsyncDevice.deviceParser for parsing. The deviceParser checks for
-     * error, then extracts device-list and key-index-list from the devices node.
      * @param userNode    the user node from {@code usync > list > user}
      * @param usernameMap the username map for correlating usernames
      * @return stream of device list results for this user
@@ -219,10 +193,6 @@ public final class DeviceUSyncResponseParser {
      *
      * <p>If the device-list contains companion devices (non-primary), the result is dropped
      * because a companion device list without a signed key index is invalid.
-     *
-     * @implNote WAWebHandleAdvForUsyncApi.handleADVSyncResultSync: when keyIndex is null or
-     * signedKeyIndexBytes is null, delegates to WAWebHandleAdvOmittedResultApi.handleOmittedResult
-     * after checking for companion devices.
      * @param userJid          the user JID
      * @param deviceListNode   the device-list node, or {@code null}
      * @param keyIndexListNode the key-index-list node, or {@code null}
@@ -252,9 +222,6 @@ public final class DeviceUSyncResponseParser {
 
     /**
      * Checks if the device-list contains companion (non-primary) devices.
-     *
-     * @implNote WAWebHandleAdvForUsyncApi.handleADVSyncResultSync: checks if
-     * {@code deviceList.some(e => e.id !== DEFAULT_DEVICE_ID)} to detect companion devices.
      * @param deviceListNode the device-list node
      * @return {@code true} if any device has a non-primary device ID
      */
@@ -271,10 +238,6 @@ public final class DeviceUSyncResponseParser {
      *
      * <p>Validates the signed key index list, builds a key index map, parses device entries,
      * and constructs a full device list result.
-     *
-     * @implNote WAWebHandleAdvKeyIndexResultApi.handleKeyIndexResultSync: validates the signed
-     * key index list via WAWebHandleAdvDeviceNotificationUtils.verifySKeyIndexWithAccSigKey,
-     * extracts device information, and builds the update record.
      * @param userJid            the user JID
      * @param username           the username from username protocol, or {@code null}
      * @param deviceListNode     the device-list node
@@ -328,12 +291,6 @@ public final class DeviceUSyncResponseParser {
 
     /**
      * Parses a key index entry from a device node in the key-index-list.
-     *
-     * @implNote WAWebHandleAdvKeyIndexResultApi.handleKeyIndexResultSync: extracts device JID and
-     * key-index from key-index-list/device nodes to build the key index map. Note that
-     * WAWebUsyncDevice.deviceParser extracts keyIndex from device-list device nodes directly
-     * via {@code maybeAttrInt("key-index")}, but the key-index-list/device nodes provide
-     * an equivalent mapping used for ADV validation.
      * @param deviceNode the device node from key-index-list
      * @return stream containing the key index entry, or empty if required attributes are missing
      */
@@ -355,12 +312,6 @@ public final class DeviceUSyncResponseParser {
      * <p>Extracts the device ID, resolves the key index from the key-index-list map, validates
      * against valid indexes, and conditionally sets the hosted flag based on the
      * {@code is_hosted} attribute.
-     *
-     * @implNote WAWebUsyncDevice.deviceParser: maps each device child to
-     * {@code {id, keyIndex, isHosted?}}. The {@code isHosted} flag is only set when
-     * {@code bizHostedDevicesEnabled()} is true and {@code is_hosted="true"} attribute is present.
-     * WAWebHandleAdvKeyIndexResultApi.handleKeyIndexResultSync: filters devices whose keyIndex
-     * is not in validIndexes.
      * @param deviceNode   the device node from device-list
      * @param keyIndexMap  map of device ID to key index (from key-index-list)
      * @param validIndexes the set of valid key indexes, or {@code null} if not available
@@ -408,17 +359,6 @@ public final class DeviceUSyncResponseParser {
      *
      * <p>Extracts the username from the {@code <username>} child of a user node,
      * skipping entries with errors or empty content.
-     *
-     * @implNote WAWebUsyncUsername.usernameParser: {@code e.assertTag("username")} is implicit
-     * because the child is located by tag name via {@link Node#getChild(String)}. The WA parser
-     * returns three possible values: an error object {@code {errorCode, errorText}} when an
-     * {@code <error>} child is present, the content string when {@code hasContent()} is true,
-     * or {@code null} otherwise.
-     * @implNote ADAPTED: Cobalt collapses the error-object branch into the same outcome as the
-     * null branch (no username stored). The map built here is typed {@code Map<Jid, String>} and
-     * is consumed only to populate {@link DeviceListResult.Full#username()}, which is a plain
-     * {@code String}; there is no downstream consumer for a per-user username-fetch error, so
-     * suppressing it is observationally equivalent to the JS "username field was not set" path.
      * @param userNode the user node from {@code usync > list > user}
      * @return stream containing the username entry, or empty if not available
      */
@@ -454,9 +394,6 @@ public final class DeviceUSyncResponseParser {
 
     /**
      * Internal record for holding parsed key index entries.
-     *
-     * @implNote WAWebHandleAdvKeyIndexResultApi: intermediate data structure for building
-     * the key index map from key-index-list device nodes.
      * @param deviceId the device ID
      * @param keyIndex the key index value
      */
@@ -464,9 +401,6 @@ public final class DeviceUSyncResponseParser {
 
     /**
      * Internal record for holding parsed username entries.
-     *
-     * @implNote WAWebUsyncUsername.usernameParser: intermediate data structure for correlating
-     * usernames with user JIDs from the USync list.
      * @param userJid  the user JID
      * @param username the username string
      */

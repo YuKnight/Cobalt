@@ -9,6 +9,7 @@ import it.auties.protobuf.model.ProtobufType;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * Represents a WhatsApp newsletter, also known as a channel.
@@ -128,11 +129,29 @@ public abstract non-sealed class Newsletter implements JidProvider {
     public abstract void removeMessages();
 
     /**
-     * Returns an unmodifiable, ordered view of every stored message.
+     * Returns the stored messages as a {@link Stream} of
+     * {@link NewsletterMessageInfo}, in server-id order.
      *
-     * @return the messages view, never {@code null}
+     * <p>The returned stream is {@link AutoCloseable}: implementations that
+     * back the newsletter with an external resource keep that resource open
+     * for the lifetime of the stream and release it when the stream is
+     * closed. Callers MUST consume the stream inside a try-with-resources
+     * block, otherwise the underlying resource is leaked.
+     *
+     * @return a non-null stream of newsletter messages, in server-id order
      */
-    public abstract SequencedCollection<NewsletterMessageInfo> messages();
+    public abstract Stream<NewsletterMessageInfo> messages();
+
+    /**
+     * Returns the number of messages stored in this newsletter.
+     *
+     * <p>Provided as a dedicated accessor so callers do not have to consume
+     * {@link #messages()} just to count. Both the in-memory and the
+     * persistent backing implementations answer this in constant time.
+     *
+     * @return the number of messages currently stored in this newsletter
+     */
+    public abstract int messageCount();
 
     /**
      * Looks up a stored message by its client identifier.

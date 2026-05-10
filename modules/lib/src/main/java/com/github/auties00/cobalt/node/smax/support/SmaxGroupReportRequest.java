@@ -184,19 +184,6 @@ public final class SmaxGroupReportRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         payload
-     *
-     * @implNote {@code WASmaxOutSpamGroupReportRequest.makeGroupReportRequest}
-     *           composes
-     *           {@code WASmaxOutSpamBaseIQSetRequestMixin}
-     *           ({@code id=generateId() type="set"}) and
-     *           {@code WASmaxOutSpamBaseReportMixin}
-     *           ({@code to=S_WHATSAPP_NET xmlns="spam"
-     *           spam_flow=…}) over a
-     *           {@code <spam_list jid source? subject? is_known_chat?>}
-     *           payload with 0..210 {@code <message>} and 0..5
-     *           {@code <call>} children, optionally followed by a
-     *           sibling {@code <frx>} block carrying the FRX
-     *           extension.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutSpamGroupReportRequest",

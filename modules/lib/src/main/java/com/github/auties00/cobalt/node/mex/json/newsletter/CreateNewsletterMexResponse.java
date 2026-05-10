@@ -23,9 +23,6 @@ import java.util.OptionalLong;
  * Response variant for {@link CreateNewsletterMexRequest} that exposes the
  * fully-hydrated newsletter metadata returned by the server after a
  * successful create.
- *
- * @implNote The body wraps the {@code data.xwa2_newsletter_create} root of
- *           the JSON response.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexCreateNewsletterJob")
 public final class CreateNewsletterMexResponse implements MexOperation.Response.Json {

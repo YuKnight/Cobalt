@@ -120,12 +120,6 @@ public final class SenderKeyDistribution {
      * @throws NullPointerException          if {@code groupJid}, {@code senderKeyBytes},
      *                                       or {@code devices} is {@code null}
      * @throws WhatsAppMessageException.Send if encryption fails for a primary device
-     * @implNote Session establishment for the distribution devices is the caller's
-     * responsibility. {@code WAWebSendGroupSkmsgJob} invokes {@code ensureE2ESessions}
-     * before this function and emits the {@code PrekeysDepletionEvent}; Cobalt's
-     * {@code GroupMessageSender} mirrors that by calling
-     * {@code deviceService.ensureSessions} on the distribution devices before invoking
-     * this method.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetGroupKeyDistributionMsg", exports = "getKeyDistributionMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)

@@ -7,7 +7,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -15,8 +14,6 @@ import com.github.auties00.cobalt.model.sync.action.payment.PaymentTosAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -34,26 +31,17 @@ import java.util.List;
  * {@code setPaymentTos}.
  *
  * <p>Index format: {@code ["payment_tos"]}
- *
- * @implNote WAWebPaymentTosSync.default — singleton instance {@code m = new d()}
- *           exported as {@code l.default = m} where {@code d} extends
- *           {@code AccountSyncdActionBase}
  */
 @WhatsAppWebModule(moduleName = "WAWebPaymentTosSync")
 public final class PaymentTosHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code PaymentTosHandler}.
-     *
-     * @implNote WAWebPaymentTosSync — module-level {@code m = new d; l.default = m}
      */
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final PaymentTosHandler INSTANCE = new PaymentTosHandler();
 
     /**
      * Creates a new {@code PaymentTosHandler}.
-     *
-     * @implNote WAWebPaymentTosSync.d — constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      */
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private PaymentTosHandler() {
@@ -62,10 +50,6 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for payment terms of service mutations.
-     *
-     * @implNote WAWebPaymentTosSync.getAction — returns
-     *           {@code WASyncdConst.Actions.PaymentTos} which is
-     *           {@code "payment_tos"}
      * @return the action name {@code "payment_tos"}
      */
     @Override
@@ -76,9 +60,6 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the collection name for payment terms of service mutations.
-     *
-     * @implNote WAWebPaymentTosSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -89,33 +70,12 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for payment terms of service mutations.
-     *
-     * @implNote WAWebPaymentTosSync.getVersion — returns {@code 7}
      * @return {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PaymentTosAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single payment terms of service mutation.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result state is {@code SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebPaymentTosSync.applyMutations — WA Web returns
-     *           {@code WASyncdConst.SyncActionState} values directly; Cobalt
-     *           wraps them in {@link MutationApplicationResult} for type safety
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -146,15 +106,13 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
      * <p>WA Web's {@code WALogger.WARN} calls for the unsupported/malformed
      * batch counters and the SMB/ABProp gate failures are intentionally
      * omitted in Cobalt; the return semantics are preserved exactly.
-     *
-     * @implNote WAWebPaymentTosSync.applyMutations
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var platform = client.store().device().platform(); // ADAPTED: WAWebMobilePlatforms.isSMB — checks c === u.SMBA || c === u.SMBI where SMBA = "smba" (ANDROID_BUSINESS) and SMBI = "smbi" (IOS_BUSINESS)
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
             return MutationApplicationResult.unsupported();
@@ -169,7 +127,7 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().action().orElse(null) instanceof PaymentTosAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().setPaymentTos(action); // ADAPTED: WAWebUserPrefsPaymentTos.setPaymentTos -> WhatsAppStore.setPaymentTos
@@ -193,8 +151,6 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
      * <p>This builder is invoked by {@code WAWebPaymentsTosJob} when the user
      * accepts the payment terms of service and the app needs to sync the new
      * state to the server.
-     *
-     * @implNote WAWebPaymentTosSync.getPaymentTosSetMutation
      * @param action the payment terms of service action to build the mutation for
      * @return the pending mutation ready for sync upload
      */

@@ -14,13 +14,6 @@ import java.util.Optional;
 /**
  * The outbound acknowledgement stanza emitted after consuming the
  * {@link SmaxMdPrimaryHelloNotifyCompanionResponse} notification.
- *
- * @implNote {@code WASmaxOutMdPrimaryHelloNotifyCompanionResponseAck.makePrimaryHelloNotifyCompanionResponseAck}
- *           composes
- *           {@code WASmaxOutMdNotificationClientAckMixin.mergeNotificationClientAckMixin}
- *           into an {@code <ack id to class="notification" type/>}
- *           stanza echoing the notification's id, from (as the ack's
- *           to), and type attributes.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutMdPrimaryHelloNotifyCompanionResponseAck")
 @WhatsAppWebModule(moduleName = "WASmaxOutMdNotificationClientAckMixin")
@@ -99,9 +92,6 @@ public final class SmaxMdPrimaryHelloNotifyCompanionAcknowledgement implements S
      * Builds the outbound ack stanza.
      *
      * @return a {@link NodeBuilder} carrying the ack envelope
-     *
-     * @implNote emits {@code <ack id=… to=… class="notification"
-     *           type=…/>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutMdPrimaryHelloNotifyCompanionResponseAck",

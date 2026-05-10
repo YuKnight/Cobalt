@@ -44,15 +44,12 @@ import java.util.Optional;
  *
  * <p>Helpers for processing incoming sender-key distribution messages and for
  * inspecting existing session state are also provided.
- *
- * @implNote In WA Web a single {@code decryptEnc} dispatches to all three ciphers.
- * In Cobalt the dispatch is performed by the caller rather than by a single dispatch
- * method.
  */
 @WhatsAppWebModule(moduleName = "WAWebMsgProcessingDecryptEnc")
 @WhatsAppWebModule(moduleName = "WAWebSignalCipherApi")
 @WhatsAppWebModule(moduleName = "WAWebBotMessageSecret")
 @WhatsAppWebModule(moduleName = "WAWebCryptoLibrary")
+@WhatsAppWebModule(moduleName = "WASignalGroupCipher")
 public final class MessageDecryption {
     /**
      * Minimum valid PKCS#7 padding length.
@@ -267,6 +264,10 @@ public final class MessageDecryption {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebCryptoLibrary", exports = "decryptGroupSignalProto",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASignalGroupCipher", exports = "decryptSenderKeyMsgFromSession",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASignalGroupCipher", exports = "deserializeSenderKeyMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public byte[] decryptFromGroup(byte[] ciphertext, Jid groupJid, Jid senderJid) {
         Objects.requireNonNull(ciphertext, "ciphertext cannot be null");
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
@@ -370,13 +371,14 @@ public final class MessageDecryption {
      *
      * <p>Reads the last byte to determine padding length and returns the original
      * plaintext with the padding stripped.
-     *
      * @param paddedPlaintext the padded plaintext bytes
      * @return the plaintext with padding removed
      * @throws IllegalArgumentException if the padding is invalid
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgProcess", exports = "processDecryptedMessageProto",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WACryptoPkcs7", exports = "unpadPkcs7",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static byte[] removePadding(byte[] paddedPlaintext) {
         Objects.requireNonNull(paddedPlaintext, "paddedPlaintext cannot be null");
 
@@ -414,6 +416,8 @@ public final class MessageDecryption {
      */
     @WhatsAppWebExport(moduleName = "WAWebCryptoLibrary", exports = "processSenderKeyDistributionMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASignalGroupCipher", exports = "processSenderKeyDistributionMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void processSenderKeyDistribution(Jid groupJid, Jid senderJid, SignalSenderKeyDistributionMessage distributionMsg) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
@@ -434,6 +438,10 @@ public final class MessageDecryption {
      */
     @WhatsAppWebExport(moduleName = "WAWebCryptoLibrary", exports = "processSenderKeyDistributionMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASignalGroupCipher", exports = "processSenderKeyDistributionMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASignalGroupCipher", exports = "deserializeSenderKeyMsg",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void processSenderKeyDistribution(Jid groupJid, Jid senderJid, byte[] distributionData) {
         Objects.requireNonNull(distributionData, "distributionData cannot be null");
 

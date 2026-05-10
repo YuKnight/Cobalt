@@ -21,9 +21,6 @@ import java.util.Optional;
 /**
  * The response variant of {@link FetchNewsletterReportsMexResponse} that exposes the data
  * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterReportsJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterReportsJob")
 public final class FetchNewsletterReportsMexResponse implements MexOperation.Response.Json {
@@ -41,10 +38,6 @@ public final class FetchNewsletterReportsMexResponse implements MexOperation.Res
 
     /**
      * Parses a MEX response from the given IQ response node.
-     *
-     * @implNote WAWebMexFetchNewsletterReportsJob.mexFetchNewsletterReports: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -186,11 +179,6 @@ public final class FetchNewsletterReportsMexResponse implements MexOperation.Res
          *       nested {@code question_data} fragment of type
          *       {@code XWA2ChannelServerMsgData}.</li>
          * </ul>
-         *
-         * @implNote WAWebMexFetchNewsletterReportsJobQuery.graphql: the
-         * compiled GraphQL document declares this field as a {@code LinkedField}
-         * with three {@code InlineFragment} selections discriminated by
-         * {@code __typename}.
          */
         public static final class ReportedContentData {
             private final String typename;
@@ -296,11 +284,6 @@ public final class FetchNewsletterReportsMexResponse implements MexOperation.Res
             /**
              * The {@code question_data} nested fragment carried by
              * {@code XWA2ChannelQuestionResponseData}.
-             *
-             * @implNote WAWebMexFetchNewsletterReportsJobQuery.graphql:
-             * declared as a {@code LinkedField} with a single
-             * {@code XWA2ChannelServerMsgData} {@code InlineFragment}
-             * selection providing {@code server_msg_id}.
              */
             public static final class QuestionData {
                 private final String typename;
@@ -507,10 +490,6 @@ public final class FetchNewsletterReportsMexResponse implements MexOperation.Res
     /**
      * Parses a {@link FetchNewsletterReportsMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
-     *
-     * @implNote WAWebMexFetchNewsletterReportsJob.mexFetchNewsletterReports: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_channels_reports} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields

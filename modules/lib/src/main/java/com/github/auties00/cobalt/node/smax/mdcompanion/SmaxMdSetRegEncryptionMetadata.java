@@ -14,13 +14,6 @@ import java.util.Optional;
 /**
  * Projection of the optional {@code <encryption-metadata/>} child
  * carried by the {@code <pair-success/>} stanza.
- *
- * @implNote {@code WASmaxInMdAESEncryptionMetadataMixin.parseAESEncryptionMetadataMixin}
- *           validates the {@code version="1"} /
- *           {@code algorithm="aes-256-gcm"} attributes and extracts
- *           the {@code <encrypted_key/>}, {@code <nonce/>},
- *           {@code <encrypted_data/>} and {@code <auth_tag/>}
- *           content bytes.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInMdAESEncryptionMetadataMixin")
 public final class SmaxMdSetRegEncryptionMetadata {

@@ -11,7 +11,7 @@ import it.auties.protobuf.model.ProtobufType;
  * <p>The default values come from the Telegram Android client and are
  * suitable for any caller that just wants to receive arbitrary FCM
  * pushes (the project itself does not have to be the caller's). Pass a
- * custom instance via {@link FcmClient#newSession(FcmConfig)} to
+ * custom instance via {@link FcmClient#newSession()} to
  * impersonate a different Android app.
  *
  * <p>Stored inside {@link FcmSession} so a serialized session round-trips

@@ -2,13 +2,18 @@ package com.github.auties00.cobalt.stream.notification.business;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.model.business.BusinessCampaignStatusBuilder;
+import com.github.auties00.cobalt.model.business.BusinessFeatureFlagBuilder;
+import com.github.auties00.cobalt.model.business.BusinessSubscriptionBuilder;
 import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.node.smax.biz.SmaxNonceNotificationResponse;
+import com.github.auties00.cobalt.node.smax.biz.SmaxSyncPrivacySettingResponse;
 import com.github.auties00.cobalt.stream.SocketStream;
 
-import java.util.HashMap;
+import java.time.Instant;
 
 /**
  * Handles incoming business notification stanzas from WhatsApp.
@@ -17,31 +22,23 @@ import java.util.HashMap;
  * verified name changes, business removal, profile updates, product catalog
  * changes, subscriptions, CTWA suggestions, privacy settings, ad account nonces,
  * and marketing campaign state changes.
- *
- * @implNote WAWebHandleBusinessNotification (module-level handler)
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleBusinessNotification")
 public final class NotificationBusinessStreamHandler implements SocketStream.Handler {
 
     /**
      * Logger for this handler.
-     *
-     * @implNote WAWebHandleBusinessNotification (WALogger usage for parse errors and unknown types)
      */
     private static final System.Logger LOGGER =
             System.getLogger(NotificationBusinessStreamHandler.class.getName());
 
     /**
      * The WhatsApp client instance used to send responses and access the store.
-     *
-     * @implNote WAWebHandleBusinessNotification (module-level dependency on WAWap, WAWebBackendApi, etc.)
      */
     private final WhatsAppClient whatsapp;
 
     /**
      * Constructs a new business notification handler.
-     *
-     * @implNote WAWebHandleBusinessNotification (module initialization)
      * @param whatsapp the WhatsApp client for sending acks and accessing store
      */
     public NotificationBusinessStreamHandler(WhatsAppClient whatsapp) {
@@ -59,9 +56,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * {@code WAWebOrchestratorNonPersistedJob.createNonPersistedJob("handleBusinessNotification", ...)}
      * with priority from {@code WAWebBackendJobsCommon.getNonCriticalNotificationPriority}.
      * In Cobalt, the virtual thread spawning at the dispatcher level serves the same purpose.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotificationJob
-     *     and WAWebHandleBusinessNotification.handleBusinessNotification
      * @param node the notification stanza node
      */
     @Override
@@ -179,9 +173,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * <p>Returns {@code true} when a hash-based lookup was not found, which
      * means the ack should include a {@code <user side_list="out"/>} child so
      * the server redistributes the notification to companion devices.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotification
-     *     (parser switch over notification child tags)
      * @param node the full notification stanza
      * @return {@code true} if the ack should include the side-list user child,
      *     {@code false} otherwise
@@ -250,8 +241,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * <p>For hash-based: delegates to
      * {@code WAWebHandleBusinessRemoval.handleBusinessRemovalNotificationHash},
      * which looks up the contact by hash first. Returns whether the contact was found.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotification (remove_jid / remove_hash cases)
      * @param removeNode the {@code <remove>} child node
      * @return {@code true} if hash-based and the contact was NOT found (needs side-list ack),
      *     {@code false} otherwise
@@ -296,9 +285,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * <p>For hash-based: delegates to
      * {@code WAWebHandleBusinessNameChange.handleVerifiedBusinessNameNotificationHash},
      * which looks up the contact by hash first.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotification
-     *     (verified_name_jid / verified_name_hash cases)
      * @param verifiedNameNode the {@code <verified_name>} child node
      * @return {@code true} if hash-based and the contact was NOT found (needs side-list ack),
      *     {@code false} otherwise
@@ -343,9 +329,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * <p>For hash-based: delegates to
      * {@code WAWebHandleBusinessProfile.handleBusinessProfileHash}, which looks
      * up the contact by hash first.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotification
-     *     (profile / profile_hash cases)
      * @param node the full notification stanza (used to extract the {@code from} jid)
      * @param profileNode the {@code <profile>} child node
      * @return {@code true} if hash-based and the contact was NOT found (needs side-list ack),
@@ -383,9 +366,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * <p>For products: WA Web collects all product IDs and calls
      * {@code refreshCatalogProducts}. For collections: WA Web collects collection
      * IDs and review statuses and calls {@code updateCatalogCollectionReviewStatuses}.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotification
-     *     (product / collection cases within product_catalog)
      * @param catalogNode the {@code <product_catalog>} child node
      */
     private void handleProductCatalog(Node catalogNode) {
@@ -413,9 +393,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
 
     /**
      * Applies the given business profile fields to the own store.
-     *
-     * @implNote WAWebHandleBusinessProfile.handleBusinessProfile
-     *     (frontend applies profile fields after updateBusinessProfile)
      * @param profile the refreshed business profile
      */
     private void applyOwnBusinessProfile(BusinessProfile profile) {
@@ -430,8 +407,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
 
     /**
      * Determines whether the given JID refers to the currently authenticated user.
-     *
-     * @implNote WAWebHandleBusinessNotification (implicit self-check in various handlers)
      * @param jid the JID to check
      * @return {@code true} if the JID matches the authenticated user, {@code false} otherwise
      */
@@ -450,91 +425,88 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * which reads {@code feature_flags} and {@code subscriptions} as direct children of the
      * notification stanza, then applies via
      * {@code WAWebSubscriptions.applySubscriptionsAndFeatureFlags(subscriptions, featureFlags, "update")}.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotification
-     *     (subscriptions case) and WAWebParseSubscriptionNotification.parseSubscriptionsAndFeatureFlags
-     *     and WAWebSubscriptions.applySubscriptionsAndFeatureFlags
      * @param node the full notification stanza (not the subscriptions child)
      */
     private void handleSubscriptions(Node node) {
         // feature_flags are a direct child of the notification, not of the subscriptions child
-        var flags = new HashMap<>(whatsapp.store().businessFeatureFlags());
         node.getChild("feature_flags").ifPresent(featureFlagsNode -> {
             featureFlagsNode.getChildren("feature_flag").forEach(featureFlag -> {
                 var name = featureFlag.getAttributeAsString("name", null);
                 var enabled = featureFlag.getAttributeAsString("enabled", null);
                 if (name != null && enabled != null) {
-                    flags.put(name, "true".equalsIgnoreCase(enabled));
+                    whatsapp.store().putBusinessFeatureFlag(new BusinessFeatureFlagBuilder()
+                            .name(name)
+                            .enabled("true".equalsIgnoreCase(enabled))
+                            .build());
                 }
             });
         });
 
-        var statuses = new HashMap<>(whatsapp.store().businessSubscriptionStatuses());
-        var expirations = new HashMap<>(whatsapp.store().businessSubscriptionExpirations());
-        var creationTimes = new HashMap<>(whatsapp.store().businessSubscriptionCreationTimes());
         node.getChild("subscriptions").ifPresent(subscriptionsNode -> {
             subscriptionsNode.getChildren("subscription").forEach(subscription -> {
                 var id = subscription.getAttributeAsString("id", null);
+                if (id == null) {
+                    return;
+                }
+                var existing = whatsapp.store().findBusinessSubscription(id).orElse(null);
+                var builder = new BusinessSubscriptionBuilder().id(id);
+                if (existing != null) {
+                    existing.status().ifPresent(builder::status);
+                    existing.expiration().ifPresent(builder::expiration);
+                    existing.createdAt().ifPresent(builder::createdAt);
+                }
                 var status = subscription.getAttributeAsString("status", null);
-                if (id != null && status != null) {
-                    statuses.put(id, status);
+                if (status != null) {
+                    builder.status(status);
                 }
                 var expiration = subscription.getAttributeAsLong("subscription_end_time", (Long) null);
-                if (id != null && expiration != null) {
-                    expirations.put(id, expiration);
+                if (expiration != null) {
+                    builder.expiration(Instant.ofEpochSecond(expiration));
                 }
                 var creationTime = subscription.getAttributeAsLong("subscription_creation_time", (Long) null);
-                if (id != null && creationTime != null) {
-                    creationTimes.put(id, creationTime);
+                if (creationTime != null) {
+                    builder.createdAt(Instant.ofEpochSecond(creationTime));
                 }
+                whatsapp.store().putBusinessSubscription(builder.build());
             });
         });
-
-        whatsapp.store().setBusinessFeatureFlags(flags);
-        whatsapp.store().setBusinessSubscriptionStatuses(statuses);
-        whatsapp.store().setBusinessSubscriptionExpirations(expirations);
-        whatsapp.store().setBusinessSubscriptionCreationTimes(creationTimes);
     }
 
     /**
      * Handles a {@code privacy} notification by extracting the SMB data sharing
-     * setting and storing it.
+     * with Meta consent value and storing it on the local store.
      *
-     * <p>WA Web parses via {@code WAWebCTWAParsePrivacy.parseCTWAPrivacy} (an RPC parser
-     * that extracts {@code privacySmbDataSharingSettingMixin.value}), then calls
-     * {@code WAWebHandlePrivacySettingsNotification.handleSmbDataSharingSettingNotification}.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotification (privacy case)
-     *     and WAWebCTWAParsePrivacy.parseCTWAPrivacy
-     *     and WAWebHandlePrivacySettingsNotification.handleSmbDataSharingSettingNotification
+     * <p>WA Web parses via
+     * {@code WASmaxBizSettingsSyncPrivacySettingRPC.receiveSyncPrivacySettingRPC},
+     * a thin {@code WAWebCTWAParsePrivacy.parseCTWAPrivacy} wrapper that
+     * extracts {@code parsedRequest.privacySmbDataSharingSettingMixin.value}
+     * (the {@code <smb_data_sharing_with_meta_consent value="..."/>} attribute
+     * read through {@code WASmaxInBizSettingsSmbDataSharingSettingValueMixin}
+     * with {@code attrStringEnum} validation against
+     * {@code ENUM_FALSE_NOTSET_TRUE}). The result is forwarded to
+     * {@code WAWebHandlePrivacySettingsNotification.handleSmbDataSharingSettingNotification}
+     * which fires {@code frontendFireAndForget("smbDataSharingSettingUpdate", ...)};
+     * the frontend resolves to
+     * {@code WAWebSmbDataSharingServerUpdateAction.smbDataSharingSettingUpdateAction}
+     * which calls {@code WAWebCTWADataSharingModel.CTWADataSharingModel.setValue(value)}.
      * @param node the full notification stanza
      */
     private void handlePrivacy(Node node) {
-        // ADAPTED: WA Web uses WASmaxBizSettingsSyncPrivacySettingRPC.receiveSyncPrivacySettingRPC
-        // to parse the privacy node via protobuf RPC, extracting privacySmbDataSharingSettingMixin.value.
-        // WA Web also gates behind WAWebBizGatingUtils.smbDataSharingConsentEnabled().
-        // Cobalt reads the setting from the privacy child node's content or attributes.
-        var privacyNode = node.getChild("privacy").orElse(null);
-        if (privacyNode == null) {
-            return;
-        }
-
-        // fires frontendFireAndForget("smbDataSharingSettingUpdate", {smbDataSharingSettingValue: value})
-        // ADAPTED: Cobalt stores the value directly.
-        var fromJid = node.getAttributeAsJid("from")
-                .map(Jid::withoutData)
+        // WAWebCTWAParsePrivacy.parseCTWAPrivacy: receiveSyncPrivacySettingRPC(node) ->
+        //   parsedRequest.privacySmbDataSharingSettingMixin?.value
+        // The JS swallows parse failures and returns null; we mirror the
+        // null-on-failure semantic by collapsing to Optional.empty.
+        var consent = SmaxSyncPrivacySettingResponse.of(node)
+                .flatMap(SmaxSyncPrivacySettingResponse.Notification::dataSharingConsent)
                 .orElse(null);
-        if (fromJid == null) {
+        if (consent == null) {
             return;
         }
-
-        var smbDataSharingSetting = privacyNode.getAttributeAsString("smb_data_sharing_setting", null);
-        if (smbDataSharingSetting != null) {
-            whatsapp.store().setCtwaDataSharing(
-                    fromJid.toString(),
-                    "true".equalsIgnoreCase(smbDataSharingSetting)
-            );
-        }
+        // WAWebHandlePrivacySettingsNotification.handleSmbDataSharingSettingNotification ->
+        //   frontendFireAndForget("smbDataSharingSettingUpdate", {smbDataSharingSettingValue: value}) ->
+        //   WAWebCTWADataSharingModel.CTWADataSharingModel.setValue(value).
+        // ADAPTED: Cobalt persists the wire literal on the store directly.
+        whatsapp.store().setSmbDataSharingConsent(consent);
     }
 
     /**
@@ -545,17 +517,18 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * {@code WASmaxBizCtwaAdAccountNonceNotificationRPC.receiveNonceNotificationRPC},
      * then calls {@code WAWebCTWABizAccessTokenNonceManager.setNonceFromPushNotification}
      * which resolves a pending promise or logs a warning.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotification
-     *     (wa_ad_account_nonce case) and WAWebCTWABizAccessTokenNonceManager.setNonceFromPushNotification
      * @param node the full notification stanza
      */
     private void handleAdAccountNonce(Node node) {
-        // ADAPTED: WA Web parses via RPC, extracts waAdAccountNonceElementValue,
-        // passes through castToNonce (identity function), then calls
-        // setNonceFromPushNotification. Cobalt reads the nonce from the child content.
-        node.getChild("wa_ad_account_nonce")
-                .flatMap(Node::toContentString)
+        // WAWebHandleBusinessNotification (wa_ad_account_nonce case): WA Web parses via
+        // WASmaxBizCtwaAdAccountNonceNotificationRPC.receiveNonceNotificationRPC,
+        // extracts waAdAccountNonceElementValue, passes through castToNonce
+        // (identity), then calls setNonceFromPushNotification.
+        // ADAPTED: Cobalt routes through the typed SMAX response so the
+        // export's parser is the single source of truth, then mirrors the
+        // setNonceFromPushNotification side-effect by storing the nonce.
+        SmaxNonceNotificationResponse.of(node)
+                .map(SmaxNonceNotificationResponse.Notification::nonce)
                 .ifPresent(whatsapp.store()::setBusinessAccountNonce);
     }
 
@@ -573,9 +546,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * <p>WA Web extracts {@code mmCampaignAdCreativeId}, {@code mmCampaignAdGroupId},
      * {@code mmCampaignAdId}, and {@code mmCampaignStatus} from the RPC result,
      * and only processes the notification if all three ID fields are non-null.
-     *
-     * @implNote WAWebHandleBusinessNotification.handleBusinessNotification (mm_campaign case)
-     *     and WAWebBizBroadcastMarketingCampaignNotificationEmitter.marketingCampaignNotificationEmitter.emit
      * @param node the full notification stanza
      */
     private void handleMarketingCampaign(Node node) {
@@ -596,11 +566,12 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
 
         // ADAPTED: WA Web emits to marketingCampaignNotificationEmitter with
         // adCreativeId, adGroupId, adId, status, timestamp, backgroundSendHandling=false.
-        // Cobalt stores the campaign status in the store.
-        var statuses = new HashMap<>(whatsapp.store().businessCampaignStatuses());
+        // Cobalt stores the campaign status in the typed quintet.
         if (status != null) {
-            statuses.put(adCreativeId, status);
-            whatsapp.store().setBusinessCampaignStatuses(statuses);
+            whatsapp.store().putBusinessCampaignStatus(new BusinessCampaignStatusBuilder()
+                    .campaignId(adCreativeId)
+                    .status(status)
+                    .build());
         }
     }
 
@@ -612,8 +583,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * {@code needsSideList} is {@code true} (hash-based lookup failed), a
      * {@code <user side_list="out"/>} child is included to request the server to
      * redistribute the notification to companion devices.
-     *
-     * @implNote WAWebHandleBusinessNotification (function u: ack builder)
      * @param node the notification stanza to acknowledge
      * @param needsSideList whether to include the {@code <user side_list="out"/>} child
      */
@@ -653,7 +622,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * {@code WAWebHandleDigitalCommerceSubscriptionNotification}.
      *
      * @param node the notification stanza to acknowledge
-     * @implNote WAWebHandleDigitalCommerceSubscriptionNotification (function u: ack builder)
      */
     private void sendDigitalCommerceSubscriptionAck(Node node) {
         var stanzaId = node.getAttributeAsString("id", null);
@@ -680,7 +648,6 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * {@code WAWebHandleBotProfileNotification}.
      *
      * @param node the notification stanza to acknowledge
-     * @implNote WAWebHandleBotProfileNotification.handleBotProfileNotification (function h: ack builder)
      */
     private void sendBotProfileAck(Node node) {
         var stanzaId = node.getAttributeAsString("id", null);

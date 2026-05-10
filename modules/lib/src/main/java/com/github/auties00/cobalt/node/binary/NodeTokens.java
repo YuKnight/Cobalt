@@ -38,16 +38,6 @@ public final class NodeTokens {
 
     /**
      * Dictionary of strings reachable through a single byte wire token.
-     *
-     * @implNote WA Web exports a 235 entry array where the first entry
-     *           {@code "xmlstreamstart"} is indexed by wire byte {@code 1};
-     *           wire byte {@code 0} is reserved for {@link NodeTags#LIST_EMPTY}.
-     *           Cobalt pads index {@code 0} with a sentinel empty string so
-     *           wire bytes can be used directly as array indices in
-     *           {@link #get(int)}. The sentinel is never emitted or returned
-     *           because {@link NodeEncoder} short circuits on the empty
-     *           string and {@link NodeDecoder} dispatches {@code LIST_EMPTY}
-     *           independently.
      */
     @WhatsAppWebExport(moduleName = "WAWapDict", exports = "SINGLE_BYTE_TOKEN",
             adaptation = WhatsAppAdaptation.ADAPTED)

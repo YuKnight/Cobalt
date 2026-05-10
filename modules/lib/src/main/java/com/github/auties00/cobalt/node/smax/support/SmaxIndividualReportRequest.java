@@ -228,18 +228,6 @@ public final class SmaxIndividualReportRequest implements SmaxOperation.Request 
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         payload
-     *
-     * @implNote {@code WASmaxOutSpamIndividualReportRequest.makeIndividualReportRequest}
-     *           composes
-     *           {@code WASmaxOutSpamBaseIQSetRequestMixin} and
-     *           {@code WASmaxOutSpamBaseReportMixin} over a
-     *           {@code <spam_list jid?>} payload, optionally
-     *           wrapping the spam-list in a chain of
-     *           {@code WASmaxOutSpamBizOptOutMixin},
-     *           {@code WASmaxOutSpamUIStateSetMixin},
-     *           {@code WASmaxOutSpamBizReportMixin}, and
-     *           {@code WASmaxOutSpamTCTokenMixin} (each pulled in
-     *           via {@code optionalMerge}).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutSpamIndividualReportRequest",

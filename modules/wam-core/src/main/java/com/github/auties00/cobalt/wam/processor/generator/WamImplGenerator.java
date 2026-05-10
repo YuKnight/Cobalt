@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.wam.processor.generator;
 
+import com.github.auties00.cobalt.wam.binary.WamEventDecoder;
 import com.github.auties00.cobalt.wam.binary.WamEventEncoder;
+import com.github.auties00.cobalt.wam.binary.WamEventSizes;
 import com.github.auties00.cobalt.wam.processor.element.WamEnumElement;
 import com.github.auties00.cobalt.wam.processor.element.WamEventElement;
 import com.github.auties00.cobalt.wam.processor.element.WamPropertyElement;
@@ -17,16 +19,19 @@ import java.util.OptionalInt;
 
 /**
  * Generates the companion {@code *Impl} class for a {@code @WamEvent}-annotated
- * interface, implementing the interface methods and providing high-performance
- * {@code sizeOf} and {@code encode} methods.
+ * interface, implementing the interface methods and providing
+ * high-performance {@code sizeOf}, {@code encode}, and {@code decode}
+ * methods.
  *
- * <p>The generated code makes direct calls to
- * {@link com.github.auties00.cobalt.wam.binary.WamEncoder WamEncoder} with
- * hardcoded field identifiers and pre-determined types. No reflection is
- * involved at runtime.
+ * <p>The generated code makes direct calls to {@link WamEventEncoder}
+ * and {@link WamEventDecoder} instance methods with hardcoded field
+ * identifiers and pre-determined types. Sizes come from
+ * {@link WamEventSizes}. No reflection is involved at runtime.
  */
 public final class WamImplGenerator {
     private static final ClassName WAM_EVENT_ENCODER = ClassName.get(WamEventEncoder.class);
+    private static final ClassName WAM_EVENT_DECODER = ClassName.get(WamEventDecoder.class);
+    private static final ClassName WAM_EVENT_SIZES = ClassName.get(WamEventSizes.class);
     private static final ClassName WAM_CHANNEL = ClassName.get(WamChannel.class);
     private static final ClassName OPTIONAL = ClassName.get(Optional.class);
     private static final ClassName OPTIONAL_INT = ClassName.get(OptionalInt.class);
@@ -42,8 +47,8 @@ public final class WamImplGenerator {
     }
 
     /**
-     * Generates a {@code JavaFile} containing the {@code *Impl} class for the
-     * given event element.
+     * Generates a {@code JavaFile} containing the {@code *Impl} class for
+     * the given event element.
      *
      * @param event the parsed event metadata
      * @return the generated Java file ready to be written
@@ -62,7 +67,9 @@ public final class WamImplGenerator {
         addMarkCommitted(implBuilder);
         addSizeOf(implBuilder, event);
         addEncode(implBuilder, event);
+        addDecode(implBuilder, event);
         addEnumEncoders(implBuilder, event);
+        addEnumDecoders(implBuilder, event);
 
         return JavaFile.builder(event.packageName(), implBuilder.build())
                 .indent("    ")
@@ -176,7 +183,7 @@ public final class WamImplGenerator {
                 .addParameter(int.class, "weight");
 
         method.addStatement("int size = $T.eventMarkerSize($L, weight)",
-                WAM_EVENT_ENCODER, event.eventId());
+                WAM_EVENT_SIZES, event.eventId());
 
         for (var prop : event.properties()) {
             method.beginControlFlow("if (this.$N != null)", prop.fieldName());
@@ -191,21 +198,21 @@ public final class WamImplGenerator {
     private static void addSizeForProperty(MethodSpec.Builder method, WamPropertyElement prop) {
         switch (prop.wamType()) {
             case INTEGER -> method.addStatement("size += $T.intFieldSize($L, this.$N)",
-                    WAM_EVENT_ENCODER, prop.index(), prop.fieldName());
+                    WAM_EVENT_SIZES, prop.index(), prop.fieldName());
             case BOOLEAN -> method.addStatement("size += $T.boolFieldSize($L)",
-                    WAM_EVENT_ENCODER, prop.index());
+                    WAM_EVENT_SIZES, prop.index());
             case STRING -> method.addStatement("size += $T.stringFieldSize($L, this.$N)",
-                    WAM_EVENT_ENCODER, prop.index(), prop.fieldName());
+                    WAM_EVENT_SIZES, prop.index(), prop.fieldName());
             case FLOAT -> method.addStatement("size += $T.floatFieldSize($L)",
-                    WAM_EVENT_ENCODER, prop.index());
+                    WAM_EVENT_SIZES, prop.index());
             case TIMER -> {
                 method.beginControlFlow("if (this.$N.toEpochMilli() <= $L)", prop.fieldName(), Integer.MAX_VALUE);
                 method.addStatement("size += $T.intFieldSize($L, this.$N.toEpochMilli())",
-                        WAM_EVENT_ENCODER, prop.index(), prop.fieldName());
+                        WAM_EVENT_SIZES, prop.index(), prop.fieldName());
                 method.endControlFlow();
             }
             case ENUM -> method.addStatement("size += $T.intFieldSize($L, $N(this.$N))",
-                    WAM_EVENT_ENCODER, prop.index(), encoderMethodName(prop), prop.fieldName());
+                    WAM_EVENT_SIZES, prop.index(), enumEncoderName(prop), prop.fieldName());
         }
     }
 
@@ -213,15 +220,14 @@ public final class WamImplGenerator {
         var method = MethodSpec.methodBuilder("encode")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
-                .returns(int.class)
-                .addParameter(byte[].class, "output")
-                .addParameter(int.class, "offset")
+                .returns(void.class)
+                .addParameter(WAM_EVENT_ENCODER, "encoder")
                 .addParameter(int.class, "weight");
 
         var properties = event.properties();
 
-        // Find last non-null field index for LAST flag computation
-        // Timer fields that exceed Integer.MAX_VALUE are skipped on the wire,
+        // Find last non-null field index for LAST flag computation.
+        // Timer fields exceeding Integer.MAX_VALUE are skipped on the wire,
         // so they must also be excluded from the last-field determination.
         method.addStatement("int lastField = -1");
         for (var i = properties.size() - 1; i >= 0; i--) {
@@ -249,8 +255,8 @@ public final class WamImplGenerator {
 
         // Event marker
         method.addStatement(
-                "offset = $T.writeEventMarker($L, weight, lastField >= 0, output, offset)",
-                WAM_EVENT_ENCODER, event.eventId()
+                "encoder.writeEventMarker($L, weight, lastField >= 0)",
+                event.eventId()
         );
 
         // Fields
@@ -262,34 +268,90 @@ public final class WamImplGenerator {
             method.endControlFlow();
         }
 
-        method.addStatement("return offset");
         implBuilder.addMethod(method.build());
     }
 
     private static void addWriteForProperty(MethodSpec.Builder method, WamPropertyElement prop) {
         switch (prop.wamType()) {
             case INTEGER -> method.addStatement(
-                    "offset = $T.writeIntField($L, this.$N, hasMore, output, offset)",
-                    WAM_EVENT_ENCODER, prop.index(), prop.fieldName());
+                    "encoder.writeIntField($L, this.$N, hasMore)",
+                    prop.index(), prop.fieldName());
             case BOOLEAN -> method.addStatement(
-                    "offset = $T.writeBoolField($L, this.$N, hasMore, output, offset)",
-                    WAM_EVENT_ENCODER, prop.index(), prop.fieldName());
+                    "encoder.writeBoolField($L, this.$N, hasMore)",
+                    prop.index(), prop.fieldName());
             case STRING -> method.addStatement(
-                    "offset = $T.writeStringField($L, this.$N, hasMore, output, offset)",
-                    WAM_EVENT_ENCODER, prop.index(), prop.fieldName());
+                    "encoder.writeStringField($L, this.$N, hasMore)",
+                    prop.index(), prop.fieldName());
             case FLOAT -> method.addStatement(
-                    "offset = $T.writeFloatField($L, this.$N, hasMore, output, offset)",
-                    WAM_EVENT_ENCODER, prop.index(), prop.fieldName());
+                    "encoder.writeFloatField($L, this.$N, hasMore)",
+                    prop.index(), prop.fieldName());
             case TIMER -> {
                 method.beginControlFlow("if (this.$N.toEpochMilli() <= $L)", prop.fieldName(), Integer.MAX_VALUE);
-                method.addStatement("offset = $T.writeIntField($L, this.$N.toEpochMilli(), hasMore, output, offset)",
-                        WAM_EVENT_ENCODER, prop.index(), prop.fieldName());
+                method.addStatement("encoder.writeIntField($L, this.$N.toEpochMilli(), hasMore)",
+                        prop.index(), prop.fieldName());
                 method.endControlFlow();
             }
             case ENUM -> method.addStatement(
-                    "offset = $T.writeIntField($L, $N(this.$N), hasMore, output, offset)",
-                    WAM_EVENT_ENCODER, prop.index(), encoderMethodName(prop), prop.fieldName());
+                    "encoder.writeIntField($L, $N(this.$N), hasMore)",
+                    prop.index(), enumEncoderName(prop), prop.fieldName());
         }
+    }
+
+    private static void addDecode(TypeSpec.Builder implBuilder, WamEventElement event) {
+        var implName = event.className().simpleName() + "Impl";
+        var implType = ClassName.get(event.packageName(), implName);
+
+        var method = MethodSpec.methodBuilder("decode")
+                .addModifiers(Modifier.STATIC)
+                .returns(implType)
+                .addParameter(WAM_EVENT_DECODER, "decoder")
+                .addParameter(boolean.class, "hasFields");
+
+        for (var prop : event.properties()) {
+            method.addStatement("$T $N = null", rawFieldType(prop), prop.fieldName());
+        }
+
+        method.beginControlFlow("while (hasFields)");
+        method.addStatement("int header = decoder.readHeader()");
+        method.addStatement("int fieldId = $T.fieldIdOf(header)", WAM_EVENT_DECODER);
+        method.beginControlFlow("switch (fieldId)");
+        for (var prop : event.properties()) {
+            switch (prop.wamType()) {
+                case INTEGER -> method.addStatement(
+                        "case $L -> $N = (int) decoder.readInt(header)",
+                        prop.index(), prop.fieldName());
+                case BOOLEAN -> method.addStatement(
+                        "case $L -> $N = decoder.readInt(header) != 0L",
+                        prop.index(), prop.fieldName());
+                case STRING -> method.addStatement(
+                        "case $L -> $N = decoder.readString(header)",
+                        prop.index(), prop.fieldName());
+                case FLOAT -> method.addStatement(
+                        "case $L -> $N = decoder.readFloat(header)",
+                        prop.index(), prop.fieldName());
+                case TIMER -> method.addStatement(
+                        "case $L -> $N = $T.ofEpochMilli(decoder.readInt(header))",
+                        prop.index(), prop.fieldName(), INSTANT);
+                case ENUM -> method.addStatement(
+                        "case $L -> $N = $N(decoder.readInt(header))",
+                        prop.index(), prop.fieldName(), enumDecoderName(prop));
+            }
+        }
+        method.addStatement("default -> decoder.skip(header)");
+        method.endControlFlow();
+        method.addStatement("hasFields = !$T.isLast(header)", WAM_EVENT_DECODER);
+        method.endControlFlow();
+
+        var ctorArgs = new StringBuilder();
+        for (var i = 0; i < event.properties().size(); i++) {
+            if (i > 0) {
+                ctorArgs.append(", ");
+            }
+            ctorArgs.append(event.properties().get(i).fieldName());
+        }
+        method.addStatement("return new $T($L)", implType, ctorArgs.toString());
+
+        implBuilder.addMethod(method.build());
     }
 
     private static void addEnumEncoders(TypeSpec.Builder implBuilder, WamEventElement event) {
@@ -298,7 +360,7 @@ public final class WamImplGenerator {
             if (prop.wamType() != WamType.ENUM || prop.enumElement() == null) {
                 continue;
             }
-            var methodName = encoderMethodName(prop);
+            var methodName = enumEncoderName(prop);
             if (!generated.add(methodName)) {
                 continue;
             }
@@ -317,6 +379,38 @@ public final class WamImplGenerator {
         for (var entry : enumElement.constants().entrySet()) {
             switchBuilder.add("    case $N -> $LL;\n", entry.getKey(), entry.getValue());
         }
+        switchBuilder.add("};\n");
+        method.addCode(switchBuilder.build());
+
+        return method.build();
+    }
+
+    private static void addEnumDecoders(TypeSpec.Builder implBuilder, WamEventElement event) {
+        var generated = new HashSet<String>();
+        for (var prop : event.properties()) {
+            if (prop.wamType() != WamType.ENUM || prop.enumElement() == null) {
+                continue;
+            }
+            var methodName = enumDecoderName(prop);
+            if (!generated.add(methodName)) {
+                continue;
+            }
+            implBuilder.addMethod(generateEnumDecoder(prop.enumElement(), methodName));
+        }
+    }
+
+    private static MethodSpec generateEnumDecoder(WamEnumElement enumElement, String methodName) {
+        var method = MethodSpec.methodBuilder(methodName)
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                .returns(enumElement.className())
+                .addParameter(long.class, "value");
+
+        var switchBuilder = CodeBlock.builder()
+                .add("return switch ((int) value) {\n");
+        for (var entry : enumElement.constants().entrySet()) {
+            switchBuilder.add("    case $L -> $T.$N;\n", entry.getValue(), enumElement.className(), entry.getKey());
+        }
+        switchBuilder.add("    default -> null;\n");
         switchBuilder.add("};\n");
         method.addCode(switchBuilder.build());
 
@@ -348,11 +442,19 @@ public final class WamImplGenerator {
         };
     }
 
-    private static String encoderMethodName(WamPropertyElement prop) {
+    private static String enumEncoderName(WamPropertyElement prop) {
         var enumElement = prop.enumElement();
         if (enumElement == null) {
             throw new IllegalStateException("No enum element for property " + prop.fieldName());
         }
         return "encode" + enumElement.className().simpleName();
+    }
+
+    private static String enumDecoderName(WamPropertyElement prop) {
+        var enumElement = prop.enumElement();
+        if (enumElement == null) {
+            throw new IllegalStateException("No enum element for property " + prop.fieldName());
+        }
+        return "decode" + enumElement.className().simpleName();
     }
 }

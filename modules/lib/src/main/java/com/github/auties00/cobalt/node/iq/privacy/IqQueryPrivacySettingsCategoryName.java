@@ -6,11 +6,6 @@ import java.util.Optional;
 
 /**
  * Closed set of privacy category names recognised by the relay.
- *
- * @implNote {@code WAWebPrivacySettings} ships category-specific value
- *           enums. The category-name keys themselves are not exported as
- *           a single enum but are spread across the {@code privacyParser}
- *           switch. Cobalt re-projects the keys as this enum.
  */
 @WhatsAppWebModule(moduleName = "WAWebPrivacySettings")
 public enum IqQueryPrivacySettingsCategoryName {

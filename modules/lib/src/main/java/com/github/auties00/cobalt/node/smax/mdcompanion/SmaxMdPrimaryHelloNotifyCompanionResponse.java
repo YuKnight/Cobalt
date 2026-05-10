@@ -14,16 +14,6 @@ import java.util.Optional;
 /**
  * The inbound projection of the
  * {@code <notification type="link_code_companion_reg">} stanza.
- *
- * @implNote {@code WASmaxInMdPrimaryHelloNotifyCompanionRequest.parsePrimaryHelloNotifyCompanionRequest}
- *           validates the {@code <notification type="link_code_companion_reg"
- *           from="s.whatsapp.net">} envelope. Asserts
- *           {@code stage="primary_hello"} on the
- *           {@code <link_code_companion_reg/>} child, and extracts
- *           three byte payloads:
- *           {@code <link_code_pairing_wrapped_primary_ephemeral_pub/>},
- *           {@code <primary_identity_pub/>}, and
- *           {@code <link_code_pairing_ref/>}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInMdPrimaryHelloNotifyCompanionRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInMdServerNotificationMixin")

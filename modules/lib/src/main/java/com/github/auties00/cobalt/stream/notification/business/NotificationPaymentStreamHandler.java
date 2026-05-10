@@ -38,23 +38,17 @@ import java.util.Objects;
 final class NotificationPaymentStreamHandler implements SocketStream.Handler {
     /**
      * Logger for payment notification handling diagnostics.
-     *
-     * @implNote WAWebPaymentNotificationHandler (WALogger references)
      */
     private static final System.Logger LOGGER = System.getLogger(NotificationPaymentStreamHandler.class.getName());
 
     /**
      * The WhatsApp client instance providing access to the store and socket for
      * sending acknowledgement stanzas.
-     *
-     * @implNote WAWebPaymentNotificationHandler (module-level dependencies)
      */
     private final WhatsAppClient whatsapp;
 
     /**
      * Constructs a new payment notification stream handler with the given client.
-     *
-     * @implNote WAWebPaymentNotificationHandler (module initialization)
      * @param whatsapp the WhatsApp client instance
      */
     NotificationPaymentStreamHandler(WhatsAppClient whatsapp) {
@@ -104,15 +98,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * if necessary), and dispatches an {@code onNewMessage} callback so listeners can
      * surface it to the user. Other invite types are logged and otherwise ignored,
      * matching WA Web which only processes {@code account-set-up} in this branch.
-     *
-     * @implNote WAWebPaymentNotificationHandler (inner functions {@code _} and {@code R}):
-     *           {@code R(from, t)} fabricates a {@code NotificationTemplate} chat
-     *           message with {@code MsgSubtype.PaymentInviteAccountSetUp} and
-     *           {@code templateParams: [from]}, then hands it to
-     *           {@code WAWebHandleSingleMsgWorkerCompatible.handleSingleMsg}.
-     *           Cobalt has no {@code MsgSubtype} enum and uses the closest stub
-     *           type ({@link StubType#PAYMENT_ACTION_ACCOUNT_SETUP_REMINDER})
-     *           with {@code stubParameters} carrying the inviter JID.
      * @param node   the parent notification stanza node
      * @param invite the invite child node
      */
@@ -176,8 +161,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * <p>If the referenced message cannot be found in the store, the transaction data
      * is saved as an orphan payment notification for later resolution when the message
      * arrives.
-     *
-     * @implNote WAWebPaymentNotificationHandler (inner functions m/p and g/h)
      * @param transaction the transaction child node from the notification stanza
      */
     private void handlePaymentTransaction(Node transaction) {
@@ -226,10 +209,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * up and its payment status is updated, with {@code txnStatus} coerced through
      * {@link #determinePaymentRequestFulfilledStatus(PaymentInfo.TxnStatus)} so that
      * a successful payment transitions the request to its fulfilled state.
-     *
-     * @implNote WAWebPaymentNotificationHandler inner functions {@code y} (field
-     *           assignment) and {@code h}/{@code g} (bulk update with request message
-     *           propagation and orphan removal).
      * @param chatMessageInfo the resolved chat message to update
      * @param transaction     the transaction child node with payment data
      * @param fromMe          whether the current user is the sender
@@ -314,9 +293,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * <p>This method combines the behavior of both {@code getMessageFromCollection}
      * (in-memory lookup) and {@code getMessageFromDb} (persistent lookup) from WA Web,
      * since Cobalt's store unifies both storage layers.
-     *
-     * @implNote WAWebPaymentNotificationHandler.getMessageFromCollection,
-     *           WAWebPaymentNotificationHandler.getMessageFromDb
      * @param remote      the remote JID (chat or group) that owns the message
      * @param participant the sender JID within a group, or {@code null} for 1:1 chats
      * @param messageId   the message identifier to look up
@@ -343,8 +319,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
 
     /**
      * Creates a new {@link PaymentInfo} with default unknown status values.
-     *
-     * @implNote WAWebPaymentNotificationHandler (implicit default in function g/h)
      * @return a new {@link PaymentInfo} with {@link PaymentInfo.Status#UNKNOWN_STATUS}
      *         and {@link PaymentInfo.TxnStatus#UNKNOWN}
      */
@@ -543,8 +517,6 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * <p>The ACK stanza uses fixed {@code class="notification"} and {@code type="pay"}
      * attributes as specified in the WA Web protocol, rather than reflecting the
      * original stanza's attributes generically.
-     *
-     * @implNote WAWebPaymentNotificationHandler (inner function E)
      * @param node the notification stanza to acknowledge
      */
     private void sendNotificationAck(Node node) {

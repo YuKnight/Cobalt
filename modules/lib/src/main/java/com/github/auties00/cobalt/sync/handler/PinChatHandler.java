@@ -3,8 +3,9 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.newsletter.NewsletterPin;
+import com.github.auties00.cobalt.model.newsletter.NewsletterPinBuilder;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -19,9 +20,7 @@ import com.github.auties00.cobalt.wam.WamService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Handles pin chat sync actions.
@@ -42,8 +41,6 @@ import java.util.Map;
  * <p>Per WhatsApp Web, this handler extends {@code ChatSyncdActionBase} (the
  * common base class for chat-jid-indexed sync actions) and sets
  * {@code chatJidIndex = 1} and {@code collectionName = RegularLow}.
- *
- * @implNote WAWebPinChatSync — singleton instance exported as {@code PinChatSync}
  */
 public final class PinChatHandler implements WebAppStateActionHandler {
     /**
@@ -53,8 +50,6 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * WA Web {@code WAWebChatPinBridge.getPinLimit} also consults a premium
      * benefit gating function ({@code cr:12224.getPinnedChatsBenefitLimit})
      * which is not implemented in Cobalt, so the constant value is used directly.
-     *
-     * @implNote WAWebPinChatLimits.MAX_PINNED_CHATS
      */
     private static final int MAX_PINNED_CHATS = 3;
 
@@ -62,36 +57,28 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * Maximum number of pinned newsletters allowed.
      *
      * <p>Per WhatsApp Web {@code WAWebPinChatLimits.MAX_PINNED_NEWSLETTERS = 2}.
-     *
-     * @implNote WAWebPinChatLimits.MAX_PINNED_NEWSLETTERS
      */
     private static final int MAX_PINNED_NEWSLETTERS = 2;
 
     /**
-     * Singleton instance of the pin chat handler.
-     *
-     * <p>Per WhatsApp Web, {@code WAWebPinChatSync} exports a single instance
-     * ({@code var f = new _(); l.PinChatSync = f}).
-     *
-     * @implNote WAWebPinChatSync.PinChatSync — module-level singleton
+     * The WAM telemetry service used to commit dogfooding feature usage events.
      */
-    public static final PinChatHandler INSTANCE = new PinChatHandler();
+    private final WamService wamService;
 
     /**
-     * Private constructor to enforce singleton pattern.
+     * Constructs a {@code PinChatHandler}.
      *
-     * @implNote WAWebPinChatSync — class {@code _} constructor (initializes
-     *           {@code chatJidIndex = 1} and {@code collectionName = RegularLow})
+     * <p>Per WhatsApp Web, {@code WAWebPinChatSync} exports a single instance
+     * ({@code var f = new _(); l.PinChatSync = f}); Cobalt mirrors that single
+     * instance with a registry-injected dependency on the WAM telemetry service.
+     * @param wamService the WAM telemetry service used by this handler
      */
-    private PinChatHandler() {
-
+    public PinChatHandler(WamService wamService) {
+        this.wamService = wamService;
     }
 
     /**
      * Returns the action name for pin chat actions.
-     *
-     * @implNote WAWebPinChatSync.getAction — returns
-     *           {@code WASyncdConst.Actions.Pin} ({@code "pin_v1"})
      * @return the action name {@code "pin_v1"}
      */
     @Override
@@ -104,9 +91,6 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, the pin chat handler's {@code collectionName} is set to
      * {@code WASyncdConst.CollectionName.RegularLow} in the constructor.
-     *
-     * @implNote WAWebPinChatSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -116,30 +100,11 @@ public final class PinChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for pin chat actions.
-     *
-     * @implNote WAWebPinChatSync.getVersion — returns {@code 5}
      * @return the version number {@code 5}
      */
     @Override
     public int version() {
         return PinAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a pin chat mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebPinChatSync.applyMutations — per-mutation inner logic, success
-     *           check on the returned {@code syncApplyActionResult}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -178,14 +143,12 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * </ol>
      *
      * <p>Exceptions are caught and return {@code Failed}.
-     *
-     * @implNote WAWebPinChatSync.applyMutation — per-mutation inner function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -194,21 +157,21 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             var indexArray = JSON.parseArray(mutation.index());
             var chatJidString = indexArray.size() > 1 ? indexArray.getString(1) : null;
             if (chatJidString == null || chatJidString.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             Jid chatJid;
             try {
                 chatJid = Jid.of(chatJidString);
             } catch (Exception e) { // ADAPTED: Jid.of throws WhatsAppMalformedJidException; WA Web isWid() returns false
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             if (chatJid == null) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().action().orElse(null) instanceof PinAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             // ADAPTED: Cobalt's PinAction.pinned() boolean accessor coalesces null to false,
@@ -222,7 +185,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             // them separately, so the dispatch is split based on the JID's server type
             // and routes to the dedicated newsletter pin path when the JID is a newsletter.
             if (isNewsletter) {
-                return applyNewsletterPinMutation(client, wamService, chatJid, action, currentTimestamp); // ADAPTED: Cobalt routes newsletter pins through a separate code path
+                return applyNewsletterPinMutation(client, chatJid, action, currentTimestamp); // ADAPTED: Cobalt routes newsletter pins through a separate code path
             }
 
             var chat = client.store().findChatByJid(chatJid);
@@ -256,7 +219,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
                 return MutationApplicationResult.success();
             }
 
-            wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
+            this.wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
                     .mdSyncdDogfoodingFeature(MdFeatureCode.UNPIN_4TH_CHAT_MUTATION)
                     .build());
 
@@ -301,12 +264,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * {@link Instant}. The semantic ordering — already-pinned passthrough,
      * limit check, oldest-vs-incoming kick-out — mirrors the WA Web logic
      * exactly.
-     *
-     * @implNote ADAPTED: WAWebPinChatSync.applyMutation y.isNewsletter() branch —
-     *           Cobalt routes newsletter pins through a dedicated map because the
-     *           {@code Newsletter} model has no pinnedTimestamp field
      * @param client          the WhatsApp client instance
-     * @param wamService      the WAM telemetry service used for committing the dogfooding event
      * @param newsletterJid   the newsletter JID
      * @param action          the pin action (carries pinned flag)
      * @param currentTimestamp the mutation timestamp
@@ -314,7 +272,6 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      */
     private MutationApplicationResult applyNewsletterPinMutation(
             WhatsAppClient client,
-            WamService wamService,
             Jid newsletterJid,
             PinAction action,
             Instant currentTimestamp
@@ -324,41 +281,35 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.orphan(newsletterJid.toString(), "Newsletter");
         }
 
-        var states = new HashMap<>(client.store().newsletterPinStates()); // ADAPTED: snapshot the current map for read-modify-write
-        var key = newsletterJid.toString();
-
         if (!action.pinned()) {
-            states.remove(key);
-            client.store().setNewsletterPinStates(states); // ADAPTED: persist the updated map back to the store
+            client.store().removeNewsletterPin(newsletterJid); // ADAPTED: WAWebPinChatSync — typed store quintet
             return MutationApplicationResult.success();
         }
 
-        if (states.containsKey(key)) {
-            states.put(key, currentTimestamp);
-            client.store().setNewsletterPinStates(states); // ADAPTED: persist the updated map back to the store
+        var existing = client.store().findNewsletterPin(newsletterJid).orElse(null);
+        if (existing != null) {
+            client.store().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build()); // ADAPTED: refresh the existing pin timestamp
             return MutationApplicationResult.success();
         }
 
-        if (states.size() < MAX_PINNED_NEWSLETTERS) {
-            states.put(key, currentTimestamp);
-            client.store().setNewsletterPinStates(states); // ADAPTED: persist the updated map back to the store
+        var pins = client.store().newsletterPinStates();
+        if (pins.size() < MAX_PINNED_NEWSLETTERS) {
+            client.store().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
             return MutationApplicationResult.success();
         }
 
-        wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
+        this.wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
                 .mdSyncdDogfoodingFeature(MdFeatureCode.UNPIN_4TH_CHAT_MUTATION)
                 .build());
 
-        var oldest = states.entrySet().stream()
-                .min(Map.Entry.comparingByValue())
+        var oldest = pins.stream()
+                .min(Comparator.comparing(NewsletterPin::pinnedAt))
                 .orElseThrow(); // size >= MAX_PINNED_NEWSLETTERS guarantees at least one entry
-        var oldestTimestamp = oldest.getValue();
 
-        if (oldestTimestamp.isBefore(currentTimestamp)) {
-            states.remove(oldest.getKey());
-            states.put(key, currentTimestamp);
-            client.store().setNewsletterPinStates(states); // ADAPTED: persist the updated map back to the store
-            queueUnpinMutation(client, Jid.of(oldest.getKey()), currentTimestamp);
+        if (oldest.pinnedAt().isBefore(currentTimestamp)) {
+            client.store().removeNewsletterPin(oldest.newsletterJid());
+            client.store().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
+            queueUnpinMutation(client, oldest.newsletterJid(), currentTimestamp);
             return MutationApplicationResult.success();
         }
 
@@ -373,8 +324,6 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * pin mutation with {@code pinned = false} via {@code getPinMutation(t, false, e)}
      * and appends it to the pending mutations table via
      * {@code WAWebSyncdDb.appendPendingMutationsRows}.
-     *
-     * @implNote WAWebPinChatSync.createPendingUnpin
      * @param client    the WhatsApp client instance
      * @param chatJid   the chat or newsletter JID to unpin
      * @param timestamp the mutation timestamp
@@ -398,14 +347,12 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * {@code chatJid.toString()} directly because Cobalt does not maintain the
      * LID-migration accountLid lookup that {@code getChatJidMutationIndexForChat}
      * performs in WA Web.
-     *
-     * @implNote WAWebPinChatSync.getPinMutation
      * @param timestamp the mutation timestamp
      * @param pinned    whether the chat should be pinned ({@code true}) or unpinned ({@code false})
      * @param chatJid   the JID of the chat or newsletter
      * @return the pending mutation for the pin action
      */
-    public SyncPendingMutation getPinMutation(Instant timestamp, boolean pinned, Jid chatJid) {
+    public static SyncPendingMutation getPinMutation(Instant timestamp, boolean pinned, Jid chatJid) {
         var pinAction = new PinActionBuilder()
                 .pinned(pinned)
                 .build();
@@ -415,13 +362,13 @@ public final class PinChatHandler implements WebAppStateActionHandler {
                 .build();
         // ADAPTED: Cobalt does not implement the LID 1:1 migration accountLid path,
         // so the chat-jid mutation index resolves to the JID's canonical string form.
-        var index = JSON.toJSONString(List.of(actionName(), chatJid.toString()));
+        var index = JSON.toJSONString(List.of(PinAction.ACTION_NAME, chatJid.toString()));
         var mutation = new DecryptedMutation.Trusted(
                 index,
                 value,
                 SyncdOperation.SET,
                 timestamp,
-                version()
+                PinAction.ACTION_VERSION
         );
         return new SyncPendingMutation(mutation, 0);
     }
@@ -442,16 +389,12 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * higher-level archive sync infrastructure. Callers that need the combined
      * pin+unarchive sequence should explicitly invoke
      * {@code ArchiveChatHandler.getArchiveChatMutation} after this method.
-     *
-     * @implNote WAWebPinChatSync.getMutationsForPin — WAM commit and the
-     *           cross-handler archive append are documented as caller-side
-     *           responsibilities in Cobalt
      * @param timestamp the mutation timestamp
      * @param pinned    whether the chat should be pinned
      * @param chatJid   the JID of the chat or newsletter
      * @return the list of pending mutations for the pin operation
      */
-    public List<SyncPendingMutation> getMutationsForPin(Instant timestamp, boolean pinned, Jid chatJid) {
+    public static List<SyncPendingMutation> getMutationsForPin(Instant timestamp, boolean pinned, Jid chatJid) {
         // The PIN_MUTATION WAM emission is performed at the caller (WhatsAppClient.pinChat) since
         // this method has no WamService handle (handler is a singleton with no injected client).
         var mutations = new ArrayList<SyncPendingMutation>();

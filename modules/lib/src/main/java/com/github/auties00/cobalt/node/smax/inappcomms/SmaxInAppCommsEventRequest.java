@@ -102,15 +102,6 @@ public final class SmaxInAppCommsEventRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <event/>} child
-     *
-     * @implNote {@code WASmaxOutInAppCommsEventRequest.makeEventRequest}
-     *           composes
-     *           {@code WASmaxOutInAppCommsBaseIQSetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="set"}) over
-     *           {@code <iq xmlns="w:comms" to="s.whatsapp.net">}
-     *           with the {@code <event/>} child carrying every
-     *           field as a {@code CUSTOM_STRING}/{@code INT}
-     *           attribute.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutInAppCommsEventRequest",

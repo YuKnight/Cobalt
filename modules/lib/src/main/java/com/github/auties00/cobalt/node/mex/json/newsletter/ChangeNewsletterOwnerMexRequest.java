@@ -41,10 +41,6 @@ public final class ChangeNewsletterOwnerMexRequest implements MexOperation.Reque
 
     /**
      * The identifier of the user who will become the new owner.
-     *
-     * @implNote WA Web derives this value from the target wid via
-     *           {@code WAWebLidMigrationUtils} before passing it into the
-     *           variables object.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexChangeNewsletterOwnerJob", exports = "mexChangeNewsletterOwner",
             adaptation = WhatsAppAdaptation.DIRECT)

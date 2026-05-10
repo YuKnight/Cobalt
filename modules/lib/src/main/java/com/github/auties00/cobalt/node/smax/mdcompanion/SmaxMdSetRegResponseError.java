@@ -14,12 +14,6 @@ import java.util.Optional;
 /**
  * The error reply variant. Emitted when the companion declines
  * to complete the link.
- *
- * @implNote {@code WASmaxOutMdSetRegResponseError.makeSetRegResponseError}
- *           composes
- *           {@code WASmaxOutMdIQErrorNotAuthorizedMixin.mergeIQErrorNotAuthorizedMixin}
- *           which sets the canonical {@code <error code="401"
- *           text="not-authorized"/>} child.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutMdSetRegResponseError")
 @WhatsAppWebModule(moduleName = "WASmaxOutMdIQErrorNotAuthorizedMixin")
@@ -52,10 +46,6 @@ public final class SmaxMdSetRegResponseError implements SmaxOperation.Request {
      * Builds the outbound error stanza.
      *
      * @return a {@link NodeBuilder} carrying the error envelope
-     *
-     * @implNote emits {@code <iq id to="s.whatsapp.net"
-     *           type="error"><error code="401"
-     *           text="not-authorized"/></iq>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutMdSetRegResponseError",

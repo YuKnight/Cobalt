@@ -53,12 +53,6 @@ public final class SmaxGroupsGetLinkedGroupsParticipantsRequest implements SmaxO
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         {@code <linked_groups_participants/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsGetLinkedGroupsParticipantsRequest.makeGetLinkedGroupsParticipantsRequest}
-     *           wraps a bare {@code <linked_groups_participants/>}
-     *           in {@code WASmaxOutGroupsBaseGetGroupMixin}
-     *           ({@code xmlns="w:g2"}, {@code to=GROUP_JID(t)},
-     *           {@code id=generateId()}, {@code type="get"}).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGetLinkedGroupsParticipantsRequest",

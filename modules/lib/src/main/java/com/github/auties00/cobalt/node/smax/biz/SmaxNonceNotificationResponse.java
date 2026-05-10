@@ -36,14 +36,6 @@ public sealed interface SmaxNonceNotificationResponse extends SmaxOperation.Resp
     /**
      * The {@code Notification} variant. Carries the freshly-pushed
      * nonce string plus the standard envelope echoes.
-     *
-     * @implNote {@code WASmaxInBizCtwaAdAccountNonceNotificationRequest.parseNonceNotificationRequest}
-     *           validates the notification tag, asserts
-     *           {@code from="s.whatsapp.net"} and
-     *           {@code type="business"}, asserts the
-     *           {@code <wa_ad_account_nonce>} child exists, and
-     *           projects the child's text content as
-     *           {@code waAdAccountNonceElementValue}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountNonceNotificationRequest")
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountServerNotificationMixin")
@@ -104,6 +96,9 @@ public sealed interface SmaxNonceNotificationResponse extends SmaxOperation.Resp
          */
         @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountNonceNotificationRequest",
                 exports = "parseNonceNotificationRequest",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountServerNotificationMixin",
+                exports = "parseServerNotificationMixin",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Notification> of(Node node) {
             Objects.requireNonNull(node, "node cannot be null");

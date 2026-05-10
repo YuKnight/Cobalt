@@ -3,32 +3,29 @@ package com.github.auties00.cobalt.node.smax.biz;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalInt;
 
 /**
  * Documented {@code should_show_privacy_interstitial_to_new_users}
  * enum carried by the {@code <meta_verified/>} child. Boolean
  * surfaced as the literal {@code "true"}/{@code "false"} pair.
- *
- * @implNote Mirrors {@code WASmaxInBizMarketingMessageEnums.ENUM_FALSE_TRUE}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageEnums")
 public enum SmaxGetBusinessEligibilityFalseTrueFlag {
     /**
      * Literal {@code "false"} attribute value.
      */
+    @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageEnums",
+            exports = "ENUM_FALSE_TRUE",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     FALSE,
     /**
      * Literal {@code "true"} attribute value.
      */
+    @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageEnums",
+            exports = "ENUM_FALSE_TRUE",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     TRUE;
 
     /**
@@ -40,6 +37,9 @@ public enum SmaxGetBusinessEligibilityFalseTrueFlag {
      *         constant, or empty when the value is {@code null} or
      *         does not match a documented literal
      */
+    @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageEnums",
+            exports = "ENUM_FALSE_TRUE",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<SmaxGetBusinessEligibilityFalseTrueFlag> of(String value) {
         if (value == null) {
             return Optional.empty();

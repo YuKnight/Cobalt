@@ -36,17 +36,6 @@ import java.util.Objects;
  * {@code <skey/>} (the current signed pre-key — a three-byte
  * {@code <id/>}, a thirty-two-byte {@code <value/>}, and a sixty-four
  * byte {@code <signature/>}).
- *
- * @implNote {@code WAWebUploadPreKeysJob.uploadPreKeys} runs the upload
- *           inside a fibonacci-back-off retry loop driven by
- *           {@code WAPromiseRetryLoop}; Cobalt mirrors the request
- *           shape and the response variants but leaves retry
- *           orchestration to the configurable error handler. The
- *           module-level constant {@code UPLOAD_KEYS_COUNT = 812}
- *           caps the {@code <list/>} cardinality on the WA Web side —
- *           Cobalt does not enforce this cap at the type level because
- *           the cap is a producer-side budget rather than a wire
- *           constraint.
  */
 @WhatsAppWebModule(moduleName = "WAWebUploadPreKeysJob")
 public final class IqUploadPreKeysRequest implements IqOperation.Request {
@@ -164,12 +153,6 @@ public final class IqUploadPreKeysRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the pre-key payload
-     *
-     * @implNote {@code WAWebUploadPreKeysJob} composes the IQ
-     *           with five children produced via
-     *           {@code WAWebSignalUtilsApi.xmppPreKey} and
-     *           {@code WAWebSignalUtilsApi.xmppSignedPreKey} for
-     *           the inner key formatting.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUploadPreKeysJob",

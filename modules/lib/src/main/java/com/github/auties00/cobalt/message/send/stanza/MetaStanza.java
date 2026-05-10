@@ -313,9 +313,6 @@ public final class MetaStanza {
      * @param entryPoint the bot metrics entry point
      * @return the origin string, or {@code null} if the entry point has no
      *         corresponding origin value
-     * @implNote The {@code WEB_INTRO_PANEL} and {@code WEB_NAVIGATION_BAR} entry points
-     * are web-specific values not yet present in Cobalt's enum and fall through to the
-     * {@code default} branch.
      */
     @WhatsAppWebExport(moduleName = "WAWebBotLoggingUtils", exports = "getBotOriginFromBotMetricsEntryPoint",
             adaptation = WhatsAppAdaptation.DIRECT)

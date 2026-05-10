@@ -17,12 +17,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxMdCompanionHelloRequest}.
- *
- * @implNote {@code WASmaxMdCompanionHelloRPC.sendCompanionHelloRPC}
- *           tries {@code NotifyCompanion} → {@code Error} in order;
- *           the {@code ServerError} variant is layered on Cobalt's
- *           side via {@link SmaxBaseServerErrorMixin} for parity with
- *           the rest of the SMAX domain shape.
  */
 public sealed interface SmaxMdCompanionHelloResponse extends SmaxOperation.Response
         permits SmaxMdCompanionHelloResponse.NotifyCompanion, SmaxMdCompanionHelloResponse.ClientError, SmaxMdCompanionHelloResponse.ServerError {
@@ -57,12 +51,6 @@ public sealed interface SmaxMdCompanionHelloResponse extends SmaxOperation.Respo
      * The {@code NotifyCompanion} reply variant. The relay accepted
      * the hello and echoes back a {@code link_code_pairing_ref} that
      * the user types on the primary device.
-     *
-     * @implNote {@code WASmaxInMdCompanionHelloResponseNotifyCompanion.parseCompanionHelloResponseNotifyCompanion}
-     *           validates the {@code <iq type="result">} envelope,
-     *           asserts {@code stage="companion_hello"} on the
-     *           {@code <link_code_companion_reg/>} child, and extracts
-     *           the {@code <link_code_pairing_ref/>} content bytes.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInMdCompanionHelloResponseNotifyCompanion")
     final class NotifyCompanion implements SmaxMdCompanionHelloResponse {
@@ -149,13 +137,6 @@ public sealed interface SmaxMdCompanionHelloResponse extends SmaxOperation.Respo
      * request with a {@code 4xx} {@code IqMixin} error
      * (bad-request, forbidden, rate-overlimit, feature-not-available,
      * or internal-server-error mapped to client range).
-     *
-     * @implNote {@code WASmaxInMdCompanionHelloResponseError.parseCompanionHelloResponseError}
-     *           composes
-     *           {@code WASmaxInMdIQErrorResponseMixin.parseIQErrorResponseMixin}
-     *           with
-     *           {@code WASmaxInMdIqMixinErrors.parseIqMixinErrors}.
-     *           Cobalt collapses to the bare {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInMdCompanionHelloResponseError")
     final class ClientError implements SmaxMdCompanionHelloResponse {
@@ -248,11 +229,6 @@ public sealed interface SmaxMdCompanionHelloResponse extends SmaxOperation.Respo
      * The {@code ServerError} reply variant. The relay encountered a
      * {@code 5xx} transient internal failure while processing the
      * request.
-     *
-     * @implNote Layered onto Cobalt's domain via the shared
-     *           {@link SmaxBaseServerErrorMixin}; WA Web folds the
-     *           same {@code 500} code into the {@code IqMixin}
-     *           disjunction.
      */
     final class ServerError implements SmaxMdCompanionHelloResponse {
         /**

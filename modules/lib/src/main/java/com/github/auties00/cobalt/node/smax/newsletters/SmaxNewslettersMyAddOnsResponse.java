@@ -18,11 +18,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxNewslettersMyAddOnsRequest}.
- *
- * @implNote {@code WASmaxNewslettersMyAddOnsRPC.sendMyAddOnsRPC} tries
- *           {@code Success} → {@code ClientError} → {@code ServerError}
- *           in order and throws on no-match. Cobalt returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Response
         permits SmaxNewslettersMyAddOnsResponse.Success, SmaxNewslettersMyAddOnsResponse.ClientError, SmaxNewslettersMyAddOnsResponse.ServerError {
@@ -58,13 +53,6 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
     /**
      * The {@code Success} reply variant. The relay returned the user's
      * per-newsletter add-on list.
-     *
-     * @implNote {@code WASmaxInNewslettersMyAddOnsResponseSuccess.parseMyAddOnsResponseSuccess}
-     *           validates the {@code <iq>} envelope through
-     *           {@code parseIQResultResponseMixin}. Asserts the
-     *           {@code <my_addons>} child exists, then projects every
-     *           {@code <messages>} child through
-     *           {@code parseMyAddOnsResponseSuccessMyAddonsMessages}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersMyAddOnsResponseSuccess")
     final class Success implements SmaxNewslettersMyAddOnsResponse {
@@ -150,8 +138,6 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
          * {@code <messages jid="<newsletterJid>"><message ...>*</messages>}
          * sub-tree into a typed pair of {@code (newsletterJid,
          * messages)}.
-         *
-         * @implNote {@code WASmaxInNewslettersMyAddOnsResponseSuccess.parseMyAddOnsResponseSuccessMyAddonsMessages}.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInNewslettersMyAddOnsResponseSuccess")
         public static final class NewsletterBlock {
@@ -205,15 +191,6 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
              *                     {@code null}
              * @return an {@link Optional} carrying the parsed block, or
              *         empty when the child does not match the schema
-             *
-             * @implNote {@code WASmaxInNewslettersMyAddOnsResponseSuccess.parseMyAddOnsResponseSuccessMyAddonsMessages}
-             *           asserts the {@code messages} tag, parses the
-             *           {@code jid} attribute through
-             *           {@code attrNewsletterJid}, then projects every
-             *           {@code <message>} child via
-             *           {@code parseMyAddOnsResponseSuccessMyAddonsMessagesMessage}
-             *           (which delegates to
-             *           {@code parseNewsletterMessageMyAddOnsMixin}).
              */
             @WhatsAppWebExport(moduleName = "WASmaxInNewslettersMyAddOnsResponseSuccess",
                     exports = "parseMyAddOnsResponseSuccessMyAddonsMessages",
@@ -266,14 +243,6 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
          * One per-message add-on entry. Projects a
          * {@code <message server_id><reaction?/><votes?/></message>}
          * sub-tree into a typed bundle.
-         *
-         * @implNote {@code WASmaxInNewslettersNewsletterMessageMyAddOnsMixin.parseNewsletterMessageMyAddOnsMixin}
-         *           asserts the {@code message} tag, parses
-         *           {@code server_id} via
-         *           {@code attrIntRange(99, 2147476647)}, then
-         *           optionally projects
-         *           {@code parseNewsletterMyReactionMixin} and
-         *           {@code parseNewsletterMyPollVoteMixin}.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInNewslettersNewsletterMessageMyAddOnsMixin")
         public static final class MessageAddOns {
@@ -396,8 +365,6 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
         /**
          * The user's own reaction on a newsletter message .
          * {@code <reaction code t/>}.
-         *
-         * @implNote {@code WASmaxInNewslettersNewsletterMyReactionMixin.parseNewsletterMyReactionMixin}.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInNewslettersNewsletterMyReactionMixin")
         public static final class MyReaction {
@@ -501,8 +468,6 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
          * The user's own poll-vote projection .
          * {@code <votes t><vote/>+</votes>} where every {@code <vote/>}
          * carries an opaque 32-byte option id as its content.
-         *
-         * @implNote {@code WASmaxInNewslettersNewsletterMyPollVoteMixin.parseNewsletterMyPollVoteMixin}.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInNewslettersNewsletterMyPollVoteMixin")
         public static final class MyPollVote {
@@ -626,12 +591,6 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent newsletter.
-     *
-     * @implNote {@code WASmaxInNewslettersMyAddOnsResponseClientError.parseMyAddOnsResponseClientError}
-     *           parses the {@code <error code text/>} child and routes
-     *           it through
-     *           {@code WASmaxInNewslettersMyAddonsClientErrors}. Cobalt
-     *           collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersMyAddOnsResponseClientError")
     final class ClientError implements SmaxNewslettersMyAddOnsResponse {
@@ -724,12 +683,6 @@ public sealed interface SmaxNewslettersMyAddOnsResponse extends SmaxOperation.Re
     /**
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInNewslettersMyAddOnsResponseServerError.parseMyAddOnsResponseServerError}
-     *           delegates to
-     *           {@code WASmaxInNewslettersInternalServerErrorIQErrorResponseMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersMyAddOnsResponseServerError")
     final class ServerError implements SmaxNewslettersMyAddOnsResponse {

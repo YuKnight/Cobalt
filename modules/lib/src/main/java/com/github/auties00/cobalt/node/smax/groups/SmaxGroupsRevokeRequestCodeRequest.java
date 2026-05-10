@@ -84,17 +84,6 @@ public final class SmaxGroupsRevokeRequestCodeRequest implements SmaxOperation.R
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <revoke>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsRevokeRequestCodeRequest.makeRevokeRequestCodeRequest}
-     *           composes
-     *           {@code <revoke>REPEATED_CHILD(participant, 1, 1000)</revoke>}
-     *           inside the standard
-     *           {@code WASmaxOutGroupsBaseSetGroupMixin}
-     *           {@code <iq xmlns="w:g2" to=GROUP_JID(t) type="set">}
-     *           envelope. Each participant child is built by
-     *           {@code makeRevokeRequestCodeRequestRevokeParticipant}
-     *           which simply emits
-     *           {@code <participant jid=USER_JID(t)/>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsRevokeRequestCodeRequest",

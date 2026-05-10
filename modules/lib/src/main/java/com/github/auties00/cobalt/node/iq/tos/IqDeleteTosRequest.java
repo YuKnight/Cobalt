@@ -44,10 +44,6 @@ public final class IqDeleteTosRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <delete>} payload
-     *
-     * @implNote {@code WAWebTosJob.deleteTosState} composes the IQ via
-     *           {@code wap("iq", {xmlns:"tos", id, type:"set",
-     *           to:S_WHATSAPP_NET}, wap("delete", {id:e}))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTosJob",

@@ -5,12 +5,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqErrorResponseMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -22,6 +18,7 @@ import java.util.Optional;
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutBizCtwaAdAccountGetAccessTokenAndSessionCookiesRequest")
 @WhatsAppWebModule(moduleName = "WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin")
+@WhatsAppWebModule(moduleName = "WASmaxOutBizCtwaAdAccountBaseIQGetRequestMixin")
 public final class SmaxGetAccessTokenAndSessionCookiesRequest implements SmaxOperation.Request {
     /**
      * The user-supplied verification code (the email-recovery code
@@ -86,20 +83,17 @@ public final class SmaxGetAccessTokenAndSessionCookiesRequest implements SmaxOpe
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <parameters/>} payload
-     *
-     * @implNote {@code WASmaxOutBizCtwaAdAccountGetAccessTokenAndSessionCookiesRequest.makeGetAccessTokenAndSessionCookiesRequest}
-     *           composes
-     *           {@code WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin}
-     *           ({@code from=USER_JID(t)?}, {@code to=S_WHATSAPP_NET},
-     *           {@code id=generateId()}, {@code type="get"}) over a
-     *           bare {@code <iq xmlns="fb:thrift_iq">} carrying a
-     *           {@code <parameters><code>VERIFICATION_CODE</code></parameters>}
-     *           child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBizCtwaAdAccountGetAccessTokenAndSessionCookiesRequest",
             exports = "makeGetAccessTokenAndSessionCookiesRequest",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin",
+            exports = "mergeHackBaseIQGetRequestMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizCtwaAdAccountBaseIQGetRequestMixin",
+            exports = "mergeBaseIQGetRequestMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
         var codeNode = new NodeBuilder()
                 .description("code")
@@ -112,11 +106,11 @@ public final class SmaxGetAccessTokenAndSessionCookiesRequest implements SmaxOpe
         var builder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "fb:thrift_iq")
-                .attribute("to", JidServer.user())
-                .attribute("type", "get")
+                .attribute("to", JidServer.user()) // WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin.mergeHackBaseIQGetRequestMixin: to: WAWap.S_WHATSAPP_NET
+                .attribute("type", "get") // WASmaxOutBizCtwaAdAccountBaseIQGetRequestMixin.mergeBaseIQGetRequestMixin: type: "get" (id=generateId() delegated to WhatsAppClient.sendNode)
                 .content(parametersNode);
         if (fromUserJid != null) {
-            builder.attribute("from", fromUserJid);
+            builder.attribute("from", fromUserJid); // WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin.mergeHackBaseIQGetRequestMixin: from: OPTIONAL(USER_JID, t)
         }
         return builder;
     }

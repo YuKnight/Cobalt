@@ -19,12 +19,6 @@ import java.util.OptionalInt;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGetSMBMeteredMessagingCheckoutRequest}.
- *
- * @implNote {@code WASmaxSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutRPC.sendGetSMBMeteredMessagingCheckoutRPC}
- *           tries {@code Success} → {@code Error} in order. Cobalt
- *           collapses the {@code Error} arm into the
- *           {@code ClientError}/{@code ServerError} pair via the
- *           shared {@link SmaxBaseServerErrorMixin} helpers.
  */
 public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxOperation.Response
         permits SmaxGetSMBMeteredMessagingCheckoutResponse.Success, SmaxGetSMBMeteredMessagingCheckoutResponse.ClientError, SmaxGetSMBMeteredMessagingCheckoutResponse.ServerError {
@@ -63,13 +57,6 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
      * The {@code Success} reply variant. Carries the projected
      * cost, optional discounts, integrity-eligibility marker,
      * account-balance triple and optional quota state.
-     *
-     * @implNote {@code WASmaxInSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutResponseSuccess.parseGetSMBMeteredMessagingCheckoutResponseSuccess}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope, projects the mandatory {@code <cost/>},
-     *           {@code <integrity/>} and {@code <account_balance/>}
-     *           children, optional {@code <discounts/>} grandchildren
-     *           and the optional {@code <quota/>} child.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutResponseSuccess")
     final class Success implements SmaxGetSMBMeteredMessagingCheckoutResponse {
@@ -969,12 +956,6 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
      * The {@code ClientError} reply variant. The relay rejected the
      * request with a documented {@code 4xx} error code drawn from
      * the SMB metered-messaging error catalogue.
-     *
-     * @implNote {@code WASmaxInSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutResponseError.parseGetSMBMeteredMessagingCheckoutResponseError}
-     *           routes the {@code <error/>} child through
-     *           {@code WASmaxInSmbMeteredMessagingAccountGetSmbMeteredMessagingCheckoutIqErrors};
-     *           Cobalt collapses to the raw {@code (code, text)}
-     *           pair via the shared {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagingAccountGetSmbMeteredMessagingCheckoutIqErrors")
@@ -1069,11 +1050,6 @@ public sealed interface SmaxGetSMBMeteredMessagingCheckoutResponse extends SmaxO
     /**
      * The {@code ServerError} reply variant. The relay encountered
      * a transient internal failure ({@code 5xx}).
-     *
-     * @implNote Sourced from the {@code 5xx} arms of
-     *           {@code WASmaxInSmbMeteredMessagingAccountGetSmbMeteredMessagingCheckoutIqErrors};
-     *           Cobalt routes through the shared
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutResponseError")
     final class ServerError implements SmaxGetSMBMeteredMessagingCheckoutResponse {

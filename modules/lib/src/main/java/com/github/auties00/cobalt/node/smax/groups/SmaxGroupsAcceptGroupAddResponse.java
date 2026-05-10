@@ -14,11 +14,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsAcceptGroupAddRPC.sendAcceptGroupAddRPC}
- *           tries {@code GroupJoinRequestSuccess} →
- *           {@code Success} → {@code ClientError} →
- *           {@code ServerError}.
  */
 public sealed interface SmaxGroupsAcceptGroupAddResponse extends SmaxOperation.Response
         permits SmaxGroupsAcceptGroupAddResponse.GroupJoinRequestSuccess, SmaxGroupsAcceptGroupAddResponse.Success,
@@ -61,10 +56,6 @@ public sealed interface SmaxGroupsAcceptGroupAddResponse extends SmaxOperation.R
      * pending-approval queue. Carries the same envelope as
      * {@link Success} plus a {@code <membership_approval_request/>}
      * child marker.
-     *
-     * @implNote {@code WASmaxInGroupsAcceptGroupAddResponseGroupJoinRequestSuccess.parseAcceptGroupAddResponseGroupJoinRequestSuccess}
-     *           validates the IQ-result envelope and asserts the
-     *           {@code <membership_approval_request/>} child exists.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsAcceptGroupAddResponseGroupJoinRequestSuccess")
     final class GroupJoinRequestSuccess implements SmaxGroupsAcceptGroupAddResponse {
@@ -117,9 +108,6 @@ public sealed interface SmaxGroupsAcceptGroupAddResponse extends SmaxOperation.R
     /**
      * The {@code Success} reply variant — the relay added the caller
      * to the group as a regular participant.
-     *
-     * @implNote {@code WASmaxInGroupsAcceptGroupAddResponseSuccess.parseAcceptGroupAddResponseSuccess}
-     *           validates the IQ-result envelope only.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsAcceptGroupAddResponseSuccess")
     final class Success implements SmaxGroupsAcceptGroupAddResponse {

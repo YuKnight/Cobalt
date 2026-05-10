@@ -15,11 +15,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants. Only the {@code Success}
  * shape is documented for this RPC.
- *
- * @implNote {@code WASmaxReceiptPublishViewRPC.sendPublishViewRPC}
- *           tries {@code Success} only. On no-match the WA Web
- *           parser throws and the Cobalt {@link SmaxReceiptPublishViewResponse#of(Node, Node)}
- *           returns {@link Optional#empty()}.
  */
 public sealed interface SmaxReceiptPublishViewResponse extends SmaxOperation.Response
         permits SmaxReceiptPublishViewResponse.Success {
@@ -48,14 +43,6 @@ public sealed interface SmaxReceiptPublishViewResponse extends SmaxOperation.Res
      * {@code <ack class="receipt" type=ECHO from=ECHO id=ECHO/>}
      * envelope, optionally carrying the timestamp and read-receipts
      * echo plus a deprecated edit marker.
-     *
-     * @implNote {@code WASmaxInReceiptPublishViewResponseSuccess.parsePublishViewResponseSuccess}
-     *           delegates to {@code WASmaxInReceiptPublishSuccessMixin.parsePublishSuccessMixin}
-     *           which validates {@code <ack class="receipt"
-     *           id=ECHO from=ECHO type=ECHO>}, optionally extracts
-     *           the {@code t} and {@code readreceipts} echoes, and
-     *           reads the deprecated {@code edit} marker from
-     *           {@code WASmaxInReceiptDeprecatedEditMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInReceiptPublishViewResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInReceiptPublishSuccessMixin")

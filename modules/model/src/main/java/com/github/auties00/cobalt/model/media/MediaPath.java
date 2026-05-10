@@ -289,7 +289,16 @@ public enum MediaPath {
     /**
      * Videos exchanged through Waffle (Meta account-linking) integrations.
      */
-    WAFFLE_VIDEO("waffle-video", "mms/waffle-video", null, false);
+    WAFFLE_VIDEO("waffle-video", "mms/waffle-video", null, false),
+
+    /**
+     * AI knowledge-base file uploads used by Meta AI business integrations.
+     *
+     * <p>The CDN routes hash-based downloads under the {@code /wa-ai/maiba-file}
+     * namespace and the payload is end-to-end encrypted with the same HKDF
+     * info string as documents.
+     */
+    MAIBA_FILE("maiba-file", "wa-ai/maiba-file", "WhatsApp Document Keys", false);
 
     /**
      * The server-side identifier used when referring to this media type on

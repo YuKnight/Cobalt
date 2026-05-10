@@ -17,9 +17,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxSpamNewsletterReportRPC.sendNewsletterReportRPC}
- *           tries {@code Success} → {@code Error}.
  */
 public sealed interface SmaxNewsletterReportResponse extends SmaxOperation.Response
         permits SmaxNewsletterReportResponse.Success, SmaxNewsletterReportResponse.Error {
@@ -48,11 +45,6 @@ public sealed interface SmaxNewsletterReportResponse extends SmaxOperation.Respo
     /**
      * The {@code Success} reply variant. The relay accepted the
      * report and (typically) returned a ticket id.
-     *
-     * @implNote {@code WASmaxInSpamNewsletterReportResponseSuccess.parseNewsletterReportResponseSuccess}
-     *           validates the {@code <iq>} envelope, optionally
-     *           projects the {@code <report id>} child via
-     *           {@code WASmaxInSpamReportIdMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSpamNewsletterReportResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInSpamReportIdMixin")
@@ -130,12 +122,6 @@ public sealed interface SmaxNewsletterReportResponse extends SmaxOperation.Respo
      * The {@code Error} reply variant. The relay rejected the
      * report (malformed payload, rate limit, or transient internal
      * failure).
-     *
-     * @implNote {@code WASmaxInSpamNewsletterReportResponseError.parseNewsletterReportResponseError}
-     *           routes through {@code WASmaxInSpamSpamIqErrors} which
-     *           is a disjunction over every documented spam-iq error
-     *           code; Cobalt collapses to the {@code (code, text)}
-     *           pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSpamNewsletterReportResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInSpamSpamIqErrors")

@@ -106,9 +106,6 @@ public final class GetPrivacyListsMexRequest implements MexOperation.Request.Jso
 
     /**
      * Builds the IQ stanza that dispatches this operation to the WhatsApp relay.
-     *
-     * @implNote The {@code variables} payload is shaped as
-     *           {@code {input: {query_input: [{jid, privacy_contact_list_type: {dhash, category, type}}]}}}.
      * @return a {@link NodeBuilder} carrying the IQ envelope and the serialised GraphQL variables
      */
     @WhatsAppWebExport(moduleName = "WAWebMexGetPrivacyList", exports = "fetchPrivacyList",

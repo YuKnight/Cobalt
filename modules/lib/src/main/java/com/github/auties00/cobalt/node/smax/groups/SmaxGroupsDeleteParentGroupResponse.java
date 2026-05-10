@@ -14,10 +14,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsDeleteParentGroupRPC.sendDeleteParentGroupRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError}.
  */
 public sealed interface SmaxGroupsDeleteParentGroupResponse extends SmaxOperation.Response
         permits SmaxGroupsDeleteParentGroupResponse.Success, SmaxGroupsDeleteParentGroupResponse.ClientError, SmaxGroupsDeleteParentGroupResponse.ServerError {

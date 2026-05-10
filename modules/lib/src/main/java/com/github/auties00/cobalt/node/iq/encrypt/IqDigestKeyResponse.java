@@ -53,12 +53,6 @@ public sealed interface IqDigestKeyResponse extends IqOperation.Response
     /**
      * The {@code Success} reply variant — the relay returned the
      * remote-side digest of the user's Signal key bundle.
-     *
-     * @implNote {@code WAWebDigestKeyJob.digestResponseParser}
-     *           projects the {@code <digest/>} grandchild's
-     *           registration id, type marker, identity key,
-     *           signed-pre-key subtree, the list of pre-key
-     *           identifiers, and the SHA-1 hash.
      */
     @WhatsAppWebModule(moduleName = "WAWebDigestKeyJob")
     final class Success implements IqDigestKeyResponse {
@@ -188,11 +182,6 @@ public sealed interface IqDigestKeyResponse extends IqOperation.Response
          * @return an {@link Optional} carrying the parsed variant, or
          *         empty when the stanza does not match the success
          *         schema
-         *
-         * @implNote {@code WAWebDigestKeyJob.digestResponseParser}:
-         *           {@code child("digest").{registration, type,
-         *           identity, skey:{id, value, signature},
-         *           list:[id*], hash}}.
          */
         @WhatsAppWebExport(moduleName = "WAWebDigestKeyJob",
                 exports = "digestResponseParser", adaptation = WhatsAppAdaptation.ADAPTED)

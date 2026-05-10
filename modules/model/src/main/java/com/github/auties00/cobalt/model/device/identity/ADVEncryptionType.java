@@ -38,7 +38,19 @@ public enum ADVEncryptionType {
      * from regular end-to-end encrypted ones and apply the appropriate verification
      * rules.
      */
-    HOSTED(1);
+    HOSTED(1),
+
+    /**
+     * Indicates a device or account that participates without end-to-end encryption.
+     *
+     * <p>Used by data-privacy phase 2 flows where a recipient is enrolled in a non-E2EE
+     * mode (typically a business account opt-in tied to the
+     * {@code data_privacy_phase_2_non_e2ee_enabled} server gating). When the device-table
+     * update path encounters this value alongside an account marked {@link #E2EE}, the
+     * companion record is skipped so that the local device table never mixes E2EE and
+     * non-E2EE entries for the same account.
+     */
+    NON_E2EE(2);
 
     /**
      * Constructs an encryption type with the given protobuf index.

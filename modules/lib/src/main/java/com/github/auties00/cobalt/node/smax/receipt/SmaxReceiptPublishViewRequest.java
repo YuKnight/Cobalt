@@ -118,12 +118,6 @@ public final class SmaxReceiptPublishViewRequest implements SmaxOperation.Reques
      *
      * @return a {@link NodeBuilder} carrying the receipt envelope
      *         and the {@code <list>} payload
-     *
-     * @implNote {@code WASmaxOutReceiptPublishViewRequest.makePublishViewRequest}
-     *           composes {@code mergeNewsletterMixin} →
-     *           {@code mergeViewTypeMixin} →
-     *           {@code mergeSenderAggregatedViewPublishMixin} over a
-     *           bare {@code <receipt/>} root.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutReceiptPublishViewRequest",

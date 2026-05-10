@@ -61,14 +61,6 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <key_fetch/>} payload
-     *
-     * @implNote {@code WASmaxOutPreKeysFetchMissingPreKeysRequest.makeFetchMissingPreKeysRequest}
-     *           composes
-     *           {@code WASmaxOutPreKeysClientRequestMixin}
-     *           ({@code id=generateId()}, {@code xmlns="encrypt"},
-     *           {@code to=S_WHATSAPP_NET}) over a {@code <key_fetch/>}
-     *           carrying {@code REPEATED_CHILD(<user jid reason?>(<device
-     *           id> <registration/>)...)}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPreKeysFetchMissingPreKeysRequest",
@@ -136,10 +128,6 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
      * Per-user entry in the outbound {@code <key_fetch>} payload. Pairs
      * a target user JID with a list of per-device fetch entries plus
      * the optional {@code reason="identity"} hint.
-     *
-     * @implNote {@code WASmaxOutPreKeysFetchMissingPreKeysRequest.makeFetchMissingPreKeysRequestKeyFetchUser}
-     *           emits {@code <user jid=JID(t) reason?=OPTIONAL_LITERAL("identity",
-     *           hasUserReasonIdentity)>(<device id=INT(t) ><registration/></device>)*}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutPreKeysFetchMissingPreKeysRequest")
     public static final class UserKeyFetchRequest {
@@ -239,12 +227,6 @@ public final class SmaxPreKeysFetchMissingPreKeysRequest implements SmaxOperatio
     /**
      * Per-device entry. Pairs a numeric device id with the 4-byte
      * registration id whose stale-state needs refreshing.
-     *
-     * @implNote {@code WASmaxOutPreKeysFetchMissingPreKeysRequest.makeFetchMissingPreKeysRequestKeyFetchUserDevice}
-     *           emits {@code <device id=INT(t)><registration>BYTES</registration></device>}
-     *           via the {@code WASmaxOutPreKeysRegistrationIDMixin} that
-     *           merges the 4-byte registration content into the device
-     *           element.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutPreKeysFetchMissingPreKeysRequest")
     @WhatsAppWebModule(moduleName = "WASmaxOutPreKeysRegistrationIDMixin")

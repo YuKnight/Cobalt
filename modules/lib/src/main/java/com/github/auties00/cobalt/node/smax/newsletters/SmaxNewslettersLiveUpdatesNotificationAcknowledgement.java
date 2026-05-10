@@ -16,14 +16,6 @@ import java.util.Optional;
  * The outbound acknowledgement stanza. Emitted by the client back
  * through the socket pipeline after consuming the {@link SmaxNewslettersLiveUpdatesNotificationResponse}
  * notification.
- *
- * @implNote {@code WASmaxOutNewslettersLiveUpdatesNotificationResponseAck.makeLiveUpdatesNotificationResponseAck}
- *           composes
- *           {@code WASmaxOutNewslettersNotificationClientAckMixin.mergeNotificationClientAckMixin}
- *           into an {@code <ack id to class="notification" type/>}
- *           stanza echoing the notification's {@code id},
- *           {@code from} (as the ack's {@code to}) and {@code type}
- *           attributes.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersLiveUpdatesNotificationResponseAck")
 @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersNotificationClientAckMixin")
@@ -121,11 +113,6 @@ public final class SmaxNewslettersLiveUpdatesNotificationAcknowledgement impleme
      * Builds the outbound ack stanza.
      *
      * @return a {@link NodeBuilder} carrying the ack envelope
-     *
-     * @implNote {@code WASmaxOutNewslettersNotificationClientAckMixin.mergeNotificationClientAckMixin}
-     *           produces
-     *           {@code <ack id=STANZA_ID(t) to=JID(n)
-     *           class="notification" type=CUSTOM_STRING(r)/>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersLiveUpdatesNotificationResponseAck",

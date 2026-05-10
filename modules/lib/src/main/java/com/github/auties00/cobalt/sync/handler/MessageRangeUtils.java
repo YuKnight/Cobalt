@@ -36,10 +36,6 @@ import java.util.*;
  * derives a minimal range from the chat's newest in-memory message, and
  * {@code WebAppStateService.pushPatches} serializes per-collection writes so
  * no explicit lock is required.
- *
- * @implNote The three store-bound exports above have no in-class stub in
- *           Cobalt; see {@code WhatsAppClient.buildOutgoingMessageRange} and
- *           {@code WebAppStateService.pushPatches} for their adaptations.
  */
 @WhatsAppWebModule(moduleName = "WAWebMessageRangeUtils")
 final class MessageRangeUtils {
@@ -50,44 +46,32 @@ final class MessageRangeUtils {
      * string-valued members. Cobalt maps each to an equivalent Java enum
      * constant; the renaming from camel case to SCREAMING_SNAKE is purely
      * stylistic.
-     *
-     * @implNote WAWebMessageRangeUtils.MessageRangeEncloseType
      */
     @WhatsAppWebModule(moduleName = "WAWebMessageRangeUtils")
     enum EnclosureType {
         /**
          * Range A fully encloses range B (A covers all messages that B covers).
-         *
-         * @implNote WAWebMessageRangeUtils.MessageRangeEncloseType.RangeAEnclosesRangeB
          */
         RANGE_A_ENCLOSES_RANGE_B,
 
         /**
          * Range B fully encloses range A (B covers all messages that A covers).
-         *
-         * @implNote WAWebMessageRangeUtils.MessageRangeEncloseType.RangeBEnclosesRangeA
          */
         RANGE_B_ENCLOSES_RANGE_A,
 
         /**
          * Both ranges cover exactly the same set of messages.
-         *
-         * @implNote WAWebMessageRangeUtils.MessageRangeEncloseType.RangesAreEqual
          */
         RANGES_ARE_EQUAL,
 
         /**
          * Neither range fully encloses the other (partial overlap or disjoint).
-         *
-         * @implNote WAWebMessageRangeUtils.MessageRangeEncloseType.RangesNotEnclosing
          */
         RANGES_NOT_ENCLOSING
     }
 
     /**
      * Private constructor to prevent instantiation of this utility class.
-     *
-     * @implNote NO_WA_BASIS - Java utility class pattern
      */
     private MessageRangeUtils() {
     }
@@ -98,8 +82,6 @@ final class MessageRangeUtils {
      * <p>Per WhatsApp Web {@code compareMessageRanges}: checks in both
      * directions whether one range encloses the other and maps the two
      * boolean outcomes to one of the four {@link EnclosureType} values.
-     *
-     * @implNote WAWebMessageRangeUtils.compareMessageRanges
      * @param rangeA the first range (typically remote)
      * @param rangeB the second range (typically local)
      * @return the enclosure relationship between the two ranges
@@ -136,8 +118,6 @@ final class MessageRangeUtils {
      *       values, but only sets it if it strictly exceeds the merged
      *       {@code lastMessageTimestamp}
      * </ul>
-     *
-     * @implNote WAWebMessageRangeUtils.mergeMessageRanges
      * @param rangeA the first range (typically remote)
      * @param rangeB the second range (typically local)
      * @return a new merged range covering both inputs
@@ -189,11 +169,6 @@ final class MessageRangeUtils {
      * range itself is {@code null}. Applied mutation callers that need the
      * null-check already perform it inline via
      * {@code orElse(null)} on the action's optional {@code messageRange}.
-     *
-     * @implNote WAWebMessageRangeUtils.validateMessageRange - WAM telemetry
-     *           emission is intentionally skipped (Cobalt does not ship
-     *           WAM); the validation short-circuit on {@code null} range
-     *           is preserved
      * @param messageRange the message range to validate, may be {@code null}
      * @return the same range when non-{@code null}, otherwise {@code null}
      */
@@ -227,8 +202,6 @@ final class MessageRangeUtils {
      * handlers to swap the remote JID (which may reference the original
      * mutation index JID) for the resolved local chat JID before applying
      * the range to the chat database.
-     *
-     * @implNote WAWebMessageRangeUtils.replaceMessageRangeRemoteJid
      * @param remoteJid    the JID to stamp into every message key
      * @param messageRange the range whose messages should be rewritten
      * @return a new range with identical timestamps and rewritten message keys
@@ -268,8 +241,6 @@ final class MessageRangeUtils {
      * <p>Concatenates both lists, then keeps only messages whose timestamp
      * is {@code >=} the given threshold. Among messages with the same key ID,
      * the one with the higher timestamp wins.
-     *
-     * @implNote WAWebMessageRangeUtils (function g - merge helper)
      * @param messagesA    the first message list
      * @param messagesB    the second message list
      * @param maxTimestamp the threshold timestamp (epoch seconds)
@@ -315,8 +286,6 @@ final class MessageRangeUtils {
      *   <li>If the message's key ID is NOT found in A's messages, its timestamp
      *       must be strictly less than A's {@code lastMessageTimestamp}
      * </ul>
-     *
-     * @implNote WAWebMessageRangeUtils (function m - encloses helper)
      * @param encloser the range that should enclose
      * @param enclosed the range that should be enclosed
      * @return {@code true} if {@code encloser} encloses {@code enclosed}
@@ -357,10 +326,6 @@ final class MessageRangeUtils {
      * Converts an {@link Instant} to epoch seconds, returning {@code 0}
      * for {@code null} values. Mirrors the WhatsApp Web convention of
      * treating missing timestamps as {@code 0}.
-     *
-     * @implNote ADAPTED: WAWebMessageRangeUtils - WA Web uses
-     *           {@code WALongInt.numberOrThrowIfTooLarge(val ?? 0)}; Cobalt uses
-     *           epoch seconds conversion with null coalescing to 0
      * @param instant the instant to convert, may be {@code null}
      * @return the epoch seconds, or {@code 0} if {@code null}
      */

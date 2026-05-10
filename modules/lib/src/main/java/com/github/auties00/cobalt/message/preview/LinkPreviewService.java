@@ -53,15 +53,6 @@ import java.util.WeakHashMap;
  * <p>The service is constructed lazily per {@link WhatsAppClient} via
  * {@link #forClient(WhatsAppClient)} so the per-session cache and the
  * HTTP client survive across messages but do not leak across clients.
- *
- * @implNote WAWebLinkPreviewChatAction.getLinkPreview is the JS entry
- *           point; the corresponding helpers are split out into the
- *           sibling {@code WAWebLinkify} / {@code WAWebApiParse} /
- *           {@code WAWebCheckIfDomainIsPreviewable} /
- *           {@code WAWebLinkPreviewCache} /
- *           {@code WAWebLinkPreviewUtils} modules. Cobalt mirrors the
- *           split with one class per JS module so each port stays
- *           narrowly scoped and individually testable.
  */
 @WhatsAppWebModule(moduleName = "WAWebLinkPreviewChatAction")
 public final class LinkPreviewService {
@@ -125,7 +116,6 @@ public final class LinkPreviewService {
      * value is repurposed as the bound on the direct HTTP fetch.
      *
      * @return the timeout duration
-     * @implNote WAWebABPropsConfigs.link_preview_wait_time.
      */
     @WhatsAppWebExport(moduleName = "WAWebABProps", exports = "getABPropConfigValue",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -255,7 +245,6 @@ public final class LinkPreviewService {
      *                         the URL is a payment link, or {@code null}
      * @return whether a preview was attached (always {@code true} since
      *         the minimal-fallback path always succeeds)
-     * @implNote WAWebLinkPreviewChatAction non-newsletter branch.
      */
     private boolean attachRichPreview(Linkify.Match match,
                                       ExtendedTextMessage message,
@@ -310,10 +299,6 @@ public final class LinkPreviewService {
      * @param thumbnailBytes the JPEG bytes to embed inline and upload
      * @return the assembled thumbnail, or {@code null} when the bytes
      *         are unavailable
-     * @implNote WAWebLinkPreviewUtils.getThumbnailDetails — the JS path
-     *           expects the bytes to come pre-uploaded by the primary
-     *           device; Cobalt is the primary, so the upload happens
-     *           inline through {@code MediaConnection.upload}.
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewUtils", exports = "getThumbnailDetails",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -379,10 +364,6 @@ public final class LinkPreviewService {
      * @param mediaType the {@code og:type}/{@code og:medium} value
      * @param baseline  the baseline preview-type seed
      * @return the resolved preview-type
-     * @implNote WAWebLinkPreviewChatAction inner function {@code k}:
-     *           returns VIDEO for any media type starting with
-     *           {@code "video"} (covers {@code "video"},
-     *           {@code "video.other"}, {@code "video.movie"}, etc.).
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewChatAction", exports = "getLinkPreview",
             adaptation = WhatsAppAdaptation.ADAPTED)

@@ -25,11 +25,6 @@ import java.util.stream.Collectors;
  * <p>Invoked by
  * {@link com.github.auties00.cobalt.device.DeviceService#getUserFanout(Jid, String)}
  * and {@link com.github.auties00.cobalt.device.DeviceService#getGroupFanout(Jid, Jid)}.
- *
- * @implNote WAWebDBDeviceListFanout.getFanOutList: retrieves device identifiers for
- * specified users, filtering out the sender's own device and applying hosted device
- * logic. Hosted inclusion gated via WAWebBizCoexGatingUtils.bizHostedDevicesEnabled.
- * Identity change filtering is WAWebSendMsgCommonApi.filterDeviceWithChangedIdentity.
  */
 @WhatsAppWebModule(moduleName = "WAWebDBDeviceListFanout")
 public final class DeviceFanoutCalculator {
@@ -62,8 +57,9 @@ public final class DeviceFanoutCalculator {
      *
      * <p>For each user's device list, iterates over all devices and includes them in
      * the fanout unless they are hosted (and hosted inclusion is not enabled) or they
-     * represent the sender's own device. When no device list exists for a user, falls
-     * back to the user's primary JID unless the user is the sender's own account.
+     * represent one of the sender's own devices (PN or LID). When no device list exists
+     * for a user, falls back to the user's primary JID unless the user is the sender's
+     * own account on either the PN or the LID side.
      *
      * <p>Hosted devices are included only when all three conditions are met:
      * <ol>
@@ -72,21 +68,18 @@ public final class DeviceFanoutCalculator {
      *   <li>{@code includeHostedForOneToOneChatJid} is a user-type JID</li>
      * </ol>
      *
-     * @param senderJid                       the JID of the sender (exact device JID)
+     * @param senderPnDeviceJid               the PN device JID of the sender, or {@code null}
+     * @param senderLidDeviceJid              the LID device JID of the sender, or {@code null}
      * @param deviceLists                     the users' device lists
      * @param includeHostedForOneToOneChatJid JID for which hosted devices should be included, or {@code null}
      * @return unmodifiable set of device JIDs to send to
-     * @implNote WAWebDBDeviceListFanout.getFanOutList: filters out sender's own device via
-     * {@code isMeDevice}, skips hosted devices unless {@code bizHostedDevicesEnabled}
-     * and the chat is a 1:1 user chat ({@code chatWidSetToIncludeHostedInFanoutOneToOneChatOnly.isUser()}).
-     * Uses a {@code Map} keyed by {@code toString()} for deduplication; Cobalt uses a
-     * {@code HashSet} which achieves the same deduplication via {@code equals}/{@code hashCode}.
      */
     @WhatsAppWebExport(moduleName = "WAWebDBDeviceListFanout",
             exports = "getFanOutList",
             adaptation = WhatsAppAdaptation.DIRECT)
     public Set<Jid> calculate(
-            Jid senderJid,
+            Jid senderPnDeviceJid,
+            Jid senderLidDeviceJid,
             Set<DeviceList> deviceLists,
             Jid includeHostedForOneToOneChatJid
     ) {
@@ -104,7 +97,8 @@ public final class DeviceFanoutCalculator {
                 if (fallbackWids.size() < 3) {
                     fallbackWids.add(primaryJid.toString());
                 }
-                if (!isSameAccount(primaryJid, senderJid)) {
+                // WAWebDBDeviceListFanout: !isMeAccount(primaryJid) — PN OR LID account.
+                if (!isMeAccount(primaryJid, senderPnDeviceJid, senderLidDeviceJid)) {
                     results.add(primaryJid);
                 }
                 continue;
@@ -115,7 +109,8 @@ public final class DeviceFanoutCalculator {
                     continue;
                 }
                 var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
-                if (isSameDevice(deviceJid, senderJid)) {
+                // WAWebDBDeviceListFanout: !isMeDevice(deviceJid) — equals PN OR LID device.
+                if (isMeDevice(deviceJid, senderPnDeviceJid, senderLidDeviceJid)) {
                     continue;
                 }
                 results.add(deviceJid);
@@ -163,37 +158,51 @@ public final class DeviceFanoutCalculator {
     }
 
     /**
-     * Returns whether the two JIDs reference the same device.
+     * Returns whether the candidate device JID is one of the sender's own devices.
      *
-     * @param a the first JID
-     * @param b the second JID
-     * @return {@code true} if both refer to the same device
+     * <p>Mirrors WA Web's {@code isMeDevice}, which is the disjunction
+     * {@code candidate.equals(meDevicePn) || candidate.equals(meDeviceLid)}.
+     *
+     * @param candidate          the candidate device JID
+     * @param senderPnDeviceJid  the sender's PN device JID, or {@code null}
+     * @param senderLidDeviceJid the sender's LID device JID, or {@code null}
+     * @return {@code true} when the candidate equals either sender device JID
      */
     @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
             exports = "isMeDevice",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static boolean isSameDevice(Jid a, Jid b) {
-        return Objects.equals(a, b);
+    private static boolean isMeDevice(Jid candidate, Jid senderPnDeviceJid, Jid senderLidDeviceJid) {
+        return Objects.equals(candidate, senderPnDeviceJid)
+                || Objects.equals(candidate, senderLidDeviceJid);
     }
 
     /**
-     * Returns whether the two JIDs reference the same account.
+     * Returns whether the candidate user-level JID is one of the sender's own accounts.
      *
-     * <p>The {@code hosted} server maps to {@code c.us} and {@code hosted.lid} to
-     * {@code lid} when comparing via {@link Jid#toUserJid()}.
+     * <p>Mirrors WA Web's {@code isMeAccount}, which is the disjunction
+     * {@code isMePnUser(candidate) || isMeLidUser(candidate)}. The {@code hosted} server
+     * maps to {@code c.us} and {@code hosted.lid} to {@code lid} when comparing via
+     * {@link Jid#toUserJid()}.
      *
-     * @param a the first JID
-     * @param b the second JID
-     * @return {@code true} if both reference the same account
+     * @param candidate          the candidate user JID
+     * @param senderPnDeviceJid  the sender's PN device JID, or {@code null}
+     * @param senderLidDeviceJid the sender's LID device JID, or {@code null}
+     * @return {@code true} when the candidate's user JID equals either sender account
      */
     @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
             exports = "isMeAccount",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static boolean isSameAccount(Jid a, Jid b) {
-        if (a == null || b == null) {
+    private static boolean isMeAccount(Jid candidate, Jid senderPnDeviceJid, Jid senderLidDeviceJid) {
+        if (candidate == null) {
             return false;
         }
-        return Objects.equals(a.toUserJid(), b.toUserJid());
+        var candidateUser = candidate.toUserJid();
+        if (senderPnDeviceJid != null
+                && candidateUser.equals(senderPnDeviceJid.toUserJid())) {
+            return true;
+        }
+        return senderLidDeviceJid != null
+                && candidateUser.equals(senderLidDeviceJid.toUserJid());
     }
 
     /**

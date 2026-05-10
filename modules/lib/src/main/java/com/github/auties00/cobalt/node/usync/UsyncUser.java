@@ -24,15 +24,6 @@ import java.util.Optional;
  * fields such as LID, device-list hashes, persona id, contact type, and
  * trusted-contact token. Per-protocol payload data is read back by each
  * {@code UsyncProtocol.buildUserElement} when the query stanza is assembled.
- *
- * @implNote The JS counterpart {@code WAWebUsyncUser.USyncUser} is a builder
- *     class with private numeric slots {@code $1..$12}. Cobalt names each slot
- *     for readability and promotes nullable slots to {@link Optional}
- *     accessors. {@code WAWebUsyncUser.validate} is removed because its only
- *     failure mode ("user must have an id, phone, username or pnJid") is
- *     unreachable by construction here. The runtime call to
- *     {@code WAWebWidValidator.validateWid} is also dropped because Cobalt's
- *     {@link Jid} factories validate at parse time.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncUser")
 public final class UsyncUser {
@@ -211,9 +202,6 @@ public final class UsyncUser {
      *
      * @param deviceHash the hash, base64-encoded
      * @return this builder
-     * @implNote Cobalt accepts any non-blank string. WhatsApp Web pre-filters
-     *     through {@code WAWebNonEmptyString.asMaybeNonEmptyString} which
-     *     collapses empty strings to {@code undefined}.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsyncUser",
             exports = "USyncUser.withDeviceHash", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -227,8 +215,6 @@ public final class UsyncUser {
      *
      * @param timestamp the cache timestamp
      * @return this builder
-     * @implNote The JS slot stores Unix epoch seconds. Cobalt promotes it to
-     *     {@link Instant}.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsyncUser",
             exports = "USyncUser.withTs", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -268,8 +254,6 @@ public final class UsyncUser {
      *
      * @param pin the username PIN
      * @return this builder
-     * @implNote The JS getter is named {@code getPin}. Cobalt unifies the name
-     *     to {@code pin} on both sides.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsyncUser",
             exports = "USyncUser.withUsernameKey", adaptation = WhatsAppAdaptation.DIRECT)

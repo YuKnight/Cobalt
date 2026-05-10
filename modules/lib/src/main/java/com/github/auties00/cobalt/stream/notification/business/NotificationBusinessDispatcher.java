@@ -15,14 +15,6 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * <p>This dispatcher owns one instance of each concrete business-category
  * handler and forwards each incoming node to the matching handler. Stanzas
  * with an unrecognised {@code type} are silently ignored.
- *
- * @implNote Adapts the notification-type switch inside
- *     {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza} that
- *     fans out to {@code WAWebHandleBusinessNotification},
- *     {@code WAWebHandleDigitalCommerceSubscriptionNotification},
- *     {@code WAWebHandleBotProfileNotification},
- *     {@code WAWebHandleMexNotification} and
- *     {@code WAWebPaymentNotificationHandler}.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class NotificationBusinessDispatcher implements SocketStream.Handler {
@@ -60,14 +52,6 @@ public final class NotificationBusinessDispatcher implements SocketStream.Handle
      * handler based on the stanza's {@code type} attribute.
      *
      * @param node the incoming notification stanza
-     * @implNote Mirrors the business-category arms of the
-     *     {@code case "notification":} switch on {@code n.type} inside
-     *     {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza}.
-     *     Unrecognised {@code type} values fall through silently: in WA
-     *     Web the unmatched default is handled by the surrounding
-     *     {@code handleLoggedInStanza} NACK logic, which is orchestrated
-     *     by Cobalt's outer stream pipeline rather than by this
-     *     dispatcher.
      */
     @WhatsAppWebExport(moduleName = "WAWebCommsHandleLoggedInStanza", exports = "handleLoggedInStanza", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
@@ -90,9 +74,6 @@ public final class NotificationBusinessDispatcher implements SocketStream.Handle
     /**
      * Fans out a reset call to every sub-handler so that any cached state
      * is discarded on a socket reconnect.
-     *
-     * @implNote Cobalt-specific lifecycle hook; WhatsApp Web handles this
-     *     via module-level reset calls.
      */
     @Override
     public void reset() {

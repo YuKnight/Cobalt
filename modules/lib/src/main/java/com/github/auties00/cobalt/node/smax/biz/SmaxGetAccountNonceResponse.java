@@ -14,12 +14,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGetAccountNonceRequest}.
- *
- * @implNote {@code WASmaxBizLinkingGetAccountNonceRPC.sendGetAccountNonceRPC}
- *           tries {@code Success} → {@code Error} in order. Cobalt
- *           collapses the {@code Error} arm into the
- *           {@code ClientError}/{@code ServerError} pair via the shared
- *           {@link SmaxBaseServerErrorMixin} helpers.
  */
 public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Response
         permits SmaxGetAccountNonceResponse.Success, SmaxGetAccountNonceResponse.ClientError, SmaxGetAccountNonceResponse.ServerError {
@@ -56,14 +50,6 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
     /**
      * The {@code Success} reply variant. The relay issued an
      * account-nonce.
-     *
-     * @implNote {@code WASmaxInBizLinkingGetAccountNonceResponseSuccess.parseGetAccountNonceResponseSuccess}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope, descends into the mandatory {@code <detail>}
-     *           child, asserts the mandatory {@code <nonce>}
-     *           grandchild and reads its element-content, then
-     *           optionally projects the
-     *           {@code <request><id/></request>} echo.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingGetAccountNonceResponseSuccess")
     final class Success implements SmaxGetAccountNonceResponse {
@@ -125,6 +111,9 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
          */
         @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingGetAccountNonceResponseSuccess",
                 exports = "parseGetAccountNonceResponseSuccess",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingGetAccountNonceResponseSuccess",
+                exports = "parseGetAccountNonceResponseSuccessDetailRequest",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Success> of(Node node, Node request) {
             Objects.requireNonNull(node, "node cannot be null");
@@ -188,13 +177,13 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
      * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} error code.
      *
-     * @implNote {@code WASmaxInBizLinkingGetAccountNonceResponseError.parseGetAccountNonceResponseError}
-     *           routes the {@code <error/>} child through
-     *           {@code WASmaxInBizLinkingAccountNonceErrors};
-     *           Cobalt collapses to the raw {@code (code, text)} pair.
+     * <p>Carries the parsed {@code (code, text)} pair plus the
+     * optional {@code tos_version} that only the {@code 475}
+     * {@code notice-required} sub-variant surfaces.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingGetAccountNonceResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingAccountNonceErrors")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingIQErrorNoticeRequiredMixin")
     final class ClientError implements SmaxGetAccountNonceResponse {
         /**
          * The numeric server-side error code.
@@ -207,15 +196,26 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
         private final String errorText;
 
         /**
+         * The {@code tos_version} carried only by the
+         * {@code notice-required} sub-variant ({@code 475}); may be
+         * {@code null} for the {@code bad-request} arm.
+         */
+        private final Integer tosVersion;
+
+        /**
          * Constructs a new client-error reply.
          *
-         * @param errorCode the numeric error code
-         * @param errorText the optional human-readable text; may be
-         *                  {@code null}
+         * @param errorCode  the numeric error code
+         * @param errorText  the optional human-readable text; may be
+         *                   {@code null}
+         * @param tosVersion the optional {@code tos_version}; may be
+         *                   {@code null} when the error is not
+         *                   {@code notice-required}
          */
-        public ClientError(int errorCode, String errorText) {
+        public ClientError(int errorCode, String errorText, Integer tosVersion) {
             this.errorCode = errorCode;
             this.errorText = errorText;
+            this.tosVersion = tosVersion;
         }
 
         /**
@@ -238,8 +238,29 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
         }
 
         /**
+         * Returns the optional {@code tos_version}, present only on
+         * the {@code (475, "notice-required")} sub-variant.
+         *
+         * @return an {@link Optional} carrying the version, or empty
+         *         when the error is not {@code notice-required}
+         */
+        public Optional<Integer> tosVersion() {
+            return Optional.ofNullable(tosVersion);
+        }
+
+        /**
          * Tries to parse a {@link ClientError} variant from the given
          * inbound stanza.
+         *
+         * <p>Validates the {@code <iq>} envelope and extracts the
+         * {@code (code, text)} pair via the shared 4xx envelope
+         * helper, then validates the literal pair against the
+         * documented disjunction
+         * ({@code (400, "bad-request")} or
+         * {@code (475, "notice-required")}). For the
+         * {@code notice-required} arm the {@code <error/>} child's
+         * {@code tos_version} attribute is projected through the
+         * {@code [1, 65535]} range check before being surfaced.
          *
          * @param node    the inbound IQ stanza
          * @param request the original outbound request
@@ -250,12 +271,44 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
         @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingGetAccountNonceResponseError",
                 exports = "parseGetAccountNonceResponseError",
                 adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingAccountNonceErrors",
+                exports = "parseAccountNonceErrors",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingIQErrorNoticeRequiredMixin",
+                exports = "parseIQErrorNoticeRequiredMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<ClientError> of(Node node, Node request) {
             var envelope = SmaxBaseServerErrorMixin.parseClientError(node, request).orElse(null);
             if (envelope == null) {
                 return Optional.empty();
             }
-            return Optional.of(new ClientError(envelope.code(), envelope.text()));
+            var code = envelope.code();
+            var text = envelope.text();
+            // Validate the (code, text) pair against the documented disjunction.
+            Integer tosVersion = null;
+            if (code == 400 && "bad-request".equals(text)) {
+                // IQErrorBadRequestMixin: text="bad-request", code=400.
+            } else if (code == 475 && "notice-required".equals(text)) {
+                // IQErrorNoticeRequiredMixin: text="notice-required", code=475,
+                // plus tos_version in [1, 65535] on the <error/> child.
+                var errorChild = node.getChild("error").orElse(null);
+                if (errorChild == null) {
+                    return Optional.empty();
+                }
+                var tos = errorChild.getAttributeAsInt("tos_version");
+                if (tos.isEmpty()) {
+                    return Optional.empty();
+                }
+                var tosValue = tos.getAsInt();
+                if (tosValue < 1 || tosValue > 65535) {
+                    return Optional.empty();
+                }
+                tosVersion = tosValue;
+            } else {
+                // Unknown (code, text) pair; not a documented BizLinking variant.
+                return Optional.empty();
+            }
+            return Optional.of(new ClientError(code, text, tosVersion));
         }
 
         @Override
@@ -267,18 +320,21 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
                 return false;
             }
             var that = (ClientError) obj;
-            return this.errorCode == that.errorCode && Objects.equals(this.errorText, that.errorText);
+            return this.errorCode == that.errorCode
+                    && Objects.equals(this.errorText, that.errorText)
+                    && Objects.equals(this.tosVersion, that.tosVersion);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(errorCode, errorText);
+            return Objects.hash(errorCode, errorText, tosVersion);
         }
 
         @Override
         public String toString() {
             return "SmaxGetAccountNonceResponse.ClientError[errorCode=" + errorCode
-                    + ", errorText=" + errorText + ']';
+                    + ", errorText=" + errorText
+                    + ", tosVersion=" + tosVersion + ']';
         }
     }
 
@@ -286,13 +342,10 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}) while processing the
      * request.
-     *
-     * @implNote Sourced from the {@code 5xx} arms of
-     *           {@code WASmaxInBizLinkingAccountNonceErrors}; Cobalt
-     *           routes through the shared
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingGetAccountNonceResponseError")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingAccountNonceErrors")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingIQErrorInternalServerErrorMixin")
     final class ServerError implements SmaxGetAccountNonceResponse {
         /**
          * The numeric server-side error code.
@@ -345,6 +398,14 @@ public sealed interface SmaxGetAccountNonceResponse extends SmaxOperation.Respon
          *         empty when the stanza does not match the
          *         server-error schema
          */
+        @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingGetAccountNonceResponseError",
+                exports = "parseGetAccountNonceResponseError",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingAccountNonceErrors",
+                exports = "parseAccountNonceErrors", adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingIQErrorInternalServerErrorMixin",
+                exports = "parseIQErrorInternalServerErrorMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<ServerError> of(Node node, Node request) {
             var envelope = SmaxBaseServerErrorMixin.parseServerError(node, request).orElse(null);
             if (envelope == null) {

@@ -25,6 +25,8 @@ import it.auties.protobuf.stream.ProtobufOutputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Stream;
+import java.util.stream.Stream;
 
 /**
  * Chunk of account history transferred from the primary device to a companion
@@ -653,15 +655,31 @@ public abstract sealed class HistorySync {
             }
 
             /**
-             * Returns the messages of this chat as a sequenced collection of
+             * Returns the messages of this chat as a {@link Stream} of
              * {@link ChatMessageInfo}, projected on the fly from the
              * underlying {@link HistorySyncMsg} envelopes.
              *
-             * @return the sequenced collection of messages
+             * <p>The returned stream holds no external resource; closing it
+             * is a no-op but callers are still expected to honour the
+             * try-with-resources contract declared by the abstract
+             * {@link com.github.auties00.cobalt.model.chat.Chat#messages()}.
+             *
+             * @return the stream of messages, in insertion order
              */
             @Override
-            public SequencedCollection<ChatMessageInfo> messages() {
-                return messages.toView();
+            public Stream<ChatMessageInfo> messages() {
+                return messages.toStream();
+            }
+
+            /**
+             * Returns the number of messages currently stored in this
+             * history-sync chat.
+             *
+             * @return the message count, in {@code O(1)}
+             */
+            @Override
+            public int messageCount() {
+                return messages.size();
             }
 
             /**
@@ -921,140 +939,22 @@ public abstract sealed class HistorySync {
                 }
 
                 /**
-                 * Returns an unmodifiable, live sequenced view of the chat
-                 * messages carried by this collection, projected through
-                 * {@link HistorySyncMsg#message()}.
+                 * Returns a lazy {@link Stream} of the chat messages carried
+                 * by this collection, projected through
+                 * {@link HistorySyncMsg#message()} on demand. Envelopes that
+                 * carry no inner message are dropped.
                  *
-                 * <p>Each call does not materialise a snapshot: reads delegate
-                 * to the backing sequenced collection of envelopes and unwrap
-                 * the inner {@link ChatMessageInfo} lazily.
+                 * <p>Elements are unwrapped one at a time during iteration
+                 * without any intermediate materialisation. The stream
+                 * reflects subsequent mutations of the backing map.
                  *
-                 * @return a non-null, unmodifiable sequenced collection of
-                 *         chat messages backed by this map
+                 * @return a non-null lazy stream of chat messages, in
+                 *         insertion order
                  */
-                public SequencedCollection<ChatMessageInfo> toView() {
-                    return toView(backing.sequencedValues());
-                }
-
-                /**
-                 * Returns an unmodifiable sequenced view over the given
-                 * {@link HistorySyncMsg} source, projecting each envelope
-                 * through {@link HistorySyncMsg#message()}.
-                 *
-                 * <p>All read operations delegate to {@code source}, so the
-                 * view reflects subsequent mutations of the backing map.
-                 * Mutating operations throw {@link UnsupportedOperationException}.
-                 *
-                 * @param source the source collection of envelopes to project
-                 * @return an unmodifiable sequenced view over {@code source}
-                 */
-                private SequencedCollection<ChatMessageInfo> toView(SequencedCollection<T> source) {
-                    return new SequencedCollection<>() {
-                        @Override
-                        public SequencedCollection<ChatMessageInfo> reversed() {
-                            return toView(source.reversed());
-                        }
-
-                        @Override
-                        public int size() {
-                            return source.size();
-                        }
-
-                        @Override
-                        public boolean isEmpty() {
-                            return source.isEmpty();
-                        }
-
-                        @Override
-                        public boolean contains(Object o) {
-                            return o instanceof ChatMessageInfo needle
-                                   && source.stream().anyMatch(envelope -> envelope.message().filter(needle::equals).isPresent());
-                        }
-
-                        @Override
-                        public Iterator<ChatMessageInfo> iterator() {
-                            var inner = source.iterator();
-                            return new Iterator<>() {
-                                @Override
-                                public boolean hasNext() {
-                                    return inner.hasNext();
-                                }
-
-                                @Override
-                                public ChatMessageInfo next() {
-                                    return inner.next().message().orElse(null);
-                                }
-                            };
-                        }
-
-                        @Override
-                        public Object[] toArray() {
-                            var size = source.size();
-                            var result = new Object[size];
-                            var i = 0;
-                            for (var envelope : source) {
-                                if (i == size) {
-                                    break;
-                                }
-                                result[i++] = envelope.message().orElse(null);
-                            }
-                            return result;
-                        }
-
-                        @Override
-                        @SuppressWarnings("unchecked")
-                        public <T> T[] toArray(T[] a) {
-                            var size = source.size();
-                            var result = a.length >= size ? a : Arrays.copyOf(a, size);
-                            var i = 0;
-                            for (var envelope : source) {
-                                if (i == size) {
-                                    break;
-                                }
-                                result[i++] = (T) envelope.message().orElse(null);
-                            }
-                            if (result.length > i) {
-                                result[i] = null;
-                            }
-                            return result;
-                        }
-
-                        @Override
-                        public boolean containsAll(Collection<?> c) {
-                            Objects.requireNonNull(c);
-                            return c.stream().allMatch(this::contains);
-                        }
-
-                        @Override
-                        public boolean add(ChatMessageInfo e) {
-                            throw new UnsupportedOperationException();
-                        }
-
-                        @Override
-                        public boolean remove(Object o) {
-                            throw new UnsupportedOperationException();
-                        }
-
-                        @Override
-                        public boolean addAll(Collection<? extends ChatMessageInfo> c) {
-                            throw new UnsupportedOperationException();
-                        }
-
-                        @Override
-                        public boolean removeAll(Collection<?> c) {
-                            throw new UnsupportedOperationException();
-                        }
-
-                        @Override
-                        public boolean retainAll(Collection<?> c) {
-                            throw new UnsupportedOperationException();
-                        }
-
-                        @Override
-                        public void clear() {
-                            throw new UnsupportedOperationException();
-                        }
-                    };
+                public Stream<ChatMessageInfo> toStream() {
+                    return backing.sequencedValues()
+                            .stream()
+                            .flatMap(envelope -> envelope.message().stream());
                 }
 
                 /**

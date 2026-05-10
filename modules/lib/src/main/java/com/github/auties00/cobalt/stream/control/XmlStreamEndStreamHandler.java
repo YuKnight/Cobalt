@@ -14,12 +14,6 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * server has finished sending data and will close the socket shortly. This
  * handler logs the event for diagnostics and does not send any ack stanza
  * back to the server (the {@code "NO_ACK"} contract from WA Web).
- *
- * @implNote WA Web does not expose a dedicated module for this stanza: the
- * behavior is inlined inside the {@code "xmlstreamend"} branch of the
- * {@code handleLoggedInStanza} switch in {@code WAWebCommsHandleLoggedInStanza},
- * which logs the message and returns {@code "NO_ACK"} so that no
- * acknowledgement node is dispatched to the server.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class XmlStreamEndStreamHandler implements SocketStream.Handler {
@@ -56,8 +50,6 @@ public final class XmlStreamEndStreamHandler implements SocketStream.Handler {
      * {@code "NO_ACK"} contract.
      *
      * @param node the {@code <xmlstreamend>} stanza received from the server
-     * @implNote The log message text matches the WA Web template literal
-     * exactly: {@code "Comms.handleStanza received xmlstreamend, return NO_ACK"}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCommsHandleLoggedInStanza", exports = "handleLoggedInStanza", adaptation = WhatsAppAdaptation.ADAPTED)

@@ -56,12 +56,6 @@ public final class IqClearDirtyBitsRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <clean/>} payload children
-     *
-     * @implNote {@code WAWebClearDirtyBitsJob.clearDirtyBits} composes
-     *           {@code wap("iq", {to:S_WHATSAPP_NET, type:"set",
-     *           xmlns:"urn:xmpp:whatsapp:dirty", id}, ...t.map(e =&#42;>
-     *           wap("clean", {type:CUSTOM_STRING(e.type),
-     *           timestamp:INT(e.timestamp)})))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearDirtyBitsJob",
@@ -112,10 +106,6 @@ public final class IqClearDirtyBitsRequest implements IqOperation.Request {
      * Per-resource dirty-bit entry — a {@code (type, timestamp)} pair
      * routed verbatim into one {@code <clean/>} child of the outbound
      * IQ.
-     *
-     * @implNote {@code WAWebClearDirtyBitsJob.clearDirtyBits}: each
-     *           entry is the {@code {type, timestamp}} shape consumed
-     *           by the helper.
      */
     @WhatsAppWebModule(moduleName = "WAWebClearDirtyBitsJob")
     public static final class DirtyEntry {

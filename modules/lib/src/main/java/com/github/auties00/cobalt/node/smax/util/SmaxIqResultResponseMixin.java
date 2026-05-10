@@ -28,15 +28,24 @@ import java.util.Objects;
  * an explicit {@code to} (the sub-set of groups RPCs addressed at
  * {@code G_US}) can still use the helper without supplying a synthetic
  * reference.
- *
- * @implNote {@code WASmaxInGroupsIQResultResponseMixin.parseIQResultResponseMixin}
- *           and the equally-shaped {@code parseIQErrorResponseMixin} share
- *           this very same envelope. Cobalt provides a single
- *           {@link #validate(Node, Node)} for the success case and a
- *           companion {@link SmaxIqErrorResponseMixin} for the error case
- *           rather than re-emitting one mixin per RPC.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInGroupsIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizAccessTokenIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizAccessTokenHackBaseIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountHackBaseIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizCtwaNativeAdIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizCtwaNativeAdHackBaseIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizLinkingIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizLinkingHackBaseIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageHackBaseIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBugReportingHackBaseIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizMsgUserFeedbackIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizSettingsIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBotIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBrPaymentIQResultResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBugReportingIQResultResponseMixin")
 public final class SmaxIqResultResponseMixin {
 
     /**
@@ -66,16 +75,40 @@ public final class SmaxIqResultResponseMixin {
      * @return {@code true} when {@code reply} is a result envelope echoing
      *         {@code request}'s identifiers; {@code false} otherwise
      * @throws NullPointerException if either argument is {@code null}
-     *
-     * @implNote {@code WASmaxInGroupsIQResultResponseMixin.parseIQResultResponseMixin}
-     *           returns the structured result of the same checks. Cobalt
-     *           collapses to a boolean since none of its callers consume
-     *           the parsed projection (the {@code type} field is always
-     *           {@code "result"} when the function succeeds and the
-     *           echoed scalars have already been validated by the request
-     *           builder).
      */
     @WhatsAppWebExport(moduleName = "WASmaxInGroupsIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizAccessTokenIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizAccessTokenHackBaseIQResultResponseMixin",
+            exports = "parseHackBaseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountHackBaseIQResultResponseMixin",
+            exports = "parseHackBaseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaNativeAdIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaNativeAdHackBaseIQResultResponseMixin",
+            exports = "parseHackBaseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingHackBaseIQResultResponseMixin",
+            exports = "parseHackBaseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageHackBaseIQResultResponseMixin",
+            exports = "parseHackBaseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBugReportingHackBaseIQResultResponseMixin",
+            exports = "parseHackBaseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizMsgUserFeedbackIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizSettingsIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBotIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentIQResultResponseMixin",
+            exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBugReportingIQResultResponseMixin",
             exports = "parseIQResultResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
     public static boolean validate(Node reply, Node request) {
         Objects.requireNonNull(reply, "reply cannot be null");

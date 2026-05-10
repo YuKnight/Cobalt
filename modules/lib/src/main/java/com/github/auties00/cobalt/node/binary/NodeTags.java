@@ -76,25 +76,16 @@ public final class NodeTags {
 
     /**
      * Marks a cross platform interoperability JID.
-     *
-     * @implNote The body is a user string, a 16 bit device id, a 16 bit
-     *           integrator id, and a domain string.
      */
     public static final byte JID_INTEROP = (byte) 245;
 
     /**
      * Marks a Facebook Messenger JID.
-     *
-     * @implNote The body is a user string, a 16 bit device id, and a
-     *           domain string.
      */
     public static final byte JID_FB = (byte) 246;
 
     /**
      * Marks a multi device JID with explicit domain code.
-     *
-     * @implNote The body is an 8 bit domain code, an 8 bit device id, and
-     *           a user string.
      */
     public static final byte AD_JID = (byte) 247;
 

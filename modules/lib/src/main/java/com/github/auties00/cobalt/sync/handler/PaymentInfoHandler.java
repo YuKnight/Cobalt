@@ -6,14 +6,11 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.payment.PaymentInfoAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Handles payment info sync actions.
  *
@@ -29,27 +26,17 @@ import com.github.auties00.cobalt.wam.WamService;
  * {@code setPaymentInstructionCpi}.
  *
  * <p>Index format: {@code ["payment_info"]}
- *
- * @implNote WAWebPaymentInfoSync.default — singleton instance
- *           {@code m = new d()} exported as {@code l.default = m} where
- *           {@code d} extends {@code AccountSyncdActionBase}
  */
 @WhatsAppWebModule(moduleName = "WAWebPaymentInfoSync")
 public final class PaymentInfoHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code PaymentInfoHandler}.
-     *
-     * @implNote WAWebPaymentInfoSync — module-level
-     *           {@code m = new d(); l.default = m}
      */
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final PaymentInfoHandler INSTANCE = new PaymentInfoHandler();
 
     /**
      * Creates a new {@code PaymentInfoHandler}.
-     *
-     * @implNote WAWebPaymentInfoSync.d — constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      */
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private PaymentInfoHandler() {
@@ -58,10 +45,6 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for payment info mutations.
-     *
-     * @implNote WAWebPaymentInfoSync.getAction — returns
-     *           {@code WASyncdConst.Actions.PaymentInfo} which is
-     *           {@code "payment_info"}
      * @return the action name {@code "payment_info"}
      */
     @Override
@@ -72,9 +55,6 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the collection name for payment info mutations.
-     *
-     * @implNote WAWebPaymentInfoSync — constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -85,33 +65,12 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for payment info mutations.
-     *
-     * @implNote WAWebPaymentInfoSync.getVersion — returns {@code 7}
      * @return {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PaymentInfoAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single payment info mutation.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result state is {@code SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebPaymentInfoSync.applyMutations — WA Web returns
-     *           {@code WASyncdConst.SyncActionState} values directly; Cobalt
-     *           wraps them in {@link MutationApplicationResult} for type safety
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -151,15 +110,13 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
      * diff-against-current and event-emission logic in
      * {@code WAWebPaymentInfo.setCPIInfo} is collapsed into the single
      * store setter {@link com.github.auties00.cobalt.store.WhatsAppStore#setPaymentInstructionCpi(String)}.
-     *
-     * @implNote WAWebPaymentInfoSync.applyMutations
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var platform = client.store().device().platform(); // ADAPTED: WAWebMobilePlatforms.isSMB — checks c === u.SMBA || c === u.SMBI where SMBA = "smba" (ANDROID_BUSINESS) and SMBI = "smbi" (IOS_BUSINESS)
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
             return MutationApplicationResult.unsupported();
@@ -174,12 +131,12 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().action().orElse(null) instanceof PaymentInfoAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var cpi = action.cpi().orElse(null);
         if (cpi == null) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().setPaymentInstructionCpi(cpi); // ADAPTED: WAWebBackendApi.frontendFireAndForget("setCPIInfo") -> WAWebPaymentInfoSyncBridgeApi.setCPIInfo -> WAWebPaymentInfo.setCPIInfo -> WAWebUserPrefsPaymentInfo.setCPIInfo collapsed into WhatsAppStore.setPaymentInstructionCpi

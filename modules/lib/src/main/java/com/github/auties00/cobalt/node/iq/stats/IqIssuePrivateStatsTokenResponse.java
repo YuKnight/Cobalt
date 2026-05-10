@@ -14,14 +14,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link IqIssuePrivateStatsTokenRequest}.
- *
- * @implNote {@code WASmaxPrivatestatsSignCredentialRPC.sendSignCredentialRPC}
- *           tries {@code Success} (signed credential issued) →
- *           {@code ClientError} (bad request, no retry) →
- *           {@code ServerError} (internal failure, may retry) in
- *           order. Cobalt mirrors the same priority ordering and
- *           returns {@link Optional#empty()} on no-match instead of
- *           throwing a parsing failure.
  */
 public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Response
         permits IqIssuePrivateStatsTokenResponse.Success, IqIssuePrivateStatsTokenResponse.ClientError, IqIssuePrivateStatsTokenResponse.ServerError {
@@ -66,13 +58,6 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
      * coordinates ({@code c}, {@code s}) are 32-byte elliptic-curve
      * scalars. The {@code signCredentialT} timestamp records the
      * relay-side wall-clock when the signature was minted.
-     *
-     * @implNote {@code WASmaxInPrivatestatsSignCredentialResponseSuccess.parseSignCredentialResponseSuccess}
-     *           extracts the {@code <signed_credential>},
-     *           {@code <acs_public_key>}, {@code <dleq_proof>}
-     *           ({@code <c>}/{@code <s>}), {@code <project_name>}
-     *           grandchildren of {@code <sign_credential>}, plus
-     *           the {@code t} attribute.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsSignCredentialResponseSuccess")
     final class Success implements IqIssuePrivateStatsTokenResponse {
@@ -204,13 +189,6 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
          * @return an {@link Optional} carrying the parsed variant,
          *         or empty when the stanza does not match the
          *         success schema
-         *
-         * @implNote Mirrors
-         *           {@code WASmaxInPrivatestatsSignCredentialResponseSuccess.parseSignCredentialResponseSuccess}
-         *. Validates the IQ envelope, extracts every
-         *           grandchild of {@code <sign_credential>},
-         *           checks the 32-byte length on each scalar, and
-         *           reads the {@code t} attribute.
          */
         @WhatsAppWebExport(moduleName = "WASmaxInPrivatestatsSignCredentialResponseSuccess",
                 exports = "parseSignCredentialResponseSuccess", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -303,12 +281,6 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
      * The {@code ClientError} reply variant. The relay rejected
      * the credential issuance request as malformed or otherwise
      * non-retryable.
-     *
-     * @implNote {@code WASmaxInPrivatestatsSignCredentialResponseErrorNoRetry.parseSignCredentialResponseErrorNoRetry}
-     *           routes through
-     *           {@code WASmaxInPrivatestatsSignCredentialNoRetryError}
-     *           to extract a per-error-code semantic enum. Cobalt
-     *           collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsSignCredentialResponseErrorNoRetry")
     final class ClientError implements IqIssuePrivateStatsTokenResponse {
@@ -403,13 +375,6 @@ public sealed interface IqIssuePrivateStatsTokenResponse extends IqOperation.Res
      * The {@code ServerError} reply variant. The relay encountered
      * a transient internal failure while issuing the credential.
      * The caller may retry after a backoff.
-     *
-     * @implNote {@code WASmaxInPrivatestatsSignCredentialResponseErrorRetry.parseSignCredentialResponseErrorRetry}
-     *           extracts the canonical
-     *           {@code <error code text/>} child via
-     *           {@code WASmaxInPrivatestatsIQErrorInternalServerErrorMixin}.
-     *           Cobalt routes through the shared
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsSignCredentialResponseErrorRetry")
     final class ServerError implements IqIssuePrivateStatsTokenResponse {

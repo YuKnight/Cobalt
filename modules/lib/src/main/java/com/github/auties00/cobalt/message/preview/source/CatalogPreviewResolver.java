@@ -24,8 +24,6 @@ import java.util.Optional;
  * Builds preview details for {@code wa.me/c/...} catalog and
  * {@code wa.me/p/.../...} product links by querying the server-side
  * catalog through {@link WhatsAppClient#queryBusinessCatalog(Jid)}.
- *
- * @implNote WAWebBizLinkPreviewCatalogUtils.getProductOrCatalogLinkPreview.
  */
 @WhatsAppWebModule(moduleName = "WAWebBizLinkPreviewCatalogUtils")
 public final class CatalogPreviewResolver {
@@ -152,9 +150,6 @@ public final class CatalogPreviewResolver {
      * @param wid    the catalog owner JID
      * @return the display name, falling back to the JID's user portion
      *         when nothing else resolves
-     * @implNote WAWebBizLinkPreviewCatalogUtils inner branch:
-     *           {@code MeUser.equals(c) ? getDisplayName(localContact)
-     *           : (await getOrQueryUsyncInfo(...)).bizInfo.verifiedName.name}.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetOrQueryUsyncInfoContactAction", exports = "getOrQueryUsyncInfo",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -189,10 +184,6 @@ public final class CatalogPreviewResolver {
      *
      * @param product the catalog entry
      * @return the description string
-     * @implNote WAWebBizLinkPreviewCatalogUtils inner block: when both
-     *           description and price are present joins them with
-     *           {@code " · "}; otherwise falls back to whichever is
-     *           available.
      */
     private static String buildProductDescription(BusinessCatalogEntry product) {
         var description = product.description().orElse(null);
@@ -217,7 +208,6 @@ public final class CatalogPreviewResolver {
      * @param currency the ISO 4217 currency code
      * @param amount   the amount in thousandths
      * @return the formatted amount
-     * @implNote WAWebCurrencyUtils.formatAmount1000.
      */
     @WhatsAppWebExport(moduleName = "WAWebCurrencyUtils", exports = "formatAmount1000",
             adaptation = WhatsAppAdaptation.ADAPTED)

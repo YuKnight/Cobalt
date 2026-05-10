@@ -26,6 +26,7 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebSignalCipherApi")
 @WhatsAppWebModule(moduleName = "WAWebSignalSessionApi")
 @WhatsAppWebModule(moduleName = "WAWebCryptoLibrary")
+@WhatsAppWebModule(moduleName = "WASignalGroupCipher")
 public final class MessageEncryption {
     /**
      * Holds the logger used for encryption diagnostics.
@@ -164,6 +165,8 @@ public final class MessageEncryption {
             adaptation = WhatsAppAdaptation.DIRECT)
     @WhatsAppWebExport(moduleName = "WAWebCryptoLibrary", exports = "encryptSenderKeyMsgSignalProto",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASignalGroupCipher", exports = "encryptSenderKeyMsgWithSession",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public MessageEncryptedPayload encryptForGroup(Jid groupJid, Jid senderJid, byte[] plaintext) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
@@ -236,6 +239,8 @@ public final class MessageEncryption {
      */
     @WhatsAppWebExport(moduleName = "WAWebSignalSessionApi", exports = "getGroupSenderKeyInfo",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASignalGroupCipher", exports = "createSenderKeyDistributionProto",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public SignalSenderKeyDistributionMessage createSenderKeyDistributionMessage(Jid groupJid, Jid senderJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");

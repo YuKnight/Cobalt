@@ -90,14 +90,6 @@ public final class SmaxGroupsJoinLinkedGroupRequest implements SmaxOperation.Req
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <join_linked_group/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsJoinLinkedGroupRequest.makeJoinLinkedGroupRequest}
-     *           composes
-     *           {@code WASmaxOutGroupsBaseSetGroupMixin}
-     *           ({@code xmlns="w:g2"}, {@code to=GROUP_JID(t)}) over
-     *           {@code <join_linked_group jid type/>}. Cobalt builds
-     *           the same shape inline; the {@code id} attribute is
-     *           injected by {@code WhatsAppClient.sendNode}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsJoinLinkedGroupRequest",

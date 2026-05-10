@@ -25,13 +25,6 @@ import java.util.Optional;
  * {@code entry_point} variable carries the UI surface that triggered the
  * rotation so the relay can attribute usage telemetry to the originating
  * flow.
- *
- * @implNote WAWebMexCreateInviteCodeJob: adapts the
- * {@code mexCreateInviteCode} GraphQL mutation, which in WA Web is invoked
- * via {@code WAWebMexClient.fetchQuery} and whose response is unwrapped by
- * the same module to expose the {@code code} scalar. Cobalt models the
- * request and response as sibling variants of a sealed interface rather
- * than a free-standing async function.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexCreateInviteCodeJob")
 public final class CreateInviteCodeMexRequest implements MexOperation.Request.Json {
@@ -53,12 +46,6 @@ public final class CreateInviteCodeMexRequest implements MexOperation.Request.Js
     /**
      * Constructs a request that asks the relay to mint a fresh invite code
      * for the given {@code receiver}.
-     *
-     * @implNote The sole caller in WA Web ({@code WAWebOutContactInviteAction.sendInvite})
-     * always forwards a non-{@code null} telemetry tag identifying the UI
-     * surface that triggered the action, so Cobalt enforces the contract at
-     * the API boundary rather than emitting a JSON {@code null} the server
-     * would treat as a missing telemetry signal.
      * @param receiver   the opaque receiver identifier the code is being
      *                   minted for, never {@code null}
      * @param entryPoint the UI-surface telemetry tag (e.g.
@@ -93,12 +80,6 @@ public final class CreateInviteCodeMexRequest implements MexOperation.Request.Js
 
     /**
      * Builds the IQ stanza that dispatches this operation to the WhatsApp relay.
-     *
-     * @implNote WA Web constructs the {@code variables} object inline as
-     * {@code {input: {receiver: t, entry_point: r}}} and delegates to
-     * {@code WAWebMexClient.fetchQuery}. Cobalt writes the JSON directly via
-     * {@code fastjson2.JSONWriter} and wraps it through
-     * {@link Json#createMexNode(String, String)}.
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised GraphQL variables
      */

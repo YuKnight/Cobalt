@@ -18,7 +18,6 @@ import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,24 +34,17 @@ import java.util.regex.Pattern;
  * (mark a contact as no longer in the user's address book).
  *
  * <p>Index format: {@code ["contact", contactJid]}.
- *
- * @implNote WAWebContactSync.default — singleton instance of the contact sync action
- *           handler extending {@code AccountSyncdActionBase}
  */
 @WhatsAppWebModule(moduleName = "WAWebContactSync")
 public final class ContactActionHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of this handler.
-     *
-     * @implNote WAWebContactSync — module-level singleton {@code v = new b()}
      */
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ContactActionHandler INSTANCE = new ContactActionHandler();
 
     /**
      * Logger for diagnostic messages emitted during contact sync processing.
-     *
-     * @implNote ADAPTED: WAWebContactSync uses WALogger; Cobalt uses java.util.logging
      */
     private static final Logger LOGGER = Logger.getLogger(ContactActionHandler.class.getName());
 
@@ -62,17 +54,11 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      * <p>Used by {@link #deriveShortName(String)} to split a full name into words,
      * matching the WA Web {@code WAWebContactShortName.getShortName} behavior which
      * splits on {@code /\s/}.
-     *
-     * @implNote ADAPTED: WAWebContactShortName.getShortName — JS regex {@code /\s/} mapped
-     *           to Java's {@code \s} pattern
      */
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s");
 
     /**
      * Private constructor preventing external instantiation.
-     *
-     * @implNote WAWebContactSync — class {@code b} constructor sets
-     *           {@code collectionName = CriticalUnblockLow}
      */
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ContactActionHandler() {
@@ -81,9 +67,6 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for this handler.
-     *
-     * @implNote WAWebContactSync.getAction — returns {@code WASyncdConst.Actions.Contact}
-     *           (value: {@code "contact"})
      * @return the action name string
      */
     @Override
@@ -94,9 +77,6 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection this handler belongs to.
-     *
-     * @implNote WAWebContactSync — constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.CriticalUnblockLow}
      * @return the sync patch type
      */
     @Override
@@ -107,29 +87,12 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for this handler.
-     *
-     * @implNote WAWebContactSync.getVersion — returns {@code 2}
      * @return the version number
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return ContactAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single contact mutation and returns whether it succeeded.
-     *
-     * @implNote WAWebContactSync.applyMutations — per-mutation logic within the batch
-     *           handler, delegating to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -149,20 +112,17 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      *   <li>Skips LID and bot contacts (returns {@code SKIPPED})</li>
      *   <li>Clears the contact's name and username fields</li>
      * </ul>
-     *
-     * @implNote WAWebContactSync.applyMutations — per-mutation processing within the
-     *           batch {@code applyMutations(t, a, i)} method
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var contactJidString = indexArray.getString(1);
         if (contactJidString == null || contactJidString.isEmpty()) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         var contactJid = Jid.of(contactJidString);
@@ -172,7 +132,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
         switch (mutation.operation()) {
             case SET -> {
                 if (!(mutation.value().action().orElse(null) instanceof ContactAction action)) {
-                    return malformedActionValue();
+                    return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
                 if (contactJid.hasLidServer()) {
@@ -210,7 +170,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                 });
 
                 // SKIPPED: debounced background contact sync refresh; not mirrored in Cobalt.
-                retryOrphanStatusMutes(client, wamService, contactJidString);
+                retryOrphanStatusMutes(client, contactJidString);
 
                 return MutationApplicationResult.success();
             }
@@ -254,10 +214,6 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      *
      * <p>The contact JID is serialized in legacy format for the index, matching
      * WhatsApp Web's use of {@code e.toString({legacy: true})}.
-     *
-     * @implNote WAWebContactSync.getContactSyncMutation — builds a pending mutation via
-     *           {@code WAWebSyncdActionUtils.buildPendingMutation} with the contact's
-     *           action fields and index arguments
      * @param contactJid          the JID of the contact being synced
      * @param firstName           the contact's first name, or {@code null}
      * @param fullName            the contact's full name, or {@code null}
@@ -314,19 +270,11 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      * orphaned {@code userStatusMute} mutations referencing that contact's JID
      * are re-applied. Successfully applied orphan mutations are removed from
      * the store.
-     *
-     * @implNote WAWebContactSync.applyMutations —
-     *           {@code o("WAWebSyncdOrphan").checkOrphanUserStatusMutes(y.map(...))}
-     *           retrieves and re-applies orphan status mute mutations by model ID.
-     *           WA Web catches errors with {@code .catch()} and logs; Cobalt uses
-     *           try/catch and logs via java.util.logging.
      * @param client           the WhatsApp client instance
-     * @param wamService       the WAM telemetry service propagated to the
-     *                         orphan handler's per-mutation classification
      * @param contactJidString the JID string of the contact to check orphans for
      */
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void retryOrphanStatusMutes(WhatsAppClient client, WamService wamService, String contactJidString) {
+    private void retryOrphanStatusMutes(WhatsAppClient client, String contactJidString) {
         try {
             var entries = client.store().findOrphanMutationsByModel(UserStatusMuteAction.COLLECTION_NAME, contactJidString);
             if (entries.isEmpty()) {
@@ -342,7 +290,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                         entry.timestamp(),
                         entry.actionVersion()
                 );
-                var result = UserStatusMuteHandler.INSTANCE.applyMutationResult(client, wamService, orphanMutation);
+                var result = UserStatusMuteHandler.INSTANCE.applyMutation(client, orphanMutation);
                 if (result.actionState() == SyncActionState.SUCCESS) {
                     applied.add(entry);
                 }
@@ -366,10 +314,6 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      * the {@code WAWebAlphaRegex} character class). If the first token is
      * non-empty and contains a letter, it is returned; otherwise an empty string
      * is returned.
-     *
-     * @implNote WAWebContactShortName.getShortName — splits on {@code /\s/}, takes
-     *           first token, tests against {@code WAWebAlphaRegex}, returns
-     *           {@code asMaybeNonEmptyString(a)} or {@code null} (mapped to {@code ""})
      * @param fullName the full name to derive from
      * @return the first word of the full name, or an empty string if the name
      *         is blank or the first token does not contain a letter character
@@ -397,10 +341,6 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      * regex (a comprehensive Unicode letter character class) matches any character
      * in the string. Java's {@code Character.isLetter()} covers the same Unicode
      * categories (L* general category), so a simple code-point scan is sufficient.
-     *
-     * @implNote ADAPTED: WAWebAlphaRegex.exec(a) — WA Web uses a regex character class
-     *           covering Unicode letters; Java's {@code Character.isLetter()} covers
-     *           the same Unicode general categories
      * @param s the string to test
      * @return {@code true} if the string contains at least one Unicode letter
      */

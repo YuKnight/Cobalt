@@ -16,10 +16,6 @@ import java.util.*;
  * a batched response may independently succeed or fail. The collection-level
  * error state is captured in {@link #collectionError()} so that callers can
  * process successful collections even when some fail.
- *
- * @implNote WAWebSyncdResponseParser.syncResponseParser (return value structure),
- *           WAWebSyncdResponseParser.h (per-collection error state),
- *           WASyncdConst.CollectionState (state mapped to hasMore/exceptions)
  */
 public final class MutationSyncResponse {
     /**
@@ -56,8 +52,6 @@ public final class MutationSyncResponse {
 
     /**
      * Constructs a new sync response.
-     *
-     * @implNote WAWebSyncdResponseParser.syncResponseParser (return value)
      * @param collectionName the sync collection type
      * @param version the collection version
      * @param hasMore whether more patches are available
@@ -81,9 +75,6 @@ public final class MutationSyncResponse {
      * node has {@code type="error"}, the error state is captured on the response
      * object rather than thrown, so that other collections in a batch can still
      * be processed.
-     *
-     * @implNote WAWebSyncdResponseParser.h (collection error state),
-     *           WAWebSyncdServerSync.S (pre-filter ErrorRetry/ErrorFatal/Blocked)
      * @param collectionName  the sync collection type
      * @param version         the collection version
      * @param hasMore         whether more patches are available
@@ -168,9 +159,6 @@ public final class MutationSyncResponse {
      * collection node has {@code type="error"}, the error is captured here
      * rather than thrown, so batched responses can process other collections
      * independently.
-     *
-     * @implNote WAWebSyncdResponseParser.h (collection error state),
-     *           WAWebSyncdServerSync.S (pre-filter by state)
      * @return an optional containing the collection-level error
      */
     public Optional<WhatsAppWebAppStateSyncException> collectionError() {

@@ -76,8 +76,6 @@ public final class ChatFanoutStanza {
      * @return a {@link NodeBuilder} for the {@code <message>} stanza
      * @throws NullPointerException if {@code messageId}, {@code chatJid}, {@code type},
      *                              or {@code payloads} is {@code null}
-     * @implNote The token child is selected as {@code tctokenNode} with
-     * {@code cstokenNode} as a fallback.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.DIRECT)

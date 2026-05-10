@@ -52,12 +52,6 @@ public final class IqUpdateTosRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <request type="session_update">} payload
-     *
-     * @implNote {@code WAWebTosJob.updateTosState} composes the IQ via
-     *           {@code wap("iq", {xmlns:"tos", id, type:"set",
-     *           to:S_WHATSAPP_NET}, wap("request",
-     *           {type:"session_update"}, e.map(id =&#42;> wap("notice",
-     *           {id}))))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTosJob",

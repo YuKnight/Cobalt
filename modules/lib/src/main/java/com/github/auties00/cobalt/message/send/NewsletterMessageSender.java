@@ -171,10 +171,6 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * @param newsletterJid the newsletter JID
      * @param container     the question-response container
      * @return the stanza builder
-     *
-     * @implNote The parent server id resolver is not yet plumbed through; the
-     * value falls back to {@link NewsletterMessageInfo#serverId()} matching
-     * the existing behaviour.
      */
     @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishNewsletterQuestionResponsePublishMixin",
             exports = "applyMixin", adaptation = WhatsAppAdaptation.DIRECT)
@@ -413,11 +409,6 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * @param pollUpdate    the poll-update payload
      * @return the stanza builder, or {@code null} when the parent poll cannot
      *         be resolved
-     *
-     * @implNote WA Web sends SHA-256 hashes of the selected option names; the
-     * Cobalt {@link PollUpdateMessage} currently carries an encrypted
-     * {@code PollEncValue}, so the cleartext option names are forwarded as a
-     * placeholder until a vote-hash resolver is plumbed through.
      */
     @WhatsAppWebExport(moduleName = "WASmaxOutMessagePublishContentTypePollVoteMixin", exports = "applyMixin",
             adaptation = WhatsAppAdaptation.DIRECT)

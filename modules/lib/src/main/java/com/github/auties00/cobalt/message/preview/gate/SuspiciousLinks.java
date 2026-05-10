@@ -18,15 +18,6 @@ import java.util.List;
  * which itself is a thin adapter over {@code WAIdn.findSuspiciousCharacters}
  * that pulls the country codes out of the chat JID and the local
  * user's JID and forwards them to the heuristic.
- *
- * @implNote WASuspiciousLinks.findSuspiciousCharacters: the JS module
- *           reads the chat type via
- *           {@code WAJids.interpretAndValidateJid}; for LID chats it
- *           passes the sentinel {@code "ZZ"} as the recipient country
- *           code. Cobalt collapses the equivalent logic onto
- *           {@link Jid#hasUserServer()} since the JID's server type
- *           is sufficient to distinguish phone users from LID/group/
- *           newsletter users.
  */
 @WhatsAppWebModule(moduleName = "WASuspiciousLinks")
 public final class SuspiciousLinks {
@@ -34,9 +25,6 @@ public final class SuspiciousLinks {
      * Country-code sentinel used when the recipient is a LID, group,
      * or newsletter — i.e. when no phone country code can be
      * extracted.
-     *
-     * @implNote WASuspiciousLinks {@code s} constant
-     *           ({@code "ZZ"}).
      */
     private static final String LID_COUNTRY_CODE_SENTINEL = "ZZ";
 
@@ -61,9 +49,6 @@ public final class SuspiciousLinks {
      *                use {@link #LID_COUNTRY_CODE_SENTINEL}
      * @param match   the URL match
      * @return {@code true} when the host is suspicious
-     * @implNote WASuspiciousLinks.findSuspiciousCharacters +
-     *           WAWebLinkPreviewChatAction inner gate
-     *           {@code if (e.suspiciousCharacters?.size) return null}.
      */
     @WhatsAppWebExport(moduleName = "WASuspiciousLinks", exports = "findSuspiciousCharacters",
             adaptation = WhatsAppAdaptation.ADAPTED)

@@ -15,8 +15,6 @@ import java.util.Optional;
  * The inbound projection of the
  * {@code <notification type="link_code_companion_reg"
  * stage="refresh_code">} stanza.
- *
- * @implNote {@code WASmaxInMdRefreshCodeNotifyCompanionRequest.parseRefreshCodeNotifyCompanionRequest}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInMdRefreshCodeNotifyCompanionRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInMdServerNotificationMixin")

@@ -213,7 +213,7 @@ public final class NewsletterReactionSettings {
          *         {@code name} is {@code null} or does not match any
          *         constant
          */
-        static Type of(String name) {
+        public static Type of(String name) {
             return name == null ? UNKNOWN : BY_NAME.getOrDefault(name.toLowerCase(), UNKNOWN);
         }
 

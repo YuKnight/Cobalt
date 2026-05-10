@@ -7,6 +7,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.iq.IqOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
 import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -15,12 +16,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to an {@link IqQueryMediaConnsRequest}.
- *
- * @implNote {@code WAWebQueryMediaConnsJob.queryMediaConn} folds every
- *           non-success code into either {@code E507} with backoff or
- *           {@code ServerStatusCodeError}; Cobalt splits the failure
- *           into typed {@code ClientError} and {@code ServerError}
- *           variants.
  */
 @WhatsAppWebModule(moduleName = "WAWebQueryMediaConnsJob")
 public sealed interface IqQueryMediaConnsResponse extends IqOperation.Response
@@ -58,14 +53,6 @@ public sealed interface IqQueryMediaConnsResponse extends IqOperation.Response
     /**
      * The {@code Success} reply variant — the relay returned the
      * current media-conn configuration.
-     *
-     * @implNote {@code WAMediaConnParser.mediaConnParser} reads the
-     *           top-level {@code <media_conn auth auth_ttl ttl
-     *           max_buckets max_manual_retry max_auto_download_retry/>}
-     *           attributes and the {@code <host/>} grandchild list;
-     *           Cobalt maps the wire shape onto {@link Host}
-     *           tuples and surfaces the auth/TTL/bucket scalars
-     *           directly on {@link Success}.
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryMediaConnsJob")
     @WhatsAppWebModule(moduleName = "WAMediaConnParser")
@@ -224,20 +211,40 @@ public sealed interface IqQueryMediaConnsResponse extends IqOperation.Response
             if (!SmaxIqResultResponseMixin.validate(node, request)) {
                 return Optional.empty();
             }
+            // WAMediaConnParser.mediaConnParser: e.child("media_conn")
             var mediaConnChild = node.getChild("media_conn").orElse(null);
             if (mediaConnChild == null) {
                 return Optional.empty();
             }
+            // WAMediaConnParser.mediaConnParser: r.attrString("auth")
             var auth = mediaConnChild.getAttributeAsString("auth").orElse(null);
             if (auth == null) {
                 return Optional.empty();
             }
-            var authTtl = mediaConnChild.getAttributeAsLong("auth_ttl", -1L);
-            var ttl = mediaConnChild.getAttributeAsLong("ttl", -1L);
-            if (authTtl < 0 || ttl < 0) {
+            // WAMediaConnParser.mediaConnParser: r.attrFutureTime("auth_ttl")
+            // attrFutureTime reads the int attribute and folds it into an
+            // absolute unix-second timestamp via WATimeUtils.futureUnixTime,
+            // i.e. now + delta. Mirrored here so the field stored on Success
+            // matches the contract documented on authTokenExpiry/routesExpiry.
+            var authTtlDelta = mediaConnChild.getAttributeAsLong("auth_ttl", -1L);
+            var ttlDelta = mediaConnChild.getAttributeAsLong("ttl", -1L);
+            if (authTtlDelta < 0 || ttlDelta < 0) {
                 return Optional.empty();
             }
-            var maxBuckets = mediaConnChild.getAttributeAsInt("max_buckets", 0);
+            var nowSeconds = Instant.now().getEpochSecond();
+            var authTtl = nowSeconds + authTtlDelta;
+            var ttl = nowSeconds + ttlDelta;
+            // WAMediaConnParser.mediaConnParser: r.attrInt("max_buckets")
+            // attrInt rejects missing attributes; mirror that by treating an
+            // absent attribute as a non-success reply.
+            var maxBucketsValue = mediaConnChild.getAttributeAsInt("max_buckets", -1);
+            if (maxBucketsValue < 0) {
+                return Optional.empty();
+            }
+            var maxBuckets = maxBucketsValue;
+            // WAMediaConnParser.mediaConnParser: r.maybeAttrInt("max_manual_retry", 0, 4) ?? 3
+            // maybeAttrInt returns null when the attribute is missing OR out of
+            // [0, 4]; the surrounding "?? 3" then defaults the result to 3.
             var maxManualRetry = mediaConnChild.getAttributeAsInt("max_manual_retry", 3);
             if (maxManualRetry < 0 || maxManualRetry > 4) {
                 maxManualRetry = 3;
@@ -246,6 +253,7 @@ public sealed interface IqQueryMediaConnsResponse extends IqOperation.Response
             if (maxAutoDownloadRetry < 0 || maxAutoDownloadRetry > 4) {
                 maxAutoDownloadRetry = 3;
             }
+            // WAMediaConnParser.c: e.mapChildrenWithTag("host", u)
             var hostNodes = mediaConnChild.getChildren("host");
             var hosts = new ArrayList<Host>(hostNodes.size());
             for (var hostNode : hostNodes) {
@@ -294,15 +302,6 @@ public sealed interface IqQueryMediaConnsResponse extends IqOperation.Response
          * One media-server host endpoint projected from a single
          * {@code <host hostname class ip4 ip6 type><download/><upload/><download_buckets/></host>}
          * subtree.
-         *
-         * @implNote {@code WAMediaConnParser.u()} reads the
-         *           {@code <host/>} attributes and inner
-         *           {@code <upload/>} / {@code <download/>} /
-         *           {@code <download_buckets/>} subtrees;
-         *           {@code WAWebQueryMediaConnsJob.f()} drops the
-         *           wire-side {@code fallback_*} variants because
-         *           Cobalt callers don't need the legacy
-         *           secondary-host indirection.
          */
         @WhatsAppWebModule(moduleName = "WAMediaConnParser")
         @WhatsAppWebModule(moduleName = "WAWebQueryMediaConnsJob")
@@ -485,22 +484,29 @@ public sealed interface IqQueryMediaConnsResponse extends IqOperation.Response
              * @param hostNode the {@code <host/>} subtree; never
              *                 {@code null}
              * @return the parsed host
-             *
-             * @implNote Mirrors {@code WAMediaConnParser.u} +
-             *           {@code d} for the upload/download tag
-             *           lists.
              */
             @WhatsAppWebExport(moduleName = "WAMediaConnParser",
                     exports = "mediaConnParser", adaptation = WhatsAppAdaptation.ADAPTED)
             public static Host of(Node hostNode) {
                 Objects.requireNonNull(hostNode, "hostNode cannot be null");
-                var hostname = hostNode.getAttributeAsString("hostname").orElse("");
+                // WAMediaConnParser.u: e.attrString("hostname")
+                // attrString throws when the attribute is missing; mirror that by
+                // requiring the attribute here so a malformed <host/> subtree
+                // surfaces as a parse failure rather than a silently-empty host.
+                var hostname = hostNode.getRequiredAttributeAsString("hostname");
+                // WAMediaConnParser.u: e.maybeAttrString("class")
                 var hostClass = hostNode.getAttributeAsString("class").orElse(null);
+                // WAMediaConnParser.u: e.maybeAttrString("ip4") (?? undefined)
                 var ip4 = hostNode.getAttributeAsString("ip4").orElse(null);
+                // WAMediaConnParser.u: e.maybeAttrString("ip6") (?? undefined)
                 var ip6 = hostNode.getAttributeAsString("ip6").orElse(null);
+                // WAMediaConnParser.u: e.maybeAttrString("type") === "fallback"
                 var fallback = "fallback".equals(hostNode.getAttributeAsString("type").orElse(null));
+                // WAMediaConnParser.d: e.hasChild("upload") ? e.child("upload").mapChildren(...).filter(Boolean) : SERVER_MEDIA
                 var uploadable = collectMediaTypes(hostNode.getChild("upload").orElse(null));
+                // WAMediaConnParser.d: e.hasChild("download") ? ... : SERVER_MEDIA
                 var downloadable = collectMediaTypes(hostNode.getChild("download").orElse(null));
+                // WAMediaConnParser.u: e.maybeChild("download_buckets")?.mapChildren(e => parseInt(e.tag(), 10)) ?? []
                 var bucketsNode = hostNode.getChild("download_buckets").orElse(null);
                 var buckets = new ArrayList<Integer>();
                 if (bucketsNode != null) {

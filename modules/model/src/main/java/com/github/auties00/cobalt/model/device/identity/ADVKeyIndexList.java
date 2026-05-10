@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.model.device.identity;
 
-import com.github.auties00.cobalt.model.mixin.InstantMillisMixin;
+import com.github.auties00.cobalt.model.mixin.InstantSecondsMixin;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
@@ -44,12 +44,12 @@ public final class ADVKeyIndexList {
     /**
      * When the list was last regenerated.
      *
-     * <p>Optional on the wire. Transmitted as a protobuf {@code uint64} of milliseconds
+     * <p>Optional on the wire. Transmitted as a protobuf {@code uint64} of seconds
      * since the Unix epoch and converted to a Java {@link Instant} via
-     * {@link InstantMillisMixin}. Peers use this timestamp to discard obsolete lists and
+     * {@link InstantSecondsMixin}. Peers use this timestamp to discard obsolete lists and
      * to trigger re-verification when the stored copy becomes too old.
      */
-    @ProtobufProperty(index = 2, type = ProtobufType.UINT64, mixins = InstantMillisMixin.class)
+    @ProtobufProperty(index = 2, type = ProtobufType.UINT64, mixins = InstantSecondsMixin.class)
     Instant timestamp;
 
     /**

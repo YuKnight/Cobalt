@@ -83,18 +83,6 @@ public final class SmaxGroupsAddParticipantsRequest implements SmaxOperation.Req
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <add>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsAddParticipantsRequest.makeAddParticipantsRequest}
-     *           composes {@code WASmaxOutGroupsBaseSetGroupMixin}
-     *           ({@code xmlns="w:g2"}, {@code to=GROUP_JID(t)},
-     *           {@code id=generateId()}, {@code type="set"}) over an
-     *           {@code <add>REPEATED_CHILD(participant, 1, 1024)
-     *           </add>} child. Each {@code <participant>} carries a
-     *           mandatory {@code jid} plus optional {@code phone_number}
-     *           and {@code username} echoes; Cobalt only emits the
-     *           mandatory {@code jid} since the optional attrs are
-     *           consumed solely by the relay's permission-token mixin
-     *           (not validated client-side).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsAddParticipantsRequest",

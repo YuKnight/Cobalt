@@ -79,11 +79,6 @@ public final class SmaxGroupsCancelGroupMembershipRequestsRequest implements Sma
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <cancel_membership_requests>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsCancelGroupMembershipRequestsRequest.makeCancelGroupMembershipRequestsRequest}
-     *           composes
-     *           {@code <iq><cancel_membership_requests>REPEATED_CHILD(participant,
-     *           1, 19999)</cancel_membership_requests></iq>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsCancelGroupMembershipRequestsRequest",

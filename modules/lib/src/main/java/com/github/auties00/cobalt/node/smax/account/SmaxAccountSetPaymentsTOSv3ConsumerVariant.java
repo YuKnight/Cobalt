@@ -1,15 +1,8 @@
 package com.github.auties00.cobalt.node.smax.account;
 
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Sealed disjunction over the v3-payments-ToS payload variants.
@@ -28,8 +21,9 @@ public sealed interface SmaxAccountSetPaymentsTOSv3ConsumerVariant permits SmaxA
     final class BrConsumer implements SmaxAccountSetPaymentsTOSv3ConsumerVariant {
         /**
          * The 1..10 BR-consumer notice enum literals. One of
-         * {@code "BRP2PCONSENT"}, {@code "BRPAYPRIVACYPOLICY"},
-         * {@code "BRPAYTOS"}, {@code "BRPAYWATOS"}.
+         * {@code "br_p2p_consent"},
+         * {@code "br_pay_privacy_policy"}, {@code "br_pay_tos"},
+         * {@code "br_pay_wa_tos"}.
          */
         private final List<String> additionalNotices;
 
@@ -92,7 +86,7 @@ public sealed interface SmaxAccountSetPaymentsTOSv3ConsumerVariant permits SmaxA
     final class UpiConsumer implements SmaxAccountSetPaymentsTOSv3ConsumerVariant {
         /**
          * The 1..10 UPI-consumer notice enum literals. One of
-         * {@code "PAYTOSV3"}, {@code "UPIPAYPRIVACYPOLICY"}.
+         * {@code "pay_tos_v3"}, {@code "upi_pay_privacy_policy"}.
          */
         private final List<String> additionalNotices;
 

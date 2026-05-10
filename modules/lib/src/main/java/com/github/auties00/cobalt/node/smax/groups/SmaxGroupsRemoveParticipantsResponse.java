@@ -16,10 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsRemoveParticipantsRPC.sendRemoveParticipantsRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError}.
  */
 public sealed interface SmaxGroupsRemoveParticipantsResponse extends SmaxOperation.Response
         permits SmaxGroupsRemoveParticipantsResponse.Success, SmaxGroupsRemoveParticipantsResponse.ClientError, SmaxGroupsRemoveParticipantsResponse.ServerError {
@@ -51,17 +47,6 @@ public sealed interface SmaxGroupsRemoveParticipantsResponse extends SmaxOperati
     /**
      * The {@code Success} reply variant — the relay processed the
      * request and returned a per-participant outcome list.
-     *
-     * @implNote {@code WASmaxInGroupsRemoveParticipantsResponseSuccess.parseRemoveParticipantsResponseSuccess}
-     *           validates the IQ-result envelope, asserts the
-     *           {@code <remove>} child, parses the optional
-     *           {@code linked_groups="true"} echo and the
-     *           {@code addressing_mode} mixin, then projects every
-     *           {@code <participant>} child via
-     *           {@code parseRemoveParticipantsResponseSuccessRemoveParticipant}
-     *           which routes through the
-     *           {@code ParticipantNotInGroupOrParticipantNotAllowedOrParticipantNotAcceptableOrRemoveParticipantsLinkedGroupsServerErrorMixinGroup}
-     *           disjunction.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsRemoveParticipantsResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupAddressingModeMixin")
@@ -281,13 +266,6 @@ public sealed interface SmaxGroupsRemoveParticipantsResponse extends SmaxOperati
              *
              * @param node the {@code <participant>} child
              * @return an {@link Optional} carrying the parsed entry
-             *
-             * @implNote {@code WASmaxInGroupsRemoveParticipantsResponseSuccess.parseRemoveParticipantsResponseSuccessRemoveParticipant}
-             *           projects the {@code error} attribute through
-             *           a 4-arm disjunction; Cobalt distinguishes the
-             *           rejected arms by the presence of the
-             *           {@code error} attribute on the
-             *           {@code <participant>} node.
              */
             @WhatsAppWebExport(moduleName = "WASmaxInGroupsRemoveParticipantsResponseSuccess",
                     exports = "parseRemoveParticipantsResponseSuccessRemoveParticipant",

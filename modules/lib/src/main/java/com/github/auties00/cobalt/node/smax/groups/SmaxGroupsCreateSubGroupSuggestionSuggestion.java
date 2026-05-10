@@ -17,13 +17,6 @@ import java.util.Optional;
 
 /**
  * Sealed alternation modelling the suggestion-body oneof.
- *
- * @implNote {@code WASmaxOutGroupsSuggestionForCreateSubGroupSuggestionNewGroupOrCreateSubGroupSuggestionExistingGroupsMixinGroup.mergeSuggestionForCreateSubGroupSuggestionNewGroupOrCreateSubGroupSuggestionExistingGroupsMixinGroup}
- *           branches on {@code createSubGroupSuggestionSuggestionForNewGroup}
- *           vs
- *           {@code createSubGroupSuggestionSuggestionForExistingGroups}.
- *           Cobalt models the branch with this sealed interface
- *           permitting {@link NewGroup} and {@link ExistingGroups}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutGroupsSuggestionForCreateSubGroupSuggestionNewGroupOrCreateSubGroupSuggestionExistingGroupsMixinGroup")
 public sealed interface SmaxGroupsCreateSubGroupSuggestionSuggestion permits SmaxGroupsCreateSubGroupSuggestionSuggestion.NewGroup, SmaxGroupsCreateSubGroupSuggestionSuggestion.ExistingGroups {
@@ -38,16 +31,6 @@ public sealed interface SmaxGroupsCreateSubGroupSuggestionSuggestion permits Sma
     /**
      * Suggestion body for a brand-new sub-group spun up inside the
      * parent community.
-     *
-     * @implNote {@code WASmaxOutGroupsCreateSubGroupSuggestionSuggestionForNewGroupMixin.mergeCreateSubGroupSuggestionSuggestionForNewGroupMixin}
-     *           emits {@code <subject>VALUE</subject>}, plus optional
-     *           {@code <description>} (with optional inner
-     *           {@code <body/>}), {@code <locked/>},
-     *           {@code <announcement/>}, {@code <hidden_group/>},
-     *           {@code <membership_approval_mode/>}; the optional
-     *           member-add / link / share-history mixins are merged
-     *           onto the root attributes. Cobalt collapses the
-     *           remaining mixins into typed fields.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutGroupsCreateSubGroupSuggestionSuggestionForNewGroupMixin")
     final class NewGroup implements SmaxGroupsCreateSubGroupSuggestionSuggestion {
@@ -338,10 +321,6 @@ public sealed interface SmaxGroupsCreateSubGroupSuggestionSuggestion permits Sma
     /**
      * Suggestion body recommending that one or more existing groups
      * be linked into the parent community as sub-groups.
-     *
-     * @implNote {@code WASmaxOutGroupsCreateSubGroupSuggestionSuggestionForExistingGroupsMixin.mergeCreateSubGroupSuggestionSuggestionForExistingGroupsMixin}
-     *           emits {@code REPEATED_CHILD(<group jid [hidden_group]>)}
-     *           inside the {@code <sub_group_suggestion/>} root.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutGroupsCreateSubGroupSuggestionSuggestionForExistingGroupsMixin")
     final class ExistingGroups implements SmaxGroupsCreateSubGroupSuggestionSuggestion {

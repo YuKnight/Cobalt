@@ -49,14 +49,6 @@ public sealed interface IqQueryCtwaContextResponse extends IqOperation.Response
     /**
      * The {@code Success} reply variant — carries the
      * {@code <context>} grandchild's projection.
-     *
-     * @implNote {@code WAWebQueryCtwaContextJob.ctwaContext}:
-     *           {@code child("context")} -> {sourceUrl, sourceId,
-     *           sourceType, [title], [description], [thumbnailUrl],
-     *           [thumbnail bytes], [mediaUrl], mediaType,
-     *           [sourceApp], (WAMO-AGM extras: greetingMessageBody,
-     *           automatedGreetingMessageShown, ctaPayload,
-     *           originalImageUrl)}.
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryCtwaContextJob")
     final class Success implements IqQueryCtwaContextResponse {

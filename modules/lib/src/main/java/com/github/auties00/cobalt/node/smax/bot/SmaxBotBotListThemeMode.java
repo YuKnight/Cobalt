@@ -3,16 +3,7 @@ package com.github.auties00.cobalt.node.smax.bot;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+
 import java.util.Optional;
 
 /**
@@ -20,14 +11,29 @@ import java.util.Optional;
  * attribute through {@code WASmaxInBotEnums.ENUM_DARK_LIGHT}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBotEnums")
+@WhatsAppWebExport(
+        moduleName = "WASmaxInBotEnums",
+        exports = "ENUM_DARK_LIGHT",
+        adaptation = WhatsAppAdaptation.ADAPTED
+)
 public enum SmaxBotBotListThemeMode {
     /**
      * The dark-mode colour bundle.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_DARK_LIGHT",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     DARK("dark"),
     /**
      * The light-mode colour bundle.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_DARK_LIGHT",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     LIGHT("light");
 
     /**
@@ -60,6 +66,11 @@ public enum SmaxBotBotListThemeMode {
      * @return an {@link Optional} carrying the resolved enum
      *         constant, or empty when the literal is unknown
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_DARK_LIGHT",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     public static Optional<SmaxBotBotListThemeMode> ofWire(String wireValue) {
         if (wireValue == null) {
             return Optional.empty();

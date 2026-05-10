@@ -11,12 +11,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
  * stanza, it condenses the aggregated outcome into one of these values. The result drives
  * the subsequent decision tree (delivery receipt, retry receipt, NACK, or silent drop)
  * and determines whether the decoded content is stored locally.
- *
- * @implNote {@link #BACKFILL} additionally absorbs every variant of
- * WAWebHandleMsgTypes.flow.PlaceholderType ({@code E2E}, {@code FANOUT},
- * {@code BOT_UNAVAILABLE_FANOUT}, {@code HOSTED_UNAVAILABLE_FANOUT},
- * {@code VIEW_ONCE_UNAVAILABLE_FANOUT}) since the downstream receipt logic is identical
- * for all four placeholder kinds.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgTypes.flow")
 public enum MessageDecryptionResult {

@@ -150,9 +150,6 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
      * @param plaintext the raw protobuf bytes from the {@code <plaintext>}
      *                  child node
      * @return the decoded message container, or {@code null} on failure
-     * @implNote WAWebNewsletterStatusUtils.mapStatusStanzaToMsgData:
-     * calls {@code decodeProtobuf(MessageSpec, n)} on the plaintext payload
-     * bytes extracted from the {@code <plaintext>} child node.
      */
     private MessageContainer decodeMessage(String id, byte[] plaintext) {
         try {
@@ -171,10 +168,6 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
      * @param node the stanza node containing the {@code t} attribute
      * @return the resolved timestamp, or {@code null} if the attribute is
      *         absent
-     * @implNote WASmaxInStatusDeliverFromNewsletterMixin:
-     * {@code attrIntRange(e, "t", 1577865600, 4102473600)} extracts the
-     * timestamp as a required integer.  Cobalt treats it as optional for
-     * defensive safety.
      */
     private Instant resolveTimestamp(Node node) {
         var timestamp = node.getAttributeAsLong("t", (Long) null);
@@ -190,10 +183,6 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
      *
      * @param newsletterJid the newsletter JID
      * @param info          the message to store
-     * @implNote ADAPTED: WAWebHandleNewsletterStatus.default delegates to
-     * WAWebHandleSingleMsgFactory.handleSingleMsg which stores the message
-     * through the standard pipeline.  Cobalt directly stores to the
-     * newsletter entity in the {@code WhatsAppStore}.
      */
     private void storeMessage(Jid newsletterJid, NewsletterMessageInfo info) {
         var newsletter = whatsapp.store()
@@ -214,10 +203,6 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
      * blocking the handler.
      *
      * @param info the received message info
-     * @implNote ADAPTED: WAWebHandleNewsletterStatus.default fires
-     * notifications through the standard message pipeline after
-     * handleSingleMsg completes.  Cobalt directly notifies listeners
-     * on virtual threads.
      */
     private void notifyNewMessage(MessageInfo info) {
         for (var listener : whatsapp.store().listeners()) {

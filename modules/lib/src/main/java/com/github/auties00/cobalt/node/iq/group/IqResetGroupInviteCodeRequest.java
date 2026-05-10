@@ -46,10 +46,6 @@ public final class IqResetGroupInviteCodeRequest implements IqOperation.Request 
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the bare {@code <invite/>} payload
-     *
-     * @implNote {@code WAWebGroupInviteJob.resetGroupInviteCode}:
-     *           {@code wap("iq", {type:"set", xmlns:"w:g2",
-     *           to:GROUP_JID(t), id}, wap("invite", null))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebGroupInviteJob",

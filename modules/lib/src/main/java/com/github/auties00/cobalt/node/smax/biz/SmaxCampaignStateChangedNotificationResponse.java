@@ -38,8 +38,6 @@ public sealed interface SmaxCampaignStateChangedNotificationResponse extends Sma
     /**
      * The {@code Notification} variant. Carries the campaign
      * identifiers, the new status, and the standard envelope echoes.
-     *
-     * @implNote {@code WASmaxInSmbMeteredMessagesCampaignCampaignStateChangedNotificationRequest.parseCampaignStateChangedNotificationRequest}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagesCampaignCampaignStateChangedNotificationRequest")
     @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagesCampaignServerNotificationMixin")

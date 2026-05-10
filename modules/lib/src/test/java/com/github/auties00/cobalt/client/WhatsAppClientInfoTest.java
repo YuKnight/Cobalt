@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.client;
 
-import com.github.auties00.cobalt.info.WhatsAppClientInfo;
-import com.github.auties00.cobalt.info.WhatsAppMobileClientInfo;
+import com.github.auties00.cobalt.client.info.WhatsAppClientInfo;
+import com.github.auties00.cobalt.client.info.WhatsAppMobileClientInfo;
 import org.junit.jupiter.api.Test;
 
 

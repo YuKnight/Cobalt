@@ -14,6 +14,7 @@
         <module>modules/source-meta</module>
         <module>modules/model</module>
         <module>modules/lib</module>
+        <module>modules/call-toolkit</module>
     </modules>
 
     <developers>
@@ -83,6 +84,7 @@
         <javapoet.version>0.6.0</javapoet.version>
         <jmh.version>1.37</jmh.version>
         <selenium.version>4.27.0</selenium.version>
+        <bouncycastle.version>1.80</bouncycastle.version>
     </properties>
 
     <profiles>

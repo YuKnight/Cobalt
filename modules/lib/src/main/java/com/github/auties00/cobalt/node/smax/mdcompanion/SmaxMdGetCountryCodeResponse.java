@@ -14,11 +14,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxMdGetCountryCodeRPC.sendGetCountryCodeRPC}
- *           tries {@code GetCountryCodeResponse} → {@code Error} in
- *           order; Cobalt subdivides the {@code Error} side into
- *           {@code ClientError} / {@code ServerError}.
  */
 public sealed interface SmaxMdGetCountryCodeResponse extends SmaxOperation.Response
         permits SmaxMdGetCountryCodeResponse.Success, SmaxMdGetCountryCodeResponse.ClientError, SmaxMdGetCountryCodeResponse.ServerError {
@@ -50,9 +45,6 @@ public sealed interface SmaxMdGetCountryCodeResponse extends SmaxOperation.Respo
     /**
      * The {@code Success} reply variant. The relay echoed back the
      * geo-derived ISO country code.
-     *
-     * @implNote {@code WASmaxInMdGetCountryCodeResponseGetCountryCodeResponse.parseGetCountryCodeResponseGetCountryCodeResponse}
-     *           extracts the {@code <country_code iso=…/>} attribute.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInMdGetCountryCodeResponseGetCountryCodeResponse")
     final class Success implements SmaxMdGetCountryCodeResponse {
@@ -132,11 +124,6 @@ public sealed interface SmaxMdGetCountryCodeResponse extends SmaxOperation.Respo
      * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} bad-request or internal-error mapped
      * to client range.
-     *
-     * @implNote {@code WASmaxInMdGetCountryCodeResponseError.parseGetCountryCodeResponseError}
-     *           composes
-     *           {@code parseIQErrorResponseMixin} with
-     *           {@code WASmaxInMdCountryCodeErrors.parseCountryCodeErrors}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInMdGetCountryCodeResponseError")
     final class ClientError implements SmaxMdGetCountryCodeResponse {
@@ -227,9 +214,6 @@ public sealed interface SmaxMdGetCountryCodeResponse extends SmaxOperation.Respo
     /**
      * The {@code ServerError} reply variant. The relay encountered
      * a {@code 5xx} transient internal failure.
-     *
-     * @implNote layered onto Cobalt's domain via the shared
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     final class ServerError implements SmaxMdGetCountryCodeResponse {
         /**

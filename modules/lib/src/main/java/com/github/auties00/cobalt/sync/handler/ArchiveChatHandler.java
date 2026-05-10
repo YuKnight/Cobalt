@@ -7,7 +7,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
@@ -18,8 +17,6 @@ import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,8 +36,6 @@ import java.util.List;
  * <p>Per WhatsApp Web, this handler extends {@code ChatMessageRangeSyncdActionBase},
  * which provides shared message-range-based conflict resolution. In Cobalt, this
  * logic is inlined since Java does not use the same inheritance hierarchy.
- *
- * @implNote WAWebArchiveChatSync — singleton instance exported as {@code default}
  */
 @WhatsAppWebModule(moduleName = "WAWebArchiveChatSync")
 public final class ArchiveChatHandler implements WebAppStateActionHandler {
@@ -49,16 +44,12 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, {@code WAWebArchiveChatSync} exports a single instance
      * ({@code var C = new y(); l.default = C}).
-     *
-     * @implNote WAWebArchiveChatSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ArchiveChatHandler INSTANCE = new ArchiveChatHandler();
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebArchiveChatSync — class {@code y} constructor (no custom init)
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ArchiveChatHandler() {
@@ -67,9 +58,6 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for archive chat actions.
-     *
-     * @implNote WAWebArchiveChatSync.getAction — returns
-     *           {@code WASyncdConst.Actions.Archive} ({@code "archive"})
      * @return the action name {@code "archive"}
      */
     @Override
@@ -83,9 +71,6 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, the archive handler's {@code collectionName} is set to
      * {@code WASyncdConst.CollectionName.RegularLow} in the constructor.
-     *
-     * @implNote WAWebArchiveChatSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -96,32 +81,12 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for archive chat actions.
-     *
-     * @implNote WAWebArchiveChatSync.getVersion — returns {@code 3}
      * @return the version number {@code 3}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return ArchiveChatAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies an archive chat mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebArchiveChatSync.applyMutations — per-mutation inner logic,
-     *           success check on the returned {@code syncApplyActionResult}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -140,32 +105,30 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      *
      * <p>Non-{@code SET} operations return {@code Unsupported}. Exceptions are
      * caught and return {@code Failed}.
-     *
-     * @implNote WAWebArchiveChatSync.applyMutations — per-mutation inner function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveChatSync", exports = {"applyMutations", "validateSyncActionValue", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
         try {
             if (!(mutation.value().action().orElse(null) instanceof ArchiveChatAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chatJidString = JSON.parseArray(mutation.index()).getString(1);
             if (chatJidString == null || chatJidString.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chatJid = Jid.of(chatJidString);
             if (chatJid == null) { // ADAPTED: Jid.of returns null for null input; WA Web uses isWid() validation
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chat = client.store().findChatByJid(chatJid);
@@ -206,8 +169,6 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      *     </ul>
      *   </li>
      * </ol>
-     *
-     * @implNote WAWebArchiveChatSync.resolveConflicts
      * @param localMutation  the local pending mutation
      * @param remoteMutation the incoming remote mutation
      * @return the conflict resolution indicating which mutation to keep
@@ -286,8 +247,6 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      * <p>In Cobalt, the message range is passed as a parameter since
      * {@code constructMessageRange} requires store infrastructure that is
      * built at a higher level.
-     *
-     * @implNote WAWebArchiveChatSync.getArchiveChatMutation
      * @param timestamp    the mutation timestamp
      * @param archived     whether the chat should be archived
      * @param chatJid      the JID of the chat to archive
@@ -330,8 +289,6 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
      *       with {@code pinned = false} to unpin the chat (via
      *       {@code WAWebPinChatSync.PinChatSync.getPinMutation(e, false, r)})</li>
      * </ul>
-     *
-     * @implNote WAWebArchiveChatSync.getMutationsForArchive
      * @param timestamp    the mutation timestamp
      * @param archived     whether the chat should be archived
      * @param chatJid      the JID of the chat
@@ -348,7 +305,7 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
         var mutations = new ArrayList<SyncPendingMutation>();
         mutations.add(getArchiveChatMutation(timestamp, archived, chatJid, messageRange));
         if (archived) {
-            mutations.add(PinChatHandler.INSTANCE.getPinMutation(timestamp, false, chatJid));
+            mutations.add(PinChatHandler.getPinMutation(timestamp, false, chatJid));
         }
         return mutations;
     }

@@ -4,9 +4,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
 import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
@@ -18,10 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WASmaxBlocklistsGetBlockListRPC.sendGetBlockListRPC}
- *           tries the variants in fall-through order; Cobalt mirrors
- *           that with {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
         permits SmaxGetBlockListResponse.SuccessWithMatch,
@@ -78,15 +72,12 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
      * Descriptor for one entry in the relay-returned list of blocked
      * users.
      *
-     * <p>The {@code jid} attribute is the only required field; the
-     * other fields are populated only on the migrated/CAPI variants.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetBlockListResponseSuccessWithMismatchListItem}
-     *           and the migrated/CAPI/force-migrated variants project
-     *           an item with at most these four fields. Cobalt
-     *           consolidates the four shapes into this single record.
+     * <p>The {@code jid} attribute is the only required field on the
+     * standard, migrated, and force-migrated variants; on the CAPI
+     * variant it is also optional. The other fields are populated
+     * only when the underlying wire attribute is present.
      */
-    record Item(Jid jid, boolean active, String displayName, String blocklistIdentifier) {
+    record Item(Jid jid, boolean active, String displayName) {
         /**
          * Returns the {@code displayName} as an {@link Optional}.
          *
@@ -95,16 +86,6 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
          */
         public Optional<String> displayNameAsOptional() {
             return Optional.ofNullable(displayName);
-        }
-
-        /**
-         * Returns the {@code blocklistIdentifier} as an {@link Optional}.
-         *
-         * @return an {@link Optional} carrying the identifier, or
-         *         empty when omitted
-         */
-        public Optional<String> blocklistIdentifierAsOptional() {
-            return Optional.ofNullable(blocklistIdentifier);
         }
     }
 
@@ -135,24 +116,73 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
      *                              child (required for the standard
      *                              and migrated variants, optional
      *                              for the force-migrated and CAPI
-     *                              variants)
-     * @return the parsed list of items; never {@code null}
+     *                              variants); when {@code true}, an
+     *                              item without a {@code jid} causes
+     *                              the entire parse to fail (mirrors
+     *                              WA's {@code mapChildrenWithTag}
+     *                              semantics, where a per-item
+     *                              parser failure aborts the parent
+     *                              parser)
+     * @return an {@link Optional} carrying the parsed list of items,
+     *         or empty when {@code requireJid} is {@code true} and an
+     *         {@code <item/>} child lacks the {@code jid} attribute
      */
-    private static List<Item> parseItems(Node list, boolean requireJid) {
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsGetBlockListResponseSuccessWithMismatch",
+            exports = "parseGetBlockListResponseSuccessWithMismatchListItem",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsGetBlockListResponseMigratedSuccessWithMismatch",
+            exports = "parseGetBlockListResponseMigratedSuccessWithMismatchListItem",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsGetBlockListResponseForceMigratedSuccessWithMismatch",
+            exports = "parseGetBlockListResponseForceMigratedSuccessWithMismatchListItem",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsGetBlockListResponseCAPISuccessWithMismatch",
+            exports = "parseGetBlockListResponseCAPISuccessWithMismatchListItem",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsBlocklistIdentifierMixin",
+            exports = "parseBlocklistIdentifierMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsBlocklistIds",
+            exports = "parseBlocklistIds", adaptation = WhatsAppAdaptation.ADAPTED)
+    private static Optional<List<Item>> parseItems(Node list, boolean requireJid) {
         var items = new ArrayList<Item>();
         for (var child : list.getChildren("item")) {
             var jid = child.getAttributeAsString("jid")
                     .map(Jid::of)
                     .orElse(null);
             if (jid == null && requireJid) {
-                continue;
+                // WA mapChildrenWithTag aborts the parent parser when a per-item
+                // parser fails. The Migrated and standard PN variants treat jid
+                // as required, so a missing jid must propagate as a parse failure
+                // — not silently drop the item — otherwise the priority chain in
+                // SmaxGetBlockListResponse.of skips the variant that should
+                // actually catch the stanza (e.g. CAPISuccessWithMismatch).
+                return Optional.empty();
             }
             var active = child.hasAttribute("active", "true");
+            // ADAPTED: WASmaxInBlocklistsDisplayNameMixin.parseDisplayNameMixin
+            // — inlined: reads the optional display_name attribute and projects {displayName}.
+            //   Used by the standard PN-addressed variant directly, and indirectly by the
+            //   migrated/force-migrated/CAPI variants when their parseBlocklistIds disjunction
+            //   resolves to the GuestNameAndDisplayName or DisplayName branch.
             var displayName = child.getAttributeAsString("display_name").orElse(null);
-            var blocklistIdentifier = child.getAttributeAsString("blocklist_identifier").orElse(null);
-            items.add(new Item(jid, active, displayName, blocklistIdentifier));
+            // ADAPTED: WASmaxInBlocklistsBlocklistIdentifierMixin.parseBlocklistIdentifierMixin
+            // — reads the optional country_code attribute then runs
+            //   WASmaxInBlocklistsBlocklistIds.parseBlocklistIds, a six-way disjunction
+            //   over {Username | PnJid | GuestNameAndDisplayName | DisplayName | GuestName |
+            //   UnknownIdentifier}, projecting one of {username}, {pn_jid},
+            //   {display_name, guest_name}, {display_name}, {guest_name}, or {unknown_identifier:"true"},
+            //   and spreading the result into a {countryCode, blocklistIds} envelope.
+            //   Cobalt intentionally DOES NOT model this disjunction nor the country_code
+            //   wrapper (see parseItems javadoc): no Cobalt consumer of SmaxGetBlockListResponse
+            //   reads the discriminator or the country code, so collapsing reduces the public
+            //   surface without any observable loss. The display_name branch is the only one
+            //   whose value is preserved (via the displayName field above); the other branch
+            //   payloads (username, pn_jid, guest_name, unknown_identifier) and the country_code
+            //   attribute are dropped. If a future consumer needs the discriminator, widen
+            //   Item.displayName to a sealed BlocklistIdentifier variant carrying the countryCode.
+            items.add(new Item(jid, active, displayName));
         }
-        return Collections.unmodifiableList(items);
+        return Optional.of(Collections.unmodifiableList(items));
     }
 
     /**
@@ -301,7 +331,10 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
                 return Optional.empty();
             }
             var dhash = list.getAttributeAsString("dhash").orElse(null);
-            var items = parseItems(list, true);
+            var items = parseItems(list, true).orElse(null);
+            if (items == null) {
+                return Optional.empty();
+            }
             return Optional.of(new SuccessWithMismatch(dhash, addressingMode != null, items));
         }
 
@@ -400,11 +433,18 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
             if (!list.hasAttribute("addressing_mode", "lid")) {
                 return Optional.empty();
             }
-            if (list.hasAttribute("dirty", "true")) {
+            // WA: optional(attrString, list, "dhash")
+            var dhash = list.getAttributeAsString("dhash").orElse(null);
+            // WA: mapChildrenWithTag(list, "item", 0, 64000, parseGetBlockListResponseMigratedSuccessWithMismatchListItem)
+            //     — per-item jid is REQUIRED on this variant (attrLidUserJid, not optional), so requireJid=true.
+            //     A missing per-item jid aborts the parse so the priority chain can fall through to
+            //     ForceMigrated/CAPI variants. WA's Migrated parser does NOT check dirty="true"; the
+            //     ForceMigrated variant claims dirty stanzas only because its per-item jid is optional —
+            //     not because Migrated rejects them. Cobalt mirrors WA exactly: no dirty check here.
+            var items = parseItems(list, true).orElse(null);
+            if (items == null) {
                 return Optional.empty();
             }
-            var dhash = list.getAttributeAsString("dhash").orElse(null);
-            var items = parseItems(list, true);
             return Optional.of(new MigratedSuccessWithMismatch(dhash, items));
         }
 
@@ -507,7 +547,7 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
                 return Optional.empty();
             }
             var dhash = list.getAttributeAsString("dhash").orElse(null);
-            var items = parseItems(list, false);
+            var items = parseItems(list, false).orElseThrow();
             return Optional.of(new ForceMigratedSuccessWithMismatch(dhash, items));
         }
 
@@ -539,9 +579,20 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
     /**
      * The {@code CAPISuccessWithMismatch} reply variant. Issued by
      * the Cloud-API server flavour rather than the regular relay.
-     * Same wire shape as {@link MigratedSuccessWithMismatch} but with
-     * a different envelope source. Distinguished only by relay-side
-     * metadata that Cobalt does not currently track.
+     *
+     * <p>The wire envelope checked here is identical to
+     * {@link MigratedSuccessWithMismatch} ({@code <iq type="result">}
+     * with a {@code <list addressing_mode="lid">} child); the variants
+     * are disambiguated solely by the per-item {@code jid} requirement
+     * and by parser priority order. The standard PN variant claims
+     * non-LID stanzas; {@link MigratedSuccessWithMismatch} claims any
+     * LID stanza whose items all carry a {@code jid};
+     * {@link ForceMigratedSuccessWithMismatch} claims LID stanzas
+     * marked {@code dirty="true"}; this CAPI variant is the
+     * fall-through that catches LID stanzas whose items lack
+     * {@code jid} attributes (mirroring WA's
+     * {@code WASmaxBlocklistsGetBlockListRPC.sendGetBlockListRPC}
+     * priority chain).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetBlockListResponseCAPISuccessWithMismatch")
     final class CAPISuccessWithMismatch implements SmaxGetBlockListResponse {
@@ -598,18 +649,21 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
                 exports = "parseGetBlockListResponseCAPISuccessWithMismatch",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<CAPISuccessWithMismatch> of(Node node, Node request) {
+            // WASmaxInBlocklistsGetBlockListResponseCAPISuccessWithMismatch.parseGetBlockListResponseCAPISuccessWithMismatch
             var list = validateMismatchEnvelope(node, request).orElse(null);
             if (list == null) {
                 return Optional.empty();
             }
+            // WA: literal(attrString, list, "addressing_mode", "lid")
             if (!list.hasAttribute("addressing_mode", "lid")) {
                 return Optional.empty();
             }
-            if (list.hasAttribute("dirty", "true")) {
-                return Optional.empty();
-            }
+            // WA: optional(attrString, list, "dhash")
             var dhash = list.getAttributeAsString("dhash").orElse(null);
-            var items = parseItems(list, false);
+            // WA: mapChildrenWithTag(list, "item", 0, 64000, parseGetBlockListResponseCAPISuccessWithMismatchListItem)
+            //     — per-item jid is OPTIONAL on this variant, so requireJid=false; the
+            //     Optional from parseItems is always populated when requireJid=false.
+            var items = parseItems(list, false).orElseThrow();
             return Optional.of(new CAPISuccessWithMismatch(dhash, items));
         }
 
@@ -641,11 +695,6 @@ public sealed interface SmaxGetBlockListResponse extends SmaxOperation.Response
     /**
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed.
-     *
-     * @implNote {@code WASmaxInBlocklistsGetBlockListResponseInvalidRequest.parseGetBlockListResponseInvalidRequest}
-     *           routes through {@code parseGetBlocklistErrors} for a
-     *           per-RPC enum lookup. Cobalt collapses to the universal
-     *           {@code (errorCode, errorText)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetBlockListResponseInvalidRequest")
     final class ClientError implements SmaxGetBlockListResponse {

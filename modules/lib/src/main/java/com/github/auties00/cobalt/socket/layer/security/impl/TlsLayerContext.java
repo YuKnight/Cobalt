@@ -20,18 +20,6 @@ import java.nio.channels.SocketChannel;
  * buffers. The same implementation serves both tunnel-level TLS
  * (client-to-proxy) and transport-level TLS (client-to-target); the
  * composition of the stack picks the role.
- *
- * @implNote The inbound read path takes a zero-copy fast path:
- *     encrypted bytes are read into {@link #netInBuffer} and then
- *     unwrapped directly into the next layer's
- *     {@link SocketClientLayerContext#inboundTarget()}. A slow path
- *     through {@link #appInBuffer} handles the rare
- *     {@code BUFFER_OVERFLOW} case after the buffer sizes have been
- *     fixed by {@link #resizeSslBuffers()} at end of handshake.
- * @implNote The outbound path coalesces multiple application buffers
- *     into a single TLS record via
- *     {@link SSLEngine#wrap(ByteBuffer[], int, int, ByteBuffer)} so
- *     batched writes do not produce one record per buffer.
  */
 final class TlsLayerContext implements SocketClientSecurityLayerContext {
     /**

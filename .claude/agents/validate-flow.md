@@ -73,8 +73,6 @@ For every line you change, add an inline provenance comment matching the pattern
 - Lines with a WA Web counterpart: `// WAModuleName.functionName`
 - Lines that are Java-specific adaptations: `// ADAPTED: WAModuleName.functionName`
 
-If a method's `@implNote` becomes inaccurate after the refactor, update it.
-
 ### Step 5: Write Report
 
 Write the report to the output path specified in the task. Use this format:
@@ -118,5 +116,5 @@ Write the report to the output path specified in the task. Use this format:
 - Always verify against WA Web via MCP before applying a fix. Never guess.
 - If a fix requires changing a file's signature, ensure all callers of that signature are updated in the same pass.
 - If a reported issue cannot be cleanly fixed without breaking compilation, document it in the report and leave it for follow-up.
-- Add provenance comments and update `@implNote` tags as part of the fix.
+- Add provenance comments.
 - Do not touch files outside the discovered set.

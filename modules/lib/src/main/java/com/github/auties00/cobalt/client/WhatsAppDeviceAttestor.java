@@ -359,57 +359,61 @@ public sealed interface WhatsAppDeviceAttestor
         AppAttestData attest(WhatsAppStore store);
 
         /**
-         * Pair of Apple App Attest payloads the iOS registration code
-         * appends to every attested request body: the CBOR attestation
-         * object produced by
-         * {@code DCAppAttestService.attestKey:clientDataHash:}, and the
+         * Triple of Apple App Attest payloads the iOS registration
+         * code attaches to every attested request: the CBOR
+         * attestation object produced by
+         * {@code DCAppAttestService.attestKey:clientDataHash:}, the
          * CBOR assertion object produced by
          * {@code DCAppAttestService.generateAssertion:clientDataHash:}
-         * under the same {@code keyId}.
+         * under the same {@code keyId}, and the {@code keyId} itself.
          *
-         * <p>Both pieces are shipped as base64-encoded strings:
+         * <p>The three values map onto the wire as follows, confirmed
+         * by Frida runtime tracing of {@code -[NSMutableURLRequest
+         * setHTTPBody:]} and {@code setValue:forHTTPHeaderField:} on a
+         * live iOS WhatsApp registration:
          * <ul>
-         *   <li>{@code attestation} — base64 of the CBOR attestation
-         *       object. The CBOR structure carries the {@code keyId}
-         *       internally in {@code authData.credentialId}, so no
-         *       separate key-id field is needed alongside it. The
-         *       native iOS client caches this value across requests in
-         *       the same registration session under the Keychain
-         *       service {@code app-attestation-reg} with the account
-         *       name {@code "app-attestation_reg-" + keyId} (note the
-         *       deliberate underscore in the account-name prefix), and
-         *       only re-mints via {@code attestKey:} when the cached
-         *       entry has expired.</li>
-         *   <li>{@code assertion} — base64 of the CBOR assertion object.
+         *   <li>{@link #attestation} and {@link #keyId} together
+         *       become the {@code Authorization} request header on
+         *       every attested endpoint, joined by a literal
+         *       {@code "|"}: {@code <base64 attestation>|<base64 keyId>}.
+         *       Both halves use regular base64 (not URL-safe). The
+         *       native iOS client caches this attestation across
+         *       requests in the same registration session under the
+         *       Keychain service {@code app-attestation-reg} with the
+         *       account name
+         *       {@code "app-attestation_reg-" + keyId} (note the
+         *       deliberate underscore in the account-name prefix),
+         *       and only re-mints via {@code attestKey:} when the
+         *       cached entry has expired.</li>
+         *   <li>{@link #assertion} becomes the {@code H=} form-field
+         *       suffix on the outgoing body, wrapped in a JSON
+         *       envelope: {@code {"assertion":"<base64 assertion>"}}.
          *       Freshly produced per request by signing a
          *       {@code clientDataHash} that is the SHA-256 of the
-         *       base64-decoded {@code authkey} bytes (i.e. the raw
-         *       Curve25519 noise public key bytes, not the form-field
-         *       string). The assertion therefore proves possession of
-         *       the identity key on a real device, but it does
-         *       <em>not</em> sign the outer AES-GCM-encrypted request
-         *       body, unlike Android's {@code H=} suffix.</li>
+         *       base64-decoded {@code authkey} bytes (the raw
+         *       Curve25519 noise public key, not the form-field
+         *       string). The assertion proves possession of the
+         *       identity key on a real device but does <em>not</em>
+         *       sign the outer AES-GCM-encrypted request body,
+         *       unlike Android's {@code H=} suffix which is an
+         *       HMAC over the body.</li>
          * </ul>
-         * The wire-field names under which the iOS native client
-         * actually carries these payloads in the registration request
-         * body are not yet confirmed: static analysis of the
-         * {@code v.whatsapp.net/v2} URL builders shows neither
-         * {@code attestation=} nor {@code assertion=} as form-key
-         * strings, and the relevant emit path is dispatched through
-         * Swift protocol witness tables. Cobalt currently does not
-         * embed either payload in the outgoing body for this reason.
-         * Both components are never {@code null}; attestors that cannot
-         * produce a particular payload should return the empty string
-         * for it.
+         * All three components are never {@code null}; attestors that
+         * cannot produce a particular payload should return the empty
+         * string for it. The registration server tolerates empty
+         * values but treats the request as a low-trust signal.
          *
-         * @param attestation the base64-encoded CBOR attestation object
-         *                    produced by
+         * @param attestation the base64-encoded CBOR attestation
+         *                    object produced by
          *                    {@code DCAppAttestService.attestKey}
-         * @param assertion the base64-encoded CBOR assertion object
-         *                  produced by
-         *                  {@code DCAppAttestService.generateAssertion}
+         * @param assertion   the base64-encoded CBOR assertion object
+         *                    produced by
+         *                    {@code DCAppAttestService.generateAssertion}
+         * @param keyId       the base64-encoded App Attest key
+         *                    identifier returned by
+         *                    {@code DCAppAttestService.generateKeyWithCompletionHandler:}
          */
-        record AppAttestData(String attestation, String assertion) {
+        record AppAttestData(String attestation, String assertion, String keyId) {
             /**
              * All-empty App Attest payload, used by attestors that
              * cannot mint a real Apple App Attest assertion (no
@@ -417,17 +421,17 @@ public sealed interface WhatsAppDeviceAttestor
              * revoked App Attest). The registration server tolerates
              * empty payloads but treats them as a low-trust signal.
              */
-            public static final AppAttestData EMPTY = new AppAttestData("", "");
+            public static final AppAttestData EMPTY = new AppAttestData("", "", "");
 
             /**
              * Compact canonical constructor that rejects {@code null}
              * components.
              *
-             * @throws NullPointerException if either component is
+             * @throws NullPointerException if any component is
              *                              {@code null}
              */
             public AppAttestData {
-                if (attestation == null || assertion == null) {
+                if (attestation == null || assertion == null || keyId == null) {
                     throw new NullPointerException("AppAttestData components must not be null");
                 }
             }

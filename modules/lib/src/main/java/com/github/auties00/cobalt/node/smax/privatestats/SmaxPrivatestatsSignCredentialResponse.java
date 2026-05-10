@@ -15,10 +15,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxPrivatestatsSignCredentialRPC.sendSignCredentialRPC}
- *           tries {@code Success} → {@code ErrorNoRetry} →
- *           {@code ErrorRetry}.
  */
 public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOperation.Response
         permits SmaxPrivatestatsSignCredentialResponse.Success, SmaxPrivatestatsSignCredentialResponse.ErrorNoRetry, SmaxPrivatestatsSignCredentialResponse.ErrorRetry {
@@ -54,16 +50,6 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
      * The {@code Success} reply variant. The relay signed the
      * blinded credential and returned the signature, the ACS public
      * key, and the DLEQ proof bytes.
-     *
-     * @implNote {@code WASmaxInPrivatestatsSignCredentialResponseSuccess.parseSignCredentialResponseSuccess}
-     *           validates the IQ-result envelope (echoed
-     *           {@code id} / {@code from=request.to} / {@code type="result"}),
-     *           then projects the {@code <sign_credential t>} child
-     *           plus its grandchildren:
-     *           {@code <signed_credential>{32 bytes}</signed_credential>},
-     *           {@code <acs_public_key>{32 bytes}</acs_public_key>},
-     *           {@code <dleq_proof>}{@code <c>{32 bytes}</c>}{@code <s>{32 bytes}</s></dleq_proof>},
-     *           {@code <project_name>{string}</project_name>}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsSignCredentialResponseSuccess")
     final class Success implements SmaxPrivatestatsSignCredentialResponse {
@@ -306,13 +292,6 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
      * {@code (400, "bad-request")},
      * {@code (501, "feature-not-implemented")}, or
      * {@code (503, "service-unavailable")}.
-     *
-     * @implNote {@code WASmaxInPrivatestatsSignCredentialResponseErrorNoRetry.parseSignCredentialResponseErrorNoRetry}
-     *           projects the {@code <error/>} child through
-     *           {@code WASmaxInPrivatestatsSignCredentialNoRetryError},
-     *           a disjunction over {@code IQErrorBadRequest},
-     *           {@code IQErrorFeatureNotImplemented}, and
-     *           {@code IQErrorServiceUnavailable}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsSignCredentialResponseErrorNoRetry")
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsSignCredentialNoRetryError")
@@ -423,13 +402,6 @@ public sealed interface SmaxPrivatestatsSignCredentialResponse extends SmaxOpera
      * The {@code ErrorRetry} reply variant. A transient
      * {@code 500 internal-server-error} rejection. The local client
      * may retry on the next flush window.
-     *
-     * @implNote {@code WASmaxInPrivatestatsSignCredentialResponseErrorRetry.parseSignCredentialResponseErrorRetry}
-     *           projects the {@code <error/>} child through
-     *           {@code WASmaxInPrivatestatsIQErrorInternalServerErrorMixin}
-     *           which asserts the literal
-     *           {@code (code=500, text="internal-server-error")}
-     *           pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsSignCredentialResponseErrorRetry")
     @WhatsAppWebModule(moduleName = "WASmaxInPrivatestatsIQErrorInternalServerErrorMixin")

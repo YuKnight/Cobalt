@@ -30,24 +30,29 @@ import java.util.Objects;
  *       case, matching the iOS behaviour.</li>
  * </ul>
  *
- * <p>Although the configured {@link WhatsAppDeviceAttestor.Ios}
- * produces an Apple App Attest attestation+assertion pair (signed over
- * {@code SHA-256(authkey)} per
- * {@link WhatsAppDeviceAttestor.Ios.AppAttestData}), this driver does
- * not currently emit it on the wire. The wire-field names that carry
- * the App Attest payload have not been confirmed by static analysis of
- * the native iOS binary: the relevant code paths sit behind Swift
- * protocol-witness dispatch and the feature itself is gated by an
- * {@code isAttestationAtRegistrationEnabled} server-driven flag on the
- * native client. Until the wire shape is settled by Frida runtime
- * tracing of {@code -[RegistrationAttestationManagerImpl
- * assertionFor:path:]} together with {@code -[NSMutableURLRequest
- * setHTTPBody:]} on a real device, {@link #attestationFields()}
- * returns just the APNS {@code push_token} and the attestor passed at
- * construction is stored but never consulted. It stays in the API
- * surface so that embedders can wire a real attestor today and have it
- * activate the moment the wire shape is filled in here without any
- * builder change.
+ * <p>The configured {@link WhatsAppDeviceAttestor.Ios} produces an
+ * Apple App Attest attestation+assertion pair plus the matching
+ * {@code keyId} (per {@link WhatsAppDeviceAttestor.Ios.AppAttestData}),
+ * and this driver emits both on every attested endpoint, in the wire
+ * shape confirmed by Frida runtime tracing of {@code
+ * -[RegistrationAttestationManagerImpl assertionFor:path:]} and
+ * {@code attestationPayloadForRegistrationFor:} together with
+ * {@code -[NSMutableURLRequest setHTTPBody:]} /
+ * {@code setValue:forHTTPHeaderField:} on a live iOS WhatsApp
+ * registration:
+ * <ul>
+ *   <li>The per-request CBOR assertion goes into the {@code H=}
+ *       suffix of the body, wrapped in a JSON envelope
+ *       {@code {"assertion":"<base64 CBOR>"}}.</li>
+ *   <li>The session-stable CBOR attestation goes into the
+ *       {@code Authorization} request header alongside the
+ *       {@code keyId}, joined by a literal {@code "|"}:
+ *       {@code <base64 attestation>|<base64 keyId>}.</li>
+ * </ul>
+ * Both wire slots are skipped on the funnel endpoints
+ * ({@code /v2/client_log}, {@code /v2/pre_pn_client_log}), matching
+ * the native client's behaviour where
+ * {@code attestationFor:path:} returns {@code nil} for those paths.
  *
  * @apiNote iOS-specific driver for the native mobile registration
  *          protocol. Not present in WA Web. Package-private because
@@ -98,18 +103,17 @@ final class IosClientRegistration extends MobileClientRegistration {
 
     /**
      * Builds an HTTP POST request to the registration endpoint with the
-     * pre-assembled body and the minimal iOS headers.
-     *
-     * <p>{@code authorizationHeader} is always {@code null} in the iOS
-     * flow because the current iOS registration does not send an
-     * {@code Authorization} header, but the parameter is still accepted
-     * so the shared base-class contract stays platform-neutral.
+     * pre-assembled body and the minimal iOS headers, attaching the
+     * App Attest {@code Authorization} header when one is supplied.
      *
      * @param path the API sub-path ({@code /exist}, {@code /code},
-     *             {@code /register})
+     *             {@code /register}, {@code /challenge},
+     *             {@code /security})
      * @param body the fully-assembled request body
-     * @param authorizationHeader ignored by the iOS flow. Retained for
-     *                            interface compatibility
+     * @param authorizationHeader the
+     *                            {@code <base64 attestation>|<base64 keyId>}
+     *                            value produced by {@link #attestBody},
+     *                            or {@code null} to omit the header
      * @return a ready-to-send HTTP request
      */
     @Override
@@ -126,29 +130,55 @@ final class IosClientRegistration extends MobileClientRegistration {
     }
 
     /**
-     * Returns {@link BodyAttestation#EMPTY}. The iOS flow does not
-     * attach an {@code H=} body suffix or an {@code Authorization}
-     * request header.
+     * Asks the configured {@link WhatsAppDeviceAttestor.Ios} to mint
+     * an App Attest payload and packages it into the
+     * {@link BodyAttestation} pair the base class appends to the
+     * request:
+     * <ul>
+     *   <li>The {@code H=} body suffix carries
+     *       {@code {"assertion":"<base64 CBOR>"}} — a JSON envelope
+     *       around the per-request CBOR assertion the attestor
+     *       returned. The native iOS client emits the JSON verbatim
+     *       (with {@code "/"} JSON-escaped to {@code "\/"} but
+     *       otherwise un-URL-encoded), and the WhatsApp registration
+     *       server tolerates the resulting raw {@code =}, {@code +}
+     *       and {@code /} characters in the form value.</li>
+     *   <li>The {@code Authorization} header carries
+     *       {@code <base64 attestation>|<base64 keyId>} — the cached
+     *       CBOR attestation object joined to the App Attest
+     *       {@code keyId} by a literal {@code "|"}.</li>
+     * </ul>
+     * When the attestor returns
+     * {@link WhatsAppDeviceAttestor.Ios.AppAttestData#EMPTY}
+     * (the case for the {@link WhatsAppDeviceAttestor.Ios#NONE}
+     * fallback or for any other attestor that cannot mint App
+     * Attest), {@link BodyAttestation#EMPTY} is returned and the base
+     * class skips both wire slots — matching the low-trust shape a
+     * simulator or jailbroken device would emit, which the server
+     * tolerates as a downgrade signal.
      *
-     * <p>This is not a stub. Static analysis of the native iOS binary
-     * confirms it: the only {@code H=%s} format string in the binary
-     * is unrelated debug formatting. The {@code "H"} CFString in the
-     * iOS form-field master table has no code xrefs. The
-     * {@code "Authorization"} string has no xrefs from any function in
-     * the registration / URL-builder / attestation address ranges. And
-     * {@code -[NSMutableURLRequest setValue:forHTTPHeaderField:]} is
-     * never called from those ranges. The Android keystore-signature
-     * mechanism that produces both legs simply does not exist on iOS,
-     * which is why {@link #attestBody(byte[])} is permanently empty
-     * and {@link #createRequest createRequest}'s
-     * {@code authorizationHeader} parameter is permanently {@code null}.
+     * <p>Note that, unlike Android's {@code H=} which is an HMAC
+     * over the encrypted body, the iOS assertion does not sign
+     * {@code encBodyBytes}: the {@code clientDataHash} the attestor
+     * binds the assertion to is the SHA-256 of the noise public key,
+     * derived from the store rather than from the request body.
+     * {@code encBodyBytes} is accepted only because the base-class
+     * contract is platform-neutral.
      *
-     * @param encBodyBytes the UTF-8 bytes of the base64 ENC body. Unused
-     * @return {@link BodyAttestation#EMPTY}
+     * @param encBodyBytes the UTF-8 bytes of the base64 ENC body;
+     *                     unused by this implementation
+     * @return the App Attest pair, or {@link BodyAttestation#EMPTY}
+     *         when no real attestation is available
      */
     @Override
     protected BodyAttestation attestBody(byte[] encBodyBytes) {
-        return BodyAttestation.EMPTY;
+        var data = attestor.attest(store);
+        if (data.attestation().isEmpty() || data.assertion().isEmpty() || data.keyId().isEmpty()) {
+            return BodyAttestation.EMPTY;
+        }
+        var bodyAttestation = "{\"assertion\":\"" + data.assertion() + "\"}";
+        var authorizationHeader = data.attestation() + "|" + data.keyId();
+        return new BodyAttestation(bodyAttestation, authorizationHeader);
     }
 
     /**
@@ -184,25 +214,24 @@ final class IosClientRegistration extends MobileClientRegistration {
     }
 
     /**
-     * Returns the iOS-specific attestation-time fields that ship on
-     * every attested endpoint, currently just the APNS device token.
+     * Returns the iOS-specific form fields that ship on every
+     * attested endpoint inside the encrypted body — currently just
+     * the APNS device token.
      *
-     * <p>App Attest payloads (the attestation+assertion CBOR pair the
-     * configured {@link WhatsAppDeviceAttestor.Ios} can mint) are not
-     * emitted because the wire-field names under which those payloads
-     * ship in {@code /v2/exist}, {@code /v2/code}, {@code /v2/register},
-     * {@code /v2/challenge}, {@code /v2/security} cannot be determined
-     * from static analysis of the native iOS binary. Every emission
-     * path goes through Swift protocol-witness dispatch
-     * ({@code attestationPayloadForRegistrationFor:} and
-     * {@code assertionFor:path:} on
-     * {@code RegistrationAttestationManagerImpl}) and the feature is
-     * gated by an {@code isAttestationAtRegistrationEnabled} Swift
-     * lazy property that may not even be active in a given IPA build.
+     * <p>App Attest payloads do not appear here because they ride
+     * outside the encrypted body: the assertion goes into the
+     * {@code H=} suffix appended after the {@code ENC=} envelope
+     * (built by {@link #attestBody(byte[])}) and the attestation
+     * goes into the {@code Authorization} request header (built by
+     * {@link #attestBody(byte[])} and attached by
+     * {@link #createRequest(String, String, String) createRequest}).
+     * That mirrors the native iOS client which calls its own
+     * {@code attestationPayloadForRegistrationFor:} and
+     * {@code assertionFor:path:} hooks at request-build time, not
+     * during form-field assembly.
      *
-     * <p>The {@code push_token} field, by contrast, is well-known: it
-     * carries the APNS device token the iOS app receives via
-     * {@code -[UIApplication
+     * <p>The {@code push_token} field carries the APNS device token
+     * the iOS app receives via {@code -[UIApplication
      * application:didRegisterForRemoteNotificationsWithDeviceToken:]}
      * and gets advertised on every attested endpoint so the
      * registration server knows where to silent-push the verification

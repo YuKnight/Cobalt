@@ -473,11 +473,6 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      *                       or {@code null} on failure
      * @param retryCount     the retry count passed through from the sender job;
      *                       {@code 0} for a fresh send
-     *
-     * @implNote Optional WA Web fields that require unavailable context
-     * (receiver device-type lookups, bot-specific context for {@code botType}
-     * and {@code agentEngagementType}) are omitted; only the fields resolvable
-     * at the Cobalt call site are populated.
      */
     @WhatsAppWebExport(moduleName = "WAWebPostE2eMessageSendMetric",
             exports = {"postSuccessDirectE2eMessageSendMetric", "postFailureDirectE2eMessageSendMetric"},
@@ -522,10 +517,6 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * @param isLidAddressingMode whether the SKMSG fanout uses LID addressing
      * @param success             {@code true} for a successful encryption,
      *                            {@code false} for a failure
-     *
-     * @implNote The {@code typeOfGroup} field, which depends on group metadata
-     * not threaded into this helper, is intentionally omitted; only fields
-     * resolvable from the send-path state are populated.
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = "encryptMsgSenderKey",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -676,10 +667,6 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      *
      * @param error the exception raised by the inbound decryption pipeline
      * @return the matching reason, or {@code null} when no placeholder applies
-     *
-     * @implNote The WA Web cascade also emits a sampled debug log for some
-     * branches; Cobalt's logging is centralised in the exception subtypes, so
-     * this helper performs only the enum mapping.
      */
     @WhatsAppWebExport(moduleName = "WAWebBackendJobsCommon", exports = "getPlaceholderAddReason",
             adaptation = WhatsAppAdaptation.ADAPTED)

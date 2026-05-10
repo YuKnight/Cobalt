@@ -10,14 +10,15 @@ import static com.github.auties00.cobalt.wam.binary.WamTags.GLOBAL;
  *
  * <p>Each WhatsApp-defined global field has a dedicated pair of methods:
  * a {@code xxxSize} method that returns the exact byte count, and a
- * {@code writeXxx} method that writes into a pre-allocated buffer and
- * returns the new offset. Field identifiers are hardcoded inside each
+ * {@code writeXxx} method that pushes the encoded bytes into a
+ * {@link WamEventEncoder}. Field identifiers are hardcoded inside each
  * method so callers never deal with raw numeric IDs.
  *
  * <p>This class is thread-safe as all methods are static and operate
  * on provided parameters without shared mutable state.
  *
- * @see WamEncoder
+ * @see WamEventEncoder
+ * @see WamEventSizes
  * @see WamTags#GLOBAL
  */
 public final class WamGlobalEncoder {
@@ -83,28 +84,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the mobile network
      * code global.
      *
-     * <p>The MNC identifies the mobile carrier of the paired phone's SIM
-     * card. This global is populated from the phone's connection
-     * properties when available.
-     *
      * @param value the mobile network code
      * @return the encoded size in bytes
      */
     public static int mncSize(long value) {
-        return WamEncoder.intSize(MNC, value);
+        return WamEventSizes.intSize(MNC, value);
     }
 
     /**
-     * Writes the mobile network code global attribute into the output
-     * array.
+     * Writes the mobile network code global attribute.
      *
-     * @param value  the mobile network code
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the mobile network code
+     * @param encoder the destination encoder
      */
-    public static int writeMnc(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(MNC, GLOBAL, value, output, offset);
+    public static void writeMnc(long value, WamEventEncoder encoder) {
+        encoder.writeInt(MNC, GLOBAL, value);
     }
 
     // mcc (5, int)
@@ -112,28 +106,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the mobile country
      * code global.
      *
-     * <p>The MCC identifies the country of the paired phone's SIM card.
-     * This global is populated from the phone's connection properties
-     * when available.
-     *
      * @param value the mobile country code
      * @return the encoded size in bytes
      */
     public static int mccSize(long value) {
-        return WamEncoder.intSize(MCC, value);
+        return WamEventSizes.intSize(MCC, value);
     }
 
     /**
-     * Writes the mobile country code global attribute into the output
-     * array.
+     * Writes the mobile country code global attribute.
      *
-     * @param value  the mobile country code
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the mobile country code
+     * @param encoder the destination encoder
      */
-    public static int writeMcc(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(MCC, GLOBAL, value, output, offset);
+    public static void writeMcc(long value, WamEventEncoder encoder) {
+        encoder.writeInt(MCC, GLOBAL, value);
     }
 
     // generic null global
@@ -141,52 +128,42 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode a null global
      * entry for the given field identifier.
      *
-     * <p>A null global is written when a previously non-{@code null}
-     * global transitions to {@code null}, matching the
-     * {@code VALUE_NULL} tag entry produced by WhatsApp Web's
-     * {@code writeGlobalAttribute(buffer, id, null)}.
-     *
      * @param fieldId the numeric field identifier
      * @return the encoded size in bytes
      */
     public static int nullGlobalSize(int fieldId) {
-        return WamEncoder.nullSize(fieldId);
+        return WamEventSizes.nullSize(fieldId);
     }
 
     /**
-     * Writes a null global entry into the output array.
+     * Writes a null global entry.
      *
      * @param fieldId the numeric field identifier
-     * @param output  the output byte array
-     * @param offset  the current offset in the output array
-     * @return the new offset after writing
+     * @param encoder the destination encoder
      */
-    public static int writeNullGlobal(int fieldId, byte[] output, int offset) {
-        return WamEncoder.writeNull(fieldId, GLOBAL, output, offset);
+    public static void writeNullGlobal(int fieldId, WamEventEncoder encoder) {
+        encoder.writeNull(fieldId, GLOBAL);
     }
 
     // platform (11, int)
     /**
      * Returns the number of bytes required to encode the platform global.
      *
-     * @param value the platform identifier (e.g. {@code 1} for web,
-     *              {@code 2} for mobile)
+     * @param value the platform identifier
      * @return the encoded size in bytes
      */
     public static int platformSize(long value) {
-        return WamEncoder.intSize(PLATFORM, value);
+        return WamEventSizes.intSize(PLATFORM, value);
     }
 
     /**
-     * Writes the platform global attribute into the output array.
+     * Writes the platform global attribute.
      *
-     * @param value  the platform identifier
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the platform identifier
+     * @param encoder the destination encoder
      */
-    public static int writePlatform(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(PLATFORM, GLOBAL, value, output, offset);
+    public static void writePlatform(long value, WamEventEncoder encoder) {
+        encoder.writeInt(PLATFORM, GLOBAL, value);
     }
 
     // deviceName (13, string)
@@ -198,19 +175,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int deviceNameSize(String value) {
-        return WamEncoder.stringSize(DEVICE_NAME, value);
+        return WamEventSizes.stringSize(DEVICE_NAME, value);
     }
 
     /**
-     * Writes the device name global attribute into the output array.
+     * Writes the device name global attribute.
      *
-     * @param value  the device name, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the device name, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeDeviceName(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(DEVICE_NAME, GLOBAL, value, output, offset);
+    public static void writeDeviceName(String value, WamEventEncoder encoder) {
+        encoder.writeString(DEVICE_NAME, GLOBAL, value);
     }
 
     // osVersion (15, string)
@@ -222,19 +197,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int osVersionSize(String value) {
-        return WamEncoder.stringSize(OS_VERSION, value);
+        return WamEventSizes.stringSize(OS_VERSION, value);
     }
 
     /**
-     * Writes the OS version global attribute into the output array.
+     * Writes the OS version global attribute.
      *
-     * @param value  the OS version string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the OS version string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeOsVersion(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(OS_VERSION, GLOBAL, value, output, offset);
+    public static void writeOsVersion(String value, WamEventEncoder encoder) {
+        encoder.writeString(OS_VERSION, GLOBAL, value);
     }
 
     // appVersion (17, string)
@@ -242,26 +215,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the app version
      * global.
      *
-     * <p>The app version is transmitted as a UTF-8 string on the wire
-     * (e.g. {@code "2.2409.2"}).
-     *
      * @param value the version string, must not be {@code null}
      * @return the encoded size in bytes
      */
     public static int appVersionSize(String value) {
-        return WamEncoder.stringSize(APP_VERSION, value);
+        return WamEventSizes.stringSize(APP_VERSION, value);
     }
 
     /**
-     * Writes the app version global attribute into the output array.
+     * Writes the app version global attribute.
      *
-     * @param value  the version string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the version string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeAppVersion(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(APP_VERSION, GLOBAL, value, output, offset);
+    public static void writeAppVersion(String value, WamEventEncoder encoder) {
+        encoder.writeString(APP_VERSION, GLOBAL, value);
     }
 
     // appIsBetaRelease (21, bool as int)
@@ -273,19 +241,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int appIsBetaReleaseSize(boolean value) {
-        return WamEncoder.intSize(APP_IS_BETA_RELEASE, value ? 1 : 0);
+        return WamEventSizes.intSize(APP_IS_BETA_RELEASE, value ? 1 : 0);
     }
 
     /**
-     * Writes the app-is-beta global attribute into the output array.
+     * Writes the app-is-beta global attribute.
      *
-     * @param value  {@code true} if this is a beta release
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   {@code true} if this is a beta release
+     * @param encoder the destination encoder
      */
-    public static int writeAppIsBetaRelease(boolean value, byte[] output, int offset) {
-        return WamEncoder.writeInt(APP_IS_BETA_RELEASE, GLOBAL, value ? 1 : 0, output, offset);
+    public static void writeAppIsBetaRelease(boolean value, WamEventEncoder encoder) {
+        encoder.writeInt(APP_IS_BETA_RELEASE, GLOBAL, value ? 1 : 0);
     }
 
     // networkIsWifi (23, bool as int)
@@ -297,19 +263,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int networkIsWifiSize(boolean value) {
-        return WamEncoder.intSize(NETWORK_IS_WIFI, value ? 1 : 0);
+        return WamEventSizes.intSize(NETWORK_IS_WIFI, value ? 1 : 0);
     }
 
     /**
-     * Writes the network-is-wifi global attribute into the output array.
+     * Writes the network-is-wifi global attribute.
      *
-     * @param value  {@code true} if the device is connected via Wi-Fi
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   {@code true} if the device is connected via Wi-Fi
+     * @param encoder the destination encoder
      */
-    public static int writeNetworkIsWifi(boolean value, byte[] output, int offset) {
-        return WamEncoder.writeInt(NETWORK_IS_WIFI, GLOBAL, value ? 1 : 0, output, offset);
+    public static void writeNetworkIsWifi(boolean value, WamEventEncoder encoder) {
+        encoder.writeInt(NETWORK_IS_WIFI, GLOBAL, value ? 1 : 0);
     }
 
     // commitTime (47, int)
@@ -322,19 +286,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int commitTimeSize(long epochSeconds) {
-        return WamEncoder.intSize(COMMIT_TIME, epochSeconds);
+        return WamEventSizes.intSize(COMMIT_TIME, epochSeconds);
     }
 
     /**
-     * Writes the commit-time global attribute into the output array.
+     * Writes the commit-time global attribute.
      *
      * @param epochSeconds the Unix epoch seconds
-     * @param output       the output byte array
-     * @param offset       the current offset in the output array
-     * @return the new offset after writing
+     * @param encoder      the destination encoder
      */
-    public static int writeCommitTime(long epochSeconds, byte[] output, int offset) {
-        return WamEncoder.writeInt(COMMIT_TIME, GLOBAL, epochSeconds, output, offset);
+    public static void writeCommitTime(long epochSeconds, WamEventEncoder encoder) {
+        encoder.writeInt(COMMIT_TIME, GLOBAL, epochSeconds);
     }
 
     // browserVersion (295, string)
@@ -346,19 +308,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int browserVersionSize(String value) {
-        return WamEncoder.stringSize(BROWSER_VERSION, value);
+        return WamEventSizes.stringSize(BROWSER_VERSION, value);
     }
 
     /**
-     * Writes the browser version global attribute into the output array.
+     * Writes the browser version global attribute.
      *
-     * @param value  the browser version string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the browser version string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeBrowserVersion(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(BROWSER_VERSION, GLOBAL, value, output, offset);
+    public static void writeBrowserVersion(String value, WamEventEncoder encoder) {
+        encoder.writeString(BROWSER_VERSION, GLOBAL, value);
     }
 
     // webcEnv (633, int enum)
@@ -370,20 +330,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcEnvSize(long value) {
-        return WamEncoder.intSize(WEBC_ENV, value);
+        return WamEventSizes.intSize(WEBC_ENV, value);
     }
 
     /**
-     * Writes the web client environment global attribute into the
-     * output array.
+     * Writes the web client environment global attribute.
      *
-     * @param value  the environment code enum value
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the environment code enum value
+     * @param encoder the destination encoder
      */
-    public static int writeWebcEnv(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(WEBC_ENV, GLOBAL, value, output, offset);
+    public static void writeWebcEnv(long value, WamEventEncoder encoder) {
+        encoder.writeInt(WEBC_ENV, GLOBAL, value);
     }
 
     // memClass (655, int)
@@ -395,19 +352,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int memClassSize(long value) {
-        return WamEncoder.intSize(MEM_CLASS, value);
+        return WamEventSizes.intSize(MEM_CLASS, value);
     }
 
     /**
-     * Writes the memory class global attribute into the output array.
+     * Writes the memory class global attribute.
      *
-     * @param value  the device memory class in megabytes
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the device memory class in megabytes
+     * @param encoder the destination encoder
      */
-    public static int writeMemClass(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(MEM_CLASS, GLOBAL, value, output, offset);
+    public static void writeMemClass(long value, WamEventEncoder encoder) {
+        encoder.writeInt(MEM_CLASS, GLOBAL, value);
     }
 
     // yearClass (689, int)
@@ -415,28 +370,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the year class
      * global.
      *
-     * <p>The year class is a device performance classification derived
-     * from Facebook's device-year-class library. It estimates the year
-     * in which the device's hardware specs would have been considered
-     * high-end.
-     *
-     * @param value the year class (e.g. {@code 2024})
+     * @param value the year class
      * @return the encoded size in bytes
      */
     public static int yearClassSize(long value) {
-        return WamEncoder.intSize(YEAR_CLASS, value);
+        return WamEventSizes.intSize(YEAR_CLASS, value);
     }
 
     /**
-     * Writes the year class global attribute into the output array.
+     * Writes the year class global attribute.
      *
-     * @param value  the year class (e.g. {@code 2024})
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the year class
+     * @param encoder the destination encoder
      */
-    public static int writeYearClass(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(YEAR_CLASS, GLOBAL, value, output, offset);
+    public static void writeYearClass(long value, WamEventEncoder encoder) {
+        encoder.writeInt(YEAR_CLASS, GLOBAL, value);
     }
 
     // webcPhonePlatform (707, int enum)
@@ -444,26 +392,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the phone platform
      * global.
      *
-     * <p>This identifies the platform type of the paired phone
-     * (e.g. Android, iOS), as reported by the phone's connection data.
-     *
      * @param value the platform type enum value
      * @return the encoded size in bytes
      */
     public static int webcPhonePlatformSize(long value) {
-        return WamEncoder.intSize(WEBC_PHONE_PLATFORM, value);
+        return WamEventSizes.intSize(WEBC_PHONE_PLATFORM, value);
     }
 
     /**
-     * Writes the phone platform global attribute into the output array.
+     * Writes the phone platform global attribute.
      *
-     * @param value  the platform type enum value
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the platform type enum value
+     * @param encoder the destination encoder
      */
-    public static int writeWebcPhonePlatform(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(WEBC_PHONE_PLATFORM, GLOBAL, value, output, offset);
+    public static void writeWebcPhonePlatform(long value, WamEventEncoder encoder) {
+        encoder.writeInt(WEBC_PHONE_PLATFORM, GLOBAL, value);
     }
 
     // browser (779, string)
@@ -474,19 +417,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int browserSize(String value) {
-        return WamEncoder.stringSize(BROWSER, value);
+        return WamEventSizes.stringSize(BROWSER, value);
     }
 
     /**
-     * Writes the browser global attribute into the output array.
+     * Writes the browser global attribute.
      *
-     * @param value  the browser name, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the browser name, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeBrowser(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(BROWSER, GLOBAL, value, output, offset);
+    public static void writeBrowser(String value, WamEventEncoder encoder) {
+        encoder.writeString(BROWSER, GLOBAL, value);
     }
 
     // webcPhoneCharging (783, bool as int)
@@ -498,19 +439,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcPhoneChargingSize(boolean value) {
-        return WamEncoder.intSize(WEBC_PHONE_CHARGING, value ? 1 : 0);
+        return WamEventSizes.intSize(WEBC_PHONE_CHARGING, value ? 1 : 0);
     }
 
     /**
-     * Writes the phone-charging global attribute into the output array.
+     * Writes the phone-charging global attribute.
      *
-     * @param value  {@code true} if the paired phone is charging
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   {@code true} if the paired phone is charging
+     * @param encoder the destination encoder
      */
-    public static int writeWebcPhoneCharging(boolean value, byte[] output, int offset) {
-        return WamEncoder.writeInt(WEBC_PHONE_CHARGING, GLOBAL, value ? 1 : 0, output, offset);
+    public static void writeWebcPhoneCharging(boolean value, WamEventEncoder encoder) {
+        encoder.writeInt(WEBC_PHONE_CHARGING, GLOBAL, value ? 1 : 0);
     }
 
     // webcPhoneDeviceManufacturer (829, string)
@@ -522,20 +461,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcPhoneDeviceManufacturerSize(String value) {
-        return WamEncoder.stringSize(WEBC_PHONE_DEVICE_MANUFACTURER, value);
+        return WamEventSizes.stringSize(WEBC_PHONE_DEVICE_MANUFACTURER, value);
     }
 
     /**
-     * Writes the phone device manufacturer global attribute into the
-     * output array.
+     * Writes the phone device manufacturer global attribute.
      *
-     * @param value  the manufacturer name, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the manufacturer name, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcPhoneDeviceManufacturer(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_PHONE_DEVICE_MANUFACTURER, GLOBAL, value, output, offset);
+    public static void writeWebcPhoneDeviceManufacturer(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_PHONE_DEVICE_MANUFACTURER, GLOBAL, value);
     }
 
     // webcPhoneDeviceModel (831, string)
@@ -547,20 +483,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcPhoneDeviceModelSize(String value) {
-        return WamEncoder.stringSize(WEBC_PHONE_DEVICE_MODEL, value);
+        return WamEventSizes.stringSize(WEBC_PHONE_DEVICE_MODEL, value);
     }
 
     /**
-     * Writes the phone device model global attribute into the output
-     * array.
+     * Writes the phone device model global attribute.
      *
-     * @param value  the model name, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the model name, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcPhoneDeviceModel(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_PHONE_DEVICE_MODEL, GLOBAL, value, output, offset);
+    public static void writeWebcPhoneDeviceModel(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_PHONE_DEVICE_MODEL, GLOBAL, value);
     }
 
     // webcPhoneOsBuildNumber (833, string)
@@ -572,20 +505,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcPhoneOsBuildNumberSize(String value) {
-        return WamEncoder.stringSize(WEBC_PHONE_OS_BUILD_NUMBER, value);
+        return WamEventSizes.stringSize(WEBC_PHONE_OS_BUILD_NUMBER, value);
     }
 
     /**
-     * Writes the phone OS build number global attribute into the output
-     * array.
+     * Writes the phone OS build number global attribute.
      *
-     * @param value  the build number string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the build number string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcPhoneOsBuildNumber(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_PHONE_OS_BUILD_NUMBER, GLOBAL, value, output, offset);
+    public static void writeWebcPhoneOsBuildNumber(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_PHONE_OS_BUILD_NUMBER, GLOBAL, value);
     }
 
     // webcPhoneOsVersion (835, string)
@@ -597,20 +527,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcPhoneOsVersionSize(String value) {
-        return WamEncoder.stringSize(WEBC_PHONE_OS_VERSION, value);
+        return WamEventSizes.stringSize(WEBC_PHONE_OS_VERSION, value);
     }
 
     /**
-     * Writes the phone OS version global attribute into the output
-     * array.
+     * Writes the phone OS version global attribute.
      *
-     * @param value  the version string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the version string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcPhoneOsVersion(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_PHONE_OS_VERSION, GLOBAL, value, output, offset);
+    public static void writeWebcPhoneOsVersion(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_PHONE_OS_VERSION, GLOBAL, value);
     }
 
     // webcBucket (875, string)
@@ -622,19 +549,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcBucketSize(String value) {
-        return WamEncoder.stringSize(WEBC_BUCKET, value);
+        return WamEventSizes.stringSize(WEBC_BUCKET, value);
     }
 
     /**
-     * Writes the web bucket global attribute into the output array.
+     * Writes the web bucket global attribute.
      *
-     * @param value  the experiment bucket string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the experiment bucket string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcBucket(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_BUCKET, GLOBAL, value, output, offset);
+    public static void writeWebcBucket(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_BUCKET, GLOBAL, value);
     }
 
     // webcWebPlatform (899, int enum)
@@ -646,20 +571,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcWebPlatformSize(long value) {
-        return WamEncoder.intSize(WEBC_WEB_PLATFORM, value);
+        return WamEventSizes.intSize(WEBC_WEB_PLATFORM, value);
     }
 
     /**
-     * Writes the web platform type global attribute into the output
-     * array.
+     * Writes the web platform type global attribute.
      *
-     * @param value  the web platform enum value
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the web platform enum value
+     * @param encoder the destination encoder
      */
-    public static int writeWebcWebPlatform(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(WEBC_WEB_PLATFORM, GLOBAL, value, output, offset);
+    public static void writeWebcWebPlatform(long value, WamEventEncoder encoder) {
+        encoder.writeInt(WEBC_WEB_PLATFORM, GLOBAL, value);
     }
 
     // webcPhoneAppVersion (1005, string)
@@ -667,27 +589,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the phone app
      * version global.
      *
-     * <p>This is the WhatsApp version running on the paired phone,
-     * populated from the phone's connection data.
-     *
      * @param value the version string, must not be {@code null}
      * @return the encoded size in bytes
      */
     public static int webcPhoneAppVersionSize(String value) {
-        return WamEncoder.stringSize(WEBC_PHONE_APP_VERSION, value);
+        return WamEventSizes.stringSize(WEBC_PHONE_APP_VERSION, value);
     }
 
     /**
-     * Writes the phone app version global attribute into the output
-     * array.
+     * Writes the phone app version global attribute.
      *
-     * @param value  the version string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the version string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcPhoneAppVersion(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_PHONE_APP_VERSION, GLOBAL, value, output, offset);
+    public static void writeWebcPhoneAppVersion(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_PHONE_APP_VERSION, GLOBAL, value);
     }
 
     // webcNativeBetaUpdates (1007, bool as int)
@@ -700,20 +616,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcNativeBetaUpdatesSize(boolean value) {
-        return WamEncoder.intSize(WEBC_NATIVE_BETA_UPDATES, value ? 1 : 0);
+        return WamEventSizes.intSize(WEBC_NATIVE_BETA_UPDATES, value ? 1 : 0);
     }
 
     /**
-     * Writes the native beta updates global attribute into the output
-     * array.
+     * Writes the native beta updates global attribute.
      *
-     * @param value  {@code true} if configured for beta updates
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   {@code true} if configured for beta updates
+     * @param encoder the destination encoder
      */
-    public static int writeWebcNativeBetaUpdates(boolean value, byte[] output, int offset) {
-        return WamEncoder.writeInt(WEBC_NATIVE_BETA_UPDATES, GLOBAL, value ? 1 : 0, output, offset);
+    public static void writeWebcNativeBetaUpdates(boolean value, WamEventEncoder encoder) {
+        encoder.writeInt(WEBC_NATIVE_BETA_UPDATES, GLOBAL, value ? 1 : 0);
     }
 
     // webcNativeAutolaunch (1009, bool as int)
@@ -726,20 +639,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcNativeAutolaunchSize(boolean value) {
-        return WamEncoder.intSize(WEBC_NATIVE_AUTOLAUNCH, value ? 1 : 0);
+        return WamEventSizes.intSize(WEBC_NATIVE_AUTOLAUNCH, value ? 1 : 0);
     }
 
     /**
-     * Writes the native autolaunch global attribute into the output
-     * array.
+     * Writes the native autolaunch global attribute.
      *
-     * @param value  {@code true} if configured for autolaunch
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   {@code true} if configured for autolaunch
+     * @param encoder the destination encoder
      */
-    public static int writeWebcNativeAutolaunch(boolean value, byte[] output, int offset) {
-        return WamEncoder.writeInt(WEBC_NATIVE_AUTOLAUNCH, GLOBAL, value ? 1 : 0, output, offset);
+    public static void writeWebcNativeAutolaunch(boolean value, WamEventEncoder encoder) {
+        encoder.writeInt(WEBC_NATIVE_AUTOLAUNCH, GLOBAL, value ? 1 : 0);
     }
 
     // appBuild (1657, int enum)
@@ -751,19 +661,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int appBuildSize(long value) {
-        return WamEncoder.intSize(APP_BUILD, value);
+        return WamEventSizes.intSize(APP_BUILD, value);
     }
 
     /**
-     * Writes the app build type global attribute into the output array.
+     * Writes the app build type global attribute.
      *
-     * @param value  the app build type enum value
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the app build type enum value
+     * @param encoder the destination encoder
      */
-    public static int writeAppBuild(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(APP_BUILD, GLOBAL, value, output, offset);
+    public static void writeAppBuild(long value, WamEventEncoder encoder) {
+        encoder.writeInt(APP_BUILD, GLOBAL, value);
     }
 
     // yearClass2016 (2617, int)
@@ -771,26 +679,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the year class 2016
      * global.
      *
-     * <p>A variant of the year class metric using a 2016-era
-     * classification baseline.
-     *
      * @param value the year class value
      * @return the encoded size in bytes
      */
     public static int yearClass2016Size(long value) {
-        return WamEncoder.intSize(YEAR_CLASS_2016, value);
+        return WamEventSizes.intSize(YEAR_CLASS_2016, value);
     }
 
     /**
-     * Writes the year class 2016 global attribute into the output array.
+     * Writes the year class 2016 global attribute.
      *
-     * @param value  the year class value
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the year class value
+     * @param encoder the destination encoder
      */
-    public static int writeYearClass2016(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(YEAR_CLASS_2016, GLOBAL, value, output, offset);
+    public static void writeYearClass2016(long value, WamEventEncoder encoder) {
+        encoder.writeInt(YEAR_CLASS_2016, GLOBAL, value);
     }
 
     // datacenter (2795, string)
@@ -798,26 +701,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the datacenter
      * global.
      *
-     * <p>This identifies the server datacenter handling the session,
-     * typically set by the server.
-     *
      * @param value the datacenter identifier, must not be {@code null}
      * @return the encoded size in bytes
      */
     public static int datacenterSize(String value) {
-        return WamEncoder.stringSize(DATACENTER, value);
+        return WamEventSizes.stringSize(DATACENTER, value);
     }
 
     /**
-     * Writes the datacenter global attribute into the output array.
+     * Writes the datacenter global attribute.
      *
-     * @param value  the datacenter identifier, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the datacenter identifier, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeDatacenter(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(DATACENTER, GLOBAL, value, output, offset);
+    public static void writeDatacenter(String value, WamEventEncoder encoder) {
+        encoder.writeString(DATACENTER, GLOBAL, value);
     }
 
     // beaconSessionId (3433, int)
@@ -825,29 +723,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the beacon session
      * ID global written per-event when beaconing is active.
      *
-     * <p>WAWebWamGlobals declares this field with ID {@code 18529}, but
-     * the actual runtime code in WAWebWamLibContext hardcodes
-     * {@code 3433}. This implementation uses the runtime value to match
-     * what is actually written to the wire.
-     *
      * @param value the beaconing sequence number
      * @return the encoded size in bytes
      */
     public static int beaconSessionIdSize(long value) {
-        return WamEncoder.intSize(BEACON_SESSION_ID, value);
+        return WamEventSizes.intSize(BEACON_SESSION_ID, value);
     }
 
     /**
-     * Writes the beacon session ID global attribute into the output
-     * array.
+     * Writes the beacon session ID global attribute.
      *
-     * @param value  the beaconing sequence number
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the beaconing sequence number
+     * @param encoder the destination encoder
      */
-    public static int writeBeaconSessionId(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(BEACON_SESSION_ID, GLOBAL, value, output, offset);
+    public static void writeBeaconSessionId(long value, WamEventEncoder encoder) {
+        encoder.writeInt(BEACON_SESSION_ID, GLOBAL, value);
     }
 
     // streamId (3543, int)
@@ -859,19 +749,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int streamIdSize(long value) {
-        return WamEncoder.intSize(STREAM_ID, value);
+        return WamEventSizes.intSize(STREAM_ID, value);
     }
 
     /**
-     * Writes the stream ID global attribute into the output array.
+     * Writes the stream ID global attribute.
      *
-     * @param value  the stream identifier
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the stream identifier
+     * @param encoder the destination encoder
      */
-    public static int writeStreamId(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(STREAM_ID, GLOBAL, value, output, offset);
+    public static void writeStreamId(long value, WamEventEncoder encoder) {
+        encoder.writeInt(STREAM_ID, GLOBAL, value);
     }
 
     // webcTabId (3727, string)
@@ -882,19 +770,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcTabIdSize(String value) {
-        return WamEncoder.stringSize(WEBC_TAB_ID, value);
+        return WamEventSizes.stringSize(WEBC_TAB_ID, value);
     }
 
     /**
-     * Writes the tab ID global attribute into the output array.
+     * Writes the tab ID global attribute.
      *
-     * @param value  the tab identifier string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the tab identifier string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcTabId(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_TAB_ID, GLOBAL, value, output, offset);
+    public static void writeWebcTabId(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_TAB_ID, GLOBAL, value);
     }
 
     // abKey2 (4473, string)
@@ -906,19 +792,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int abKey2Size(String value) {
-        return WamEncoder.stringSize(AB_KEY_2, value);
+        return WamEventSizes.stringSize(AB_KEY_2, value);
     }
 
     /**
-     * Writes the AB key 2 global attribute into the output array.
+     * Writes the AB key 2 global attribute.
      *
-     * @param value  the AB key string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the AB key string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeAbKey2(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(AB_KEY_2, GLOBAL, value, output, offset);
+    public static void writeAbKey2(String value, WamEventEncoder encoder) {
+        encoder.writeString(AB_KEY_2, GLOBAL, value);
     }
 
     // deviceVersion (4505, string)
@@ -930,19 +814,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int deviceVersionSize(String value) {
-        return WamEncoder.stringSize(DEVICE_VERSION, value);
+        return WamEventSizes.stringSize(DEVICE_VERSION, value);
     }
 
     /**
-     * Writes the device version global attribute into the output array.
+     * Writes the device version global attribute.
      *
-     * @param value  the device version string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the device version string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeDeviceVersion(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(DEVICE_VERSION, GLOBAL, value, output, offset);
+    public static void writeDeviceVersion(String value, WamEventEncoder encoder) {
+        encoder.writeString(DEVICE_VERSION, GLOBAL, value);
     }
 
     // expoKey (5029, string)
@@ -950,26 +832,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the exposure key
      * global.
      *
-     * <p>The exposure key tracks which AB test configurations were
-     * accessed during the session.
-     *
      * @param value the exposure key string, must not be {@code null}
      * @return the encoded size in bytes
      */
     public static int expoKeySize(String value) {
-        return WamEncoder.stringSize(EXPO_KEY, value);
+        return WamEventSizes.stringSize(EXPO_KEY, value);
     }
 
     /**
-     * Writes the exposure key global attribute into the output array.
+     * Writes the exposure key global attribute.
      *
-     * @param value  the exposure key string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the exposure key string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeExpoKey(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(EXPO_KEY, GLOBAL, value, output, offset);
+    public static void writeExpoKey(String value, WamEventEncoder encoder) {
+        encoder.writeString(EXPO_KEY, GLOBAL, value);
     }
 
     // psId (6005, string)
@@ -977,28 +854,24 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the private stats
      * identifier global.
      *
-     * <p>This global is only written for
-     * {@link WamChannel#PRIVATE PRIVATE}
-     * channel buffers.
+     * <p>This global is only written for {@link WamChannel#PRIVATE
+     * PRIVATE} channel buffers.
      *
      * @param value the PS identifier string, must not be {@code null}
      * @return the encoded size in bytes
      */
     public static int psIdSize(String value) {
-        return WamEncoder.stringSize(PS_ID, value);
+        return WamEventSizes.stringSize(PS_ID, value);
     }
 
     /**
-     * Writes the private stats identifier global attribute into the
-     * output array.
+     * Writes the private stats identifier global attribute.
      *
-     * @param value  the PS identifier string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the PS identifier string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writePsId(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(PS_ID, GLOBAL, value, output, offset);
+    public static void writePsId(String value, WamEventEncoder encoder) {
+        encoder.writeString(PS_ID, GLOBAL, value);
     }
 
     // ocVersion (6251, int)
@@ -1010,20 +883,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int ocVersionSize(long value) {
-        return WamEncoder.intSize(OC_VERSION, value);
+        return WamEventSizes.intSize(OC_VERSION, value);
     }
 
     /**
-     * Writes the official client version global attribute into the
-     * output array.
+     * Writes the official client version global attribute.
      *
-     * @param value  the official client version number
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the official client version number
+     * @param encoder the destination encoder
      */
-    public static int writeOcVersion(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(OC_VERSION, GLOBAL, value, output, offset);
+    public static void writeOcVersion(long value, WamEventEncoder encoder) {
+        encoder.writeInt(OC_VERSION, GLOBAL, value);
     }
 
     // webcWebDeviceManufacturer (6599, string)
@@ -1035,20 +905,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcWebDeviceManufacturerSize(String value) {
-        return WamEncoder.stringSize(WEBC_WEB_DEVICE_MANUFACTURER, value);
+        return WamEventSizes.stringSize(WEBC_WEB_DEVICE_MANUFACTURER, value);
     }
 
     /**
-     * Writes the web device manufacturer global attribute into the
-     * output array.
+     * Writes the web device manufacturer global attribute.
      *
-     * @param value  the manufacturer name, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the manufacturer name, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcWebDeviceManufacturer(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_WEB_DEVICE_MANUFACTURER, GLOBAL, value, output, offset);
+    public static void writeWebcWebDeviceManufacturer(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_WEB_DEVICE_MANUFACTURER, GLOBAL, value);
     }
 
     // webcWebDeviceModel (6601, string)
@@ -1060,20 +927,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcWebDeviceModelSize(String value) {
-        return WamEncoder.stringSize(WEBC_WEB_DEVICE_MODEL, value);
+        return WamEventSizes.stringSize(WEBC_WEB_DEVICE_MODEL, value);
     }
 
     /**
-     * Writes the web device model global attribute into the output
-     * array.
+     * Writes the web device model global attribute.
      *
-     * @param value  the model name, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the model name, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcWebDeviceModel(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_WEB_DEVICE_MODEL, GLOBAL, value, output, offset);
+    public static void writeWebcWebDeviceModel(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_WEB_DEVICE_MODEL, GLOBAL, value);
     }
 
     // webcWebOsReleaseNumber (6603, string)
@@ -1085,20 +949,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcWebOsReleaseNumberSize(String value) {
-        return WamEncoder.stringSize(WEBC_WEB_OS_RELEASE_NUMBER, value);
+        return WamEventSizes.stringSize(WEBC_WEB_OS_RELEASE_NUMBER, value);
     }
 
     /**
-     * Writes the web OS release number global attribute into the output
-     * array.
+     * Writes the web OS release number global attribute.
      *
-     * @param value  the release number string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the release number string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcWebOsReleaseNumber(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_WEB_OS_RELEASE_NUMBER, GLOBAL, value, output, offset);
+    public static void writeWebcWebOsReleaseNumber(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_WEB_OS_RELEASE_NUMBER, GLOBAL, value);
     }
 
     // webcWebArch (6605, string)
@@ -1110,20 +971,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcWebArchSize(String value) {
-        return WamEncoder.stringSize(WEBC_WEB_ARCH, value);
+        return WamEventSizes.stringSize(WEBC_WEB_ARCH, value);
     }
 
     /**
-     * Writes the web architecture global attribute into the output
-     * array.
+     * Writes the web architecture global attribute.
      *
-     * @param value  the architecture string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the architecture string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWebcWebArch(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WEBC_WEB_ARCH, GLOBAL, value, output, offset);
+    public static void writeWebcWebArch(String value, WamEventEncoder encoder) {
+        encoder.writeString(WEBC_WEB_ARCH, GLOBAL, value);
     }
 
     // psCountryCode (6833, string)
@@ -1131,27 +989,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the private stats
      * country code global.
      *
-     * <p>This is derived from the user's phone number and written only
-     * on the {@code PRIVATE} channel.
-     *
      * @param value the country code string, must not be {@code null}
      * @return the encoded size in bytes
      */
     public static int psCountryCodeSize(String value) {
-        return WamEncoder.stringSize(PS_COUNTRY_CODE, value);
+        return WamEventSizes.stringSize(PS_COUNTRY_CODE, value);
     }
 
     /**
-     * Writes the private stats country code global attribute into the
-     * output array.
+     * Writes the private stats country code global attribute.
      *
-     * @param value  the country code string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the country code string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writePsCountryCode(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(PS_COUNTRY_CODE, GLOBAL, value, output, offset);
+    public static void writePsCountryCode(String value, WamEventEncoder encoder) {
+        encoder.writeString(PS_COUNTRY_CODE, GLOBAL, value);
     }
 
     // numCpu (10317, int)
@@ -1163,19 +1015,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int numCpuSize(long value) {
-        return WamEncoder.intSize(NUM_CPU, value);
+        return WamEventSizes.intSize(NUM_CPU, value);
     }
 
     /**
-     * Writes the CPU count global attribute into the output array.
+     * Writes the CPU count global attribute.
      *
-     * @param value  the number of available processors
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the number of available processors
+     * @param encoder the destination encoder
      */
-    public static int writeNumCpu(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(NUM_CPU, GLOBAL, value, output, offset);
+    public static void writeNumCpu(long value, WamEventEncoder encoder) {
+        encoder.writeInt(NUM_CPU, GLOBAL, value);
     }
 
     // serviceImprovementOptOut (13293, bool as int)
@@ -1183,25 +1033,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the service
      * improvement opt-out global.
      *
-     * @param value {@code true} if the user has opted out of service
-     *              improvement data collection
+     * @param value {@code true} if the user has opted out
      * @return the encoded size in bytes
      */
     public static int serviceImprovementOptOutSize(boolean value) {
-        return WamEncoder.intSize(SERVICE_IMPROVEMENT_OPT_OUT, value ? 1 : 0);
+        return WamEventSizes.intSize(SERVICE_IMPROVEMENT_OPT_OUT, value ? 1 : 0);
     }
 
     /**
-     * Writes the service improvement opt-out global attribute into the
-     * output array.
+     * Writes the service improvement opt-out global attribute.
      *
-     * @param value  {@code true} if opted out
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   {@code true} if opted out
+     * @param encoder the destination encoder
      */
-    public static int writeServiceImprovementOptOut(boolean value, byte[] output, int offset) {
-        return WamEncoder.writeInt(SERVICE_IMPROVEMENT_OPT_OUT, GLOBAL, value ? 1 : 0, output, offset);
+    public static void writeServiceImprovementOptOut(boolean value, WamEventEncoder encoder) {
+        encoder.writeInt(SERVICE_IMPROVEMENT_OPT_OUT, GLOBAL, value ? 1 : 0);
     }
 
     // deviceClassification (14507, int)
@@ -1209,25 +1055,21 @@ public final class WamGlobalEncoder {
      * Returns the number of bytes required to encode the device
      * classification global.
      *
-     * @param value the device classification enum value (e.g. {@code 4}
-     *              for DESKTOP)
+     * @param value the device classification enum value
      * @return the encoded size in bytes
      */
     public static int deviceClassificationSize(long value) {
-        return WamEncoder.intSize(DEVICE_CLASSIFICATION, value);
+        return WamEventSizes.intSize(DEVICE_CLASSIFICATION, value);
     }
 
     /**
-     * Writes the device classification global attribute into the output
-     * array.
+     * Writes the device classification global attribute.
      *
-     * @param value  the device classification enum value
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the device classification enum value
+     * @param encoder the destination encoder
      */
-    public static int writeDeviceClassification(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(DEVICE_CLASSIFICATION, GLOBAL, value, output, offset);
+    public static void writeDeviceClassification(long value, WamEventEncoder encoder) {
+        encoder.writeInt(DEVICE_CLASSIFICATION, GLOBAL, value);
     }
 
     // wametaLoggerTestFilter (15881, string)
@@ -1239,20 +1081,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int wametaLoggerTestFilterSize(String value) {
-        return WamEncoder.stringSize(WAMETA_LOGGER_TEST_FILTER, value);
+        return WamEventSizes.stringSize(WAMETA_LOGGER_TEST_FILTER, value);
     }
 
     /**
-     * Writes the WAMeta logger test filter global attribute into the
-     * output array.
+     * Writes the WAMeta logger test filter global attribute.
      *
-     * @param value  the test filter string, must not be {@code null}
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the test filter string, must not be {@code null}
+     * @param encoder the destination encoder
      */
-    public static int writeWametaLoggerTestFilter(String value, byte[] output, int offset) {
-        return WamEncoder.writeString(WAMETA_LOGGER_TEST_FILTER, GLOBAL, value, output, offset);
+    public static void writeWametaLoggerTestFilter(String value, WamEventEncoder encoder) {
+        encoder.writeString(WAMETA_LOGGER_TEST_FILTER, GLOBAL, value);
     }
 
     // webcRevision (18491, int)
@@ -1264,20 +1103,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int webcRevisionSize(long value) {
-        return WamEncoder.intSize(WEBC_REVISION, value);
+        return WamEventSizes.intSize(WEBC_REVISION, value);
     }
 
     /**
-     * Writes the web client revision global attribute into the output
-     * array.
+     * Writes the web client revision global attribute.
      *
-     * @param value  the client revision number
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   the client revision number
+     * @param encoder the destination encoder
      */
-    public static int writeWebcRevision(long value, byte[] output, int offset) {
-        return WamEncoder.writeInt(WEBC_REVISION, GLOBAL, value, output, offset);
+    public static void writeWebcRevision(long value, WamEventEncoder encoder) {
+        encoder.writeInt(WEBC_REVISION, GLOBAL, value);
     }
 
     // isInCohort (19129, bool as int)
@@ -1289,19 +1125,17 @@ public final class WamGlobalEncoder {
      * @return the encoded size in bytes
      */
     public static int isInCohortSize(boolean value) {
-        return WamEncoder.intSize(IS_IN_COHORT, value ? 1 : 0);
+        return WamEventSizes.intSize(IS_IN_COHORT, value ? 1 : 0);
     }
 
     /**
-     * Writes the is-in-cohort global attribute into the output array.
+     * Writes the is-in-cohort global attribute.
      *
-     * @param value  {@code true} if in cohort
-     * @param output the output byte array
-     * @param offset the current offset in the output array
-     * @return the new offset after writing
+     * @param value   {@code true} if in cohort
+     * @param encoder the destination encoder
      */
-    public static int writeIsInCohort(boolean value, byte[] output, int offset) {
-        return WamEncoder.writeInt(IS_IN_COHORT, GLOBAL, value ? 1 : 0, output, offset);
+    public static void writeIsInCohort(boolean value, WamEventEncoder encoder) {
+        encoder.writeInt(IS_IN_COHORT, GLOBAL, value ? 1 : 0);
     }
 
     // dynamic dispatch for dirty-tracking
@@ -1320,10 +1154,10 @@ public final class WamGlobalEncoder {
      */
     public static int dynamicGlobalSize(int fieldId, Object value) {
         return switch (value) {
-            case Double d -> Double.isNaN(d) ? 0 : WamEncoder.floatSize(fieldId);
-            case Number n -> WamEncoder.intSize(fieldId, n.longValue());
-            case String s -> WamEncoder.stringSize(fieldId, s);
-            case Boolean b -> WamEncoder.intSize(fieldId, b ? 1 : 0);
+            case Double d -> Double.isNaN(d) ? 0 : WamEventSizes.floatSize(fieldId);
+            case Number n -> WamEventSizes.intSize(fieldId, n.longValue());
+            case String s -> WamEventSizes.stringSize(fieldId, s);
+            case Boolean b -> WamEventSizes.intSize(fieldId, b ? 1 : 0);
             default -> throw new IllegalArgumentException(
                     "Unsupported global value type: " + value.getClass());
         };
@@ -1331,7 +1165,7 @@ public final class WamGlobalEncoder {
 
     /**
      * Writes a global attribute whose type is determined at runtime from
-     * the value's class into the output array.
+     * the value's class.
      *
      * <p>Supported value types are {@link Long}, {@link Integer},
      * {@link String}, and {@link Boolean}. {@link Double} values that
@@ -1339,18 +1173,20 @@ public final class WamGlobalEncoder {
      *
      * @param fieldId the numeric field identifier
      * @param value   the global value (must not be {@code null})
-     * @param output  the output byte array
-     * @param offset  the current offset in the output array
-     * @return the new offset after writing
+     * @param encoder the destination encoder
      */
-    public static int writeDynamicGlobal(int fieldId, Object value, byte[] output, int offset) {
-        return switch (value) {
-            case Double d -> Double.isNaN(d) ? offset : WamEncoder.writeFloat(fieldId, GLOBAL, d, output, offset);
-            case Number n -> WamEncoder.writeInt(fieldId, GLOBAL, n.longValue(), output, offset);
-            case String s -> WamEncoder.writeString(fieldId, GLOBAL, s, output, offset);
-            case Boolean b -> WamEncoder.writeInt(fieldId, GLOBAL, b ? 1 : 0, output, offset);
+    public static void writeDynamicGlobal(int fieldId, Object value, WamEventEncoder encoder) {
+        switch (value) {
+            case Double d -> {
+                if (!Double.isNaN(d)) {
+                    encoder.writeFloat(fieldId, GLOBAL, d);
+                }
+            }
+            case Number n -> encoder.writeInt(fieldId, GLOBAL, n.longValue());
+            case String s -> encoder.writeString(fieldId, GLOBAL, s);
+            case Boolean b -> encoder.writeInt(fieldId, GLOBAL, b ? 1 : 0);
             default -> throw new IllegalArgumentException(
                     "Unsupported global value type: " + value.getClass());
-        };
+        }
     }
 }

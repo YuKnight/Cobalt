@@ -3,14 +3,7 @@ package com.github.auties00.cobalt.node.smax.biz;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.Arrays;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -18,18 +11,20 @@ import java.util.Optional;
  * {@code <whatsapp_as_page_button>} grandchild of
  * {@code <fb_page/>}. Opt-in toggle for the
  * "WhatsApp as page button" overlay.
- *
- * @implNote Mirrors {@code WASmaxInBizLinkingEnums.ENUM_OFF_ON}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBizLinkingEnums")
 public enum SmaxGetLinkedAccountsOffOnState {
     /**
-     * The toggle is off.
+     * The toggle is off. Wire form: {@code "off"}.
      */
+    @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingEnums",
+            exports = "ENUM_OFF_ON", adaptation = WhatsAppAdaptation.DIRECT)
     OFF,
     /**
-     * The toggle is on.
+     * The toggle is on. Wire form: {@code "on"}.
      */
+    @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingEnums",
+            exports = "ENUM_OFF_ON", adaptation = WhatsAppAdaptation.DIRECT)
     ON;
 
     /**
@@ -39,6 +34,8 @@ public enum SmaxGetLinkedAccountsOffOnState {
      * @return an {@link Optional} carrying the matching enum
      *         constant, or empty
      */
+    @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingEnums",
+            exports = "ENUM_OFF_ON", adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<SmaxGetLinkedAccountsOffOnState> of(String value) {
         if (value == null) {
             return Optional.empty();

@@ -75,7 +75,7 @@ Built via `NodeBuilder` with `.description()`, `.attribute()`, `.content()`.
 `Node` has convenience methods to get and stream attributes and content: use the best convenience method to improve code readability.
 
 ## Javadoc Requirements
-ALL members (public, protected, package-private, private) MUST have JDK-style multiline javadoc. No `@since` tags. Use source provenance annotations (`@WhatsAppWebModule`/`@WhatsAppWebExport` for Web, `@WhatsAppMobileClass`/`@WhatsAppMobileMethod` for Mobile) to declare WA source mappings. `@implNote` can be used alongside annotations for free-text adaptation explanations when the annotation alone is insufficient.
+ALL members (public, protected, package-private, private) MUST have JDK-style multiline javadoc. No `@since` tags. Use source provenance annotations (`@WhatsAppWebModule`/`@WhatsAppWebExport` for Web, `@WhatsAppMobileClass`/`@WhatsAppMobileMethod` for Mobile) to declare WA source mappings.
 
 ### Style Rules
 - Third person declarative present tense: "Returns the value" not "Return the value"

@@ -27,37 +27,24 @@ import java.util.Arrays;
  * loop that adapts {@code WAWebSyncdDecryptMutationsWrapper.tryDecryptSnapshot} and
  * {@code WAWebSyncdDecryptMutationsWrapper.tryDecryptPatch}. The batch wrapper exports
  * live in {@code WebAppStateService.decryptMutations}.
- *
- * @implNote WAWebSyncdDecryptMutations.syncdDecryptMutation,
- *           WAWebSyncdDecryptMutationsWrapper.tryDecryptSnapshot,
- *           WAWebSyncdDecryptMutationsWrapper.tryDecryptPatch
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdDecryptMutations")
 @WhatsAppWebModule(moduleName = "WAWebSyncdDecryptMutationsWrapper")
 public sealed interface DecryptedMutation {
     /**
      * Returns the index string identifying this mutation's target.
-     *
-     * @implNote WAWebSyncdDecryptMutations.syncdDecryptMutation — return field {@code index},
-     *           decoded from raw bytes via {@code WAWebSyncdDecryptMutationsWrapper} TextDecoder
      * @return the index string
      */
     String index();
 
     /**
      * Returns the sync operation type (SET or REMOVE).
-     *
-     * @implNote ADAPTED: WAWebSyncdDecryptMutationsWrapper passes operation from the SyncdMutation
-     *           record; Cobalt stores it directly in the mutation result
      * @return the operation type
      */
     SyncdOperation operation();
 
     /**
      * Returns the timestamp of the action.
-     *
-     * @implNote ADAPTED: WAWebSyncdValidateMutations.validateAndTypeSetMutations extracts
-     *           timestamp for SET mutations only; Cobalt extracts eagerly during decryption
      * @return the action timestamp
      */
     Instant timestamp();
@@ -74,7 +61,6 @@ public sealed interface DecryptedMutation {
      * @param timestamp     the action timestamp
      * @param keyId         the sync key ID used for decryption
      * @param actionVersion the action version from the decoded action data
-     * @implNote WAWebSyncdDecryptMutations.syncdDecryptMutation
      */
     record Untrusted(
             String index,
@@ -113,17 +99,6 @@ public sealed interface DecryptedMutation {
          * @throws GeneralSecurityException if any cryptographic operation fails
          * @throws WhatsAppWebAppStateSyncException.ValueMacMismatch if value MAC verification fails
          * @throws WhatsAppWebAppStateSyncException.IndexMacMismatch if index MAC verification fails
-         * @implNote WAWebSyncdDecryptMutations.syncdDecryptMutation,
-         *           WAWebSyncdDecryptMutationsWrapper (per-mutation body of {@code y}
-         *           after the missing-key branch, which in Cobalt is pre-scanned in the
-         *           calling batch loop),
-         *           WAWebSyncdMutationsCryptoUtils.generateMac,
-         *           WAWebSyncdMutationsCryptoUtils.generateAssociatedData,
-         *           WAWebSyncdMutationsCryptoUtils.decryptCipherText,
-         *           WAWebSyncdCrypto.generateIndexMac,
-         *           WAWebSyncdCrypto.valueMacFromIndexAndValueCipherText,
-         *           WAWebSyncdDecode.decodeSyncActionData,
-         *           WAWebSyncdValidateSyncActionProtobuf.validateSyncActionDataProtobuf
          */
         @WhatsAppWebExport(moduleName = "WAWebSyncdDecryptMutations", exports = "syncdDecryptMutation", adaptation = WhatsAppAdaptation.DIRECT)
         @WhatsAppWebExport(moduleName = "WAWebSyncdDecryptMutationsWrapper", exports = {"tryDecryptSnapshot", "tryDecryptPatch"}, adaptation = WhatsAppAdaptation.ADAPTED)
@@ -212,8 +187,6 @@ public sealed interface DecryptedMutation {
      * @param operation     the sync operation type (SET or REMOVE)
      * @param timestamp     the action timestamp
      * @param actionVersion the action version number
-     * @implNote ADAPTED: Cobalt-specific post-verification type, no direct WA Web equivalent.
-     *           WA Web passes raw fields after anti-tampering; Cobalt wraps them in a sealed variant.
      */
     record Trusted(
             String index,

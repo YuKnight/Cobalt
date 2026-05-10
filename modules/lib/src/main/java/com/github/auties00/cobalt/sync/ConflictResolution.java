@@ -19,11 +19,8 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * @param mergedMutation  an optional merged mutation to apply and add to pending,
  *                        only present when the handler merges two non-enclosing
  *                        ranges and returns {@code SKIP_REMOTE_DROP_LOCAL}
- * @implNote Wraps the return value of the conflict resolution callbacks
- *     defined in {@code WAWebSyncActionCore.doConflictResolution} and
- *     consumed by {@code WAWebApplyActionUtils.applyAction}.
  */
-@WhatsAppWebModule(moduleName = "WAWebSyncActionCore")
+@WhatsAppWebModule(moduleName = "WAWebSyncActionStore")
 public record ConflictResolution(
         ConflictResolutionState state,
         DecryptedMutation.Trusted mergedMutation
@@ -33,11 +30,8 @@ public record ConflictResolution(
      *
      * @param state the resolution state
      * @return a new conflict resolution
-     * @implNote Convenience factory for the common case where a handler
-     *     decides between keeping local or remote without producing a
-     *     merged mutation.
      */
-    @WhatsAppWebExport(moduleName = "WAWebSyncActionCore", exports = "doConflictResolution", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncActionStore", exports = "doConflictResolution", adaptation = WhatsAppAdaptation.ADAPTED)
     public static ConflictResolution of(ConflictResolutionState state) {
         return new ConflictResolution(state, null);
     }
@@ -51,10 +45,8 @@ public record ConflictResolution(
      *
      * @param merged the merged mutation to apply and add to pending
      * @return a new conflict resolution with {@code SKIP_REMOTE_DROP_LOCAL} state
-     * @implNote Factory used by handlers that produce a merged mutation
-     *     (e.g. archive/clear chat range merges).
      */
-    @WhatsAppWebExport(moduleName = "WAWebSyncActionCore", exports = "doConflictResolution", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebSyncActionStore", exports = "doConflictResolution", adaptation = WhatsAppAdaptation.ADAPTED)
     public static ConflictResolution merged(DecryptedMutation.Trusted merged) {
         return new ConflictResolution(ConflictResolutionState.SKIP_REMOTE_DROP_LOCAL, merged);
     }

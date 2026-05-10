@@ -110,11 +110,6 @@ public final class CompanionPairingService {
      * {@code 1} through {@code 9} and continues with
      * {@code ABCDEFGHJKLMNPQRSTVWXYZ}, yielding 32 characters chosen for
      * easy reading and copying.
-     *
-     * @implNote The alphabet deviates from canonical Crockford. Canonical
-     *     Crockford starts at {@code 0} and skips {@code L}, while this
-     *     variant skips {@code 0} and keeps {@code L}, matching
-     *     {@code WAWebAltDeviceLinkingBase32Encode.bytesToCrockford}.
      */
     private static final char[] CROCKFORD_ALPHABET =
             "123456789ABCDEFGHJKLMNPQRSTVWXYZ".toCharArray();
@@ -251,9 +246,6 @@ public final class CompanionPairingService {
      *
      * @return whether the caller should route the flow through this
      *         service rather than through the QR path
-     * @implNote WA Web exposes this choice through an explicit UI
-     *     toggle. Cobalt derives it from the configured verification
-     *     handler and the presence of a phone number on the store.
      */
     public boolean isEnabled() {
         return webVerificationHandler instanceof WhatsAppClientVerificationHandler.Web.PairingCode

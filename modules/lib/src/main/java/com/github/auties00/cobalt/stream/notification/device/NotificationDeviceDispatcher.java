@@ -19,12 +19,6 @@ import com.github.auties00.cobalt.wam.WamService;
  * <p>This dispatcher owns one instance of each concrete device-category
  * handler: device list changes, companion linking, server-issued crypto
  * rotations, and server-driven app-state sync notifications.
- *
- * @implNote Adapts the WhatsApp Web dispatch that routes device
- *     notifications to {@code WAWebHandleDeviceNotification},
- *     {@code WAWebHandleLinkingDeviceNotification},
- *     {@code WAWebHandleServerCryptoNotification} and
- *     {@code WAWebHandleServerSyncNotification}.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleNotification")
 public final class NotificationDeviceDispatcher implements SocketStream.Handler {
@@ -87,9 +81,6 @@ public final class NotificationDeviceDispatcher implements SocketStream.Handler 
      * handler based on the stanza's {@code type} attribute.
      *
      * @param node the incoming notification stanza
-     * @implNote Mirrors the {@code type}-based switch in
-     *     {@code WAWebHandleNotification.handleNotification} for the device
-     *     category.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleNotification", exports = "handleNotification", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
@@ -115,9 +106,6 @@ public final class NotificationDeviceDispatcher implements SocketStream.Handler 
     /**
      * Fans out a reset call to every sub-handler so that any cached state
      * is discarded on a socket reconnect.
-     *
-     * @implNote Cobalt-specific lifecycle hook; WhatsApp Web handles this
-     *     via module-level reset calls.
      */
     @Override
     public void reset() {

@@ -13,12 +13,8 @@ import java.util.UUID;
  * next sync cycle. Each mutation has a unique {@code mutationId} that persists
  * through the sync cycle for correlating upload requests with server
  * acknowledgements.
- *
- * @implNote Cobalt-local holder for the entries stored in WhatsApp Web's
- *     pending-mutation IndexedDB table managed by
- *     {@code WAWebSyncdPendingMutations}.
  */
-@WhatsAppWebModule(moduleName = "WAWebSyncdPendingMutations")
+@WhatsAppWebModule(moduleName = "WAWebPendingMutationStore")
 public final class SyncPendingMutation {
     /**
      * Stable identifier for tracking this mutation through the sync cycle.

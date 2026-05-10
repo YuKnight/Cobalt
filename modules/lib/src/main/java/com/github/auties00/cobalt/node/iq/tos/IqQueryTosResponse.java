@@ -15,12 +15,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link IqQueryTosRequest}.
- *
- * @implNote {@code WAWebTosJob.queryTosState}'s
- *           {@code WAWebBackendErrors.ServerStatusCodeError} throw
- *           collapses both client and server error envelopes. Cobalt
- *           splits them into typed {@code ClientError} /
- *           {@code ServerError} variants.
  */
 public sealed interface IqQueryTosResponse extends IqOperation.Response
         permits IqQueryTosResponse.Success, IqQueryTosResponse.ClientError, IqQueryTosResponse.ServerError {
@@ -29,8 +23,6 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
      * The minimum server-recommended refresh interval in seconds
      * ({@code 7200} = 2h). Replies below this floor are clamped to
      * {@link #DEFAULT_TOS_REFRESH_INTERVAL_SECONDS}.
-     *
-     * @implNote {@code WAWebTosJob} local constant {@code e=7200}.
      */
     @WhatsAppWebExport(moduleName = "WAWebTosJob",
             exports = "queryTosState", adaptation = WhatsAppAdaptation.DIRECT)
@@ -40,8 +32,6 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
      * The maximum server-recommended refresh interval in seconds
      * ({@code 259200} = 3d). Replies above this ceiling are clamped to
      * {@link #DEFAULT_TOS_REFRESH_INTERVAL_SECONDS}.
-     *
-     * @implNote {@code WAWebTosJob} local constant {@code s=259200}.
      */
     @WhatsAppWebExport(moduleName = "WAWebTosJob",
             exports = "queryTosState", adaptation = WhatsAppAdaptation.DIRECT)
@@ -51,8 +41,6 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
      * The default server-recommended refresh interval in seconds
      * ({@code 86400} = 24h). Used as a fallback when the reply's
      * {@code refresh} value is out of the {@code [MIN, MAX]} range.
-     *
-     * @implNote {@code WAWebTosJob.DEFAULT_TOS_REFRESH_INTERVAL = u = 86400}.
      */
     @WhatsAppWebExport(moduleName = "WAWebTosJob",
             exports = "DEFAULT_TOS_REFRESH_INTERVAL", adaptation = WhatsAppAdaptation.DIRECT)
@@ -93,12 +81,6 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
      *
      * <p>Carries the clamped {@code refresh} interval and the list of
      * per-notice {@link NoticeState} entries.
-     *
-     * @implNote {@code WAWebTosJob.tosNotices} parser:
-     *           {@code child("tos").attrInt("refresh")} clamped to
-     *           {@code [7200, 259200]} (else {@code 86400}). Each
-     *           {@code <notice id state/>} is parsed via
-     *           {@code maybeAttrString("state") !== "false"}.
      */
     @WhatsAppWebModule(moduleName = "WAWebTosJob")
     final class Success implements IqQueryTosResponse {
@@ -218,12 +200,6 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
         /**
          * Per-notice state entry projected from one {@code <notice/>}
          * child of the {@code <tos/>} reply envelope.
-         *
-         * @implNote {@code WAWebTosJob.tosNotices}: each notice carries
-         *           an {@code id} (verbatim) and an interpreted
-         *           {@code state} flag (any value other than
-         *           {@code "false"} maps to {@code true}. Missing
-         *           attribute defaults to {@code true}).
          */
         @WhatsAppWebModule(moduleName = "WAWebTosJob")
         public static final class NoticeState {
@@ -302,10 +278,6 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
     /**
      * The {@code ClientError} reply variant. The relay rejected the
      * query as malformed or unauthorised.
-     *
-     * @implNote {@code WAWebTosJob.queryTosState} throws
-     *           {@code ServerStatusCodeError(code, text)} on any
-     *           non-result. Cobalt narrows to codes {@code [400, 500)}.
      */
     @WhatsAppWebModule(moduleName = "WAWebTosJob")
     final class ClientError implements IqQueryTosResponse {
@@ -398,10 +370,6 @@ public sealed interface IqQueryTosResponse extends IqOperation.Response
     /**
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the query.
-     *
-     * @implNote {@code WAWebTosJob.queryTosState} folds server failures
-     *           into the same {@code ServerStatusCodeError} throw.
-     *           Cobalt narrows to codes {@code >= 500}.
      */
     @WhatsAppWebModule(moduleName = "WAWebTosJob")
     final class ServerError implements IqQueryTosResponse {

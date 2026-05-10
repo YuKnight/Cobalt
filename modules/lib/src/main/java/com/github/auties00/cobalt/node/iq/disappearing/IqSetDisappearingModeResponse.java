@@ -48,9 +48,6 @@ public sealed interface IqSetDisappearingModeResponse extends IqOperation.Respon
     /**
      * The {@code Success} reply variant — the relay accepted the
      * mutation. Carries no payload beyond the envelope echo.
-     *
-     * @implNote {@code WAWebSetDisappearingModeJob.setDMResponseParser}
-     *           only validates {@code type="result"}.
      */
     @WhatsAppWebModule(moduleName = "WAWebSetDisappearingModeJob")
     final class Success implements IqSetDisappearingModeResponse {

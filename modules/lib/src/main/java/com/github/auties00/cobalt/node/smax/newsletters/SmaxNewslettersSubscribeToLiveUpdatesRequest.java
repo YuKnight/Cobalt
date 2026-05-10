@@ -54,12 +54,6 @@ public final class SmaxNewslettersSubscribeToLiveUpdatesRequest implements SmaxO
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <live_updates/>} payload
-     *
-     * @implNote {@code WASmaxOutNewslettersSubscribeToLiveUpdatesRequest.makeSubscribeToLiveUpdatesRequest}
-     *           composes {@code WASmaxOutNewslettersNewsletterIQSetRequestMixin}
-     *           ({@code xmlns="newsletter"}, {@code to=JID(iqTo)},
-     *           {@code id=generateId()}, {@code type="set"}) over a bare
-     *           {@code <live_updates/>} child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersSubscribeToLiveUpdatesRequest",

@@ -28,10 +28,6 @@ import java.util.SequencedCollection;
  * {@code xwa2_fetch_wa_users: [{ privacy_contact_list: { dhash, contacts: [{ jid, pn_jid, username_info: { username } }] } }]}.
  * Since the request always carries a single {@code query_input} entry, Cobalt collapses the outer array to its first
  * element and exposes the nested {@code privacy_contact_list} fields directly.
- *
- * @implNote WA Web's {@code fetchPrivacyList} returns the raw GraphQL response and lets the caller dig into the nested
- *           structure. Cobalt projects the typed schema so callers do not have to re-implement the JSON walk at every
- *           call site.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexGetPrivacyList")
 public final class GetPrivacyListsMexResponse implements MexOperation.Response.Json {

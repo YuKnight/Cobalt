@@ -138,10 +138,6 @@ public sealed interface SmaxWaffleWFPingResponse extends SmaxOperation.Response
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent / suspended Waffle state.
-     *
-     * @implNote {@code WASmaxInWaffleWFPingResponseError.parseWFPingResponseError}
-     *           routes through {@code WASmaxInWaffleWfPingErrors};
-     *           Cobalt collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleWFPingResponseError")
     final class ClientError implements SmaxWaffleWFPingResponse {

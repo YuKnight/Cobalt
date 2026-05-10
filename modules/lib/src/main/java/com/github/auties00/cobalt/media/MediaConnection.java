@@ -52,6 +52,7 @@ import java.util.*;
  * re-queried.
  */
 @WhatsAppWebModule(moduleName = "WAMediaConnParser")
+@WhatsAppWebModule(moduleName = "WAServerMediaType")
 @WhatsAppWebModule(moduleName = "WAWebQueryMediaConnsJob")
 @WhatsAppWebModule(moduleName = "WAWebMediaHosts")
 @WhatsAppWebModule(moduleName = "WAWebMmsClient")
@@ -362,6 +363,10 @@ public final class MediaConnection {
             adaptation = WhatsAppAdaptation.DIRECT)
     @WhatsAppWebExport(moduleName = "WAWebQueryMediaConnsJob", exports = "mapParsedMediaConn",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAServerMediaType", exports = "castToServerMediaType",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAServerMediaType", exports = "SERVER_MEDIA",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     private static Set<MediaPath> parseMediaTypes(Node hostNode, String description) {
         return hostNode.getChild(description)
                 .map(typesNode -> {

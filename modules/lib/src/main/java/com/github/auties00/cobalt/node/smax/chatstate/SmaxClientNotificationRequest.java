@@ -7,7 +7,6 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * The outbound stanza variant. Wraps the {@code to} (chat JID)

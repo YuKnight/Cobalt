@@ -43,16 +43,6 @@ import com.github.auties00.cobalt.wam.WamService;
  * <p>Notifications whose {@code type} is not recognised are silently
  * discarded, matching WhatsApp Web's behaviour of ignoring unknown
  * notification categories rather than treating them as errors.
- *
- * @implNote WA Web dispatches {@code <notification>} stanzas inside
- * {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza} by switching
- * on the {@code type} attribute and invoking the matching per-type handler
- * directly. Cobalt groups the 24 per-type handlers into four dispatchers
- * (account, business, device, group) for testability and to keep each file
- * small. The {@code w:gp2} group notification is not part of WA Web's
- * top-level {@code case "notification"} switch (WA Web handles it through a
- * separate routing path); Cobalt consolidates it here under the group
- * dispatcher.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class NotificationStreamHandler implements SocketStream.Handler {

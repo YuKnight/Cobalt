@@ -16,14 +16,14 @@ public final class FcmCheckinResponse {
      * The 64-bit Android device id the server has assigned. Becomes
      * the username on the MCS login.
      */
-    @ProtobufProperty(index = 7, type = ProtobufType.UINT64)
+    @ProtobufProperty(index = 7, type = ProtobufType.FIXED64)
     long androidId;
 
     /**
      * The 64-bit security token paired with {@link #androidId}. Becomes
      * the password on the MCS login.
      */
-    @ProtobufProperty(index = 8, type = ProtobufType.UINT64)
+    @ProtobufProperty(index = 8, type = ProtobufType.FIXED64)
     long securityToken;
 
     FcmCheckinResponse(long androidId, long securityToken) {

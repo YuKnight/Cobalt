@@ -11,10 +11,6 @@ import java.util.concurrent.atomic.AtomicLong;
  * stable random prefix for the session, mirroring the way WhatsApp Web
  * emits {@code <random1>.<random2>-<n>} stanza IDs that a server can
  * correlate back to one client session.
- *
- * @implNote Cobalt-specific helper. The matching ID and SID generators
- *     in WA Web are inlined into call sites rather than published as a
- *     dedicated module.
  */
 public final class RandomIdUtils {
     /**

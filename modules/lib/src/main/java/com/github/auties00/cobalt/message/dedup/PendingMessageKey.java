@@ -44,12 +44,6 @@ public final class PendingMessageKey {
      * {@code WAWebMsgKey.prototype.toString}, {@code ts} is the Unix-seconds
      * value of the timestamp, and every enc payload contributes a
      * {@code e2eType:retryCount} segment joined by commas.
-     *
-     * @implNote Cobalt serialises {@link com.github.auties00.cobalt.message.MessageEncryptionType}
-     * via its protocol value ({@code "pkmsg"}, {@code "msg"}, {@code "skmsg"},
-     * {@code "msmsg"}) and the timestamp via {@link Instant#getEpochSecond()}
-     * to match the numeric string WA Web produces from the parsed {@code t}
-     * stanza attribute.
      * @param key       the message key identifying the logical message
      * @param timestamp the message timestamp, serialised as its Unix
      *                  epoch-seconds value
@@ -79,10 +73,6 @@ public final class PendingMessageKey {
      * Serialises a {@link MessageKey} the same way
      * {@code WAWebMsgKey.prototype.toString} does: the {@code fromMe} flag,
      * remote JID, id, and optional participant joined with underscores.
-     *
-     * @implNote WA Web caches the serialisation as {@code this._serialized}.
-     * Cobalt recomputes the string each call because {@link MessageKey} is a
-     * protobuf value that does not cache the serialisation.
      * @param key the message key to serialise
      * @return the serialised form
      */

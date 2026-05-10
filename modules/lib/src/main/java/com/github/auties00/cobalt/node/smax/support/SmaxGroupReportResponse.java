@@ -17,9 +17,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxSpamGroupReportRPC.sendGroupReportRPC}
- *           tries {@code Success} → {@code Error}.
  */
 public sealed interface SmaxGroupReportResponse extends SmaxOperation.Response
         permits SmaxGroupReportResponse.Success, SmaxGroupReportResponse.Error {
@@ -48,11 +45,6 @@ public sealed interface SmaxGroupReportResponse extends SmaxOperation.Response
     /**
      * The {@code Success} reply variant. The relay accepted the
      * report and (typically) returned a ticket id.
-     *
-     * @implNote {@code WASmaxInSpamGroupReportResponseSuccess.parseGroupReportResponseSuccess}
-     *           validates the {@code <iq>} envelope, optionally
-     *           projects the {@code <report id>} child via
-     *           {@code WASmaxInSpamReportIdMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSpamGroupReportResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInSpamReportIdMixin")
@@ -128,10 +120,6 @@ public sealed interface SmaxGroupReportResponse extends SmaxOperation.Response
     /**
      * The {@code Error} reply variant. The relay rejected the
      * report.
-     *
-     * @implNote {@code WASmaxInSpamGroupReportResponseError.parseGroupReportResponseError}
-     *           routes through {@code WASmaxInSpamSpamIqErrors};
-     *           Cobalt collapses to the {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSpamGroupReportResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInSpamSpamIqErrors")

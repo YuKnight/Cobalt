@@ -25,10 +25,6 @@ public final class IqDigestKeyRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <digest/>} payload
-     *
-     * @implNote {@code WAWebDigestKeyJob.digestKey} composes the IQ
-     *           via {@code wap("iq", {xmlns:"encrypt", type:"get",
-     *           to:S_WHATSAPP_NET, id}, wap("digest", null))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDigestKeyJob",

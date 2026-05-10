@@ -136,10 +136,6 @@ public final class IqUploadPrekeysForRegRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the pre-key payload
-     *
-     * @implNote {@code WAWebUploadPrekeysForRegTask.startKeyUploadStage}
-     *           composes the IQ identically to
-     *           {@code WAWebUploadPreKeysJob.uploadPreKeys}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUploadPrekeysForRegTask",

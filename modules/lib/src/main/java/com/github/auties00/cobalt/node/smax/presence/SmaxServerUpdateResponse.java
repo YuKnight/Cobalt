@@ -11,13 +11,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound presence-update variants.
- *
- * @implNote The five permits track
- *           {@code WASmaxInPresencePresenceUpdates.parsePresenceUpdates}.
- *           Try {@code GroupAvailable}, then
- *           {@code GroupUnavailable}, then
- *           {@code LastSeenWithOtherValue}, then
- *           {@code UserUnavailable}, then {@code Available}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInPresenceServerUpdateRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInPresencePresenceUpdates")
@@ -65,12 +58,6 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
     /**
      * The {@code GroupAvailable} variant. The relay reports how
      * many members of a group are currently online.
-     *
-     * @implNote {@code WASmaxInPresenceGroupAvailableMixin.parseGroupAvailableMixin}
-     *           validates {@code description == "presence"},
-     *           parses the group JID from {@code from}, and the
-     *           online member count from {@code count} (range
-     *           {@code [1, 1024]}).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPresenceGroupAvailableMixin")
     final class GroupAvailable implements SmaxServerUpdateResponse {
@@ -176,11 +163,6 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
     /**
      * The {@code GroupUnavailable} variant. The relay reports the
      * group has dropped to zero online members.
-     *
-     * @implNote {@code WASmaxInPresenceGroupUnavailableMixin.parseGroupUnavailableMixin}
-     *           validates {@code description == "presence"},
-     *           parses the group JID from {@code from}, and asserts
-     *           {@code type == "unavailable"}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPresenceGroupUnavailableMixin")
     final class GroupUnavailable implements SmaxServerUpdateResponse {
@@ -266,13 +248,6 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
      * the peer is offline and the last-seen value is a
      * privacy-suppressed sentinel ({@code "deny"} / {@code "error"}
      * / {@code "none"}).
-     *
-     * @implNote {@code WASmaxInPresenceLastSeenWithOtherValueMixin.parseLastSeenWithOtherValueMixin}
-     *           validates the user JID, asserts
-     *           {@code type == "unavailable"}, and parses the
-     *           optional {@code last} attribute against the
-     *           {@code ENUM_DENY_ERROR_NONE} enum
-     *           ({@code WASmaxInPresenceEnums}).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPresenceLastSeenWithOtherValueMixin")
     @WhatsAppWebModule(moduleName = "WASmaxInPresenceEnums")
@@ -385,11 +360,6 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
      * The {@code UserUnavailable} variant. The relay reports the
      * peer is offline with a free-form {@code last} string (a
      * Unix-timestamp-as-text. The actual last-seen moment).
-     *
-     * @implNote {@code WASmaxInPresenceUserUnavailableMixin.parseUserUnavailableMixin}
-     *           validates the user JID, asserts
-     *           {@code type == "unavailable"}, and parses the
-     *           optional free-form {@code last} attribute.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPresenceUserUnavailableMixin")
     final class UserUnavailable implements SmaxServerUpdateResponse {
@@ -498,12 +468,6 @@ public sealed interface SmaxServerUpdateResponse extends SmaxOperation.Response
      * is online (group or user JID), with optional {@code type}
      * {@code "available"} literal and optional free-form
      * {@code last}.
-     *
-     * @implNote {@code WASmaxInPresenceAvailableMixin.parseAvailableMixin}
-     *           validates the JID against
-     *           {@code GROUPJID_USERJID}, parses the optional
-     *           {@code type} as the literal {@code "available"},
-     *           and the optional free-form {@code last}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPresenceAvailableMixin")
     final class Available implements SmaxServerUpdateResponse {

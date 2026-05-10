@@ -33,8 +33,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
 
     /**
      * Logger for diagnostic messages related to account sync notification handling.
-     *
-     * @implNote WAWebHandleAccountSyncNotification (WALogger references)
      */
     private static final System.Logger LOGGER = System.getLogger(NotificationAccountStreamHandler.class.getName());
 
@@ -45,22 +43,16 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
 
     /**
      * The WhatsApp client instance used for queries and sending nodes.
-     *
-     * @implNote WAWebHandleAccountSyncNotification (module-level dependency on WAWebBackendApi, WAWebGetAboutQueryJob, etc.)
      */
     private final WhatsAppClient whatsapp;
 
     /**
      * The device service used for syncing device lists.
-     *
-     * @implNote WAWebHandleAccountSyncNotification (module-level dependency on WAWebAccountSyncJob.getDevices)
      */
     private final DeviceService deviceService;
 
     /**
      * Constructs a new account sync notification handler.
-     *
-     * @implNote WAWebHandleAccountSyncNotification (module initialization)
      * @param whatsapp the WhatsApp client instance, must not be {@code null}
      * @param deviceService the device service for device list operations, must not be {@code null}
      */
@@ -98,8 +90,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      *
      * <p>Each child tag maps to a specific {@code AccountSyncType} in WA Web's
      * parser and is handled by the corresponding switch case in the main handler function.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (switch on r.type)
      * @param node the notification node containing one or more typed child elements
      */
     private void handleNotification(Node node) {
@@ -192,8 +182,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * server. Otherwise, it uses the values directly from the stanza. The non-modify
      * path is what Cobalt implements. The modify path is handled identically since
      * both end up updating the local text status for the contact.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (TEXT_STATUS case)
      * @param node the parent notification node
      * @param textStatusNode the {@code text_status} child element
      */
@@ -231,8 +219,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * Updates the own text status using values from the stanza child node.
      * Used for the {@code action === "modify"} case as a fallback when
      * no dedicated text status query API is available.
-     *
-     * @implNote WAWebHandleAccountSyncNotification (TEXT_STATUS modify path, function g/h)
      * @param textStatusNode the {@code text_status} child element
      */
     private void updateOwnTextStatus(Node textStatusNode) {
@@ -260,8 +246,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
     /**
      * Refreshes the authenticated user's device list by performing a device
      * list sync with the server.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (DEVICES case)
      * @param node the parent notification node containing the {@code from} attribute
      */
     private void refreshOwnDevices(Node node) {
@@ -311,8 +295,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * and iterates each {@code item}, collecting pairs of {@code (userJid, username)}
      * that it then forwards to {@code WAWebSetUsernameJob.setUsernamesJob}. Cobalt
      * applies the username directly to the matching contact record.
-     *
-     * @implNote WAWebHandleAccountSyncNotification parser (BLOCKLIST item loop) + WAWebSetUsernameJob.setUsernamesJob
      * @param blocklistNode the {@code blocklist} child element
      */
     private void applyBlocklistUsernames(Node blocklistNode) {
@@ -339,8 +321,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
     /**
      * Refreshes the block list by querying the server and updating local
      * contact records accordingly.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (BLOCKLIST case)
      */
     private void refreshBlockList() {
         // Cobalt queries blocklist and updates contact records directly
@@ -369,8 +349,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
     /**
      * Refreshes the authenticated user's profile picture by querying the server
      * and updating the local store if changed.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (PICTURE case)
      */
     private void refreshOwnPicture() {
         var self = whatsapp.store().jid().orElse(null);
@@ -400,8 +378,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * </ul>
      *
      * <p>The update only proceeds if both duration and setting timestamp are non-{@code null}.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (DISAPPEARING_MODE case)
      * @param node the parent notification node containing the {@code from} attribute
      * @param disappearingMode the {@code disappearing_mode} child element
      */
@@ -443,8 +419,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * {@code state} (where state != "false" means accepted), then calls
      * {@code updateTosStateFromAccountSync} which sets the TOS state via
      * {@code TosManager.setState}.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (TOS case)
      * @param tosNode the {@code tos} child element containing notice children
      */
     private void handleTosNotification(Node tosNode) {
@@ -473,8 +447,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * and {@code noticeTimestamp} are all present. It determines acceptance by comparing
      * the stage to {@code PDFN_ACCEPTED} ("5"). Then it updates the
      * {@code UserDisclosureCollection} and calls {@code updateTosStateFromAccountSync}.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (NOTICE case)
      * @param noticeNode the {@code notice} child element
      */
     private void handleNoticeNotification(Node noticeNode) {
@@ -502,8 +474,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      *
      * <p>WA Web checks if {@code isAiAvailable === true} and logs a message.
      * Cobalt additionally persists the flag in the store.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (USER case)
      * @param userNode the {@code user} child element
      */
     private void handleUserNotification(Node userNode) {
@@ -519,8 +489,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * don't match, it triggers a full opt-out list refresh. If they match and a
      * new {@code dhash} is present, it processes individual list items and updates
      * the stored hash.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (OPTOUTLIST case)
      * @param optOutListNode the {@code biz_opt_out_list} child element
      */
     private void handleBizOptOutListNotification(Node optOutListNode) {
@@ -561,8 +529,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
 
     /**
      * Extracts a user JID from the specified attribute of the given node.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (r.from conversion)
      * @param node the node to extract the JID from
      * @param key the attribute key containing the JID
      * @return the extracted user JID, or {@code null} if not present
@@ -575,8 +541,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
 
     /**
      * Fires a listener callback on all registered listeners using virtual threads.
-     *
-     * @implNote WAWebHandleAccountSyncNotification (NO_WA_BASIS - Cobalt listener dispatch pattern)
      * @param consumer the callback to execute for each listener
      */
     private void fireListeners(Consumer<WhatsAppClientListener> consumer) {
@@ -617,8 +581,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
 
     /**
      * Notifies all registered listeners about a contact text status change.
-     *
-     * @implNote WAWebBackendApi.frontendFireAndForget("updateTextStatus", ...) (ADAPTED)
      * @param contactJid the JID of the contact whose text status changed
      * @param status the updated text status
      */
@@ -633,8 +595,6 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      *
      * <p>The ack stanza mirrors the incoming notification's ID, source, class, and type
      * attributes as required by the protocol.
-     *
-     * @implNote WAWebHandleAccountSyncNotification.handleAccountSyncNotification (ack stanza: WAWap.wap("ack", ...))
      * @param node the notification node to acknowledge
      */
     private void sendNotificationAck(Node node) {

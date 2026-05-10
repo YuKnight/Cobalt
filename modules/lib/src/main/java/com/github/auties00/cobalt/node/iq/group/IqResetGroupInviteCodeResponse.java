@@ -13,11 +13,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to an {@link IqResetGroupInviteCodeRequest}.
- *
- * @implNote {@code WAWebGroupInviteJob.resetGroupInviteCode} folds every
- *           non-result reply into a {@code ServerStatusCodeError};
- *           Cobalt splits the failure path into typed
- *           {@code ClientError}/{@code ServerError} variants.
  */
 @WhatsAppWebModule(moduleName = "WAWebGroupInviteJob")
 public sealed interface IqResetGroupInviteCodeResponse extends IqOperation.Response
@@ -57,10 +52,6 @@ public sealed interface IqResetGroupInviteCodeResponse extends IqOperation.Respo
     /**
      * The {@code Success} reply variant — carries the freshly-rotated
      * invite code returned by the relay.
-     *
-     * @implNote {@code WAWebGroupInviteJob.queryGroupInviteCodeParser}:
-     *           {@code child("invite").attrString("code")} →
-     *           {@code {code:string}}.
      */
     @WhatsAppWebModule(moduleName = "WAWebGroupInviteJob")
     final class Success implements IqResetGroupInviteCodeResponse {
@@ -144,12 +135,6 @@ public sealed interface IqResetGroupInviteCodeResponse extends IqOperation.Respo
      * The {@code ClientError} reply variant — typically a
      * {@code 403} when the caller is not an admin of the target
      * group, or {@code 404} when the group does not exist.
-     *
-     * @implNote {@code WAWebGroupInviteJob.resetGroupInviteCode}
-     *           folds every non-result envelope into
-     *           {@code ServerStatusCodeError}; Cobalt narrows the
-     *           {@code [400, 500)} band via
-     *           {@link SmaxBaseServerErrorMixin#parseClientError(Node, Node)}.
      */
     @WhatsAppWebModule(moduleName = "WAWebGroupInviteJob")
     final class ClientError implements IqResetGroupInviteCodeResponse {
@@ -244,10 +229,6 @@ public sealed interface IqResetGroupInviteCodeResponse extends IqOperation.Respo
      * The {@code ServerError} reply variant — the relay
      * encountered a transient internal failure while rotating
      * the invite code.
-     *
-     * @implNote Mirrors the {@code [500, ...)} band of
-     *           {@code ServerStatusCodeError}; Cobalt routes via
-     *           {@link SmaxBaseServerErrorMixin#parseServerError(Node, Node)}.
      */
     @WhatsAppWebModule(moduleName = "WAWebGroupInviteJob")
     final class ServerError implements IqResetGroupInviteCodeResponse {

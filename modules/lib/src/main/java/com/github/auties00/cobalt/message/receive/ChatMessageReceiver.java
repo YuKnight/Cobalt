@@ -98,13 +98,6 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      *         unavailable messages
      * @throws WhatsAppMessageException.Receive if decryption or validation fails and
      *         the error is not suppressed by the expired-status heuristic
-     *
-     * @implNote Pre-decrypt LID remap (WAWebProcessMsgInfoForLid.maybeProcesMsgInfoForLid)
-     * is not implemented. WA Web mutates msgInfo.chat / msgInfo.author / bclParticipants
-     * via WAWebProcessPhoneNumberMapping, WAWebLidStatusMigrationUtils, and
-     * WAWebMessageProcessUtils.selectChatForOneOnOneMessage. Implementing this requires
-     * three missing helper services plus making MessageReceiveStanza mutable, so it is
-     * tracked as a deferred cross-cutting issue.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsg", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -113,7 +106,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
     @Override
     ChatMessageInfo receive(Node node, Jid fromJid) {
         var selfJid = store.jid().orElse(null);
-        var stanza = MessageReceiveStanzaParser.parse(node, selfJid);
+        var selfLidJid = store.lid().orElse(null);
+        var stanza = MessageReceiveStanzaParser.parse(node, selfJid, selfLidJid);
 
         if (stanza.isUnavailable()) {
             LOGGER.log(System.Logger.Level.DEBUG,
@@ -255,9 +249,6 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      *
      * @param stanza the parsed stanza
      * @return {@code true} if this is a status message older than 24 hours
-     *
-     * @implNote WA Web only suppresses metric reporting for the same condition. Cobalt
-     * extends the suppression to the exception itself to avoid pointless retries.
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingDecryptionHandler", exports = "createDecryptionHandler",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -602,10 +593,6 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      *
      * @param stanza the parsed stanza
      * @return {@code true} if a DSM wrapper should be present
-     *
-     * @implNote WA Web dispatches to {@code parseSelfMessage} (expects DSM) or
-     * {@code parseOtherMessage} (rejects DSM) based on the message type and
-     * {@code isMeAccount(author)} check.
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingApiUtils", exports = "parseMessage",
             adaptation = WhatsAppAdaptation.DIRECT)

@@ -36,12 +36,6 @@ import java.util.Objects;
  * {@link MessageAddonEncryption#encrypt} and packages the resulting bytes
  * into the matching Cobalt model type ({@link EncCommentMessage},
  * {@link EncReactionMessage}, or {@link PollEncValue}).
- *
- * @implNote The JS module co-locates the encryption and the protobuf spec
- * selection in a single {@code encryptAddOn} call. Cobalt splits those
- * concerns. This factory picks the right protobuf spec and the matching
- * {@link MessageAddonType}, then hands the payload to the shared encryption
- * helper.
  */
 @WhatsAppWebModule(moduleName = "WAWebAddonEncryption")
 public final class EncMessageFactory {
@@ -192,6 +186,8 @@ public final class EncMessageFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebPollsVoteEncryption", exports = "encryptVote",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebPollOptionHashUtils", exports = "getHashBufferForString",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static PollEncValue encryptPollVote(List<String> selectedOptions, ChatMessageInfo pollCreation, Jid voterJid) {
         Objects.requireNonNull(selectedOptions, "selectedOptions cannot be null");
         Objects.requireNonNull(pollCreation, "pollCreation cannot be null");
@@ -212,6 +208,11 @@ public final class EncMessageFactory {
 
         var optionHashes = new ArrayList<byte[]>(selectedOptions.size());
         try {
+            // WAWebPollOptionHashUtils.getHashBufferForString:
+            //   self.crypto.subtle.digest("SHA-256", new TextEncoder().encode(e))
+            // Cobalt stores the raw 32-byte digest because PollVoteMessage.selectedOptions
+            // is wire-encoded as bytes (matches WAWebPollsCreateOptionLocalIdMap.getLocalIdForHash
+            // which accepts the raw buffer rather than the hex form).
             var digest = MessageDigest.getInstance("SHA-256");
             for (var option : selectedOptions) {
                 Objects.requireNonNull(option, "selectedOptions cannot contain null entries");

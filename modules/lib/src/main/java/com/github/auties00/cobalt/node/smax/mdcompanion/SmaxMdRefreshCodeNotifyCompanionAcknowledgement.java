@@ -14,10 +14,6 @@ import java.util.Optional;
 /**
  * The outbound acknowledgement stanza emitted after consuming the
  * {@link SmaxMdRefreshCodeNotifyCompanionResponse} notification.
- *
- * @implNote {@code WASmaxOutMdRefreshCodeNotifyCompanionResponseAck.makeRefreshCodeNotifyCompanionResponseAck}
- *           composes
- *           {@code WASmaxOutMdNotificationClientAckMixin.mergeNotificationClientAckMixin}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutMdRefreshCodeNotifyCompanionResponseAck")
 @WhatsAppWebModule(moduleName = "WASmaxOutMdNotificationClientAckMixin")

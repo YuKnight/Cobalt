@@ -105,18 +105,6 @@ public final class SmaxNewsletterReportRequest implements SmaxOperation.Request 
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         payload
-     *
-     * @implNote {@code WASmaxOutSpamNewsletterReportRequest.makeNewsletterReportRequest}
-     *           composes
-     *           {@code WASmaxOutSpamBaseIQSetRequestMixin}
-     *           ({@code id=generateId() type="set"}) and
-     *           {@code WASmaxOutSpamBaseReportMixin}
-     *           ({@code to=S_WHATSAPP_NET xmlns="spam"} +
-     *           {@code <spam_list spam_flow>}) over the
-     *           {@code <spam_list jid subject>} payload, then layers
-     *           {@code WASmaxOutSpamEntitySubjectMixin} for the
-     *           {@code subject} attribute and embeds 0..65 message
-     *           children.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutSpamNewsletterReportRequest",

@@ -3,10 +3,7 @@ package com.github.auties00.cobalt.node.smax.biz;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
 import com.github.auties00.cobalt.node.smax.util.SmaxIqErrorResponseMixin;
@@ -17,11 +14,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGetAccessTokenAndSessionCookiesRequest}.
- *
- * @implNote {@code WASmaxBizCtwaAdAccountGetAccessTokenAndSessionCookiesRPC.sendGetAccessTokenAndSessionCookiesRPC}
- *           tries {@code Success} → {@code TooManyAttempts} →
- *           {@code IncorrectNonce} → {@code Error} → fallback
- *           {@code ServerError} in order.
  */
 public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends SmaxOperation.Response
         permits SmaxGetAccessTokenAndSessionCookiesResponse.Success, SmaxGetAccessTokenAndSessionCookiesResponse.TooManyAttempts,
@@ -69,14 +61,6 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
      * The {@code Success} reply variant. The relay validated the
      * verification code and supplied the access token, session
      * cookies, and business-person identity.
-     *
-     * @implNote {@code WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseSuccess.parseGetAccessTokenAndSessionCookiesResponseSuccess}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope, asserts the
-     *           {@code <access_token>} / {@code <session_cookies>} /
-     *           {@code <business_person id="..."/>} children, then
-     *           projects the optional {@code <token_type>} child
-     *           (content enum {@code "STRONG"} / {@code "WEAK"}).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseSuccess")
     final class Success implements SmaxGetAccessTokenAndSessionCookiesResponse {
@@ -102,11 +86,12 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
         private final String businessPersonId;
 
         /**
-         * The optional {@code <token_type>} content (the
-         * {@code "STRONG"} / {@code "WEAK"} enum); may be
-         * {@code null} when the relay omitted the child.
+         * The optional {@code <token_type>} content. Carries the
+         * {@code "Strong"} / {@code "Weak"} literal-tuple validator
+         * from {@code WASmaxInBizCtwaAdAccountEnums.ENUM_STRONG_WEAK};
+         * may be {@code null} when the relay omitted the child.
          */
-        private final String tokenType;
+        private final SmaxGetAccessTokenAndSessionCookiesTokenType tokenType;
 
         /**
          * Constructs a new successful reply.
@@ -125,7 +110,7 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
          *                              {@code null}
          */
         public Success(String accessToken, String sessionCookies,
-                       String businessPersonId, String tokenType) {
+                       String businessPersonId, SmaxGetAccessTokenAndSessionCookiesTokenType tokenType) {
             this.accessToken = Objects.requireNonNull(accessToken, "accessToken cannot be null");
             this.sessionCookies = Objects.requireNonNull(sessionCookies, "sessionCookies cannot be null");
             this.businessPersonId = Objects.requireNonNull(businessPersonId, "businessPersonId cannot be null");
@@ -163,11 +148,13 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
          * Returns the optional token-type marker.
          *
          * @return an {@link Optional} carrying the token type
-         *         ({@code "STRONG"} or {@code "WEAK"}), or empty
-         *         when the relay omitted the {@code <token_type>}
-         *         child
+         *         ({@link SmaxGetAccessTokenAndSessionCookiesTokenType#STRONG}
+         *         or
+         *         {@link SmaxGetAccessTokenAndSessionCookiesTokenType#WEAK}),
+         *         or empty when the relay omitted the
+         *         {@code <token_type>} child
          */
-        public Optional<String> tokenType() {
+        public Optional<SmaxGetAccessTokenAndSessionCookiesTokenType> tokenType() {
             return Optional.ofNullable(tokenType);
         }
 
@@ -215,9 +202,15 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
                 return Optional.empty();
             }
             var tokenTypeNode = node.getChild("token_type").orElse(null);
-            String tokenType = null;
+            SmaxGetAccessTokenAndSessionCookiesTokenType tokenType = null;
             if (tokenTypeNode != null) {
-                tokenType = tokenTypeNode.toContentString().orElse(null);
+                // WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseSuccess.parseGetAccessTokenAndSessionCookiesResponseSuccessTokenType:
+                // var n = WASmaxParseUtils.contentStringEnum(e, ENUM_STRONG_WEAK)
+                var tokenTypeText = tokenTypeNode.toContentString().orElse(null);
+                if (tokenTypeText == null) {
+                    return Optional.empty();
+                }
+                tokenType = SmaxGetAccessTokenAndSessionCookiesTokenType.of(tokenTypeText).orElse(null);
                 if (tokenType == null) {
                     return Optional.empty();
                 }
@@ -263,8 +256,6 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
      * {@code <error code="431" text="TOO_MANY_ATTEMPTS"/>} pair on
      * the {@code <error/>} child of the {@code <iq type="error">}
      * envelope.
-     *
-     * @implNote {@code WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseTooManyAttempts.parseGetAccessTokenAndSessionCookiesResponseTooManyAttempts}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseTooManyAttempts")
     final class TooManyAttempts implements SmaxGetAccessTokenAndSessionCookiesResponse {
@@ -333,8 +324,6 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
      * {@code <error code="432" text="INCORRECT_NONCE"/>} pair on
      * the {@code <error/>} child of the {@code <iq type="error">}
      * envelope.
-     *
-     * @implNote {@code WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseIncorrectNonce.parseGetAccessTokenAndSessionCookiesResponseIncorrectNonce}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseIncorrectNonce")
     final class IncorrectNonce implements SmaxGetAccessTokenAndSessionCookiesResponse {
@@ -400,16 +389,12 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
      * request with a documented common-ad-account error code in the
      * {@code 4xx} range that is NOT one of the dedicated
      * {@code 431}/{@code 432} literals.
-     *
-     * @implNote {@code WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseError.parseGetAccessTokenAndSessionCookiesResponseError}
-     *           routes the {@code <error/>} child through
-     *           {@code WASmaxInBizCtwaAdAccountCommonAdAccountErrors}.
-     *           Cobalt collapses to the raw {@code (code, text)}
-     *           pair via the shared
-     *           {@link SmaxBaseServerErrorMixin#parseClientError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountCommonAdAccountErrors")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountHackBaseIQErrorResponseMixin")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountIQErrorBadRequestMixin")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountIQErrorForbiddenMixin")
     final class ClientError implements SmaxGetAccessTokenAndSessionCookiesResponse {
         /**
          * The numeric server-side error code.
@@ -467,6 +452,15 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
         @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseError",
                 exports = "parseGetAccessTokenAndSessionCookiesResponseError",
                 adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountCommonAdAccountErrors",
+                exports = "parseCommonAdAccountErrors",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountIQErrorBadRequestMixin",
+                exports = "parseIQErrorBadRequestMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountIQErrorForbiddenMixin",
+                exports = "parseIQErrorForbiddenMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<ClientError> of(Node node, Node request) {
             var envelope = SmaxBaseServerErrorMixin.parseClientError(node, request).orElse(null);
             if (envelope == null) {
@@ -503,13 +497,12 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}) while processing the
      * request.
-     *
-     * @implNote Sourced from the {@code 5xx} arms of
-     *           {@code WASmaxInBizCtwaAdAccountCommonAdAccountErrors};
-     *           Cobalt routes through the shared
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseError")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountCommonAdAccountErrors")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountHackBaseIQErrorResponseMixin")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountIQErrorInternalServerErrorMixin")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountIQErrorServiceUnavailableMixin")
     final class ServerError implements SmaxGetAccessTokenAndSessionCookiesResponse {
         /**
          * The numeric server-side error code.
@@ -562,6 +555,18 @@ public sealed interface SmaxGetAccessTokenAndSessionCookiesResponse extends Smax
          *         empty when the stanza does not match the
          *         server-error schema
          */
+        @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountGetAccessTokenAndSessionCookiesResponseError",
+                exports = "parseGetAccessTokenAndSessionCookiesResponseError",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountCommonAdAccountErrors",
+                exports = "parseCommonAdAccountErrors",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountIQErrorInternalServerErrorMixin",
+                exports = "parseIQErrorInternalServerErrorMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountIQErrorServiceUnavailableMixin",
+                exports = "parseIQErrorServiceUnavailableMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<ServerError> of(Node node, Node request) {
             var envelope = SmaxBaseServerErrorMixin.parseServerError(node, request).orElse(null);
             if (envelope == null) {

@@ -5,11 +5,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -104,13 +101,6 @@ public final class SmaxUpdatePreferenceRequest implements SmaxOperation.Request 
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <user_feedback>} child
-     *
-     * @implNote {@code WASmaxOutBizMsgUserFeedbackUpdatePreferenceRequest.makeUpdatePreferenceRequest}
-     *           composes
-     *           {@code smax("iq", {xmlns: "w:biz:msg_feedback",
-     *           to: S_WHATSAPP_NET, id: generateId(), type: "set"},
-     *           smax("user_feedback", {action: CUSTOM_STRING(t),
-     *           jid: USER_JID(t), feedback: OPTIONAL(CUSTOM_STRING, t)}))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBizMsgUserFeedbackUpdatePreferenceRequest",

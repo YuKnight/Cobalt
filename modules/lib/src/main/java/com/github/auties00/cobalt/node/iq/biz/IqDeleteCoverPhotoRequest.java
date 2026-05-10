@@ -19,11 +19,6 @@ import java.util.Objects;
  * actually exists; the {@code id} field carries the upload id so the relay
  * can fan the right detach event into the business profile mutation
  * pipeline.
- *
- * @implNote {@code WAWebBusinessProfileJob.deleteCoverPhoto} emits
- *           {@code <iq xmlns="w:biz" type="set">
- *           <business_profile v="3" mutation_type="delta">
- *           <cover_photo op="delete" id=ID/></business_profile*>}.
  */
 @WhatsAppWebModule(moduleName = "WAWebBusinessProfileJob")
 public final class IqDeleteCoverPhotoRequest implements IqOperation.Request {

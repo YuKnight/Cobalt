@@ -16,11 +16,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxBrPaymentCreateCustomPaymentMethodRequest}.
- *
- * @implNote {@code WASmaxBrPaymentCreateCustomPaymentMethodRPC.sendCreateCustomPaymentMethodRPC}
- *           tries {@code Success} → {@code IQError} in order and
- *           throws on no-match. Cobalt returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends SmaxOperation.Response
         permits SmaxBrPaymentCreateCustomPaymentMethodResponse.Success, SmaxBrPaymentCreateCustomPaymentMethodResponse.IqError {
@@ -95,8 +90,8 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
     @WhatsAppWebModule(moduleName = "WASmaxInBrPaymentCustomPaymentMethodMetaDataMixin")
     final class Success implements SmaxBrPaymentCreateCustomPaymentMethodResponse {
         /**
-         * The echoed custom-payment-method type. One of
-         * {@code "PAYONDELIVERY"}, {@code "PIXKEY"}.
+         * The echoed custom-payment-method type wire literal. One of
+         * {@code "pay_on_delivery"}, {@code "pix_key"}.
          */
         private final String customPaymentMethodType;
 
@@ -113,8 +108,8 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
         private final String created;
 
         /**
-         * The optional flow enum literal, {@code "P2P"} or
-         * {@code "P2M"}.
+         * The optional flow enum literal, {@code "p2p"} or
+         * {@code "p2m"}.
          */
         private final String flow;
 
@@ -274,6 +269,30 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
         @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentCreateCustomPaymentMethodResponseSuccess",
                 exports = "parseCreateCustomPaymentMethodResponseSuccess",
                 adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentCustomPaymentMethodMixin",
+                exports = "parseCustomPaymentMethodMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentMethodBaseMixin",
+                exports = "parseMethodBaseMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentCustomPaymentMethodMetaDataInfoMixin",
+                exports = "parseCustomPaymentMethodMetaDataInfoMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentCustomPaymentMethodMetaDataMixin",
+                exports = "parseCustomPaymentMethodMetaDataMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentCustomPaymentMethodMetaDataMixin",
+                exports = "parseCustomPaymentMethodMetaDataMetadata",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentEnums",
+                exports = "ENUM_PAYONDELIVERY_PIXKEY",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentEnums",
+                exports = "ENUM_P2M_P2P",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentEnums",
+                exports = "ENUM_0_1",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Success> of(Node node, Node request) {
             if (!validateIqResultEnvelope(node, request)) {
                 return Optional.empty();
@@ -295,46 +314,82 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
             if (customPaymentMethod == null) {
                 return Optional.empty();
             }
+            // WASmaxInBrPaymentCustomPaymentMethodMixin.parseCustomPaymentMethodMixin:
+            //   attrStringEnum(e,"type",WASmaxInBrPaymentEnums.ENUM_PAYONDELIVERY_PIXKEY)
+            // WASmaxInBrPaymentEnums.ENUM_PAYONDELIVERY_PIXKEY = {pay_on_delivery, pix_key}
             var type = customPaymentMethod.getAttributeAsString("type").orElse(null);
-            if (type == null || (!type.equals("PAYONDELIVERY") && !type.equals("PIXKEY"))) {
+            if (type == null || (!type.equals("pay_on_delivery") && !type.equals("pix_key"))) {
                 return Optional.empty();
             }
+            // WASmaxInBrPaymentCustomPaymentMethodMixin.parseCustomPaymentMethodMixin:
+            //   optionalLiteral(attrString, e,"country","BR")
+            // The outer mixin enforces a literal "BR" on country; the nested
+            // parseMethodBaseMixin re-reads the same attribute as a free string,
+            // but the literal check on the outer pass already pins it.
             var country = customPaymentMethod.getAttributeAsString("country").orElse(null);
             if (country != null && !"BR".equals(country)) {
                 return Optional.empty();
             }
+            // WASmaxInBrPaymentMethodBaseMixin.parseMethodBaseMixin:
+            //   optional(attrString, e,"created")
             var created = customPaymentMethod.getAttributeAsString("created").orElse(null);
+            // WASmaxInBrPaymentCustomPaymentMethodMixin.parseCustomPaymentMethodMixin:
+            //   optional(attrStringEnum, e,"flow", WASmaxInBrPaymentEnums.ENUM_P2M_P2P)
+            // WASmaxInBrPaymentEnums.ENUM_P2M_P2P = {p2m, p2p}
             var flow = customPaymentMethod.getAttributeAsString("flow").orElse(null);
-            if (flow != null && !flow.equals("P2M") && !flow.equals("P2P")) {
+            if (flow != null && !flow.equals("p2m") && !flow.equals("p2p")) {
                 return Optional.empty();
             }
+            // WASmaxInBrPaymentMethodBaseMixin.parseMethodBaseMixin:
+            //   attrString(e,"credential-id") — required
             var credentialId = customPaymentMethod.getAttributeAsString("credential-id").orElse(null);
             if (credentialId == null) {
                 return Optional.empty();
             }
+            // WASmaxInBrPaymentMethodBaseMixin.parseMethodBaseMixin:
+            //   optional(attrStringEnum, e,"p2p-eligible", WASmaxInBrPaymentEnums.ENUM_0_1)
+            // WASmaxInBrPaymentEnums.ENUM_0_1 = {0, 1}
             var p2pEligible = customPaymentMethod.getAttributeAsString("p2p-eligible").orElse(null);
             if (p2pEligible != null && !p2pEligible.equals("0") && !p2pEligible.equals("1")) {
                 return Optional.empty();
             }
+            // WASmaxInBrPaymentMethodBaseMixin.parseMethodBaseMixin:
+            //   optional(attrStringEnum, e,"p2m-eligible", WASmaxInBrPaymentEnums.ENUM_0_1)
             var p2mEligible = customPaymentMethod.getAttributeAsString("p2m-eligible").orElse(null);
             if (p2mEligible != null && !p2mEligible.equals("0") && !p2mEligible.equals("1")) {
                 return Optional.empty();
             }
-            // metadata_info → metadata*
+            // WASmaxInBrPaymentCustomPaymentMethodMetaDataInfoMixin.parseCustomPaymentMethodMetaDataInfoMixin:
+            //   flattenedChildWithTag(e,"metadata_info") -> parseCustomPaymentMethodMetaDataMixin(t.value)
+            // ADAPTED: WA's caller WASmaxInBrPaymentCustomPaymentMethodMixin.parseCustomPaymentMethodMixin
+            //          spreads `customPaymentMethodMetaDataInfoMixin: s.success ? s.value : null` — i.e.
+            //          any failure inside metadata_info collapses to null without failing the parent
+            //          parse. Cobalt collapses both "absent" and "malformed" into an empty map.
+            // ADAPTED: WA returns {metadata: [{key,value}, ...]}; Cobalt collapses into a
+            //          LinkedHashMap which preserves insertion order. Same data, denser shape.
             var metadataMap = new LinkedHashMap<String, String>();
             var metadataInfo = customPaymentMethod.getChild("metadata_info").orElse(null);
             if (metadataInfo != null) {
+                // WASmaxInBrPaymentCustomPaymentMethodMetaDataMixin.parseCustomPaymentMethodMetaDataMixin:
+                //   WASmaxParseUtils.mapChildrenWithTag(t,"metadata",1,5,e)
                 var metadataNodes = metadataInfo.getChildren("metadata");
-                if (metadataNodes.size() < 1 || metadataNodes.size() > 5) {
-                    return Optional.empty();
-                }
-                for (var entry : metadataNodes) {
-                    var key = entry.getAttributeAsString("key").orElse(null);
-                    var value = entry.getAttributeAsString("value").orElse(null);
-                    if (key == null || value == null) {
-                        return Optional.empty();
+                if (metadataNodes.size() >= 1 && metadataNodes.size() <= 5) {
+                    var partial = new LinkedHashMap<String, String>();
+                    var ok = true;
+                    for (var entry : metadataNodes) {
+                        // WASmaxInBrPaymentCustomPaymentMethodMetaDataMixin.parseCustomPaymentMethodMetaDataMetadata:
+                        //   assertTag(e,"metadata") + attrString(e,"key") + attrString(e,"value")
+                        var key = entry.getAttributeAsString("key").orElse(null);
+                        var value = entry.getAttributeAsString("value").orElse(null);
+                        if (key == null || value == null) {
+                            ok = false;
+                            break;
+                        }
+                        partial.put(key, value);
                     }
-                    metadataMap.put(key, value);
+                    if (ok) {
+                        metadataMap.putAll(partial);
+                    }
                 }
             }
             return Optional.of(new Success(type, country, created, flow, credentialId,
@@ -447,31 +502,43 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
                 exports = "parseIQErrorGenericResponseMixin",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<IqError> of(Node node, Node request) {
+            // WASmaxParseUtils.assertTag(e,"iq")
             if (!node.hasDescription("iq")) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.literal(attrString, e,"type","error")
             if (!node.hasAttribute("type", "error")) {
                 return Optional.empty();
             }
+            // WASmaxParseReference.attrStringFromReference(t,["id"])
             var requestId = request.getAttributeAsString("id").orElse(null);
             if (requestId == null) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.literal(attrString, e,"id", s.value)
             if (!node.hasAttribute("id", requestId)) {
                 return Optional.empty();
             }
+            // WASmaxParseReference.attrStringFromReference(t,["to"])
             var requestTo = request.getAttributeAsString("to").orElse(null);
+            // WASmaxParseUtils.literal(attrString, e,"from", a.value)
             if (requestTo == null || !node.hasAttribute("from", requestTo)) {
                 return Optional.empty();
             }
+            // ADAPTED: WASmaxParseUtils.flattenedChildWithTag(e,"error") — Cobalt's getChild
+            //         returns the first match; WA fails if more than one. In practice the
+            //         relay only ever emits a single <error/> child, so observable behavior
+            //         is identical for documented payloads.
             var errorChild = node.getChild("error").orElse(null);
             if (errorChild == null) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.attrString(r.value,"text")
             var text = errorChild.getAttributeAsString("text").orElse(null);
             if (text == null) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.attrIntRange(r.value,"code",1,void 0)
             var codeOpt = errorChild.getAttributeAsInt("code");
             if (codeOpt.isEmpty()) {
                 return Optional.empty();
@@ -480,6 +547,8 @@ public sealed interface SmaxBrPaymentCreateCustomPaymentMethodResponse extends S
             if (code < 1) {
                 return Optional.empty();
             }
+            // WAResultOrError.makeResult({type:l.value,errorText:c.value,errorCode:d.value})
+            // ADAPTED: type is always the literal "error", so it is not stored.
             return Optional.of(new IqError(code, text));
         }
 

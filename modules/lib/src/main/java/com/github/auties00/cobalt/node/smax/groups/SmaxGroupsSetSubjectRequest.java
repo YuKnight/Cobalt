@@ -65,12 +65,6 @@ public final class SmaxGroupsSetSubjectRequest implements SmaxOperation.Request 
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         {@code <subject/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsSetSubjectRequest.makeSetSubjectRequest}
-     *           composes
-     *           {@code WASmaxOutGroupsSetSubjectChangeSubjectMixin}
-     *           ({@code <subject>BODY</subject>}) over
-     *           {@code WASmaxOutGroupsBaseSetGroupMixin}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsSetSubjectRequest",

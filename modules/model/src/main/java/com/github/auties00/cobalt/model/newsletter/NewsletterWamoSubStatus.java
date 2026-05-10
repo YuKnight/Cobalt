@@ -68,7 +68,7 @@ public enum NewsletterWamoSubStatus {
      * @return the matching status constant, or {@link #UNKNOWN} when
      *         {@code name} is {@code null} or does not match any constant
      */
-    static NewsletterWamoSubStatus of(String name) {
+    public static NewsletterWamoSubStatus of(String name) {
         return name == null ? UNKNOWN : BY_NAME.getOrDefault(name.toLowerCase(), UNKNOWN);
     }
 

@@ -23,12 +23,6 @@ import com.github.auties00.cobalt.message.preview.model.PaymentLinkDetails;
  * pipeline already holds it; reconstructing a fresh
  * {@link ExtendedTextMessage} would force the caller to discard the
  * existing text, font, mentions, and other unrelated fields.
- *
- * @implNote WAWebLinkPreviewUtils.genLinkPreview +
- *           WAWebLinkPreviewUtils.getThumbnailDetails: the JS
- *           {@code genLinkPreview} returns a record that the caller
- *           merges into the outgoing message; Cobalt reverses the
- *           merge direction so the call site stays a single line.
  */
 @WhatsAppWebModule(moduleName = "WAWebLinkPreviewUtils")
 final class LinkPreviewUtils {
@@ -135,9 +129,6 @@ final class LinkPreviewUtils {
      * @param previewType the resolved preview type (typically
      *                    {@link ExtendedTextMessage.PreviewType#NONE})
      * @return the minimal preview details
-     * @implNote WAWebGenMinimalLinkPreviewChatAction.genMinimalLinkPreview:
-     *           emits {@code title=domain, description=url,
-     *           doNotPlayInline=true}.
      */
     @WhatsAppWebExport(moduleName = "WAWebGenMinimalLinkPreviewChatAction", exports = "genMinimalLinkPreview",
             adaptation = WhatsAppAdaptation.ADAPTED)

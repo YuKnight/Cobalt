@@ -46,11 +46,6 @@ public final class IqDebugGdprRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <gdpr>} payload
-     *
-     * @implNote {@code WAWebGdprHookUtils.getGdprIq}:
-     *           {@code wap("iq",{xmlns:"urn:xmpp:whatsapp:account",
-     *           to:S_WHATSAPP_NET, type:"get", id},
-     *           wap("gdpr",{action:"delete", [report_type]}))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDebugGDPR",

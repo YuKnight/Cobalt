@@ -8,7 +8,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMute;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -17,8 +16,6 @@ import com.github.auties00.cobalt.model.sync.action.chat.MuteActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -38,8 +35,6 @@ import java.util.List;
  * default per-chat sync scaffolding. In Cobalt, that inheritance is
  * flattened because each handler implements {@link WebAppStateActionHandler}
  * directly.
- *
- * @implNote WAWebMuteChatSync — singleton instance exported as {@code default}
  */
 @WhatsAppWebModule(moduleName = "WAWebMuteChatSync")
 public final class MuteChatHandler implements WebAppStateActionHandler {
@@ -48,18 +43,12 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, {@code WAWebMuteChatSync} exports a single instance
      * ({@code var m = new d(); l.default = m}).
-     *
-     * @implNote WAWebMuteChatSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final MuteChatHandler INSTANCE = new MuteChatHandler();
 
     /**
      * Private constructor enforcing the singleton pattern.
-     *
-     * @implNote WAWebMuteChatSync — class {@code d} constructor (inherited from
-     *           {@code ChatSyncdActionBase}); sets {@code chatJidIndex = 1} and
-     *           {@code collectionName = CollectionName.RegularHigh}
      */
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private MuteChatHandler() {
@@ -68,9 +57,6 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for mute chat actions.
-     *
-     * @implNote WAWebMuteChatSync.getAction — returns
-     *           {@code WASyncdConst.Actions.Mute} ({@code "mute"})
      * @return the action name {@code "mute"}
      */
     @Override
@@ -84,9 +70,6 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, the mute handler's {@code collectionName} is set to
      * {@code WASyncdConst.CollectionName.RegularHigh} in the constructor.
-     *
-     * @implNote WAWebMuteChatSync — constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularHigh}
      * @return {@link SyncPatchType#REGULAR_HIGH}
      */
     @Override
@@ -97,32 +80,12 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for mute chat actions.
-     *
-     * @implNote WAWebMuteChatSync.getVersion — returns {@code 2}
      * @return the version number {@code 2}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return MuteAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a mute chat mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebMuteChatSync.applyMutations — per-mutation inner logic,
-     *           the batch callback checks the per-mutation {@code actionState}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -160,38 +123,36 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      * <p>Telemetry (the {@code WALogger.WARN} calls that emit the malformed
      * and unsupported counts at the end of the batch) is intentionally
      * omitted in Cobalt because WAM events are not forwarded.
-     *
-     * @implNote WAWebMuteChatSync.applyMutations — per-mutation inner function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
         try {
             if (!(mutation.value().action().orElse(null) instanceof MuteAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chatJidString = JSON.parseArray(mutation.index()).getString(1);
             if (chatJidString == null || chatJidString.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             // ADAPTED: Cobalt's MuteAction.muted() coalesces null to false per Cobalt nullable-Boolean
             // conventions; the (d && m == null) check — muted=true with missing timestamp — is preserved.
             if (action.muted() && action.muteEndTimestamp().isEmpty()) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chatJid = Jid.of(chatJidString);
             if (chatJid == null) { // ADAPTED: Jid.of returns null for null input; WA Web uses isWid() validation
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chat = client.store().findChatByJid(chatJid);
@@ -286,9 +247,6 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      * for its paired LID when LID1x1 migration is active). Callers that need
      * LID-aware indexing should resolve the index JID before invoking this
      * method.
-     *
-     * @implNote WAWebMuteChatSync.generateMuteMutation,
-     *           WAWebSyncdActionUtils.buildPendingMutation
      * @param client            the WhatsApp client, used to read the
      *                          {@code enable_mention_everyone_syncd_sender}
      *                          AB prop and to supply the current timestamp

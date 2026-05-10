@@ -45,14 +45,6 @@ public sealed interface IqSetReadReceiptResponse extends IqOperation.Response
     /**
      * The {@code Success} reply variant. The relay echoes the new
      * read-receipts category value.
-     *
-     * @implNote {@code WAWebSetReadReceiptJob.photoResponseParser}
-     *           extracts the {@code <category name="readreceipts"
-     *           value=...>} grandchild and projects {@code {value}}.
-     *           Cobalt collapses the wire string into the
-     *           {@code enabled} boolean using the inverse of the
-     *           request mapping ({@code "all"} -> {@code true},
-     *           {@code "none"} -> {@code false}).
      */
     @WhatsAppWebModule(moduleName = "WAWebSetReadReceiptJob")
     final class Success implements IqSetReadReceiptResponse {

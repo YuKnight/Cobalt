@@ -9,10 +9,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
  * asks the relay to return only the entries that have changed
  * since the prior query, and {@link #FULL} forces a complete
  * refresh ignoring any caches.
- *
- * @implNote Mirrors {@code WAWebUsync.USyncQuery.mode} which is a
- *           free-form string. Cobalt narrows to the three
- *           documented values that appear in WA Web call sites.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public enum IqUsyncMode {

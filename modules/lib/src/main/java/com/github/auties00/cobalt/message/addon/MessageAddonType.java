@@ -19,12 +19,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
  *
  * <p>Each value records whether the use case applies additional authenticated
  * data in AES-GCM. Only poll votes and event responses set that flag.
- *
- * @implNote Cobalt simplifies {@code EVENT_EDIT_ENCRYPTED} to
- * {@link #EVENT_EDIT} and {@code POLL_EDIT_ENCRYPTED} to {@link #POLL_EDIT}.
- * The enum constant names drop the redundant {@code _ENCRYPTED} suffix but
- * the associated wire strings ({@code "Event Edit"}, {@code "Poll Edit"}) are
- * preserved byte-for-byte.
  */
 @WhatsAppWebModule(moduleName = "WAUseCaseSecret")
 @WhatsAppWebModule(moduleName = "WAWebAddonEncryption")
@@ -67,11 +61,6 @@ public enum MessageAddonType {
      * encryption of an addon payload. It is mixed into the HKDF info when
      * deriving the 32-byte HMAC key used to compute franking tags that the
      * server verifies on abuse reports.
-     *
-     * @implNote The reporting-token flow lives in
-     * {@code WAWebReportingTokenUtils} rather than {@code WAWebAddonEncryption}.
-     * {@code genReportingTokenKeyFromMessageSecret} passes this value as the
-     * fourth argument to {@code Binary.build}.
      */
     @WhatsAppWebExport(moduleName = "WAUseCaseSecret", exports = "UseCaseSecretModificationType",
             adaptation = WhatsAppAdaptation.DIRECT)

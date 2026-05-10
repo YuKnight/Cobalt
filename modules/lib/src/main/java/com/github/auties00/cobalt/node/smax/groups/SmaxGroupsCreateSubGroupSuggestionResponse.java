@@ -18,13 +18,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsCreateSubGroupSuggestionRequest}.
- *
- * @implNote {@code WASmaxGroupsCreateSubGroupSuggestionRPC.sendCreateSubGroupSuggestionRPC}
- *           tries
- *           {@code NewGroupSuggestionSuccess} →
- *           {@code ExistingGroupsSuggestionSuccess} →
- *           {@code ClientError} → {@code ServerError} in that order.
- *           Cobalt returns {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGroupsCreateSubGroupSuggestionResponse extends SmaxOperation.Response
         permits SmaxGroupsCreateSubGroupSuggestionResponse.NewGroupSuggestionSuccess,
@@ -71,14 +64,6 @@ public sealed interface SmaxGroupsCreateSubGroupSuggestionResponse extends SmaxO
      * provisional metadata (jid / creator / creation timestamp,
      * optional creator phone number, optional description-error
      * marker).
-     *
-     * @implNote {@code WASmaxInGroupsCreateSubGroupSuggestionResponseNewGroupSuggestionSuccess.parseCreateSubGroupSuggestionResponseNewGroupSuggestionSuccess}
-     *           validates the IQ result envelope, requires a
-     *           {@code <sub_group_suggestion>} child, and parses
-     *           its mandatory ({@code jid}, {@code creator},
-     *           {@code creation}) and optional
-     *           ({@code creator_pn}, inner
-     *           {@code <description error="406"?>}) attributes.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsCreateSubGroupSuggestionResponseNewGroupSuggestionSuccess")
     final class NewGroupSuggestionSuccess implements SmaxGroupsCreateSubGroupSuggestionResponse {
@@ -270,17 +255,6 @@ public sealed interface SmaxGroupsCreateSubGroupSuggestionResponse extends SmaxO
      * The {@code ExistingGroupsSuggestionSuccess} reply variant — the
      * relay accepted (or partially accepted) the existing-groups
      * suggestion and returned a per-group result row.
-     *
-     * @implNote {@code WASmaxInGroupsCreateSubGroupSuggestionResponseExistingGroupsSuggestionSuccess.parseCreateSubGroupSuggestionResponseExistingGroupsSuggestionSuccess}
-     *           validates the IQ result envelope, requires the
-     *           {@code <sub_group_suggestion/>} child, and
-     *           enumerates its 1..1000 {@code <group/>} sub-children.
-     *           Each group row may carry an optional inner error tag
-     *           taken from the
-     *           {@code SubGroupNotAuthorizedOrNotExistOrConflictOrSuggestionNotAllowedOrResourceLimitOrBadRequestOrNotAcceptableOrServerErrorMixinGroup}
-     *           family — Cobalt surfaces the discriminator tag as a
-     *           typed {@link ExistingGroupsSuggestionSuccess.Candidate#errorTag()}
-     *           accessor.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsCreateSubGroupSuggestionResponseExistingGroupsSuggestionSuccess")
     final class ExistingGroupsSuggestionSuccess implements SmaxGroupsCreateSubGroupSuggestionResponse {
@@ -489,10 +463,6 @@ public sealed interface SmaxGroupsCreateSubGroupSuggestionResponse extends SmaxO
      * The {@code ClientError} reply variant — the relay rejected the
      * request as malformed, unauthorised, or referencing an
      * inadmissible community / candidate.
-     *
-     * @implNote {@code WASmaxInGroupsCreateSubGroupSuggestionResponseClientError.parseCreateSubGroupSuggestionResponseClientError}
-     *           parses the {@code <error code text/>} child. Cobalt
-     *           collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsCreateSubGroupSuggestionResponseClientError")
     final class ClientError implements SmaxGroupsCreateSubGroupSuggestionResponse {
@@ -585,11 +555,6 @@ public sealed interface SmaxGroupsCreateSubGroupSuggestionResponse extends SmaxO
     /**
      * The {@code ServerError} reply variant — the relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInGroupsCreateSubGroupSuggestionResponseServerError.parseCreateSubGroupSuggestionResponseServerError}
-     *           delegates to {@code WASmaxInGroupsBaseServerErrorMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsCreateSubGroupSuggestionResponseServerError")
     final class ServerError implements SmaxGroupsCreateSubGroupSuggestionResponse {

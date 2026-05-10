@@ -18,11 +18,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WASmaxPrivacyGetContactBlacklistRPC.sendGetContactBlacklistRPC}
- *           tries {@link SuccessLID} → {@link Success} → {@link Error}
- *           in order; Cobalt mirrors the priority and returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGetContactBlacklistResponse extends SmaxOperation.Response
         permits SmaxGetContactBlacklistResponse.SuccessLID, SmaxGetContactBlacklistResponse.Success, SmaxGetContactBlacklistResponse.Error {
@@ -245,14 +240,6 @@ public sealed interface SmaxGetContactBlacklistResponse extends SmaxOperation.Re
      * The {@code SuccessLID} reply variant. The relay returned a
      * {@code <privacy addressing_mode="lid">} envelope carrying the
      * LID-addressed contact-blacklist entries.
-     *
-     * @implNote {@code WASmaxInPrivacyGetContactBlacklistResponseSuccessLID.parseGetContactBlacklistResponseSuccessLID}
-     *           projects {@code (privacyAddressingMode, privacyList)};
-     *           Cobalt drops the redundant {@code privacyAddressingMode}
-     *           field (always equal to the literal {@code "lid"} for
-     *           this variant) and surfaces the optional inner
-     *           {@code <list/>} child as {@link #listDhash} +
-     *           {@link #users}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivacyGetContactBlacklistResponseSuccessLID")
     @WhatsAppWebModule(moduleName = "WASmaxInPrivacyDeprecatedIQResultResponseOptionalFromMixin")
@@ -370,12 +357,6 @@ public sealed interface SmaxGetContactBlacklistResponse extends SmaxOperation.Re
      * The {@code Success} reply variant. The legacy PN-addressed
      * success envelope. The {@code addressing_mode} attribute is
      * optional but, when present, must equal {@code "pn"}.
-     *
-     * @implNote {@code WASmaxInPrivacyGetContactBlacklistResponseSuccess.parseGetContactBlacklistResponseSuccess}
-     *           projects {@code (privacyAddressingMode, privacyList)};
-     *           Cobalt drops the redundant addressing-mode field and
-     *           surfaces only the inner list digest + parsed user
-     *           entries.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivacyGetContactBlacklistResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInPrivacyDeprecatedIQResultResponseOptionalFromMixin")
@@ -503,12 +484,6 @@ public sealed interface SmaxGetContactBlacklistResponse extends SmaxOperation.Re
      * {@code InternalServerError}). Collapsed to the universal
      * {@code (errorCode, errorText)} pair since the per-shape
      * disjunction carries no additional payload.
-     *
-     * @implNote {@code WASmaxInPrivacyGetContactBlacklistResponseError.parseGetContactBlacklistResponseError}
-     *           composes the deprecated-IQ-error mixin with
-     *           {@code parseGetPrivacyListError}; Cobalt collapses the
-     *           per-RPC enum lookup since none of its callers consume
-     *           the structured projection.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPrivacyGetContactBlacklistResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInPrivacyGetPrivacyListError")

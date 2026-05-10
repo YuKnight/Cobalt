@@ -53,12 +53,6 @@ public final class SmaxUserNoticeGetDisclosuresRequest implements SmaxOperation.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <get_user_disclosures/>} payload
-     *
-     * @implNote {@code WASmaxOutUserNoticeGetDisclosuresRequest.makeGetDisclosuresRequest}
-     *           composes {@code WASmaxOutUserNoticeBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over
-     *           {@code <iq xmlns="tos" to="s.whatsapp.net">} with a
-     *           single {@code <get_user_disclosures t="…"/>} child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutUserNoticeGetDisclosuresRequest",

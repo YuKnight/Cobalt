@@ -37,19 +37,15 @@ import java.util.regex.Pattern;
  * codes, the high-confusables string, and the
  * {@code LANGUAGE_TO_REGIONS} map are all transcribed verbatim from
  * the JS bundle.
- *
- * @implNote WAIdn.findSuspiciousCharacters +
- *           WALanguagesAndRegions.LANGUAGE_TO_REGIONS.
  */
 @WhatsAppWebModule(moduleName = "WAIdn")
 @WhatsAppWebModule(moduleName = "WALanguagesAndRegions")
+@WhatsAppWebModule(moduleName = "WAPhoneFindCC")
 final class Idn {
     /**
      * Pattern matching labels composed entirely of ASCII letters,
      * digits, and dashes. Labels that match are guaranteed to be
      * non-suspicious because they cannot mix scripts.
-     *
-     * @implNote WAIdn {@code _} regex.
      */
     private static final Pattern ASCII_LABEL = Pattern.compile("^[a-z0-9-]+$");
 
@@ -57,8 +53,6 @@ final class Idn {
      * Maximum number of confusable code points the heuristic tolerates
      * before concluding the label is intentionally polyglot rather than
      * homographic.
-     *
-     * @implNote WAIdn {@code f} constant.
      */
     private static final int MAX_CONFUSABLES_BEFORE_BAIL = 2;
 
@@ -66,8 +60,6 @@ final class Idn {
      * Cyrillic-script language tags consulted when every code point in
      * the label belongs to the high-confusable Cyrillic set; if the
      * recipient speaks one of these, the label is presumed legitimate.
-     *
-     * @implNote WAIdn {@code s} set.
      */
     @WhatsAppWebExport(moduleName = "WAIdn", exports = "findSuspiciousCharacters",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -84,8 +76,6 @@ final class Idn {
     /**
      * Country-code prefixes that ship with phones whose users
      * realistically write Cyrillic.
-     *
-     * @implNote WAIdn {@code u} set.
      */
     @WhatsAppWebExport(moduleName = "WAIdn", exports = "findSuspiciousCharacters",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -98,8 +88,6 @@ final class Idn {
      * Cyrillic basic-Latin look-alike code points. When every code
      * point of the host label belongs to this set, the label is
      * considered Cyrillic-only and the script-mismatch path runs.
-     *
-     * @implNote WAIdn {@code c} string.
      */
     @WhatsAppWebExport(moduleName = "WAIdn", exports = "findSuspiciousCharacters",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -118,8 +106,6 @@ final class Idn {
      * point. A code point present in this map is a confusable
      * candidate; a code point absent from the map is treated as plain
      * Latin (no suspicion).
-     *
-     * @implNote WAIdn {@code e} map.
      */
     @WhatsAppWebExport(moduleName = "WAIdn", exports = "findSuspiciousCharacters",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -151,8 +137,6 @@ final class Idn {
     /**
      * Language → list of country codes where the language is widely
      * spoken.
-     *
-     * @implNote WALanguagesAndRegions.LANGUAGE_TO_REGIONS.
      */
     @WhatsAppWebExport(moduleName = "WALanguagesAndRegions", exports = "LANGUAGE_TO_REGIONS",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -510,12 +494,24 @@ final class Idn {
     /**
      * Extracts the country code from a phone JID's user portion.
      *
+     * <p>The implementation matches the leading digits against
+     * {@link #COUNTRY_CODE_PREFIX}; on a hit the matched 1- to 2-digit
+     * prefix is returned, otherwise the first three characters are
+     * returned (or the whole input when shorter than three characters).
+     *
+     * <p>WA Web exposes this behaviour through two exports
+     * ({@code phoneCC} and {@code findCC}); {@code phoneCC} is a thin
+     * delegating wrapper over {@code findCC} ({@code function l(e)
+     * &#123; return s(e); &#125;}). Cobalt collapses the pair into a
+     * single method.
+     *
      * @param phoneUser the user-prefix digits of a phone JID
      * @return the resolved country code (1–3 digits) or the input
      *         when no longer prefix matches
-     * @implNote WAPhoneFindCC.phoneCC.
      */
     @WhatsAppWebExport(moduleName = "WAPhoneFindCC", exports = "phoneCC",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAPhoneFindCC", exports = "findCC",
             adaptation = WhatsAppAdaptation.DIRECT)
     static String countryCodeOf(String phoneUser) {
         if (phoneUser == null || phoneUser.isEmpty()) {
@@ -529,11 +525,47 @@ final class Idn {
     }
 
     /**
+     * Returns the concatenation of every maximal run of digits found
+     * in {@code input}.
+     *
+     * <p>Mirrors WA Web's {@code u(e) &#123; var t = e.match(/\d+/g);
+     * return t != null ? t.join("") : ""; &#125;}: every digit run is
+     * kept in source order and joined without a separator; the empty
+     * string is returned when no digit is present.
+     *
+     * @param input the string to scan for digit runs
+     * @return the concatenation of every digit run, or the empty
+     *         string when {@code input} is {@code null} or contains no
+     *         digit
+     */
+    @WhatsAppWebExport(moduleName = "WAPhoneFindCC", exports = "extractDigits",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    static String extractDigits(String input) {
+        if (input == null || input.isEmpty()) {
+            return "";
+        }
+        var matcher = DIGIT_RUN.matcher(input);
+        var builder = new StringBuilder(input.length());
+        while (matcher.find()) {
+            builder.append(matcher.group());
+        }
+        return builder.toString();
+    }
+
+    /**
      * Pattern matching the leading country-code prefix of a phone
      * JID's user portion.
-     *
-     * @implNote WAPhoneFindCC {@code e} regex.
      */
+    @WhatsAppWebExport(moduleName = "WAPhoneFindCC", exports = "findCC",
+            adaptation = WhatsAppAdaptation.DIRECT)
     private static final Pattern COUNTRY_CODE_PREFIX = Pattern.compile(
             "^(1|2[07]|3[0-469]|4[013-9]|5[1-8]|6[0-6]|7|8[1246]|9[0-58])");
+
+    /**
+     * Pattern matching one or more consecutive ASCII digits, used by
+     * {@link #extractDigits(String)}.
+     */
+    @WhatsAppWebExport(moduleName = "WAPhoneFindCC", exports = "extractDigits",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static final Pattern DIGIT_RUN = Pattern.compile("\\d+");
 }

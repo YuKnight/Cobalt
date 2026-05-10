@@ -37,13 +37,6 @@ public sealed interface SmaxClientExpirationResponse extends SmaxOperation.Respo
      * The inbound projection of the
      * {@code <ib from="s.whatsapp.net"><client_expiration t?/></ib>}
      * stanza.
-     *
-     * @implNote {@code WASmaxInClientExpirationClientExpirationRequest.parseClientExpirationRequest}
-     *           extracts the literal {@code from="s.whatsapp.net"}
-     *           attribute on the {@code <ib>} envelope and the
-     *           optional non-negative {@code t} attribute on the
-     *           {@code <client_expiration/>} child. Cobalt mirrors
-     *           the projection in the {@code (from, t)} pair below.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInClientExpirationClientExpirationRequest")
     final class Inbound implements SmaxClientExpirationResponse {
@@ -108,17 +101,21 @@ public sealed interface SmaxClientExpirationResponse extends SmaxOperation.Respo
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Inbound> of(Node node) {
             Objects.requireNonNull(node, "node cannot be null");
+            // WASmaxParseUtils.assertTag(e, "ib"): rejects any envelope whose tag is not "ib".
             if (!node.hasDescription("ib")) {
                 return Optional.empty();
             }
+            // WASmaxParseJid.literalJid(attrDomainJid, e, "from", "s.whatsapp.net"): the "from" attribute must be the literal s.whatsapp.net server JID.
             var from = node.getAttributeAsJid("from").orElse(null);
-            if (from == null || !"s.whatsapp.net".equals(from.toString())) {
+            if (from == null || !Jid.userServer().equals(from)) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.flattenedChildWithTag(e, "client_expiration"): exactly one <client_expiration/> child must be present.
             var expirationNode = node.getChild("client_expiration").orElse(null);
             if (expirationNode == null) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.optional(attrIntRange, n, "t", 0, undefined): "t" is optional, but when present must be a non-negative integer.
             var clientExpirationT = expirationNode.getAttributeAsLong("t");
             if (clientExpirationT.isPresent() && clientExpirationT.getAsLong() < 0) {
                 return Optional.empty();

@@ -57,9 +57,6 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
 
     /**
      * Alphabet used to decode nibble packed strings.
-     *
-     * @implNote Indices {@code 12}-{@code 15} are reserved padding values
-     *           that the encoder never emits.
      */
     private static final char[] NIBBLE_ALPHABET = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '.', '�', '�', '�', '�'};
 
@@ -91,9 +88,6 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
     /**
      * Builds a decoder appropriate for the leading flags byte of the
      * supplied stanza buffer.
-     *
-     * @implNote Bit {@code 1} of the flags byte marks DEFLATE compressed
-     *           payloads.
      * @param source the buffer containing the encoded stanza
      * @return an inflating decoder when the compression flag is set, a
      *         direct decoder otherwise
@@ -163,11 +157,6 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
 
     /**
      * Reads a complete node from the source.
-     *
-     * @implNote The node header carries a list size that counts
-     *           {@code description + attribute keys + attribute values +
-     *           content}. An odd size means the content slot is absent and
-     *           an {@link Node.EmptyNode} is produced.
      * @return the decoded node
      * @throws IOException if the stream is truncated or holds a malformed
      *         tag
@@ -421,11 +410,6 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
 
     /**
      * Reads a packed string under the supplied alphabet.
-     *
-     * @implNote The first body byte holds the high bit as an odd length
-     *           flag and the low 7 bits as the byte count of the packed
-     *           run. When the flag is set the trailing nibble of the last
-     *           body byte is dropped.
      * @param alphabet the 16 entry alphabet to translate nibbles through
      * @return the decoded string
      * @throws IOException if the stream is truncated
@@ -462,12 +446,6 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
 
     /**
      * Reads an {@link NodeTags#AD_JID} body.
-     *
-     * @implNote The domain code maps to {@code s.whatsapp.net} for
-     *           {@link NodeTags#DOMAIN_WHATSAPP}, {@code lid} for
-     *           {@link NodeTags#DOMAIN_LID}, {@code hosted.lid} for
-     *           {@link NodeTags#DOMAIN_HOSTED_LID}, and {@code hosted} for
-     *           any other even value with bit {@code 7} set.
      * @return the parsed JID
      * @throws IOException if the stream is truncated or carries an unknown
      *         domain code
@@ -492,9 +470,6 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
 
     /**
      * Reads a {@link NodeTags#JID_FB} body.
-     *
-     * @implNote The trailing domain string is consumed but discarded
-     *           because the messenger server is implicit.
      * @return the parsed JID
      * @throws IOException if the stream is truncated
      */
@@ -507,11 +482,6 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
 
     /**
      * Reads a {@link NodeTags#JID_INTEROP} body.
-     *
-     * @implNote The integrator id is folded into the user component as
-     *           {@code integrator-user}. The trailing domain string is
-     *           consumed but discarded because the interop server is
-     *           implicit.
      * @return the parsed JID
      * @throws IOException if the stream is truncated
      */
@@ -522,6 +492,14 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
         var _ = readString();
         return Jid.of(integrator + "-" + user, JidServer.interop(), device, 0);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @throws IOException if the decoder cannot be closed
+     */
+    @Override
+    public abstract void close() throws IOException;
 
     /**
      * Decoder implementation that reads directly from the source buffer
@@ -662,10 +640,6 @@ public sealed abstract class NodeDecoder implements AutoCloseable {
         /**
          * Ensures that at least {@code needed} contiguous inflated bytes
          * are available starting at {@link #bufferPosition}.
-         *
-         * @implNote Compacts surviving bytes to the head of the staging
-         *           buffer and inflates more data until the requirement is
-         *           satisfied.
          * @param needed the minimum number of contiguous bytes required
          * @throws IOException if the source ends before enough bytes are
          *         inflated

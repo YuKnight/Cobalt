@@ -17,8 +17,6 @@ import java.util.Optional;
 /**
  * Sealed disjunction over the optional contacts/replied filter, at
  * most one is applied per request.
- *
- * @implNote {@code WASmaxOutNewslettersContactsOrRepliedFilterMixinMixinGroup.mergeContactsOrRepliedFilterMixinMixinGroup}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersContactsOrRepliedFilterMixinMixinGroup")
 public sealed interface SmaxNewslettersGetNewsletterResponsesFilter permits SmaxNewslettersGetNewsletterResponsesFilter.Contacts, SmaxNewslettersGetNewsletterResponsesFilter.Replied {
@@ -26,8 +24,6 @@ public sealed interface SmaxNewslettersGetNewsletterResponsesFilter permits Smax
     /**
      * Filters the response slice to entries authored by the user's
      * address-book contacts.
-     *
-     * @implNote {@code WASmaxOutNewslettersContactsFilterMixinMixin.mergeContactsFilterMixinMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersContactsFilterMixinMixin")
     final class Contacts implements SmaxNewslettersGetNewsletterResponsesFilter {
@@ -59,8 +55,6 @@ public sealed interface SmaxNewslettersGetNewsletterResponsesFilter permits Smax
     /**
      * Filters the response slice to entries the question owner has
      * already explicitly replied to.
-     *
-     * @implNote {@code WASmaxOutNewslettersRepliedFilterMixinMixin.mergeRepliedFilterMixinMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersRepliedFilterMixinMixin")
     final class Replied implements SmaxNewslettersGetNewsletterResponsesFilter {

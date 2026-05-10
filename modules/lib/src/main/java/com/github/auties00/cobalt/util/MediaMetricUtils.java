@@ -35,11 +35,6 @@ import java.util.concurrent.ThreadLocalRandom;
  * downloads, app-state external-patch uploads, future media-message
  * uploads) routes through the same code path and produces identical
  * telemetry.
- *
- * @implNote The classifier methods adapt WA Web's JavaScript
- *     {@code instanceof} cascade to Cobalt's {@link WhatsAppMediaException}
- *     sealed hierarchy plus {@link InterruptedException} for cancel
- *     detection.
  */
 @WhatsAppWebModule(moduleName = "WAWebWamMediaMetricUtils")
 public final class MediaMetricUtils {
@@ -47,13 +42,6 @@ public final class MediaMetricUtils {
      * Detail-message prefix produced by Cobalt's {@code MediaDownloadInputStream}
      * when the downloaded ciphertext SHA-256 disagrees with the expected
      * {@code encFilehash}.
-     *
-     * @implNote Cobalt's analogue of WA Web's
-     *     {@code MmsDownloadFilehashMismatchError}: the integrity check
-     *     surfaces as {@link WhatsAppMediaException.Download} so the
-     *     existing per-host retry loop reacts to it, and
-     *     {@link #getMetricDownloadErrorResultType(Throwable)} maps the
-     *     prefix to {@link MediaDownloadResultType#ERROR_ENC_HASH_MISMATCH}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHttpErrors", exports = "MmsDownloadFilehashMismatchError",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -64,12 +52,6 @@ public final class MediaMetricUtils {
      * Detail-message prefix produced by Cobalt's {@code MediaDownloadInputStream}
      * when the decrypted plaintext SHA-256 disagrees with the expected
      * {@code fileSha256}.
-     *
-     * @implNote Cobalt's analogue of WA Web's {@code MediaDecryptionError}
-     *     combined with {@code PLAINTEXT_HASH_MISMATCH_ERROR}: WA Web checks
-     *     {@code e instanceof MediaDecryptionError && e.message.includes(...)},
-     *     while {@code MediaDownloadInputStream} surfaces the same condition
-     *     as a {@link WhatsAppMediaException.Download} carrying this prefix.
      */
     @WhatsAppWebExport(moduleName = "WAWebMiscErrors", exports = "MediaDecryptionError",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -346,12 +328,6 @@ public final class MediaMetricUtils {
      * Returns the HTTP status code carried by the given throwable, walking
      * the cause chain to find the first {@link WhatsAppMediaException} that
      * has a status code attached.
-     *
-     * @implNote WA Web's {@code getStatusCode} only inspects the top
-     *     exception. Cobalt walks the cause chain because Java exception
-     *     wrappers (notably {@link java.util.concurrent.CompletionException})
-     *     sometimes sit between the call site and the original media
-     *     exception.
      * @param throwable the error to inspect, or {@code null}
      * @return the HTTP status code, or {@code null} if none of the
      *         exceptions in the chain carries one
@@ -380,10 +356,6 @@ public final class MediaMetricUtils {
      * deduplicate retried attempts. The range matches JavaScript's
      * {@code Number.MAX_SAFE_INTEGER} (2<sup>53</sup>&minus;1 =
      * {@code 9007199254740991}) exactly.
-     *
-     * @implNote {@link ThreadLocalRandom} is used instead of
-     *     {@link Math#random()} so the call is thread-safe under WAM's
-     *     virtual-thread commit pipeline.
      * @return a random {@code long} in the closed range
      *         {@code [1, 9007199254740991]}
      */
@@ -404,10 +376,6 @@ public final class MediaMetricUtils {
      * blob stores respectively. Any other prefix is unrecognised. A
      * {@code null} or empty path means the asset is not using a
      * direct-path scheme and maps to {@link BackendStoreType#NON_DIRECT_PATH}.
-     *
-     * @implNote WA Web emits an ERROR log via {@code WAWebLogger} on the
-     *     unrecognised branch, omitted in Cobalt because the channel is
-     *     not separately observed by the WAM pipeline.
      * @param directPath the {@code direct_path} string handed back by the
      *                   media-upload server, or {@code null}
      * @return the matching {@link BackendStoreType}, or {@code null} when

@@ -16,11 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsGetReportedMessagesRPC.sendGetReportedMessagesRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order; Cobalt returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGroupsGetReportedMessagesResponse extends SmaxOperation.Response
         permits SmaxGroupsGetReportedMessagesResponse.Success, SmaxGroupsGetReportedMessagesResponse.ClientError, SmaxGroupsGetReportedMessagesResponse.ServerError {
@@ -53,12 +48,6 @@ public sealed interface SmaxGroupsGetReportedMessagesResponse extends SmaxOperat
     /**
      * The {@code Success} reply variant — carries the list of
      * pending {@link Report} entries.
-     *
-     * @implNote {@code WASmaxInGroupsGetReportedMessagesResponseSuccess.parseGetReportedMessagesResponseSuccess}
-     *           validates the IQ envelope, then projects every
-     *           {@code <report message_id>} child via the inline
-     *           parser carried in the response module (1..10000
-     *           reporters per report).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetReportedMessagesResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupAddressingModeMixin")
@@ -145,12 +134,6 @@ public sealed interface SmaxGroupsGetReportedMessagesResponse extends SmaxOperat
     /**
      * Per-report projection — carries the reported message stanza
      * id alongside the list of reporters.
-     *
-     * @implNote {@code parseGetReportedMessagesResponseSuccessReportsReport}
-     *           extracts {@code message_id} via
-     *           {@code attrStanzaId} and maps every
-     *           {@code <reporter>} child (1..19999) via the
-     *           inline reporter parser.
      */
     final class Report {
         /**
@@ -264,12 +247,6 @@ public sealed interface SmaxGroupsGetReportedMessagesResponse extends SmaxOperat
     /**
      * Per-reporter projection — carries the reporting user's JID
      * alongside the unix-time timestamp the report was filed at.
-     *
-     * @implNote {@code parseGetReportedMessagesResponseSuccessReportsReportReporter}
-     *           extracts {@code jid} via {@code attrUserJid},
-     *           {@code timestamp} via {@code attrIntRange}, and
-     *           layers the optional
-     *           {@code WASmaxInGroupsIdentityMixin} on top.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsIdentityMixin")
     final class Reporter {
@@ -371,10 +348,6 @@ public sealed interface SmaxGroupsGetReportedMessagesResponse extends SmaxOperat
 
     /**
      * The {@code ClientError} reply variant.
-     *
-     * @implNote {@code WASmaxInGroupsGetReportedMessagesResponseClientError.parseGetReportedMessagesResponseClientError}
-     *           parses the {@code <error code text/>} child via the
-     *           shared base mixin.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetReportedMessagesResponseClientError")
     final class ClientError implements SmaxGroupsGetReportedMessagesResponse {
@@ -463,9 +436,6 @@ public sealed interface SmaxGroupsGetReportedMessagesResponse extends SmaxOperat
 
     /**
      * The {@code ServerError} reply variant.
-     *
-     * @implNote {@code WASmaxInGroupsGetReportedMessagesResponseServerError.parseGetReportedMessagesResponseServerError}
-     *           delegates to the shared base mixin.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetReportedMessagesResponseServerError")
     final class ServerError implements SmaxGroupsGetReportedMessagesResponse {

@@ -15,9 +15,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxSpamStatusReportV2RPC.sendStatusReportV2RPC}
- *           tries {@code Success} → {@code Error}.
  */
 public sealed interface SmaxStatusReportV2Response extends SmaxOperation.Response
         permits SmaxStatusReportV2Response.Success, SmaxStatusReportV2Response.Error {
@@ -46,11 +43,6 @@ public sealed interface SmaxStatusReportV2Response extends SmaxOperation.Respons
     /**
      * The {@code Success} reply variant. The relay accepted the
      * report.
-     *
-     * @implNote {@code WASmaxInSpamStatusReportV2ResponseSuccess.parseStatusReportV2ResponseSuccess}
-     *           validates the {@code <iq>} envelope, optionally
-     *           projects the {@code <report id>} child via
-     *           {@code WASmaxInSpamReportIdMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSpamStatusReportV2ResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInSpamReportIdMixin")
@@ -126,11 +118,6 @@ public sealed interface SmaxStatusReportV2Response extends SmaxOperation.Respons
     /**
      * The {@code Error} reply variant. The relay rejected the
      * report.
-     *
-     * @implNote {@code WASmaxInSpamStatusReportV2ResponseError.parseStatusReportV2ResponseError}
-     *           routes through
-     *           {@code parseIQErrorInternalServerErrorOrBadRequestOrForbiddenOrRateOverlimitMixinGroup};
-     *           Cobalt collapses to the {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSpamStatusReportV2ResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInSpamIQErrorInternalServerErrorOrBadRequestOrForbiddenOrRateOverlimitMixinGroup")

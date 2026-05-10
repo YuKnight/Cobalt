@@ -66,11 +66,6 @@ public final class SmaxAvailabilityRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the
      *         {@code <presence type? name?/>} envelope
-     *
-     * @implNote {@code WASmaxOutPresenceAvailabilityRequest.makeAvailabilityRequest}
-     *           emits {@code smax("presence", {type:OPTIONAL,
-     *           name:OPTIONAL})}. Both attributes are dropped when
-     *           the caller passes {@code null}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPresenceAvailabilityRequest",

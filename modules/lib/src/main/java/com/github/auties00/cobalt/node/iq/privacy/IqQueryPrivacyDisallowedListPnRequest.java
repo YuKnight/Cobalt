@@ -50,12 +50,6 @@ public final class IqQueryPrivacyDisallowedListPnRequest implements IqOperation.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <privacy>} payload
-     *
-     * @implNote {@code WAWebQueryPrivacyDisallowedListPnJob.queryPrivacyDisallowedListPn}:
-     *           {@code wap("iq",{xmlns:"privacy", type:"get",
-     *           to:S_WHATSAPP_NET, id}, wap("privacy", null,
-     *           wap("list",{name:CATEGORY,
-     *           value:"contact_blacklist"})))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQueryPrivacyDisallowedListPnJob",

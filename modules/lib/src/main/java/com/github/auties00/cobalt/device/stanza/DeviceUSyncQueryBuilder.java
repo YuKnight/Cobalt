@@ -25,11 +25,6 @@ import java.util.*;
  * <p>Each user entry optionally carries the locally cached {@code device_hash}, timestamp, and
  * expected timestamp so the server can answer with an "omitted" result (hash still matches)
  * instead of retransmitting unchanged device lists.
- *
- * @implNote WAWebUsync.USyncQuery: constructs and executes USync requests with configurable
- * protocols and user lists. WAWebUsyncDevice.USyncDeviceProtocol: defines the device protocol
- * with {@code getName()="devices"}, {@code getQueryElement()}, and {@code getUserElement()}.
- * WAWebUsyncUsername.USyncUsernameProtocol: optional username co-query protocol.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 @WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
@@ -38,8 +33,6 @@ public final class DeviceUSyncQueryBuilder {
 
     /**
      * Maximum users per USync query batch.
-     *
-     * @implNote WAWebAdvSyncDeviceListApi: batches large user lists to avoid oversized requests.
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
             exports = "syncDeviceList",
@@ -55,8 +48,6 @@ public final class DeviceUSyncQueryBuilder {
      * contact protocol query element. Cobalt mirrors the constant as plain string
      * fields because no enum coercion is required at the wire layer; they are written
      * verbatim into the {@code addressing_mode} attribute when present.
-     *
-     * @implNote WAWebUsync.USYNC_ADDRESSING_MODE.PN: literal value {@code "pn"}.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USYNC_ADDRESSING_MODE",
@@ -66,8 +57,6 @@ public final class DeviceUSyncQueryBuilder {
     /**
      * Wire-protocol addressing-mode discriminator for the {@code addressing_mode}
      * attribute on the contact USync query element: long-identifier (LID) addressing.
-     *
-     * @implNote WAWebUsync.USYNC_ADDRESSING_MODE.LID: literal value {@code "lid"}.
      * @see #USYNC_ADDRESSING_MODE_PN
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
@@ -89,10 +78,6 @@ public final class DeviceUSyncQueryBuilder {
      *
      * <p>Splits large user lists into batches of up to {@value MAX_USERS_PER_QUERY} users
      * and constructs an IQ stanza for each batch.
-     *
-     * @implNote WAWebUsyncDevice.USyncDeviceProtocol: defines the device protocol query.
-     * WAWebUsync.USyncQuery.$3: constructs the full IQ stanza with usync, query, and list nodes.
-     * WAWebAdvSyncDeviceListApi: orchestrates the device sync request with user hash info.
      * @param userJids                the user JIDs to query
      * @param context                 the context for device filtering
      * @param hashInfos               hash information for delta updates, or {@code null}
@@ -132,18 +117,6 @@ public final class DeviceUSyncQueryBuilder {
      *
      * <p>Constructs the full IQ structure: {@code <iq> <usync> <query> <devices/> </query>
      * <list> <user/> ... </list> </usync> </iq>}.
-     *
-     * @implNote WAWebUsync.USyncQuery.$3: builds the complete IQ stanza with usync node containing
-     * query (with protocol elements) and list (with user elements). The IQ id attribute is
-     * added by the transport layer when sending.
-     * @implNote ADAPTED: WAWebUsyncUsername.USyncUsernameProtocol is a protocol descriptor class
-     * in WA Web with {@code getName()="username"}, {@code getQueryElement()} returning
-     * {@code WAWap.wap("username", null)} (an empty {@code <username/>} node), and
-     * {@code getUserElement()} returning {@code null}. Cobalt inlines this as a boolean flag:
-     * when {@code includeUsernameProtocol} is true an empty {@code <username/>} child is appended
-     * to the {@code <query>} node. Because {@code getUserElement} always returns {@code null}
-     * in WA Web, no per-user element is ever emitted, and no {@code <user>} child is added for
-     * the username protocol here either.
      * @param userJids                the user JIDs to include in this batch
      * @param context                 the context string for the usync request
      * @param hashInfos               hash information for delta updates, or {@code null}
@@ -218,9 +191,6 @@ public final class DeviceUSyncQueryBuilder {
      * <p>Returns a {@code <devices>} node with {@code device_hash}, {@code ts}, and
      * {@code expected_ts} attributes if hash info is available, or {@code null} if all
      * values are absent.
-     *
-     * @implNote WAWebUsyncDevice.USyncDeviceProtocol.getUserElement: returns a devices node
-     * with device_hash, ts, expected_ts attributes for delta queries, or null if all are null.
      * @param hashInfo the hash info for this user, or {@code null}
      * @return the devices user element, or {@code null} if not needed
      */
@@ -259,9 +229,6 @@ public final class DeviceUSyncQueryBuilder {
      *
      * <p>Each user node contains the JID attribute and optional protocol-specific children
      * such as a {@code <devices>} element with delta update attributes.
-     *
-     * @implNote WAWebUsync.USyncQuery.$3: constructs user nodes with jid attribute and
-     * protocol-specific children from each protocol's getUserElement method.
      * @param jid       the user JID
      * @param hashInfos hash information for delta updates, or {@code null}
      * @return the user node

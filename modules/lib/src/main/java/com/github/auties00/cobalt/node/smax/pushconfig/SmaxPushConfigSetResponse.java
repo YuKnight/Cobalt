@@ -16,10 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxPushConfigSetRPC.sendSetRPC} tries
- *           {@code Success} → {@code InternalServerError} →
- *           {@code Conflict}.
  */
 public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
         permits SmaxPushConfigSetResponse.Success, SmaxPushConfigSetResponse.InternalServerError, SmaxPushConfigSetResponse.Conflict {
@@ -55,10 +51,6 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
      * push-config change.
      *
      * <p>Carries no payload beyond the envelope echo.
-     *
-     * @implNote {@code WASmaxInPushConfigSetResponseSuccess.parseSetResponseSuccess}
-     *           delegates to
-     *           {@code WASmaxInPushConfigIQResultResponseMixin.parseIQResultResponseMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPushConfigSetResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInPushConfigIQResultResponseMixin")
@@ -108,12 +100,6 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
     /**
      * The {@code InternalServerError} reply variant carrying
      * {@code (500, "internal-server-error")}.
-     *
-     * @implNote {@code WASmaxInPushConfigSetResponseInternalServerError.parseSetResponseInternalServerError}
-     *           projects the {@code <error/>} child through
-     *           {@code WASmaxInPushConfigIQErrorInternalServerErrorMixin}
-     *           which asserts the literal {@code (500,
-     *           "internal-server-error")} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPushConfigSetResponseInternalServerError")
     @WhatsAppWebModule(moduleName = "WASmaxInPushConfigIQErrorInternalServerErrorMixin")
@@ -190,12 +176,6 @@ public sealed interface SmaxPushConfigSetResponse extends SmaxOperation.Response
      * thrown when the requested registration collides with an
      * existing one (e.g., multiple devices vying for the same push
      * token).
-     *
-     * @implNote {@code WASmaxInPushConfigSetResponseConflict.parseSetResponseConflict}
-     *           projects the {@code <error/>} child through
-     *           {@code WASmaxInPushConfigIQErrorConflictMixin}
-     *           which asserts the literal
-     *           {@code (409, "conflict")} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPushConfigSetResponseConflict")
     @WhatsAppWebModule(moduleName = "WASmaxInPushConfigIQErrorConflictMixin")

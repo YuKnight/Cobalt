@@ -17,11 +17,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsUnlinkGroupsRequest}.
- *
- * @implNote {@code WASmaxGroupsUnlinkGroupsRPC.sendUnlinkGroupsRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order and throws on no-match.
- *           Cobalt returns {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGroupsUnlinkGroupsResponse extends SmaxOperation.Response
         permits SmaxGroupsUnlinkGroupsResponse.Success, SmaxGroupsUnlinkGroupsResponse.ClientError, SmaxGroupsUnlinkGroupsResponse.ServerError {
@@ -58,19 +53,6 @@ public sealed interface SmaxGroupsUnlinkGroupsResponse extends SmaxOperation.Res
     /**
      * The {@code Success} reply variant — the relay processed every
      * unlink request and returned a per-sub-group result row.
-     *
-     * @implNote {@code WASmaxInGroupsUnlinkGroupsResponseSuccess.parseUnlinkGroupsResponseSuccess}
-     *           validates the IQ result envelope, requires the
-     *           {@code <unlink unlink_type="sub_group">} skeleton,
-     *           and enumerates the {@code <group/>} children. Each
-     *           {@code <group/>} carries an optional
-     *           {@code remove_orphaned_members="true"} echo plus an
-     *           optional sub-group-error mixin (bad request /
-     *           not-authorized / not-exist / not-acceptable /
-     *           partial-server-error / server-error). Cobalt exposes
-     *           the optional error tag as a typed
-     *           {@link SmaxGroupsUnlinkGroupsResponse.Success.UnlinkedGroup#errorTag()}
-     *           accessor.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsUnlinkGroupsResponseSuccess")
     final class Success implements SmaxGroupsUnlinkGroupsResponse {
@@ -305,10 +287,6 @@ public sealed interface SmaxGroupsUnlinkGroupsResponse extends SmaxOperation.Res
      * The {@code ClientError} reply variant — the relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent parent / sub-group pair.
-     *
-     * @implNote {@code WASmaxInGroupsUnlinkGroupsResponseClientError.parseUnlinkGroupsResponseClientError}
-     *           parses the {@code <error code text/>} child. Cobalt
-     *           collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsUnlinkGroupsResponseClientError")
     final class ClientError implements SmaxGroupsUnlinkGroupsResponse {
@@ -401,11 +379,6 @@ public sealed interface SmaxGroupsUnlinkGroupsResponse extends SmaxOperation.Res
     /**
      * The {@code ServerError} reply variant — the relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInGroupsUnlinkGroupsResponseServerError.parseUnlinkGroupsResponseServerError}
-     *           delegates to {@code WASmaxInGroupsBaseServerErrorMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsUnlinkGroupsResponseServerError")
     final class ServerError implements SmaxGroupsUnlinkGroupsResponse {

@@ -14,12 +14,6 @@ import java.util.Optional;
 /**
  * The inbound projection of the {@code <iq><pair-success/></iq>}
  * stanza.
- *
- * @implNote {@code WASmaxInMdSetRegRequest.parseSetRegRequest} unpacks
- *           {@code <pair-success>} → {@code <device-identity/>},
- *           {@code <device jid lid? beta?/>}, {@code <platform name/>},
- *           plus optional {@code <biz name/>}, {@code <client-props/>}
- *           and {@code <encryption-metadata/>} children.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInMdSetRegRequest")
 public final class SmaxMdSetRegResponse implements SmaxOperation.Response {

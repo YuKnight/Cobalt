@@ -39,9 +39,87 @@
                 </plugins>
             </build>
         </profile>
+
+        <!--
+            Native-bundle JARs — opt-in per-classifier artifacts for
+            consumers that don't want the runtime download. The
+            default `cobalt` artifact ships no binaries; the loader
+            fetches them from
+            https://github.com/Auties00/Cobalt/raw/v<version>/dependencies/<lib>/bin/<classifier>/...
+            on first use, verifies the SHA-256 against the bundled
+            META-INF/native-checksums.json manifest, and caches the
+            result under ${user.home}/.cobalt/natives/.
+
+            Activated by `-Pnatives` plus one of the
+            `-Dnatives.classifier=` values:
+
+                mvn -Pnatives -Dnatives.classifier=linux-x86_64    package
+                mvn -Pnatives -Dnatives.classifier=linux-aarch64   package
+                mvn -Pnatives -Dnatives.classifier=darwin-x86_64   package
+                mvn -Pnatives -Dnatives.classifier=darwin-aarch64  package
+                mvn -Pnatives -Dnatives.classifier=windows-x86_64  package
+
+            The binaries are taken from the same
+            `dependencies/<lib>/bin/<classifier>/` tree the manifest
+            references — the assembly descriptor copies them into the
+            `META-INF/native/<classifier>/` resource path the loader
+            looks them up at.
+        -->
+        <profile>
+            <id>natives</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-assembly-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>natives-bundle</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>single</goal>
+                                </goals>
+                                <configuration>
+                                    <appendAssemblyId>true</appendAssemblyId>
+                                    <descriptors>
+                                        <descriptor>${project.basedir}/src/main/assembly/natives.xml</descriptor>
+                                    </descriptors>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 
     <build>
+        <!--
+            Layer the module's `dependencies/<lib>/bin/<classifier>/`
+            tree onto the test classpath so the loader's classpath
+            probe (which uses the manifest's repo-relative path
+            verbatim, e.g.
+            `modules/lib/dependencies/libopus/bin/linux-x86_64/libopus.so`)
+            hits the local binary during `mvn test` instead of trying
+            to download from GitHub at a release tag that may not
+            exist yet during development.
+
+            This affects only the test classpath — the main JAR
+            stays binary-free and downloads at runtime in production.
+        -->
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+            </testResource>
+            <testResource>
+                <directory>${project.basedir}/dependencies</directory>
+                <targetPath>modules/lib/dependencies</targetPath>
+                <includes>
+                    <include>**/bin/**</include>
+                </includes>
+            </testResource>
+        </testResources>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -79,7 +157,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven.surefire.plugin.version}</version>
                 <configuration>
-                    <argLine>--enable-preview --add-modules jdk.incubator.vector</argLine>
+                    <argLine>--enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED</argLine>
                 </configuration>
                 <dependencies>
                     <dependency>
@@ -155,6 +233,18 @@
             <version>${curve25519.version}</version>
         </dependency>
 
+        <!-- BouncyCastle: required by bctls-jdk18on (DTLS-SRTP handshake) -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bctls-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
+        </dependency>
+
         <!-- Protobuf serialization (used by Whatsapp) -->
         <dependency>
             <groupId>com.github.auties00</groupId>
@@ -223,12 +313,11 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Bouncy Castle for test certificate generation -->
+        <!-- Bouncy Castle PKIX (test certificate generation; runtime DTLS-SRTP cert/fingerprint) -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcpkix-jdk18on</artifactId>
-            <version>1.80</version>
-            <scope>test</scope>
+            <version>${bouncycastle.version}</version>
         </dependency>
 
         <!-- Selenium for TLS fingerprint verification -->

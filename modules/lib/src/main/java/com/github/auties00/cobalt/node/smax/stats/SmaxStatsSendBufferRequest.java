@@ -69,14 +69,6 @@ public final class SmaxStatsSendBufferRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <add>} child
-     *
-     * @implNote {@code WASmaxOutStatsSendBufferRequest.makeSendBufferRequest}
-     *           composes the
-     *           {@code WASmaxOutStatsBaseIQSetRequestMixin}
-     *           ({@code id=generateId() type="set"}) over a bare
-     *           {@code <iq xmlns="w:stats" to=S_WHATSAPP_NET>}
-     *           envelope wrapping a single
-     *           {@code <add t=INT>{bytes}</add>} child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutStatsSendBufferRequest",

@@ -1,18 +1,22 @@
 package com.github.auties00.cobalt.wam.model;
 
+import com.github.auties00.cobalt.wam.binary.WamEventDecoder;
+import com.github.auties00.cobalt.wam.binary.WamEventEncoder;
+
 /**
  * A base interface for all WhatsApp Metrics (WAM) event types, providing
  * methods to calculate the binary-encoded size, write the event into a
- * WAM buffer, and query event metadata.
+ * {@link WamEventEncoder}, and query event metadata.
  *
  * <p>Each {@code @WamEvent}-annotated interface extends this interface.
  * The annotation processor generates an implementation class that
  * provides high-performance, zero-reflection implementations of all
  * methods using hardcoded literal values from the annotation and direct
- * calls to
- * {@link com.github.auties00.cobalt.wam.binary.WamEventEncoder WamEventEncoder}.
+ * calls to {@link WamEventEncoder}.
  *
  * @see com.github.auties00.cobalt.wam.annotation.WamEvent
+ * @see WamEventEncoder
+ * @see WamEventDecoder
  */
 public interface WamEventSpec {
     /**
@@ -63,10 +67,7 @@ public interface WamEventSpec {
      * Validates this event before commit, checking that required fields
      * are non-{@code null} and any custom conditions are satisfied.
      *
-     * <p>The default implementation always returns {@code true}. Generated
-     * implementations may override this method with codegen-defined
-     * validators that check required field presence and custom conditions,
-     * matching WhatsApp Web's {@code runPreCommitValidation()}.
+     * <p>The default implementation always returns {@code true}.
      *
      * @return {@code true} if the event is valid and should be committed,
      *         {@code false} if validation failed
@@ -79,11 +80,6 @@ public interface WamEventSpec {
      * Marks this event as committed and returns whether this is the
      * first commit.
      *
-     * <p>If this method returns {@code false}, the event has already
-     * been committed and the caller should discard the duplicate. This
-     * matches the redundant-commit guard in WhatsApp Web's
-     * {@code WAWebWam.commit()}.
-     *
      * @return {@code true} if this is the first commit, {@code false}
      *         if already committed
      */
@@ -92,9 +88,6 @@ public interface WamEventSpec {
     /**
      * Returns the number of bytes required to encode this event in the
      * WAM binary protocol using the static release weight.
-     *
-     * <p>The size includes the event marker (event id and negative
-     * weight) and all non-{@code null} field entries.
      *
      * @return the encoded size in bytes
      */
@@ -106,40 +99,26 @@ public interface WamEventSpec {
      * Returns the number of bytes required to encode this event in the
      * WAM binary protocol using the given weight.
      *
-     * <p>The size includes the event marker (event id and negative
-     * weight) and all non-{@code null} field entries.
-     *
      * @param weight the resolved sampling weight to encode
      * @return the encoded size in bytes
      */
     int sizeOf(int weight);
 
     /**
-     * Writes this event into the given output buffer starting at the
-     * specified offset, using the static release weight.
+     * Writes this event into the given encoder using the static release
+     * weight.
      *
-     * <p>The caller must ensure that the output array has at least
-     * {@code offset + sizeOf()} bytes available.
-     *
-     * @param output the output byte array
-     * @param offset the starting offset within the output array
-     * @return the new offset after the last byte written
+     * @param encoder the destination encoder, must not be {@code null}
      */
-    default int encode(byte[] output, int offset) {
-        return encode(output, offset, releaseWeight());
+    default void encode(WamEventEncoder encoder) {
+        encode(encoder, releaseWeight());
     }
 
     /**
-     * Writes this event into the given output buffer starting at the
-     * specified offset, using the given weight.
+     * Writes this event into the given encoder using the given weight.
      *
-     * <p>The caller must ensure that the output array has at least
-     * {@code offset + sizeOf(weight)} bytes available.
-     *
-     * @param output the output byte array
-     * @param offset the starting offset within the output array
-     * @param weight the resolved sampling weight to encode
-     * @return the new offset after the last byte written
+     * @param encoder the destination encoder, must not be {@code null}
+     * @param weight  the resolved sampling weight to encode
      */
-    int encode(byte[] output, int offset, int weight);
+    void encode(WamEventEncoder encoder, int weight);
 }

@@ -21,13 +21,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
  *
  * <p>All operations are constant time with respect to limb values.
  * No branch depends on the secret data being processed.
- *
- * @implNote Mirrors the {@code A}, {@code Z}, {@code M}, {@code S},
- *     {@code car25519}, {@code pack25519}, {@code unpack25519},
- *     {@code sel25519}, {@code pow2523}, and {@code inv25519}
- *     helpers from {@code WACryptoPrimitives.lowlevel}, which
- *     {@code WACryptoEd25519} (and therefore the private-stats token
- *     blinder) builds upon.
  */
 @WhatsAppWebModule(moduleName = "WACryptoPrimitives")
 public final class Ed25519Field {

@@ -3,9 +3,7 @@ package com.github.auties00.cobalt.node.smax.privacy;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
 import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
@@ -56,105 +54,104 @@ public sealed interface SmaxGetOptOutListResponse extends SmaxOperation.Response
     /**
      * Descriptor for one entry in the relay-returned opt-out list.
      *
-     * @implNote {@code WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin}
-     *           projects all six business-opt-out attributes plus an
-     *           optional reason/description pair. Cobalt collapses
-     *           the attributes into this single record.
+     * <p>Mirrors the {@code WAResultOrError} payload of
+     * {@code WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin},
+     * which exposes optional {@code action} / {@code category} /
+     * {@code expiry_at} attributes plus the
+     * {@link BizOptOutId} disjunction.
+     *
+     * @param action       the optional {@code action} attribute (e.g.
+     *                     {@code "block"}); may be {@code null}
+     * @param category     the optional {@code category} attribute; may
+     *                     be {@code null}
+     * @param expiryAt     the optional {@code expiry_at} attribute,
+     *                     interpreted as a non-negative integer; may
+     *                     be {@code null}
+     * @param bizOptOutIds the {@link BizOptOutId} disjunction; never
+     *                     {@code null}
      */
-    record Item(String reason, String reasonDescription, String entryPoint, String firstMessage,
-                String businessDiscoveryEntryPoint, Long businessDiscoveryTimestamp,
-                String businessDiscoveryId) {
+    record Item(String action, String category, Long expiryAt, BizOptOutId bizOptOutIds) {
         /**
-         * Returns the reason as an {@link Optional}.
+         * Compact constructor that null-checks the disjunction.
          *
-         * @return the reason, or empty when omitted
+         * @param action       the optional action; may be {@code null}
+         * @param category     the optional category; may be {@code null}
+         * @param expiryAt     the optional expiry; may be {@code null}
+         * @param bizOptOutIds the disjunction; never {@code null}
+         * @throws NullPointerException if {@code bizOptOutIds} is
+         *                              {@code null}
          */
-        public Optional<String> reasonAsOptional() {
-            return Optional.ofNullable(reason);
+        public Item {
+            Objects.requireNonNull(bizOptOutIds, "bizOptOutIds cannot be null");
         }
 
         /**
-         * Returns the reason description as an {@link Optional}.
+         * Returns the action as an {@link Optional}.
          *
-         * @return the description, or empty when omitted
+         * @return the action, or empty when omitted
          */
-        public Optional<String> reasonDescriptionAsOptional() {
-            return Optional.ofNullable(reasonDescription);
+        public Optional<String> actionAsOptional() {
+            return Optional.ofNullable(action);
         }
 
         /**
-         * Returns the entry point as an {@link Optional}.
+         * Returns the category as an {@link Optional}.
          *
-         * @return the entry point, or empty when omitted
+         * @return the category, or empty when omitted
          */
-        public Optional<String> entryPointAsOptional() {
-            return Optional.ofNullable(entryPoint);
+        public Optional<String> categoryAsOptional() {
+            return Optional.ofNullable(category);
         }
 
         /**
-         * Returns the first message as an {@link Optional}.
-         *
-         * @return the first message, or empty when omitted
-         */
-        public Optional<String> firstMessageAsOptional() {
-            return Optional.ofNullable(firstMessage);
-        }
-
-        /**
-         * Returns the business-discovery entry point as an
-         * {@link Optional}.
-         *
-         * @return the entry point, or empty when omitted
-         */
-        public Optional<String> businessDiscoveryEntryPointAsOptional() {
-            return Optional.ofNullable(businessDiscoveryEntryPoint);
-        }
-
-        /**
-         * Returns the business-discovery timestamp as an
-         * {@link Optional}.
+         * Returns the expiry-at timestamp as an {@link Optional}.
          *
          * @return the timestamp, or empty when omitted
          */
-        public Optional<Long> businessDiscoveryTimestampAsOptional() {
-            return Optional.ofNullable(businessDiscoveryTimestamp);
-        }
-
-        /**
-         * Returns the business-discovery id as an {@link Optional}.
-         *
-         * @return the id, or empty when omitted
-         */
-        public Optional<String> businessDiscoveryIdAsOptional() {
-            return Optional.ofNullable(businessDiscoveryId);
+        public Optional<Long> expiryAtAsOptional() {
+            return Optional.ofNullable(expiryAt);
         }
     }
 
     /**
-     * Parses a {@code <biz_opt_out>} child of an item node.
+     * Parses a single {@code <item>} entry, mirroring
+     * {@code WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin}.
      *
-     * @param itemNode the {@code <item>} container
-     * @return the populated {@link Item}; never {@code null}
+     * @param itemNode the {@code <item>} node; never {@code null}
+     * @return an {@link Optional} carrying the populated
+     *         {@link Item}, or empty when the
+     *         {@code biz_opt_out_ids} disjunction does not match or
+     *         {@code expiry_at} is present but negative
      */
-    private static Item parseItem(Node itemNode) {
-        var bizOptOut = itemNode.getChild("biz_opt_out").orElse(itemNode);
-        var reason = bizOptOut.getAttributeAsString("reason").orElse(null);
-        var reasonDescription = bizOptOut.getAttributeAsString("reason_description").orElse(null);
-        var entryPoint = bizOptOut.getAttributeAsString("entry_point").orElse(null);
-        var firstMessage = bizOptOut.getAttributeAsString("first_message").orElse(null);
-        var bdEntryPoint = bizOptOut.getAttributeAsString("business_discovery_entry_point").orElse(null);
-        var bdTimestampOpt = bizOptOut.getAttributeAsString("business_discovery_timestamp").orElse(null);
-        Long bdTimestamp = null;
-        if (bdTimestampOpt != null) {
-            try {
-                bdTimestamp = Long.parseLong(bdTimestampOpt);
-            } catch (NumberFormatException ignored) {
-                bdTimestamp = null;
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsBizOptOutResponseMixin",
+            exports = "parseBizOptOutResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsGetOptOutListResponseSuccessWithMismatch",
+            exports = "parseGetOptOutListResponseSuccessWithMismatchListItem",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static Optional<Item> parseItem(Node itemNode) {
+        // WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin:
+        // optional(attrString, item, "action")
+        var action = itemNode.getAttributeAsString("action").orElse(null);
+        // WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin:
+        // optional(attrString, item, "category")
+        var category = itemNode.getAttributeAsString("category").orElse(null);
+        // WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin:
+        // optional(attrIntRange, item, "expiry_at", 0, void 0)
+        Long expiryAt = null;
+        if (itemNode.hasAttribute("expiry_at")) {
+            var parsed = itemNode.getAttributeAsLong("expiry_at");
+            if (parsed.isEmpty() || parsed.getAsLong() < 0L) {
+                return Optional.empty();
             }
+            expiryAt = parsed.getAsLong();
         }
-        var bdId = bizOptOut.getAttributeAsString("business_discovery_id").orElse(null);
-        return new Item(reason, reasonDescription, entryPoint, firstMessage,
-                bdEntryPoint, bdTimestamp, bdId);
+        // WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin:
+        // WASmaxInBlocklistsBizOptOutIds.parseBizOptOutIds(item)
+        var ids = BizOptOutId.parse(itemNode).orElse(null);
+        if (ids == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new Item(action, category, expiryAt, ids));
     }
 
     /**
@@ -164,24 +161,26 @@ public sealed interface SmaxGetOptOutListResponse extends SmaxOperation.Response
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsGetOptOutListResponseSuccessWithMatch")
     final class SuccessWithMatch implements SmaxGetOptOutListResponse {
         /**
-         * Whether the request carried a {@code category} attribute.
-         * The relay echoes it; Cobalt projects only its presence.
+         * Whether the inbound reply carried a {@code category}
+         * attribute. Mirrors {@code hasCategory: s.value != null} from
+         * {@code WASmaxInBlocklistsGetOptOutListResponseSuccessWithMatch.parseGetOptOutListResponseSuccessWithMatch}.
          */
         private final boolean hasCategory;
 
         /**
          * Constructs a successful match reply.
          *
-         * @param hasCategory whether the request was category-scoped
+         * @param hasCategory whether the reply echoed a category
+         *                    attribute
          */
         public SuccessWithMatch(boolean hasCategory) {
             this.hasCategory = hasCategory;
         }
 
         /**
-         * Returns whether the request was category-scoped.
+         * Returns whether the reply echoed a category attribute.
          *
-         * @return {@code true} when the request carried a category
+         * @return {@code true} when the reply carried a category
          */
         public boolean hasCategory() {
             return hasCategory;
@@ -199,17 +198,24 @@ public sealed interface SmaxGetOptOutListResponse extends SmaxOperation.Response
                 exports = "parseGetOptOutListResponseSuccessWithMatch",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<SuccessWithMatch> of(Node node, Node request) {
+            // WASmaxInBlocklistsGetOptOutListResponseSuccessWithMatch.parseGetOptOutListResponseSuccessWithMatch:
+            // assertTag(e,"iq") + attrStringFromReference(t,["to"]) + literal(attrString,e,"from",...)
+            // + literal(attrString,e,"type","result") + literal(attrString,e,"id",...).
             if (!SmaxIqResultResponseMixin.validate(node, request)) {
                 return Optional.empty();
             }
-            if (node.getChild("list").isPresent()) {
-                return Optional.empty();
-            }
+            // WASmaxInBlocklistsGetOptOutListResponseSuccessWithMatch.parseGetOptOutListResponseSuccessWithMatch:
+            // l = optionalAttrStringFromReference(t,["category"]); s = optionalLiteral(attrString,e,"category",l.value).
+            // optionalLiteral semantics: when expected (request) value is null -> trivially succeed (no
+            // reply check). When expected value is non-null -> reply must echo it OR be absent. When reply
+            // is present but mismatches -> variant rejected. The reported hasCategory is s.value != null,
+            // i.e. whether the REPLY actually carried the category attribute.
             var requestCategory = request.getAttributeAsString("category").orElse(null);
-            if (requestCategory != null && !node.hasAttribute("category", requestCategory)) {
+            var replyCategory = node.getAttributeAsString("category").orElse(null);
+            if (requestCategory != null && replyCategory != null && !replyCategory.equals(requestCategory)) {
                 return Optional.empty();
             }
-            return Optional.of(new SuccessWithMatch(requestCategory != null));
+            return Optional.of(new SuccessWithMatch(replyCategory != null));
         }
 
         @Override
@@ -304,7 +310,11 @@ public sealed interface SmaxGetOptOutListResponse extends SmaxOperation.Response
             var dhash = list.getAttributeAsString("dhash").orElse(null);
             var items = new ArrayList<Item>();
             for (var child : list.getChildren("item")) {
-                items.add(parseItem(child));
+                var parsed = parseItem(child).orElse(null);
+                if (parsed == null) {
+                    return Optional.empty();
+                }
+                items.add(parsed);
             }
             return Optional.of(new SuccessWithMismatch(dhash, Collections.unmodifiableList(items)));
         }

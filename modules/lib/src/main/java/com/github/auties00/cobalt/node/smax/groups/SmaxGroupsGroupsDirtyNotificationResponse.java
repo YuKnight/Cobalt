@@ -14,13 +14,6 @@ import java.util.Optional;
 /**
  * The inbound notification — the relay's "your group list is stale"
  * hint carrying the affected group JIDs.
- *
- * @implNote {@code WASmaxInGroupsGroupsDirtyNotificationRequest.parseGroupsDirtyNotificationRequest}
- *           validates the {@code <notification type="w:gp2"
- *           from="g.us">} envelope, extracts the
- *           {@code <groups_dirty>} child, and projects every
- *           {@code <group jid="…"/>} grandchild into the
- *           {@link #dirtyGroups()} list.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupsDirtyNotificationRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInGroupsServerNotificationMixin")

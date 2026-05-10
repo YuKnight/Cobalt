@@ -101,11 +101,6 @@ public final class SmaxGroupsAcceptGroupAddRequest implements SmaxOperation.Requ
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <accept/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsAcceptGroupAddRequest.makeAcceptGroupAddRequest}
-     *           composes {@code WASmaxOutGroupsBaseSetGroupMixin}
-     *           over a {@code <accept code=CUSTOM_STRING(t)
-     *           expiration=INT(n) admin=USER_JID(r)/>} child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsAcceptGroupAddRequest",

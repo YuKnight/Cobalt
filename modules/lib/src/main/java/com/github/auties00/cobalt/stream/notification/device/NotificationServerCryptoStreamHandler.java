@@ -36,10 +36,6 @@ import java.util.function.Consumer;
  *   <li>{@code server} - server-initiated log upload and AB prop sync requests</li>
  *   <li>{@code registration} - device switching/OTP code notifications</li>
  * </ul>
- *
- * @implNote WAWebHandlePreKeyLow.default, WAWebHandleIdentityChange.handleE2eIdentityChange,
- *           WAWebHandleMediaRetryNotification.default, WAWebHandleServerNotification.handleServerNotification,
- *           WAWebHandleDeviceSwitchingNotification.default, WAWebHandleDigestKey.default
  */
 @WhatsAppWebModule(moduleName = "WAWebHandlePreKeyLow")
 @WhatsAppWebModule(moduleName = "WAWebHandleIdentityChange")
@@ -50,8 +46,6 @@ import java.util.function.Consumer;
 final class NotificationServerCryptoStreamHandler implements SocketStream.Handler {
     /**
      * Logger for this handler.
-     *
-     * @implNote WAWebHandlePreKeyLow.default - WALogger.ERROR/LOG
      */
     private static final System.Logger LOGGER = System.getLogger(NotificationServerCryptoStreamHandler.class.getName());
 
@@ -69,16 +63,12 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
     /**
      * The WhatsApp client instance used for sending pre-keys, accessing the
      * store, and dispatching listener events.
-     *
-     * @implNote WAWebHandlePreKeyLow.default - o("WAWebUploadPreKeysJob").uploadPreKeys()
      */
     private final WhatsAppClient whatsapp;
 
     /**
      * The AB props service used to synchronize A/B testing properties when
      * a server notification of type {@code abprops} is received.
-     *
-     * @implNote WAWebHandleServerNotification.handleServerNotification - o("WAWebAbPropsSyncJob").syncABPropsTask
      */
     private final ABPropsService abPropsService;
 
@@ -87,8 +77,6 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * same session. Each stanza ID is added before the upload begins and
      * removed when the upload completes, ensuring that only one upload is
      * in progress at any given time per session.
-     *
-     * @implNote WAWebHandlePreKeyLow.default - var s = new Set
      */
     private final Set<String> preKeyUploadGuard;
 
@@ -153,8 +141,6 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
     /**
      * Resets per-session state. Clears the pre-key upload deduplication guard
      * so that a new session can trigger fresh pre-key uploads.
-     *
-     * @implNote WAWebHandlePreKeyLow.default - s.delete(n) / session reset
      */
     @Override
     public void reset() {
@@ -173,8 +159,6 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * </ul>
      *
      * @param node the encrypt notification stanza
-     * @implNote WAWebCommsHandleLoggedInStanza.handleLoggedInStanza (encrypt case),
-     *           WAWebCommsHandleWorkerCompatibleStanza.handleWorkerCompatibleStanza (identity case)
      */
     private void handleEncrypt(Node node) {
         var firstChild = node.getChild().orElse(null);
@@ -416,7 +400,6 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      *
      * @param id the stanza identifier to search for
      * @return the matching {@link MessageInfo}, or {@code null} if not found
-     * @implNote WAWebHandleMediaRetryNotification.default - message lookup by msgId
      */
     private MessageInfo findMessageById(String id) {
         if (id == null) {
@@ -430,10 +413,7 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
             }
         }
 
-        var statusMessage = whatsapp.store().status().stream()
-                .filter(message -> Objects.equals(message.key().id().orElse(""), id))
-                .findFirst()
-                .orElse(null);
+        var statusMessage = whatsapp.store().findStatusById(id).orElse(null);
         if (statusMessage != null) {
             return statusMessage;
         }
@@ -461,9 +441,6 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      *
      * @param node the notification stanza to acknowledge
      * @param type the notification type from the stanza's {@code type} attribute
-     * @implNote WAWebHandlePreKeyLow.default, WAWebHandleIdentityChange.handleE2eIdentityChange,
-     *           WAWebHandleMediaRetryNotification.default, WAWebHandleServerNotification.handleServerNotification,
-     *           WAWebHandleDeviceSwitchingNotification.default
      */
     private void sendNotificationAck(Node node, String type) {
         var stanzaId = node.getAttributeAsString("id", null);

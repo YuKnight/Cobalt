@@ -6,7 +6,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.RemoveRecentStickerAction;
@@ -14,8 +13,6 @@ import com.github.auties00.cobalt.model.sync.action.media.RemoveRecentStickerAct
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -42,14 +39,6 @@ import java.util.List;
  * </ol>
  *
  * <p>Index format: {@code ["removeRecentSticker", stickerFileHash]}.
- *
- * @implNote WAWebStickersRemoveRecentSyncAction — extends
- *           {@code AccountSyncdActionBase} with
- *           {@code collectionName = WASyncdConst.CollectionName.RegularLow},
- *           {@code getAction()} returning
- *           {@code WASyncdConst.Actions.RemoveRecentSticker}
- *           ({@code "removeRecentSticker"}), and {@code getVersion()} returning
- *           the literal {@code 7}
  */
 @WhatsAppWebModule(moduleName = "WAWebStickersRemoveRecentSyncAction")
 public final class RemoveRecentStickerHandler implements WebAppStateActionHandler {
@@ -61,26 +50,18 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      * The handler must consult the primary device's reported feature set rather
      * than any AB prop, since recent-sticker sync is gated on the primary's
      * support for the feature, not on a per-companion experiment.
-     *
-     * @implNote WAWebMiscGatingUtils.isRecentStickersMDEnabled — primary feature key
      */
     @WhatsAppWebExport(moduleName = "WAWebMiscGatingUtils", exports = "isRecentStickersMDEnabled", adaptation = WhatsAppAdaptation.ADAPTED)
     private static final String RECENT_STICKER_FEATURE = "recent_sticker";
 
     /**
      * The singleton instance of {@code RemoveRecentStickerHandler}.
-     *
-     * @implNote WAWebStickersRemoveRecentSyncAction.default — WA Web exports a
-     *           single pre-instantiated handler ({@code d = new c; l.default = d})
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final RemoveRecentStickerHandler INSTANCE = new RemoveRecentStickerHandler();
 
     /**
      * Constructs the singleton instance.
-     *
-     * @implNote WAWebStickersRemoveRecentSyncAction — WA Web instantiates the
-     *           handler once via {@code new c()} and exports it as the module default
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private RemoveRecentStickerHandler() {
@@ -89,10 +70,6 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebStickersRemoveRecentSyncAction.getAction — returns
-     *           {@code WASyncdConst.Actions.RemoveRecentSticker} which equals
-     *           {@code "removeRecentSticker"}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
@@ -102,10 +79,6 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebStickersRemoveRecentSyncAction — sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
-     *           in the constructor
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
@@ -115,9 +88,6 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebStickersRemoveRecentSyncAction.getVersion — returns the
-     *           literal {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
@@ -128,36 +98,15 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
     /**
      * {@inheritDoc}
      *
-     * <p>Single-mutation adapter that mirrors the WhatsApp Web batch logic for
-     * a list of size one and reduces the per-mutation outcome to a boolean: a
-     * {@code SUCCESS} result is mapped to {@code true}, all other states are
-     * mapped to {@code false}.
-     *
-     * @implNote ADAPTED: WAWebStickersRemoveRecentSyncAction.applyMutations — WA
-     *           Web only defines a batch entry point; this single-mutation path
-     *           delegates to {@link #applyMutationResult} and reduces the outcome
-     *           to a boolean
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
-    }
-
-    /**
-     * {@inheritDoc}
-     *
      * <p>Implements the body of
      * {@code WAWebStickersRemoveRecentSyncAction.applyMutations} for a single
      * mutation. The WA Web batch counter logging that aggregates the
      * {@code notSupported} and {@code malformed} buckets via {@code WALogger.WARN}
      * is intentionally omitted (WAM/telemetry).
-     *
-     * @implNote WAWebStickersRemoveRecentSyncAction.applyMutations
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         //   if (!WAWebMiscGatingUtils.isRecentStickersMDEnabled())
         //     return WALogger.WARN("syncd: remove recent sticker operation not supported"),
         //            t.map(() => ({actionState: Unsupported}))
@@ -176,7 +125,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
         var indexArray = JSON.parseArray(mutation.index());
         var stickerHash = indexArray.getString(1);
         if (stickerHash == null) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         //   var s = (t = e.value.removeRecentStickerAction) == null ? void 0 : t.lastStickerSentTs
@@ -230,8 +179,6 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      *          {@code RemoveRecentStickerAction} protobuf model — the field
      *          should be exposed as a raw {@code OptionalLong} so that no unit
      *          assumption is encoded.
-     * @implNote WAWebStickersRemoveRecentSyncAction.applyMutations — adapter for
-     *           Cobalt's Instant-typed accessor
      * @param instant the {@link Instant} read from the protobuf, must not be {@code null}
      * @return the epoch-second value of {@code instant}
      */
@@ -251,11 +198,6 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      * timestamp as {@code lastStickerSentTs}. Receiving devices compare this
      * timestamp against their local recent-sticker entry to decide whether to
      * remove it.
-     *
-     * @implNote WAWebStickersRemoveRecentSyncAction — outgoing SET mutation
-     *           shape mirrors the inbound payload that
-     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     *           consumes
      * @param stickerHash the sticker file hash used as the mutation index
      * @return the pending mutation ready to be pushed via
      *         {@link com.github.auties00.cobalt.sync.WebAppStateService#pushPatches}

@@ -19,9 +19,6 @@ import java.util.Optional;
  * caller-supplied base path, and each session is stored inside a
  * UUID-named subdirectory. These helpers handle directory creation,
  * lookup of the most recently modified session, and recursive deletion.
- *
- * @implNote WhatsApp Web persists its equivalent data to IndexedDB via
- *     {@code WAWebSchema*} modules rather than the filesystem.
  */
 public final class StorePathUtils {
     /**

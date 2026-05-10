@@ -30,9 +30,6 @@ import java.security.GeneralSecurityException;
  * @param encryptedValue the encrypted payload: IV (16 bytes) || AES-CBC ciphertext || value MAC (32 bytes)
  * @param keyId          the sync key ID used for encryption
  * @param operation      the sync operation type (SET or REMOVE)
- * @implNote WAWebSyncdEncryptMutations.syncdEncryptMutation,
- *           WAWebSyncdEncryptionManager.WASyncdEncryptionManager.encryptMutation,
- *           WAWebSyncdEncryptMutationsWrapper.encryptMutation
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdEncryptMutations")
 @WhatsAppWebModule(moduleName = "WAWebSyncdEncryptMutationsWrapper")
@@ -100,32 +97,6 @@ public record EncryptedMutation(
      * @param keyId the sync key ID bytes
      * @return a new {@code EncryptedMutation} with the encrypted data
      * @throws GeneralSecurityException if any cryptographic operation fails
-     * @implNote WAWebSyncdEncryptMutations.syncdEncryptMutation,
-     *           WAWebSyncdEncryptMutationsWrapper.encryptMutation (result assembly and
-     *           {@code valueMac} extraction; dispatch/key-lookup live in
-     *           {@code MutationRequestBuilder.encryptMutations}; per-{@code keyId} caching
-     *           is absorbed into the {@link MutationKeys} instance reuse in the caller),
-     *           WAWebSyncdMutationsCryptoUtils.generateCipherText,
-     *           WAWebSyncdMutationsCryptoUtils.generateAssociatedData,
-     *           WAWebSyncdMutationsCryptoUtils.generateMac,
-     *           WAWebSyncdMutationsCryptoUtils.generatePadding,
-     *           WAWebSyncdCrypto.generateIndexMac,
-     *           WAWebSyncdCrypto.valueMacFromIndexAndValueCipherText,
-     *           WAWebSyncdRequestEncode.encodeSyncActionData.
-     *           WA Web derives the mutation keys inline from the sync key data via
-     *           {@code WAWebSyncdCrypto.generateEncryptionKeys(r)}; Cobalt receives the already
-     *           derived {@link MutationKeys} as a constructor-injected parameter, so the key
-     *           derivation step lives in the caller.
-     *           WA Web's {@code generatePadding} receives the pre-serialized
-     *           {@code binarySyncAction.byteLength}; Cobalt stores the decoded
-     *           {@code SyncActionValue} on the mutation, so the value length is unknown until
-     *           encoding. Since {@code MAX_OF_MIN_DATA_LENGTH = 0} forces the result to an
-     *           empty array regardless of inputs, Cobalt passes {@code 0} as the value length.
-     *           WA Web's error path logs, reports a {@code SyncdFatalError} metric, and throws
-     *           {@code new SyncdFatalError("encryption failure")} (both in
-     *           {@code syncdEncryptMutation} and the outer wrapper); per Cobalt's error model,
-     *           the underlying {@link GeneralSecurityException} is propagated directly and
-     *           recovery is left to {@code WhatsAppClientErrorHandler}.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdEncryptMutations", exports = "syncdEncryptMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdEncryptMutationsWrapper", exports = "encryptMutation", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -195,9 +166,6 @@ public record EncryptedMutation(
      * accessor so callers that only need the ciphertext+MAC buffer do not pay for the slice.
      *
      * @return the 32-byte value MAC
-     * @implNote WAWebSyncdCrypto.valueMacFromIndexAndValueCipherText,
-     *           WAWebSyncdEncryptMutationsWrapper.encryptMutation (inline {@code valueMac}
-     *           extraction on the returned object)
      */
     public byte[] valueMac() {
         return MutationKeys.valueMacFromIndexAndValueCipherText(encryptedValue);

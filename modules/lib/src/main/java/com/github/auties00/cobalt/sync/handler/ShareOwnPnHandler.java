@@ -7,13 +7,10 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Handles the {@code shareOwnPn} app state sync action.
  *
@@ -54,9 +51,6 @@ import com.github.auties00.cobalt.wam.WamService;
  * <p>WA Web's frontend {@code bulkUpdateLidContactState} call and its WAM /
  * WALogger telemetry are intentionally omitted: Cobalt's store is the sole
  * source of truth and telemetry is not mirrored.
- *
- * @implNote WAWebShareOwnPnSync.default — singleton instance {@code d = new c()}
- *           where {@code c} extends {@code WAWebSyncdAction.AccountSyncdActionBase}
  */
 @WhatsAppWebModule(moduleName = "WAWebShareOwnPnSync")
 public final class ShareOwnPnHandler implements WebAppStateActionHandler {
@@ -67,8 +61,6 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      * a single {@code new c()} instance assigned to {@code l.default = d};
      * Cobalt mirrors this by exposing only {@link #INSTANCE} and disallowing
      * external construction.
-     *
-     * @implNote WAWebShareOwnPnSync: {@code d = new c; l.default = d}
      */
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ShareOwnPnHandler INSTANCE = new ShareOwnPnHandler();
@@ -77,11 +69,6 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      * Constructs the singleton handler instance.
      *
      * <p>Kept {@code private} so that all callers go through {@link #INSTANCE}.
-     *
-     * @implNote WAWebShareOwnPnSync: the {@code c} constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.Regular};
-     *           Cobalt encodes this as a constant returned by
-     *           {@link #collectionName()}.
      */
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ShareOwnPnHandler() {
@@ -90,9 +77,6 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name routed to this handler.
-     *
-     * @implNote WAWebShareOwnPnSync.getAction:
-     *           {@code WASyncdConst.Actions.ShareOwnPn} ({@code "shareOwnPn"})
      * @return the action identifier {@code "shareOwnPn"}
      */
     @Override
@@ -103,8 +87,6 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection this handler operates on.
-     *
-     * @implNote WAWebShareOwnPnSync: {@code this.collectionName = WASyncdConst.CollectionName.Regular}
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
@@ -115,35 +97,12 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version implemented by this handler.
-     *
-     * @implNote WAWebShareOwnPnSync.getVersion: {@code return 8}
      * @return {@code 8}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return 8;
-    }
-
-    /**
-     * Applies a single {@code shareOwnPn} mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} only when the resulting action state is
-     * {@link SyncActionState#SUCCESS}, mirroring WhatsApp Web's per-mutation
-     * success flag.
-     *
-     * @implNote WAWebShareOwnPnSync.applyMutations — per-mutation success
-     *           branch returning {@code {actionState: SyncActionState.Success}}
-     * @param client   the WhatsApp client that owns the mutation source
-     * @param mutation the decrypted, trusted mutation to apply
-     * @return {@code true} if the mutation was applied successfully,
-     *         {@code false} for unsupported or malformed mutations
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -180,15 +139,13 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      * {@code bulkUpdateLidContactState} mirror call and the WAM telemetry are
      * intentionally not replicated, as Cobalt's store is the sole source of
      * truth.
-     *
-     * @implNote WAWebShareOwnPnSync.applyMutations
      * @param client   the WhatsApp client whose store receives the contact update
      * @param mutation the decrypted, trusted mutation to apply
      * @return the detailed {@link MutationApplicationResult}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!client.abPropsService().getBool(ABProp.SHARE_OWN_PN_SYNC)) {
             return MutationApplicationResult.unsupported();
         }
@@ -204,7 +161,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
         // empty/null guard and the wid-likeness check into a single null/empty test, then defers the
         // strict @lid check to the JID parse below.
         if (lidJidString == null || lidJidString.isEmpty()) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         // ADAPTED: WAWebWidFactory.createUserLidOrThrow throws if the parsed wid is not a @lid; the throw
@@ -213,7 +170,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
         // semantic without surfacing a runtime exception to the caller.
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         //   -> WAWebUpdateLidMetadataApi.updateLidMetadata({updates: r})

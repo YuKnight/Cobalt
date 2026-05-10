@@ -156,10 +156,6 @@ public final class NodeEncoder {
     /**
      * Returns the byte count required to encode a string under the most
      * efficient applicable strategy.
-     *
-     * @implNote The encoder picks the first strategy that applies in this
-     *           order: empty literal, single byte token, dictionary token,
-     *           nibble or hex packed run, length prefixed UTF-8.
      * @param input the string to size
      * @return the byte count required to encode the string
      */
@@ -361,10 +357,6 @@ public final class NodeEncoder {
      * <p>The caller passes a {@code length} equal to the value returned by
      * {@link #sizeOf(Node)}. A mismatch indicates an internal encoder bug
      * and is reported through {@link WhatsAppStreamException.MalformedNode}.
-     *
-     * @implNote The leading zero byte is the WAWap flags byte. Bit
-     *           {@code 1} would mark a DEFLATE compressed payload but
-     *           Cobalt always writes uncompressed bytes.
      * @param node   the node to encode
      * @param output the destination byte array
      * @param offset the position in the destination array to start writing
@@ -457,10 +449,6 @@ public final class NodeEncoder {
 
     /**
      * Writes a string under the most efficient applicable strategy.
-     *
-     * @implNote The encoder picks the first strategy that applies in this
-     *           order: empty literal, single byte token, dictionary token,
-     *           nibble or hex packed run, length prefixed UTF-8.
      * @param input  the string to write
      * @param output the destination byte array
      * @param offset the current write offset
@@ -592,10 +580,6 @@ public final class NodeEncoder {
     /**
      * Determines whether the supplied string is eligible for nibble or hex
      * packed encoding.
-     *
-     * @implNote Nibble packing covers {@code [0-9.-]} and hex packing covers
-     *           {@code [0-9A-F]}. Nibble packing is preferred when both
-     *           shapes apply.
      * @param input the string to inspect
      * @return {@link NodeTags#NIBBLE_8}, {@link NodeTags#HEX_8}, or
      *         {@code -1} when neither shape applies
@@ -624,10 +608,6 @@ public final class NodeEncoder {
 
     /**
      * Writes a string in nibble or hex packed form.
-     *
-     * @implNote Two characters share each output byte. Odd lengths set the
-     *           high bit of the byte count header and pad the trailing
-     *           nibble with {@code 0xF}.
      * @param input  the string to encode
      * @param tag    {@link NodeTags#NIBBLE_8} or {@link NodeTags#HEX_8}
      * @param output the destination byte array
@@ -737,10 +717,6 @@ public final class NodeEncoder {
 
     /**
      * Writes a JID under the shape appropriate for its server and device.
-     *
-     * @implNote Messenger and interop JIDs carry a 16 bit device id;
-     *           multi device JIDs carry an 8 bit device id and a domain
-     *           code; plain JIDs use a user and server pair.
      * @param jid    the JID to write
      * @param output the destination byte array
      * @param offset the current write offset

@@ -13,11 +13,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxStatusPublishPostNewsletterStatusRequest}.
- *
- * @implNote {@code WASmaxStatusPublishPostNewsletterStatusRPC.sendPostNewsletterStatusRPC}
- *           tries {@code Negative} → {@code Success} in order and
- *           throws on no-match. Cobalt returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxStatusPublishPostNewsletterStatusResponse extends SmaxOperation.Response
         permits SmaxStatusPublishPostNewsletterStatusResponse.Success, SmaxStatusPublishPostNewsletterStatusResponse.Negative {

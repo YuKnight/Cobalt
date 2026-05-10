@@ -13,12 +13,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to an {@link IqUnpairDeviceRequest}.
- *
- * @implNote {@code WAWebUnpairDeviceJob.unpairDevice} projects both
- *           result and error envelopes into a single
- *           {@code {status:int}} record; Cobalt splits them into typed
- *           {@code Success}, {@code ClientError} and
- *           {@code ServerError} variants.
  */
 @WhatsAppWebModule(moduleName = "WAWebUnpairDeviceJob")
 public sealed interface IqUnpairDeviceResponse extends IqOperation.Response
@@ -59,10 +53,6 @@ public sealed interface IqUnpairDeviceResponse extends IqOperation.Response
      *
      * <p>Carries no payload beyond the envelope echo: the WA Web parser
      * collapses {@code type="result"} to a {@code {status:200}} record.
-     *
-     * @implNote {@code WAWebUnpairDeviceJob.unpairResponse} parser:
-     *           {@code attrString("type")} not {@code "error"} →
-     *           {@code status=200}.
      */
     @WhatsAppWebModule(moduleName = "WAWebUnpairDeviceJob")
     final class Success implements IqUnpairDeviceResponse {
@@ -114,11 +104,6 @@ public sealed interface IqUnpairDeviceResponse extends IqOperation.Response
      * The {@code ClientError} reply variant — the relay rejected the
      * unpair as malformed, unauthorised, or referencing an unknown
      * device.
-     *
-     * @implNote {@code WAWebUnpairDeviceJob.unpairResponse}:
-     *           {@code child("error").attrInt("code")} → returned as
-     *           {@code status}. Cobalt narrows to codes
-     *           {@code [400, 500)}.
      */
     @WhatsAppWebModule(moduleName = "WAWebUnpairDeviceJob")
     final class ClientError implements IqUnpairDeviceResponse {
@@ -211,11 +196,6 @@ public sealed interface IqUnpairDeviceResponse extends IqOperation.Response
     /**
      * The {@code ServerError} reply variant — the relay encountered a
      * transient internal failure while processing the unpair.
-     *
-     * @implNote {@code WAWebUnpairDeviceJob.unpairResponse} treats every
-     *           non-result reply uniformly; Cobalt narrows to codes
-     *           {@code >= 500} via
-     *           {@link SmaxBaseServerErrorMixin#parseServerError}.
      */
     @WhatsAppWebModule(moduleName = "WAWebUnpairDeviceJob")
     final class ServerError implements IqUnpairDeviceResponse {

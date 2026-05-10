@@ -17,11 +17,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxNewslettersGetNewsletterMessagesRequest}.
- *
- * @implNote {@code WASmaxNewslettersGetNewsletterMessagesRPC.sendGetNewsletterMessagesRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order and throws on no-match. Cobalt
- *           returns {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends SmaxOperation.Response
         permits SmaxNewslettersGetNewsletterMessagesResponse.Success, SmaxNewslettersGetNewsletterMessagesResponse.ClientError, SmaxNewslettersGetNewsletterMessagesResponse.ServerError {
@@ -66,13 +61,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
      * envelope, and a variable bundle of add-ons (reactions, polls,
      * forwards, views, etc.) which Cobalt exposes as the raw child
      * {@link Node} for further inspection.
-     *
-     * @implNote {@code WASmaxInNewslettersGetNewsletterMessagesResponseSuccess.parseGetNewsletterMessagesResponseSuccess}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope (echo-checking against {@code s.whatsapp.net}),
-     *           asserts the {@code <messages>} child exists, then
-     *           projects every {@code <message>} via
-     *           {@code parseNewsletterMessageHistoryWithAddOnsMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersGetNewsletterMessagesResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersNewsletterMessageResponsePayloadMixin")
@@ -216,24 +204,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
      * typed bundle and exposes the underlying {@link Node} so callers
      * can drill into the variable-shape add-on children (reactions,
      * polls, responses, forwards, views, paid-partnership content).
-     *
-     * @implNote {@code WASmaxInNewslettersNewsletterMessageHistoryWithAddOnsMixin.parseNewsletterMessageHistoryWithAddOnsMixin}
-     *           composes
-     *           {@code parseNewsletterMessageHistoryMixin} (id /
-     *           server_id / t / is_sender / optional original-timestamp
-     *           / last-edit-timestamp / admin-profile-meta /
-     *           paid-partnership / history-content) with the optional
-     *           {@code parseNewsletterReactionsMixin},
-     *           {@code parseNewsletterPollVotesMixin},
-     *           {@code parseNewsletterResponsesCountMixin},
-     *           {@code parseReceiverContentTypeMediaRCATMixin},
-     *           {@code parseNewsletterForwardsCountMixin},
-     *           and
-     *           {@code parseNewsletterViewsCountViewsOrDeprecatedMixinGroup}.
-     *           Cobalt projects the top-level scalars and exposes the
-     *           raw {@link Node} for downstream add-on parsing rather
-     *           than recreating every nested mixin as a typed final
-     *           class.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersNewsletterMessageHistoryWithAddOnsMixin")
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersNewsletterMessageHistoryMixin")
@@ -406,8 +376,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent newsletter / invite.
-     *
-     * @implNote {@code WASmaxInNewslettersGetNewsletterMessagesResponseClientError.parseGetNewsletterMessagesResponseClientError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersGetNewsletterMessagesResponseClientError")
     final class ClientError implements SmaxNewslettersGetNewsletterMessagesResponse {
@@ -500,8 +468,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesResponse extends Sma
     /**
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInNewslettersGetNewsletterMessagesResponseServerError.parseGetNewsletterMessagesResponseServerError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersGetNewsletterMessagesResponseServerError")
     final class ServerError implements SmaxNewslettersGetNewsletterMessagesResponse {

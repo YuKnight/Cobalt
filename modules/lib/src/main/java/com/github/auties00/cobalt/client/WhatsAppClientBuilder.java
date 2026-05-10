@@ -64,7 +64,7 @@ public sealed class WhatsAppClientBuilder {
      * @return the web client builder
      */
     public Client.Web webClient() {
-        return new Client.Web(WhatsAppStoreFactory.inMemory());
+        return new Client.Web(WhatsAppStoreFactory.temporary());
     }
 
     /**
@@ -88,7 +88,7 @@ public sealed class WhatsAppClientBuilder {
      * @return the mobile client builder
      */
     public Client.Mobile mobileClient() {
-        return new Client.Mobile(WhatsAppStoreFactory.inMemory());
+        return new Client.Mobile(WhatsAppStoreFactory.temporary());
     }
 
     /**
@@ -150,15 +150,14 @@ public sealed class WhatsAppClientBuilder {
         public abstract Options createConnection() throws IOException;
 
         /**
-         * Loads a connection from a six-parts credentials representation.
+         * Creates a connection from a six-parts credentials representation.
          *
          * @param sixParts the credentials to load
-         * @return the next builder stage if a matching store was found,
-         *         empty otherwise
+         * @return the next builder stage
          * @throws NullPointerException if {@code sixParts} is {@code null}
-         * @throws IOException if the store cannot be read from disk
+         * @throws IOException if the store cannot be created on disk
          */
-        public abstract Optional<? extends Options> loadConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException;
+        public abstract Options createConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException;
 
         /**
          * Loads the most recently serialised connection.
@@ -326,18 +325,15 @@ public sealed class WhatsAppClientBuilder {
             }
             
             @Override
-            public Optional<Options.Web> loadConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException {
-                if (sixParts == null) {
-                    return Optional.empty();
+            public Options.Web createConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException {
+                Objects.requireNonNull(sixParts, "sixParts must not be null");
+                var existingStore = factory.load(WhatsAppClientType.WEB, sixParts.phoneNumber());
+                if(existingStore.isPresent()) {
+                    return new Options.Web(existingStore.get());
                 }
 
-                var store = factory.load(WhatsAppClientType.WEB, sixParts);
-                if (store.isEmpty()) {
-                    return Optional.empty();
-                }
-
-                var result = new Options.Web(store.get());
-                return Optional.of(result);
+                var freshStore = factory.create(WhatsAppClientType.WEB, sixParts);
+                return new Options.Web(freshStore);
             }
 
             @Override
@@ -451,18 +447,15 @@ public sealed class WhatsAppClientBuilder {
             }
 
             @Override
-            public Optional<Options.Mobile> loadConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException {
-                if (sixParts == null) {
-                    return Optional.empty();
+            public Options.Mobile createConnection(WhatsAppClientSixPartsKeys sixParts) throws IOException {
+                Objects.requireNonNull(sixParts, "sixParts must not be null");
+                var existingStore = factory.load(WhatsAppClientType.WEB, sixParts.phoneNumber());
+                if(existingStore.isPresent()) {
+                    return new Options.Mobile(existingStore.get());
                 }
 
-                var store = factory.load(WhatsAppClientType.MOBILE, sixParts);
-                if (store.isEmpty()) {
-                    return Optional.empty();
-                }
-
-                var result = new Options.Mobile(store.get());
-                return Optional.of(result);
+                var freshStore = factory.create(WhatsAppClientType.WEB, sixParts);
+                return new Options.Mobile(freshStore);
             }
 
             @Override

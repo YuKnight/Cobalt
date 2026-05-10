@@ -121,11 +121,6 @@ public final class SmaxGroupsSetDescriptionRequest implements SmaxOperation.Requ
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         {@code <description/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsSetDescriptionRequest.makeSetDescriptionRequest}
-     *           composes the {@code <description id prev delete>}
-     *           child carrying the {@code <body/>} sub-element when
-     *           {@code body} is supplied.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsSetDescriptionRequest",

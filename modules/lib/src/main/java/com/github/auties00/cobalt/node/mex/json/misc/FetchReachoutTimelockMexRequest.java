@@ -45,9 +45,6 @@ public final class FetchReachoutTimelockMexRequest implements MexOperation.Reque
 
     /**
      * Constructs a {@link FetchReachoutTimelockMexRequest}.
-     *
-     * @implNote The compiled query takes no variables and operates on the
-     * caller's identity.
      */
     public FetchReachoutTimelockMexRequest() {
     }

@@ -4,7 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.client.WhatsAppDevicePushClient;
-import com.github.auties00.cobalt.info.WhatsAppMobileClientInfo;
+import com.github.auties00.cobalt.client.info.WhatsAppMobileClientInfo;
 import com.github.auties00.cobalt.client.WhatsAppDeviceAttestor;
 import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
 import com.github.auties00.cobalt.model.business.*;
@@ -350,22 +350,38 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
 
     /**
      * Pair of values produced by {@link #attestBody(byte[])}: the
-     * hex-encoded signature that becomes the {@code &H=} suffix on the
-     * request body, and the base64-encoded certificate chain that
-     * becomes the {@code Authorization} request header.
+     * platform-specific value that becomes the {@code &H=} suffix on
+     * the request body, and the value that becomes the
+     * {@code Authorization} request header.
+     *
+     * <p>The contents of {@link #bodyAttestation} differ per platform:
+     * <ul>
+     *   <li>On Android it is the lower-case hex of the HMAC-SHA1 over
+     *       the base64 ENC body produced by the device's
+     *       Keystore-backed key.</li>
+     *   <li>On iOS it is a JSON envelope
+     *       {@code {"assertion":"<base64 CBOR>"}} wrapping the
+     *       per-request App Attest assertion, which signs a
+     *       {@code clientDataHash} derived from the noise public key
+     *       rather than the request body.</li>
+     * </ul>
+     * The {@link #authorizationHeader} is similarly platform-specific:
+     * the base64 certificate chain on Android, and
+     * {@code <base64 attestation>|<base64 keyId>} on iOS.
      *
      * <p>{@link #EMPTY} is used whenever no attestor is configured or
      * the configured attestor returned empty output. In that case
      * neither piece is appended and the request goes out without the
      * {@code H=} field and without the header.
      *
-     * @param hmacHex the hex-encoded signature, or {@code null} when
-     *                no signature was produced
-     * @param authorizationHeader the base64-encoded certificate chain,
-     *                            or {@code null} when no chain was
-     *                            produced
+     * @param bodyAttestation     the value to append after
+     *                            {@code &H=}, or {@code null} when no
+     *                            attestation was produced
+     * @param authorizationHeader the value of the {@code Authorization}
+     *                            request header, or {@code null} when
+     *                            no header should be sent
      */
-    protected record BodyAttestation(String hmacHex, String authorizationHeader) {
+    protected record BodyAttestation(String bodyAttestation, String authorizationHeader) {
         /**
          * Sentinel used when no attestation output is available, either
          * because no attestor is configured or because the configured
@@ -899,8 +915,8 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
 
             // Assembles the final body: "ENC=<base64>" optionally followed by "&H=<hex>"
             var body = new StringBuilder("ENC=").append(cipheredParameters);
-            if (attestation.hmacHex() != null && !attestation.hmacHex().isEmpty()) {
-                body.append("&H=").append(attestation.hmacHex());
+            if (attestation.bodyAttestation() != null && !attestation.bodyAttestation().isEmpty()) {
+                body.append("&H=").append(attestation.bodyAttestation());
             }
             var requestBuilder = createRequest(path, body.toString(), attestation.authorizationHeader());
 

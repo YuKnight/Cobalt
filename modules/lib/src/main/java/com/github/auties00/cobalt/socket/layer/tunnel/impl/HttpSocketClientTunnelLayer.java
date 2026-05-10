@@ -33,18 +33,6 @@ import java.util.List;
  *     {@link WhatsAppProxy.Http} for proxy configuration; if the
  *     socket stack is ever extracted as a standalone library a
  *     generic proxy configuration interface should be introduced.
- * @implNote The response parser uses two tiers throughout. Header
- *     names are matched with a quick first-byte reject, then with
- *     bulk
- *     {@link HttpResponseReader#regionMatchesIgnoreCase(int, byte[], int)}
- *     when the value fits in the buffer; non-matching lines are
- *     skipped with the vectorised
- *     {@link HttpResponseReader#skipToEndOfLine(long)}. Cross-buffer
- *     paths live in dedicated slow methods so the JIT can always
- *     inline the fast path. {@code Location} URIs are parsed without
- *     materialising the full value: a streaming state machine reads
- *     host bytes into a fixed {@code byte[253]} and port digits into
- *     an {@code int} accumulator.
  */
 public final class HttpSocketClientTunnelLayer implements SocketClientTunnelLayer {
     /**

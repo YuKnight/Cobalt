@@ -94,14 +94,6 @@ public final class SmaxGroupsBatchGetGroupInfoRequest implements SmaxOperation.R
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         per-group {@code <query/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsBatchGetGroupInfoRequest.makeBatchGetGroupInfoRequest}
-     *           composes {@code <query context?>} carrying
-     *           {@code REPEATED_CHILD(<group jid/>, 1, 10000)},
-     *           wrapped in
-     *           {@code WASmaxOutGroupsBaseGetServerMixin}
-     *           ({@code xmlns="w:g2"}, {@code to="g.us"},
-     *           {@code id=generateId()}, {@code type="get"}).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsBatchGetGroupInfoRequest",

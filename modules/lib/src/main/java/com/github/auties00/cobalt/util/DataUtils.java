@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.util;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+
 import java.nio.ByteBuffer;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -14,11 +17,6 @@ import java.security.SecureRandom;
  */
 public final class DataUtils {
     /**
-     * Shared strong {@link SecureRandom} instance used by every helper.
-     */
-    private static final SecureRandom RANDOM;
-
-    /**
      * Shared empty byte array, safe to use as a sentinel for zero-length
      * payloads.
      */
@@ -27,12 +25,13 @@ public final class DataUtils {
     /**
      * Shared empty heap {@link ByteBuffer}, safe to use as a sentinel for
      * zero-length buffer payloads.
-     *
-     * @implNote A zero-capacity buffer exposes no mutable state because its
-     *     position and limit are both fixed at {@code 0}, so a single shared
-     *     instance is safe to reuse across threads.
      */
     public static final ByteBuffer EMPTY_BYTE_BUFFER = ByteBuffer.allocate(0);
+
+    /**
+     * Shared strong {@link SecureRandom} instance used by every helper.
+     */
+    private static final SecureRandom RANDOM;
 
     /**
      * Character table used by {@link #randomHex(int)} to produce uppercase
@@ -157,16 +156,34 @@ public final class DataUtils {
     }
 
     /**
-     * Returns a random uppercase hexadecimal string of the given length.
+     * Returns a random uppercase hexadecimal string produced by sampling
+     * {@code byteCount} cryptographically-random bytes and encoding them
+     * with the alphabet {@code [0-9 A-F]}.
      *
-     * @param i the number of characters to return
-     * @return a new string containing {@code i} random hex digits
+     * <p>The returned string therefore has length {@code 2 * byteCount}.
+     *
+     * @param byteCount the number of random bytes to sample; the output
+     *                  length in characters is {@code 2 * byteCount}
+     * @return a new string containing the uppercase hex encoding of the
+     *         freshly-sampled byte sequence
+     * @throws IllegalArgumentException if {@code byteCount} is negative
      */
-    public static String randomHex(int i) {
-        var result = new char[i];
-        while (i-- > 0) {
-            var index = RANDOM.nextInt(0, HEX_ALPHABET.length);
-            result[i] = HEX_ALPHABET[index];
+    @WhatsAppWebExport(moduleName = "WARandomHex", exports = "randomHex", adaptation = WhatsAppAdaptation.DIRECT)
+    public static String randomHex(int byteCount) {
+        if (byteCount < 0) {
+            throw new IllegalArgumentException("Byte count cannot be negative: " + byteCount);
+        }
+
+        // WARandomHex.randomHex: var t = new Uint8Array(e); getCrypto().getRandomValues(t);
+        var bytes = new byte[byteCount];
+        RANDOM.nextBytes(bytes);
+
+        // WAHex.toHex: pushes HEX_ALPHABET[b >> 4] then HEX_ALPHABET[b & 15] for each byte.
+        var result = new char[byteCount * 2];
+        for (var i = 0; i < byteCount; i++) {
+            var b = bytes[i] & 0xFF;
+            result[i * 2] = HEX_ALPHABET[b >>> 4];
+            result[i * 2 + 1] = HEX_ALPHABET[b & 0x0F];
         }
         return new String(result);
     }

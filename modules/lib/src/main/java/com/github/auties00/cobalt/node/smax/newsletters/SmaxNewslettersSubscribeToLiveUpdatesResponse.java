@@ -15,11 +15,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxNewslettersSubscribeToLiveUpdatesRequest}.
- *
- * @implNote {@code WASmaxNewslettersSubscribeToLiveUpdatesRPC.sendSubscribeToLiveUpdatesRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order and throws on no-match. Cobalt
- *           returns {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends SmaxOperation.Response
         permits SmaxNewslettersSubscribeToLiveUpdatesResponse.Success, SmaxNewslettersSubscribeToLiveUpdatesResponse.ClientError, SmaxNewslettersSubscribeToLiveUpdatesResponse.ServerError {
@@ -56,13 +51,6 @@ public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends Sm
     /**
      * The {@code Success} reply variant. The relay accepted the
      * subscription and returned the chosen TTL.
-     *
-     * @implNote {@code WASmaxInNewslettersSubscribeToLiveUpdatesResponseSuccess.parseSubscribeToLiveUpdatesResponseSuccess}
-     *           validates the {@code <iq>} envelope through
-     *           {@code parseIQResultResponseMixin}. Asserts the
-     *           {@code <live_updates>} child exists, then projects its
-     *           {@code duration} attribute through
-     *           {@code attrIntRange(value, 30, 600)}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersSubscribeToLiveUpdatesResponseSuccess")
     final class Success implements SmaxNewslettersSubscribeToLiveUpdatesResponse {
@@ -145,12 +133,6 @@ public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends Sm
      * The {@code ClientError} reply variant. The relay rejected the
      * subscription as malformed, unauthorised, or referencing a
      * non-existent newsletter.
-     *
-     * @implNote {@code WASmaxInNewslettersSubscribeToLiveUpdatesResponseClientError.parseSubscribeToLiveUpdatesResponseClientError}
-     *           parses the {@code <error code text/>} child and routes
-     *           it through
-     *           {@code WASmaxInNewslettersSubscribeToLiveUpdatesClientErrors}.
-     *           Cobalt collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersSubscribeToLiveUpdatesResponseClientError")
     final class ClientError implements SmaxNewslettersSubscribeToLiveUpdatesResponse {
@@ -243,12 +225,6 @@ public sealed interface SmaxNewslettersSubscribeToLiveUpdatesResponse extends Sm
     /**
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the subscription.
-     *
-     * @implNote {@code WASmaxInNewslettersSubscribeToLiveUpdatesResponseServerError.parseSubscribeToLiveUpdatesResponseServerError}
-     *           delegates to
-     *           {@code WASmaxInNewslettersInternalServerErrorIQErrorResponseMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersSubscribeToLiveUpdatesResponseServerError")
     final class ServerError implements SmaxNewslettersSubscribeToLiveUpdatesResponse {

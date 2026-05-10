@@ -391,16 +391,6 @@ public final class SmaxGroupsSetPropertyRequest implements SmaxOperation.Request
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         selected toggle children
-     *
-     * @implNote {@code WASmaxOutGroupsSetPropertyRequest.makeSetPropertyRequest}
-     *           composes
-     *           {@code WASmaxOutGroupsBaseSetGroupMixin} with
-     *           {@code WASmaxOutGroupsBaseIQSetRequestMixin} over the
-     *           selected boolean toggle children, the
-     *           {@code <ephemeral/>} child (when
-     *           {@link #ephemeralExpiration} is set), and the
-     *           {@code <membership_approval_mode/>} child (when
-     *           {@link #membershipApprovalGroupJoinMode} is set).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsSetPropertyRequest",

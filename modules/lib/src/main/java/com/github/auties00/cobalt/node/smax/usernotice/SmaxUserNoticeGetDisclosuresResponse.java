@@ -16,10 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxUserNoticeGetDisclosuresRPC.sendGetDisclosuresRPC}
- *           tries {@code ClientSuccess} → {@code ClientError} →
- *           {@code ServerError} in order.
  */
 public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperation.Response
         permits SmaxUserNoticeGetDisclosuresResponse.ClientSuccess, SmaxUserNoticeGetDisclosuresResponse.ClientError, SmaxUserNoticeGetDisclosuresResponse.ServerError {
@@ -56,11 +52,6 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
     /**
      * The {@code ClientSuccess} reply variant. The relay returned
      * zero or more disclosure entries.
-     *
-     * @implNote {@code WASmaxInUserNoticeGetDisclosuresResponseClientSuccess.parseGetDisclosuresResponseClientSuccess}
-     *           validates the IQ-result envelope and projects every
-     *           {@code <notice>} child into a {@link DisclosureNotice}
-     *           via {@code mapChildrenWithTag(notice, 0, ∞)}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeGetDisclosuresResponseClientSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeIQResultResponseMixin")
@@ -312,14 +303,6 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
     /**
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed (always {@code 400 bad-request}).
-     *
-     * @implNote {@code WASmaxInUserNoticeGetDisclosuresResponseClientError.parseGetDisclosuresResponseClientError}
-     *           composes the IQ-error envelope check with
-     *           {@code WASmaxInUserNoticeIQErrorBadRequestMixin}
-     *           which asserts the literal {@code text="bad-request"}
-     *           and {@code code=400}. Cobalt routes through the
-     *           shared
-     *           {@link SmaxBaseServerErrorMixin#parseClientError(Node, Node)}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeGetDisclosuresResponseClientError")
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeIQErrorBadRequestMixin")
@@ -417,12 +400,6 @@ public sealed interface SmaxUserNoticeGetDisclosuresResponse extends SmaxOperati
      * Web disjunction lumps it under {@code ServerError}. Cobalt
      * collapses them into the single {@code (errorCode, errorText)}
      * pair.
-     *
-     * @implNote {@code WASmaxInUserNoticeGetDisclosuresResponseServerError.parseGetDisclosuresResponseServerError}
-     *           composes the error-envelope check with
-     *           {@code WASmaxInUserNoticeUserNoticeServerError.parseUserNoticeServerError}
-     *           which is the disjunction of the two projected error
-     *           mixins.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeGetDisclosuresResponseServerError")
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeUserNoticeServerError")

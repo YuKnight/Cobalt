@@ -42,12 +42,6 @@ public final class SmaxOfflineBatchRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the {@code <ib>} envelope
      *         and the {@code <offline_batch/>} payload
-     *
-     * @implNote {@code WASmaxOutOfflineBatchRequest.makeBatchRequest}
-     *           emits {@code <ib><offline_batch count=INT(t)/></ib>}.
-     *           No id/xmlns/to attributes are populated. The relay
-     *           identifies the cast by the {@code <offline_batch/>}
-     *           grandchild's tag alone.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutOfflineBatchRequest",

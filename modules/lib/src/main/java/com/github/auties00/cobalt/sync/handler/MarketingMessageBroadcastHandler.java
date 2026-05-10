@@ -5,16 +5,12 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.MarketingMessageBroadcastBuilder;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageBroadcastAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
-import java.util.HashMap;
-
 /**
  * Handles marketing message broadcast actions.
  *
@@ -32,28 +28,17 @@ import java.util.HashMap;
  * message model itself (and persists via {@code WAWebPremiumMessageAddSendAction}).
  * Cobalt's {@link MarketingMessageBroadcastAction} protobuf does not carry a
  * {@code sentMessageIds} field, so a side map is used instead.
- *
- * @implNote WAWebPremiumMessageBroadcastSync — concrete handler extending
- *           {@code AccountSyncdActionBase} with {@code collectionName = Regular},
- *           {@code getVersion() = 7} and
- *           {@code getAction() = WASyncdConst.Actions.MarketingMessageBroadcast}
  */
 @WhatsAppWebModule(moduleName = "WAWebPremiumMessageBroadcastSync")
 public final class MarketingMessageBroadcastHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code MarketingMessageBroadcastHandler}.
-     *
-     * @implNote WAWebPremiumMessageBroadcastSync — module-level
-     *           {@code s = new e} singleton exported as {@code default}
      */
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final MarketingMessageBroadcastHandler INSTANCE = new MarketingMessageBroadcastHandler();
 
     /**
      * Constructs the singleton handler.
-     *
-     * @implNote WAWebPremiumMessageBroadcastSync — class constructor that
-     *           initializes {@code collectionName = WASyncdConst.CollectionName.Regular}
      */
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private MarketingMessageBroadcastHandler() {
@@ -62,10 +47,6 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebPremiumMessageBroadcastSync.getAction — returns
-     *           {@code WASyncdConst.Actions.MarketingMessageBroadcast},
-     *           which resolves to the literal {@code "marketingMessageBroadcast"}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
@@ -75,9 +56,6 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebPremiumMessageBroadcastSync — set in constructor as
-     *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -87,38 +65,11 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebPremiumMessageBroadcastSync.getVersion — returns the
-     *           literal {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return MarketingMessageBroadcastAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a marketing message broadcast mutation.
-     *
-     * <p>Boolean adapter on top of {@link #applyMutationResult}: returns
-     * {@code true} only when the underlying result is {@code SUCCESS}.
-     * {@code MALFORMED}, {@code UNSUPPORTED} and {@code ORPHAN} all map to
-     * {@code false}, mirroring WhatsApp Web's batch loop where any non-Success
-     * outcome is treated as not-applied.
-     *
-     * @implNote ADAPTED: WAWebPremiumMessageBroadcastSync.applyMutations —
-     *           WhatsApp Web stores per-mutation states in an array; Cobalt
-     *           collapses the {@code SUCCESS} case to {@code true} and every
-     *           other state to {@code false}
-     * @param client   the WhatsAppClient instance linked to the mutation
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was successfully applied,
-     *         {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -160,22 +111,19 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
      *       unexpected exceptions propagate to the orchestration layer instead
      *       of being mapped to a Failed state.</li>
      * </ul>
-     *
-     * @implNote WAWebPremiumMessageBroadcastSync.applyMutations — single
-     *           mutation slice of the WhatsApp Web batch loop
      * @param client   the WhatsAppClient instance linked to the mutation
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var premiumMessageId = indexArray.getString(1);
         var messageId = indexArray.getString(2);
         if (premiumMessageId == null || premiumMessageId.isEmpty()
                 || messageId == null || messageId.isEmpty()) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
@@ -184,9 +132,8 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
         }
 
         // PremiumMessageCollection.find(i) == null ? {actionState: Orphan}
-        // ADAPTED: Cobalt's marketingMessages map plays the role of PremiumMessageCollection;
-        // containsKey() is the equivalent of WhatsApp Web's BaseCollection.find(id) == null check.
-        if (!client.store().marketingMessages().containsKey(premiumMessageId)) {
+        // ADAPTED: Cobalt's marketingMessages collection plays the role of PremiumMessageCollection.
+        if (client.store().findMarketingMessage(premiumMessageId).isEmpty()) {
             return MutationApplicationResult.orphan();
         }
 
@@ -195,12 +142,12 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
         //     if (r) { var a = new Set(r.sentMessageIds); a.add(messageId); r.set("sentMessageIds", a); }
         //     ...bulkCreateOrMerge to persist...
         // ADAPTED: MarketingMessageAction has no `sentMessageIds` field, so the association is
-        // tracked in a side map keyed by messageId. The eager copy-then-replace pattern
-        // mirrors how Cobalt's other handlers update store maps without holding the
-        // collection lock.
-        var broadcasts = new HashMap<>(client.store().marketingMessageBroadcasts());
-        broadcasts.put(messageId, premiumMessageId);
-        client.store().setMarketingMessageBroadcasts(broadcasts);
+        // tracked in a side store keyed by messageId, with the premium message id stored as the
+        // record's status field.
+        client.store().putMarketingMessageBroadcast(new MarketingMessageBroadcastBuilder()
+                .templateId(messageId)
+                .status(premiumMessageId)
+                .build());
         return MutationApplicationResult.success();
     }
 }

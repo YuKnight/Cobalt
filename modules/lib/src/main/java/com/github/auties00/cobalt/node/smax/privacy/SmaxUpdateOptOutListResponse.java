@@ -3,10 +3,7 @@ package com.github.auties00.cobalt.node.smax.privacy;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
 import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
@@ -56,13 +53,37 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
     /**
      * Descriptor for one entry in the relay-returned opt-out list.
      *
-     * @implNote {@code WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin}
-     *           projects optional {@code action}, {@code category},
-     *           {@code expiry_at}, and a sub-bundle of business
-     *           opt-out ids; Cobalt collapses the action/category
-     *           pair plus expiry into this record.
+     * <p>Mirrors the {@code WAResultOrError} payload of
+     * {@code WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin},
+     * which exposes optional {@code action} / {@code category} /
+     * {@code expiry_at} attributes plus the
+     * {@link BizOptOutId} disjunction.
+     *
+     * @param action       the optional {@code action} attribute (e.g.
+     *                     {@code "block"}); may be {@code null}
+     * @param category     the optional {@code category} attribute; may
+     *                     be {@code null}
+     * @param expiryAt     the optional {@code expiry_at} attribute,
+     *                     interpreted as a non-negative integer; may
+     *                     be {@code null}
+     * @param bizOptOutIds the {@link BizOptOutId} disjunction; never
+     *                     {@code null}
      */
-    record Item(String action, String category, Long expiryAt) {
+    record Item(String action, String category, Long expiryAt, BizOptOutId bizOptOutIds) {
+        /**
+         * Compact constructor that null-checks the disjunction.
+         *
+         * @param action       the optional action; may be {@code null}
+         * @param category     the optional category; may be {@code null}
+         * @param expiryAt     the optional expiry; may be {@code null}
+         * @param bizOptOutIds the disjunction; never {@code null}
+         * @throws NullPointerException if {@code bizOptOutIds} is
+         *                              {@code null}
+         */
+        public Item {
+            Objects.requireNonNull(bizOptOutIds, "bizOptOutIds cannot be null");
+        }
+
         /**
          * Returns the action as an {@link Optional}.
          *
@@ -92,19 +113,41 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
     }
 
     /**
-     * Parses a single {@code <item>} entry, including the optional
-     * {@code <biz_opt_out>} child.
+     * Parses a single {@code <item>} entry, mirroring
+     * {@code WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin}.
      *
      * @param itemNode the source node; never {@code null}
-     * @return the populated {@link Item}; never {@code null}
+     * @return an {@link Optional} carrying the populated
+     *         {@link Item}, or empty when the
+     *         {@code biz_opt_out_ids} disjunction does not match or
+     *         {@code expiry_at} is present but negative
      */
-    private static Item parseItem(Node itemNode) {
-        var bizOptOut = itemNode.getChild("biz_opt_out").orElse(itemNode);
-        var action = bizOptOut.getAttributeAsString("action").orElse(null);
-        var category = bizOptOut.getAttributeAsString("category").orElse(null);
-        var expiryAtOpt = bizOptOut.getAttributeAsLong("expiry_at");
-        Long expiryAt = expiryAtOpt.isPresent() ? expiryAtOpt.getAsLong() : null;
-        return new Item(action, category, expiryAt);
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsBizOptOutResponseMixin",
+            exports = "parseBizOptOutResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    private static Optional<Item> parseItem(Node itemNode) {
+        // WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin:
+        // optional(attrString, item, "action")
+        var action = itemNode.getAttributeAsString("action").orElse(null);
+        // WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin:
+        // optional(attrString, item, "category")
+        var category = itemNode.getAttributeAsString("category").orElse(null);
+        // WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin:
+        // optional(attrIntRange, item, "expiry_at", 0, void 0)
+        Long expiryAt = null;
+        if (itemNode.hasAttribute("expiry_at")) {
+            var parsed = itemNode.getAttributeAsLong("expiry_at");
+            if (parsed.isEmpty() || parsed.getAsLong() < 0L) {
+                return Optional.empty();
+            }
+            expiryAt = parsed.getAsLong();
+        }
+        // WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin:
+        // WASmaxInBlocklistsBizOptOutIds.parseBizOptOutIds(item)
+        var ids = BizOptOutId.parse(itemNode).orElse(null);
+        if (ids == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new Item(action, category, expiryAt, ids));
     }
 
     /**
@@ -167,25 +210,41 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
                 exports = "parseUpdateOptOutListResponseSuccessWithMatch",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<SuccessWithMatch> of(Node node, Node request) {
+            // WASmaxParseUtils.assertTag(reply, "iq")
+            // WASmaxParseUtils.literal(attrString, reply, "type", "result")
+            // WASmaxParseReference.attrStringFromReference(request, ["id"])
+            // WASmaxParseUtils.literal(attrString, reply, "id", id)
+            // WASmaxParseReference.attrStringFromReference(request, ["to"])
+            // WASmaxParseUtils.literal(attrString, reply, "from", to)
             if (!SmaxIqResultResponseMixin.validate(node, request)) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.flattenedChildWithTag(reply, "list")
             var list = node.getChild("list").orElse(null);
             if (list == null) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.literal(attrString, list, "matched", "true")
             if (!list.hasAttribute("matched", "true")) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.attrString(list, "dhash")
             var dhash = list.getAttributeAsString("dhash").orElse(null);
             if (dhash == null) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.flattenedChildWithTag(list, "item")
             var itemNode = list.getChild("item").orElse(null);
             if (itemNode == null) {
                 return Optional.empty();
             }
-            return Optional.of(new SuccessWithMatch(dhash, parseItem(itemNode)));
+            // WASmaxInBlocklistsBizOptOutResponseMixin.parseBizOptOutResponseMixin(item)
+            var parsed = parseItem(itemNode).orElse(null);
+            if (parsed == null) {
+                return Optional.empty();
+            }
+            // WAResultOrError.makeResult({type, listMatched, listDhash, listItemBizOptOutResponseMixin})
+            return Optional.of(new SuccessWithMatch(dhash, parsed));
         }
 
         @Override
@@ -292,25 +351,55 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
                 exports = "parseUpdateOptOutListResponseSuccessWithMismatch",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<SuccessWithMismatch> of(Node node, Node request) {
+            // WASmaxParseUtils.assertTag(reply, "iq")
+            // WASmaxParseUtils.literal(attrString, reply, "type", "result")
+            // WASmaxParseReference.attrStringFromReference(request, ["id"])
+            // WASmaxParseUtils.literal(attrString, reply, "id", id)
+            // WASmaxParseReference.attrStringFromReference(request, ["to"])
+            // WASmaxParseUtils.literal(attrString, reply, "from", to)
             if (!SmaxIqResultResponseMixin.validate(node, request)) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.flattenedChildWithTag(reply, "list")
             var list = node.getChild("list").orElse(null);
             if (list == null) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.literal(attrString, list, "matched", "false")
             if (!list.hasAttribute("matched", "false")) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.attrString(list, "dhash")
             var dhash = list.getAttributeAsString("dhash").orElse(null);
             if (dhash == null) {
                 return Optional.empty();
             }
-            var hasListCDhash = list.getAttributeAsString("c_dhash").isPresent();
-            var entries = new ArrayList<Item>();
-            for (var itemNode : list.getChildren("item")) {
-                entries.add(parseItem(itemNode));
+            // WASmaxParseReference.optionalAttrStringFromReference(request, ["item", "dhash"])
+            // WASmaxParseUtils.optionalLiteral(attrString, list, "c_dhash", requestItemDhash)
+            var replyCDhash = list.getAttributeAsString("c_dhash").orElse(null);
+            var hasListCDhash = replyCDhash != null;
+            if (hasListCDhash) {
+                var requestItemDhash = request.getChild("item")
+                        .flatMap(itemRef -> itemRef.getAttributeAsString("dhash"))
+                        .orElse(null);
+                if (requestItemDhash != null && !replyCDhash.equals(requestItemDhash)) {
+                    return Optional.empty();
+                }
             }
+            // WASmaxParseUtils.mapChildrenWithTag(list, "item", 0, 64000, parseBizOptOutResponseMixin)
+            var itemNodes = list.getChildren("item");
+            if (itemNodes.size() > 64000) {
+                return Optional.empty();
+            }
+            var entries = new ArrayList<Item>(itemNodes.size());
+            for (var itemNode : itemNodes) {
+                var parsed = parseItem(itemNode).orElse(null);
+                if (parsed == null) {
+                    return Optional.empty();
+                }
+                entries.add(parsed);
+            }
+            // WAResultOrError.makeResult({type, listMatched, hasListCDhash, listDhash, listItem})
             return Optional.of(new SuccessWithMismatch(hasListCDhash, dhash, entries));
         }
 
@@ -344,10 +433,6 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
     /**
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed.
-     *
-     * @implNote {@code WASmaxInBlocklistsUpdateOptOutListResponseInvalidRequest.parseUpdateOptOutListResponseInvalidRequest}
-     *           routes through {@code parseUpdateOptoutErrors};
-     *           Cobalt collapses to the {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateOptOutListResponseInvalidRequest")
     final class ClientError implements SmaxUpdateOptOutListResponse {

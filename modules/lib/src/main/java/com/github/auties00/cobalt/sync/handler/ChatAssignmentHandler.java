@@ -5,9 +5,9 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.chat.ChatAssignmentBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentAction;
@@ -15,10 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentActionBui
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -32,26 +29,17 @@ import java.util.List;
  * with {@code chatJidIndex = 1} and collection {@code Regular}.
  *
  * <p>Index format: {@code ["agentChatAssignment", "chatJid"]}
- *
- * @implNote WAWebChatAssignmentSync.default
  */
 @WhatsAppWebModule(moduleName = "WAWebChatAssignmentSync")
 public final class ChatAssignmentHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code ChatAssignmentHandler}.
-     *
-     * @implNote WAWebChatAssignmentSync.default, the module exports
-     *           a singleton {@code new s()} where {@code s} is the handler class
      */
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ChatAssignmentHandler INSTANCE = new ChatAssignmentHandler();
 
     /**
      * Creates a new {@code ChatAssignmentHandler}.
-     *
-     * @implNote WAWebChatAssignmentSync.default, constructor sets
-     *           {@code chatJidIndex = 1} and
-     *           {@code collectionName = WASyncdConst.CollectionName.Regular}
      */
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ChatAssignmentHandler() {
@@ -60,10 +48,6 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for chat assignment sync.
-     *
-     * @implNote WAWebChatAssignmentSync.getAction --
-     *           returns {@code WASyncdConst.Actions.ChatAssignment}
-     *           which is {@code "agentChatAssignment"}
      * @return the action name string
      */
     @Override
@@ -74,9 +58,6 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection for this handler.
-     *
-     * @implNote WAWebChatAssignmentSync constructor --
-     *           sets {@code collectionName = WASyncdConst.CollectionName.Regular}
      * @return the {@link SyncPatchType#REGULAR} collection
      */
     @Override
@@ -87,31 +68,12 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for chat assignment.
-     *
-     * @implNote WAWebChatAssignmentSync.getVersion --
-     *           returns {@code WASyncdConst.CHAT_ASSIGNMENT_SYNC_VERSION} which is {@code 7}
      * @return the version number
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return ChatAssignmentAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single chat assignment mutation.
-     *
-     * @implNote WAWebChatAssignmentSync.applyMutations, delegates to
-     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     *           and checks for success
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -129,20 +91,18 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
      * ({@code processChatAssignments}, {@code remove}), system message creation,
      * notification triggering, and orphan checking. In Cobalt, the store update
      * is applied inline per mutation via the {@code chatAssignmentStates} map.
-     *
-     * @implNote WAWebChatAssignmentSync.applyMutations
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             var chatJidString = indexArray.getString(1);
             if (chatJidString == null || chatJidString.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (mutation.operation() != SyncdOperation.SET) {
@@ -150,11 +110,11 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
             }
 
             if (!(mutation.value().action().orElse(null) instanceof ChatAssignmentAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var agentId = action.deviceAgentID().orElse("");
-            if (!agentId.isEmpty() && !client.store().agentStates().containsKey(agentId)) {
+            if (!agentId.isEmpty() && client.store().findAgentState(agentId).isEmpty()) {
                 return MutationApplicationResult.orphan(agentId, "Agent");
             }
 
@@ -164,14 +124,18 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            var resolvedChatJid = chat.get().toJid().toString();
-            var states = new HashMap<>(client.store().chatAssignmentStates()); // ADAPTED: WAWebChatAssignmentSync.applyMutations, batch bulkCreateOrMerge/bulkRemove/processChatAssignments simplified to inline map update
+            var resolvedChatJid = chat.get().toJid();
+            // ADAPTED: WAWebChatAssignmentSync.applyMutations, batch bulkCreateOrMerge/bulkRemove/processChatAssignments simplified to a typed-quintet read-modify-write keyed by chat JID
             if (agentId.isEmpty()) {
-                states.remove(resolvedChatJid); // ADAPTED: WAWebChatAssignmentSync.applyMutations: getAgentCollectionForChatId(_).filter(e => e.id !== d).forEach(e => l.push(...)) + bulkRemove(l), removes all existing assignments for this chat
+                client.store().removeChatAssignment(resolvedChatJid); // ADAPTED: WAWebChatAssignmentSync.applyMutations: getAgentCollectionForChatId(_).filter(e => e.id !== d).forEach(e => l.push(...)) + bulkRemove(l), removes all existing assignments for this chat
             } else {
-                states.put(resolvedChatJid, agentId); // ADAPTED: WAWebChatAssignmentSync.applyMutations: i.push({id: _.toJid()+"_"+d, chatId: _.toJid(), agentId: d, chatOpenedByAgent: false}) + bulkCreateOrMerge(i)
+                var existing = client.store().findChatAssignment(resolvedChatJid).orElse(null);
+                client.store().putChatAssignment(new ChatAssignmentBuilder() // ADAPTED: WAWebChatAssignmentSync.applyMutations: i.push({id: _.toJid()+"_"+d, chatId: _.toJid(), agentId: d, chatOpenedByAgent: false}) + bulkCreateOrMerge(i)
+                        .chatJid(resolvedChatJid)
+                        .agentId(agentId)
+                        .opened(existing != null && existing.opened())
+                        .build());
             }
-            client.store().setChatAssignmentStates(states); // ADAPTED: WAWebChatAssignmentSync.applyMutations: yield getChatAssignmentTable().bulkCreateOrMerge(i) + processChatAssignments(i) + bulkRemove(l) + remove(l)
             return MutationApplicationResult.success();
         } catch (Exception e) {
             return MutationApplicationResult.failed();
@@ -188,8 +152,6 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
      * {@code deviceAgentID} is the target agent id (an empty string
      * unassigns the chat). The mutation index is
      * {@code ["agentChatAssignment", chatJid]}.
-     *
-     * @implNote WAWebChatAssignmentSync.default.createChatAssignmentMutations
      * @param chatJid   the JID of the chat being assigned
      * @param agentId   the target agent id, or {@code ""} to unassign
      * @param timestamp the mutation timestamp

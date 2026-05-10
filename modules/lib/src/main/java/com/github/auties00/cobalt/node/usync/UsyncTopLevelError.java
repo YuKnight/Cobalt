@@ -8,10 +8,6 @@ import java.util.Objects;
  * Top-level error returned when the IQ failed entirely (network error, server
  * NACK, or any other failure where the response's {@code type} attribute is
  * not {@code "result"}).
- *
- * @implNote Matches the catch branch of the {@code deprecatedSendIq} call in
- *     {@code WAWebUsync.execute} where the response shape is
- *     {@code {error: {all: ...}}}.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public final class UsyncTopLevelError {

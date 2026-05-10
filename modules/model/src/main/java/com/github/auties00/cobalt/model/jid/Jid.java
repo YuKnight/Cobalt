@@ -758,6 +758,18 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
     }
 
     /**
+     * Returns whether this JID identifies the primary device for its account.
+     *
+     * <p>A JID identifies the primary device when its {@linkplain #device() device}
+     * identifier equals {@code 0}, the default device id.
+     *
+     * @return {@code true} if the device identifier is {@code 0}
+     */
+    public boolean isPrimaryDevice() {
+        return device == 0;
+    }
+
+    /**
      * Returns whether this JID has a non-zero agent identifier.
      *
      * @return {@code true} if the agent identifier is not {@code 0}

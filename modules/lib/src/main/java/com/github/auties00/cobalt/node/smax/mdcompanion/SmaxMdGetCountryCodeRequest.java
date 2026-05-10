@@ -31,11 +31,6 @@ public final class SmaxMdGetCountryCodeRequest implements SmaxOperation.Request 
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutMdGetCountryCodeRequest.makeGetCountryCodeRequest}
-     *           emits {@code <iq id=… type="get" xmlns="md"
-     *           to="s.whatsapp.net"><link_code_companion_reg
-     *           stage="get_country_code"/></iq>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutMdGetCountryCodeRequest",

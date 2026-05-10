@@ -14,19 +14,11 @@ import java.util.Set;
  * that {@link Linkify} produces exactly the same matches as the JS
  * runtime; deviating from the WA list would either miss links the user
  * intends to share or treat noise tokens as links.
- *
- * @implNote WATopLevelDomains.TLD: a {@code Set} of lower-case ASCII
- *           and IDN labels. Cobalt embeds the same labels as a Java
- *           {@link Set} of {@link String}.
  */
 @WhatsAppWebModule(moduleName = "WATopLevelDomains")
 final class TopLevelDomains {
     /**
      * The lower-case set of recognised top-level domain labels.
-     *
-     * @implNote WATopLevelDomains.TLD: cloned verbatim from the JS
-     *           bundle. Includes IDN labels for Russian, Hindi, Bengali,
-     *           Gujarati, Oriya, Japanese, Chinese, and Korean TLDs.
      */
     @WhatsAppWebExport(moduleName = "WATopLevelDomains", exports = "TLD",
             adaptation = WhatsAppAdaptation.DIRECT)

@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.sync.handler.*;
+import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,28 +16,23 @@ import java.util.Optional;
  * <p>Per WhatsApp Web {@code WAWebSyncdGetActionHandler}: the registry stores
  * all action handlers and provides lookup by action name and a global
  * max-supported-version query for version gating.
- *
- * @implNote WAWebSyncdGetActionHandler.setActionHandlers, WAWebSyncdGetActionHandler.getActionHandler, WAWebSyncdGetActionHandler.maxSupportedVersion
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdGetActionHandler")
 public final class WebAppStateHandlerRegistry {
     /**
      * Map of action names to their registered handlers.
-     *
-     * @implNote Mirrors the lazily-constructed {@code Map e} in
-     *           {@code WAWebSyncdGetActionHandler}, keyed by each handler's
-     *           {@code getAction()} value. Cobalt constructs the map eagerly
-     *           at registry creation time.
      */
     private final Map<String, WebAppStateActionHandler> handlers;
 
     /**
      * Constructs a new handler registry and registers the default handlers.
+     * @param wamService the WAM telemetry service shared with handlers that
+     *                   need to commit per-mutation telemetry events
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "setActionHandlers", adaptation = WhatsAppAdaptation.ADAPTED)
-    public WebAppStateHandlerRegistry() {
+    public WebAppStateHandlerRegistry(WamService wamService) {
         this.handlers = new HashMap<>();
-        registerDefaultHandlers();
+        registerDefaultHandlers(wamService);
     }
 
     /**
@@ -44,11 +40,13 @@ public final class WebAppStateHandlerRegistry {
      * {@code WAWebCollectionHandlerActions.ActionHandlers} array, which is passed
      * to {@code WAWebSyncdGetActionHandler.setActionHandlers} during the success
      * handler flow in {@code WAWebHandleSuccess}.
+     * @param wamService the WAM telemetry service to inject into handlers that
+     *                   require it
      */
-    private void registerDefaultHandlers() {
+    private void registerDefaultHandlers(WamService wamService) {
         // Chat actions
         registerHandler(ArchiveChatHandler.INSTANCE); // WAWebArchiveChatSync
-        registerHandler(PinChatHandler.INSTANCE); // WAWebPinChatSync
+        registerHandler(new PinChatHandler(wamService)); // WAWebPinChatSync
         registerHandler(MuteChatHandler.INSTANCE); // WAWebMuteChatSync
         registerHandler(MarkChatAsReadHandler.INSTANCE); // WAWebMarkChatAsReadSync
         registerHandler(ClearChatHandler.INSTANCE); // WAWebClearChatSync
@@ -110,14 +108,14 @@ public final class WebAppStateHandlerRegistry {
         registerHandler(SentinelHandler.INSTANCE); // WAWebSentinelMutationSync
         registerHandler(PrimaryFeatureHandler.INSTANCE); // WAWebPrimaryFeatureSync
         registerHandler(AndroidUnsupportedActionsHandler.INSTANCE); // WAWebAndroidUnsupportedActionsSync
-        registerHandler(DeviceCapabilitiesHandler.INSTANCE); // WAWebDeviceCapabilitiesSync
+        registerHandler(new DeviceCapabilitiesHandler(wamService)); // WAWebDeviceCapabilitiesSync
         registerHandler(BotWelcomeRequestHandler.INSTANCE); // WAWebBotWelcomeRequestSync
         registerHandler(DetectedOutcomesStatusHandler.INSTANCE); // WAWebDetectedOutcomesStatusSync
-        registerHandler(WaffleAccountLinkStateHandler.INSTANCE); // WAWebWaffleAccountLinkStateSync
+        registerHandler(new WaffleAccountLinkStateHandler(wamService)); // WAWebWaffleAccountLinkStateSync
         registerHandler(CtwaPerCustomerDataSharingHandler.INSTANCE); // WAWebCtwaPerCustomerDataSharingSync
 
         // Settings
-        registerHandler(PushNameSettingHandler.INSTANCE); // WAWebPushNameSync
+        registerHandler(new PushNameSettingHandler(wamService)); // WAWebPushNameSync
         registerHandler(LocaleSettingHandler.INSTANCE); // WAWebLocaleSettingSync
         registerHandler(UnarchiveChatsSettingHandler.INSTANCE); // WAWebArchiveSettingSync
         registerHandler(StatusPrivacyHandler.INSTANCE); // WAWebStatusPrivacySettingSync

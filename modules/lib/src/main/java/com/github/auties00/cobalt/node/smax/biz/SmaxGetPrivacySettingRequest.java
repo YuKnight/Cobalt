@@ -32,17 +32,13 @@ public final class SmaxGetPrivacySettingRequest implements SmaxOperation.Request
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         bare {@code <privacy/>} child
-     *
-     * @implNote {@code WASmaxOutBizSettingsGetPrivacySettingRequest.makeGetPrivacySettingRequest}
-     *           composes
-     *           {@code WASmaxOutBizSettingsBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over a
-     *           bare {@code <iq xmlns="w:biz" to="s.whatsapp.net">}
-     *           with a single empty {@code <privacy/>} child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBizSettingsGetPrivacySettingRequest",
             exports = "makeGetPrivacySettingRequest", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizSettingsBaseIQGetRequestMixin",
+            exports = "mergeBaseIQGetRequestMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
         var privacyNode = new NodeBuilder()
                 .description("privacy")
@@ -51,7 +47,7 @@ public final class SmaxGetPrivacySettingRequest implements SmaxOperation.Request
                 .description("iq")
                 .attribute("xmlns", "w:biz")
                 .attribute("to", JidServer.user())
-                .attribute("type", "get")
+                .attribute("type", "get") // WASmaxOutBizSettingsBaseIQGetRequestMixin.mergeBaseIQGetRequestMixin: type: "get" (id=generateId() delegated to WhatsAppClient.sendNode)
                 .content(privacyNode);
     }
 

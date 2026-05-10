@@ -105,13 +105,6 @@ public final class SmaxMdCompanionFinishRequest implements SmaxOperation.Request
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <link_code_companion_reg/>} payload
-     *
-     * @implNote {@code WASmaxOutMdCompanionFinishRequest.makeCompanionFinishRequest}
-     *           emits {@code <iq xmlns="md" to="s.whatsapp.net"
-     *           type="set" id=…>} with a single
-     *           {@code <link_code_companion_reg jid stage="companion_finish">}
-     *           payload nested over the wrapped key-bundle, identity
-     *           pubkey and pairing-ref children.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutMdCompanionFinishRequest",

@@ -6,6 +6,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.DeviceCapabilities;
+import com.github.auties00.cobalt.model.device.DeviceCapabilitiesEntry;
+import com.github.auties00.cobalt.model.device.DeviceCapabilitiesEntryBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -16,7 +18,6 @@ import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
 import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
 import com.github.auties00.cobalt.wam.WamService;
 
-import java.util.HashMap;
 import java.util.Objects;
 
 /**
@@ -56,24 +57,11 @@ import java.util.Objects;
  *   <li>logs {@code "[DeviceCapabilitiesSync] primary caps updated Nx"} via
  *       {@code WALogger} &mdash; omitted in Cobalt (logging).</li>
  * </ul>
- *
- * @implNote WAWebDeviceCapabilitiesSync &mdash; singleton instance of a class
- *           extending {@code AccountSyncdActionBase} from
- *           {@code WAWebSyncdAction}. Declares
- *           {@code collectionName = RegularLow}, {@code getVersion() = 7} and
- *           {@code getAction() = "device_capabilities"}. Outbound
- *           {@code getMutation}/{@code sendMutation} are not mirrored
- *           per-handler in Cobalt: outbound mutation construction is handled
- *           centrally by {@code WebAppStateService}.
  */
 @WhatsAppWebModule(moduleName = "WAWebDeviceCapabilitiesSync")
 public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler {
     /**
      * Primary device identifier constant.
-     *
-     * @implNote WAWebDeviceCapabilitiesSync: {@code var c = "0"}. A value of
-     *           {@code 0} in the {@code device} component of a JID identifies
-     *           the primary device of the account.
      */
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     private static final int PRIMARY_DEVICE = 0;
@@ -81,46 +69,33 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
     /**
      * Index of the JID element inside the mutation's {@code indexParts}
      * array.
-     *
-     * @implNote WAWebDeviceCapabilitiesSync: {@code var d = 1}. The mutation
-     *           index is {@code [hash, jidString]}; element {@code 1} holds
-     *           the target device JID in legacy format.
      */
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     private static final int JID_INDEX = 1;
 
     /**
-     * Singleton instance of this handler.
-     *
-     * @implNote WAWebDeviceCapabilitiesSync.default &mdash; the module exports
-     *           a single instance ({@code var f = new _()}) as its default
-     *           export.
+     * The WAM telemetry service used to commit LID 1:1 migration lifecycle
+     * events.
      */
-    @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public static final DeviceCapabilitiesHandler INSTANCE = new DeviceCapabilitiesHandler();
+    private final WamService wamService;
 
     /**
-     * Constructs the singleton device capabilities handler.
+     * Constructs a {@code DeviceCapabilitiesHandler}.
      *
      * <p>Per WhatsApp Web, the constructor of class {@code _} inherits from
      * {@code AccountSyncdActionBase} and sets
      * {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}.
      * The {@code collectionName} assignment is surfaced in Cobalt via
      * {@link #collectionName()} rather than as an instance field.
-     *
-     * @implNote WAWebDeviceCapabilitiesSync &mdash; constructor of class
-     *           {@code _} extending {@code AccountSyncdActionBase}.
+     * @param wamService the WAM telemetry service used by this handler
      */
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    private DeviceCapabilitiesHandler() {
+    public DeviceCapabilitiesHandler(WamService wamService) {
+        this.wamService = wamService;
     }
 
     /**
      * Returns the action name for device capabilities sync.
-     *
-     * @implNote WAWebDeviceCapabilitiesSync.getAction &mdash; returns
-     *           {@code WASyncdConst.Actions.DeviceCapabilities} which
-     *           resolves to {@code "device_capabilities"}.
      * @return the action name {@code "device_capabilities"}
      */
     @Override
@@ -131,9 +106,6 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
 
     /**
      * Returns the sync collection for device capabilities mutations.
-     *
-     * @implNote WAWebDeviceCapabilitiesSync.collectionName &mdash; set in the
-     *           constructor to {@code WASyncdConst.CollectionName.RegularLow}.
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -144,35 +116,12 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
 
     /**
      * Returns the mutation format version for device capabilities.
-     *
-     * @implNote WAWebDeviceCapabilitiesSync.getVersion &mdash; returns
-     *           {@code 7}.
      * @return the version number {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return DeviceCapabilities.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single device capabilities mutation by delegating to
-     * {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}.
-     *
-     * @implNote ADAPTED: WAWebDeviceCapabilitiesSync.applyMutations &mdash;
-     *           WA Web processes mutations in a batch loop returning per
-     *           mutation {@code {actionState: SyncActionState.Success}};
-     *           Cobalt delegates to the result-returning variant for
-     *           consistency with the handler interface.
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied with state
-     *         {@link SyncActionState#SUCCESS}
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -196,15 +145,6 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
      * part and mutations carrying a non {@code deviceCapabilities} action are
      * silently accepted as {@link SyncActionState#SUCCESS}, matching WA Web
      * which always returns {@code {actionState: Success}} from the loop body.
-     *
-     * @implNote WAWebDeviceCapabilitiesSync.applyMutations &mdash; per
-     *           mutation logic inside the batch handler. Differences vs. WA
-     *           Web are called out inline via {@code ADAPTED} comments.
-     *           WA Web only persists the primary device payload; Cobalt also
-     *           keeps a map keyed by JID (see
-     *           {@code WhatsAppStore.deviceCapabilitiesStates}) which is
-     *           used to skip redundant primary updates when the payload is
-     *           identical to the previous one.
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return a {@link MutationApplicationResult} with
@@ -212,7 +152,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.success();
         }
@@ -229,18 +169,19 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
             return MutationApplicationResult.success();
         }
 
-        // ADAPTED: NO_WA_BASIS - Cobalt tracks a per-JID map so repeated primary mutations with
+        // ADAPTED: NO_WA_BASIS - Cobalt tracks a per-JID typed quintet so repeated primary mutations with
         // an identical payload can be fast-pathed. WA Web always re-merges the storage entry.
-        var states = new HashMap<>(client.store().deviceCapabilitiesStates());
-        var previous = states.put(deviceJidString, capabilities);
-        client.store().setDeviceCapabilitiesStates(states);
+        var deviceJid = Jid.of(deviceJidString);
+        var previous = client.store().findDeviceCapabilitiesEntry(deviceJid)
+                .map(DeviceCapabilitiesEntry::capabilities)
+                .orElse(null);
+        client.store().putDeviceCapabilitiesEntry(new DeviceCapabilitiesEntryBuilder().deviceJid(deviceJid).capabilities(capabilities).build());
         if (Objects.equals(previous, capabilities)) {
             return MutationApplicationResult.success();
         }
 
         // where m() extracts the substring between ':' and '@' from the legacy JID string.
         // Jid.of(...).device() returns the same integer decoded from the ":<device>@" section.
-        var deviceJid = Jid.of(deviceJidString);
         if (deviceJid.device() == PRIMARY_DEVICE) {
             //   u = mapProtobufToAllDeviceCapabilities(a);
             //   mergeDeviceCapabilitiesToStorage(u, "primary");
@@ -268,7 +209,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
                         // WA Web always passes the post-check value which is false at this point;
                         // Cobalt keeps the same read so the wire payload stays byte-identical.
                         if (!client.lidMigrationService().isLidMigrated()) {
-                            wamService.commit(new Lid11MigrationLifecycleEventBuilder()
+                            this.wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                                     .migrationStage(MigrationStageEnum.COMPANION_RECEIVED_DEVICE_CAPABILITY)
                                     .isLocally1x1MigratedFromDb(client.lidMigrationService().isLidMigrated())
                                     .build());

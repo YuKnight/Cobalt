@@ -104,11 +104,6 @@ public final class NodeBuilder {
 
     /**
      * Adds a text attribute when the value is non null.
-     *
-     * @implNote The {@code null} check mirrors WAWap's {@code DROP_ATTR}
-     *           sentinel pattern. The JS factory accepts a {@code DROP_ATTR}
-     *           placeholder which the dispatcher filters out, while the
-     *           builder folds the same intent into a per call null check.
      * @param key   the attribute key
      * @param value the attribute value, or {@code null} to skip
      * @return this builder

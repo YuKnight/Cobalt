@@ -45,10 +45,6 @@ public sealed interface IqSendProfilePictureResponse extends IqOperation.Respons
     /**
      * The {@code Success} reply variant. Carries the relay-assigned
      * picture identifier (or empty when the picture was cleared).
-     *
-     * @implNote {@code WAWebSendProfilePictureJob.photoResponseParser}:
-     *           {@code hasChild("picture") ? {id: child("picture")
-     *           .attrInt("id")} : {id: null}}.
      */
     @WhatsAppWebModule(moduleName = "WAWebSendProfilePictureJob")
     final class Success implements IqSendProfilePictureResponse {

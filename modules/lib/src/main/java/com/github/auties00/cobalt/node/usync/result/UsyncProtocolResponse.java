@@ -10,10 +10,6 @@ import com.github.auties00.cobalt.node.usync.UsyncProtocolResult;
  * <p>Sibling permit of {@link UsyncProtocolError} under
  * {@link UsyncProtocolResult}. A parser yields either an error or one of the
  * eleven concrete shapes permitted here.
- *
- * @implNote Each {@code WAWebUsync*Protocol.parser} in WhatsApp Web returns
- *     its protocol-specific success shape (or an error). The eleven permits
- *     below correspond one-to-one with those eleven success shapes.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public sealed interface UsyncProtocolResponse extends UsyncProtocolResult permits

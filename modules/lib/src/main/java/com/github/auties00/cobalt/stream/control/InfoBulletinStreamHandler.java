@@ -8,6 +8,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.node.smax.clientexpiration.SmaxClientExpirationResponse;
 import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.wam.WamService;
@@ -42,124 +43,80 @@ import java.util.stream.Collectors;
  * collapses the two-phase parser/dispatcher into a single ordered
  * {@code if-else} chain mirroring the WA Web priority, with one private
  * method per branch.
- *
- * @implNote WAWebHandleInfoBulletin.default: the top-level
- * {@code infoBulletinParser} plus the async dispatch function {@code _}.
- * Child tags and the {@code INFO_TYPE} constants come from
- * {@code WAWebHandleInfoBulletinTypes.flow.INFO_TYPE}.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleInfoBulletin")
 @WhatsAppWebModule(moduleName = "WAWebHandleDirtyBits")
 @WhatsAppWebModule(moduleName = "WAWebClearDirtyBitsJob")
 @WhatsAppWebModule(moduleName = "WAWebHandleRoutingInfo")
 @WhatsAppWebModule(moduleName = "WAWebHandleServerClientExpiration")
+@WhatsAppWebModule(moduleName = "WASmaxClientExpirationClientExpirationRPC")
 public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     /**
      * Logger used for info bulletin diagnostic output.
-     *
-     * @implNote WAWebHandleInfoBulletin.default: uses {@code WALogger} with
-     * tagged template literals for {@code ERROR}, {@code WARN} and
-     * {@code LOG} output. Cobalt uses {@link System.Logger} instead.
      */
     private static final System.Logger LOGGER =
             System.getLogger(InfoBulletinStreamHandler.class.getName());
 
     /**
      * Child tag carrying dirty-bit notifications.
-     *
-     * @implNote WAWebHandleInfoBulletinTypes.flow.INFO_TYPE.DIRTY =
-     * {@code "dirty"}.
      */
     private static final String INFO_TYPE_DIRTY = "dirty";
 
     /**
      * Child tag carrying edge-routing info.
-     *
-     * @implNote WAWebHandleInfoBulletinTypes.flow.INFO_TYPE.ROUTING =
-     * {@code "edge_routing"}.
      */
     private static final String INFO_TYPE_ROUTING = "edge_routing";
 
     /**
      * Child tag carrying the total offline message count.
-     *
-     * @implNote WAWebHandleInfoBulletinTypes.flow.INFO_TYPE.OFFLINE =
-     * {@code "offline"}.
      */
     private static final String INFO_TYPE_OFFLINE = "offline";
 
     /**
      * Child tag carrying the offline priority completion marker.
-     *
-     * @implNote WAWebHandleInfoBulletinTypes.flow.INFO_TYPE.OFFLINE_PRIORITY_COMPLETE
-     * = {@code "priority_offline_complete"}.
      */
     private static final String INFO_TYPE_OFFLINE_PRIORITY_COMPLETE = "priority_offline_complete";
 
     /**
      * Child tag carrying categorised offline message counts.
-     *
-     * @implNote WAWebHandleInfoBulletinTypes.flow.INFO_TYPE.OFFLINE_PREVIEW
-     * = {@code "offline_preview"}.
      */
     private static final String INFO_TYPE_OFFLINE_PREVIEW = "offline_preview";
 
     /**
      * Child tag carrying Terms-of-Service notices.
-     *
-     * @implNote WAWebHandleInfoBulletinTypes.flow.INFO_TYPE.TOS =
-     * {@code "tos"}.
      */
     private static final String INFO_TYPE_TOS = "tos";
 
     /**
      * Child tag carrying per-thread offline timestamps.
-     *
-     * @implNote WAWebHandleInfoBulletinTypes.flow.INFO_TYPE.THREAD_META =
-     * {@code "thread_metadata"}.
      */
     private static final String INFO_TYPE_THREAD_META = "thread_metadata";
 
     /**
      * Child tag carrying the server-mandated client expiration override.
-     *
-     * @implNote WAWebHandleInfoBulletinTypes.flow.INFO_TYPE.CLIENT_EXPIRATION
-     * = {@code "client_expiration"}.
      */
     private static final String INFO_TYPE_CLIENT_EXPIRATION = "client_expiration";
 
     /**
      * Dirty-bit type name that triggers app-state syncd collection pulls.
-     *
-     * @implNote WAWebDirtyBitsConsts.SUPPORTED_DIRTY_TYPE.syncd_app_state =
-     * {@code "syncd_app_state"}.
      */
     private static final String DIRTY_TYPE_SYNCD_APP_STATE = "syncd_app_state";
 
     /**
      * Dirty-bit type name that triggers account-level subsystem refreshes
      * (devices, profile picture, privacy, block list, notices, opt-out list).
-     *
-     * @implNote WAWebDirtyBitsConsts.SUPPORTED_DIRTY_TYPE.account_sync =
-     * {@code "account_sync"}.
      */
     private static final String DIRTY_TYPE_ACCOUNT_SYNC = "account_sync";
 
     /**
      * Dirty-bit type name that triggers a group metadata refresh after
      * offline delivery ends.
-     *
-     * @implNote WAWebDirtyBitsConsts.SUPPORTED_DIRTY_TYPE.groups =
-     * {@code "groups"}.
      */
     private static final String DIRTY_TYPE_GROUPS = "groups";
 
     /**
      * Dirty-bit type name that triggers a newsletter metadata refresh
      * after offline delivery ends.
-     *
-     * @implNote WAWebDirtyBitsConsts.SUPPORTED_DIRTY_TYPE.newsletter_metadata
-     * = {@code "newsletter_metadata"}.
      */
     private static final String DIRTY_TYPE_NEWSLETTER_METADATA = "newsletter_metadata";
 
@@ -167,10 +124,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * Set of supported account-sync protocol names that may appear as
      * children of an {@code account_sync} dirty entry. Any value not in
      * this set is ignored.
-     *
-     * @implNote WAWebDirtyBitsConsts.SUPPORTED_DIRTY_PROTOCOLS =
-     * {@code {devices, picture, privacy, blocklist, notice}} from
-     * {@code WAWebAccountSyncJob.AccountSyncType}.
      */
     private static final Set<String> SUPPORTED_DIRTY_PROTOCOLS = Set.of(
             "devices", "picture", "privacy", "blocklist", "notice"
@@ -179,11 +132,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     /**
      * Default routing domain used when the stanza omits {@code dns_domain}
      * and no previously stored domain exists.
-     *
-     * @implNote WAWebHandleRoutingInfo.DOMAINS = {@code {fb: "fb", sl: "sl"}};
-     * the default used inside {@code handleRoutingInfo} when the domain is
-     * missing and {@code getRoutingInfo()} resolves to {@code null} is
-     * {@code DOMAINS.fb}, i.e. the string {@code "fb"}.
      */
     private static final String DEFAULT_ROUTING_DOMAIN = "fb";
 
@@ -191,21 +139,12 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * Minimum future floor applied to the client expiration override, in
      * seconds. When the server pushes an expiration timestamp the resulting
      * value is clamped to at least this many seconds in the future.
-     *
-     * @implNote WAWebHandleServerClientExpiration: {@code 3 * DAY_SECONDS}
-     * where {@code DAY_SECONDS} is {@code 24 * 60 * 60 = 86400} per
-     * {@code WATimeUtils.DAY_SECONDS}.
      */
     private static final long CLIENT_EXPIRATION_MIN_FLOOR_SECONDS = 3L * 86_400L;
 
     /**
      * The WhatsApp client used for store access, outgoing stanza dispatch
      * and delegated service calls.
-     *
-     * @implNote WAWebHandleInfoBulletin.default uses module-level imports
-     * (for example {@code o("WAWebHandleRoutingInfo")}); Cobalt injects the
-     * single {@link WhatsAppClient} facade via the constructor and reaches
-     * the equivalent subsystems through it.
      */
     private final WhatsAppClient whatsapp;
 
@@ -221,11 +160,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * {@code server_sync} notification counts in
      * {@code NotificationSyncStreamHandler} and flushes them as a WAM event
      * when the offline bulletin arrives.
-     *
-     * @implNote WAWebHandleReportServerSyncNotification: WA Web keeps the
-     * count map at module scope and flushes via
-     * {@code reportOfflineNotifications()}; Cobalt reifies both sides as a
-     * shared reporter object injected into producer and consumer.
      */
     private final OfflineNotificationsReporter offlineNotificationsReporter;
 
@@ -247,10 +181,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      *                                     offline bulletin arrives, must not be {@code null}
      * @param wamService                   the WAM telemetry service used to commit the
      *                                     dirty-bits event, must not be {@code null}
-     * @implNote WAWebHandleInfoBulletin.default: the handler is registered
-     * by {@code WADeprecatedWapParser("infoBulletinParser", ...)}; Cobalt
-     * registers handlers as {@link SocketStream.Handler} implementations
-     * via {@link SocketStream}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -279,13 +209,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * malformed bulletin cannot propagate up through the socket reader.
      *
      * @param node the {@code ib} stanza node, never {@code null}
-     * @implNote WAWebHandleInfoBulletin.default: the parser function
-     * {@code p} performs {@code assertTag("ib")}, {@code assertFromServer()}
-     * and then the ordered {@code hasChild} chain; the async dispatch
-     * function {@code _}/{@code f} switches on the parsed result type and
-     * returns {@code "NO_ACK"} so that the stream does not ack the stanza.
-     * Cobalt does not ack control stanzas either so the sentinel is not
-     * materialised.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
@@ -332,9 +255,9 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
                 return;
             }
 
-            var expiration = node.getChild(INFO_TYPE_CLIENT_EXPIRATION);
-            if (expiration.isPresent()) {
-                handleClientExpiration(expiration.get());
+            // WAWebHandleInfoBulletin.default: hasChild(CLIENT_EXPIRATION) gates the call to receiveClientExpirationRPC(e.getNode()).
+            if (node.hasChild(INFO_TYPE_CLIENT_EXPIRATION)) {
+                handleClientExpiration(node);
                 return;
             }
 
@@ -371,12 +294,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * aggregated app-state pull and sends the {@code clean} IQ.
      *
      * @param node the parent {@code ib} node, never {@code null}
-     * @implNote WAWebHandleDirtyBits.handleDirtyBits: iterates every
-     * supported dirty entry, resolves each {@code type} against
-     * {@code SUPPORTED_DIRTY_TYPE}, runs the {@code Promise.all} of
-     * per-type handlers, then calls
-     * {@code WAWebClearDirtyBitsJob.clearDirtyBits([...unsupported,
-     * ...supported])}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleDirtyBits", exports = "handleDirtyBits",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -473,11 +390,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      *
      * @param dirtyEntries the dirty entries to acknowledge, never
      *                     {@code null}
-     * @implNote WAWebClearDirtyBitsJob.clearDirtyBits: builds an IQ with
-     * attributes {@code to=s.whatsapp.net}, {@code type=set},
-     * {@code xmlns=urn:xmpp:whatsapp:dirty}, {@code id=generateId()}, and
-     * sends it via {@code deprecatedSendIq}; logs on success and swallows
-     * errors with a {@code WARN}.
      */
     @WhatsAppWebExport(moduleName = "WAWebClearDirtyBitsJob", exports = "clearDirtyBits",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -526,13 +438,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      *
      * @param routingNode the {@code edge_routing} child node, never
      *                    {@code null}
-     * @implNote WAWebHandleRoutingInfo.handleRoutingInfo: the async
-     * function reads the optional {@code domain} from the parsed result,
-     * falls back to the previously stored domain via
-     * {@code WAWebUserPrefsMultiDevice.getRoutingInfo()} or to
-     * {@code DOMAINS.fb}, converts the {@code edgeRouting} bytes with
-     * {@code WAHex.bytesToBuffer} and writes everything back with
-     * {@code setRoutingInfo({domain, edgeRouting})}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleRoutingInfo", exports = "handleRoutingInfo",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -571,10 +476,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * connect.
      *
      * @param offlineNode the {@code offline} child node, never {@code null}
-     * @implNote WAWebHandleInfoBulletin.default dispatch
-     * (INFO_TYPE.OFFLINE): runs {@code processOfflineIb(count)},
-     * {@code reportOfflineNotifications()} and
-     * {@code maybeClearPendingMessages(count)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -600,11 +501,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      *
      * @param previewNode the {@code offline_preview} child node, never
      *                    {@code null}
-     * @implNote WAWebHandleInfoBulletin.default parser reads the attributes
-     * {@code count}, {@code message}, {@code receipt}, {@code notification}
-     * and {@code call} from the {@code offline_preview} child; the
-     * dispatch then calls
-     * {@code OfflineMessageHandler.processOfflinePreviewIb}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -626,12 +522,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * bulletin without performing any further work; Cobalt additionally
      * drives a best-effort orphan-mutation retry because dependencies on
      * peer data may now be satisfied.
-     *
-     * @implNote WAWebHandleInfoBulletin.default dispatch:
-     * {@code INFO_TYPE.OFFLINE_PRIORITY_COMPLETE} has no case in the switch
-     * and the parser returns {@code {type: OFFLINE_PRIORITY_COMPLETE}}, so
-     * the dispatcher falls through the {@code default} branch and simply
-     * returns {@code "NO_ACK"}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -651,12 +541,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * can inspect the set and render the notices at an appropriate time.
      *
      * @param tosNode the {@code tos} child node, never {@code null}
-     * @implNote WAWebHandleInfoBulletin.default parser: iterates
-     * {@code "tos"} child {@code notice} entries and collects the
-     * {@code id} attribute into {@code noticeIds}; dispatch then calls
-     * {@code WAWebTos.TosManager.maybeUpdateServer(noticeIds)} which pushes
-     * accepted states back. Cobalt performs the server round-trip lazily
-     * at the consumer side via the stored set.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -683,12 +567,6 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      *
      * @param threadMetaNode the {@code thread_metadata} child node, never
      *                       {@code null}
-     * @implNote WAWebHandleInfoBulletin.default parser (THREAD_META): via
-     * {@code WAWebParseThreadMetadata.parseThreadMetadata}, for every
-     * {@code item} child reads {@code attrChatJid("from")} and
-     * {@code attrTime("t")} into a {@code {chatTimestamp: {jid: t}}} map;
-     * the dispatch then calls
-     * {@code WAWebThreadMetadata.setOfflineThreadMeta(threadMeta)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -714,39 +592,48 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * Handles the {@code client_expiration} info bulletin, applying or
      * clearing the server-mandated client expiration override.
      *
-     * <p>When the {@code t} attribute is absent the stored override is
-     * cleared. Otherwise the new timestamp is compared against any
-     * existing override: if the new value is not earlier than the current
-     * override the update is ignored (the server never extends the
-     * expiration window). Accepted values are clamped to at least
-     * {@link #CLIENT_EXPIRATION_MIN_FLOOR_SECONDS} in the future to give
-     * the user a reasonable grace period.
+     * <p>The full {@code <ib>} envelope is parsed via the typed
+     * {@link SmaxClientExpirationResponse} parser, mirroring WA Web's
+     * {@code receiveClientExpirationRPC(e.getNode())} dispatch. A parse
+     * failure is logged and the bulletin is dropped, matching WA Web's
+     * {@code SmaxParsingFailure} which is caught by the surrounding
+     * dispatcher.
      *
-     * @param clientExpirationNode the {@code client_expiration} child
-     *                             node, never {@code null}
-     * @implNote WAWebHandleServerClientExpiration.handleServerClientExpiration:
-     * reads {@code WAWebUpdaterHardExpireTime} as the hard cap,
-     * short-circuits when the new value is not earlier than either the
-     * existing override or the hard cap, clamps via
-     * {@code Math.max(futureUnixTime(3 * DAY_SECONDS), Math.min(e, t))},
-     * and persists with
-     * {@code setServerClientExpirationOverride(String(l), VERSION_BASE)}.
-     * Cobalt does not have {@code WAWebUpdaterHardExpireTime}; the hard
-     * cap check is skipped which makes the accepted value effectively
-     * unbounded above.
+     * <p>When the parsed {@code t} attribute is absent the stored
+     * override is cleared. Otherwise the new timestamp is normalised
+     * through the int32 clamp that mirrors {@code WATimeUtils.castToUnixTime},
+     * compared against any existing override: if the new value is not
+     * earlier than the current override the update is ignored (the
+     * server never extends the expiration window). Accepted values are
+     * clamped to at least {@link #CLIENT_EXPIRATION_MIN_FLOOR_SECONDS}
+     * in the future to give the user a reasonable grace period.
+     *
+     * @param node the {@code <ib>} envelope, never {@code null}
      */
+    @WhatsAppWebExport(moduleName = "WASmaxClientExpirationClientExpirationRPC",
+            exports = "receiveClientExpirationRPC", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebHandleServerClientExpiration",
             exports = "handleServerClientExpiration", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void handleClientExpiration(Node clientExpirationNode) {
-        var expirationAttr = clientExpirationNode.getAttributeAsLong("t", (Long) null);
-        if (expirationAttr == null) {
+    private void handleClientExpiration(Node node) {
+        // WASmaxClientExpirationClientExpirationRPC.receiveClientExpirationRPC: typed parse of <ib><client_expiration t?/></ib>; failure surfaces as Optional.empty (Cobalt) vs SmaxParsingFailure throw (WA Web).
+        var parsed = SmaxClientExpirationResponse.of(node).orElse(null);
+        if (!(parsed instanceof SmaxClientExpirationResponse.Inbound inbound)) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "Failed to parse client_expiration bulletin {0}",
+                    node.getAttributeAsString("id", "[missing-id]"));
+            return;
+        }
+
+        // WAWebHandleInfoBulletin.default: c = u != null ? WATimeUtils.castToUnixTime(u) : null.
+        var newExpiration = inbound.clientExpirationT()
+                .map(InfoBulletinStreamHandler::castToUnixTime)
+                .orElse(null);
+        if (newExpiration == null) {
             whatsapp.store().setClientExpiration(null);
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Cleared client expiration override");
             return;
         }
-
-        var newExpiration = expirationAttr;
 
         var existingExpiration = whatsapp.store().clientExpiration().orElse(null);
 
@@ -767,5 +654,27 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
         whatsapp.store().setClientExpiration(clampedExpiration);
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received client expiration bulletin, clamped to {0}", clampedExpiration);
+    }
+
+    /**
+     * Clamps a Unix-second timestamp to the signed 32-bit integer range,
+     * mirroring {@code WATimeUtils.castToUnixTime} which is invoked on
+     * the parsed {@code clientExpirationT} before downstream handling.
+     *
+     * <p>WA Web's {@code k(e)} truncates with {@code (e | 0)} then applies
+     * {@code Math.max(b, Math.min(t, C))} with
+     * {@code b = (1 << 31) + 1 = -2147483647} and
+     * {@code C = ~(1 << 31) = 2147483647}. Cobalt has no native int32
+     * coercion of a {@code long}, so the truncation is expressed as
+     * {@code (long) (int) value}; the surrounding clamp is then a no-op
+     * within int32 but preserved for documentation parity.
+     *
+     * @param value the raw timestamp in seconds; never {@code null}
+     * @return the clamped timestamp; never {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WATimeUtils", exports = "castToUnixTime",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static long castToUnixTime(long value) {
+        return Math.max(-2_147_483_647L, Math.min((long) (int) value, 2_147_483_647L));
     }
 }

@@ -64,11 +64,6 @@ public final class IqUnpairDeviceRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <remove-companion-device>} payload
-     *
-     * @implNote {@code WAWebUnpairDeviceJob.unpairDevice} composes the
-     *           IQ via {@code WAWap.wap("iq", {to:S_WHATSAPP_NET,
-     *           type:"set", id, xmlns:"md"}, wap("remove-companion-device",
-     *           {jid:DEVICE_JID(t), reason:CUSTOM_STRING(t)}))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUnpairDeviceJob",

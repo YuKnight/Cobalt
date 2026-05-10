@@ -53,13 +53,6 @@ public sealed interface SmaxContactFormResponse extends SmaxOperation.Response
      * relay accepted the form, returning the user-visible
      * acknowledgement message. The ticket id (for follow-ups),
      * and the routing group JID.
-     *
-     * @implNote {@code WASmaxInSupportContactFormResponseSuccess.parseContactFormResponseSuccess}
-     *           validates the {@code <iq>} envelope, extracts the
-     *           {@code <response status="ok">} child, and projects
-     *           its three {@code <message>} / {@code <ticket_id>}
-     *           / {@code <group_jid>} grandchildren into the
-     *           triple below.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSupportContactFormResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInSupportHackBaseIQResultResponseMixin")
@@ -242,11 +235,6 @@ public sealed interface SmaxContactFormResponse extends SmaxOperation.Response
      * The {@code ContactFormResponseRetryableError} reply variant. The
      * relay deferred the form (e.g. transient back-pressure) and
      * recommended a retry timestamp.
-     *
-     * @implNote {@code WASmaxInSupportContactFormResponseRetryableError.parseContactFormResponseRetryableError}
-     *           extracts the {@code <response error_code="…"
-     *           next_retry_ts="…"/>} child without requiring the
-     *           {@code status="ok"} marker.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSupportContactFormResponseRetryableError")
     final class ContactFormResponseRetryableError implements SmaxContactFormResponse {
@@ -360,17 +348,6 @@ public sealed interface SmaxContactFormResponse extends SmaxOperation.Response
      * {@code (code, text)} pair and, for the
      * {@code notice-required} sub-case. The surfaced
      * {@code tos_version}.
-     *
-     * @implNote {@code WASmaxInSupportContactFormResponseError.parseContactFormResponseError}
-     *           extracts the {@code <error/>} child and routes it
-     *           through
-     *           {@code WASmaxInSupportContactFormError} .
-     *           a disjunction over the three sub-mixins
-     *           ({@code IQErrorBadRequest},
-     *           {@code IQErrorNoticeRequired},
-     *           {@code IQErrorInternalServerError}). Cobalt
-     *           collapses all three into the single pair below
-     *           plus the optional {@code tosVersion}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSupportContactFormResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInSupportContactFormError")

@@ -6,7 +6,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.TimeFormatAction;
@@ -14,8 +13,6 @@ import com.github.auties00.cobalt.model.sync.action.device.TimeFormatActionBuild
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -34,13 +31,6 @@ import java.util.Objects;
  * Cobalt does not ship a UI layer, so instead it persists the new value
  * directly into {@link com.github.auties00.cobalt.store.WhatsAppStore} via
  * {@link com.github.auties00.cobalt.store.WhatsAppStore#setTwentyFourHourFormat(boolean)}.
- *
- * @implNote WAWebTimeFormatSync.default — concrete subclass of
- *           {@code WAWebSyncdAction.AccountSyncdActionBase} with
- *           {@code collectionName = RegularLow}, {@code getVersion() = 7},
- *           {@code getAction() = Actions.TimeFormat} and
- *           {@code applyMutations()} implementing the per-mutation time
- *           format apply.
  */
 @WhatsAppWebModule(moduleName = "WAWebTimeFormatSync")
 public final class TimeFormatHandler implements WebAppStateActionHandler {
@@ -50,8 +40,6 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      * <p>WA Web instantiates the handler exactly once at module evaluation
      * time via {@code var u = new s; l.default = u;}. Cobalt mirrors that by
      * exposing a module-level constant.
-     *
-     * @implNote WAWebTimeFormatSync — {@code var u = new s; l.default = u}
      */
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final TimeFormatHandler INSTANCE = new TimeFormatHandler();
@@ -61,9 +49,6 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      *
      * <p>The constructor is private because callers should always go through
      * {@link #INSTANCE}, matching the WA Web module-level singleton.
-     *
-     * @implNote WAWebTimeFormatSync — hidden {@code function r()} constructor
-     *           that only initializes {@code this.collectionName = RegularLow}
      */
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private TimeFormatHandler() {
@@ -72,10 +57,6 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name this handler processes.
-     *
-     * @implNote WAWebTimeFormatSync.getAction — returns
-     *           {@code WASyncdConst.Actions.TimeFormat}, which resolves to
-     *           the string {@code "time_format"}
      * @return the constant {@link TimeFormatAction#ACTION_NAME}
      */
     @Override
@@ -89,8 +70,6 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      *
      * <p>On WA Web this is set on the prototype inside the constructor as
      * {@code this.collectionName = CollectionName.RegularLow}.
-     *
-     * @implNote WAWebTimeFormatSync — {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      * @return the constant {@link TimeFormatAction#COLLECTION_NAME}, always
      *         {@link SyncPatchType#REGULAR_LOW}
      */
@@ -102,36 +81,12 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version this handler supports.
-     *
-     * @implNote WAWebTimeFormatSync.getVersion — {@code return 7}
      * @return the constant {@link TimeFormatAction#ACTION_VERSION}, always {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return TimeFormatAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single decoded time format mutation.
-     *
-     * <p>Thin bridge over {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * that reduces the richer {@link MutationApplicationResult} state to a
-     * legacy boolean: {@code true} only for {@link SyncActionState#SUCCESS},
-     * {@code false} for {@code MALFORMED}, {@code UNSUPPORTED}, {@code SKIPPED}
-     * and {@code FAILED}.
-     *
-     * @implNote ADAPTED: WAWebTimeFormatSync.applyMutations — the WA Web
-     *           inner async callback returns a {@code SyncActionState}; Cobalt
-     *           exposes both a boolean and a richer result through two methods
-     * @param client   the WhatsApp client the mutation is being applied to
-     * @param mutation the trusted, decoded mutation to apply
-     * @return {@code true} if the apply succeeded, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -175,8 +130,6 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      * registered in {@code WAWebABPropsConfigs}, it is never read by
      * {@code WAWebTimeFormatSync} or any other module. Cobalt therefore
      * applies every well-formed {@code SET} mutation unconditionally.
-     *
-     * @implNote WAWebTimeFormatSync.applyMutations — per-mutation body
      * @param client   the WhatsApp client the mutation is being applied to
      * @param mutation the trusted, decoded mutation to apply
      * @return {@link MutationApplicationResult#unsupported()} for non-{@code SET}
@@ -186,13 +139,13 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof TimeFormatAction action)) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         // ADAPTED: WAWebTimeFormatSync.applyMutations:
@@ -217,11 +170,6 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      * surfaces the typed helper — mirroring sibling handlers — so the public
      * {@code WhatsAppClient.changeTwentyFourHourFormat} setter can build a single
      * mutation without hand-rolling the protobuf wrapping.
-     *
-     * @implNote ADAPTED: WAWebSyncdActionUtils.buildPendingMutation — shaped
-     *           after {@code WAWebDisableLinkPreviewsSync.getMutation} (same
-     *           {@code collection / indexArgs=[] / value / version / operation=SET
-     *           / timestamp / action} payload).
      * @param timestamp               the mutation timestamp
      * @param twentyFourHourFormat    {@code true} to enable 24-hour display,
      *                                {@code false} for 12-hour display

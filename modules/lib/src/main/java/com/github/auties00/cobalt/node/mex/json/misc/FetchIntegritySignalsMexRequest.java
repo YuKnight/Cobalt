@@ -25,15 +25,6 @@ import java.util.Optional;
  * of users in the wire format but WA Web only ever passes a single Jid;
  * Cobalt mirrors that single-user shape and exposes the two scalar flags
  * from the resulting {@code XWA2IntegritySignals} fragment.
- *
- * @implNote WAWebMexFetchIntegritySignals: adapts the
- * {@code fetchIntegritySignals} GraphQL query, which in WA Web is invoked
- * via {@code WAWebMexClient.fetchQuery}. The JS side wraps the call in
- * defensive logging and try/catch boilerplate that emits {@code WALogger}
- * breadcrumbs and downgrades any failure to a {@code null} return; Cobalt
- * drops that telemetry sidetrack and surfaces the parsed scalars
- * directly, which is why this mex is annotated as
- * {@link WhatsAppAdaptation#ADAPTED} rather than {@code DIRECT}.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchIntegritySignals")
 public final class FetchIntegritySignalsMexRequest implements MexOperation.Request.Json {
@@ -58,9 +49,6 @@ public final class FetchIntegritySignalsMexRequest implements MexOperation.Reque
     /**
      * Constructs a request that asks the relay for integrity signals on the
      * given user.
-     *
-     * @implNote The string literals {@code "CHAT_FMX"} and {@code "INTERACTIVE"}
-     * are hard-coded constants in the JS source. Cobalt emits them verbatim.
      * @param userJid the user the integrity signals are being fetched for,
      *                must not be {@code null}
      * @throws NullPointerException if {@code userJid} is {@code null}

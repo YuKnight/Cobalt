@@ -5,14 +5,11 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.ExternalWebBetaAction;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Handles external web beta sync actions.
  *
@@ -28,8 +25,6 @@ import com.github.auties00.cobalt.wam.WamService;
  * <p>Per WhatsApp Web, this handler extends {@code AccountSyncdActionBase} and
  * gates on the {@code external_beta_can_join} AB prop. When disabled, all
  * mutations are returned as {@code Unsupported}.
- *
- * @implNote WAWebExternalWebBetaSync — singleton instance exported as {@code default}
  */
 @WhatsAppWebModule(moduleName = "WAWebExternalWebBetaSync")
 public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
@@ -38,17 +33,12 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, {@code WAWebExternalWebBetaSync} exports a single instance
      * ({@code var p = new m(); l.default = p}).
-     *
-     * @implNote WAWebExternalWebBetaSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ExternalWebBetaHandler INSTANCE = new ExternalWebBetaHandler();
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebExternalWebBetaSync — class {@code m} constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.Regular}
      */
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ExternalWebBetaHandler() {
@@ -57,9 +47,6 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for external web beta actions.
-     *
-     * @implNote WAWebExternalWebBetaSync.getAction — returns
-     *           {@code WASyncdConst.Actions.ExternalWebBeta} ({@code "external_web_beta"})
      * @return the action name {@code "external_web_beta"}
      */
     @Override
@@ -70,9 +57,6 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection for external web beta actions.
-     *
-     * @implNote WAWebExternalWebBetaSync — constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.Regular}
      * @return the sync patch type {@code REGULAR}
      */
     @Override
@@ -83,32 +67,12 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for external web beta actions.
-     *
-     * @implNote WAWebExternalWebBetaSync.getVersion — returns {@code 3}
      * @return the version {@code 3}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return ExternalWebBetaAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single external web beta mutation.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result state is {@code SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebExternalWebBetaSync.applyMutations — WA Web returns
-     *           {@code {actionState: ...}} objects; Cobalt delegates to the richer result method
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -124,16 +88,13 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
      * <p>In Cobalt, the {@code changeOptInStatusForExternalWebBeta} call is adapted to
      * a direct store update via {@code setExternalWebBeta(boolean)}, since the API-level
      * side effects (backend restart, AB prop sync, WAM refresh) are not applicable.
-     *
-     * @implNote WAWebExternalWebBetaSync.applyMutations — per-mutation logic within
-     *           the {@code Promise.all(r.map(...))} block
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!client.abPropsService().getBool(ABProp.EXTERNAL_BETA_CAN_JOIN)) {
             return MutationApplicationResult.unsupported();
         }
@@ -143,7 +104,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().action().orElse(null) instanceof ExternalWebBetaAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().setExternalWebBeta(action.isOptIn()); // ADAPTED: WAWebExternalWebBetaSync.applyMutations -> WAWebExternalBetaApi.changeOptInStatusForExternalWebBeta(r.isOptIn)

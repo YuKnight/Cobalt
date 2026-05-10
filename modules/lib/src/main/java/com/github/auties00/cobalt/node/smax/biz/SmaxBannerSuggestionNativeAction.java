@@ -3,12 +3,7 @@ package com.github.auties00.cobalt.node.smax.biz;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -105,27 +100,33 @@ public final class SmaxBannerSuggestionNativeAction {
      * @return an {@link Optional} carrying the parsed entry, or
      *         empty when the node does not match the documented
      *         schema
+     * @throws NullPointerException if {@code node} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaActionNativeActionsMixinMixin",
             exports = "parseNativeActionsMixinNativeAction",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<SmaxBannerSuggestionNativeAction> of(Node node) {
         Objects.requireNonNull(node, "node cannot be null");
+        // WASmaxParseUtils.assertTag(e, "native_action")
         if (!node.hasDescription("native_action")) {
             return Optional.empty();
         }
+        // WASmaxParseUtils.attrString(e, "platform")
         var platform = node.getAttributeAsString("platform").orElse(null);
         if (platform == null) {
             return Optional.empty();
         }
+        // WASmaxParseUtils.attrString(e, "min_app_version")
         var minAppVersion = node.getAttributeAsString("min_app_version").orElse(null);
         if (minAppVersion == null) {
             return Optional.empty();
         }
+        // WASmaxParseUtils.attrString(e, "local_link")
         var localLink = node.getAttributeAsString("local_link").orElse(null);
         if (localLink == null) {
             return Optional.empty();
         }
+        // WASmaxParseUtils.optional(WASmaxParseUtils.attrString, e, "universal_link")
         var universalLink = node.getAttributeAsString("universal_link").orElse(null);
         return Optional.of(new SmaxBannerSuggestionNativeAction(platform, minAppVersion, localLink, universalLink));
     }

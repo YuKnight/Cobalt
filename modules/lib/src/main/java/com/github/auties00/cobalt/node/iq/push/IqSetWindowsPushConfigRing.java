@@ -5,13 +5,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 /**
  * The Windows-store distribution ring controlling which {@code version}
  * attribute is sent on the wire.
- *
- * @implNote {@code WAWebSetWindowsPushConfig} local helper {@code m(e)}
- *           switches on the literal ring name. {@code "uwp_public"}
- *           drops the attribute (relay default), every other ring is
- *           routed verbatim. Cobalt models the four documented rings
- *           explicitly and exposes the wire-string mapping via
- *           {@link #wireValue()}.
  */
 @WhatsAppWebModule(moduleName = "WAWebSetWindowsPushConfig")
 public enum IqSetWindowsPushConfigRing {

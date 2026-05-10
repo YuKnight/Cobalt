@@ -101,10 +101,6 @@ public final class CreateReportAppealMexResponse implements MexOperation.Respons
 
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
-     *
-     * @implNote Reads the {@code data.xwa2_create_channel_report_appeal_v2}
-     * payload (an {@code XWA2ChannelsReport}) including the appeal record and
-     * nested {@code reported_content_data} channel metadata.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
      * @return the parsed response, or {@code Optional.empty()} if the
      *         expected JSON shape is absent

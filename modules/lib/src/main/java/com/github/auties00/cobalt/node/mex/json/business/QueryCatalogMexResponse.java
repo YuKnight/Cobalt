@@ -34,9 +34,6 @@ public final class QueryCatalogMexResponse implements MexOperation.Response.Json
 
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
-     *
-     * @implNote When the relay returns an absent {@code product_catalog}
-     *           both the WA Web helper and this method yield an empty page.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
      * @return the parsed response, or empty if the expected JSON shape is
      *         absent

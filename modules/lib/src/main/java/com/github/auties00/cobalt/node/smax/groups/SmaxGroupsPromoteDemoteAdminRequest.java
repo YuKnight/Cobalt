@@ -96,12 +96,6 @@ public final class SmaxGroupsPromoteDemoteAdminRequest implements SmaxOperation.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <admin>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsPromoteDemoteAdminRequest.makePromoteDemoteAdminRequest}
-     *           composes
-     *           {@code <iq><admin>OPTIONAL_CHILD(promote)
-     *           OPTIONAL_CHILD(demote)</admin></iq>}; each list child
-     *           wraps {@code REPEATED_CHILD(participant, 0, 1024)}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsPromoteDemoteAdminRequest",

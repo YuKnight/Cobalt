@@ -15,12 +15,6 @@ import java.util.Optional;
 /**
  * The inbound projection of the {@code <iq><pair-device/></iq>}
  * stanza.
- *
- * @implNote {@code WASmaxInMdSetToCompanionRequest.parseSetToCompanionRequest}
- *           validates the {@code <iq xmlns="md" from="s.whatsapp.net"
- *           type="set">} envelope. Asserts the presence of the
- *           {@code <pair-device/>} child, and extracts the six
- *           {@code <ref/>} content-byte payloads.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInMdSetToCompanionRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInMdBaseIQSetRequestMixin")

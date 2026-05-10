@@ -5,11 +5,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -21,6 +18,7 @@ import java.util.Optional;
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutBizCtwaAdAccountSendAccountRecoveryNonceRequest")
 @WhatsAppWebModule(moduleName = "WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin")
+@WhatsAppWebModule(moduleName = "WASmaxOutBizCtwaAdAccountBaseIQGetRequestMixin")
 public final class SmaxSendAccountRecoveryNonceRequest implements SmaxOperation.Request {
     /**
      * The optional {@code from} attribute echoed onto the outbound
@@ -61,25 +59,22 @@ public final class SmaxSendAccountRecoveryNonceRequest implements SmaxOperation.
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutBizCtwaAdAccountSendAccountRecoveryNonceRequest.makeSendAccountRecoveryNonceRequest}
-     *           composes
-     *           {@code WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin}
-     *           ({@code from=USER_JID(t)?}, {@code to=S_WHATSAPP_NET},
-     *           {@code id=generateId()}, {@code type="get"}) over a
-     *           bare {@code <iq xmlns="fb:thrift_iq">}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBizCtwaAdAccountSendAccountRecoveryNonceRequest",
             exports = "makeSendAccountRecoveryNonceRequest", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin",
+            exports = "mergeHackBaseIQGetRequestMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizCtwaAdAccountBaseIQGetRequestMixin",
+            exports = "mergeBaseIQGetRequestMixin", adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
         var builder = new NodeBuilder()
                 .description("iq")
-                .attribute("xmlns", "fb:thrift_iq")
-                .attribute("to", JidServer.user())
-                .attribute("type", "get");
+                .attribute("xmlns", "fb:thrift_iq") // WASmaxOutBizCtwaAdAccountSendAccountRecoveryNonceRequest.makeSendAccountRecoveryNonceRequest: smax("iq", {xmlns: "fb:thrift_iq", smax_id: INT(112)})
+                .attribute("to", JidServer.user()) // WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin.mergeHackBaseIQGetRequestMixin: to: WAWap.S_WHATSAPP_NET
+                .attribute("type", "get"); // WASmaxOutBizCtwaAdAccountBaseIQGetRequestMixin.mergeBaseIQGetRequestMixin: type: "get" (id=generateId() delegated to WhatsAppClient.sendNode)
         if (fromUserJid != null) {
-            builder.attribute("from", fromUserJid);
+            builder.attribute("from", fromUserJid); // WASmaxOutBizCtwaAdAccountHackBaseIQGetRequestMixin.mergeHackBaseIQGetRequestMixin: from: OPTIONAL(USER_JID, t)
         }
         return builder;
     }

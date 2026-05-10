@@ -370,9 +370,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      *
      * @param chatJid the target chat JID
      * @return the recipient PN, or {@code null} when not applicable
-     *
-     * @implNote Cobalt reads the phone number from the LID-to-PN mapping
-     * table in the store rather than from the contact model.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -542,10 +539,6 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      *
      * @param jid the chat JID to classify, or {@code null}
      * @return the matching {@link MessageChatType}; never {@code null}
-     *
-     * @implNote The {@code STATUS} branch is unreachable because the
-     * preceding broadcast check already catches {@code status@broadcast}; it
-     * is kept to mirror the WA Web source exactly.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetMessageChatTypeFromWid",
             exports = "getMessageChatTypeFromWid",

@@ -7,14 +7,11 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.PnForLidChatAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Handles the {@code pn_for_lid_chat} app state sync action, which carries a
  * phone number JID to be associated with an existing LID JID for a chat.
@@ -32,8 +29,6 @@ import com.github.auties00.cobalt.wam.WamService;
  * each mapping directly on the {@code WhatsAppStore} as the mutations arrive.
  * The end result is semantically equivalent because the store already persists
  * bidirectional {@code phoneJid <-> lidJid} entries.
- *
- * @implNote WAWebPnForLidChatSync
  */
 @WhatsAppWebModule(moduleName = "WAWebPnForLidChatSync")
 public final class PnForLidChatHandler implements WebAppStateActionHandler {
@@ -43,8 +38,6 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      * <p>Per WhatsApp Web {@code WAWebPnForLidChatSync}, the default export is a
      * single {@code new d(...)} instance registered with the sync action
      * registry; Cobalt exposes the same singleton via this constant.
-     *
-     * @implNote WAWebPnForLidChatSync: {@code m=new d;l.default=m}
      */
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final PnForLidChatHandler INSTANCE = new PnForLidChatHandler();
@@ -53,10 +46,6 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      * Constructs the singleton handler instance.
      *
      * <p>Kept {@code private} so that all callers go through {@link #INSTANCE}.
-     *
-     * @implNote WAWebPnForLidChatSync: the default export is a single
-     *           {@code new d} instance; Cobalt mirrors this by exposing only
-     *           {@link #INSTANCE} and disallowing external construction.
      */
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private PnForLidChatHandler() {
@@ -65,9 +54,6 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name routed to this handler.
-     *
-     * @implNote WAWebPnForLidChatSync.getAction:
-     *           {@code WASyncdConst.Actions.PnForLidChat} ({@code "pnForLidChat"})
      * @return the action identifier {@code "pnForLidChat"}
      */
     @Override
@@ -78,8 +64,6 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection this handler operates on.
-     *
-     * @implNote WAWebPnForLidChatSync: {@code this.collectionName = WASyncdConst.CollectionName.Regular}
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
@@ -90,34 +74,12 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version implemented by this handler.
-     *
-     * @implNote WAWebPnForLidChatSync.getVersion: {@code return 8}
      * @return {@code 8}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PnForLidChatAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single {@code pnForLidChat} mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} only when the action state is {@link SyncActionState#SUCCESS},
-     * mirroring WhatsApp Web's per-mutation success flag.
-     *
-     * @implNote WAWebPnForLidChatSync.applyMutations — per-mutation success branch
-     *           returning {@code {actionState: SyncActionState.Success}}
-     * @param client   the WhatsApp client that owns the mutation source
-     * @param mutation the decrypted, trusted mutation to apply
-     * @return {@code true} if the mutation was applied successfully, {@code false}
-     *         for unsupported or malformed mutations
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -151,15 +113,13 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      * {@code bulkUpdatePhoneNumberJids} call and the identity-change side-effect
      * are intentionally not replicated, as Cobalt's store is the sole source of
      * truth.
-     *
-     * @implNote WAWebPnForLidChatSync.applyMutations
      * @param client   the WhatsApp client whose store receives the mapping update
      * @param mutation the decrypted, trusted mutation to apply
      * @return the detailed {@link MutationApplicationResult}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!client.abPropsService().getBool(ABProp.PNH_PN_FOR_LID_CHAT_SYNC)) {
             return MutationApplicationResult.unsupported();
         }
@@ -171,16 +131,16 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
         var indexArray = JSON.parseArray(mutation.index()); // ADAPTED: Cobalt parses the raw JSON index string; WA Web's WAWebSyncdMutationParser already exposes indexParts
         var lidJidString = indexArray != null && indexArray.size() > 1 ? indexArray.getString(1) : null; // ADAPTED: out-of-bounds access in WA Web returns undefined, which fails isWidlike
         if (lidJidString == null || lidJidString.isEmpty()) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         if (!(mutation.value().action().orElse(null) instanceof PnForLidChatAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var pnJid = action.pnJid().orElse(null);
         if (pnJid == null) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         // ADAPTED: WA Web splits the LID check into isWidlike (above) then createUserLidOrThrow
@@ -189,7 +149,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
         // an exception, preserving the underlying MALFORMED semantic.
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         // ADAPTED: WA Web accumulates pairs and flushes once at the end of the batch;

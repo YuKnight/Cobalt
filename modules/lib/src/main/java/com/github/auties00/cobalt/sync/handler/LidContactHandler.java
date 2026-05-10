@@ -14,7 +14,6 @@ import com.github.auties00.cobalt.model.sync.action.contact.LidContactAction;
 import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
 
 import java.util.ArrayList;
 import java.util.logging.Logger;
@@ -33,34 +32,22 @@ import java.util.logging.Logger;
  * address book).
  *
  * <p>Index format: {@code ["lid_contact", lidJid]}.
- *
- * @implNote WAWebLidContactSync.default — singleton instance of the LID contact
- *           sync action handler extending {@code AccountSyncdActionBase}; the
- *           class {@code f} constructor sets
- *           {@code collectionName = WASyncdConst.CollectionName.CriticalUnblockLow}
  */
 @WhatsAppWebModule(moduleName = "WAWebLidContactSync")
 public final class LidContactHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of this handler.
-     *
-     * @implNote WAWebLidContactSync — module-level singleton {@code g = new f()}
      */
     @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final LidContactHandler INSTANCE = new LidContactHandler();
 
     /**
      * Logger for diagnostic messages emitted during LID contact sync processing.
-     *
-     * @implNote ADAPTED: WAWebLidContactSync uses WALogger; Cobalt uses java.util.logging
      */
     private static final Logger LOGGER = Logger.getLogger(LidContactHandler.class.getName());
 
     /**
      * Private constructor preventing external instantiation.
-     *
-     * @implNote WAWebLidContactSync — class {@code f} constructor sets
-     *           {@code collectionName = CriticalUnblockLow}
      */
     @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private LidContactHandler() {
@@ -69,9 +56,6 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for this handler.
-     *
-     * @implNote WAWebLidContactSync.getAction — returns
-     *           {@code WASyncdConst.Actions.LidContact} (value: {@code "lid_contact"})
      * @return the action name string
      */
     @Override
@@ -82,9 +66,6 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection this handler belongs to.
-     *
-     * @implNote WAWebLidContactSync — constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.CriticalUnblockLow}
      * @return the sync patch type
      */
     @Override
@@ -95,30 +76,12 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for this handler.
-     *
-     * @implNote WAWebLidContactSync.getVersion — returns {@code 1}
      * @return the version number
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return LidContactAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single LID contact mutation and returns whether it succeeded.
-     *
-     * @implNote WAWebLidContactSync.applyMutations — per-mutation logic within the
-     *           batch handler, delegating to
-     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -154,21 +117,13 @@ public final class LidContactHandler implements WebAppStateActionHandler {
      * propagated as {@link com.github.auties00.cobalt.exception.WhatsAppException}
      * instances by the calling pipeline; the handler itself no longer mirrors the
      * inline {@code try/catch}.
-     *
-     * @implNote WAWebLidContactSync.applyMutations — per-mutation processing within
-     *           the batch {@code applyMutations(t, a, i)} method. Batch-level
-     *           post-processing in WA Web ({@code createOrMergeAddressBookContacts},
-     *           {@code bulkGet}, {@code setNotAddressBookContacts},
-     *           {@code setUsernamesJob}, {@code frontendFireAndForget}) is adapted
-     *           into direct mutations on the local contact record since Cobalt's
-     *           store is updated synchronously per-mutation
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLidContactSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!client.abPropsService().getBool(ABProp.USERNAME_CONTACT_SYNCD_SUPPORT_ENABLE)) {
             return MutationApplicationResult.unsupported();
         }
@@ -176,19 +131,19 @@ public final class LidContactHandler implements WebAppStateActionHandler {
         var indexArray = JSON.parseArray(mutation.index());
         var lidJidString = indexArray.getString(1);
         if (lidJidString == null || lidJidString.isEmpty()) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
             LOGGER.fine(() -> "[syncd] lid contact sync received non-lid jid: " + lidJidString); // ADAPTED: WAWebLidContactSync.applyMutations — WALogger.ERROR("[syncd] lid contact sync received %s non-lid jids") batched telemetry
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         return switch (mutation.operation()) {
             case SET -> {
                 if (!(mutation.value().action().orElse(null) instanceof LidContactAction action)) {
-                    yield malformedActionValue();
+                    yield SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
                 var contact = client.store()
@@ -217,7 +172,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
                 contact.setAddedByUsername(hasUsername);
 
                 // SKIPPED: debounced background contact sync refresh; not mirrored in Cobalt.
-                retryOrphanStatusMutes(client, wamService, lidJidString);
+                retryOrphanStatusMutes(client, lidJidString);
                 yield MutationApplicationResult.success();
             }
             case REMOVE -> {
@@ -253,20 +208,10 @@ public final class LidContactHandler implements WebAppStateActionHandler {
      * any previously orphaned {@code userStatusMute} mutations referencing that
      * contact's JID are re-applied. Successfully applied orphan mutations are
      * removed from the store.
-     *
-     * @implNote WAWebLidContactSync.applyMutations —
-     *           {@code o("WAWebSyncdOrphan").checkOrphanUserStatusMutes(h.map(e => e.id))}
-     *           retrieves and re-applies orphan status mute mutations by model id.
-     *           WA Web invokes this once after the batch loop with all LID JIDs;
-     *           Cobalt invokes it per-mutation because mutations are processed one
-     *           at a time. WA Web catches failures with {@code .catch()} and logs;
-     *           Cobalt mirrors that with a {@code try/catch} that logs at WARNING.
      * @param client        the WhatsApp client instance
-     * @param wamService    the WAM telemetry service propagated to the
-     *                      orphan handler's per-mutation classification
      * @param lidJidString  the LID JID string of the contact to check orphans for
      */
-    private void retryOrphanStatusMutes(WhatsAppClient client, WamService wamService, String lidJidString) {
+    private void retryOrphanStatusMutes(WhatsAppClient client, String lidJidString) {
         try {
             var entries = client.store().findOrphanMutationsByModel(UserStatusMuteAction.COLLECTION_NAME, lidJidString);
             if (entries.isEmpty()) {
@@ -282,7 +227,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
                         entry.timestamp(),
                         entry.actionVersion()
                 );
-                var result = UserStatusMuteHandler.INSTANCE.applyMutationResult(client, wamService, orphanMutation);
+                var result = UserStatusMuteHandler.INSTANCE.applyMutation(client, orphanMutation);
                 if (result.actionState() == SyncActionState.SUCCESS) {
                     applied.add(entry);
                 }

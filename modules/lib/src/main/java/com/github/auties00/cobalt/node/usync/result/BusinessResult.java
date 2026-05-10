@@ -13,10 +13,6 @@ import java.util.Optional;
  * {@code WAWebCommonParsersVerifiedName} runs in WhatsApp Web is left to the
  * caller because Cobalt's verified-name protobuf decoder lives in a separate
  * module and is shared with notification handlers.
- *
- * @implNote The JS parser returns {@code {verifiedName: parser(node)}} where
- *     {@code parser} is {@code WAWebCommonParsersVerifiedName}. Cobalt defers
- *     the decode to the consumer so the protocol carrier stays cheap.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncBusiness")
 public final class BusinessResult implements UsyncProtocolResponse {

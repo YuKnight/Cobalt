@@ -3,12 +3,8 @@ package com.github.auties00.cobalt.node.smax.biz;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -109,9 +105,11 @@ public final class SmaxBannerSuggestionBanner {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<SmaxBannerSuggestionBanner> of(Node node) {
         Objects.requireNonNull(node, "node cannot be null");
+        // WASmaxParseUtils.assertTag(t, "banner")
         if (!node.hasDescription("banner")) {
             return Optional.empty();
         }
+        // WASmaxParseUtils.flattenedChildWithTag(t, "config")
         var configNode = node.getChild("config").orElse(null);
         if (configNode == null) {
             return Optional.empty();
@@ -120,6 +118,7 @@ public final class SmaxBannerSuggestionBanner {
         if (config == null) {
             return Optional.empty();
         }
+        // WASmaxParseUtils.flattenedChildWithTag(t, "content")
         var contentNode = node.getChild("content").orElse(null);
         if (contentNode == null) {
             return Optional.empty();
@@ -128,6 +127,7 @@ public final class SmaxBannerSuggestionBanner {
         if (content == null) {
             return Optional.empty();
         }
+        // WASmaxParseUtils.optionalChildWithTag(t, "action", e)
         SmaxBannerSuggestionAction action = null;
         var actionNode = node.getChild("action").orElse(null);
         if (actionNode != null) {
@@ -137,19 +137,15 @@ public final class SmaxBannerSuggestionBanner {
             }
             action = parsed.get();
         }
-        var nativeActions = new ArrayList<SmaxBannerSuggestionNativeAction>();
-        var iter = node.streamChildren("native_action").iterator();
-        while (iter.hasNext()) {
-            var parsed = SmaxBannerSuggestionNativeAction.of(iter.next());
-            if (parsed.isEmpty()) {
-                return Optional.empty();
-            }
-            nativeActions.add(parsed.get());
-        }
-        if (nativeActions.size() > 50) {
+        // WASmaxInBizCtwaActionNativeActionsMixinMixin.parseNativeActionsMixinMixin(t):
+        // delegate to the mixin so the 0..50 cardinality check fires
+        // before any native-action child is parsed.
+        var nativeActionsMixin = SmaxBannerSuggestionNativeActionsMixin.of(node).orElse(null);
+        if (nativeActionsMixin == null) {
             return Optional.empty();
         }
-        return Optional.of(new SmaxBannerSuggestionBanner(config, content, action, nativeActions));
+        return Optional.of(new SmaxBannerSuggestionBanner(config, content, action,
+                nativeActionsMixin.nativeAction()));
     }
 
     @Override

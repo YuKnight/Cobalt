@@ -13,8 +13,6 @@ import java.util.Objects;
 /**
  * Typed container for the {@code <skey/>} subtree carrying the
  * current signed pre-key.
- *
- * @implNote Mirrors {@code WAWebSignalUtilsApi.xmppSignedPreKey}.
  */
 @WhatsAppWebModule(moduleName = "WAWebSignalUtilsApi")
 public final class IqUploadPreKeysSignedPreKey {

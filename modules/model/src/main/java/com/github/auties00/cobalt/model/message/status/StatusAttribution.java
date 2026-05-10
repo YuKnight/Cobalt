@@ -271,9 +271,17 @@ public final class StatusAttribution {
          */
         LAYOUTS(8),
         /**
+         * Status was produced by a newsletter (channel) post.
+         */
+        NEWSLETTER_STATUS(9),
+        /**
          * Status is part of the close-friends sharing audience.
          */
-        STATUS_CLOSE_SHARING(9);
+        STATUS_CLOSE_SHARING(10),
+        /**
+         * Status is a paid partnership disclosure.
+         */
+        PAID_PARTNERSHIP(11);
 
         /**
          * Constructs a new {@code Type} enum constant.
@@ -558,7 +566,15 @@ public final class StatusAttribution {
             /**
              * Content was shared from Google Photos.
              */
-            GOOGLE_PHOTOS(10);
+            GOOGLE_PHOTOS(10),
+            /**
+             * Content was shared from SoundCloud.
+             */
+            SOUNDCLOUD(11),
+            /**
+             * Content was shared from Shazam.
+             */
+            SHAZAM(12);
 
             /**
              * Constructs a new {@code Source} enum constant.

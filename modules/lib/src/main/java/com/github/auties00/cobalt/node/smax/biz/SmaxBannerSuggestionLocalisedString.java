@@ -3,12 +3,7 @@ package com.github.auties00.cobalt.node.smax.biz;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -74,6 +69,15 @@ public final class SmaxBannerSuggestionLocalisedString {
      * @return an {@link Optional} carrying the projection, or empty
      *         when the node does not match the documented schema
      */
+    @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaActionBannerSuggestionRequest",
+            exports = "parseBannerSuggestionRequestCtwaSuggestionBannerContentLocalisedHeading",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaActionBannerSuggestionRequest",
+            exports = "parseBannerSuggestionRequestCtwaSuggestionBannerContentLocalisedBody",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaActionBannerSuggestionRequest",
+            exports = "parseBannerSuggestionRequestCtwaSuggestionBannerContentLocalisedHighlight",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<SmaxBannerSuggestionLocalisedString> of(Node node, String expectedTag) {
         Objects.requireNonNull(node, "node cannot be null");
         Objects.requireNonNull(expectedTag, "expectedTag cannot be null");

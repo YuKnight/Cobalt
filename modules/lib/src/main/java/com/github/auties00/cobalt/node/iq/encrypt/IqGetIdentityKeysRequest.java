@@ -58,11 +58,6 @@ public final class IqGetIdentityKeysRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <identity/>} payload
-     *
-     * @implNote {@code WAWebGetIdentityKeysJob.m()} composes the IQ
-     *           via {@code wap("iq", {xmlns:"encrypt", type:"get",
-     *           to:S_WHATSAPP_NET, id}, wap("identity", null,
-     *           e.map(jid =&gt; wap("user", {jid:DEVICE_JID(jid)}))))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",

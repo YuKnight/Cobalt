@@ -22,11 +22,6 @@ import java.util.Optional;
  *
  * <p>Produced by {@link IcdcComputer} and consumed by the outbound message encoder
  * to populate the {@code deviceListMetadata} field in {@code messageContextInfo}.
- *
- * @implNote WA Web returns separate {@code senderAccountType} and
- * {@code receiverAccountType} fields. Cobalt collapses them into a single
- * {@link #accountType} because the caller already knows which role this result
- * represents based on the JID it computed against.
  */
 @WhatsAppWebModule(moduleName = "WAWebIdentityIcdcApi")
 public final class IcdcResult {

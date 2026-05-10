@@ -7,7 +7,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.preference.Label;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.LabelReorderingAction;
@@ -15,8 +14,6 @@ import com.github.auties00.cobalt.model.sync.action.contact.LabelReorderingActio
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -36,30 +33,17 @@ import java.util.List;
  * name.
  *
  * <p>Index format: {@code ["label_reordering"]}
- *
- * @implNote WAWebLabelReorderingSync.default — class extends
- *           {@code AccountSyncdActionBase} with {@code collectionName = Regular},
- *           {@code getVersion() = 3}, {@code getAction() = LabelReordering}, and
- *           {@code applyMutations()} as the per-mutation apply logic
  */
 @WhatsAppWebModule(moduleName = "WAWebLabelReorderingSync")
 public final class LabelReorderingHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code LabelReorderingHandler}.
-     *
-     * @implNote WAWebLabelReorderingSync.default — WA Web exports a single module
-     *           instance {@code m = new d()}; Cobalt mirrors this with a singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final LabelReorderingHandler INSTANCE = new LabelReorderingHandler();
 
     /**
      * Constructs the singleton handler.
-     *
-     * @implNote WAWebLabelReorderingSync.default constructor — sets
-     *           {@code collectionName = CollectionName.Regular}; in Cobalt the
-     *           collection is returned via {@link #collectionName()} from the
-     *           action's static {@code COLLECTION_NAME} constant
      */
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private LabelReorderingHandler() {
@@ -68,10 +52,6 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebLabelReorderingSync.default.getAction — returns
-     *           {@code WASyncdConst.Actions.LabelReordering} which maps to the
-     *           {@code "label_reordering"} action constant
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
@@ -81,9 +61,6 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebLabelReorderingSync.default.collectionName — set in
-     *           constructor to {@code CollectionName.Regular}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -103,20 +80,6 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
     /**
      * {@inheritDoc}
      *
-     * @implNote ADAPTED: WAWebLabelReorderingSync.default.applyMutations — WA Web
-     *           returns {@code {actionState}} objects; Cobalt wraps them in
-     *           {@link MutationApplicationResult} and maps success to
-     *           {@code true}
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
      * <p>Applies the reordering by updating each matching label's
      * {@code orderIndex} to its zero-based position in
      * {@link LabelReorderingAction#sortedLabelIds()}. Labels referenced by the
@@ -125,30 +88,21 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      * {@code WAWebDBLabelsReorder.updateLabelsSortOrder}. Labels present in the
      * store but not referenced by the action retain their existing
      * {@code orderIndex}.
-     *
-     * @implNote WAWebLabelReorderingSync.default.applyMutations and
-     *           WAWebDBLabelsReorder.updateLabelsSortOrder — validates the
-     *           mutation envelope, then applies the sort-order update using the
-     *           in-memory store instead of WA Web's IndexedDB {@code label}
-     *           table. WAM telemetry
-     *           ({@code generateLabelReorderHash}/{@code logLabelSyncEvent}) and
-     *           the {@code frontendFireAndForget("reorderLabels", ...)} renderer
-     *           notification are intentionally omitted in Cobalt.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof LabelReorderingAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var sortedLabelIds = action.sortedLabelIds();
         if (sortedLabelIds.isEmpty()) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         // ADAPTED: WAWebDBLabelsReorder.updateLabelsSortOrder — WA Web builds a
@@ -177,15 +131,6 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      * reorder action uses an empty index (Cobalt still prefixes the action
      * name as the canonical first element to stay consistent with every
      * other handler's index layout).
-     *
-     * @implNote ADAPTED: WA Web ships no public "getMutation" for
-     *           {@code WAWebLabelReorderingSync}; Cobalt materialises the
-     *           mutation here so that {@code reorderLabels} can be exposed on
-     *           {@link WhatsAppClient}. The shape follows the sibling
-     *           {@code WAWebLabelSync.default.getLabelMutation} pattern:
-     *           build a {@link LabelReorderingAction}, wrap it in a
-     *           {@link SyncActionValueBuilder}, emit index {@code [actionName]}
-     *           and wrap the raw mutation in a {@link SyncPendingMutation}.
      * @param sortedLabelIds the full ordered list of integer label identifiers
      * @param timestamp      the mutation timestamp
      * @return the pending mutation for the reorder operation

@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import java.util.Objects;
@@ -16,6 +17,8 @@ import java.util.Optional;
  */
 @WhatsAppWebModule(moduleName = "WASmaxInCoexistenceOnboardingStatusNotificationRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInCoexistenceServerNotificationMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInCoexistenceProductSurfaceMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInCoexistenceEnums")
 public final class SmaxCoexistenceOnboardingStatusNotificationResponse implements SmaxOperation.Response {
     /**
      * The notification id.
@@ -127,28 +130,36 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
             adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<SmaxCoexistenceOnboardingStatusNotificationResponse> of(Node node) {
         Objects.requireNonNull(node, "node cannot be null");
+        // WASmaxParseUtils.assertTag(e, "notification")
         if (!node.hasDescription("notification")) {
             return Optional.empty();
         }
-        if (!node.hasAttribute("type", "hosted")) {
-            return Optional.empty();
-        }
-        var from = node.getAttributeAsJid("from").orElse(null);
-        if (from == null || !"s.whatsapp.net".equals(from.server().toString())) {
-            return Optional.empty();
-        }
-        var id = node.getAttributeAsString("id").orElse(null);
-        if (id == null) {
-            return Optional.empty();
-        }
+        // WASmaxParseUtils.flattenedChildWithTag(e, "onboarding_status")
         var onboardingStatus = node.getChild("onboarding_status").orElse(null);
         if (onboardingStatus == null) {
             return Optional.empty();
         }
+        // WASmaxParseJid.literalJid(WASmaxParseJid.attrDomainJid, e, "from", "s.whatsapp.net"):
+        // attrDomainJid validates the JID is a server-only domain JID
+        // (s.whatsapp.net | g.us | call); literalJid then asserts the
+        // value equals "s.whatsapp.net".
+        var from = node.getAttributeAsJid("from").orElse(null);
+        if (from == null || !from.isServerJid(JidServer.user())) {
+            return Optional.empty();
+        }
+        // WASmaxParseUtils.literal(WASmaxParseUtils.attrString, e, "type", "hosted")
+        if (!node.hasAttribute("type", "hosted")) {
+            return Optional.empty();
+        }
+        // WASmaxParseUtils.attrStringEnum(onboardingStatus, "status",
+        //   WASmaxInCoexistenceEnums.ENUM_COMPLETED_FAILED)
         var status = onboardingStatus.getAttributeAsString("status").orElse(null);
         if (status == null || (!"completed".equals(status) && !"failed".equals(status))) {
             return Optional.empty();
         }
+        // WASmaxInCoexistenceProductSurfaceMixin.parseProductSurfaceMixin(onboardingStatus):
+        // inlined as WASmaxParseUtils.attrStringEnum(onboardingStatus, "product_surface",
+        //   WASmaxInCoexistenceEnums.ENUM_AIFROMMETA_AUTOMATION_BUSINESSPLATFORM)
         var productSurface = onboardingStatus.getAttributeAsString("product_surface").orElse(null);
         if (productSurface == null
                 || (!"ai_from_meta".equals(productSurface)
@@ -156,8 +167,17 @@ public final class SmaxCoexistenceOnboardingStatusNotificationResponse implement
                 && !"business_platform".equals(productSurface))) {
             return Optional.empty();
         }
+        // WASmaxInCoexistenceProviderInfoMixin.parseProviderInfoMixin(onboardingStatus)
         var providerInfo = SmaxCoexistenceOffboardingNotificationProviderInfo.of(onboardingStatus).orElse(null);
         if (providerInfo == null) {
+            return Optional.empty();
+        }
+        // WASmaxInCoexistenceServerNotificationMixin.parseServerNotificationMixin(e):
+        // ADAPTED: only the `id` projection is consumed here. `t` (server
+        // timestamp) and the optional `offline` batch index ([0, 1024]) are
+        // dropped — see class-level @implNote.
+        var id = node.getAttributeAsString("id").orElse(null);
+        if (id == null) {
             return Optional.empty();
         }
         return Optional.of(new SmaxCoexistenceOnboardingStatusNotificationResponse(id, from, status, productSurface, providerInfo));

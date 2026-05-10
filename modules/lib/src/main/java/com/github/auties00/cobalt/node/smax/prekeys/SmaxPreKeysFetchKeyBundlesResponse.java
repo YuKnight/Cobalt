@@ -19,13 +19,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxPreKeysFetchKeyBundlesRequest}.
- *
- * @implNote {@code WASmaxPreKeysFetchKeyBundlesRPC.sendFetchKeyBundlesRPC}
- *           tries {@code Success} → {@code RequestError} →
- *           {@code ServerError} and throws on no-match. Cobalt returns
- *           {@link Optional#empty()} on no-match and renames
- *           {@code RequestError} to the consistent
- *           {@link SmaxPreKeysFetchKeyBundlesResponse.ClientError} naming used across SMAX RPCs.
  */
 public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation.Response
         permits SmaxPreKeysFetchKeyBundlesResponse.Success, SmaxPreKeysFetchKeyBundlesResponse.ClientError, SmaxPreKeysFetchKeyBundlesResponse.ServerError {
@@ -65,18 +58,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
      * user. Each entry is either a successful key-bundle projection
      * ({@link UserKeyBundle}) or a per-user error projection
      * ({@link UserError}).
-     *
-     * @implNote {@code WASmaxInPreKeysFetchKeyBundlesResponseSuccess.parseFetchKeyBundlesResponseSuccess}
-     *           validates the {@code <iq type="result">} envelope,
-     *           extracts the {@code <list/>} child, then projects every
-     *           {@code <user/>} grandchild via the
-     *           {@code UserSuccess} → {@code UserError} →
-     *           {@code UserErrorFallback} disjunction supplied by
-     *           {@code WASmaxInPreKeysUserFetchKeyBundlesSuccessOrFetchKeyBundlesErrorOrFetchKeyBundlesErrorFallbackMixinGroup}.
-     *           Cobalt collapses the two error sub-shapes into the
-     *           single {@link UserError} variant since their wire-shape
-     *           differs only in the code's range
-     *           ({@code 500} literal vs {@code [500, 599]} fallback).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchKeyBundlesResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysIQResultResponseMixin")
@@ -186,9 +167,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
              * @return an {@link Optional} carrying the parsed entry, or
              *         empty when the grandchild matches neither the
              *         success nor error shape
-             *
-             * @implNote mirrors
-             *           {@code WASmaxInPreKeysUserFetchKeyBundlesSuccessOrFetchKeyBundlesErrorOrFetchKeyBundlesErrorFallbackMixinGroup}.
              */
             static Optional<UserEntry> of(Node userNode) {
                 Objects.requireNonNull(userNode, "userNode cannot be null");
@@ -203,15 +181,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
         /**
          * The successful per-user projection. Carries the full Signal
          * pre-key bundle plus optional device-identity attestation.
-         *
-         * @implNote {@code WASmaxInPreKeysFetchKeyBundlesUserSuccessMixin.parseFetchKeyBundlesUserSuccessMixin}
-         *           projects {@code <registration/>}, optional
-         *           {@code <type/>} (32-bit literal {@code [5]}),
-         *           {@code <identity/>}, optional {@code <key/>} pre-key,
-         *           {@code <skey/>} signed pre-key, and optional
-         *           {@code <device-identity/>}. Cobalt models the
-         *           per-user fields verbatim and exposes the optional
-         *           sub-elements as {@link Optional} accessors.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchKeyBundlesUserSuccessMixin")
         @WhatsAppWebModule(moduleName = "WASmaxInPreKeysRegistrationIDMixin")
@@ -537,13 +506,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
             /**
              * The unsigned pre-key projection. Pairs a 3-byte key id
              * with 32 bytes of public-key material.
-             *
-             * @implNote {@code WASmaxInPreKeysPreKeyMixin.parsePreKeyMixin}
-             *           extracts the {@code <id/>} (3 bytes) and
-             *           {@code <value/>} (32 bytes) children of the
-             *           {@code <key/>} element via
-             *           {@code WASmaxInPreKeysKeyIDMixin} and
-             *           {@code WASmaxInPreKeysKeyDataMixin}.
              */
             @WhatsAppWebModule(moduleName = "WASmaxInPreKeysPreKeyMixin")
             @WhatsAppWebModule(moduleName = "WASmaxInPreKeysKeyIDMixin")
@@ -648,12 +610,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
              * The signed pre-key projection. Pairs a 3-byte key id with
              * 32 bytes of public-key material plus a 64-byte
              * signature.
-             *
-             * @implNote {@code WASmaxInPreKeysSignedPreKeyMixin.parseSignedPreKeyMixin}
-             *           extracts the {@code <id/>} (3 bytes),
-             *           {@code <value/>} (32 bytes), and
-             *           {@code <signature/>} (64 bytes) children of the
-             *           {@code <skey/>} element.
              */
             @WhatsAppWebModule(moduleName = "WASmaxInPreKeysSignedPreKeyMixin")
             @WhatsAppWebModule(moduleName = "WASmaxInPreKeysKeyIDMixin")
@@ -787,15 +743,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
          * The per-user error projection. Surfaces a relay-side rejection
          * for a single addressee while the rest of the {@code <list>}
          * may still carry successful bundles.
-         *
-         * @implNote {@code WASmaxInPreKeysFetchKeyBundlesUserErrorMixin.parseFetchKeyBundlesUserErrorMixin}
-         *           parses the literal {@code code="500"} variant. The
-         *           companion
-         *           {@code WASmaxInPreKeysFetchKeyBundlesUserErrorFallbackMixin.parseFetchKeyBundlesUserErrorFallbackMixin}
-         *           accepts {@code code} in {@code [500, 599]}. Cobalt
-         *           collapses the two into the single {@link UserError}
-         *           variant since the wire-shape only differs in the
-         *           code's accepted range.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchKeyBundlesUserErrorMixin")
         @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchKeyBundlesUserErrorFallbackMixin")
@@ -929,13 +876,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
      * The {@code ClientError} reply variant. The relay rejected the
      * outer request as malformed, unauthorised, or referencing no valid
      * JIDs.
-     *
-     * @implNote {@code WASmaxInPreKeysFetchKeyBundlesResponseRequestError.parseFetchKeyBundlesResponseRequestError}
-     *           routes through {@code WASmaxInPreKeysRequestErrorsFetch}
-     *           ({@code IQErrorBadRequest} / {@code IQErrorNoValidJID} /
-     *           {@code IQErrorFallbackClient}); Cobalt collapses to the
-     *           raw {@code (code, text)} pair filtered by the
-     *           {@code [400, 500)} client-error range.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchKeyBundlesResponseRequestError")
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysRequestErrorsFetch")
@@ -1027,11 +967,6 @@ public sealed interface SmaxPreKeysFetchKeyBundlesResponse extends SmaxOperation
     /**
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInPreKeysFetchKeyBundlesResponseServerError.parseFetchKeyBundlesResponseServerError}
-     *           routes through {@code WASmaxInPreKeysServerErrors};
-     *           Cobalt collapses to the raw {@code (code, text)} pair
-     *           filtered by the {@code [500, ∞)} server-error range.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchKeyBundlesResponseServerError")
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysServerErrors")

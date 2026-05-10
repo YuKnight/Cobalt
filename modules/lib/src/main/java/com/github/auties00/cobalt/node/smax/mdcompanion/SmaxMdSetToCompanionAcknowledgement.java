@@ -15,10 +15,6 @@ import java.util.Optional;
 /**
  * The outbound ack stanza. Emitted by the companion back through
  * the socket pipeline after consuming the {@link SmaxMdSetToCompanionResponse} stanza.
- *
- * @implNote {@code WASmaxOutMdSetToCompanionResponseClientResponse.makeSetToCompanionResponseClientResponse}
- *           composes a bare {@code <iq id to type="result"/>} stanza
- *           echoing the request's {@code id} and {@code from}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutMdSetToCompanionResponseClientResponse")
 public final class SmaxMdSetToCompanionAcknowledgement implements SmaxOperation.Request {
@@ -79,10 +75,6 @@ public final class SmaxMdSetToCompanionAcknowledgement implements SmaxOperation.
      * Builds the outbound ack stanza.
      *
      * @return a {@link NodeBuilder} carrying the ack envelope
-     *
-     * @implNote {@code WASmaxOutMdSetToCompanionResponseClientResponse.makeSetToCompanionResponseClientResponse}
-     *           emits {@code <iq id=STANZA_ID(t) to=DOMAIN_JID(n)
-     *           type="result"/>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutMdSetToCompanionResponseClientResponse",

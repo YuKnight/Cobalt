@@ -6,7 +6,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -14,8 +13,6 @@ import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingDisabl
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingDisableLinkPreviewsActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,25 +27,17 @@ import java.util.List;
  * version {@code 8}, and action {@code "setting_disableLinkPreviews"}.
  *
  * <p>Index format: {@code ["setting_disableLinkPreviews"]}
- *
- * @implNote WAWebDisableLinkPreviewsSync.default (singleton instance of the
- *           DisableLinkPreviewsSync class extending AccountSyncdActionBase)
  */
 @WhatsAppWebModule(moduleName = "WAWebDisableLinkPreviewsSync")
 public final class DisableLinkPreviewsHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code DisableLinkPreviewsHandler}.
-     *
-     * @implNote WAWebDisableLinkPreviewsSync.default — {@code var m = new d; l.default = m}
      */
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final DisableLinkPreviewsHandler INSTANCE = new DisableLinkPreviewsHandler();
 
     /**
      * Creates a new {@code DisableLinkPreviewsHandler}.
-     *
-     * @implNote WAWebDisableLinkPreviewsSync — constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
      */
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private DisableLinkPreviewsHandler() {
@@ -57,10 +46,6 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebDisableLinkPreviewsSync.getAction — returns
-     *           {@code WASyncdConst.Actions.DisableLinkPreviews} which is
-     *           {@code "setting_disableLinkPreviews"}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
@@ -70,10 +55,6 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebDisableLinkPreviewsSync — constructor field
-     *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
-     *           which is {@code "regular"}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -91,25 +72,6 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
     }
 
     /**
-     * Applies a single disable link previews mutation.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result state is {@code SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebDisableLinkPreviewsSync.applyMutations — WA Web returns
-     *           {@code SyncActionState} values directly; Cobalt wraps in
-     *           {@link MutationApplicationResult} for type safety
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
-    }
-
-    /**
      * {@inheritDoc}
      *
      * <p>Per WhatsApp Web {@code WAWebDisableLinkPreviewsSync.applyMutations}: iterates
@@ -120,15 +82,13 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      * {@code WAWebSyncdIndexUtils.malformedActionValue}. After iteration,
      * persists the accumulated value once via
      * {@code WAWebDisableLinkPreviewsAction.setDisableLinkPreviewsToUserPrefs}.
-     *
-     * @implNote WAWebDisableLinkPreviewsSync.applyMutations
      * @param client    the WhatsApp client instance
      * @param mutations the batch of mutations to apply
      * @return a list of results parallel to the input
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.isEmpty()) {
             return List.of();
         }
@@ -170,15 +130,13 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      *       {@code WAWebDisableLinkPreviewsAction.setDisableLinkPreviewsToUserPrefs}
      *       and returns {@code Success}.</li>
      * </ol>
-     *
-     * @implNote WAWebDisableLinkPreviewsSync.applyMutations (single-mutation semantics)
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -203,13 +161,6 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      *       operation={@code SET}, version={@code 8},
      *       action={@code "setting_disableLinkPreviews"}</li>
      * </ol>
-     *
-     * @implNote WAWebDisableLinkPreviewsSync.getMutation. The sibling
-     *           {@code sendMutation} export (a thin wrapper that yields
-     *           {@code WAWebSyncdCoreApi.lockForSync([], [this.getMutation(unixTimeMs(), e)], () => Promise.resolve())})
-     *           is not mirrored per-handler in Cobalt; commit is driven by the
-     *           outgoing sync pipeline that consumes {@link SyncPendingMutation}
-     *           instances returned here.
      * @param timestamp          the mutation timestamp
      * @param isPreviewsDisabled whether link previews should be disabled
      * @return the pending mutation ready for sync upload

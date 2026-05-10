@@ -18,11 +18,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsBatchGetGroupInfoRequest}.
- *
- * @implNote {@code WASmaxGroupsBatchGetGroupInfoRPC.sendBatchGetGroupInfoRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order and throws on no-match;
- *           Cobalt returns {@link Optional#empty()} instead.
  */
 public sealed interface SmaxGroupsBatchGetGroupInfoResponse extends SmaxOperation.Response
         permits SmaxGroupsBatchGetGroupInfoResponse.Success, SmaxGroupsBatchGetGroupInfoResponse.ClientError, SmaxGroupsBatchGetGroupInfoResponse.ServerError {
@@ -68,12 +63,6 @@ public sealed interface SmaxGroupsBatchGetGroupInfoResponse extends SmaxOperatio
      * unmodifiable {@link List} of raw {@link Node}s, mirroring the
      * precedent from
      * {@link SmaxGroupsGetParticipatingGroupsResponse.Success}.
-     *
-     * @implNote {@code WASmaxInGroupsBatchGetGroupInfoResponseSuccess.parseBaseGetGroupInfoResponseSuccess}
-     *           validates the IQ envelope, then projects every
-     *           {@code <group>} child via
-     *           {@code WASmaxInGroupsGroupInfoOrTruncatedGroupInfoOrGroupForbiddenOrGroupNotExistMixinGroup}.
-     *           Cobalt keeps the children as raw {@link Node}s.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsBatchGetGroupInfoResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupInfoOrTruncatedGroupInfoOrGroupForbiddenOrGroupNotExistMixinGroup")
@@ -161,12 +150,6 @@ public sealed interface SmaxGroupsBatchGetGroupInfoResponse extends SmaxOperatio
     /**
      * The {@code ClientError} reply variant — the relay rejected the
      * request as malformed or unauthorised.
-     *
-     * @implNote {@code WASmaxInGroupsBatchGetGroupInfoResponseClientError.parseBatchGetGroupInfoResponseClientError}
-     *           parses the {@code <error code text/>} child via the
-     *           shared base mixin; Cobalt collapses to the raw
-     *           {@code (code, text)} pair via
-     *           {@link SmaxBaseServerErrorMixin#parseClientError(Node, Node)}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsBatchGetGroupInfoResponseClientError")
     final class ClientError implements SmaxGroupsBatchGetGroupInfoResponse {
@@ -259,11 +242,6 @@ public sealed interface SmaxGroupsBatchGetGroupInfoResponse extends SmaxOperatio
     /**
      * The {@code ServerError} reply variant — the relay encountered
      * a transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInGroupsBatchGetGroupInfoResponseServerError.parseBatchGetGroupInfoResponseServerError}
-     *           delegates to {@code WASmaxInGroupsBaseServerErrorMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsBatchGetGroupInfoResponseServerError")
     final class ServerError implements SmaxGroupsBatchGetGroupInfoResponse {

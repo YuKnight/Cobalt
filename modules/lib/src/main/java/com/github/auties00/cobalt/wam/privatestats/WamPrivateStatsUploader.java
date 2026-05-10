@@ -241,8 +241,7 @@ public final class WamPrivateStatsUploader {
     /**
      * Assembles the {@code multipart/form-data} body by computing its
      * total length up front and writing directly into a single
-     * heap-allocated {@code byte[]}, avoiding the copy that
-     * {@link java.io.ByteArrayOutputStream#toByteArray} performs.
+     * heap-allocated {@code byte[]}
      *
      * <p>Layout:
      *

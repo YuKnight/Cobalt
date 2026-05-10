@@ -69,12 +69,6 @@ public final class IqSendProfilePictureRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the optional {@code <picture>} payload
-     *
-     * @implNote {@code WAWebSendProfilePictureJob.default}:
-     *           {@code wap("iq",{to:S_WHATSAPP_NET,
-     *           target: isGroup ? CHAT_JID : DROP_ATTR,
-     *           type:"set", xmlns:"w:profile:picture", id},
-     *           a ? wap("picture",{type:"image"}, a) : null)}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSendProfilePictureJob",

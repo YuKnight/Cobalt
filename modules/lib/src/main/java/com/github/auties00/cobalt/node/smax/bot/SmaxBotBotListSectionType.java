@@ -3,16 +3,7 @@ package com.github.auties00.cobalt.node.smax.bot;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+
 import java.util.Optional;
 
 /**
@@ -20,18 +11,38 @@ import java.util.Optional;
  * attribute through {@code WASmaxInBotEnums.ENUM_ALL_CATEGORY_FEATURED}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBotEnums")
+@WhatsAppWebExport(
+        moduleName = "WASmaxInBotEnums",
+        exports = "ENUM_ALL_CATEGORY_FEATURED",
+        adaptation = WhatsAppAdaptation.ADAPTED
+)
 public enum SmaxBotBotListSectionType {
     /**
      * The "all bots" section. A flat list aggregating every bot.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_ALL_CATEGORY_FEATURED",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     ALL("all"),
     /**
      * A category section. Bots grouped by topical category.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_ALL_CATEGORY_FEATURED",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     CATEGORY("category"),
     /**
      * A featured / curated section.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_ALL_CATEGORY_FEATURED",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     FEATURED("featured");
 
     /**
@@ -64,6 +75,11 @@ public enum SmaxBotBotListSectionType {
      * @return an {@link Optional} carrying the resolved enum
      *         constant, or empty when the literal is unknown
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_ALL_CATEGORY_FEATURED",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     public static Optional<SmaxBotBotListSectionType> ofWire(String wireValue) {
         if (wireValue == null) {
             return Optional.empty();

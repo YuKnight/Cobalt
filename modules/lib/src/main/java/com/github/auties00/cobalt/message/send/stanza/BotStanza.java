@@ -295,7 +295,12 @@ public final class BotStanza {
     }
 
     /**
-     * Returns whether the JID is an FBID bot, that is a numeric user on the bot server.
+     * Returns whether the JID is an FBID bot.
+     *
+     * <p>Per WhatsApp Web {@code WAWebWid.prototype.isFbidBot}: a JID is an FBID
+     * bot when its server is {@code bot} and its device identifier is either
+     * {@code null} or {@code 0} (the primary device). The user component is not
+     * inspected.
      *
      * @param jid the JID to check
      * @return {@code true} if the JID is an FBID bot
@@ -303,11 +308,6 @@ public final class BotStanza {
     @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isFbidBot",
             adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isFbidBot(Jid jid) {
-        if (!jid.hasBotServer()) {
-            return false;
-        }
-        var user = jid.user();
-        return user != null && !user.isEmpty()
-                && user.chars().allMatch(Character::isDigit);
+        return jid.hasBotServer() && jid.isPrimaryDevice(); // WAWebWid.Wid.prototype.isFbidBot
     }
 }

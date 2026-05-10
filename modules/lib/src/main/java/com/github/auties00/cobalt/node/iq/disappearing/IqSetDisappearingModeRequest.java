@@ -54,12 +54,6 @@ public final class IqSetDisappearingModeRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <disappearing_mode>} payload
-     *
-     * @implNote {@code WAWebSetDisappearingModeJob.setDisappearingMode}:
-     *           {@code wap("iq",{xmlns:"disappearing_mode",
-     *           to:S_WHATSAPP_NET,type:"set",id},
-     *           wap("disappearing_mode",
-     *           {duration:CUSTOM_STRING(String(t))}))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSetDisappearingModeJob",

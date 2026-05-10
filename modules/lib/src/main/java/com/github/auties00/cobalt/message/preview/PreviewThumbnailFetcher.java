@@ -33,13 +33,6 @@ import javax.imageio.ImageWriteParam;
  * to the source bytes when it is not (Cobalt declares
  * {@code requires static java.desktop} so the build still succeeds
  * on minimal runtimes).
- *
- * @implNote WAWebMediaDataUtils.getResizedThumbData: the JS module
- *           crops/scales to a fixed square (100×100) and transcodes
- *           to JPEG. Cobalt does the same resize when AWT is
- *           available; otherwise it embeds the source bytes verbatim
- *           and the recipient renders them through the same
- *           inline-thumbnail path.
  */
 @WhatsAppWebModule(moduleName = "WAWebMediaDataUtils")
 public final class PreviewThumbnailFetcher {
@@ -53,17 +46,11 @@ public final class PreviewThumbnailFetcher {
 
     /**
      * Target side length (in pixels) of the resized JPEG thumbnail.
-     *
-     * @implNote WAWebMediaDataUtils.getResizedThumbData: WA Web uses
-     *           {@code width=100, height=100}.
      */
     private static final int TARGET_SIZE = 100;
 
     /**
      * JPEG quality applied to the re-encoded thumbnail.
-     *
-     * @implNote WAWebMediaDataUtils.getResizedThumbData uses
-     *           {@code imageFormatOptions: 0.75}.
      */
     private static final float JPEG_QUALITY = 0.75f;
 
@@ -85,7 +72,6 @@ public final class PreviewThumbnailFetcher {
      * @param uri        the image URI
      * @param timeout    the per-request timeout
      * @return the image bytes, or {@code null} when the fetch failed
-     * @implNote WAWebMediaDataUtils.getResizedThumbData download seam.
      */
     @WhatsAppWebExport(moduleName = "WAWebMediaDataUtils", exports = "getResizedThumbData",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -128,8 +114,6 @@ public final class PreviewThumbnailFetcher {
      * @param source the source bytes
      * @return the resized JPEG bytes, or {@code null} when the resize
      *         failed
-     * @implNote WAWebMediaDataUtils.getResizedThumbData inner canvas
-     *           pipeline.
      */
     @WhatsAppWebExport(moduleName = "WAWebMediaDataUtils", exports = "getResizedThumbData",
             adaptation = WhatsAppAdaptation.ADAPTED)

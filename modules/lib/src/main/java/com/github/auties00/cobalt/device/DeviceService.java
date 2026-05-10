@@ -87,9 +87,6 @@ public final class DeviceService {
      * Failed subtasks are swallowed so a single failed batch does not lose the successful
      * results from its siblings. Failures surface later when the expected JID is missing
      * from the collated output and callers fall back to the primary-only device list.
-     *
-     * @implNote Mirrors {@code Promise.allSettled} semantics over virtual threads, replacing
-     * WA Web's {@code Promise.all} on sliced batches in {@code WAWebUsync.USyncQuery.execute}.
      */
     private static final Joiner<List<DeviceListResult>, List<DeviceListResult>> JOINER = new Joiner<>() {
         private final List<Subtask<? extends List<DeviceListResult>>> subtasks = new ArrayList<>();
@@ -224,10 +221,6 @@ public final class DeviceService {
      * @param abPropsService     the AB props service for feature gating
      * @param sessionCipher      the Signal session cipher used by the pre-key handler
      * @param wamService         the WAM telemetry service for committing device events
-     *
-     * @implNote WA Web wires these modules via module-level imports. Cobalt groups their
-     * construction here so a single {@link DeviceService} instance owns and can deterministically
-     * tear down the background ADV scheduler.
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
             exports = "syncDeviceList",
@@ -274,10 +267,6 @@ public final class DeviceService {
      * hosted-device identities instead of requiring a stored identity.
      *
      * @return {@code true} if both AB props gate the feature on
-     *
-     * @implNote Requires both {@code adv_accept_hosted_devices} and
-     * {@code override_adv_account_signature_key_enabled} to be true. Used by
-     * {@code WAWebHandleAdvDeviceNotificationUtils.verifySKeyIndexWithAccSigKey}.
      */
     private boolean isHostedOverrideAdvAccountSignatureKeyEnabled() {
         var hostedDevicesEnabled = abPropsService.getBool(ABProp.ADV_ACCEPT_HOSTED_DEVICES);
@@ -410,10 +399,6 @@ public final class DeviceService {
      * @param userJids the user JIDs to check
      * @param caller   the caller context for the log line; defaults to {@code "unknown"}
      *                 when {@code null}, matching WA Web
-     *
-     * @implNote Uses {@link Set} accumulators so duplicate inputs collapse the same way
-     * WA Web's two {@code Set} buckets do. {@link WhatsAppStore#findLidByPhone} already
-     * embeds WA Web's {@code getCurrentLid} me-user fast path.
      */
     @WhatsAppWebExport(moduleName = "WAWebApiContact",
             exports = "checkPnToLidMapping",
@@ -547,9 +532,9 @@ public final class DeviceService {
                                         .ifPresent(contact -> contact.setUsername(username)));
 
                         if (newList.advAccountType() == ADVEncryptionType.HOSTED) {
-                            store.addToCoexHostedVerificationCache(newList.userJid());
+                            store.addToInteropHostedVerificationCache(newList.userJid());
                             LOGGER.log(System.Logger.Level.DEBUG,
-                                    "Added {0} to coex hosted verification cache", newList.userJid());
+                                    "Added {0} to interop hosted verification cache", newList.userJid());
                         }
 
                         full.accountSignatureKey()
@@ -970,10 +955,6 @@ public final class DeviceService {
      * @param batches the USync IQ batches to dispatch
      * @return the flattened list of parsed device list results
      * @throws RuntimeException if the calling virtual thread is interrupted while waiting
-     *
-     * @implNote WA Web iterates batches with {@code Promise.all}. Cobalt forks one
-     * virtual-thread subtask per batch via {@link StructuredTaskScope} and accumulates
-     * results through the static {@code JOINER}.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery",
@@ -1012,8 +993,8 @@ public final class DeviceService {
 
         // Reject transitions to HOSTED for users not in the verification cache to prevent spoofing.
         if (newType == ADVEncryptionType.HOSTED) {
-            if(!store.isInCoexHostedVerificationCache(userJid)) {
-                throw new IllegalStateException(userJid + " is not in the coex hosted verification cache");
+            if(!store.isInInteropHostedVerificationCache(userJid)) {
+                throw new IllegalStateException(userJid + " is not in the interop hosted verification cache");
             }
         }
 
@@ -1253,9 +1234,6 @@ public final class DeviceService {
      * @param requestedJids the JIDs that were originally requested
      * @param results       the results returned from the server
      * @return the results with backfilled PN entries appended
-     *
-     * @implNote Filters via {@code isRegularUserPn = isUser() && !isPSA() && !isBot() && !isLid()}
-     * and uses {@link WhatsAppStore#findLidByPhone} to resolve the alternate identity.
      */
     @WhatsAppWebExport(moduleName = "WAWebContactSyncUtils",
             exports = "backfillMissingDeviceSyncEntries",
@@ -1411,10 +1389,6 @@ public final class DeviceService {
     /**
      * Stops the ADV device info check scheduler. Callers should invoke this before
      * disconnecting to halt background work deterministically.
-     *
-     * @implNote WA Web has no explicit cancel hook for its scheduled timeout (it is simply
-     * cleared during logout). Cobalt exposes this method so the connection lifecycle can
-     * tear the scheduler down before disconnect.
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
             exports = "scheduleAdvDeviceInfoCheck",
@@ -1519,7 +1493,12 @@ public final class DeviceService {
                 List.of(chatJid, myDeviceJid), "message", expectedPhash, false);
 
         // 1:1 user chats include hosted devices when bizHostedDevicesEnabled.
-        var fanoutDevices = fanoutCalculator.calculate(myDeviceJid, deviceLists, chatJid);
+        // Pass both PN and LID device JIDs so isMeDevice/isMeAccount filter both sides
+        // (WAWebDBDeviceListFanout uses WAWebUserPrefsMeUser globals which read both).
+        var mePnDeviceJid = store.jid().orElse(null);
+        var meLidDeviceJid = store.lid().orElse(null);
+        var fanoutDevices = fanoutCalculator.calculate(
+                mePnDeviceJid, meLidDeviceJid, deviceLists, chatJid);
 
         var changedIdentities = store.unconfirmedIdentityChanges();
         return fanoutCalculator.filterIdentityChanges(fanoutDevices, changedIdentities);
@@ -1542,7 +1521,6 @@ public final class DeviceService {
             exports = "phashV2",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public DeviceGroupFanoutResult getGroupFanout(Jid groupJid, Jid senderDeviceJid) {
-        var myDeviceJid = resolveMyDeviceJid(groupJid);
         try {
             var metadata = client.queryChatMetadata(groupJid);
             var participants = metadata.participants()
@@ -1551,8 +1529,13 @@ public final class DeviceService {
                     .toList();
             var deviceLists = getDeviceLists(participants, "message", null, false);
 
-            // Group messages exclude hosted devices.
-            var fanoutDevices = fanoutCalculator.calculate(myDeviceJid, deviceLists, null);
+            // Group messages exclude hosted devices. Pass both PN and LID device JIDs so
+            // isMeDevice/isMeAccount filter both addressing-mode sides
+            // (WAWebDBDeviceListFanout uses WAWebUserPrefsMeUser globals which read both).
+            var mePnDeviceJid = store.jid().orElse(null);
+            var meLidDeviceJid = store.lid().orElse(null);
+            var fanoutDevices = fanoutCalculator.calculate(
+                    mePnDeviceJid, meLidDeviceJid, deviceLists, null);
 
             var changedIdentities = store.unconfirmedIdentityChanges();
             var filteredDevices = fanoutCalculator.filterIdentityChanges(fanoutDevices, changedIdentities);
@@ -1607,7 +1590,7 @@ public final class DeviceService {
      * @throws IllegalStateException if not logged in
      */
     @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
-            exports = {"getMeDeviceLidOrThrow", "getMeDevicePnOrThrow_DO_NOT_USE"},
+            exports = {"getMeDeviceLidOrThrow", "getMeDevicePnOrThrow_DO_NOT_USE", "getMeDeviceOrThrow"},
             adaptation = WhatsAppAdaptation.ADAPTED)
     private Jid resolveMyDeviceJid(Jid chatJid) {
         var selfJid = store.jid().orElseThrow(() ->
@@ -1765,9 +1748,9 @@ public final class DeviceService {
                 : null;
 
         if (advAccountType == ADVEncryptionType.HOSTED) {
-            store.addToCoexHostedVerificationCache(userJid);
+            store.addToInteropHostedVerificationCache(userJid);
             LOGGER.log(System.Logger.Level.DEBUG,
-                    "Added {0} to coex hosted verification cache via notification", userJid);
+                    "Added {0} to interop hosted verification cache via notification", userJid);
         }
 
         var currentIndex = validatedKeyIndexInfo != null ? validatedKeyIndexInfo.currentIndex() : 0;
@@ -2132,6 +2115,9 @@ public final class DeviceService {
     @WhatsAppWebExport(moduleName = "WAWebAdvSyncDeviceListApi",
             exports = "syncMyDeviceList",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
+            exports = "getMePNandLIDWids",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public void syncMyDeviceList() {
         var myJids = new ArrayList<Jid>();
         store.jid().ifPresent(jid -> myJids.add(jid.toUserJid()));
@@ -2163,10 +2149,6 @@ public final class DeviceService {
      *
      * @param userJid the user JID; only the user portion is significant
      * @return the cached record, or {@link Optional#empty()} when none is stored
-     *
-     * @implNote WA Web backs the LRU with an IndexedDB read. Cobalt collapses cache and
-     * persistence into {@link WhatsAppStore#findDeviceList(Jid)} so the IDB-fallback path
-     * is not needed.
      */
     @WhatsAppWebExport(moduleName = "WAWebApiDeviceList",
             exports = "getDeviceRecord",
@@ -2266,11 +2248,6 @@ public final class DeviceService {
      * @param userJids              the user JIDs to look up
      * @param shouldMergeAltDevices whether alternate-identity records should be merged
      * @return one record per input JID, in input order; missing or deleted entries are {@code null}
-     *
-     * @implNote WA Web returns a stripped projection ({@code {id, devices: [{id, isHosted}]}});
-     * Cobalt returns the full {@link DeviceList} so downstream callers can read any field
-     * directly. WA Web mutates {@code u.devices} in place when merging; Cobalt rebuilds
-     * the record via {@link DeviceList#merge(DeviceList)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebApiDeviceList",
             exports = "getDeviceIds",
@@ -2390,9 +2367,6 @@ public final class DeviceService {
      *
      * @param userJids the user JIDs to look up
      * @return one record per input JID, in input order; missing or deleted entries are {@code null}
-     *
-     * @implNote WA Web returns a lighter projection ({@code {id, devices: [{id, isHosted}], timestamp, expectedTs}}).
-     * Cobalt returns the full {@link DeviceList} since every field is already addressable.
      */
     @WhatsAppWebExport(moduleName = "WAWebApiDeviceList",
             exports = "getDeviceInfoForSync",
@@ -2438,10 +2412,6 @@ public final class DeviceService {
      *
      * @param userJid the user JID whose alternate identity should be resolved
      * @return the alternate user JID, or {@code null} when no mapping exists
-     *
-     * @implNote Mirrors {@code WAWebApiContact.getAlternateUserWid} as needed by
-     * {@link #getDeviceIds(Collection, boolean)}. Kept private here to avoid coupling
-     * the device service to the LID migration service for a pure store lookup.
      */
     @WhatsAppWebExport(moduleName = "WAWebApiContact",
             exports = "getAlternateUserWid",
@@ -2648,10 +2618,6 @@ public final class DeviceService {
      *
      * @param userJid           the user JID to update
      * @param adjustedTimestamp the sender timestamp plus one second
-     *
-     * @implNote In WA Web this routes through {@code handleADVSyncResult} with a minimal
-     * device list and {@code signedKeyIndexBytes=null}, which falls through to
-     * {@code handleOmittedResult}. Cobalt inlines the omitted-result behaviour here.
      */
     private void handleMinimalTimestampOnlySync(Jid userJid, Instant adjustedTimestamp) {
         var cachedList = store.findDeviceList(userJid).orElse(null);
@@ -2765,9 +2731,9 @@ public final class DeviceService {
 
         offlineBizHostedSenderICDCProcessedCache.add(relevantJid);
         LOGGER.log(System.Logger.Level.DEBUG,
-                "handleIcdcMetadataInline: add to coex cache for {0}", relevantJid);
+                "handleIcdcMetadataInline: add to interop cache for {0}", relevantJid);
 
-        store.addToCoexHostedVerificationCache(relevantJid);
+        store.addToInteropHostedVerificationCache(relevantJid);
 
         var existingRecord = store.findDeviceList(relevantJid).orElse(null);
         var senderTimestamp = metadata.senderTimestamp()

@@ -44,11 +44,6 @@ public final class SmaxUnifiedSessionShareRequest implements SmaxOperation.Reque
      *
      * @return a {@link NodeBuilder} carrying the {@code <ib>} envelope
      *         and the {@code <unified_session/>} payload
-     *
-     * @implNote {@code WASmaxOutUnifiedSessionShareRequest.makeShareRequest}
-     *           emits {@code <ib><unified_session
-     *           id=CUSTOM_STRING(t)/></ib>}. No id/xmlns/to attributes
-     *           are populated on the outer envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutUnifiedSessionShareRequest",

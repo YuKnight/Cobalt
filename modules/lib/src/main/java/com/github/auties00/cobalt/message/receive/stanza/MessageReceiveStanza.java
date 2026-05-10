@@ -21,12 +21,6 @@ import java.util.OptionalInt;
  * broadcast participant lists, and every {@code <meta>} attribute. Decryption and
  * downstream processing operate on this structured form rather than re-scanning the
  * raw node.
- *
- * @implNote WA Web produces equivalent data in separate {@code msgInfo},
- * {@code msgMeta}, {@code encs}, {@code deviceIdentity}, {@code bizInfo},
- * {@code hsmInfo}, {@code paymentInfo}, {@code rcat}, {@code msgBotInfo}, and
- * {@code reportingTokenInfo} objects. Cobalt merges them into a single cohesive
- * container.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgParser")
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgCommon")

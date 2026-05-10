@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -54,6 +55,18 @@ public final class UpdateTextStatusMexResponse implements MexOperation.Response.
      */
     public Optional<String> result() {
         return Optional.ofNullable(result);
+    }
+
+    /**
+     * Returns whether the text-status mutation succeeded. Mirrors the WA Web check
+     * {@code result?.xwa2_update_text_status?.result === "SUCCESS"}.
+     *
+     * @return {@code true} if the {@code result} field equals {@code "SUCCESS"}, {@code false} otherwise
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexUpdateTextStatusJob", exports = "mexUpdateTextStatus",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public boolean isSuccess() {
+        return Objects.equals(result, "SUCCESS");
     }
 
     /**

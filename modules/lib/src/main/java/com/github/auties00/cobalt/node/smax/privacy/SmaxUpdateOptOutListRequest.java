@@ -5,18 +5,23 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The outbound stanza variant.
+ * The outbound stanza variant. Wraps a single {@code <item>} child
+ * carrying the marketing-message opt-out parameters in the canonical
+ * {@code <iq xmlns="optoutlist" type="set">} envelope addressed at
+ * {@code s.whatsapp.net}. Three of the eight item attributes
+ * ({@code jid}, {@code category}, {@code action}) are mandatory; the
+ * remaining five ({@code dhash}, {@code reason}, {@code entry_point},
+ * {@code signup_id}, {@code duration}) are optional and are emitted
+ * only when supplied. The {@code id} attribute is generated downstream
+ * by {@code WhatsAppClient.sendNode} via the same path used by every
+ * other SMAX request — Cobalt does not call {@code WAWap.generateId}
+ * inline because dispatch ownership is centralised on the client.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutBlocklistsUpdateOptOutListRequest")
 public final class SmaxUpdateOptOutListRequest implements SmaxOperation.Request {
@@ -183,28 +188,43 @@ public final class SmaxUpdateOptOutListRequest implements SmaxOperation.Request 
     @WhatsAppWebExport(moduleName = "WASmaxOutBlocklistsUpdateOptOutListRequest",
             exports = "makeUpdateOptOutListRequest", adaptation = WhatsAppAdaptation.DIRECT)
     public NodeBuilder toNode() {
-        //   {jid, category, action, dhash?, reason?, entry_point?, signup_id?, duration?})
+        // WASmaxOutBlocklistsUpdateBlockListRequest.makeUpdateOptOutListRequest:
+        // smax("item", { jid: USER_JID(r), category: CUSTOM_STRING(a), action: CUSTOM_STRING(i),
+        //                dhash: OPTIONAL(CUSTOM_STRING, l), reason: OPTIONAL(CUSTOM_STRING, s),
+        //                entry_point: OPTIONAL(CUSTOM_STRING, u), signup_id: OPTIONAL(CUSTOM_STRING, c),
+        //                duration: OPTIONAL(INT, d) })
+        // USER_JID is a thin wrapper over WAWap.JID, and Cobalt's
+        // NodeBuilder.attribute(String, JidProvider) emits the wap-encoded JID directly.
         var itemBuilder = new NodeBuilder()
                 .description("item")
                 .attribute("jid", itemJid)
                 .attribute("category", itemCategory)
                 .attribute("action", itemAction);
         if (itemDhash != null) {
+            // dhash: OPTIONAL(CUSTOM_STRING, l)
             itemBuilder.attribute("dhash", itemDhash);
         }
         if (itemReason != null) {
+            // reason: OPTIONAL(CUSTOM_STRING, s)
             itemBuilder.attribute("reason", itemReason);
         }
         if (itemEntryPoint != null) {
+            // entry_point: OPTIONAL(CUSTOM_STRING, u)
             itemBuilder.attribute("entry_point", itemEntryPoint);
         }
         if (itemSignupId != null) {
+            // signup_id: OPTIONAL(CUSTOM_STRING, c)
             itemBuilder.attribute("signup_id", itemSignupId);
         }
         if (itemDuration != null) {
+            // duration: OPTIONAL(INT, d) — WAWap.INT serialises the integer as a numeric attribute;
+            // NodeBuilder.attribute(String, int) forwards through the same Number coercion path.
             itemBuilder.attribute("duration", itemDuration.intValue());
         }
-        //   {to: S_WHATSAPP_NET, xmlns: "optoutlist", type: "set", id: generateId()})
+        // WASmaxOutBlocklistsUpdateBlockListRequest.makeUpdateOptOutListRequest:
+        // smax("iq", { to: S_WHATSAPP_NET, xmlns: "optoutlist", type: "set", id: generateId() }, <item .../>)
+        // The id attribute is generated downstream by WhatsAppClient.sendNode — Cobalt centralises
+        // generateId() on the client so every SMAX request omits it from toNode().
         return new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "optoutlist")

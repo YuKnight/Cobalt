@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.model.device;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import it.auties.protobuf.annotation.*;
 import it.auties.protobuf.model.*;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -350,6 +351,39 @@ public final class DeviceProps {
         @ProtobufProperty(index = 20, type = ProtobufType.UINT32)
         Integer initialSyncMaxMessagesPerChat;
 
+        /**
+         * Whether the companion can consume chat history from Manus, Meta's
+         * agentic assistant surface that participates in conversations as a
+         * bot side.
+         */
+        @ProtobufProperty(index = 21, type = ProtobufType.BOOL)
+        Boolean supportManusHistory;
+
+        /**
+         * Whether the companion can consume chat history from Hatch, Meta's
+         * Imagine and creator centric chat surface, when its messages are
+         * replayed inside the companion's main inbox.
+         */
+        @ProtobufProperty(index = 22, type = ProtobufType.BOOL)
+        Boolean supportHatchHistory;
+
+        /**
+         * List of Meta bot channel FBIDs whose chat history the companion
+         * supports rendering. The primary uses this list to filter which bot
+         * channel conversations are included in the history bundle.
+         */
+        @ProtobufProperty(index = 23, type = ProtobufType.STRING)
+        List<String> supportedBotChannelFbids;
+
+        /**
+         * Whether the companion supports inline contact rendering inside
+         * historical messages, i.e. the presentation of phone numbers as
+         * tappable contact tokens that resolve against the local address
+         * book rather than as plain text.
+         */
+        @ProtobufProperty(index = 24, type = ProtobufType.BOOL)
+        Boolean supportInlineContacts;
+
 
         /**
          * Creates a new history sync capability descriptor. This constructor
@@ -376,8 +410,12 @@ public final class DeviceProps {
          * @param completeOnDemandReady                      see {@link #completeOnDemandReady()}
          * @param thumbnailSyncDaysLimit                     see {@link #thumbnailSyncDaysLimit()}
          * @param initialSyncMaxMessagesPerChat              see {@link #initialSyncMaxMessagesPerChat()}
+         * @param supportManusHistory                        see {@link #supportManusHistory()}
+         * @param supportHatchHistory                        see {@link #supportHatchHistory()}
+         * @param supportedBotChannelFbids                   see {@link #supportedBotChannelFbids()}
+         * @param supportInlineContacts                      see {@link #supportInlineContacts()}
          */
-        HistorySyncConfig(Integer fullSyncDaysLimit, Integer fullSyncSizeMbLimit, Integer storageQuotaMb, Boolean inlineInitialPayloadInE2EeMsg, Integer recentSyncDaysLimit, Boolean supportCallLogHistory, Boolean supportBotUserAgentChatHistory, Boolean supportCagReactionsAndPolls, Boolean supportBizHostedMsg, Boolean supportRecentSyncChunkMessageCountTuning, Boolean supportHostedGroupMsg, Boolean supportFbidBotChatHistory, Boolean supportAddOnHistorySyncMigration, Boolean supportMessageAssociation, Boolean supportGroupHistory, Boolean onDemandReady, Boolean supportGuestChat, Boolean completeOnDemandReady, Integer thumbnailSyncDaysLimit, Integer initialSyncMaxMessagesPerChat) {
+        HistorySyncConfig(Integer fullSyncDaysLimit, Integer fullSyncSizeMbLimit, Integer storageQuotaMb, Boolean inlineInitialPayloadInE2EeMsg, Integer recentSyncDaysLimit, Boolean supportCallLogHistory, Boolean supportBotUserAgentChatHistory, Boolean supportCagReactionsAndPolls, Boolean supportBizHostedMsg, Boolean supportRecentSyncChunkMessageCountTuning, Boolean supportHostedGroupMsg, Boolean supportFbidBotChatHistory, Boolean supportAddOnHistorySyncMigration, Boolean supportMessageAssociation, Boolean supportGroupHistory, Boolean onDemandReady, Boolean supportGuestChat, Boolean completeOnDemandReady, Integer thumbnailSyncDaysLimit, Integer initialSyncMaxMessagesPerChat, Boolean supportManusHistory, Boolean supportHatchHistory, List<String> supportedBotChannelFbids, Boolean supportInlineContacts) {
             this.fullSyncDaysLimit = fullSyncDaysLimit;
             this.fullSyncSizeMbLimit = fullSyncSizeMbLimit;
             this.storageQuotaMb = storageQuotaMb;
@@ -398,6 +436,10 @@ public final class DeviceProps {
             this.completeOnDemandReady = completeOnDemandReady;
             this.thumbnailSyncDaysLimit = thumbnailSyncDaysLimit;
             this.initialSyncMaxMessagesPerChat = initialSyncMaxMessagesPerChat;
+            this.supportManusHistory = supportManusHistory;
+            this.supportHatchHistory = supportHatchHistory;
+            this.supportedBotChannelFbids = supportedBotChannelFbids;
+            this.supportInlineContacts = supportInlineContacts;
         }
 
         /**
@@ -621,6 +663,50 @@ public final class DeviceProps {
         }
 
         /**
+         * Returns whether the companion can consume Manus chat history in
+         * the history bundle.
+         *
+         * @return {@code true} if Manus history is supported, {@code false}
+         *         otherwise
+         */
+        public boolean supportManusHistory() {
+            return supportManusHistory != null && supportManusHistory;
+        }
+
+        /**
+         * Returns whether the companion can consume Hatch chat history in
+         * the history bundle.
+         *
+         * @return {@code true} if Hatch history is supported, {@code false}
+         *         otherwise
+         */
+        public boolean supportHatchHistory() {
+            return supportHatchHistory != null && supportHatchHistory;
+        }
+
+        /**
+         * Returns the list of Meta bot channel FBIDs whose chat history the
+         * companion supports rendering.
+         *
+         * @return the list of supported bot channel FBIDs; never {@code null},
+         *         possibly empty when no entries were sent on the wire
+         */
+        public List<String> supportedBotChannelFbids() {
+            return supportedBotChannelFbids == null ? List.of() : supportedBotChannelFbids;
+        }
+
+        /**
+         * Returns whether the companion supports rendering inline contact
+         * tokens inside historical messages.
+         *
+         * @return {@code true} if inline contacts are supported,
+         *         {@code false} otherwise
+         */
+        public boolean supportInlineContacts() {
+            return supportInlineContacts != null && supportInlineContacts;
+        }
+
+        /**
          * Overrides the full sync day limit.
          *
          * @param fullSyncDaysLimit the new limit, or {@code null} to clear it
@@ -814,6 +900,44 @@ public final class DeviceProps {
          */
         public void setInitialSyncMaxMessagesPerChat(Integer initialSyncMaxMessagesPerChat) {
             this.initialSyncMaxMessagesPerChat = initialSyncMaxMessagesPerChat;
+    }
+
+        /**
+         * Overrides the Manus history support flag.
+         *
+         * @param supportManusHistory the new flag, or {@code null} to clear it
+         */
+        public void setSupportManusHistory(Boolean supportManusHistory) {
+            this.supportManusHistory = supportManusHistory;
+    }
+
+        /**
+         * Overrides the Hatch history support flag.
+         *
+         * @param supportHatchHistory the new flag, or {@code null} to clear it
+         */
+        public void setSupportHatchHistory(Boolean supportHatchHistory) {
+            this.supportHatchHistory = supportHatchHistory;
+    }
+
+        /**
+         * Overrides the supported bot channel FBIDs list.
+         *
+         * @param supportedBotChannelFbids the new list, or {@code null} to
+         *                                 clear it
+         */
+        public void setSupportedBotChannelFbids(List<String> supportedBotChannelFbids) {
+            this.supportedBotChannelFbids = supportedBotChannelFbids;
+    }
+
+        /**
+         * Overrides the inline contacts support flag.
+         *
+         * @param supportInlineContacts the new flag, or {@code null} to
+         *                              clear it
+         */
+        public void setSupportInlineContacts(Boolean supportInlineContacts) {
+            this.supportInlineContacts = supportInlineContacts;
     }
     }
 }

@@ -85,13 +85,6 @@ public final class MessageIdGenerator {
      *                  pre-image
      * @return the generated message id
      * @throws NullPointerException if any argument is {@code null}
-     *
-     * @implNote Cobalt narrows the V2 fallback catch to
-     * {@link NoSuchAlgorithmException} since the rest of the V2 path cannot
-     * raise checked exceptions and unchecked errors should propagate rather
-     * than silently downgrade. A {@code null} sender JID is rejected up front
-     * instead of being funneled through V1, since that condition is a
-     * programmer error at this layer.
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgKey", exports = "newId",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -145,9 +138,6 @@ public final class MessageIdGenerator {
      * @param senderJid the sender PN user JID, written into the pre-image
      *                  without a length prefix
      * @return the pre-image bytes
-     *
-     * @implNote The WA Web export reads the sender JID from a global user
-     * store; Cobalt receives it as a parameter to avoid that hidden dependency.
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgKeyNewId", exports = "genMsgKeyUint",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -175,10 +165,6 @@ public final class MessageIdGenerator {
      * @param payload the pre-image produced by {@link #genMsgKeyUint}
      * @return {@code "3EB0"} concatenated with 18 uppercase hex characters
      * @throws NoSuchAlgorithmException if SHA-256 is unavailable
-     *
-     * @implNote The WA Web export is {@code async} and reads the pre-image
-     * from a no-arg helper. Cobalt blocks on a virtual thread and accepts
-     * the pre-image as a parameter so the sender JID can be injected.
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgKeyNewId", exports = "getMsgKeyNewSHA256Id",
             adaptation = WhatsAppAdaptation.ADAPTED)

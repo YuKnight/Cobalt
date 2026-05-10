@@ -16,8 +16,6 @@ import java.util.Optional;
  * reply, carrying the bare
  * {@code <hosted-pair-set><device-identity/></hosted-pair-set>}
  * payload.
- *
- * @implNote {@code WASmaxOutMdHostedCompanionSetRegResponseBundleMixin.mergeHostedCompanionSetRegResponseBundleMixin}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutMdSetRegResponseHostedClientResponse")
 @WhatsAppWebModule(moduleName = "WASmaxOutMdHostedCompanionSetRegResponseBundleMixin")
@@ -66,8 +64,6 @@ public final class SmaxMdSetRegResponseHostedClient implements SmaxOperation.Req
      * Builds the outbound hosted pair-success reply stanza.
      *
      * @return a {@link NodeBuilder} carrying the reply envelope
-     *
-     * @implNote {@code WASmaxOutMdSetRegResponseHostedClientResponse.makeSetRegResponseHostedClientResponse}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutMdSetRegResponseHostedClientResponse",

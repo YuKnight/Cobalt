@@ -16,17 +16,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxUpdatePreferenceRequest}.
- *
- * @implNote {@code WASmaxBizMsgUserFeedbackUpdatePreferenceRPC.sendUpdatePreferenceRPC}
- *           tries {@code Success} → {@code InvalidRequest} →
- *           {@code ServerError} parsers in order. The
- *           {@code InvalidRequest} arm carries the {@code 4xx}-code
- *           subset
- *           ({@code NotAcceptable} / {@code BadRequest} /
- *           {@code Forbidden} / {@code RateOverlimit}); Cobalt
- *           collapses it under the standard
- *           {@code ClientError} name to mirror the rest of the SMAX
- *           surface.
  */
 public sealed interface SmaxUpdatePreferenceResponse extends SmaxOperation.Response
         permits SmaxUpdatePreferenceResponse.Success, SmaxUpdatePreferenceResponse.ClientError, SmaxUpdatePreferenceResponse.ServerError {
@@ -63,10 +52,6 @@ public sealed interface SmaxUpdatePreferenceResponse extends SmaxOperation.Respo
     /**
      * The {@code Success} reply variant. The relay accepted the
      * preference update.
-     *
-     * @implNote {@code WASmaxInBizMsgUserFeedbackUpdatePreferenceResponseSuccess.parseUpdatePreferenceResponseSuccess}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope and projects nothing else.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizMsgUserFeedbackUpdatePreferenceResponseSuccess")
     final class Success implements SmaxUpdatePreferenceResponse {
@@ -121,16 +106,6 @@ public sealed interface SmaxUpdatePreferenceResponse extends SmaxOperation.Respo
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, rate-limited, or
      * not-acceptable for the active user.
-     *
-     * @implNote {@code WASmaxInBizMsgUserFeedbackUpdatePreferenceResponseInvalidRequest.parseUpdatePreferenceResponseInvalidRequest}
-     *           routes the {@code <error/>} child through
-     *           {@code WASmaxInBizMsgUserFeedbackUpdatePreferenceReqErrors}
-     *           which collapses {@code NotAcceptable},
-     *           {@code BadRequest}, {@code Forbidden}, and
-     *           {@code RateOverlimit} into a single tagged
-     *           disjunction. Cobalt collapses to the raw
-     *           {@code (code, text)} pair via the shared
-     *           {@link SmaxBaseServerErrorMixin#parseClientError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizMsgUserFeedbackUpdatePreferenceResponseInvalidRequest")
     @WhatsAppWebModule(moduleName = "WASmaxInBizMsgUserFeedbackUpdatePreferenceReqErrors")
@@ -225,12 +200,6 @@ public sealed interface SmaxUpdatePreferenceResponse extends SmaxOperation.Respo
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}) while processing the
      * request.
-     *
-     * @implNote {@code WASmaxInBizMsgUserFeedbackUpdatePreferenceResponseServerError.parseUpdatePreferenceResponseServerError}
-     *           routes through
-     *           {@code WASmaxInBizMsgUserFeedbackUpdatePreferenceServerErrors}.
-     *           Cobalt routes through the shared
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizMsgUserFeedbackUpdatePreferenceResponseServerError")
     @WhatsAppWebModule(moduleName = "WASmaxInBizMsgUserFeedbackUpdatePreferenceServerErrors")

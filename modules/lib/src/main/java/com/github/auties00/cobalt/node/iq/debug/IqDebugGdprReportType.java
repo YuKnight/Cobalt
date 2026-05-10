@@ -7,9 +7,6 @@ import java.util.Optional;
 
 /**
  * Closed set of GDPR report types recognised by the relay.
- *
- * @implNote {@code WAWebGdprConstants.ReportType =
- *           Mirrored(["Account","Newsletters"])}.
  */
 @WhatsAppWebModule(moduleName = "WAWebGdprConstants")
 public enum IqDebugGdprReportType {

@@ -50,10 +50,6 @@ public sealed interface IqClearDirtyBitsResponse extends IqOperation.Response
     /**
      * The {@code Success} reply variant — the relay accepted the
      * dirty-bit clear. Carries no payload beyond the envelope echo.
-     *
-     * @implNote {@code WAWebClearDirtyBitsJob.cleanDirtyReplyParser}
-     *           asserts {@code attr("type")=="result"} and returns
-     *           an empty record.
      */
     @WhatsAppWebModule(moduleName = "WAWebClearDirtyBitsJob")
     final class Success implements IqClearDirtyBitsResponse {

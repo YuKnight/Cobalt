@@ -3,12 +3,9 @@ package com.github.auties00.cobalt.node.smax.biz;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -81,36 +78,47 @@ public final class SmaxBannerSuggestionLocalisationMetadata {
     }
 
     /**
-     * Tries to parse the projection from the given node.
+     * Tries to parse the projection from the given
+     * {@code <localisation_metadata/>} node.
      *
      * @param node the {@code <localisation_metadata/>} node
      * @return an {@link Optional} carrying the projection, or empty
      *         when the node does not match the documented schema
+     * @throws NullPointerException if {@code node} is {@code null}
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBizCtwaActionLocalisationMetadataMixin",
+            exports = "parseLocalisationMetadataMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<SmaxBannerSuggestionLocalisationMetadata> of(Node node) {
         Objects.requireNonNull(node, "node cannot be null");
+        // WASmaxParseUtils.assertTag(t, "localisation_metadata")
         if (!node.hasDescription("localisation_metadata")) {
             return Optional.empty();
         }
+        // WASmaxParseUtils.attrString(t, "uid")
         var uid = node.getAttributeAsString("uid").orElse(null);
         if (uid == null) {
             return Optional.empty();
         }
+        // WASmaxParseUtils.attrString(t, "translation_project")
         var translationProject = node.getAttributeAsString("translation_project").orElse(null);
         if (translationProject == null) {
             return Optional.empty();
         }
-        var parameters = new ArrayList<Parameter>();
-        var iter = node.streamChildren("parameter").iterator();
-        while (iter.hasNext()) {
-            var parsed = Parameter.of(iter.next());
+        // WASmaxParseUtils.mapChildrenWithTag(t, "parameter", 0, 20, e):
+        // first enforce the 0..20 cardinality, then parse each child.
+        var parameterNodes = node.streamChildren("parameter").toList();
+        if (parameterNodes.size() > 20) {
+            return Optional.empty();
+        }
+        var parameters = new ArrayList<Parameter>(parameterNodes.size());
+        for (var parameterNode : parameterNodes) {
+            var parsed = Parameter.of(parameterNode);
             if (parsed.isEmpty()) {
                 return Optional.empty();
             }
             parameters.add(parsed.get());
-        }
-        if (parameters.size() > 20) {
-            return Optional.empty();
         }
         return Optional.of(new SmaxBannerSuggestionLocalisationMetadata(uid, translationProject, parameters));
     }
@@ -188,22 +196,32 @@ public final class SmaxBannerSuggestionLocalisationMetadata {
         }
 
         /**
-         * Tries to parse the entry from the given node.
+         * Tries to parse the entry from the given {@code <parameter/>}
+         * node.
          *
          * @param node the {@code <parameter/>} node
          * @return an {@link Optional} carrying the parsed entry,
          *         or empty when the node does not match the
          *         documented schema
+         * @throws NullPointerException if {@code node} is
+         *                              {@code null}
          */
+        @WhatsAppWebExport(
+                moduleName = "WASmaxInBizCtwaActionLocalisationMetadataMixin",
+                exports = "parseLocalisationMetadataParameter",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Parameter> of(Node node) {
             Objects.requireNonNull(node, "node cannot be null");
+            // WASmaxParseUtils.assertTag(e, "parameter")
             if (!node.hasDescription("parameter")) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.attrString(e, "name")
             var name = node.getAttributeAsString("name").orElse(null);
             if (name == null) {
                 return Optional.empty();
             }
+            // WASmaxParseUtils.attrString(e, "value")
             var value = node.getAttributeAsString("value").orElse(null);
             if (value == null) {
                 return Optional.empty();

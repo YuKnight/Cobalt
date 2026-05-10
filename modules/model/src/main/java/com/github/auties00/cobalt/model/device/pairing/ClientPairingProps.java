@@ -4,6 +4,8 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.util.Optional;
+
 /**
  * Describes the set of client side capabilities and migration states that a companion
  * advertises to WhatsApp's server during the pairing handshake.
@@ -64,18 +66,33 @@ public final class ClientPairingProps {
     Boolean isHsThumbnailSyncEnabled;
 
     /**
+     * Opaque payload that carries the snapshot of the client's subscription
+     * sync state, transmitted to the server during pairing so it can resume
+     * the subscription tracker without replaying the full event log.
+     *
+     * <p>The format is private to the syncd subsystem and is treated as raw
+     * bytes by this layer. Serialised as wire index {@code 5}.
+     */
+    @ProtobufProperty(index = 5, type = ProtobufType.BYTES)
+    byte[] subscriptionSyncPayload;
+
+    /**
      * Full protobuf constructor invoked by the generated builder and the deserializer.
      *
      * @param isChatDbLidMigrated            chat database LID migration flag
      * @param isSyncdPureLidSession          pure LID Syncd session flag
      * @param isSyncdSnapshotRecoveryEnabled snapshot recovery capability flag
      * @param isHsThumbnailSyncEnabled       history sync thumbnail capability flag
+     * @param subscriptionSyncPayload        snapshot of the subscription sync state, or
+     *                                       {@code null} when the client does not need to
+     *                                       resume an existing subscription tracker
      */
-    ClientPairingProps(Boolean isChatDbLidMigrated, Boolean isSyncdPureLidSession, Boolean isSyncdSnapshotRecoveryEnabled, Boolean isHsThumbnailSyncEnabled) {
+    ClientPairingProps(Boolean isChatDbLidMigrated, Boolean isSyncdPureLidSession, Boolean isSyncdSnapshotRecoveryEnabled, Boolean isHsThumbnailSyncEnabled, byte[] subscriptionSyncPayload) {
         this.isChatDbLidMigrated = isChatDbLidMigrated;
         this.isSyncdPureLidSession = isSyncdPureLidSession;
         this.isSyncdSnapshotRecoveryEnabled = isSyncdSnapshotRecoveryEnabled;
         this.isHsThumbnailSyncEnabled = isHsThumbnailSyncEnabled;
+        this.subscriptionSyncPayload = subscriptionSyncPayload;
     }
 
     /**
@@ -119,6 +136,16 @@ public final class ClientPairingProps {
     }
 
     /**
+     * Returns the snapshot of the client's subscription sync state.
+     *
+     * @return the opaque payload bytes, or {@link Optional#empty()} when the field was
+     *         absent on the wire
+     */
+    public Optional<byte[]> subscriptionSyncPayload() {
+        return Optional.ofNullable(subscriptionSyncPayload);
+    }
+
+    /**
      * Replaces the chat database LID migration flag.
      *
      * @param isChatDbLidMigrated the new flag value, or {@code null} to clear it
@@ -153,5 +180,14 @@ public final class ClientPairingProps {
      */
     public void setHsThumbnailSyncEnabled(Boolean isHsThumbnailSyncEnabled) {
         this.isHsThumbnailSyncEnabled = isHsThumbnailSyncEnabled;
+    }
+
+    /**
+     * Replaces the subscription sync payload snapshot.
+     *
+     * @param subscriptionSyncPayload the new payload bytes, or {@code null} to clear it
+     */
+    public void setSubscriptionSyncPayload(byte[] subscriptionSyncPayload) {
+        this.subscriptionSyncPayload = subscriptionSyncPayload;
     }
 }

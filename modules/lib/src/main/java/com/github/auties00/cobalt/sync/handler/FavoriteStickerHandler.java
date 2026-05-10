@@ -6,7 +6,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.StickerAction;
@@ -14,8 +13,6 @@ import com.github.auties00.cobalt.model.sync.action.media.StickerActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -50,11 +47,6 @@ import java.util.List;
  * </ol>
  *
  * <p>Index format: {@code ["favoriteSticker", stickerFileHash]}.
- *
- * @implNote WAWebStickersFavoriteSyncAction — extends {@code AccountSyncdActionBase}
- *           with {@code collectionName = WASyncdConst.CollectionName.RegularLow},
- *           {@code getAction()} returning {@code WASyncdConst.Actions.FavoriteSticker}
- *           ({@code "favoriteSticker"}), and {@code getVersion()} returning {@code 7}
  */
 @WhatsAppWebModule(moduleName = "WAWebStickersFavoriteSyncAction")
 public final class FavoriteStickerHandler implements WebAppStateActionHandler {
@@ -66,25 +58,17 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
      * The handler must consult the primary device's reported feature set rather
      * than any AB prop, since favorite-sticker sync is gated on the primary's
      * support for the feature, not on a per-companion experiment.
-     *
-     * @implNote WAWebMiscGatingUtils.isFavoriteStickersEnabled — primary feature key
      */
     private static final String FAVORITE_STICKER_FEATURE = "favorite_sticker";
 
     /**
      * The singleton instance of {@code FavoriteStickerHandler}.
-     *
-     * @implNote WAWebStickersFavoriteSyncAction.default — WA Web exports a single
-     *           pre-instantiated handler ({@code p = new m; l.default = p})
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final FavoriteStickerHandler INSTANCE = new FavoriteStickerHandler();
 
     /**
      * Constructs the singleton instance.
-     *
-     * @implNote WAWebStickersFavoriteSyncAction — WA Web instantiates the handler
-     *           once via {@code new m()} and exports it as the module default
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private FavoriteStickerHandler() {
@@ -93,10 +77,6 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebStickersFavoriteSyncAction.getAction — returns
-     *           {@code WASyncdConst.Actions.FavoriteSticker} which equals
-     *           {@code "favoriteSticker"}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "getAction", adaptation = WhatsAppAdaptation.DIRECT)
@@ -106,10 +86,6 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebStickersFavoriteSyncAction — sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
-     *           in the constructor
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
@@ -124,24 +100,6 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return StickerAction.ACTION_VERSION;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>Single-mutation adapter that mirrors the WhatsApp Web batch logic for
-     * a list of size one and reduces the per-mutation outcome to a boolean: a
-     * {@code SUCCESS} result is mapped to {@code true}, all other states are
-     * mapped to {@code false}.
-     *
-     * @implNote ADAPTED: WAWebStickersFavoriteSyncAction.applyMutations — WA Web only
-     *           defines a batch entry point; this single-mutation path delegates to
-     *           {@link #applyMutationResult} and reduces the outcome to a boolean
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
     }
 
     /**
@@ -179,12 +137,10 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
      * "use existing boolean accessors for nullable Boolean fields". This is an
      * intentional architectural difference from WA Web, which would treat the
      * same case as {@code malformedActionValue}.
-     *
-     * @implNote WAWebStickersFavoriteSyncAction.applyMutations — per-mutation closure
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -193,11 +149,11 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
             var indexArray = JSON.parseArray(mutation.index());
             var stickerHash = indexArray.getString(1);
             if (stickerHash == null || stickerHash.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().action().orElse(null) instanceof StickerAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
             // ADAPTED: WAWebStickersFavoriteSyncAction.applyMutations — WA Web checks if (g == null) on the protobuf isFavorite flag and returns malformedActionValue.
             // Cobalt's StickerAction.isFavorite() accessor coalesces a null protobuf field to false per the project's "no Optional<Boolean>" rule, so the malformed-on-null check is intentionally not replicated here.
@@ -238,11 +194,6 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
      * the original sticker record on the primary device when the mutation
      * round-trips through app-state sync, so this helper intentionally leaves
      * the media fields unset.
-     *
-     * @implNote WAWebStickersFavoriteSyncAction — outgoing SET mutation shape
-     *           mirrors the inbound payload that
-     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     *           consumes
      * @param stickerHash the sticker file hash used as the mutation index
      * @param favorite    {@code true} to mark the sticker as favourite,
      *                    {@code false} to unfavourite it

@@ -37,13 +37,6 @@ import java.util.concurrent.StructuredTaskScope.Subtask;
  *
  * <p>Invoked by {@link com.github.auties00.cobalt.device.DeviceService} during message send
  * (to ensure sessions exist) and after device sync (to prefetch identity keys).
- *
- * @implNote WAWebFetchPrekeysJob.fetchPrekeys: performs the IQ exchange against
- * {@code <iq xmlns="encrypt" type="get">} and parses prekey bundles from the response.
- * WAWebManageE2ESessionsJob.ensureE2ESessions: deduplicates concurrent session establishment
- * requests via a module-level map.
- * WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: prefetches identity keys for users with
- * validated key index info after USync completes.
  */
 @WhatsAppWebModule(moduleName = "WAWebFetchPrekeysJob")
 @WhatsAppWebModule(moduleName = "WAWebManageE2ESessionsJob")
@@ -108,10 +101,6 @@ public final class DevicePreKeyHandler {
      * @param depletedPrekeyCount the number of devices in the response for which the
      *                            server returned no one-time pre-key (the pool was
      *                            depleted for that device)
-     *
-     * @implNote WAWebProcessKeyBundle.splitKeyBundles: the count is incremented for
-     *     each response entry where {@code !i.key && !i.wid.isBot()}; Cobalt replicates
-     *     that check during response parsing.
      */
     public record PreKeyFetchResult(Map<Jid, SignalPreKeyBundle> bundles, int depletedPrekeyCount) {
         /**
@@ -132,7 +121,6 @@ public final class DevicePreKeyHandler {
      *
      * @param deviceJids the device JIDs to fetch pre-keys for
      * @return the fetch result with bundles and depleted one-time pre-key count
-     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: default call does not set {@code reason=identity}.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
@@ -154,10 +142,6 @@ public final class DevicePreKeyHandler {
      * @param hasUserReasonIdentity whether to set {@code reason="identity"} on each user node
      * @return map of device JIDs to their pre-key bundles; empty if the fetch fails
      * @throws RuntimeException if the virtual thread is interrupted while waiting
-     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: builds the IQ, parses the response into
-     * per-user bundles, then hands each bundle to WAWebProcessKeyBundle.
-     * WAWebManageE2ESessionsJob.ensureE2ESessions: deduplicates concurrent fetches and
-     * delegates to fetchPrekeys for missing devices.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
@@ -284,10 +268,6 @@ public final class DevicePreKeyHandler {
      *
      * @param bundles             the pre-key bundles parsed from this batch's response
      * @param depletedPrekeyCount the depleted one-time pre-key count for this batch
-     *
-     * @implNote WAWebProcessKeyBundle.splitKeyBundles: returns {@code {primaryBundle,
-     *     companionBundle, depletedPrekeyCount}}; Cobalt collapses the primary/companion
-     *     split since sorting happens later and only keeps the depleted count.
      */
     private record PreKeyBatchResult(Map<Jid, SignalPreKeyBundle> bundles, int depletedPrekeyCount) {
     }
@@ -298,8 +278,6 @@ public final class DevicePreKeyHandler {
      * @param deviceJids            the devices included in this batch
      * @param hasUserReasonIdentity whether to set {@code reason="identity"} on each user node
      * @return the batch result with parsed bundles and depleted one-time pre-key count
-     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: sends the IQ and passes the response to
-     * the response parser.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
@@ -315,8 +293,6 @@ public final class DevicePreKeyHandler {
      *
      * @param deviceJids the devices to batch
      * @return the list of batches in input order
-     * @implNote WAWebRunInBatches: WA Web provides a generic batching helper; Cobalt inlines
-     * a simple linear split because the sizes involved are small.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
@@ -351,8 +327,6 @@ public final class DevicePreKeyHandler {
      * @param deviceJids            the device JIDs to query
      * @param hasUserReasonIdentity whether to include {@code reason="identity"}
      * @return the IQ node builder
-     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: constructs the {@code <key>} node with
-     * {@code <user jid=".." [reason="identity"]/>} children.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
@@ -396,10 +370,6 @@ public final class DevicePreKeyHandler {
      *
      * @param response the IQ response node
      * @return the batch result with parsed bundles and depleted one-time pre-key count
-     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: iterates the response list and delegates
-     * per-user parsing to an internal function matching {@link #parseUserPreKeyBundle}.
-     * WAWebProcessKeyBundle.splitKeyBundles: increments the depleted counter when
-     * {@code !i.key && !i.wid.isBot()}.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
@@ -447,8 +417,6 @@ public final class DevicePreKeyHandler {
      * @param userNode the {@code <user>} node for this device
      * @return the parsed pre-key bundle
      * @throws IllegalArgumentException if any required field is missing
-     * @implNote WAWebFetchPrekeysJob.fetchPrekeys: decodes registration id, identity, signed
-     * pre-key, and optional one-time pre-key from the user node.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchPrekeysJob",
             exports = "fetchPrekeys",
@@ -528,7 +496,6 @@ public final class DevicePreKeyHandler {
      * @param byteCount the number of leading bytes to interpret
      * @return the resulting big-endian unsigned integer
      * @throws IllegalArgumentException if {@code bytes} has fewer than {@code byteCount} bytes
-     * @implNote WAParsableXmlNode.convertBytesToUint: identical accumulator implementation.
      */
     @WhatsAppWebExport(moduleName = "WAParsableXmlNode",
             exports = "convertBytesToUint",
@@ -549,8 +516,6 @@ public final class DevicePreKeyHandler {
      *
      * @param deviceJids the device JIDs to check
      * @return the devices for which a session needs to be established
-     * @implNote WAWebManageE2ESessionsJob.ensureE2ESessions: filters devices via
-     * {@code hasSignalSessions} before calling {@code fetchPrekeys}.
      */
     @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
             exports = "ensureE2ESessions",
@@ -577,9 +542,6 @@ public final class DevicePreKeyHandler {
      * @return the number of devices in the server response for which the one-time pre-key
      *         pool was depleted (i.e. no {@code <key>} element was returned for a non-bot
      *         device); used by the caller to emit {@code PrekeysDepletionEvent}
-     * @implNote WAWebManageE2ESessionsJob.ensureE2ESessions: combines the
-     * "missing session?" filter and the fetch into a single top-level entry point and
-     * returns {@code {missedPrekeyCount, depletedPrekeyCount, deletedDevices}}.
      */
     @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
             exports = "ensureE2ESessions",
@@ -605,8 +567,6 @@ public final class DevicePreKeyHandler {
      *
      * @param userJids the user JIDs to fetch identity keys for
      * @throws RuntimeException if the virtual thread is interrupted while waiting
-     * @implNote WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: sends the identity query and
-     * stores each received identity via {@code WAWebSignalProtocolStore.saveIdentity}.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
             exports = "getAndStoreIdentityKeys",
@@ -654,8 +614,6 @@ public final class DevicePreKeyHandler {
      * Fetches and stores identity keys for a single batch of users.
      *
      * @param userJids the users in this batch
-     * @implNote WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: sends the identity IQ and
-     * parses the response into trusted identity store entries.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
             exports = "getAndStoreIdentityKeys",
@@ -671,8 +629,6 @@ public final class DevicePreKeyHandler {
      *
      * @param userJids the users in this batch
      * @return the IQ node builder with the {@code <identity>} child
-     * @implNote WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: constructs the
-     * {@code <identity>} node with one {@code <user>} per user JID targeting the primary device.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
             exports = "getAndStoreIdentityKeys",
@@ -705,9 +661,6 @@ public final class DevicePreKeyHandler {
      * or non-32-byte identity value are likewise skipped and logged.
      *
      * @param response the IQ response node
-     * @implNote WAWebGetIdentityKeysJob.getAndStoreIdentityKeys: iterates response
-     * {@code <list>/<user>} children and calls {@code WAWebSignalProtocolStore.saveIdentity}
-     * for each valid entry.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
             exports = "getAndStoreIdentityKeys",
@@ -754,8 +707,6 @@ public final class DevicePreKeyHandler {
      * @param userJids  the users to batch
      * @param batchSize the maximum batch size
      * @return the list of batches in input order
-     * @implNote WAWebRunInBatches: WA Web uses a generic batching helper; Cobalt inlines a
-     * linear split.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetIdentityKeysJob",
             exports = "getAndStoreIdentityKeys",
@@ -791,12 +742,9 @@ public final class DevicePreKeyHandler {
      * @param accountSignatureKey the 32-byte account signature key
      * @throws NullPointerException     if any argument is {@code null}
      * @throws IllegalArgumentException if {@code accountSignatureKey} is not exactly 32 bytes
-     * @implNote WAWebBizCoexGatingUtils.hostedOverrideAdvAccountSignatureKeyEnabled path:
-     * WA Web calls {@code WAWebSignalProtocolStore.saveIdentity(address, accountSignatureKey)}
-     * directly when the override flag is active.
      */
-    @WhatsAppWebExport(moduleName = "WAWebBizCoexGatingUtils",
-            exports = "hostedOverrideAdvAccountSignatureKeyEnabled",
+    @WhatsAppWebExport(moduleName = "WAWebHandleAdvDeviceNotificationUtils",
+            exports = "verifySKeyIndexWithAccSigKey",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void storeIdentityFromAccountSignatureKey(Jid userJid, byte[] accountSignatureKey) {
         Objects.requireNonNull(userJid, "userJid cannot be null");

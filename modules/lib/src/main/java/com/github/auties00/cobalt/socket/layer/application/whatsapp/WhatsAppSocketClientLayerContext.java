@@ -1,9 +1,12 @@
 package com.github.auties00.cobalt.socket.layer.application.whatsapp;
 
-import com.github.auties00.cobalt.socket.threading.SocketClientInboundResult;
-import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.socket.layer.SocketClientLayerListener;
 import com.github.auties00.cobalt.socket.layer.application.SocketClientApplicationLayerContext;
+import com.github.auties00.cobalt.socket.threading.SocketClientInboundResult;
+import com.github.auties00.cobalt.socket.threading.SocketClientLayerContext;
 import com.github.auties00.cobalt.socket.threading.SocketClientPendingRead;
 import com.github.auties00.cobalt.util.DataUtils;
 
@@ -32,14 +35,8 @@ import java.util.concurrent.Executors;
  * <li>Lower layers (and the selector) read or unwrap directly into
  *     whichever buffer {@link #inboundTarget()} returns.</li>
  * </ul>
- *
- * @implNote Adapts WA Web's {@code WAFrameSocket.FrameSocket}. WA Web
- *     uses a single {@code Binary} accumulation buffer plus a
- *     peek/read loop; Cobalt integrates the same state machine
- *     directly into the selector-driven layer context chain and adds
- *     a dual-mode flag so the Noise handshake can pull bytes through
- *     blocking reads instead of going via the listener.
  */
+@WhatsAppWebModule(moduleName = "WAFrameSocket")
 final class WhatsAppSocketClientLayerContext implements SocketClientApplicationLayerContext {
     /**
      * Number of bytes in the int24 length prefix.
@@ -190,6 +187,7 @@ final class WhatsAppSocketClientLayerContext implements SocketClientApplicationL
      * @return the processing result
      */
     @Override
+    @WhatsAppWebExport(moduleName = "WAFrameSocket", exports = "FrameSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     public SocketClientInboundResult processInbound(int bytesRead) {
         if (handshakeMode) {
             return processHandshakeRead(bytesRead);
@@ -246,6 +244,7 @@ final class WhatsAppSocketClientLayerContext implements SocketClientApplicationL
      * @param source the buffer containing decoded bytes, in read mode
      * @return the processing result
      */
+    @WhatsAppWebExport(moduleName = "WAFrameSocket", exports = "FrameSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     public SocketClientInboundResult feedFromSource(ByteBuffer source) {
         if (handshakeMode) {
             return feedHandshakeRead(source);

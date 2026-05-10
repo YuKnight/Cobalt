@@ -7,10 +7,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -218,28 +215,24 @@ public final class SmaxBugReportingReportBugRequest implements SmaxOperation.Req
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         payload
-     *
-     * @implNote {@code WASmaxOutBugReportingReportBugRequest.makeReportBugRequest}
-     *           composes the
-     *           {@code WASmaxOutBugReportingHackBaseIQSetRequestMixin}
-     *           ({@code from? to=S_WHATSAPP_NET}) and
-     *           {@code WASmaxOutBugReportingBaseIQSetRequestMixin}
-     *           ({@code id=generateId() type="set"}) over a payload
-     *           comprising mandatory {@code <description/>} and
-     *           {@code <debug_information_json/>} children, an
-     *           OPTIONAL_CHILD {@code <device_log_handle/>}, a
-     *           REPEATED_CHILD ({@code 0..10}) of
-     *           {@code <media iv cipherKey type? fileName?/>}
-     *           entries, and four trailing OPTIONAL_CHILD entries
-     *           ({@code <title/>}, {@code <category/>},
-     *           {@code <client_server_join_key/>},
-     *           {@code <reproducibility/>}). The envelope carries
-     *           the literal {@code xmlns="fb:thrift_iq"} and
-     *           {@code smax_id=105} attributes.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBugReportingReportBugRequest",
             exports = "makeReportBugRequest", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBugReportingReportBugRequest",
+            exports = "makeReportBugRequestDeviceLogHandle", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBugReportingReportBugRequest",
+            exports = "makeReportBugRequestTitle", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBugReportingReportBugRequest",
+            exports = "makeReportBugRequestCategory", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBugReportingReportBugRequest",
+            exports = "makeReportBugRequestClientServerJoinKey", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBugReportingReportBugRequest",
+            exports = "makeReportBugRequestReproducibility", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBugReportingHackBaseIQSetRequestMixin",
+            exports = "mergeHackBaseIQSetRequestMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBugReportingBaseIQSetRequestMixin",
+            exports = "mergeBaseIQSetRequestMixin", adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
         var children = new ArrayList<Node>();
         // <description>{descriptionElementValue}</description>
@@ -300,11 +293,11 @@ public final class SmaxBugReportingReportBugRequest implements SmaxOperation.Req
         }
         return new NodeBuilder()
                 .description("iq")
-                .attribute("xmlns", "fb:thrift_iq")
+                .attribute("xmlns", "fb:thrift_iq") // smax("iq", {xmlns: "fb:thrift_iq", smax_id: WAWap.INT(105)}, ...) in WASmaxOutBugReportingReportBugRequest.makeReportBugRequest
                 .attribute("smax_id", 105)
-                .attribute("from", iqFrom)
-                .attribute("to", Jid.userServer())
-                .attribute("type", "set")
+                .attribute("from", iqFrom) // WASmaxOutBugReportingHackBaseIQSetRequestMixin.mergeHackBaseIQSetRequestMixin: stamps OPTIONAL(WAWap.USER_JID, iqFrom)
+                .attribute("to", Jid.userServer()) // WASmaxOutBugReportingHackBaseIQSetRequestMixin.mergeHackBaseIQSetRequestMixin: stamps to=WAWap.S_WHATSAPP_NET
+                .attribute("type", "set") // WASmaxOutBugReportingBaseIQSetRequestMixin.mergeBaseIQSetRequestMixin: stamps type="set" via WASmaxMixins.mergeStanzas; id is added by the central IQ dispatch pipeline (WAWap.generateId())
                 .content(children);
     }
 

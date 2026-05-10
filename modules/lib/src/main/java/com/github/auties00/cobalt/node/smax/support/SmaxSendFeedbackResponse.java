@@ -14,16 +14,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxSupportMessageFeedbackSendFeedbackRPC.sendSendFeedbackRPC}
- *           tries {@code Success} → {@code Error} in order. The WA
- *           Web {@code Error} variant is itself a disjunction over
- *           {@code IQErrorBadRequest} (400) /
- *           {@code IQErrorInternalServerError} (500) /
- *           {@code IQErrorRateOverlimit} (429); Cobalt splits the
- *           disjunction by code into the standard
- *           {@code ClientError} ({@code [400, 500)}) and
- *           {@code ServerError} ({@code [500, ...)}) buckets.
  */
 public sealed interface SmaxSendFeedbackResponse extends SmaxOperation.Response
         permits SmaxSendFeedbackResponse.Success, SmaxSendFeedbackResponse.ClientError, SmaxSendFeedbackResponse.ServerError {
@@ -59,11 +49,6 @@ public sealed interface SmaxSendFeedbackResponse extends SmaxOperation.Response
      * The {@code Success} reply variant. The relay accepted the
      * feedback and emitted the {@code <result status="Success"/>}
      * acknowledgement.
-     *
-     * @implNote {@code WASmaxInSupportMessageFeedbackSendFeedbackResponseSuccess.parseSendFeedbackResponseSuccess}
-     *           validates the {@code <iq>} envelope, extracts the
-     *           {@code <result>} child, and asserts
-     *           {@code status == "Success"}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInSupportMessageFeedbackSendFeedbackResponseSuccess")
     final class Success implements SmaxSendFeedbackResponse {

@@ -41,8 +41,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
     /**
      * The logger instance for this handler, using the fully qualified class name
      * as the logger name.
-     *
-     * @implNote WAWebHandleProfilePicNotification (WALogger usage)
      */
     private static final System.Logger LOGGER =
             System.getLogger(NotificationProfileStreamHandler.class.getName());
@@ -57,8 +55,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
     /**
      * The WhatsApp client instance providing access to the store, query methods,
      * and node sending capabilities.
-     *
-     * @implNote WAWebHandleProfilePicNotification (module-level dependencies)
      */
     private final WhatsAppClient whatsapp;
 
@@ -66,7 +62,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * Constructs a new profile/status notification handler.
      *
      * @param whatsapp the non-{@code null} WhatsApp client instance
-     * @implNote WAWebHandleProfilePicNotification, WAWebHandleAboutNotification (module scope)
      */
     public NotificationProfileStreamHandler(WhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
@@ -81,8 +76,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * are routed to {@link #handleAbout(Node)}.
      *
      * @param node the non-{@code null} notification stanza node
-     * @implNote WAWebHandleProfilePicNotification.handleProfilePicNotificationJob,
-     *           WAWebHandleAboutNotification.handleAboutNotification
      */
     @Override
     public void handle(Node node) {
@@ -197,8 +190,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * @param actionType either {@code "set"} or {@code "delete"}
      * @param node       the notification stanza node (for timestamp and author extraction)
      * @param actionNode the action child node (for author extraction)
-     * @implNote WAWebHandleProfilePicNotification._ (delete/set case),
-     *           WAWebChangeProfilePicThumb.changeProfilePicThumb
      */
     private void handlePictureSetOrDelete(Jid targetJid, String actionType, Node node, Node actionNode) {
         // ADAPTED: Cobalt only persists the picture URI for the local account; non-self
@@ -282,7 +273,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * @param node     the notification stanza node (for {@code from}, {@code notify}, {@code t} attrs)
      * @param setNode  the {@code set} child node containing the status content
      * @param stanzaId the stanza ID for logging purposes
-     * @implNote WAWebHandleAboutNotification.f (case "change")
      */
     private void handleAboutChange(Node node, Node setNode, String stanzaId) {
         var from = node.getAttributeAsJid("from")
@@ -334,7 +324,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @param setNode  the {@code set} child node containing the {@code hash} attribute
      * @param stanzaId the stanza ID for logging purposes
-     * @implNote WAWebHandleAboutNotification.f (case "sideListChange")
      */
     private void handleAboutSideListChange(Node setNode, String stanzaId) {
         var hash = setNode.getAttributeAsString("hash", null);
@@ -400,7 +389,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @param user the user component of the contact's JID (typically a phone number)
      * @return the Base64-encoded 3-byte hash
-     * @implNote WAWebApiContact.getContactHash (function k)
      */
     private String computeContactHash(String user) {
         try {
@@ -456,7 +444,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @param contactJid the non-{@code null} JID of the contact to update
      * @param chosenName the new chosen name, or {@code null} to skip the update
-     * @implNote ADAPTED: WAWebHandleAboutNotification.p (pushname parsed but only used for logging in WA Web)
      */
     private void updateContactChosenName(Jid contactJid, String chosenName) {
         if (contactJid == null || chosenName == null || chosenName.isBlank()) {
@@ -474,7 +461,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * listeners, each on its own virtual thread.
      *
      * @param jid the JID of the entity whose profile picture changed
-     * @implNote WAWebHandleProfilePicNotification._ (implicit via changeProfilePicThumb completion)
      */
     private void fireProfilePictureChanged(Jid jid) {
         for (var listener : whatsapp.store().listeners()) {
@@ -488,7 +474,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @param contactJid the JID of the contact whose text status changed
      * @param status     the updated text status
-     * @implNote WAWebHandleAboutNotification.f (TextStatusCollection mutation triggers)
      */
     private void notifyContactTextStatusChanged(Jid contactJid, ContactTextStatus status) {
         for (var listener : whatsapp.store().listeners()) {
@@ -503,7 +488,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * {@code type="picture"}, matching the format expected by the WhatsApp server.
      *
      * @param node the notification stanza node to acknowledge
-     * @implNote WAWebHandleProfilePicNotification._ (ack stanza)
      */
     private void sendPictureNotificationAck(Node node) {
         var stanzaId = node.getAttributeAsString("id", null);
@@ -528,7 +512,6 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * {@code type="status"}, matching the format expected by the WhatsApp server.
      *
      * @param node the notification stanza node to acknowledge
-     * @implNote WAWebHandleAboutNotification.f (ack stanza)
      */
     private void sendStatusNotificationAck(Node node) {
         var stanzaId = node.getAttributeAsString("id", null);

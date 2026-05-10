@@ -19,8 +19,6 @@ import com.github.auties00.cobalt.props.ABProp;
  * action; that action is implemented inside the newsletter branch of
  * {@link LinkPreviewService}, so this class only covers the synchronous
  * gate.
- *
- * @implNote WAWebCheckIfDomainIsPreviewable.checkIfDomainIsPreviewable.
  */
 @WhatsAppWebModule(moduleName = "WAWebCheckIfDomainIsPreviewable")
 public final class DomainPreviewableGate {
@@ -43,14 +41,6 @@ public final class DomainPreviewableGate {
      * @param domain  the link's domain (informational; the gate is
      *                currently AB-prop driven, not domain driven)
      * @return {@code true} when previews are allowed
-     * @implNote WAWebCheckIfDomainIsPreviewable.checkIfDomainIsPreviewable:
-     *           returns true unconditionally for non-newsletter chats.
-     *           Newsletter chats with the
-     *           {@code channels_hide_news_url_preview} AB-prop on
-     *           additionally consult the server-side allow-list via
-     *           {@code mexFetchNewsletterIsDomainPreviewable}; that
-     *           round-trip is delegated to
-     *           {@link WhatsAppClient#isNewsletterDomainPreviewable(String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebCheckIfDomainIsPreviewable", exports = "checkIfDomainIsPreviewable",
             adaptation = WhatsAppAdaptation.DIRECT)

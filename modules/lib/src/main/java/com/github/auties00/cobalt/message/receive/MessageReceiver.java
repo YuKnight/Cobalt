@@ -83,10 +83,6 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
      * @param messageId the message id used for log context
      * @param plaintext the raw protobuf bytes
      * @return the decoded container, or {@code null} on failure
-     *
-     * @implNote WA Web's {@code processDecryptedMessageProto} strips PKCS#7 padding
-     * before decoding. In Cobalt the padding has already been removed by the Signal
-     * cipher, so only the decode step remains here.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgProcess", exports = "processDecryptedMessageProto",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -118,21 +114,27 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
 
     /**
      * Returns whether the given sender JID represents the currently logged-in user's
-     * account.
+     * account, matching either the PN or the LID identity.
      *
      * <p>Comparison is performed on user-level JIDs so companion-device addressing is
-     * treated as the same account as the primary device.
+     * treated as the same account as the primary device. Both the PN and the LID are
+     * checked so that a message addressed via either mode is recognised as self.
      *
      * @param senderJid the sender JID to check
-     * @return {@code true} if the sender matches the logged-in user
+     * @return {@code true} if the sender matches the logged-in user's PN or LID
      */
     @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser", exports = "isMeAccount",
             adaptation = WhatsAppAdaptation.ADAPTED)
     boolean isFromMe(Jid senderJid) {
-        var selfJid = store.jid().orElse(null);
-        if (selfJid == null) {
+        if (senderJid == null) {
             return false;
         }
-        return senderJid.toUserJid().equals(selfJid.toUserJid());
+        var senderUser = senderJid.toUserJid();
+        var selfPn = store.jid().orElse(null);
+        if (selfPn != null && senderUser.equals(selfPn.toUserJid())) {
+            return true;
+        }
+        var selfLid = store.lid().orElse(null);
+        return selfLid != null && senderUser.equals(selfLid.toUserJid());
     }
 }

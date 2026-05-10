@@ -15,12 +15,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WASmaxAbPropsGetGroupExperimentConfigRPC.sendGetGroupExperimentConfigRPC}
- *           tries {@code Success} → {@code ErrorNoRetry} →
- *           {@code ErrorRetry}; Cobalt routes the dual error variants
- *           through the standard {@code ClientError}/{@code ServerError}
- *           code-range split.
  */
 public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends SmaxOperation.Response
         permits SmaxAbPropsGetGroupExperimentConfigResponse.Success, SmaxAbPropsGetGroupExperimentConfigResponse.ClientError, SmaxAbPropsGetGroupExperimentConfigResponse.ServerError {
@@ -54,11 +48,6 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
     /**
      * The {@code Success} reply variant. The relay returned the
      * materialised group-scoped props bundle.
-     *
-     * @implNote {@code WASmaxInAbPropsGetGroupExperimentConfigResponseSuccess.parseGetGroupExperimentConfigResponseSuccess}
-     *           projects the {@code <props/>} envelope plus its
-     *           {@code <prop/>} children. Cobalt surfaces only the raw
-     *           {@code <props/>} subtree.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInAbPropsGetGroupExperimentConfigResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInAbPropsIQResultResponseMixin")
@@ -223,11 +212,6 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
     /**
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed or unauthorised.
-     *
-     * @implNote {@code WASmaxInAbPropsGetGroupExperimentConfigResponseErrorNoRetry.parseGetGroupExperimentConfigResponseErrorNoRetry}
-     *           routes the {@code <error code text/>} child through
-     *           {@code WASmaxInAbPropsNoRetryErrors}; Cobalt collapses
-     *           to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInAbPropsGetGroupExperimentConfigResponseErrorNoRetry")
     final class ClientError implements SmaxAbPropsGetGroupExperimentConfigResponse {
@@ -318,12 +302,6 @@ public sealed interface SmaxAbPropsGetGroupExperimentConfigResponse extends Smax
     /**
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure and asks the client to retry.
-     *
-     * @implNote {@code WASmaxInAbPropsGetGroupExperimentConfigResponseErrorRetry.parseGetGroupExperimentConfigResponseErrorRetry}
-     *           routes through
-     *           {@code WASmaxInAbPropsIQErrorInternalServerErrorMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInAbPropsGetGroupExperimentConfigResponseErrorRetry")
     final class ServerError implements SmaxAbPropsGetGroupExperimentConfigResponse {

@@ -15,11 +15,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxLinkCreateRequest}.
- *
- * @implNote {@code WASmaxVoipLinkCreateRPC.sendLinkCreateRPC} tries
- *           {@code LinkCreateAck} then {@code LinkCreateNack} in order
- *           and throws on no-match. Cobalt returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxLinkCreateResponse extends SmaxOperation.Response
         permits SmaxLinkCreateResponse.Success, SmaxLinkCreateResponse.ClientError {
@@ -61,12 +56,6 @@ public sealed interface SmaxLinkCreateResponse extends SmaxOperation.Response
      * @param request the original outbound request
      * @return {@code true} when the envelope matches; {@code false}
      *         otherwise
-     *
-     * @implNote {@code WASmaxInVoipCallAckBaseMixin.parseCallAckBaseMixin}
-     *           runs the equivalent envelope checks; Cobalt collapses
-     *           the structured projection to a boolean since callers
-     *           only consume the projected scalars from the
-     *           per-variant inner child.
      */
     private static boolean validateAckEnvelope(Node node, Node request) {
         if (!node.hasDescription("ack")) {
@@ -254,13 +243,6 @@ public sealed interface SmaxLinkCreateResponse extends SmaxOperation.Response
      * encoded as a numeric code (mapped via {@code parseInt} when
      * possible) and {@code errorText} carries the raw string for
      * human inspection.
-     *
-     * @implNote {@code WASmaxInVoipLinkCreateResponseLinkCreateNack.parseLinkCreateResponseLinkCreateNack}
-     *           extracts the {@code error} attribute on the bare
-     *           {@code <ack>} envelope (no {@code <error/>} child).
-     *           Cobalt collapses the projection to the
-     *           universal {@code (code, text)} shape with the raw
-     *           error string in {@link #errorText()}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInVoipLinkCreateResponseLinkCreateNack")
     final class ClientError implements SmaxLinkCreateResponse {

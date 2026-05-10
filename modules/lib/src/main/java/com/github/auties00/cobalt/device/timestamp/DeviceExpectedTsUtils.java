@@ -53,8 +53,6 @@ public final class DeviceExpectedTsUtils {
      * <p>Returns {@code true} when either the server timestamp has caught up to the
      * cached expected timestamp, or when the incoming expected timestamp matches the
      * cached value and a staleness condition is met based on the last ADV job check.
-     *
-     * @implNote WAWebAdvExpectedTsApi.shouldClearExpectedTs
      * @param incomingTimestamp         the timestamp from server response
      * @param incomingExpectedTimestamp the expected timestamp from server response, or {@code null}
      * @param cachedList                the cached device list, or {@code null}
@@ -95,10 +93,6 @@ public final class DeviceExpectedTsUtils {
      *
      * <p>Handles {@code null} values safely: two {@code null} values are considered
      * equal, and a {@code null} compared to a non-{@code null} value is considered changed.
-     *
-     * @implNote ADAPTED: WAWebAdvExpectedTsApi.computeNewExpectedTs - Java null-safe
-     * comparison utility for nullable {@link Instant} values; WA Web performs this
-     * comparison inline.
      * @param oldExpectedTimestamp the old expected timestamp, or {@code null}
      * @param newExpectedTimestamp the new expected timestamp, or {@code null}
      * @return {@code true} if the timestamps differ
@@ -122,8 +116,6 @@ public final class DeviceExpectedTsUtils {
      * <p>Extracts current expected timestamp values from the cached device list (if
      * non-deleted) and delegates to {@link #computeNewExpectedTimestamp} for the
      * actual computation.
-     *
-     * @implNote WAWebAdvExpectedTsApi.computeExpectedTsForDeviceRecord
      * @param incomingTimestamp the timestamp from the server response
      * @param cachedList        the cached device list, or {@code null}
      * @param lastADVCheckTime  the last ADV device check time, or {@code null}
@@ -174,8 +166,6 @@ public final class DeviceExpectedTsUtils {
      * the expected timestamp is set to the incoming timestamp, and the update
      * timestamp is refreshed when the expected timestamp is newly set or the current
      * timestamp has caught up to the previous expected timestamp.
-     *
-     * @implNote WAWebAdvExpectedTsApi.computeNewExpectedTs
      * @param incomingTimestamp                              the incoming timestamp
      * @param currentTimestamp                               the current timestamp
      * @param lastADVCheckTime                               the last ADV check time, or {@code null}
@@ -226,8 +216,6 @@ public final class DeviceExpectedTsUtils {
      * threshold, or if its expected timestamp update timestamp was set more than
      * 25 hours ago and the last device job timestamp does not match the last ADV
      * check time.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.S
      * @param deviceList       the device list to check
      * @param currentTime      current time
      * @param expiryThreshold  threshold for regular expiration
@@ -269,8 +257,6 @@ public final class DeviceExpectedTsUtils {
      * <p>Returns {@code true} if the device list's timestamp exceeds the warning
      * threshold, or if the expected timestamp is set and ahead of the current
      * timestamp (indicating a newer device list version exists on the server).
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.R
      * @param deviceList       the device list to check
      * @param currentTime      current time
      * @param warningThreshold threshold for warning

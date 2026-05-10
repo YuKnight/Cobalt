@@ -36,16 +36,6 @@ import com.github.auties00.cobalt.node.NodeBuilder;
  * {@code WhatsAppClient.sendNode(SmaxOperation.Request)} to dispatch the
  * operation; {@link Response} carries no methods today and exists purely
  * as the closed counterpart of {@code Request}.
- *
- * @implNote {@code WAComms.sendSmaxStanza} / {@code WAComms.castSmaxStanza}:
- *           the transport entry points used by every WA Web SMAX dispatcher
- *           accept an already-constructed SMAX stanza and route it through
- *           the same socket pipeline that legacy {@code <iq>} stanzas use.
- *           The sealed hierarchy on the Cobalt side mirrors the static
- *           classification WA Web carries through the {@code WASmaxOut...}
- *           / {@code WASmaxIn...} module-name convention; the marker
- *           imposes no runtime contract beyond the abstract {@code toNode()}
- *           method declared on {@link Request}.
  */
 @WhatsAppWebModule(moduleName = "WAComms")
 public sealed interface SmaxOperation permits SmaxOperation.Request, SmaxOperation.Response {

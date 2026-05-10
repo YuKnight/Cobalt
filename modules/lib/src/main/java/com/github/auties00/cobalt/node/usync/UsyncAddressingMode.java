@@ -23,10 +23,6 @@ public enum UsyncAddressingMode {
     /**
      * Phone-number addressing. The contact query targets the legacy
      * {@code @s.whatsapp.net} JID space.
-     *
-     * @implNote The contact protocol omits the {@code addressing_mode} attribute
-     *     entirely on the wire when this mode is selected, mirroring the
-     *     {@code DROP_ATTR} behaviour of the JS frozen object.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USYNC_ADDRESSING_MODE", adaptation = WhatsAppAdaptation.DIRECT)

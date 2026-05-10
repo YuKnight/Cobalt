@@ -19,13 +19,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsCreateRequest}.
- *
- * @implNote {@code WASmaxGroupsCreateRPC.sendCreateRPC} tries
- *           {@code Success} → {@code GroupAlreadyExists} →
- *           {@code ClientError} → {@code ServerError} in priority
- *           order. Cobalt mirrors the same sequence in
- *           {@link #of(Node, Node)} and returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGroupsCreateResponse extends SmaxOperation.Response
         permits SmaxGroupsCreateResponse.Success, SmaxGroupsCreateResponse.GroupAlreadyExists,
@@ -75,19 +68,6 @@ public sealed interface SmaxGroupsCreateResponse extends SmaxOperation.Response
      * ({@code groupST}/{@code groupSO}), every
      * {@code <create/>} child the relay echoed, and the
      * non-empty list of participant rows.
-     *
-     * @implNote {@code WASmaxInGroupsCreateResponseSuccess.parseCreateResponseSuccess}
-     *           validates the {@code <iq from="g.us" type="result">}
-     *           envelope, requires a flattened {@code <group/>}
-     *           child, parses the mandatory identity triple and
-     *           every optional child, then enumerates 1..1024
-     *           {@code <participant/>} children. Cobalt projects the
-     *           same shape with typed accessors; secondary mixin
-     *           data ({@code group_addressing_mode_mixin},
-     *           {@code subject_owner_identity_mixin},
-     *           {@code group_creator_identity_mixin}, etc.) is
-     *           exposed as the raw inner {@link Node} via
-     *           {@link #group()}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsCreateResponseSuccess")
     final class Success implements SmaxGroupsCreateResponse {
@@ -930,12 +910,6 @@ public sealed interface SmaxGroupsCreateResponse extends SmaxOperation.Response
      * detected an existing group whose creator + dedup-token tuple
      * matches the request and returned the existing group's JID
      * instead of creating a new one.
-     *
-     * @implNote {@code WASmaxInGroupsCreateResponseGroupAlreadyExists.parseCreateResponseGroupAlreadyExists}
-     *           validates the {@code <iq from="g.us" type="result">}
-     *           envelope, requires a {@code <group jid/>} child,
-     *           and returns the parsed JID. Cobalt mirrors the same
-     *           projection.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsCreateResponseGroupAlreadyExists")
     final class GroupAlreadyExists implements SmaxGroupsCreateResponse {
@@ -1034,17 +1008,6 @@ public sealed interface SmaxGroupsCreateResponse extends SmaxOperation.Response
      * The {@code ClientError} reply variant — the relay rejected the
      * request as malformed, unauthorised, or bumping a per-creator
      * group-count cap.
-     *
-     * @implNote {@code WASmaxInGroupsCreateResponseClientError.parseCreateResponseClientError}
-     *           parses the {@code <error code text/>} child and
-     *           routes it through
-     *           {@code WASmaxInGroupsCreateClientErrors}. Cobalt
-     *           collapses to the raw {@code (code, text)} pair —
-     *           the two extra Cobalt-side checks
-     *           ({@link SmaxIqResultResponseMixin}-style envelope
-     *           validation and the {@code [400, 500)} code window)
-     *           are delegated to
-     *           {@link SmaxBaseServerErrorMixin#parseClientError(Node, Node)}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsCreateResponseClientError")
     final class ClientError implements SmaxGroupsCreateResponse {
@@ -1137,11 +1100,6 @@ public sealed interface SmaxGroupsCreateResponse extends SmaxOperation.Response
     /**
      * The {@code ServerError} reply variant — the relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInGroupsCreateResponseServerError.parseCreateResponseServerError}
-     *           delegates to {@code WASmaxInGroupsBaseServerErrorMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsCreateResponseServerError")
     final class ServerError implements SmaxGroupsCreateResponse {

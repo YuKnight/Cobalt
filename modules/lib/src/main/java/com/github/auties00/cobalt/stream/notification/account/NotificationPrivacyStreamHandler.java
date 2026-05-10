@@ -50,7 +50,6 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
      * an acknowledgement stanza.
      *
      * @param node the incoming notification node
-     * @implNote Cobalt always emits the ACK in a {@code finally} block to match the project-wide "always ACK" convention so the server does not retransmit the notification after a transient client error; WA Web returns the ACK only on success.
      */
     @Override
     public void handle(Node node) {
@@ -157,7 +156,6 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
      * @param senderLid      the sender's LID JID, or {@code null}
      * @param tokenTimestamp the timestamp from the token, or {@code null}
      * @param tcTokenContent the raw trusted-contact token bytes
-     * @implNote Cobalt has no orphan-tc-token store, so the missing-chat branch resolves to {@code addNewChat(senderPn)} instead of WA Web's {@code createOrUpdateOrphanTcToken}.
      */
     private void updateChatTcToken(Jid senderPn, Jid senderLid, Instant tokenTimestamp, byte[] tcTokenContent) {
         var chat = (senderLid != null

@@ -19,11 +19,6 @@ import java.util.Optional;
 /**
  * Sealed family of {@code contactListIds} discriminators projected by
  * each {@code <user/>} child of the LID success variant.
- *
- * @implNote {@code WASmaxInPrivacyContactListIds.parseContactListIds}
- *           is a disjunction over {@code UsernameMixin},
- *           {@code PnJidMixin}, and {@code EmptyContactListIdentifierMixin};
- *           Cobalt projects the disjunction as this sealed family.
  */
 public sealed interface SmaxGetContactBlacklistContactListId
         permits SmaxGetContactBlacklistContactListId.Username, SmaxGetContactBlacklistContactListId.PnJid, SmaxGetContactBlacklistContactListId.Empty {

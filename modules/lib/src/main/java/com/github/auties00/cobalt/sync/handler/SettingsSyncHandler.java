@@ -8,14 +8,11 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,12 +36,6 @@ import java.util.List;
  * field where one exists. Settings without a Cobalt store equivalent still
  * resolve to {@link MutationApplicationResult#success()} so that the WA-side
  * action state telemetry stays consistent.
- *
- * @implNote WAWebSettingsSync.default — singleton instance of the class
- *           {@code C} extending {@code WAWebSyncdAction.AccountSyncdActionBase}
- *           with {@code collectionName = WASyncdConst.CollectionName.RegularLow},
- *           {@code chatJidIndex = 3}, {@code getVersion() = 1} and
- *           {@code getAction() = WASyncdConst.Actions.SettingsSync}
  */
 @WhatsAppWebModule(moduleName = "WAWebSettingsSync")
 @WhatsAppWebModule(moduleName = "WAWebSettingsSyncHelpers")
@@ -55,8 +46,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * <p>WA Web instantiates the handler exactly once at module load time via
      * {@code var C = new y; l.default = C;}. Cobalt mirrors that with a
      * module-level constant.
-     *
-     * @implNote WAWebSettingsSync — {@code var C = new y; l.default = C}
      */
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final SettingsSyncHandler INSTANCE = new SettingsSyncHandler();
@@ -64,10 +53,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     /**
      * The {@code app} scope literal used by WA Web for global (non-per-chat)
      * settings.
-     *
-     * @implNote WAWebSettingsSync.getMutation — default value of the {@code i}
-     *           parameter when the caller omits a chat JID, propagated via
-     *           {@code indexArgs: [String(u), String(l), i]}
      */
     private static final String APP_SCOPE = "app";
 
@@ -75,8 +60,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * The number of components expected in the {@code indexParts} array of a
      * settings sync mutation, namely {@code [userIndex, platform, settingKey,
      * scope]}.
-     *
-     * @implNote WAWebSettingsSync.$SettingsSync$p_1 — {@code if (!n || n.length !== 4)}
      */
     private static final int INDEX_PARTS_LENGTH = 4;
 
@@ -86,10 +69,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * <p>The constructor is private because the only way to obtain an instance
      * is through {@link #INSTANCE}, matching the WA Web module-level singleton
      * pattern.
-     *
-     * @implNote WAWebSettingsSync — hidden {@code function a()} constructor
-     *           that only initializes {@code this.collectionName = RegularLow}
-     *           and {@code this.chatJidIndex = 3}
      */
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private SettingsSyncHandler() {
@@ -98,10 +77,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name this handler processes.
-     *
-     * @implNote WAWebSettingsSync.getAction — returns
-     *           {@code WASyncdConst.Actions.SettingsSync}, which resolves to
-     *           the string {@code "settings_sync"}
      * @return the constant {@link SettingsSyncAction#ACTION_NAME}
      */
     @Override
@@ -115,8 +90,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      *
      * <p>On WA Web this is set on the prototype inside the constructor as
      * {@code this.collectionName = CollectionName.RegularLow}.
-     *
-     * @implNote WAWebSettingsSync — {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      * @return the constant {@link SettingsSyncAction#COLLECTION_NAME}, always
      *         {@link SyncPatchType#REGULAR_LOW}
      */
@@ -128,35 +101,12 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version this handler supports.
-     *
-     * @implNote WAWebSettingsSync.getVersion — {@code return 1}
      * @return the constant {@link SettingsSyncAction#ACTION_VERSION}, always {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return SettingsSyncAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single decoded settings sync mutation.
-     *
-     * <p>Thin bridge over {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * that reduces the richer {@link MutationApplicationResult} state to a
-     * legacy boolean: {@code true} only for {@link SyncActionState#SUCCESS},
-     * {@code false} for any other state.
-     *
-     * @implNote ADAPTED: WAWebSettingsSync.applyMutations — the WA Web
-     *           per-mutation callback returns a {@code SyncActionState}; Cobalt
-     *           exposes both a boolean and a richer result through two methods
-     * @param client   the WhatsApp client the mutation is being applied to
-     * @param mutation the trusted, decoded mutation to apply
-     * @return {@code true} if the apply succeeded, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -184,18 +134,16 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      *
      * <p>The WA Web inner per-mutation work is wrapped in {@code Promise.all}
      * because each item awaits {@code applySettingUpdate}. Cobalt's
-     * {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
+     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}
      * is synchronous (running on a virtual thread) so the equivalent here is
      * just a sequential loop preserving result ordering.
-     *
-     * @implNote WAWebSettingsSync.applyMutations
      * @param client    the WhatsApp client the mutations are being applied to
      * @param mutations the batch of mutations to apply
      * @return a list of results parallel to the input
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (!isSettingsSyncEnabled(client)) {
             var unsupported = new ArrayList<MutationApplicationResult>(mutations.size());
             for (var ignored : mutations) {
@@ -236,7 +184,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      *
      * <p>This method is the entry point used by callers that bypass the batch
      * deduplication logic of
-     * {@link #applyMutationBatchResults(WhatsAppClient, List)}. It performs
+     * {@link #applyMutationBatch(WhatsAppClient, List)}. It performs
      * the same {@code settings_sync_enabled} gating that the batch entry
      * point does, then defers to {@link #applyOne(WhatsAppClient, DecryptedMutation.Trusted)}
      * for the per-mutation validation and store update.
@@ -249,15 +197,13 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * single mutation in isolation, so this branch reflects the
      * {@code Unsupported} sentinel that WA Web reserves for "no SET mutation
      * for this index".
-     *
-     * @implNote WAWebSettingsSync.applyMutations — single-mutation entry path
      * @param client   the WhatsApp client the mutation is being applied to
      * @param mutation the trusted, decoded mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!isSettingsSyncEnabled(client)) {
             return MutationApplicationResult.unsupported();
         }
@@ -312,8 +258,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * <p>WA Web also emits {@code WALogger.WARN}/{@code WALogger.ERROR}
      * messages along the failure paths; those are intentionally omitted in
      * Cobalt as logging noise with no behavioral impact.
-     *
-     * @implNote WAWebSettingsSync.$SettingsSync$p_1
      * @param client   the WhatsApp client the mutation is being applied to
      * @param mutation the trusted, decoded mutation to apply
      * @return the detailed application result
@@ -376,10 +320,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * <p>Mirrors the WA Web {@code h()} helper which returns
      * {@code WAWebPrimaryFeatures.primaryFeatureEnabled("settings_sync_enabled") === true
      * && WAWebABProps.getABPropConfigValue("settings_sync_enabled") === true}.
-     *
-     * @implNote WAWebSettingsSync.h — {@code function h() { return
-     *           primaryFeatureEnabled("settings_sync_enabled") === true &&
-     *           getABPropConfigValue("settings_sync_enabled") === true }}
      * @param client the WhatsApp client whose feature flags are being inspected
      * @return {@code true} if both the primary feature and the AB prop are enabled
      */
@@ -395,8 +335,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * <p>Mirrors WA Web's {@code SettingPlatform.cast(Number(l))}: any value
      * that is not a numeric string mapping to a known enum index returns
      * {@code null} so the caller can take the {@code Skipped} branch.
-     *
-     * @implNote WAWebSettingsSync.$SettingsSync$p_1 — {@code SettingPlatform.cast(Number(l))}
      * @param value the raw platform string from {@code indexParts[1]}, may be {@code null}
      * @return the parsed {@link SettingsSyncAction.SettingPlatform}, or
      *         {@code null} if the value cannot be mapped to a known enum entry
@@ -425,8 +363,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * <p>Mirrors WA Web's {@code SettingKey.cast(Number(p))}: any value that
      * is not a numeric string mapping to a known enum index returns
      * {@code null} so the caller can take the {@code Malformed} branch.
-     *
-     * @implNote WAWebSettingsSync.$SettingsSync$p_1 — {@code SettingKey.cast(Number(p))}
      * @param value the raw setting key string from {@code indexParts[2]}, may be {@code null}
      * @return the parsed {@link SettingsSyncAction.SettingKey}, or {@code null}
      *         if the value cannot be mapped to a known enum entry
@@ -459,8 +395,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * {@code WAWebEnvironment.isWindows}; Cobalt has no per-client runtime
      * gate, so it falls back to the paired device platform — matching the
      * convention used by {@link LocaleSettingHandler}.
-     *
-     * @implNote WAWebSettingsSync.$SettingsSync$p_1 — {@code g = f === WEB || (isWindows && f === HYBRID)}
      * @param client   the WhatsApp client the mutation is being applied to
      * @param platform the parsed platform from {@code indexParts[1]}, may be {@code null}
      * @return {@code true} if the mutation should be applied on this client
@@ -497,10 +431,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * filtered out by the caller (it has no field mapping in WA Web's
      * {@code SETTING_KEY_TO_FIELD}), so the {@code SETTING_KEY_UNKNOWN}
      * branch here only exists to satisfy exhaustiveness.
-     *
-     * @implNote WAWebSettingsSync.$SettingsSync$p_1 — {@code if (b === void 0)
-     *           return Malformed} combined with the
-     *           {@code WAWebSettingsSyncConst.SETTING_KEY_TO_FIELD} mapping
      * @param action the decoded settings sync action
      * @param key    the setting key whose field should be checked
      * @return {@code true} if the field is present on the action
@@ -558,9 +488,6 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * consistent. Per-chat overrides (i.e. any non-{@code "app"} scope) are
      * also a no-op for the same reason: Cobalt does not maintain a per-chat
      * settings store.
-     *
-     * @implNote ADAPTED: WAWebSettingsSyncHelpers.applySettingUpdate —
-     *           {@code if (n === "app") frontendSendAndReceive("applyAppSetting", {field: e, value: t}); else frontendSendAndReceive("applyPerChatSetting", {field: e, value: t, chatJid: n})}
      * @param client     the WhatsApp client the mutation is being applied to
      * @param action     the decoded settings sync action carrying the new value
      * @param settingKey the setting key whose value should be persisted

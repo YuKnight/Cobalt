@@ -94,14 +94,6 @@ public final class SmaxNewslettersGetNewsletterStatusesRequest implements SmaxOp
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <statuses>} payload
-     *
-     * @implNote {@code WASmaxOutNewslettersGetNewsletterStatusesRequest.makeGetNewsletterStatusesRequest}
-     *           composes
-     *           {@code WASmaxOutNewslettersNewsletterStatusRequestIQPayloadMixin}
-     *           around the {@code <statuses count="…">} root, embeds
-     *           the addressing block via
-     *           {@code mergeQueryNewsletterParamsMixin}, and layers the
-     *           optional direction via {@code mergeStatusDirections}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersGetNewsletterStatusesRequest",

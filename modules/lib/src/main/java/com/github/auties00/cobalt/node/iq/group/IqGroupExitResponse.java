@@ -16,15 +16,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to an {@link IqGroupExitRequest}.
- *
- * @implNote {@code WAWebGroupExitJob} parses the reply via
- *           {@code leaveGroupsResultParser} and
- *           {@code leaveCommunitiesResultParser} and rejects on a
- *           non-result envelope by throwing
- *           {@code ServerStatusCodeError}; Cobalt splits the
- *           rejected branch into typed
- *           {@code ClientError}/{@code ServerError} variants and
- *           returns {@link Optional#empty()} on no-match.
  */
 @WhatsAppWebModule(moduleName = "WAWebGroupExitJob")
 public sealed interface IqGroupExitResponse extends IqOperation.Response
@@ -73,13 +64,6 @@ public sealed interface IqGroupExitResponse extends IqOperation.Response
      * and a {@code code} integer mirroring the {@code error}
      * grandchild attribute (defaulting to {@code 200} when the
      * relay omits it, signalling a per-target success).
-     *
-     * @implNote {@code WAWebGroupExitJob.leaveGroupsResultParser}
-     *           and {@code leaveCommunitiesResultParser} both
-     *           project every {@code <leave>} grandchild to a
-     *           {@code {id, code}} pair where {@code code} defaults
-     *           to {@code 200}; Cobalt mirrors that exactly via
-     *           {@link LeaveResult}.
      */
     @WhatsAppWebModule(moduleName = "WAWebGroupExitJob")
     final class Success implements IqGroupExitResponse {
@@ -200,13 +184,6 @@ public sealed interface IqGroupExitResponse extends IqOperation.Response
          * @return an {@link Optional} carrying the parsed variant,
          *         or empty when the stanza does not match the
          *         success schema
-         *
-         * @implNote {@code WAWebGroupExitJob.leaveGroupsResultParser}
-         *           and {@code leaveCommunitiesResultParser}:
-         *           {@code child("leave").mapChildren(c -> {id:
-         *           groupJidToWid(c.attrGroupJid("id" |
-         *           "parent_group_jid")), code:
-         *           c.maybeAttrInt("error") ?? 200})}.
          */
         @WhatsAppWebExport(moduleName = "WAWebGroupExitJob",
                 exports = "leaveGroupsResultParser",
@@ -274,12 +251,6 @@ public sealed interface IqGroupExitResponse extends IqOperation.Response
     /**
      * The {@code ClientError} reply variant — the relay rejected
      * the leave as malformed or unauthorised.
-     *
-     * @implNote {@code WAWebGroupExitJob} surfaces every non-result
-     *           envelope as a {@code ServerStatusCodeError}; Cobalt
-     *           narrows the {@code [400, 500)} band to this
-     *           variant via
-     *           {@link SmaxBaseServerErrorMixin#parseClientError(Node, Node)}.
      */
     @WhatsAppWebModule(moduleName = "WAWebGroupExitJob")
     final class ClientError implements IqGroupExitResponse {
@@ -378,10 +349,6 @@ public sealed interface IqGroupExitResponse extends IqOperation.Response
      * The {@code ServerError} reply variant — the relay
      * encountered a transient internal failure while processing
      * the leave.
-     *
-     * @implNote Mirrors the {@code [500, ...)} band of
-     *           {@code ServerStatusCodeError}; Cobalt routes via
-     *           {@link SmaxBaseServerErrorMixin#parseServerError(Node, Node)}.
      */
     @WhatsAppWebModule(moduleName = "WAWebGroupExitJob")
     final class ServerError implements IqGroupExitResponse {

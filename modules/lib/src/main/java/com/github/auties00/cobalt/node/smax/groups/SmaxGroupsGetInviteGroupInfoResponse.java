@@ -19,13 +19,6 @@ import java.util.Optional;
  * {@link ServerError}); {@link #of(Node)} returns the first variant
  * whose schema matches the inbound stanza, or
  * {@link Optional#empty()} when none match.
- *
- * @implNote {@code WASmaxGroupsGetInviteGroupInfoRPC.sendGetInviteGroupInfoRPC}
- *           tries the same priority order and throws
- *           {@code SmaxParsingFailure} on no match. Cobalt returns
- *           {@link Optional#empty()} instead so callers can decide
- *           whether to throw via {@code .orElseThrow(...)} or branch
- *           via pattern matching.
  */
 public sealed interface SmaxGroupsGetInviteGroupInfoResponse extends SmaxOperation.Response
         permits SmaxGroupsGetInviteGroupInfoResponse.Success, SmaxGroupsGetInviteGroupInfoResponse.ClientError, SmaxGroupsGetInviteGroupInfoResponse.ServerError {
@@ -68,16 +61,6 @@ public sealed interface SmaxGroupsGetInviteGroupInfoResponse extends SmaxOperati
      * projection without committing this class to the full mixin
      * schema; the typical caller will read the standard child
      * attributes via {@link Node#getAttributeAsString(String)}.
-     *
-     * @implNote {@code WASmaxInGroupsGetInviteGroupInfoResponseSuccess.parseGetInviteGroupInfoResponseSuccess}
-     *           validates the {@code from} / {@code id} echoed
-     *           attributes against the request reference, asserts
-     *           {@code type=result}, then parses the {@code size}
-     *           attribute and the
-     *           {@code WASmaxInGroupsInviteLinkGroupInfoMixin}. Cobalt
-     *           keeps the {@code size} projection (it's the only
-     *           scalar callers commonly act on) and exposes the
-     *           {@code <group>} node directly for everything else.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetInviteGroupInfoResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsInviteLinkGroupInfoMixin")
@@ -189,13 +172,6 @@ public sealed interface SmaxGroupsGetInviteGroupInfoResponse extends SmaxOperati
      * The {@code ClientError} reply variant — the relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent group / revoked invite code.
-     *
-     * @implNote {@code WASmaxInGroupsGetInviteGroupInfoResponseClientError.parseGetInviteGroupInfoResponseClientError}
-     *           parses the {@code <error code text/>} child of the IQ
-     *           stanza. Cobalt exposes the parsed {@code code} and
-     *           {@code text} as typed accessors; the underlying error
-     *           node is preserved for callers that need richer
-     *           diagnostics.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetInviteGroupInfoResponseClientError")
     final class ClientError implements SmaxGroupsGetInviteGroupInfoResponse {
@@ -300,11 +276,6 @@ public sealed interface SmaxGroupsGetInviteGroupInfoResponse extends SmaxOperati
      * The {@code ServerError} reply variant — the relay encountered a
      * transient internal failure while processing the request. Callers
      * may retry after a backoff.
-     *
-     * @implNote {@code WASmaxInGroupsGetInviteGroupInfoResponseServerError.parseGetInviteGroupInfoResponseServerError}
-     *           parses the {@code <error code text/>} child of the IQ
-     *           stanza. Cobalt exposes the parsed {@code code} and
-     *           {@code text} as typed accessors.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetInviteGroupInfoResponseServerError")
     final class ServerError implements SmaxGroupsGetInviteGroupInfoResponse {

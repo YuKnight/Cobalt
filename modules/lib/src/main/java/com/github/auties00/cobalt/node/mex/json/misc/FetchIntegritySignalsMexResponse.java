@@ -19,12 +19,6 @@ import java.util.Optional;
  * Parsed response of the {@link FetchIntegritySignalsMexRequest} query,
  * exposing the {@code is_new_account} and {@code is_suspicious_start_chat}
  * scalars from the {@code XWA2IntegritySignals} fragment.
- *
- * @implNote WA Web's {@code fetchIntegritySignals} unwraps the response by
- * reading {@code i.xwa2_fetch_wa_users[0].integrity_signals_info} and
- * exposing the two scalars via a {@code {isNewAccount, isSuspicious}} record.
- * Cobalt mirrors the same projection but keeps the underlying nullability so
- * callers can distinguish "absent" from "explicitly false".
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchIntegritySignals")
 public final class FetchIntegritySignalsMexResponse implements MexOperation.Response.Json {

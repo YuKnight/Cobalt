@@ -98,17 +98,6 @@ public final class SmaxSendFeedbackRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         payload
-     *
-     * @implNote {@code WASmaxOutSupportMessageFeedbackSendFeedbackRequest.makeSendFeedbackRequest}
-     *           composes
-     *           {@code WASmaxOutSupportMessageFeedbackHackBaseIQSetRequestMixin}
-     *           ({@code from? to=S_WHATSAPP_NET}) and
-     *           {@code WASmaxOutSupportMessageFeedbackBaseIQSetRequestMixin}
-     *           ({@code id=generateId() type="set"}) over a
-     *           payload of one {@code <message id=STANZA_ID/>}
-     *           echo and a {@code <feedback_list>} wrapper
-     *           carrying repeated
-     *           {@code <feedback kind=CUSTOM_STRING/>} entries.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutSupportMessageFeedbackSendFeedbackRequest",

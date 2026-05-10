@@ -23,10 +23,6 @@ public final class IqQueryDisappearingModeRequest implements IqOperation.Request
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WAWebQueryDisappearingModeJob.queryDisappearingMode}:
-     *           {@code wap("iq",{xmlns:"disappearing_mode",
-     *           to:S_WHATSAPP_NET, type:"get", id})}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQueryDisappearingModeJob",

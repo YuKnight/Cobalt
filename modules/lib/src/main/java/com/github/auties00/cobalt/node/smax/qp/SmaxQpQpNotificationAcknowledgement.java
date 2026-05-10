@@ -14,14 +14,6 @@ import java.util.Optional;
  * The outbound acknowledgement stanza. Emitted by the client back
  * through the socket pipeline after consuming the {@link SmaxQpQpNotificationResponse}
  * notification.
- *
- * @implNote {@code WASmaxOutQpSurfacesQPNotificationResponseAck.makeQPNotificationResponseAck}
- *           composes
- *           {@code WASmaxOutQpSurfacesNotificationClientAckMixin} .
- *           an {@code <ack id to class="notification" type/>} stanza
- *           echoing the notification's {@code id},
- *           {@code from} (as the ack's {@code to}) and {@code type}
- *           attributes.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutQpSurfacesQPNotificationResponseAck")
 @WhatsAppWebModule(moduleName = "WASmaxOutQpSurfacesNotificationClientAckMixin")
@@ -129,11 +121,6 @@ public final class SmaxQpQpNotificationAcknowledgement implements SmaxOperation.
      * Builds the outbound ack stanza.
      *
      * @return a {@link NodeBuilder} carrying the ack envelope
-     *
-     * @implNote {@code WASmaxOutQpSurfacesNotificationClientAckMixin.mergeNotificationClientAckMixin}
-     *           produces {@code <ack id=STANZA_ID(t)
-     *           to=USER_JID(n) class="notification"
-     *           type=CUSTOM_STRING(r)/>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutQpSurfacesQPNotificationResponseAck",

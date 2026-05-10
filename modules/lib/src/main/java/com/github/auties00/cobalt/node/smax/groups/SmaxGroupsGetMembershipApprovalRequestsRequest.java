@@ -87,13 +87,6 @@ public final class SmaxGroupsGetMembershipApprovalRequestsRequest implements Sma
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         {@code <membership_approval_requests/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsGetMembershipApprovalRequestsRequest.makeGetMembershipApprovalRequestsRequest}
-     *           wraps {@code <membership_approval_requests
-     *           requestor_fetch?>} in
-     *           {@code WASmaxOutGroupsBaseGetGroupMixin}
-     *           ({@code xmlns="w:g2"}, {@code to=GROUP_JID(t)},
-     *           {@code id=generateId()}, {@code type="get"}).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGetMembershipApprovalRequestsRequest",

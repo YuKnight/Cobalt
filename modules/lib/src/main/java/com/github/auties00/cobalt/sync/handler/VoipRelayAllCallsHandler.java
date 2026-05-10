@@ -6,7 +6,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -14,8 +13,6 @@ import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingRelayA
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingRelayAllCallsBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -30,25 +27,17 @@ import java.util.List;
  * version {@code 1}, and action {@code "setting_relayAllCalls"}.
  *
  * <p>Index format: {@code ["setting_relayAllCalls"]}
- *
- * @implNote WAWebVoipRelayAllCallsSettingSync.default (singleton instance of the
- *           VoipRelayAllCallsSettingSync class extending AccountSyncdActionBase)
  */
 @WhatsAppWebModule(moduleName = "WAWebVoipRelayAllCallsSettingSync")
 public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code VoipRelayAllCallsHandler}.
-     *
-     * @implNote WAWebVoipRelayAllCallsSettingSync.default — {@code var m = new d; l.default = m}
      */
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final VoipRelayAllCallsHandler INSTANCE = new VoipRelayAllCallsHandler();
 
     /**
      * Creates a new {@code VoipRelayAllCallsHandler}.
-     *
-     * @implNote WAWebVoipRelayAllCallsSettingSync — constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
      */
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private VoipRelayAllCallsHandler() {
@@ -57,10 +46,6 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebVoipRelayAllCallsSettingSync.getAction — returns
-     *           {@code WASyncdConst.Actions.VoipRelayAllCalls} which is
-     *           {@code "setting_relayAllCalls"}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
@@ -70,10 +55,6 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebVoipRelayAllCallsSettingSync — constructor field
-     *           {@code this.collectionName = WASyncdConst.CollectionName.Regular}
-     *           which is {@code "regular"}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
@@ -88,25 +69,6 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return PrivacySettingRelayAllCalls.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single VoIP relay-all-calls mutation.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result state is {@code SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebVoipRelayAllCallsSettingSync.applyMutations — WA Web returns
-     *           {@code SyncActionState} values directly; Cobalt wraps in
-     *           {@link MutationApplicationResult} for type safety
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -133,15 +95,13 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      * any thrown error into {@code {actionState: Failed}} is intentionally not
      * replicated; thrown {@code WhatsAppException} subtypes propagate to the
      * pluggable error handler instead.
-     *
-     * @implNote WAWebVoipRelayAllCallsSettingSync.applyMutations (single-mutation semantics)
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -172,8 +132,6 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      *       operation={@code SET}, version={@code 1},
      *       action={@code "setting_relayAllCalls"}</li>
      * </ol>
-     *
-     * @implNote WAWebVoipRelayAllCallsSettingSync.getMutation
      * @param timestamp the mutation timestamp
      * @param isEnabled whether VoIP relay-all-calls should be enabled
      * @return the pending mutation ready for sync upload

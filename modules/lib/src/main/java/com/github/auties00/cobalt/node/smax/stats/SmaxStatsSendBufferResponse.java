@@ -15,10 +15,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxStatsSendBufferRPC.sendSendBufferRPC} tries
- *           {@code Success} → {@code ErrorNoRetry} →
- *           {@code ErrorRetry}.
  */
 public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Response
         permits SmaxStatsSendBufferResponse.Success, SmaxStatsSendBufferResponse.ErrorNoRetry, SmaxStatsSendBufferResponse.ErrorRetry {
@@ -55,10 +51,6 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
      *
      * <p>Carries no payload beyond the envelope echo: the
      * {@code <iq type="result">} validator is the only check.
-     *
-     * @implNote {@code WASmaxInStatsSendBufferResponseSuccess.parseSendBufferResponseSuccess}
-     *           delegates to
-     *           {@code WASmaxInStatsIQResultResponseMixin.parseIQResultResponseMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInStatsSendBufferResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInStatsIQResultResponseMixin")
@@ -116,16 +108,6 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
      * {@code 406} sub-shape additionally exposes a
      * {@code <field name reason/>} grandchild lifted into the
      * {@code (fieldName, fieldReason)} pair below.
-     *
-     * @implNote {@code WASmaxInStatsSendBufferResponseErrorNoRetry.parseSendBufferResponseErrorNoRetry}
-     *           projects the {@code <error/>} child through
-     *           {@code WASmaxInStatsSendBufferNoRetryError} . a
-     *           disjunction over {@code IQErrorBadRequest},
-     *           {@code IQErrorNotAcceptable}, and
-     *           {@code IQErrorFeatureNotImplemented}. Cobalt
-     *           collapses the three sub-mixins into the named
-     *           variant below plus the optional
-     *           not-acceptable-only {@code field} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInStatsSendBufferResponseErrorNoRetry")
     @WhatsAppWebModule(moduleName = "WASmaxInStatsSendBufferNoRetryError")
@@ -296,12 +278,6 @@ public sealed interface SmaxStatsSendBufferResponse extends SmaxOperation.Respon
      * The {@code ErrorRetry} reply variant. A transient
      * {@code 503 service-unavailable} rejection. The local client
      * must re-buffer the batch and retry on the next flush window.
-     *
-     * @implNote {@code WASmaxInStatsSendBufferResponseErrorRetry.parseSendBufferResponseErrorRetry}
-     *           projects the {@code <error/>} child through
-     *           {@code WASmaxInStatsIQErrorServiceUnavailableMixin}
-     *           which asserts the literal
-     *           {@code (code=503, text="service-unavailable")} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInStatsSendBufferResponseErrorRetry")
     @WhatsAppWebModule(moduleName = "WASmaxInStatsIQErrorServiceUnavailableMixin")

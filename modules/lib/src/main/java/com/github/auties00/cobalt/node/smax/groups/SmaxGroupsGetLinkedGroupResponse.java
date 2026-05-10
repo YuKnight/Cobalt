@@ -15,11 +15,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsGetLinkedGroupRequest}.
- *
- * @implNote {@code WASmaxGroupsGetLinkedGroupRPC.sendGetLinkedGroupRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order and throws on no-match;
- *           Cobalt returns {@link Optional#empty()} instead.
  */
 public sealed interface SmaxGroupsGetLinkedGroupResponse extends SmaxOperation.Response
         permits SmaxGroupsGetLinkedGroupResponse.Success, SmaxGroupsGetLinkedGroupResponse.ClientError, SmaxGroupsGetLinkedGroupResponse.ServerError {
@@ -60,13 +55,6 @@ public sealed interface SmaxGroupsGetLinkedGroupResponse extends SmaxOperation.R
      * <p>The remaining group attributes (subject, picture, owner,
      * admin list, ephemeral expiration, addressing mode, etc.) are
      * exposed verbatim via {@link #group()}.
-     *
-     * @implNote {@code WASmaxInGroupsGetLinkedGroupResponseSuccess.parseGetLinkedGroupResponseSuccess}
-     *           validates the IQ envelope, then projects via
-     *           {@code WASmaxInGroupsLinkedGroupInfoMixin}. Cobalt
-     *           keeps the {@code linked_group jid} and the inner
-     *           {@code group size} scalar projections, exposing the
-     *           {@code <group/>} child for everything else.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetLinkedGroupResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsLinkedGroupInfoMixin")
@@ -200,10 +188,6 @@ public sealed interface SmaxGroupsGetLinkedGroupResponse extends SmaxOperation.R
 
     /**
      * The {@code ClientError} reply variant.
-     *
-     * @implNote {@code WASmaxInGroupsGetLinkedGroupResponseClientError.parseGetLinkedGroupResponseClientError}
-     *           parses the {@code <error code text/>} child via the
-     *           shared base mixin.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetLinkedGroupResponseClientError")
     final class ClientError implements SmaxGroupsGetLinkedGroupResponse {
@@ -292,10 +276,6 @@ public sealed interface SmaxGroupsGetLinkedGroupResponse extends SmaxOperation.R
 
     /**
      * The {@code ServerError} reply variant.
-     *
-     * @implNote {@code WASmaxInGroupsGetLinkedGroupResponseServerError.parseGetLinkedGroupResponseServerError}
-     *           delegates to the shared base mixin which Cobalt has
-     *           consolidated under {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetLinkedGroupResponseServerError")
     final class ServerError implements SmaxGroupsGetLinkedGroupResponse {

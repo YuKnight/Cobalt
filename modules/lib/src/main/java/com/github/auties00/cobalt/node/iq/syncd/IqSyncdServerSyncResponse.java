@@ -8,21 +8,15 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
 import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.SequencedCollection;
 
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link IqSyncdServerSyncRequest}.
- *
- * @implNote {@code WAWebSyncdServerSync.serverSync} encodes the
- *           failure modes as either fatal-vs-retryable based on the
- *           top-level error code, or as per-collection state on
- *           success. Cobalt collapses to the standard
- *           {@code Success} (carrying the raw node for downstream
- *           parsing) / {@code ClientError} / {@code ServerError}
- *           split.
  */
 public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
         permits IqSyncdServerSyncResponse.Success, IqSyncdServerSyncResponse.ClientError, IqSyncdServerSyncResponse.ServerError {
@@ -90,8 +84,8 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
          * @return an unmodifiable view of the collections. Never
          *         {@code null}, possibly empty
          */
-        public java.util.SequencedCollection<IqSyncdServerSyncResponseCollection> collections() {
-            return java.util.Collections.unmodifiableSequencedCollection(collections);
+        public SequencedCollection<IqSyncdServerSyncResponseCollection> collections() {
+            return Collections.unmodifiableSequencedCollection(collections);
         }
 
         /**
@@ -103,14 +97,6 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
          * @return an {@link Optional} carrying the parsed variant, or
          *         empty when the stanza does not match the success
          *         schema
-         *
-         * @implNote {@code WAWebSyncdResponseParser.syncResponseParser}:
-         *           {@code child("sync").mapChildrenWithTag("collection",
-         *           ...)} projecting each child via the inline
-         *           {@code stateOfCollection} helper. Cobalt mirrors
-         *           the projection without decoding the encoded patch
-         *           or snapshot payloads (those remain the syncd
-         *           subsystem's responsibility).
          */
         @WhatsAppWebExport(moduleName = "WAWebSyncdResponseParser",
                 exports = "syncResponseParser", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -137,13 +123,6 @@ public sealed interface IqSyncdServerSyncResponse extends IqOperation.Response
          *              {@code null}
          * @return an {@link Optional} carrying the projection, or
          *         empty when the child lacks a {@code name} attribute
-         *
-         * @implNote {@code WAWebSyncdResponseParser.syncResponseParser}:
-         *           the inline state classifier maps
-         *           {@code type="error"} + {@code <error code/>} +
-         *           {@code has_more_patches} onto the
-         *           {@link IqSyncdServerSyncCollectionState} enum.
-         *           Cobalt mirrors the same lookup verbatim.
          */
         private static Optional<IqSyncdServerSyncResponseCollection> parseCollection(Node child) {
             var name = child.getAttributeAsString("name").orElse(null);

@@ -7,11 +7,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * Helper for firing a one-shot task on a virtual thread after a delay
  * without pulling in a dedicated scheduler.
- *
- * @implNote Leans on
- *     {@link CompletableFuture#delayedExecutor(long, TimeUnit, java.util.concurrent.Executor)}
- *     and {@link Thread#startVirtualThread(Runnable)}. WhatsApp Web uses
- *     browser timers instead.
  */
 public final class SchedulerUtils {
     /**

@@ -65,12 +65,6 @@ public final class IqSetWindowsPushConfigRequest implements IqOperation.Request 
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <config/>} payload
-     *
-     * @implNote {@code WAWebSetWindowsPushConfig.setWindowsPushConfig}
-     *           composes {@code wap("iq", {to:S_WHATSAPP_NET,
-     *           type:"set", xmlns:"urn:xmpp:whatsapp:push", id},
-     *           wap("config", {id:CUSTOM_STRING(channelUri),
-     *           platform:"wns", version:m(ring)}))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSetWindowsPushConfig",

@@ -59,11 +59,6 @@ final class WamBeaconing {
      * determines whether beaconing is activated. When activated the
      * sequence counter resets to {@code 1} and increments on each
      * subsequent call within the same day.
-     *
-     * @implNote Determines daily activation at one percent probability
-     *     and increments a per-buffer-key sequence counter. WhatsApp
-     *     Web stores that counter in user preferences. Cobalt keeps it
-     *     in memory because the WAM service is not session-persistent.
      * @param bufferKey the buffer key identifying the beaconing track,
      *                  for example {@code "regular"}, {@code "realtime"},
      *                  or a private-stats id key name

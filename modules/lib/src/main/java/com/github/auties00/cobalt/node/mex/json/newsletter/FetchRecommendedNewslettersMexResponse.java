@@ -22,9 +22,6 @@ import java.util.OptionalLong;
 /**
  * The response variant of {@link FetchRecommendedNewslettersMexResponse} that exposes the data
  * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchRecommendedNewslettersJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchRecommendedNewslettersJob")
 public final class FetchRecommendedNewslettersMexResponse implements MexOperation.Response.Json {
@@ -38,10 +35,6 @@ public final class FetchRecommendedNewslettersMexResponse implements MexOperatio
 
     /**
      * Parses a MEX response from the given IQ response node.
-     *
-     * @implNote WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -204,11 +197,6 @@ public final class FetchRecommendedNewslettersMexResponse implements MexOperatio
 
         /**
          * Returns the {@code status_metadata} field.
-         *
-         * @implNote WAWebMexFetchRecommendedNewslettersJobQuery.graphql: present in the
-         * response only when the request opted in via
-         * {@code fetch_status_metadata = true}
-         * (Relay {@code Condition} with {@code passingValue:!0}).
          * @return an {@link Optional} containing the value, or empty if absent
          */
         public Optional<StatusMetadata> statusMetadata() {
@@ -640,10 +628,6 @@ public final class FetchRecommendedNewslettersMexResponse implements MexOperatio
          * A parsed {@code StatusMetadata} object exposing per-newsletter
          * status counters returned when {@code fetch_status_metadata}
          * was set on the request.
-         *
-         * @implNote WAWebMexFetchRecommendedNewslettersJobQuery.graphql: corresponds to the
-         * {@code XWA2NewsletterStatusMetadata} concrete type, included
-         * conditionally on the {@code fetch_status_metadata} variable.
          */
         public static final class StatusMetadata {
             private final String lastStatusServerId;
@@ -747,10 +731,6 @@ public final class FetchRecommendedNewslettersMexResponse implements MexOperatio
     /**
      * Parses a {@link FetchRecommendedNewslettersMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
-     *
-     * @implNote WAWebMexFetchRecommendedNewslettersJob.mexFetchRecommendedNewsletters: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_newsletters_recommended} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields

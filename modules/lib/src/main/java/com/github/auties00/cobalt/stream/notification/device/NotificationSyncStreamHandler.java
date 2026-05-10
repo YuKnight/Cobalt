@@ -44,8 +44,6 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
 
     /**
      * The shared reporter used to accumulate per-collection offline {@code server_sync} notification counts for the {@code MdAppStateOfflineNotifications} WAM event.
-     *
-     * @implNote WA Web stores the count map at module scope; Cobalt models it as a shared reporter consumed by both this handler (producer) and {@code InfoBulletinStreamHandler} (flush on offline bulletin).
      */
     private final OfflineNotificationsReporter offlineNotificationsReporter;
 
@@ -185,7 +183,6 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      * result.
      *
      * @return {@code true} if critical data sync is still in process
-     * @implNote Cobalt approximates WA Web's global state machine by checking whether the {@code critical_block} collection has not yet been bootstrapped, which yields the same behavioural result.
      */
     private boolean isCriticalDataSyncInProcess() {
         return !whatsapp.store()

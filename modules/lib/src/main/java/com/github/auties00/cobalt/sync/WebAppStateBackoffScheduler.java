@@ -21,55 +21,36 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>If the elapsed time since the first failure exceeds the finite failure expiry
  * window ({@value #FINITE_FAILURE_EXPIRY_MS} ms), the retry is rejected and the
  * collection should be moved to fatal state.
- *
- * @implNote WAWebSyncd (te, ne, ae — retry scheduling and backoff computation;
- *     W — global attempt counter; q — sticky server backoff floor; O — setTimeout handle),
- *     WASyncdConst (BACKOFF_MIN_TIMEOUT = 1e3, BACKOFF_MAX_TIMEOUT = 1e3*60*60,
- *     BACKOFF_BASE = 2, FINITE_FAILURE_EXPIRY_DURATION = DAY_MILLISECONDS * 2),
- *     WAWebSyncdCollectionsStateMachine (getExpiredCollections — expiry check logic)
  */
 public final class WebAppStateBackoffScheduler implements Closeable {
     /**
      * Minimum backoff delay in milliseconds.
-     *
-     * @implNote WASyncdConst.BACKOFF_MIN_TIMEOUT (s = 1e3)
      */
     private static final long BASE_DELAY_MS = 1000;
 
     /**
      * Maximum backoff delay in milliseconds (1 hour).
-     *
-     * @implNote WASyncdConst.BACKOFF_MAX_TIMEOUT (u = 1e3 * 60 * 60)
      */
     private static final long MAX_DELAY_MS = 3_600_000;
 
     /**
      * Exponential backoff base multiplier.
-     *
-     * @implNote WASyncdConst.BACKOFF_BASE (c = 2)
      */
     private static final int MULTIPLIER = 2;
 
     /**
      * Maximum duration (in milliseconds) that a collection may remain in finite retry
      * state before being considered expired and moved to fatal.
-     *
-     * @implNote WASyncdConst.FINITE_FAILURE_EXPIRY_DURATION (d = DAY_MILLISECONDS * 2 = 172800000)
      */
     private static final long FINITE_FAILURE_EXPIRY_MS = 2 * 24 * 60 * 60 * 1000L;
 
     /**
      * Per-collection pending retry futures, replacing WA Web's single global timeout handle.
-     *
-     * @implNote ADAPTED: WAWebSyncd.O (single setTimeout handle) mapped to per-collection map
-     *     for concurrent collection-level retries on virtual threads
      */
     private final ConcurrentHashMap<SyncPatchType, CompletableFuture<?>> pendingRetries;
 
     /**
      * Global attempt counter shared across all collections.
-     *
-     * @implNote WAWebSyncd.W (var W = 0)
      */
     private final AtomicInteger globalAttemptCounter;
 
@@ -77,15 +58,11 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      * Sticky server-suggested backoff floor in milliseconds. This value persists across
      * retries and is only updated when a new server backoff is explicitly provided via
      * {@link #updateServerBackoff(long)}.
-     *
-     * @implNote WAWebSyncd.q (var q = 0 — module-level sticky server backoff)
      */
     private final AtomicLong stickyServerBackoffMs;
 
     /**
      * Constructs a new {@code WebAppStateBackoffScheduler} with zeroed counters.
-     *
-     * @implNote WAWebSyncd module initialization (var W = 0, q = 0, O = undefined)
      */
     public WebAppStateBackoffScheduler() {
         this.pendingRetries = new ConcurrentHashMap<>();
@@ -107,9 +84,6 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      *                              {@code null} to keep the existing sticky value
      * @param retryAction           the action to execute on retry
      * @return {@code true} if the retry was scheduled, {@code false} if the failure window expired
-     * @implNote WAWebSyncd.te (retry scheduling), WAWebSyncd.ne (backoff computation),
-     *           WAWebSyncd.ee (q = serverBackoff when ErrorRetry),
-     *           WAWebSyncdCollectionsStateMachine.getExpiredCollections (expiry check).
      */
     public boolean scheduleRetry(SyncPatchType collectionName, long firstFailureTimestamp, Long serverBackoffMs, Runnable retryAction) {
         if (serverBackoffMs != null) {
@@ -130,8 +104,6 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      * @param firstFailureTimestamp the timestamp of the first failure in this series
      * @param retryAction           the action to execute on retry
      * @return {@code true} if the retry was scheduled, {@code false} if the failure window expired
-     * @implNote WAWebSyncd.te (retry scheduling), WAWebSyncd.ne (backoff computation),
-     *           WAWebSyncdCollectionsStateMachine.getExpiredCollections (expiry check).
      */
     public boolean scheduleRetry(SyncPatchType collectionName, long firstFailureTimestamp, Runnable retryAction) {
         // WAWebSyncdCollectionsStateMachine.getExpiredCollections: check finiteFailureStartTime + FINITE_FAILURE_EXPIRY_DURATION < unixTimeMs()
@@ -166,7 +138,6 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      * until explicitly updated again.
      *
      * @param serverBackoffMs the server-suggested backoff floor in milliseconds
-     * @implNote WAWebSyncd.ee: {@code i.length > 0 && (q = i[0].serverBackoff || 0, W = 0)}.
      */
     public void updateServerBackoff(long serverBackoffMs) {
         stickyServerBackoffMs.set(serverBackoffMs);
@@ -196,7 +167,6 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      *
      * @param collectionName the collection whose retry to cancel
      * @return {@code true} if a pending retry was cancelled, {@code false} otherwise
-     * @implNote WAWebSyncd.ae: {@code O != null && clearTimeout(O)}.
      */
     public boolean cancelRetry(SyncPatchType collectionName) {
         var future = pendingRetries.remove(collectionName);
@@ -213,9 +183,6 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      * <p>Callers invoke this on a successful sync to reset the backoff progression.
      * Only {@code W} is reset, the sticky server backoff {@code q} is preserved and
      * continues to be used as a floor for future retries.
-     *
-     * @implNote WAWebSyncd.ee: the success path resets {@code W} indirectly by completing
-     *           without error. WAWebSyncdServerSync.S: success clears retry state.
      */
     public void resetAttemptCounter() {
         globalAttemptCounter.set(0);
@@ -223,9 +190,6 @@ public final class WebAppStateBackoffScheduler implements Closeable {
 
     /**
      * Closes this scheduler, cancelling all pending retries and resetting all state.
-     *
-     * @implNote No direct WA Web equivalent. The browser bundle relies on page unload
-     *           rather than an explicit lifecycle hook.
      */
     @Override
     public void close() {

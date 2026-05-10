@@ -53,15 +53,6 @@ public final class SmaxPushConfigSetRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the payload variant
-     *
-     * @implNote {@code WASmaxOutPushConfigSetRequest.makeSetRequest}
-     *           composes the
-     *           {@code WASmaxOutPushConfigBaseIQSetRequestMixin}
-     *           ({@code id=generateId() type="set"}) over a
-     *           {@code <iq xmlns="urn:xmpp:whatsapp:push" to=S_WHATSAPP_NET>}
-     *           envelope wrapping either a {@code <config>} child
-     *           (per the platform-specific config-mixins family) or
-     *           a {@code <clear platform?/>} child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPushConfigSetRequest",

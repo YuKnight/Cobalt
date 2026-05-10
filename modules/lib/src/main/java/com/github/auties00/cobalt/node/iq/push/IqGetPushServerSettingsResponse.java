@@ -13,12 +13,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link IqGetPushServerSettingsRequest}.
- *
- * @implNote {@code WAWebGetPushServerSettingsJob.getPushServerSettings}
- *           short-circuits the parser when {@code <error/>} is
- *           absent and projects {@code child("settings").attrString("webserverkey")}.
- *           Cobalt splits the failure path into typed
- *           {@code ClientError} / {@code ServerError} variants.
  */
 public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Response
         permits IqGetPushServerSettingsResponse.Success, IqGetPushServerSettingsResponse.ClientError, IqGetPushServerSettingsResponse.ServerError {
@@ -59,10 +53,6 @@ public sealed interface IqGetPushServerSettingsResponse extends IqOperation.Resp
      * <p>Carries the base64-encoded {@code webserverkey} attribute
      * value. WA Web stores this verbatim and surfaces it through the
      * push pipeline for inbound-payload signature validation.
-     *
-     * @implNote {@code WAWebGetPushServerSettingsJob.getPushServerSettings}
-     *           projects {@code child("settings").attrString("webserverkey")}
-     *           on the {@code !hasChild("error")} branch.
      */
     @WhatsAppWebModule(moduleName = "WAWebGetPushServerSettingsJob")
     final class Success implements IqGetPushServerSettingsResponse {

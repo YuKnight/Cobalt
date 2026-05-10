@@ -9,7 +9,6 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * The outbound stanza variant. Wraps the disjunctive
@@ -21,6 +20,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutAccountSetPaymentsTOSv3Request")
 @WhatsAppWebModule(moduleName = "WASmaxOutAccountSetIQMixin")
 @WhatsAppWebModule(moduleName = "WASmaxOutAccountBaseIQSetRequestMixin")
+@WhatsAppWebModule(moduleName = "WASmaxOutAccountSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3MixinGroup")
 public final class SmaxAccountSetPaymentsTOSv3Request implements SmaxOperation.Request {
     /**
      * The integer ToS version being accepted (routed into the
@@ -67,7 +67,6 @@ public final class SmaxAccountSetPaymentsTOSv3Request implements SmaxOperation.R
 
     /**
      * Builds the outbound IQ stanza ready for dispatch.
-     *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <accept_pay/>} payload
      */
@@ -75,19 +74,42 @@ public final class SmaxAccountSetPaymentsTOSv3Request implements SmaxOperation.R
     @WhatsAppWebExport(moduleName = "WASmaxOutAccountSetPaymentsTOSv3Request",
             exports = "makeSetPaymentsTOSv3Request",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutAccountSetIQMixin",
+            exports = "mergeSetIQMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutAccountBaseIQSetRequestMixin",
+            exports = "mergeBaseIQSetRequestMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutAccountSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3MixinGroup",
+            exports = "mergeSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3MixinGroup",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutAccountSetPaymentsTOSv3BRConsumerPaymentsTOSv3Mixin",
+            exports = "makeSetPaymentsTOSv3BRConsumerPaymentsTOSv3AdditionalNotice",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutAccountSetPaymentsTOSv3BRConsumerPaymentsTOSv3Mixin",
+            exports = "mergeSetPaymentsTOSv3BRConsumerPaymentsTOSv3Mixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutAccountSetPaymentsTOSv3UPIConsumerPaymentsTOSv3Mixin",
+            exports = "makeSetPaymentsTOSv3UPIConsumerPaymentsTOSv3AdditionalNotice",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutAccountSetPaymentsTOSv3UPIConsumerPaymentsTOSv3Mixin",
+            exports = "mergeSetPaymentsTOSv3UPIConsumerPaymentsTOSv3Mixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
         String service;
         List<String> notices;
         switch (variant) {
             case SmaxAccountSetPaymentsTOSv3ConsumerVariant.BrConsumer brConsumer -> {
-                service = "FBPAY";
+                service = "FBPAY"; // WASmaxOutAccountSetPaymentsTOSv3BRConsumerPaymentsTOSv3Mixin: smax("accept_pay", {service: "FBPAY"}, ...)
                 notices = brConsumer.additionalNotices();
             }
             case SmaxAccountSetPaymentsTOSv3ConsumerVariant.UpiConsumer upiConsumer -> {
-                service = "UPI";
+                service = "UPI"; // WASmaxOutAccountSetPaymentsTOSv3UPIConsumerPaymentsTOSv3Mixin: smax("accept_pay", {service: "UPI"}, ...)
                 notices = upiConsumer.additionalNotices();
             }
         }
+        // WASmaxOutAccountSetPaymentsTOSv3BRConsumerPaymentsTOSv3Mixin.makeSetPaymentsTOSv3BRConsumerPaymentsTOSv3AdditionalNotice:
+        // smax("additional_notice", {notice: WAWap.CUSTOM_STRING(t)}); REPEATED_CHILD enforces 1..10 (validated in BrConsumer/UpiConsumer constructor).
         var noticeNodes = new Node[notices.size()];
         for (var i = 0; i < notices.size(); i++) {
             noticeNodes[i] = new NodeBuilder()
@@ -95,6 +117,8 @@ public final class SmaxAccountSetPaymentsTOSv3Request implements SmaxOperation.R
                     .attribute("notice", notices.get(i))
                     .build();
         }
+        // WASmaxOutAccountSetPaymentsTOSv3BRConsumerPaymentsTOSv3Mixin (and UPI sibling): smax("accept_pay", {service}, REPEATED_CHILD(...))
+        // mergeSetPaymentsTOSv3{BR|UPI}ConsumerPaymentsTOSv3Mixin: ADAPTED — instead of a separate mergeStanzas step, the accept_pay is composed directly as the IQ's content.
         var acceptPay = new NodeBuilder()
                 .description("accept_pay")
                 .attribute("version", "3")
@@ -104,9 +128,9 @@ public final class SmaxAccountSetPaymentsTOSv3Request implements SmaxOperation.R
                 .build();
         return new NodeBuilder()
                 .description("iq")
-                .attribute("xmlns", "urn:xmpp:whatsapp:account")
-                .attribute("to", JidServer.user())
-                .attribute("type", "set")
+                .attribute("xmlns", "urn:xmpp:whatsapp:account") // WASmaxOutAccountSetIQMixin.mergeSetIQMixin: stamps xmlns="urn:xmpp:whatsapp:account"
+                .attribute("to", JidServer.user()) // WASmaxOutAccountSetIQMixin.mergeSetIQMixin: stamps to=WAWap.S_WHATSAPP_NET ("s.whatsapp.net")
+                .attribute("type", "set") // WASmaxOutAccountBaseIQSetRequestMixin.mergeBaseIQSetRequestMixin: stamps type="set" via WASmaxMixins.mergeStanzas; id is added by the central IQ dispatch pipeline (WAWap.generateId())
                 .content(acceptPay);
     }
 

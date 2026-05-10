@@ -163,14 +163,6 @@ public final class SmaxMdCompanionHelloRequest implements SmaxOperation.Request 
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <link_code_companion_reg/>} payload
-     *
-     * @implNote {@code WASmaxOutMdCompanionHelloRequest.makeCompanionHelloRequest}
-     *           emits {@code <iq xmlns="md" to="s.whatsapp.net"
-     *           type="set" id=…>} with a single
-     *           {@code <link_code_companion_reg jid stage="companion_hello"
-     *           should_show_push_notification?>} payload nested over
-     *           the wrapped ephemeral pub, server-auth pubkey, platform
-     *           id, platform display and optional pairing nonce.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutMdCompanionHelloRequest",

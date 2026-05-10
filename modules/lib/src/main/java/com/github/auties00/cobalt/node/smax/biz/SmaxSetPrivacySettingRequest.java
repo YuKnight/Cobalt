@@ -4,11 +4,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -26,7 +23,7 @@ import java.util.Optional;
 public final class SmaxSetPrivacySettingRequest implements SmaxOperation.Request {
     /**
      * The optional consent value. One of {@code "true"} /
-     * {@code "false"} / {@code "notSet"}; {@code null} omits the
+     * {@code "false"} / {@code "notset"}; {@code null} omits the
      * inner {@code <smb_data_sharing_with_meta_consent>} child via
      * the {@code optionalMerge} of the JS mixin pair.
      */
@@ -58,28 +55,23 @@ public final class SmaxSetPrivacySettingRequest implements SmaxOperation.Request
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <privacy/>} payload
-     *
-     * @implNote {@code WASmaxOutBizSettingsSetPrivacySettingRequest.makeSetPrivacySettingRequest}
-     *           composes
-     *           {@code WASmaxOutBizSettingsBaseIQSetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="set"}) over a
-     *           {@code <iq xmlns="w:biz" to="s.whatsapp.net">}
-     *           carrying a {@code <privacy>} child whose
-     *           {@code <smb_data_sharing_with_meta_consent>} child
-     *           is wrapped in
-     *           {@code WASmaxOutBizSettingsSmbDataSharingSettingValueMixin}'s
-     *           {@code smax$any value="..."} attribute.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBizSettingsSetPrivacySettingRequest",
             exports = "makeSetPrivacySettingRequest", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizSettingsBaseIQSetRequestMixin",
+            exports = "mergeBaseIQSetRequestMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizSettingsSmbDataSharingSettingMixin",
+            exports = "mergeSmbDataSharingSettingMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizSettingsSmbDataSharingSettingValueMixin",
+            exports = "mergeSmbDataSharingSettingValueMixin", adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
         var privacyBuilder = new NodeBuilder()
                 .description("privacy");
         if (dataSharingConsent != null) {
             var consentNode = new NodeBuilder()
-                    .description("smb_data_sharing_with_meta_consent")
-                    .attribute("value", dataSharingConsent)
+                    .description("smb_data_sharing_with_meta_consent") // WASmaxOutBizSettingsSmbDataSharingSettingMixin.mergeSmbDataSharingSettingMixin: emits the <smb_data_sharing_with_meta_consent> child wrapped via WASmaxMixins.optionalMerge (skipped when args are absent)
+                    .attribute("value", dataSharingConsent) // ADAPTED: WASmaxOutBizSettingsSmbDataSharingSettingValueMixin.mergeSmbDataSharingSettingValueMixin -- JS emits smax$any{value=CUSTOM_STRING(anyValue)} then folds it into the target via mergeStanzas; Cobalt stamps the attribute directly
                     .build();
             privacyBuilder.content(consentNode);
         }
@@ -87,7 +79,7 @@ public final class SmaxSetPrivacySettingRequest implements SmaxOperation.Request
                 .description("iq")
                 .attribute("xmlns", "w:biz")
                 .attribute("to", JidServer.user())
-                .attribute("type", "set")
+                .attribute("type", "set") // WASmaxOutBizSettingsBaseIQSetRequestMixin.mergeBaseIQSetRequestMixin: stamps type="set" via WASmaxMixins.mergeStanzas; id is added by the central IQ dispatch pipeline (WAWap.generateId())
                 .content(privacyBuilder.build());
     }
 

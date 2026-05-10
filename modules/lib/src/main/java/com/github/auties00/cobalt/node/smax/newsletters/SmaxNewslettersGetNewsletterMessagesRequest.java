@@ -93,17 +93,6 @@ public final class SmaxNewslettersGetNewsletterMessagesRequest implements SmaxOp
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <messages>} payload
-     *
-     * @implNote {@code WASmaxOutNewslettersGetNewsletterMessagesRequest.makeGetNewsletterMessagesRequest}
-     *           composes
-     *           {@code WASmaxOutNewslettersNewsletterMessageRequestIQPayloadMixin}
-     *           around the {@code <messages count="…">} root, embeds
-     *           the addressing block via
-     *           {@code mergeQueryNewsletterParamsMixin} (a
-     *           {@code <smax$any type="jid"/"invite" …>} marker), and
-     *           layers the optional direction via
-     *           {@code mergeMessageDirections} (rewrites the root with
-     *           a {@code before} or {@code after} attribute).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersGetNewsletterMessagesRequest",

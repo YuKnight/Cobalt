@@ -14,15 +14,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WAWebSetPrivacyJob.setPrivacyParser} maps each
- *           {@code <category/>} child onto either a successful
- *           {@code (name, value, dhash)} projection or a
- *           {@code ServerStatusCodeError} when {@code value="error"}.
- *           Cobalt models the per-category outcomes uniformly via
- *           {@link IqSetPrivacyResponse.Success#categories()} and routes wire-level
- *           {@code 4xx}/{@code 5xx} errors through
- *           {@link IqSetPrivacyResponse.ClientError} / {@link IqSetPrivacyResponse.ServerError}.
  */
 public sealed interface IqSetPrivacyResponse extends IqOperation.Response
         permits IqSetPrivacyResponse.Success, IqSetPrivacyResponse.ClientError, IqSetPrivacyResponse.ServerError {
@@ -54,15 +45,6 @@ public sealed interface IqSetPrivacyResponse extends IqOperation.Response
 
     /**
      * One per-category outcome inside a {@link Success} response.
-     *
-     * @implNote {@code WAWebSetPrivacyJob.setPrivacyParser}'s
-     *           per-{@code <category>} mapping projects either a
-     *           {@code (name, value, dhash)} record or a
-     *           {@code ServerStatusCodeError}. {@link CategoryOutcome}
-     *           is the typed successful projection. Per-category
-     *           rejections are surfaced via the optional
-     *           {@link CategoryOutcome#errorCode} / {@link CategoryOutcome#errorText}
-     *           fields.
      */
     final class CategoryOutcome {
         /**

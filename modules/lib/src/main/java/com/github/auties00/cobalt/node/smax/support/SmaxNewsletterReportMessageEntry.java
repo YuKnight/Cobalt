@@ -19,22 +19,6 @@ import java.util.Optional;
  * One {@code <message>} child of the {@code <spam_list>} payload .
  * the wire-shape descriptor of a single offending message harvested
  * from the local cache.
- *
- * @implNote {@code WASmaxOutSpamMessageMixin.mergeMessageMixin}
- *           composes the canonical
- *           {@code <message t id from? selected? unsent?
- *           deleted_reason?>} envelope with a 17-deep stack of
- *           optional mixins (revoke, admin-revoke, edit, multicast,
- *           pre-filled-text/number, automated, hsm-template,
- *           extension-screen, participant, franking,
- *           wa-message-reporting, smb-broadcast, iab-report-link,
- *           question-response, message-placeholder,
- *           reported-push-name, payload-types). Cobalt exposes a flat
- *           {@code (from, t, id, raw)} record and lets callers build
- *           ad-hoc descriptors using the {@link Builder} for the
- *           common attributes; advanced callers can attach a
- *           pre-built {@link Node} via {@link #raw()} which the
- *           {@link SmaxNewsletterReportRequest} embeds verbatim.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutSpamMessageMixin")
 public final class SmaxNewsletterReportMessageEntry {

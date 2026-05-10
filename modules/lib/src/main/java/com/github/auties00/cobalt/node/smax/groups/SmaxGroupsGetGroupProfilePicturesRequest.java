@@ -115,20 +115,6 @@ public final class SmaxGroupsGetGroupProfilePicturesRequest implements SmaxOpera
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <pictures/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsGetGroupProfilePicturesRequest.makeGetGroupProfilePicturesRequest}
-     *           composes {@code <pictures>} carrying
-     *           {@code REPEATED_CHILD(<picture id? type? query?>, 1, 1000)}
-     *           and an optional {@code linked_groups_membership_hint}
-     *           attribute (via {@code WASmaxOutGroupsSubGroupHintMixin}),
-     *           then merges the parent-or-sub-group disjunction onto
-     *           each picture child via
-     *           {@code WASmaxOutGroupsParentOrSubGroupMixinGroup} and
-     *           wraps the whole stanza in either
-     *           {@code WASmaxOutGroupsBaseGetGroupMixin} or
-     *           {@code WASmaxOutGroupsBaseGetServerMixin} depending on
-     *           the {@code BaseGetGroupOrServerMixinGroup}
-     *           disjunction.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGetGroupProfilePicturesRequest",

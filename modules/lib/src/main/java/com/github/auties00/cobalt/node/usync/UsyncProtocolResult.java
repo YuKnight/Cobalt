@@ -31,11 +31,6 @@ import com.github.auties00.cobalt.node.usync.result.UsyncProtocolResponse;
  *     default                   -> { /* other protocols * / }
  * }
  * }</pre>
- *
- * @implNote Each {@code WAWebUsync*Protocol.parser} in WhatsApp Web returns
- *     either {@code {errorCode, errorText}} or a protocol-specific shape. This
- *     two-level sealed hierarchy mirrors that union with a clean error and
- *     response split.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public sealed interface UsyncProtocolResult permits UsyncProtocolResponse, UsyncProtocolError {

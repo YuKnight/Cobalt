@@ -40,19 +40,6 @@ import java.util.zip.InflaterInputStream;
  * <p>Processing runs on a dedicated virtual thread because history blobs can
  * reach several megabytes and the caller is the stanza dispatch thread; keeping
  * it off the main path avoids back-pressuring other incoming messages.
- *
- * @implNote {@code WAWebHandleHistorySyncNotification.handleHistorySyncNotification} drives the
- *           equivalent JS flow, using
- *           {@code WAWebDownloadManager.downloadAndMaybeDecrypt} for the CDN
- *           fetch,
- *           {@code WAWebHandleHistorySyncChunk.handleHistorySyncChunk} for
- *           per-chunk application, and
- *           {@code WAWebApiHistorySyncNotification} for the background queue.
- *           Cobalt collapses the download, decrypt, inflate and decode stages
- *           into {@link MediaConnection#download(MediaProvider)},
- *           which already returns a plaintext, already-inflated stream for the
- *           {@link MediaPath#HISTORY_SYNC}
- *           media type.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleHistorySyncNotification")
 @WhatsAppWebModule(moduleName = "WAWebHistorySyncNotificationUtils")
@@ -105,8 +92,6 @@ public final class WebHistorySyncService {
      *
      * @param notification the history-sync notification to process, may be
      *                     {@code null} in which case the call is a no-op
-     * @implNote {@code WAWebApiHistorySyncNotification.enqueueNotification}
-     *           similarly defers chunk handling to a background queue.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleHistorySyncNotification",
             exports = "handleHistorySyncNotification",
@@ -125,9 +110,6 @@ public final class WebHistorySyncService {
      * can continue operating on partial history and the primary will retry.
      *
      * @param notification the non-null notification to process
-     * @implNote Mirrors the body of
-     *           {@code WAWebHandleHistorySyncNotification.handleHistorySyncNotification}, minus the
-     *           WAM progress events which are emitted separately.
      */
     private void processSync(HistorySyncNotification notification) {
         // WAWebHandleHistorySyncChunk.handleHistorySyncChunk: historySyncStepStartedTs
@@ -228,17 +210,6 @@ public final class WebHistorySyncService {
      * commits the event. Cobalt folds both steps into a single builder call at
      * the terminal point of {@link #processSync} because the intermediate
      * mutable event object is not exposed anywhere else.
-     *
-     * @implNote WAWebHistorySyncNotificationUtils.getHistorySyncMetrics,
-     *           WAWebHistorySyncNotificationUtils.commitHistoryDataAppliedMetric,
-     *           WAWebGetMetricHistorySyncPayloadType.getMetricHistorySyncPayloadType,
-     *           WAWebGetHistorySyncProgress.getHistorySyncProgress.
-     *           Cobalt has no equivalent of
-     *           {@code MdSyncFieldStatsMeta.getMdSessionId} (hashes primary +
-     *           companion identity keys), so {@code mdSessionId} is omitted.
-     *           Storage quota fields {@code mdStorageQuotaBytes}/{@code mdStorageQuotaUsedBytes}
-     *           are set only on the Downloaded event in WA Web, not on this
-     *           DataApplied event, so they are not populated here either.
      * @param notification  the notification whose chunk was processed; used for
      *                      {@code syncType}, {@code chunkOrder} and
      *                      {@code progress}
@@ -346,17 +317,6 @@ public final class WebHistorySyncService {
      * steps into a single builder call right after
      * {@link #decode(HistorySyncNotification)} because the intermediate mutable
      * event object is not exposed elsewhere.
-     *
-     * @implNote WAWebHistorySyncNotificationUtils.getHistorySyncMetrics,
-     *           WAWebHistorySyncNotificationUtils.commitHistoryDownloadedMetric,
-     *           WAWebGetMetricHistorySyncPayloadType.getMetricHistorySyncPayloadType,
-     *           WAWebGetHistorySyncProgress.getHistorySyncProgress.
-     *           Cobalt has no equivalent of
-     *           {@code MdSyncFieldStatsMeta.getMdSessionId} (hashes primary +
-     *           companion identity keys), so {@code mdSessionId} is omitted,
-     *           and {@code mdStorageQuotaBytes}/{@code mdStorageQuotaUsedBytes}
-     *           are skipped because Cobalt has no storage-estimation API
-     *           equivalent to {@code MdSyncFieldStatsMeta.getStorageEstimation}.
      * @param notification  the notification whose payload was downloaded; used
      *                      for {@code syncType}, {@code chunkOrder},
      *                      {@code progress} and {@code historySyncPayloadSize}
@@ -446,7 +406,7 @@ public final class WebHistorySyncService {
                 builder.mdBootstrapChatsCount(chats.size());
                 var messagesCount = 0;
                 for (var chat : chats) {
-                    messagesCount += chat.messages().size();
+                    messagesCount += chat.messageCount();
                 }
                 builder.mdBootstrapMessagesCount(messagesCount);
             } else if (!historySync.statusV3Messages().isEmpty()) {
@@ -506,17 +466,6 @@ public final class WebHistorySyncService {
      * committed immediately after it is captured, the {@code mdBootstrapStepDuration}
      * reported here is effectively zero, matching WA Web's behaviour (the
      * start-downloading step has no preceding work).
-     *
-     * @implNote WAWebHistorySyncNotificationUtils.getHistorySyncMetrics,
-     *           WAWebHistorySyncNotificationUtils.commitHistoryStartDownloadingMetric,
-     *           WAWebGetMetricHistorySyncPayloadType.getMetricHistorySyncPayloadType,
-     *           WAWebGetHistorySyncProgress.getHistorySyncProgress.
-     *           {@code mdSessionId} is omitted because Cobalt lacks an
-     *           equivalent of {@code MdSyncFieldStatsMeta.getMdSessionId}
-     *           (SHA-256 of primary+companion identity keys), matching the
-     *           sibling DataReceived / Downloaded / DataApplied emissions.
-     *           {@code historySyncRetryRequestId} is declared in the spec but
-     *           is never populated at any WA Web call site of this event.
      * @param notification  the non-null notification whose chunk is about to
      *                      be downloaded
      * @param applyStartTs  millisecond timestamp captured at the top of
@@ -600,18 +549,6 @@ public final class WebHistorySyncService {
      * Cobalt enforces the same guard by checking for the presence of a direct
      * path, a media key, or an inline bootstrap payload before firing the
      * event.
-     *
-     * @implNote WAWebHandleHistorySyncNotification.handleHistorySyncNotification,
-     *           WAWebGetMetricHistorySyncPayloadType.getMetricHistorySyncPayloadType,
-     *           WAWebGetHistorySyncProgress.getHistorySyncProgress.
-     *           {@code historySyncRetryRequestId} and
-     *           {@code mdSyncFailureReason} are declared in the event schema
-     *           but never populated at the WA Web call site; they are left
-     *           empty here for parity. {@code mdSessionId} is also omitted
-     *           because Cobalt lacks an equivalent of
-     *           {@code MdSyncFieldStatsMeta.getMdSessionId} (identity-key
-     *           hash), matching {@link #emitHistoryDataApplied} and
-     *           {@link #emitHistoryDataDownloaded}.
      * @param notification the history-sync notification whose arrival is
      *                     being reported
      */
@@ -689,12 +626,6 @@ public final class WebHistorySyncService {
      * @return the encrypted blob size, the inline payload size, or
      *         {@code null} when neither is available (MESSAGE_ACCESS_STATUS
      *         / NO_HISTORY markers)
-     * @implNote WAWebHandleHistorySyncNotification.handleHistorySyncNotification
-     *           sets {@code historySyncPayloadSize} from
-     *           {@code historySyncNotification.fileLength}; WAM treats the
-     *           field as a 32-bit integer so the value is narrowed to
-     *           {@code int} even though the underlying media size is a
-     *           {@code long}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleHistorySyncNotification",
             exports = "handleHistorySyncNotification",
@@ -725,8 +656,6 @@ public final class WebHistorySyncService {
      * fall-through returns {@code PUSHNAME}. {@code null} inputs (the decode
      * failure path) also fall through to {@code PUSHNAME} to mirror WA Web's
      * final else-branch.
-     *
-     * @implNote WAWebGetMetricHistorySyncPayloadType.getMetricHistorySyncPayloadType
      * @param syncType the decoded sync type, or {@code null} when decoding
      *                 failed before the payload was available
      * @return the matching {@link MdBootstrapHistoryPayloadType} constant
@@ -759,8 +688,6 @@ public final class WebHistorySyncService {
      * user-prefs lookup, so the RECENT branch relies on the notification's
      * {@code progress} field, which the primary device already clamps to
      * {@code 100} on the terminal chunk.
-     *
-     * @implNote WAWebGetHistorySyncProgress.getHistorySyncProgress
      * @param notification the chunk whose progress is being reported
      * @param syncType     the decoded sync type (may be {@code null} on
      *                     decode failures)
@@ -835,13 +762,6 @@ public final class WebHistorySyncService {
     /**
      * Commits a successful {@code MediaDownload2Event} for the just-finished
      * history sync chunk download.
-     *
-     * @implNote WAWebCreateMediaDownloadMetrics.handleDownloadAndDecryptSuccess:
-     * sets {@code overallDownloadResult=OK}, {@code overallIsFinal=true},
-     * {@code downloadHttpCode=200}, marks {@code overallCumT}, and commits the
-     * master event. Called indirectly from
-     * WAWebHandleHistorySyncNotification.handleHistorySyncNotification via
-     * WAWebDownloadManager.downloadAndMaybeDecrypt.
      * @param downloadStart the instant at which the download attempt began
      */
     @WhatsAppWebExport(moduleName = "WAWebCreateMediaDownloadMetrics",
@@ -870,12 +790,6 @@ public final class WebHistorySyncService {
     /**
      * Commits a failing {@code MediaDownload2Event} for the just-attempted
      * history sync chunk download.
-     *
-     * @implNote WAWebCreateMediaDownloadMetrics.handleDownloadError: sets
-     * {@code overallDownloadResult} to the classified error type via
-     * WAWebWamMediaMetricUtils.getMetricDownloadErrorResultType, sets
-     * {@code overallIsFinal=true}, fills {@code downloadHttpCode} when the
-     * error carries a status code, and commits the master event.
      * @param downloadStart the instant at which the download attempt began
      * @param throwable     the exception that aborted the download
      */
@@ -912,11 +826,6 @@ public final class WebHistorySyncService {
      * Maps a download failure to the appropriate
      * {@link MediaDownloadResultType} using the same rules as WA Web's
      * {@code WAWebWamMediaMetricUtils.getMetricDownloadErrorResultType}.
-     *
-     * @implNote WAWebWamMediaMetricUtils.getMetricDownloadErrorResultType:
-     * classifies by error class and HTTP status (404/410 -> TOO_OLD, 416 ->
-     * CANNOT_RESUME, 401 -> INVALID_URL, 429/507 -> THROTTLE; network errors
-     * -> NETWORK; other -> UNKNOWN).
      * @param throwable the error raised by the download path
      * @return the mapped result type
      */
@@ -947,9 +856,6 @@ public final class WebHistorySyncService {
 
     /**
      * Extracts the HTTP status code embedded in a download failure, if any.
-     *
-     * @implNote WAWebWamMediaMetricUtils.getStatusCode:
-     * {@code e instanceof HttpStatusCodeError ? e.status : null}.
      * @param throwable the error raised by the download path
      * @return the status code, or {@code null} if unavailable
      */
@@ -974,9 +880,6 @@ public final class WebHistorySyncService {
      *
      * @param stream the plaintext protobuf stream
      * @return the decoded payload
-     * @implNote {@code WAWebBinHistorySync.HistorySync.decode}: the WA Web
-     *           protobuf runtime uses a single generated decoder that handles
-     *           both shapes.
      */
     @WhatsAppWebExport(moduleName = "WAWebBinHistorySync", exports = "HistorySync",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -998,9 +901,6 @@ public final class WebHistorySyncService {
      * listener cannot block the next chunk or the LID mapping ingest.
      *
      * @param historySync the decoded payload
-     * @implNote {@code WAWebHandleHistorySyncChunk.handleHistorySyncChunk}
-     *           performs the equivalent fan-out to the WA Web reactive
-     *           collections; Cobalt routes through the listener interface.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleHistorySyncChunk", exports = "handleHistorySyncChunk",
             adaptation = WhatsAppAdaptation.ADAPTED)

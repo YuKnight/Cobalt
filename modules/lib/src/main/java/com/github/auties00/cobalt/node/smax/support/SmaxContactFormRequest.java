@@ -169,21 +169,6 @@ public final class SmaxContactFormRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         payload
-     *
-     * @implNote {@code WASmaxOutSupportContactFormRequest.makeContactFormRequest}
-     *           composes
-     *           {@code WASmaxOutSupportHackBaseIQSetRequestMixin}
-     *           ({@code from? to=S_WHATSAPP_NET}) and
-     *           {@code WASmaxOutSupportBaseIQSetRequestMixin}
-     *           ({@code id=generateId() type="set"}) over a
-     *           payload of one
-     *           {@code <description/>} mandatory child plus four
-     *           OPTIONAL_CHILD entries
-     *           ({@code <topic/>}, {@code <topic_id/>},
-     *           {@code <debug_information_json/>},
-     *           {@code <uploaded_logs_id/>}) and an
-     *           {@code <additional_attributes context_flow=…/>}
-     *           OPTIONAL_CHILD when present.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutSupportContactFormRequest",

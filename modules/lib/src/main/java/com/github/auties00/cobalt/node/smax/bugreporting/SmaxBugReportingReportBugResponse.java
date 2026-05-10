@@ -17,9 +17,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxBugReportingReportBugRPC.sendReportBugRPC}
- *           tries {@code Success} → {@code Error}.
  */
 public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.Response
         permits SmaxBugReportingReportBugResponse.Success, SmaxBugReportingReportBugResponse.Error {
@@ -49,13 +46,6 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
     /**
      * The {@code Success} reply variant. The relay accepted the
      * report and returned a backend-side {@code <task_id/>}.
-     *
-     * @implNote {@code WASmaxInBugReportingReportBugResponseSuccess.parseReportBugResponseSuccess}
-     *           validates the IQ-result envelope (via
-     *           {@code WASmaxInBugReportingHackBaseIQResultResponseMixin}
-     *           which permits an optional {@code to=USER_JID}
-     *           echo on the reply), then extracts the
-     *           {@code <task_id>{content}</task_id>} child.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBugReportingReportBugResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInBugReportingHackBaseIQResultResponseMixin")
@@ -161,18 +151,6 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
      * The {@code Error} reply variant. The relay rejected the
      * report with one of two documented codes:
      * {@code 400} bad-request or {@code 500} internal-server-error.
-     *
-     * @implNote {@code WASmaxInBugReportingReportBugResponseError.parseReportBugResponseError}
-     *           validates the IQ-error envelope (via
-     *           {@code WASmaxInBugReportingHackBaseIQErrorResponseMixin}
-     *           which permits an optional {@code to=USER_JID}
-     *           echo on the reply) and routes the {@code <error/>}
-     *           child through {@code WASmaxInBugReportingReportBugErrors},
-     *           a disjunction over {@code IQErrorBadRequest}
-     *           ({@code 400}) and {@code IQErrorInternalServerError}
-     *           ({@code 500}). Cobalt collapses the two sub-mixins
-     *           into the single {@code (errorCode, errorText)} pair
-     *           below.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBugReportingReportBugResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInBugReportingHackBaseIQErrorResponseMixin")
@@ -248,6 +226,9 @@ public sealed interface SmaxBugReportingReportBugResponse extends SmaxOperation.
          */
         @WhatsAppWebExport(moduleName = "WASmaxInBugReportingReportBugResponseError",
                 exports = "parseReportBugResponseError",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBugReportingReportBugErrors",
+                exports = "parseReportBugErrors",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Error> of(Node node, Node request) {
             // 4xx → ClientError envelope, 5xx → ServerError envelope.

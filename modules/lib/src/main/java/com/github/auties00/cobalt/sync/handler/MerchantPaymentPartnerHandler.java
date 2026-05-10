@@ -3,14 +3,11 @@ package com.github.auties00.cobalt.sync.handler;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.payment.MerchantPaymentPartnerAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Handles merchant payment partner sync actions.
  *
@@ -26,25 +23,15 @@ import com.github.auties00.cobalt.wam.WamService;
  * {@code setMerchantPaymentPartner}.
  *
  * <p>Index format: {@code ["merchant_payment_partner"]}
- *
- * @implNote WAWebMerchantPaymentPartnerSync.default — singleton instance
- *           {@code m = new d()} exported as {@code l.default = p} where
- *           {@code d} extends {@code AccountSyncdActionBase}
  */
 public final class MerchantPaymentPartnerHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code MerchantPaymentPartnerHandler}.
-     *
-     * @implNote WAWebMerchantPaymentPartnerSync — module-level
-     *           {@code m = new d(); Object.freeze(m); var p = m; l.default = p}
      */
     public static final MerchantPaymentPartnerHandler INSTANCE = new MerchantPaymentPartnerHandler();
 
     /**
      * Creates a new {@code MerchantPaymentPartnerHandler}.
-     *
-     * @implNote WAWebMerchantPaymentPartnerSync.d — constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      */
     private MerchantPaymentPartnerHandler() {
 
@@ -52,10 +39,6 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
 
     /**
      * Returns the action name for merchant payment partner mutations.
-     *
-     * @implNote WAWebMerchantPaymentPartnerSync.getAction — returns
-     *           {@code WASyncdConst.Actions.MerchantPaymentPartner} which is
-     *           {@code "merchant_payment_partner"}
      * @return the action name {@code "merchant_payment_partner"}
      */
     @Override
@@ -65,9 +48,6 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
 
     /**
      * Returns the collection name for merchant payment partner mutations.
-     *
-     * @implNote WAWebMerchantPaymentPartnerSync — constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -77,32 +57,11 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
 
     /**
      * Returns the mutation format version for merchant payment partner mutations.
-     *
-     * @implNote WAWebMerchantPaymentPartnerSync.getVersion — returns {@code 7}
      * @return {@code 7}
      */
     @Override
     public int version() {
         return MerchantPaymentPartnerAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single merchant payment partner mutation.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result state is {@code SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebMerchantPaymentPartnerSync.applyMutations — WA Web
-     *           returns {@code WASyncdConst.SyncActionState} values directly;
-     *           Cobalt wraps them in {@link MutationApplicationResult} for type
-     *           safety
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if applied successfully, {@code false} otherwise
-     */
-    @Override
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -131,14 +90,12 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
      * <p>WA Web's {@code WALogger.WARN} calls for the unsupported/malformed
      * batch counters and the SMB/ABProp gate failures are intentionally
      * omitted in Cobalt; the return semantics are preserved exactly.
-     *
-     * @implNote WAWebMerchantPaymentPartnerSync.applyMutations
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var platform = client.store().device().platform(); // ADAPTED: WAWebMobilePlatforms.isSMB — checks c === u.SMBA || c === u.SMBI where SMBA = "smba" (ANDROID_BUSINESS) and SMBI = "smbi" (IOS_BUSINESS)
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
             return MutationApplicationResult.unsupported();
@@ -153,7 +110,7 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
         }
 
         if (!(mutation.value().action().orElse(null) instanceof MerchantPaymentPartnerAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().setMerchantPaymentPartner(action); // ADAPTED: WAWebUserPrefsMerchantPaymentPartner.setMerchantPaymentPartner -> WhatsAppStore.setMerchantPaymentPartner

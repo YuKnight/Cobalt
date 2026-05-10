@@ -45,10 +45,6 @@ public final class IqSetAboutRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <status>} payload
-     *
-     * @implNote {@code WAWebSetAboutJob.setAbout}:
-     *           {@code wap("iq",{to:S_WHATSAPP_NET,type:"set",
-     *           xmlns:"status",id}, wap("status", null, content))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSetAboutJob",

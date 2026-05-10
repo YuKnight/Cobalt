@@ -143,18 +143,6 @@ public final class SmaxStatusReportV2Request implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         payload
-     *
-     * @implNote {@code WASmaxOutSpamStatusReportV2Request.makeStatusReportV2Request}
-     *           composes
-     *           {@code WASmaxOutSpamBaseIQSetRequestMixin}
-     *           ({@code id=generateId() type="set"}) and
-     *           {@code WASmaxOutSpamBaseReportMixin}
-     *           ({@code to=S_WHATSAPP_NET xmlns="spam"
-     *           spam_flow=…}) over a
-     *           {@code <spam_list jid=…><status server_id t …/>}
-     *           payload. The optional
-     *           {@code WASmaxOutSpamEntitySubjectMixin} layers a
-     *           {@code subject} attribute when present.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutSpamStatusReportV2Request",

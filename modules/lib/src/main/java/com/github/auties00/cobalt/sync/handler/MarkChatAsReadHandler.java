@@ -6,7 +6,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
@@ -18,8 +17,6 @@ import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadAction;
 import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -38,8 +35,6 @@ import java.util.List;
  * <p>Per WhatsApp Web, this handler extends {@code ChatMessageRangeSyncdActionBase},
  * which provides shared message-range-based conflict resolution. In Cobalt this
  * logic is inlined since Java does not use the same inheritance hierarchy.
- *
- * @implNote WAWebMarkChatAsReadSync — singleton instance exported as {@code default}
  */
 @WhatsAppWebModule(moduleName = "WAWebMarkChatAsReadSync")
 public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
@@ -48,18 +43,12 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, {@code WAWebMarkChatAsReadSync} exports a single instance
      * ({@code var g = new f(); l.default = g}).
-     *
-     * @implNote WAWebMarkChatAsReadSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final MarkChatAsReadHandler INSTANCE = new MarkChatAsReadHandler();
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebMarkChatAsReadSync — class {@code f} constructor (only initializes
-     *           {@code chatJidIndex = 1} and {@code collectionName = RegularLow},
-     *           both of which are compile-time constants in Cobalt)
      */
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private MarkChatAsReadHandler() {
@@ -68,9 +57,6 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for mark chat as read actions.
-     *
-     * @implNote WAWebMarkChatAsReadSync.getAction — returns
-     *           {@code WASyncdConst.Actions.MarkChatAsRead} ({@code "markChatAsRead"})
      * @return the action name {@code "markChatAsRead"}
      */
     @Override
@@ -84,9 +70,6 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, the handler's {@code collectionName} is set to
      * {@code WASyncdConst.CollectionName.RegularLow} in the constructor.
-     *
-     * @implNote WAWebMarkChatAsReadSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -97,33 +80,12 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for mark chat as read actions.
-     *
-     * @implNote WAWebMarkChatAsReadSync.getVersion — returns {@code 3}
      * @return the version number {@code 3}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return MarkChatAsReadAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a mark chat as read mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is
-     * {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebMarkChatAsReadSync.applyMutations — per-mutation inner logic,
-     *           success check on the returned {@code syncApplyActionResult}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -156,35 +118,30 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      * The WA Web {@code _} helper's orphan branch for
      * {@code RangeBEnclosesRangeA}/{@code RangesNotEnclosing} is likewise skipped
      * because it is driven by the active-range comparison that Cobalt omits.
-     *
-     * @implNote WAWebMarkChatAsReadSync.applyMutations,
-     *           WAWebMarkChatAsReadSync.$MarkChatAsReadSync$p_3,
-     *           WAWebMarkChatAsReadSync.$MarkChatAsReadSync$p_1,
-     *           WAWebMarkChatAsReadSync.validateSyncActionValue
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = {"applyMutations", "validateSyncActionValue", "$MarkChatAsReadSync$p_3", "$MarkChatAsReadSync$p_1", "$MarkChatAsReadSync$p_2", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
         try {
             if (!(mutation.value().action().orElse(null) instanceof MarkChatAsReadAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chatJidString = JSON.parseArray(mutation.index()).getString(1);
             if (chatJidString == null || chatJidString.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chatJid = Jid.of(chatJidString);
             if (chatJid == null) { // ADAPTED: Jid.of returns null for null input; WA Web uses isWid() validation
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chat = client.store().findChatByJid(chatJid);
@@ -241,8 +198,6 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      * {@code $MarkChatAsReadSync$p_1}. In Cobalt, the merged mutation is returned
      * to the caller via {@link ConflictResolution#merged(DecryptedMutation.Trusted)}
      * so that application and resolution remain decoupled.
-     *
-     * @implNote WAWebMarkChatAsReadSync.resolveConflicts
      * @param localMutation  the local pending mutation
      * @param remoteMutation the incoming remote mutation
      * @return the conflict resolution indicating which mutation to keep and
@@ -324,9 +279,6 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
      * {@code constructMessageRange} requires store infrastructure that is built
      * at a higher level, mirroring the convention used by
      * {@link ArchiveChatHandler#getArchiveChatMutation}.
-     *
-     * @implNote WAWebMarkChatAsReadSync.getMarkChatAsReadMutation,
-     *           WAWebSyncdActionUtils.buildPendingMutation
      * @param timestamp    the mutation timestamp
      * @param read         {@code true} to mark the chat as read, {@code false} to
      *                     mark it as unread

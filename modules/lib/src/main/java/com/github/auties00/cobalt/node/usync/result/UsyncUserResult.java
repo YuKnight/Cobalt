@@ -21,10 +21,6 @@ import java.util.Optional;
  * up a specific protocol via {@link #getProtocolResult(UsyncProtocol)}
  * (typed) or {@link #getProtocolResult(String)} (by wire name) and check
  * membership via {@link #hasProtocolResult(UsyncProtocol)}.
- *
- * @implNote The JS function builds a flat object keyed by protocol name.
- *     Cobalt nests the protocols under a private map so the JID identifiers
- *     cannot collide with protocol names and the map never leaks to callers.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public final class UsyncUserResult {

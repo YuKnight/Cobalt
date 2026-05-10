@@ -100,9 +100,6 @@ public enum MessageEncryptionType {
      * @apiNote Does not return {@link #MSMSG}. Bot messages are wrapped
      * separately after the Signal layer and the caller is responsible for
      * overriding the variant to {@link #MSMSG} in that case.
-     * @implNote WA Web performs this mapping inline at the emission sites
-     * inside {@code WAWebSendGroupSkmsgJob} and sibling send jobs. Cobalt
-     * centralises the mapping on the enum.
      * @param ciphertext the Signal ciphertext whose type byte is inspected
      * @return the matching wire variant
      * @throws IllegalArgumentException if the ciphertext reports an unknown

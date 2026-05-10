@@ -82,10 +82,6 @@ public final class UpdateGroupPropertyMexResponse implements MexOperation.Respon
     /**
      * Parses the JSON payload carried by the {@code <result>} child of the
      * inbound IQ stanza into a {@link UpdateGroupPropertyMexResponse}.
-     *
-     * @implNote Mirrors the JS access pattern
-     * {@code (n = a.xwa2_group_update_property) != null ? n : {}} by
-     * returning {@link Optional#empty()} when the envelope is missing.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or empty
      *         if the {@code data.xwa2_group_update_property} envelope is absent

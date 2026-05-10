@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.socket;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.util.GcmUtils;
 
@@ -27,9 +30,8 @@ import java.security.*;
  * <p>Instances are {@link AutoCloseable} and the WhatsApp socket client
  * always uses them inside a try-with-resources block so that the AES
  * key is destroyed promptly when the handshake completes or fails.
- *
- * @implNote Adapts WA Web's {@code WANoiseHandshake.NoiseHandshake} class.
  */
+@WhatsAppWebModule(moduleName = "WANoiseHandshake")
 final class WhatsAppSocketHandshake implements AutoCloseable {
     /**
      * Empty IKM passed to HKDF when {@link #finish()} expands the final
@@ -99,14 +101,20 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
      * @throws NoSuchPaddingException   if AES/GCM/NoPadding is
      *         unavailable on this JDK
      */
+    @WhatsAppWebExport(moduleName = "WANoiseHandshake", exports = "NoiseHandshake", adaptation = WhatsAppAdaptation.ADAPTED)
     WhatsAppSocketHandshake(byte[] prologue) throws NoSuchAlgorithmException, NoSuchPaddingException {
         this.kdf = KDF.getInstance("HKDF-SHA256");
         this.hashDigest = MessageDigest.getInstance("SHA-256");
         this.cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        // WANoiseHandshake.start: this.$2 = this.$3 = a (the protocol-name promise);
+        // since |a| === 32, a resolves to the raw bytes themselves.
         this.hash = NOISE_PROTOCOL;
         this.salt = new SecretKeySpec(NOISE_PROTOCOL, "AES");
+        // WANoiseHandshake.start: this.$4 = a.then(g) where g imports the bytes as an
+        // AES-GCM key; SecretKeySpec is the JCA equivalent of importKey('raw', ..., 'AES-GCM').
         this.cryptoKey = new SecretKeySpec(NOISE_PROTOCOL, 0, 32, "AES");
         this.counter = 0;
+        // WANoiseHandshake.start: this.authenticate(r) where r is the prologue.
         updateHash(prologue);
     }
 
@@ -117,7 +125,10 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
      *
      * @param data the bytes to mix into the running hash
      */
+    @WhatsAppWebExport(moduleName = "WANoiseHandshake", exports = "NoiseHandshake", adaptation = WhatsAppAdaptation.DIRECT)
     public void updateHash(byte[] data) {
+        // WANoiseHandshake.authenticate: var r = Binary.build(t, n).readByteArrayView();
+        // return WACryptoSha256.sha256(r);
         hashDigest.update(hash);
         hashDigest.update(data);
         this.hash = hashDigest.digest();
@@ -129,10 +140,6 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
      *
      * <p>Encryption mixes the produced ciphertext into the running hash;
      * decryption mixes the input ciphertext.
-     *
-     * @implNote The 12-byte nonce is built as four zero bytes followed
-     *     by the big-endian 64-bit counter; the counter is incremented
-     *     on every call so consecutive payloads never reuse a nonce.
      * @param text    plaintext when {@code encrypt} is {@code true},
      *                ciphertext when {@code false}
      * @param encrypt {@code true} to encrypt, {@code false} to decrypt
@@ -142,7 +149,10 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
      * @throws InvalidAlgorithmParameterException if the nonce parameters are invalid
      * @throws InvalidKeyException                if the cipher key is invalid
      */
+    @WhatsAppWebExport(moduleName = "WANoiseHandshake", exports = "NoiseHandshake", adaptation = WhatsAppAdaptation.DIRECT)
     byte[] cipher(byte[] text, boolean encrypt) throws IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, InvalidKeyException {
+        // WANoiseHandshake helpers h/y: subtle.encrypt/decrypt({name:'AES-GCM', iv:f(t),
+        // additionalData:n}, key, payload). f(t) builds [0,0,0,0,0,0,0,0,counterBE].
         cipher.init(
                 encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE,
                 cryptoKey,
@@ -150,6 +160,8 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
         );
         cipher.updateAAD(hash);
         var result = cipher.doFinal(text);
+        // WANoiseHandshake.encrypt: this.authenticate(o) on the produced ciphertext.
+        // WANoiseHandshake.decrypt: this.authenticate(e) on the input ciphertext.
         updateHash(encrypt ? result : text);
         return result;
     }
@@ -166,7 +178,10 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
      * @return the concatenated write and read key material
      * @throws GeneralSecurityException if HKDF expansion fails
      */
+    @WhatsAppWebExport(moduleName = "WANoiseHandshake", exports = "NoiseHandshake", adaptation = WhatsAppAdaptation.ADAPTED)
     byte[] finish() throws GeneralSecurityException {
+        // WANoiseHandshake helper C: extractWithSaltAndExpand(ikm=emptyKey, salt, "", 64).
+        // thenExpand(null, ...) is the JCE equivalent of the empty info string.
         var params = HKDFParameterSpec.ofExtract()
                 .addSalt(salt)
                 .addIKM(FINISH_KEY)
@@ -186,14 +201,18 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
      *              secret produced during the handshake
      * @throws GeneralSecurityException if HKDF expansion fails
      */
+    @WhatsAppWebExport(moduleName = "WANoiseHandshake", exports = "NoiseHandshake", adaptation = WhatsAppAdaptation.DIRECT)
     void mixIntoKey(byte[] bytes) throws GeneralSecurityException {
+        // WANoiseHandshake helper C: extractWithSaltAndExpand(ikm=bytes, salt=current, "", 64).
         var params = HKDFParameterSpec.ofExtract()
                 .addSalt(salt)
                 .addIKM(bytes)
                 .thenExpand(null, 64);
         var expanded = kdf.deriveData(params);
+        // WANoiseHandshake.mixIntoKey: this.$3 = e.then(e => e[0]); this.$4 = e.then(e => g(e[1])).
         this.salt = new SecretKeySpec(expanded, 0, 32, "AES");
         this.cryptoKey = new SecretKeySpec(expanded, 32, 32, "AES");
+        // WANoiseHandshake.mixIntoKey: this.$5 = 0.
         this.counter = 0;
     }
 

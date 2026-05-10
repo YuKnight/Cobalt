@@ -32,8 +32,8 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
     private final String accountDeviceId;
 
     /**
-     * The custom-payment-method type. One of
-     * {@code "PAYONDELIVERY"} or {@code "PIXKEY"}.
+     * The custom-payment-method type wire literal. One of
+     * {@code "pay_on_delivery"} or {@code "pix_key"}.
      */
     private final String customPaymentMethodType;
 
@@ -45,15 +45,18 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
 
     /**
      * The optional {@code flow} attribute on
-     * {@code <custom_payment_method/>}. One of {@code "P2M"} or
-     * {@code "P2P"}.
+     * {@code <custom_payment_method/>}. One of {@code "p2m"} or
+     * {@code "p2p"}.
      */
     private final String customPaymentMethodFlow;
 
     /**
-     * The 1..5 metadata key-value pairs to attach as
+     * The optional 1..5 metadata key-value pairs to attach as
      * {@code <metadata_info><metadata key= value=/>...</metadata_info>}
-     * children, preserving insertion order.
+     * children, preserving insertion order. {@code null} when the
+     * caller omits the {@code customPaymentMethodMetaDataInfoMixinArgs}
+     * argument entirely so no {@code <metadata_info>} child is
+     * emitted.
      */
     private final Map<String, String> metadata;
 
@@ -68,13 +71,16 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
      *                                  may be {@code null}
      * @param customPaymentMethodFlow   the optional flow marker;
      *                                  may be {@code null}
-     * @param metadata                  the 1..5 metadata pairs;
-     *                                  never {@code null}, never
-     *                                  empty
+     * @param metadata                  the optional 1..5 metadata
+     *                                  pairs; {@code null} omits the
+     *                                  {@code <metadata_info>} child
+     *                                  altogether, otherwise must
+     *                                  contain 1..5 entries
      * @throws NullPointerException     if any non-nullable argument
      *                                  is {@code null}
-     * @throws IllegalArgumentException if the metadata map is empty
-     *                                  or has more than 5 entries
+     * @throws IllegalArgumentException if {@code metadata} is
+     *                                  non-{@code null} and either
+     *                                  empty or larger than 5
      */
     public SmaxBrPaymentCreateCustomPaymentMethodRequest(String accountDeviceId,
                    String customPaymentMethodType,
@@ -85,11 +91,14 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
         this.customPaymentMethodType = Objects.requireNonNull(customPaymentMethodType, "customPaymentMethodType cannot be null");
         this.customPaymentMethodUpdate = customPaymentMethodUpdate;
         this.customPaymentMethodFlow = customPaymentMethodFlow;
-        Objects.requireNonNull(metadata, "metadata cannot be null");
-        if (metadata.isEmpty() || metadata.size() > 5) {
-            throw new IllegalArgumentException("metadata must contain 1..5 entries");
+        if (metadata == null) {
+            this.metadata = null;
+        } else {
+            if (metadata.isEmpty() || metadata.size() > 5) {
+                throw new IllegalArgumentException("metadata must contain 1..5 entries");
+            }
+            this.metadata = Collections.unmodifiableMap(new LinkedHashMap<>(metadata));
         }
-        this.metadata = Collections.unmodifiableMap(new LinkedHashMap<>(metadata));
     }
 
     /**
@@ -131,12 +140,14 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
     }
 
     /**
-     * Returns the metadata pairs.
+     * Returns the optional metadata pairs.
      *
-     * @return an unmodifiable map; never {@code null}
+     * @return an {@link Optional} carrying an unmodifiable 1..5
+     *         entry map, or empty when the caller omitted the
+     *         {@code <metadata_info>} child altogether
      */
-    public Map<String, String> metadata() {
-        return metadata;
+    public Optional<Map<String, String>> metadata() {
+        return Optional.ofNullable(metadata);
     }
 
     /**
@@ -150,21 +161,25 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
     @WhatsAppWebExport(moduleName = "WASmaxOutBrPaymentCreateCustomPaymentMethodRequest",
             exports = "makeCreateCustomPaymentMethodRequest",
             adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBrPaymentSetIQMixin",
+            exports = "mergeSetIQMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBrPaymentCustomPaymentMethodMetaDataInfoMixin",
+            exports = "mergeCustomPaymentMethodMetaDataInfoMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBrPaymentCustomPaymentMethodMetaDataMixin",
+            exports = "makeCustomPaymentMethodMetaDataMetadata",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBrPaymentCustomPaymentMethodMetaDataMixin",
+            exports = "mergeCustomPaymentMethodMetaDataMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentEnums",
+            exports = "ENUM_PAYONDELIVERY_PIXKEY",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBrPaymentEnums",
+            exports = "ENUM_P2M_P2P",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
-        // metadata children
-        var metadataChildren = new Node[metadata.size()];
-        var i = 0;
-        for (var entry : metadata.entrySet()) {
-            metadataChildren[i++] = new NodeBuilder()
-                    .description("metadata")
-                    .attribute("key", entry.getKey())
-                    .attribute("value", entry.getValue())
-                    .build();
-        }
-        var metadataInfo = new NodeBuilder()
-                .description("metadata_info")
-                .content(metadataChildren)
-                .build();
         // custom_payment_method child
         var cpmBuilder = new NodeBuilder()
                 .description("custom_payment_method")
@@ -175,7 +190,24 @@ public final class SmaxBrPaymentCreateCustomPaymentMethodRequest implements Smax
         if (customPaymentMethodFlow != null) {
             cpmBuilder.attribute("flow", customPaymentMethodFlow);
         }
-        cpmBuilder.content(metadataInfo);
+        // WASmaxMixins.optionalMerge: only fold <metadata_info> in when caller
+        // supplied customPaymentMethodMetaDataInfoMixinArgs (== non-null metadata)
+        if (metadata != null) {
+            var metadataChildren = new Node[metadata.size()];
+            var i = 0;
+            for (var entry : metadata.entrySet()) {
+                metadataChildren[i++] = new NodeBuilder()
+                        .description("metadata")
+                        .attribute("key", entry.getKey())
+                        .attribute("value", entry.getValue())
+                        .build();
+            }
+            var metadataInfo = new NodeBuilder()
+                    .description("metadata_info")
+                    .content(metadataChildren)
+                    .build();
+            cpmBuilder.content(metadataInfo);
+        }
         var customPaymentMethod = cpmBuilder.build();
         // <account ...>
         var account = new NodeBuilder()

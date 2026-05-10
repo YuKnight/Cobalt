@@ -60,12 +60,6 @@ import java.util.zip.GZIPInputStream;
  *   <li>AB prop {@code enable_peer_snapshot_recovery} must be enabled</li>
  *   <li>Collection must not be {@code CRITICAL_BLOCK}</li>
  * </ul>
- *
- * @implNote WAWebRequestSyncdSnapshotRecovery.SyncdSnapshotRecoveryModule,
- *           WAWebSyncdSnapshotRecoveryGatingUtils.shouldPreformSnapshotRecovery,
- *           WAWebSyncdSnapshotRecoveryGatingUtils.syncdSnapshotRecoveryEnabled,
- *           WAWebSyncdSnapshotRecoveryGatingUtils.updatePrimaryDeviceSupportsSyncdRecovery,
- *           WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest (snapshot recovery path)
  */
 @WhatsAppWebModule(moduleName = "WAWebRequestSyncdSnapshotRecovery")
 @WhatsAppWebModule(moduleName = "WAWebSyncdSnapshotRecoveryGatingUtils")
@@ -82,15 +76,10 @@ public final class SnapshotRecoveryService {
     private final WamService wamService;
     /**
      * Holds the decoded snapshot per collection to avoid double-decoding.
-     *
-     * @implNote Replaces WA Web's {@code this.recoveryPromise = new Map}, but stores the
-     *           pre-decoded {@link SyncdSnapshotRecovery} instead of a raw resolvable.
      */
     private final Map<SyncPatchType, CompletableFuture<SyncdSnapshotRecovery>> pendingRecoveries;
     /**
      * Serialises concurrent recovery requests across collections.
-     *
-     * @implNote Replaces WA Web's {@code this.recoveryInflight} resolvable.
      */
     private final Semaphore recoverySemaphore;
 
@@ -100,7 +89,6 @@ public final class SnapshotRecoveryService {
      * @param client         the WhatsApp client for sending messages
      * @param abPropsService the AB props service for gating checks
      * @param wamService     the WAM telemetry service for committing events
-     * @implNote WAWebRequestSyncdSnapshotRecovery: constructor of class _
      */
     @WhatsAppWebExport(moduleName = "WAWebRequestSyncdSnapshotRecovery", exports = "SyncdSnapshotRecoveryModule", adaptation = WhatsAppAdaptation.ADAPTED)
     public SnapshotRecoveryService(WhatsAppClient client, ABPropsService abPropsService, WamService wamService) {
@@ -117,7 +105,6 @@ public final class SnapshotRecoveryService {
      *
      * @return {@code true} if the primary device supports syncd recovery AND the
      *         {@code enable_peer_snapshot_recovery} AB prop is enabled
-     * @implNote WAWebSyncdSnapshotRecoveryGatingUtils.syncdSnapshotRecoveryEnabled
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdSnapshotRecoveryGatingUtils", exports = "syncdSnapshotRecoveryEnabled", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean isRecoveryEnabled() {
@@ -137,7 +124,6 @@ public final class SnapshotRecoveryService {
      * which is checked by {@link #isRecoveryEnabled()} to gate snapshot recovery.
      *
      * @param supported {@code true} if the primary device supports syncd recovery
-     * @implNote WAWebSyncdSnapshotRecoveryGatingUtils.updatePrimaryDeviceSupportsSyncdRecovery
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdSnapshotRecoveryGatingUtils", exports = "updatePrimaryDeviceSupportsSyncdRecovery", adaptation = WhatsAppAdaptation.ADAPTED)
     public void updatePrimaryDeviceSupportsSyncdRecovery(boolean supported) {
@@ -159,7 +145,6 @@ public final class SnapshotRecoveryService {
      * @param collectionName the collection that failed snapshot MAC validation
      * @param mutationCount  the number of mutations in the snapshot
      * @return {@code true} if recovery should be attempted
-     * @implNote WAWebSyncdSnapshotRecoveryGatingUtils.shouldPreformSnapshotRecovery
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdSnapshotRecoveryGatingUtils", exports = "shouldPreformSnapshotRecovery", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean shouldAttemptRecovery(SyncPatchType collectionName, int mutationCount) {
@@ -190,8 +175,6 @@ public final class SnapshotRecoveryService {
      *
      * @param collectionName the collection to recover
      * @return the decoded recovery snapshot, or {@code null} if recovery failed or timed out
-     * @implNote WAWebRequestSyncdSnapshotRecovery.requestRecoveryWithTimeout,
-     *           WAWebRequestSyncdSnapshotRecovery.requestRecoveryFromPrimary
      */
     @WhatsAppWebExport(moduleName = "WAWebRequestSyncdSnapshotRecovery", exports = "SyncdSnapshotRecoveryModule", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncdSnapshotRecovery requestRecovery(SyncPatchType collectionName) {
@@ -244,7 +227,6 @@ public final class SnapshotRecoveryService {
      *
      * @param collectionName the collection name extracted from the decoded snapshot
      * @param recoveredSnapshot the decoded recovery snapshot
-     * @implNote WAWebRequestSyncdSnapshotRecovery.resolveRecoveryPromise
      */
     @WhatsAppWebExport(moduleName = "WAWebRequestSyncdSnapshotRecovery", exports = "SyncdSnapshotRecoveryModule", adaptation = WhatsAppAdaptation.ADAPTED)
     public void resolveRecovery(
@@ -270,7 +252,6 @@ public final class SnapshotRecoveryService {
      *
      * @param response the recovery response
      * @return the decoded snapshot recovery
-     * @implNote WAWebNonMessageDataRequestHandler.m (decode step; WA Web does this in the handler, not in the recovery module)
      */
     @WhatsAppWebExport(moduleName = "WAWebNonMessageDataRequestHandler", exports = "m", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncdSnapshotRecovery decodeRecoverySnapshot(
@@ -298,11 +279,6 @@ public final class SnapshotRecoveryService {
      * peer data operation request message and sends it to device 0
      * (the primary device). The request includes the collection name
      * and current timestamp.
-     *
-     * @implNote WAWebRequestSyncdSnapshotRecovery.requestRecoveryFromPrimary (send portion),
-     *           WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest (orchestration),
-     *           WAWebSendNonMessageDataRequest builds syncdCollectionFatalRecoveryRequest via local helper,
-     *           WAWebSendNonMessageDataRequest builds single peer message to device 0 via non-fanout path
      */
     @WhatsAppWebExport(moduleName = "WAWebSendNonMessageDataRequest", exports = "sendPeerDataOperationRequest", adaptation = WhatsAppAdaptation.ADAPTED)
     private void sendRecoveryRequest(SyncPatchType collectionName) {
@@ -364,7 +340,6 @@ public final class SnapshotRecoveryService {
      * Gets the primary device JID (device 0).
      *
      * @return the primary device JID, or {@code null} if own JID is not set
-     * @implNote WAWebSendNonMessageDataRequest non-fanout path: createDeviceWidFromUserAndDevice(getMeDevicePnOrThrow().user, getMeDevicePnOrThrow().server, 0)
      */
     @WhatsAppWebExport(moduleName = "WAWebSendNonMessageDataRequest", exports = "D", adaptation = WhatsAppAdaptation.ADAPTED)
     private Jid getPrimaryDevice() {

@@ -44,10 +44,6 @@ public final class FetchAllNewslettersMetadataMexRequest implements MexOperation
     /**
      * Constructs a request that selects only the {@code fetch_wamo_sub}
      * gating flag.
-     *
-     * @implNote Convenience overload kept for backwards compatibility with
-     *           callers that predate the {@code fetch_status_metadata}
-     *           variable.
      * @param fetchWamoSub the value of the {@code fetch_wamo_sub} GraphQL
      *                     variable, or {@code null} to omit the field
      */

@@ -7,7 +7,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -15,8 +14,6 @@ import com.github.auties00.cobalt.model.sync.action.payment.CustomPaymentMethods
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -35,25 +32,17 @@ import java.util.List;
  * then persists the custom payment methods to the store.
  *
  * <p>Index format: {@code ["custom_payment_methods"]}
- *
- * @implNote WAWebCustomPaymentMethodsSync.default — singleton instance of the
- *           handler class that extends {@code AccountSyncdActionBase}
  */
 @WhatsAppWebModule(moduleName = "WAWebCustomPaymentMethodsSync")
 public final class CustomPaymentMethodsHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code CustomPaymentMethodsHandler}.
-     *
-     * @implNote WAWebCustomPaymentMethodsSync.default — {@code new d} (module-level singleton)
      */
     @WhatsAppWebExport(moduleName = "WAWebCustomPaymentMethodsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final CustomPaymentMethodsHandler INSTANCE = new CustomPaymentMethodsHandler();
 
     /**
      * Creates a new {@code CustomPaymentMethodsHandler}.
-     *
-     * @implNote WAWebCustomPaymentMethodsSync.d — constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.RegularLow}
      */
     @WhatsAppWebExport(moduleName = "WAWebCustomPaymentMethodsSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private CustomPaymentMethodsHandler() {
@@ -62,10 +51,6 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
 
     /**
      * Returns the action name for custom payment methods.
-     *
-     * @implNote WAWebCustomPaymentMethodsSync.getAction — returns
-     *           {@code WASyncdConst.Actions.CustomPaymentMethods} which is
-     *           {@code "custom_payment_methods"}
      * @return the action name {@code "custom_payment_methods"}
      */
     @Override
@@ -76,9 +61,6 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
 
     /**
      * Returns the collection name for custom payment methods.
-     *
-     * @implNote WAWebCustomPaymentMethodsSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -89,33 +71,12 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
 
     /**
      * Returns the mutation format version for custom payment methods.
-     *
-     * @implNote WAWebCustomPaymentMethodsSync.getVersion — returns {@code 7}
      * @return {@code 7}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCustomPaymentMethodsSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return CustomPaymentMethodsAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single custom payment methods mutation.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result state is {@code SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebCustomPaymentMethodsSync.applyMutations — WA Web returns
-     *           {@code SyncActionState} values directly; Cobalt wraps in
-     *           {@link MutationApplicationResult} for type safety
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebCustomPaymentMethodsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -135,15 +96,13 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
      *       {@code WAWebBackendApi.frontendFireAndForget("setCustomPaymentMethods", ...)}
      *       and returns {@code Success}.</li>
      * </ol>
-     *
-     * @implNote WAWebCustomPaymentMethodsSync.applyMutations
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCustomPaymentMethodsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var platform = client.store().device().platform(); // ADAPTED: WAWebMobilePlatforms.isSMB — checks c === u.SMBA || c === u.SMBI where SMBA = "smba" (ANDROID_BUSINESS) and SMBI = "smbi" (IOS_BUSINESS)
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
             return MutationApplicationResult.unsupported();
@@ -158,7 +117,7 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
         }
 
         if (!(mutation.value().action().orElse(null) instanceof CustomPaymentMethodsAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().setCustomPaymentMethods(action.customPaymentMethods());
@@ -178,8 +137,6 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
      *       operation={@code SET}, version={@code 7},
      *       action={@code "custom_payment_methods"}</li>
      * </ol>
-     *
-     * @implNote WAWebCustomPaymentMethodsSync.getCustomPaymentMethodSetMutation
      * @param action the custom payment methods action to build the mutation for
      * @return the pending mutation ready for sync upload
      */

@@ -3,7 +3,6 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
@@ -11,8 +10,6 @@ import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivity
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -55,11 +52,6 @@ import java.util.Objects;
  * {@code e === c.NOTIFICATION_ACTIVITY_SETTING_ACTION ? u.REGULAR}, so when WA
  * Web ships the real {@code WAWebNotificationActivitySettingSync} this file
  * should already be wire-compatible.
- *
- * @implNote NO_WA_BASIS — forward-looking handler. The protobuf schema exists
- *           in {@code WAWebProtobufSyncAction.pb} but {@code WAWebCollectionHandlerActions}
- *           does not yet register a sync module for it. Re-validate when WA Web
- *           introduces the corresponding {@code WAWebNotificationActivitySettingSync}.
  */
 public final class NotificationActivitySettingHandler implements WebAppStateActionHandler {
     /**
@@ -71,8 +63,6 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      * such as {@code WAWebLocaleSettingSync} and
      * {@code WAWebPushNameSync} all follow this convention, and Cobalt's
      * dispatcher expects a single shared instance per handler class.
-     *
-     * @implNote NO_WA_BASIS — placeholder mirroring sibling singleton handlers
      */
     public static final NotificationActivitySettingHandler INSTANCE = new NotificationActivitySettingHandler();
 
@@ -82,8 +72,6 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      * <p>The constructor is private because callers should always go through
      * {@link #INSTANCE}, matching the WA Web module-level singleton pattern
      * used by other sync handlers.
-     *
-     * @implNote NO_WA_BASIS — placeholder mirroring sibling private constructors
      */
     private NotificationActivitySettingHandler() {
 
@@ -91,9 +79,6 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
 
     /**
      * Returns the action name this handler processes.
-     *
-     * @implNote WAWebProtobufSyncAction.pb — {@code CollectionName.NOTIFICATION_ACTIVITY_SETTING_ACTION}
-     *           maps to the literal {@code "notificationActivitySetting"}
      * @return the constant {@link NotificationActivitySettingAction#ACTION_NAME},
      *         always {@code "notificationActivitySetting"}
      */
@@ -110,8 +95,6 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      * {@code e === c.NOTIFICATION_ACTIVITY_SETTING_ACTION} and returns
      * {@code u.REGULAR}, so the mutation is stored in the regular-priority
      * sync collection.
-     *
-     * @implNote WAWebProtobufSyncAction.pb — {@code e === c.NOTIFICATION_ACTIVITY_SETTING_ACTION ? u.REGULAR}
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
@@ -128,36 +111,12 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      * Cobalt declares the initial version {@code 1} as a forward-looking
      * default. The actual value should be re-checked when WA Web ships the
      * matching {@code WAWebNotificationActivitySettingSync} module.
-     *
-     * @implNote NO_WA_BASIS — {@link NotificationActivitySettingAction#ACTION_VERSION}
-     *           is the initial version assumed by Cobalt
      * @return the constant {@link NotificationActivitySettingAction#ACTION_VERSION},
      *         always {@code 1}
      */
     @Override
     public int version() {
         return NotificationActivitySettingAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single decoded notification activity setting mutation.
-     *
-     * <p>Thin bridge over {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * that reduces the richer {@link MutationApplicationResult} state to a
-     * legacy boolean: {@code true} only for {@link SyncActionState#SUCCESS},
-     * {@code false} for {@code MALFORMED}, {@code UNSUPPORTED}, {@code SKIPPED}
-     * and {@code FAILED}.
-     *
-     * @implNote ADAPTED: sibling handlers such as {@code WAWebLocaleSettingSync.applyMutations}
-     *           return a {@code SyncActionState} per mutation; Cobalt exposes
-     *           both a boolean and a richer result through two methods
-     * @param client   the WhatsApp client the mutation is being applied to
-     * @param mutation the trusted, decoded mutation to apply
-     * @return {@code true} if the apply succeeded, {@code false} otherwise
-     */
-    @Override
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: sibling WAWeb*Sync.applyMutations return SyncActionState directly
     }
 
     /**
@@ -194,10 +153,6 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      * propagate and the configured
      * {@code WhatsAppClientErrorHandler} decides recovery, per Cobalt's
      * pluggable error model.
-     *
-     * @implNote NO_WA_BASIS — derived from the {@code WAWebProtobufSyncAction.pb}
-     *           schema and the canonical sibling-handler shape; re-validate
-     *           when WA Web introduces {@code WAWebNotificationActivitySettingSync}
      * @param client   the WhatsApp client the mutation is being applied to
      * @param mutation the trusted, decoded mutation to apply
      * @return {@link MutationApplicationResult#unsupported()} for non-{@code SET}
@@ -207,7 +162,7 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      *         {@link MutationApplicationResult#success()} otherwise
      */
     @Override
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // ADAPTED: sibling WAWeb*Sync.applyMutations: if (e.operation === "set") { ... } p++; return {actionState: Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
@@ -236,9 +191,6 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      * surfaces the helper so the public
      * {@code WhatsAppClient.changeNotificationActivity} setter can build a single
      * mutation without hand-rolling the protobuf wrapping.
-     *
-     * @implNote NO_WA_BASIS — shaped after
-     *           {@code WAWebDisableLinkPreviewsSync.getMutation}
      * @param timestamp the mutation timestamp
      * @param setting   the new {@link NotificationActivitySettingAction.NotificationActivitySetting}
      * @return a pending mutation carrying the {@code notificationActivitySetting}

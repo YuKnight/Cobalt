@@ -108,13 +108,6 @@ public final class SmaxNewslettersGetNewsletterMessageUpdatesRequest implements 
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <message_updates>} payload
-     *
-     * @implNote {@code WASmaxOutNewslettersGetNewsletterMessageUpdatesRequest.makeGetNewsletterMessageUpdatesRequest}
-     *           composes
-     *           {@code WASmaxOutNewslettersNewsletterIQGetRequestMixin}
-     *           ({@code xmlns="newsletter"}, {@code to=JID(iqTo)},
-     *           {@code id=generateId()}, {@code type="get"}) over
-     *           {@code <message_updates count since? before|after>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersGetNewsletterMessageUpdatesRequest",

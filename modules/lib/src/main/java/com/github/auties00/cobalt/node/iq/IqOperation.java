@@ -8,10 +8,11 @@ import com.github.auties00.cobalt.node.NodeBuilder;
  * in Cobalt.
  *
  * <p>"Legacy IQ" denotes the older WhatsApp Web pattern that builds an
- * {@code <iq>} stanza directly via {@code WAComms.deprecatedSendIq} without
- * going through the SMAX typed-stanza-builder framework. The pattern
- * predates the SMAX rewrite and remains in use across roughly forty modules
- * in the WA Web bundle that have not yet migrated to typed SMAX.
+ * {@code <iq>} stanza directly via {@code WAComms._sendIq} (driven by the
+ * {@code WADeprecatedSendIq} dispatcher) without going through the SMAX
+ * typed-stanza-builder framework. The pattern predates the SMAX rewrite
+ * and remains in use across roughly forty modules in the WA Web bundle
+ * that have not yet migrated to typed SMAX.
  *
  * <p>Cobalt models every legacy-IQ operation as a pair of independent
  * top-level types — an {@code Iq<Op>Request} class implementing
@@ -28,14 +29,6 @@ import com.github.auties00.cobalt.node.NodeBuilder;
  * {@code WhatsAppClient.sendNode(IqOperation.Request)} to dispatch the
  * operation; {@link Response} carries no methods today and exists purely
  * as the closed counterpart of {@code Request}.
- *
- * @implNote {@code WADeprecatedSendIq.deprecatedSendIq}: the transport
- *           entry point shared by every implementor. The sealed hierarchy
- *           on the Cobalt side mirrors the static classification WA Web
- *           carries through the {@code WAWeb*Job} / {@code WAWeb*Action}
- *           module-name convention; the marker imposes no runtime contract
- *           beyond the abstract {@code toNode()} method declared on
- *           {@link Request}.
  */
 @WhatsAppWebModule(moduleName = "WADeprecatedSendIq")
 public sealed interface IqOperation permits IqOperation.Request, IqOperation.Response {

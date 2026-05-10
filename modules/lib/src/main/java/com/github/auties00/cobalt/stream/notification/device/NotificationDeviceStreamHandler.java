@@ -18,22 +18,6 @@ import java.util.List;
  * and dispatches to {@link DeviceService} for add/remove or device list sync for updates.
  * Processes notifications for both primary and secondary (LID/PN) user identities,
  * mirroring WA Web's dual-wid processing pattern.
- *
- * @implNote Adapts the following WA Web modules:
- * <ul>
- *   <li>{@code WAWebHandleDeviceNotification.handleDevicesNotification}: main entry point
- *       for device notification processing. Parses the notification stanza, builds an ack,
- *       registers LID-PN mappings, and dispatches each dual-wid entry to the ADV handler
- *       or device sync job.</li>
- *   <li>{@code WAWebAdvHandlerApi.handleADVDeviceNotification}: invoked indirectly through
- *       {@link DeviceService#handleDeviceNotification} for add/remove actions.</li>
- *   <li>{@code WAWebSyncDeviceAdvDeviceListJob.syncDeviceListJob}: invoked indirectly
- *       through {@link DeviceService#getDeviceLists} with context {@code "notification"}
- *       for update actions.</li>
- * </ul>
- * The WA Web {@code isResumeFromRestartComplete}/{@code isResumeOnSocketDisconnectInProgress}
- * offline-mode gating and the "NO_ACK" deferred-ack path are intentionally not replicated:
- * Cobalt sends the ack unconditionally and does not maintain an offline pending-device cache.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleDeviceNotification")
 public final class NotificationDeviceStreamHandler implements SocketStream.Handler {
@@ -147,7 +131,6 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      * @param actionType the action type ("add", "remove", or "update")
      * @param actionNode the action child node from the notification stanza
      * @param hash       the hash attribute value for update notifications, or {@code null}
-     * @implNote Cobalt does not maintain a contact-by-hash index. WA Web's update branch resolves the opaque side-contact hash to a wid through getContactRecordByHash; Cobalt syncs the device list for the entry JID directly because the entry JID already identifies the user.
      */
     private void processDeviceEntry(Jid entryJid, String actionType, Node actionNode, String hash) {
         switch (actionType) {
@@ -180,9 +163,6 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      *
      * @param actionNode the original action node from the notification stanza
      * @return the normalized action node
-     * @implNote ADAPTED: WAWebHandleDeviceNotification.h: the WA Web parser extracts device and
-     * key-index-list as separate fields. DeviceService.handleDeviceNotification expects them as
-     * child nodes of the action node, so this method adapts the stanza structure.
      */
     private Node normalizeDeviceActionNode(Node actionNode) {
         if (actionNode.getChild("device-list").isPresent()
@@ -218,7 +198,6 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      *
      * @param node    the original notification stanza node
      * @param userJid the user-level JID extracted from the {@code from} attribute
-     * @implNote The ack only carries to, id, and class. There is no type or participant attribute.
      */
     private void sendNotificationAck(Node node, Jid userJid) {
         var stanzaId = node.getAttributeAsString("id", null);

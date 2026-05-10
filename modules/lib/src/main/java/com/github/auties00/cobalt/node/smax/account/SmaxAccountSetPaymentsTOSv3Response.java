@@ -10,15 +10,11 @@ import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxAccountSetPaymentsTOSv3Request}.
- *
- * @implNote {@code WASmaxAccountSetPaymentsTOSv3RPC.sendSetPaymentsTOSv3RPC}
- *           tries {@code Success} → {@code Error} in order and
- *           throws on no-match. Cobalt returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperation.Response
         permits SmaxAccountSetPaymentsTOSv3Response.Success, SmaxAccountSetPaymentsTOSv3Response.Error {
@@ -96,6 +92,28 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
     @WhatsAppWebModule(moduleName = "WASmaxInAccountSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixinGroup")
     final class Success implements SmaxAccountSetPaymentsTOSv3Response {
         /**
+         * Allowed BR-consumer notice values.
+         */
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountEnums",
+                exports = "ENUM_BRP2PCONSENT_BRPAYPRIVACYPOLICY_BRPAYTOS_BRPAYWATOS",
+                adaptation = WhatsAppAdaptation.DIRECT)
+        private static final Set<String> BR_CONSUMER_NOTICE_VALUES = Set.of(
+                "br_p2p_consent",
+                "br_pay_privacy_policy",
+                "br_pay_tos",
+                "br_pay_wa_tos");
+
+        /**
+         * Allowed UPI-consumer notice values.
+         */
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountEnums",
+                exports = "ENUM_PAYTOSV3_UPIPAYPRIVACYPOLICY",
+                adaptation = WhatsAppAdaptation.DIRECT)
+        private static final Set<String> UPI_CONSUMER_NOTICE_VALUES = Set.of(
+                "pay_tos_v3",
+                "upi_pay_privacy_policy");
+
+        /**
          * Whether the {@code <accept_pay outage="1"/>} marker was
          * present.
          */
@@ -122,7 +140,12 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
 
         /**
          * The echoed {@code <additional_notice/>} list parsed from
-         * the response.
+         * the response. For {@code service="FBPAY"} each entry is
+         * one of {@code "br_p2p_consent"},
+         * {@code "br_pay_privacy_policy"}, {@code "br_pay_tos"},
+         * {@code "br_pay_wa_tos"}; for {@code service="UPI"} each
+         * entry is one of {@code "pay_tos_v3"} or
+         * {@code "upi_pay_privacy_policy"}.
          */
         private final List<String> additionalNotices;
 
@@ -213,6 +236,21 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
         @WhatsAppWebExport(moduleName = "WASmaxInAccountSetPaymentsTOSv3ResponseSuccess",
                 exports = "parseSetPaymentsTOSv3ResponseSuccess",
                 adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixinGroup",
+                exports = "parseSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixinGroup",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountSetPaymentsTOSv3BRConsumerPaymentsTOSv3ResponseMixin",
+                exports = {
+                        "parseSetPaymentsTOSv3BRConsumerPaymentsTOSv3ResponseAdditionalNotice",
+                        "parseSetPaymentsTOSv3BRConsumerPaymentsTOSv3ResponseMixin"
+                },
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixin",
+                exports = {
+                        "parseSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseAdditionalNotice",
+                        "parseSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixin"
+                },
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Success> of(Node node, Node request) {
             if (!validateIqEnvelope(node, request, "result")) {
                 return Optional.empty();
@@ -221,25 +259,50 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
             if (acceptPay == null) {
                 return Optional.empty();
             }
-            var outage = acceptPay.hasAttribute("outage", "1");
-            var sandbox = acceptPay.hasAttribute("sandbox", "1");
+            // WASmaxParseUtils.optionalLiteral(attrString, r.value, "outage", "1"): if present, value must equal "1"; if absent, succeeds with undefined.
+            var outageRaw = acceptPay.getAttributeAsString("outage").orElse(null);
+            if (outageRaw != null && !"1".equals(outageRaw)) {
+                return Optional.empty();
+            }
+            var outage = "1".equals(outageRaw);
+            // WASmaxParseUtils.optionalLiteral(attrString, r.value, "sandbox", "1"): if present, value must equal "1"; if absent, succeeds with undefined.
+            var sandboxRaw = acceptPay.getAttributeAsString("sandbox").orElse(null);
+            if (sandboxRaw != null && !"1".equals(sandboxRaw)) {
+                return Optional.empty();
+            }
+            var sandbox = "1".equals(sandboxRaw);
+            // WASmaxInAccountSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixinGroup.parseSetPaymentsTOSv3BRConsumerOrSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixinGroup:
+            // tries BR mixin first, then UPI mixin; Cobalt branches on the service literal in the same priority order.
+            // WASmaxInAccountSetPaymentsTOSv3BRConsumerPaymentsTOSv3ResponseMixin: literal service="FBPAY"
+            // WASmaxInAccountSetPaymentsTOSv3UPIConsumerPaymentsTOSv3ResponseMixin: literal service="UPI"
             String consumerVariantName;
             String service;
+            Set<String> allowedNotices;
             if (acceptPay.hasAttribute("service", "FBPAY")) {
                 consumerVariantName = "BRConsumerPaymentsTOSv3Response";
                 service = "FBPAY";
+                allowedNotices = BR_CONSUMER_NOTICE_VALUES;
             } else if (acceptPay.hasAttribute("service", "UPI")) {
                 consumerVariantName = "UPIConsumerPaymentsTOSv3Response";
                 service = "UPI";
+                allowedNotices = UPI_CONSUMER_NOTICE_VALUES;
             } else {
                 return Optional.empty();
             }
+            // WASmaxInAccountSetPaymentsTOSv3*ConsumerPaymentsTOSv3ResponseMixin.parseSetPaymentsTOSv3*ConsumerPaymentsTOSv3ResponseAdditionalNotice:
+            // assertTag(child, "additional_notice") + attrStringEnum(child, "notice", ENUM_*)
             var notices = acceptPay.streamChildren("additional_notice")
                     .map(child -> child.getAttributeAsString("notice").orElse(null))
-                    .filter(Objects::nonNull)
                     .toList();
+            // WASmaxInAccountSetPaymentsTOSv3*ConsumerPaymentsTOSv3ResponseMixin: mapChildrenWithTag(t, "additional_notice", 1, 10, ...)
             if (notices.isEmpty() || notices.size() > 10) {
                 return Optional.empty();
+            }
+            for (var notice : notices) {
+                // WASmaxParseUtils.attrStringEnum: rejects values outside the enum dict
+                if (notice == null || !allowedNotices.contains(notice)) {
+                    return Optional.empty();
+                }
             }
             return Optional.of(new Success(outage, sandbox, consumerVariantName, service, notices));
         }
@@ -281,17 +344,15 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
      * (internal-server-error 500, service-unavailable 503,
      * upgrade-required 443, config-mismatch 453, forbidden 403,
      * bad-request 400).
-     *
-     * @implNote {@code WASmaxInAccountSetPaymentsTOSv3ResponseError.parseSetPaymentsTOSv3ResponseError}
-     *           validates the {@code <iq type="error">} envelope
-     *           and routes the {@code <error/>} child through
-     *           {@code WASmaxInAccountSetPaymentsTosErrors.parseSetPaymentsTosErrors}.
-     *           Cobalt collapses the disjunction into a single
-     *           {@code (errorCode, errorText)} pair plus the
-     *           variant-name label.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInAccountSetPaymentsTOSv3ResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInAccountSetPaymentsTosErrors")
+    @WhatsAppWebModule(moduleName = "WASmaxInAccountIQErrorBadRequestMixin")
+    @WhatsAppWebModule(moduleName = "WASmaxInAccountIQErrorConfigMismatchMixin")
+    @WhatsAppWebModule(moduleName = "WASmaxInAccountIQErrorForbiddenMixin")
+    @WhatsAppWebModule(moduleName = "WASmaxInAccountIQErrorInternalServerErrorMixin")
+    @WhatsAppWebModule(moduleName = "WASmaxInAccountIQErrorPayUpgradeRequiredMixin")
+    @WhatsAppWebModule(moduleName = "WASmaxInAccountIQErrorServiceUnavailableMixin")
     final class Error implements SmaxAccountSetPaymentsTOSv3Response {
         /**
          * The numeric error code (one of 400 / 403 / 443 / 453 /
@@ -409,25 +470,56 @@ public sealed interface SmaxAccountSetPaymentsTOSv3Response extends SmaxOperatio
         @WhatsAppWebExport(moduleName = "WASmaxInAccountSetPaymentsTosErrors",
                 exports = "parseSetPaymentsTosErrors",
                 adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountIQErrorBadRequestMixin",
+                exports = "parseIQErrorBadRequestMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountIQErrorForbiddenMixin",
+                exports = "parseIQErrorForbiddenMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountIQErrorConfigMismatchMixin",
+                exports = "parseIQErrorConfigMismatchMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountIQErrorInternalServerErrorMixin",
+                exports = "parseIQErrorInternalServerErrorMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountIQErrorPayUpgradeRequiredMixin",
+                exports = "parseIQErrorPayUpgradeRequiredMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInAccountIQErrorServiceUnavailableMixin",
+                exports = "parseIQErrorServiceUnavailableMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         private static String classifyError(int code, String text) {
-            if (code == 400 && "bad-request".equals(text)) {
-                return "IQErrorBadRequest";
-            }
-            if (code == 403 && "forbidden".equals(text)) {
-                return "IQErrorForbidden";
-            }
-            if (code == 443 && "upgrade-required".equals(text)) {
-                return "IQErrorPayUpgradeRequired";
-            }
-            if (code == 453 && "config-mismatch".equals(text)) {
-                return "IQErrorConfigMismatch";
-            }
+            // WASmaxInAccountSetPaymentsTosErrors.parseSetPaymentsTosErrors: parseIQErrorInternalServerErrorMixin first
+            // WASmaxInAccountIQErrorInternalServerErrorMixin.parseIQErrorInternalServerErrorMixin: literal text="internal-server-error" + code=500
             if (code == 500 && "internal-server-error".equals(text)) {
                 return "IQErrorInternalServerError";
             }
+            // WASmaxInAccountSetPaymentsTosErrors.parseSetPaymentsTosErrors: then parseIQErrorServiceUnavailableMixin
+            // WASmaxInAccountIQErrorServiceUnavailableMixin.parseIQErrorServiceUnavailableMixin: literal text="service-unavailable" + code=503
             if (code == 503 && "service-unavailable".equals(text)) {
                 return "IQErrorServiceUnavailable";
             }
+            // WASmaxInAccountSetPaymentsTosErrors.parseSetPaymentsTosErrors: then parseIQErrorPayUpgradeRequiredMixin
+            // WASmaxInAccountIQErrorPayUpgradeRequiredMixin.parseIQErrorPayUpgradeRequiredMixin: literal text="upgrade-required" + code=443
+            if (code == 443 && "upgrade-required".equals(text)) {
+                return "IQErrorPayUpgradeRequired";
+            }
+            // WASmaxInAccountSetPaymentsTosErrors.parseSetPaymentsTosErrors: then parseIQErrorConfigMismatchMixin
+            // WASmaxInAccountIQErrorConfigMismatchMixin.parseIQErrorConfigMismatchMixin: literal text="config-mismatch" + code=453
+            if (code == 453 && "config-mismatch".equals(text)) {
+                return "IQErrorConfigMismatch";
+            }
+            // WASmaxInAccountSetPaymentsTosErrors.parseSetPaymentsTosErrors: then parseIQErrorForbiddenMixin
+            // WASmaxInAccountIQErrorForbiddenMixin.parseIQErrorForbiddenMixin: literal text="forbidden" + code=403
+            if (code == 403 && "forbidden".equals(text)) {
+                return "IQErrorForbidden";
+            }
+            // WASmaxInAccountSetPaymentsTosErrors.parseSetPaymentsTosErrors: finally parseIQErrorBadRequestMixin
+            // WASmaxInAccountIQErrorBadRequestMixin.parseIQErrorBadRequestMixin: literal text="bad-request" + code=400
+            if (code == 400 && "bad-request".equals(text)) {
+                return "IQErrorBadRequest";
+            }
+            // WASmaxInAccountSetPaymentsTosErrors.parseSetPaymentsTosErrors: WASmaxParseUtils.errorMixinDisjunction fallback -> ADAPTED to null
             return null;
         }
 

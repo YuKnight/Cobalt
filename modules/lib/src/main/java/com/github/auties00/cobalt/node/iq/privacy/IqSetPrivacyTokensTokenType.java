@@ -4,9 +4,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 
 /**
  * Closed set of token-type discriminators recognised by the relay.
- *
- * @implNote {@code WAWebSetPrivacyTokensJob.TokenType} ships a single
- *           {@code TrustedContact = "trusted_contact"} entry today.
  */
 @WhatsAppWebModule(moduleName = "WAWebSetPrivacyTokensJob")
 public enum IqSetPrivacyTokensTokenType {

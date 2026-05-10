@@ -13,11 +13,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WASmaxVoipLinkQueryRPC.sendLinkQueryRPC} tries
- *           {@code LinkQueryAck} then {@code LinkQueryNack} in order
- *           and throws on no-match. Cobalt returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxLinkQueryResponse extends SmaxOperation.Response
         permits SmaxLinkQueryResponse.Success, SmaxLinkQueryResponse.ClientError {
@@ -78,7 +73,6 @@ public sealed interface SmaxLinkQueryResponse extends SmaxOperation.Response
      * supplied token and returned the call link's full metadata.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInVoipLinkQueryResponseLinkQueryAck")
-    @WhatsAppWebModule(moduleName = "WASmaxInVoipLinkQueryResponseLinkQueryAckLinkQueryWaitingRoom")
     final class Success implements SmaxLinkQueryResponse {
         /**
          * The call link's creator device JID.
@@ -435,16 +429,6 @@ public sealed interface SmaxLinkQueryResponse extends SmaxOperation.Response
      * The {@code ClientError} reply variant. The relay rejected the
      * query because the supplied token is invalid, expired, revoked,
      * or refers to a link the caller is not authorised to view.
-     *
-     * @implNote {@code WASmaxInVoipLinkQueryResponseLinkQueryNack.parseLinkQueryResponseLinkQueryNack}
-     *           extracts the bare {@code @error} attribute on the
-     *           {@code <ack>} envelope and the {@code token} attribute
-     *           on the inner {@code <error/>} child. Cobalt projects
-     *           the pair as {@code (errorCode, errorText)} (where
-     *           {@code errorCode} is the parsed numeric form of the
-     *           error string when possible) plus a separate
-     *           {@link #errorToken()} accessor for the per-RPC token
-     *           field.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInVoipLinkQueryResponseLinkQueryNack")
     final class ClientError implements SmaxLinkQueryResponse {

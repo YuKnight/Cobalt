@@ -19,8 +19,6 @@ import java.util.OptionalInt;
 /**
  * Documented {@code type} enum carried by the
  * {@code <discount/>} grandchildren of {@code <discounts/>}.
- *
- * @implNote Mirrors {@code WASmaxInSmbMeteredMessagingAccountEnums.ENUM_FREEMSG_PERCENTAGE}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInSmbMeteredMessagingAccountEnums")
 public enum SmaxGetSMBMeteredMessagingCheckoutDiscountType {

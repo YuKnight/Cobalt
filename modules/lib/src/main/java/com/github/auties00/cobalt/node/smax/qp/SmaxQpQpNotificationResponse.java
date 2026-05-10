@@ -13,13 +13,6 @@ import java.util.Optional;
 /**
  * The inbound notification. The relay's PSA-class push carrying the
  * {@code <surfaces/>} subtree.
- *
- * @implNote {@code WASmaxInQpSurfacesQPNotificationRequest.parseQPNotificationRequest}
- *           validates the {@code <notification type="psa" from=USER_JID>}
- *           envelope, requires a {@code <surfaces/>} child, and projects
- *           the deeply-nested surfaces/promotion subtree. Cobalt
- *           exposes only the raw {@code <surfaces/>} node. Consumers
- *           re-parse it through the dedicated protobuf pipeline.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInQpSurfacesQPNotificationRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInQpSurfacesQPSurfacesMixin")

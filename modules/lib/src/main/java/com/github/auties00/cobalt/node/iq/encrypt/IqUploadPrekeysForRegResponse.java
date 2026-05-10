@@ -13,11 +13,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to an {@link IqUploadPrekeysForRegRequest}.
- *
- * @implNote The wire shape and parser are reused from
- *           {@code WAWebUploadPreKeysJob.uploadPreKeyResParser}; the
- *           variants therefore behave identically to
- *           {@link IqUploadPreKeysResponse}.
  */
 @WhatsAppWebModule(moduleName = "WAWebUploadPrekeysForRegTask")
 public sealed interface IqUploadPrekeysForRegResponse extends IqOperation.Response

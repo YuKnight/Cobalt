@@ -7,8 +7,6 @@ import java.util.Optional;
 
 /**
  * Success result of {@code WAWebUsyncLid.lidParser}.
- *
- * @implNote Mirrors {@code e.maybeAttrLidUserJid("val")} from the JS parser.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncLid")
 public final class LidResult implements UsyncProtocolResponse {

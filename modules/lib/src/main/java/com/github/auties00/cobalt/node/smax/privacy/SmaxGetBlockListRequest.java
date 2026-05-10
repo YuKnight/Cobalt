@@ -3,16 +3,9 @@ package com.github.auties00.cobalt.node.smax.privacy;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -54,18 +47,28 @@ public final class SmaxGetBlockListRequest implements SmaxOperation.Request {
     /**
      * Builds the outbound IQ stanza ready for dispatch.
      *
+     * <p>Mirrors {@code makeGetBlockListRequest(t)} from the WA Web
+     * source: emits {@code <iq to=S_WHATSAPP_NET xmlns="blocklist"
+     * type="get">} and conditionally attaches the {@code <item dhash/>}
+     * child via {@code OPTIONAL_CHILD}. The {@code id} attribute is
+     * generated downstream by {@code WhatsAppClient.sendNode}.
+     *
      * @return a {@link NodeBuilder} carrying the IQ envelope
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBlocklistsGetBlockListRequest",
             exports = "makeGetBlockListRequest", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBlocklistsGetBlockListRequest",
+            exports = "makeGetBlockListRequestItem", adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
+        // WASmaxOutBlocklistsGetBlockListRequest.makeGetBlockListRequest: smax("iq", {to: S_WHATSAPP_NET, xmlns: "blocklist", type: "get", id: generateId()}, OPTIONAL_CHILD(e, n))
         var iqBuilder = new NodeBuilder()
                 .description("iq")
                 .attribute("xmlns", "blocklist")
                 .attribute("to", JidServer.user())
                 .attribute("type", "get");
         if (itemDhash != null) {
+            // WASmaxOutBlocklistsGetBlockListRequest.makeGetBlockListRequestItem: smax("item", {dhash: CUSTOM_STRING(t)})
             var itemNode = new NodeBuilder()
                     .description("item")
                     .attribute("dhash", itemDhash)

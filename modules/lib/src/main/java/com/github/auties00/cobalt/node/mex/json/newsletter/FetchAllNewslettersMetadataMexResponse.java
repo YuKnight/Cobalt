@@ -65,13 +65,6 @@ public final class FetchAllNewslettersMetadataMexResponse implements MexOperatio
      * surfaces the same partition without invoking the JS-only parser:
      * callers map the active items into their domain objects and use the
      * deleted bucket to evict cached newsletters.
-     *
-     * @implNote WAWebMexFetchAllNewslettersMetadataJob.handleMexGetAllNewsletters:
-     *           {@code t.filter(e=>e!=null).map(e=>{...if(e.state?.type==="DELETED")
-     *           r.push({jid: parsed.idJid}); else n.push(parsed);});
-     *           return n.length>0||r.length>0
-     *               ? {newsletters:n, deletedNewsletters: r.length>0?{id:r}:null}
-     *               : {newsletters:[]};}.
      * @return a {@link Partitioned} carrying the active and deleted item
      *         lists; both lists are unmodifiable
      */
@@ -108,9 +101,6 @@ public final class FetchAllNewslettersMetadataMexResponse implements MexOperatio
      *                            {@code "DELETED"}, in server-defined order
      * @param deletedNewsletters  the items whose {@code state.type} is
      *                            {@code "DELETED"}, in server-defined order
-     * @implNote WAWebMexFetchAllNewslettersMetadataJob.handleMexGetAllNewsletters:
-     *           mirrors the {@code {newsletters, deletedNewsletters}}
-     *           shape returned to the Newsletter Collections layer.
      */
     public record Partitioned(List<Item> newsletters, List<Item> deletedNewsletters) {
     }

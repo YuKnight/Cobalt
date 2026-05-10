@@ -12,11 +12,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WASmaxVoipWaitingRoomToggleCallLinkRPC.sendWaitingRoomToggleCallLinkRPC}
- *           tries {@code Ack} then {@code Nack} in order and throws on
- *           no-match. Cobalt returns {@link Optional#empty()} on
- *           no-match.
  */
 public sealed interface SmaxWaitingRoomToggleCallLinkResponse extends SmaxOperation.Response
         permits SmaxWaitingRoomToggleCallLinkResponse.Success, SmaxWaitingRoomToggleCallLinkResponse.ClientError {

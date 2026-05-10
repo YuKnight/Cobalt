@@ -159,14 +159,6 @@ public final class SmaxGetSMBMeteredMessagingCheckoutRequest implements SmaxOper
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the checkout payload
-     *
-     * @implNote {@code WASmaxOutSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutRequest.makeGetSMBMeteredMessagingCheckoutRequest}
-     *           composes
-     *           {@code WASmaxOutSmbMeteredMessagingAccountHackBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over a
-     *           bare {@code <iq xmlns="w:biz" smax_id=120>} root
-     *           that carries a {@code <participants/>} block plus up
-     *           to four optional children.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutSmbMeteredMessagingAccountGetSMBMeteredMessagingCheckoutRequest",

@@ -37,12 +37,6 @@ import java.util.function.Supplier;
  * sequence runs at most once per connection lifetime. The guard is reset via
  * {@link #reset()} when the socket stream is torn down, allowing the sequence
  * to run again on reconnection.
- *
- * @implNote WAWebHandleSuccess.default is a single async function that
- *           sequentially runs all post-authentication bootstrap actions.
- *           Cobalt collapses these into the {@link #bootstrap(Node)} method,
- *           injecting each downstream service through the constructor instead
- *           of importing module-level singletons.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleSuccess")
 public final class SuccessStreamHandler implements SocketStream.Handler {
@@ -83,8 +77,6 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
 
     /**
      * Guard ensuring the full bootstrap runs at most once per connection. Reset by {@link #reset()} on socket teardown.
-     *
-     * @implNote Cobalt reuses handler instances across reconnects, so the guard is needed to avoid double bootstrap if the server sends two success stanzas on the same socket.
      */
     private final AtomicBoolean started;
 
@@ -282,10 +274,6 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      * starts streaming traffic anyway after a short timeout; surfacing the
      * exception would only abort the listener notification and the store
      * persistence steps that follow.
-     *
-     * @implNote WAWebPassiveModeManager.executePassiveTasks (final
-     *           {@code sendPassiveModeProtocol("active")} call) and
-     *           WASmaxOutPassiveModeActiveIQRequest.makeActiveIQRequest.
      */
     @WhatsAppWebExport(moduleName = "WASendPassiveModeProtocol", exports = "sendPassiveModeProtocol",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -311,13 +299,6 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
     /**
      * Logger reused by the post-success compliance probes so failures are
      * surfaced as warnings without aborting the bootstrap.
-     *
-     * @implNote ADAPTED: WA Web's {@code WALogger.ERROR} is the canonical
-     *           sink for the equivalent
-     *           {@code WAWebGetReachoutTimelockJob.fetchReachoutTimelock}
-     *           and {@code WAWebGetNewChatMessageCappingInfoJob.getNewChatMessageCapping}
-     *           failures. Cobalt routes them through a class-scoped
-     *           {@link System.Logger} instead.
      */
     private static final System.Logger LOGGER_COMPLIANCE = System.getLogger(SuccessStreamHandler.class.getName() + ".compliance");
 
@@ -332,13 +313,6 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      *
      * @param probeName the human-readable name of the probe for log output
      * @param probe     the probe to run; never {@code null}
-     *
-     * @implNote ADAPTED: WA Web wraps each probe in a persisted job
-     *           ({@code WAWebGetReachoutTimelockJob},
-     *           {@code WAWebGetNewChatMessageCappingInfoJob}) that retries
-     *           on failure. Cobalt fires them inline once during the
-     *           bootstrap; retry is left to the caller because no store
-     *           slot consumes the result yet.
      */
     private static void runComplianceProbe(String probeName, Supplier<?> probe) {
         try {

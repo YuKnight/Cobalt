@@ -54,12 +54,6 @@ public final class SmaxUserNoticeGetDisclosureStageByIdsRequest implements SmaxO
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <get_disclosure_stage_by_id/>} children
-     *
-     * @implNote {@code WASmaxOutUserNoticeGetDisclosureStageByIdsRequest.makeGetDisclosureStageByIdsRequest}
-     *           composes {@code WASmaxOutUserNoticeBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over
-     *           {@code <iq xmlns="tos" to="s.whatsapp.net">} with
-     *           {@code REPEATED_CHILD(get_disclosure_stage_by_id, args, 0, ∞)}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutUserNoticeGetDisclosureStageByIdsRequest",

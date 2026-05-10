@@ -114,14 +114,6 @@ public final class IqUsyncRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <usync/>} payload
-     *
-     * @implNote {@code WAWebUsync.USyncQuery.$3} composes the IQ
-     *           via {@code wap("iq", {to:S_WHATSAPP_NET,
-     *           xmlns:"usync", type:"get", id}, wap("usync",
-     *           {sid:generateId(), index:"0", last:"true",
-     *           mode:CUSTOM_STRING(mode), context:CUSTOM_STRING(context)},
-     *           wap("query", null, [...protocol elements]),
-     *           wap("list", null, [...user elements])))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUsync",
@@ -202,11 +194,6 @@ public final class IqUsyncRequest implements IqOperation.Request {
      * phone-only-lookup) carry exactly one of the two
      * identifiers. At least one must be present otherwise WA
      * Web's {@code USyncQuery.validate} drops the entry.
-     *
-     * @implNote {@code WAWebUsync.USyncUser} is a richer builder
-     *           with {@code withLid}/{@code withPhone} setters.
-     *           Cobalt collapses to a flat
-     *           {@code (userJid, pnJid, payloads)} triple.
      */
     @WhatsAppWebModule(moduleName = "WAWebUsync")
     @WhatsAppWebModule(moduleName = "WAWebUsyncUser")
@@ -288,10 +275,6 @@ public final class IqUsyncRequest implements IqOperation.Request {
          * routed inside the outbound {@code <list/>} envelope.
          *
          * @return the rendered node
-         *
-         * @implNote {@code WAWebUsync.USyncQuery.$3} maps each
-         *           user via {@code wap("user", {jid:USER_JID(t),
-         *           pn_jid:USER_JID(t)}, [...protocol payloads])}.
          */
         @WhatsAppWebExport(moduleName = "WAWebUsync",
                 exports = "USyncQuery", adaptation = WhatsAppAdaptation.ADAPTED)

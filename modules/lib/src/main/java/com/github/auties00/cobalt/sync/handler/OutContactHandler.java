@@ -8,13 +8,10 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.contact.OutContactBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.OutContactAction;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.util.logging.Logger;
 
 /**
@@ -36,44 +33,28 @@ import java.util.logging.Logger;
  * this handler is gated behind the {@code out_contact_invites_enabled} AB prop
  * (code 28170, int). When the gate is closed, every mutation in the batch is
  * reported as {@link MutationApplicationResult#unsupported()}.
- *
- * @implNote WAWebOutContactSync.default — singleton instance of the out-contact
- *           sync action handler extending {@code AccountSyncdActionBase}; the
- *           class constructor sets
- *           {@code collectionName = WASyncdConst.CollectionName.RegularLow}
  */
 @WhatsAppWebModule(moduleName = "WAWebOutContactSync")
 public final class OutContactHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of this handler.
-     *
-     * @implNote WAWebOutContactSync — module-level singleton {@code _ = new d()}
      */
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final OutContactHandler INSTANCE = new OutContactHandler();
 
     /**
      * Logger for diagnostic messages emitted during out-contact sync processing.
-     *
-     * @implNote ADAPTED: WAWebOutContactSync uses {@code WALogger}; Cobalt uses
-     *           {@code java.util.logging}
      */
     private static final Logger LOGGER = Logger.getLogger(OutContactHandler.class.getName());
 
     /**
      * Value of the {@code out_contact_invites_enabled} AB prop that enables the
      * outgoing-contact invite flow.
-     *
-     * @implNote WAWebOutContactInviteGating.isOutContactInviteEnabled —
-     *           {@code getABPropConfigValue("out_contact_invites_enabled") === 1}
      */
     private static final int OUT_CONTACT_INVITES_ENABLED_VALUE = 1;
 
     /**
      * Private constructor preventing external instantiation.
-     *
-     * @implNote WAWebOutContactSync — class {@code d} constructor sets
-     *           {@code collectionName = RegularLow}
      */
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private OutContactHandler() {
@@ -82,9 +63,6 @@ public final class OutContactHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for this handler.
-     *
-     * @implNote WAWebOutContactSync.getAction — returns
-     *           {@code WASyncdConst.Actions.OutContact} (value: {@code "out_contact"})
      * @return the action name string
      */
     @Override
@@ -95,9 +73,6 @@ public final class OutContactHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection this handler belongs to.
-     *
-     * @implNote WAWebOutContactSync — constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.RegularLow}
      * @return the sync patch type
      */
     @Override
@@ -108,30 +83,12 @@ public final class OutContactHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for this handler.
-     *
-     * @implNote WAWebOutContactSync.getVersion — returns {@code 1}
      * @return the version number
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return OutContactAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single out-contact mutation and returns whether it succeeded.
-     *
-     * @implNote WAWebOutContactSync.applyMutations — per-mutation logic within the
-     *           batch handler, delegating to
-     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -166,24 +123,13 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * <p>Anything other than {@code SET} or {@code REMOVE} is reported as
      * malformed, matching WA Web's {@code else} arm which increments the malformed
      * counter and pushes {@code malformedActionValue(collectionName)}.
-     *
-     * @implNote WAWebOutContactSync.applyMutations — per-mutation processing within
-     *           the batch {@code applyMutations(t)} generator. WA Web buffers SET
-     *           and REMOVE mutations into {@code r} and {@code a} arrays and then
-     *           calls {@code putOutContactBatch}, {@code removeOutContactBatch} and
-     *           {@code frontendFireAndForget('bulkUpsertOutContacts'/'bulkRemoveOutContacts')}
-     *           once at the end of the batch. Cobalt applies each mutation
-     *           synchronously against the dedicated {@code outContacts} store on
-     *           {@link com.github.auties00.cobalt.store.WhatsAppStore}, so the
-     *           batch flush and frontend bridge calls are ADAPTED into direct
-     *           per-mutation writes.
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         //     return t.map(function() { return {actionState: Unsupported} })
         var gateValue = client.abPropsService().getInt(ABProp.OUT_CONTACT_INVITES_ENABLED);
         if (gateValue != OUT_CONTACT_INVITES_ENABLED_VALUE) {
@@ -193,7 +139,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
         var indexArray = JSON.parseArray(mutation.index());
         var userJidString = indexArray.getString(1);
         if (userJidString == null) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         Jid userJid;
@@ -201,18 +147,18 @@ public final class OutContactHandler implements WebAppStateActionHandler {
             userJid = Jid.of(userJidString);
         } catch (Exception e) { // ADAPTED: WAWebOutContactSync.applyMutations — WAJids.interpretAndValidateJid returns {jidType: "unknown"} instead of throwing; Cobalt's Jid.of throws WhatsAppMalformedJidException on unparsable strings
             LOGGER.fine(() -> "OutContactSync: malformed JID: " + userJidString); // ADAPTED: WAWebOutContactSync.applyMutations — WALogger.ERROR("OutContactSync: JID missing expected domain: %s", d)
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         if (!userJid.hasUserServer()) {
             LOGGER.fine(() -> "OutContactSync: JID missing expected domain: " + userJidString);
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         return switch (mutation.operation()) {
             case SET -> {
                 if (!(mutation.value().action().orElse(null) instanceof OutContactAction action)) {
-                    yield malformedActionValue();
+                    yield SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
                 var fullName = coalesceEmpty(action.fullName().orElse(null));
@@ -254,7 +200,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
                 // SyncdOperation only has SET and REMOVE today, but mirroring WA Web's
                 // catch-all branch keeps the handler structurally aligned with the batch
                 // generator.
-                yield malformedActionValue();
+                yield SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
         };
     }
@@ -266,8 +212,6 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * {@code return e == null || e === "" ? null : e}. It is used to normalise
      * {@link OutContactAction#fullName()} and {@link OutContactAction#firstName()}
      * before deciding whether to derive a fallback or skip the field entirely.
-     *
-     * @implNote WAWebOutContactSync.m — module-local helper {@code function m(e)}
      * @param value the value to normalise, possibly {@code null}
      * @return {@code null} if the input is {@code null} or empty, otherwise the
      *         original value unchanged
@@ -288,8 +232,6 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      * the literal ASCII space character {@code " "} (rather than any Unicode
      * whitespace), so this implementation uses the same delimiter to preserve
      * exact parity with the source.
-     *
-     * @implNote WAWebOutContactSync.p — module-local helper {@code function p(e)}
      * @param value the value to extract the first word from, possibly {@code null}
      * @return the first whitespace-delimited token of the trimmed value, or
      *         {@code null} when the input is {@code null} or empty after trimming

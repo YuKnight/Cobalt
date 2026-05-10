@@ -58,6 +58,7 @@ import java.util.Objects;
  * protocol changes.
  */
 @WhatsAppWebModule(moduleName = "WAWebIssuePrivateStatsToken")
+@WhatsAppWebModule(moduleName = "WAACSTokenUtils")
 public final class WamPrivateStatsTokenIssuer {
     /**
      * XMPP namespace for the private-stats token issuance IQ.
@@ -103,7 +104,6 @@ public final class WamPrivateStatsTokenIssuer {
      * token is single-use against a particular WAM upload buffer.
      * Callers must not cache and reuse it across uploads, since
      * reuse leaks the unblinded outputs of prior buffers.
-     *
      * @return the freshly issued token
      * @throws WhatsAppPrivateStatsTokenIssuerException if the server
      *         responds with an error, the response is malformed, or
@@ -114,7 +114,14 @@ public final class WamPrivateStatsTokenIssuer {
             exports = "getToken",
             adaptation = WhatsAppAdaptation.ADAPTED
     )
+    @WhatsAppWebExport(
+            moduleName = "WAACSTokenUtils",
+            exports = {"getBlindedToken", "getSharedSecret"},
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     public WamPrivateStatsToken issue() {
+        // WAACSTokenUtils.getBlindedToken: 32 random bytes for the secret nonce,
+        // 32 random bytes for the blinding factor, then call blindToken.
         var token = new byte[WamPrivateStatsToken.TOKEN_BYTES];
         random.nextBytes(token);
         var blindingFactor = new byte[WamPrivateStatsToken.TOKEN_BYTES];
@@ -173,6 +180,9 @@ public final class WamPrivateStatsTokenIssuer {
         }
 
         try {
+            // WAACSTokenUtils.getSharedSecret: SHA-512(token || unblindedSignedToken),
+            // matching WABinary.Binary.build(token, unblindedSignedToken) followed by
+            // WACryptoPrimitives.hash on the concatenated byte view.
             var md = MessageDigest.getInstance("SHA-512");
             md.update(token);
             md.update(unblindedSignedToken);

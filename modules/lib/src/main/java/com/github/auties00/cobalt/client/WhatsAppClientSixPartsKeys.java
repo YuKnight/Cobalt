@@ -19,7 +19,7 @@ import java.util.Objects;
  * Noise protocol key pair (used during handshake with the WhatsApp server)
  * and the Signal identity key pair (used for end-to-end encryption),
  * together with an identity identifier. Cobalt can load a store from these
- * keys via {@link WhatsAppClientBuilder.Client#loadConnection(WhatsAppClientSixPartsKeys)}
+ * keys via {@link WhatsAppClientBuilder.Client#createConnection(WhatsAppClientSixPartsKeys)}
  * and emit them back via {@link #toString()} for export.
  *
  * <p>The serialized form is:

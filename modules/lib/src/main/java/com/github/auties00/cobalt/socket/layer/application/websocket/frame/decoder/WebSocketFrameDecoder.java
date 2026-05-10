@@ -28,12 +28,6 @@ import java.nio.ByteOrder;
  *
  * <p>Instances are <b>not</b> thread-safe; one decoder must be owned
  * by a single reader.
- *
- * @implNote Unmasking uses the Vector API for bulk throughput with an
- *     int-wise scalar fallback for short tails, matching the strategy
- *     used by the encoder. The SIMD path is gated by
- *     {@link #VECTORIZE_THRESHOLD} so small frames pay no vector setup
- *     cost.
  */
 public final class WebSocketFrameDecoder {
     /**
@@ -321,12 +315,6 @@ public final class WebSocketFrameDecoder {
     /**
      * Routes payload consumption to the appropriate handler based on the
      * current frame's opcode.
-     *
-     * @implNote Text frames ({@link WebSocketFrameConstants#OPCODE_TEXT})
-     *     are legal per RFC 6455 but are never produced by the WhatsApp
-     *     server, so their payload is discarded rather than delivered:
-     *     keeping the branch avoids corrupting the stream in the face of
-     *     a hypothetical rogue text frame.
      * @param source the buffer containing incoming bytes
      * @return a decoded frame result, or {@link WebSocketDecodedFrame#none()}
      *         if no complete result is available yet

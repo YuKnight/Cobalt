@@ -10,7 +10,6 @@ import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -18,7 +17,6 @@ import com.github.auties00.cobalt.model.sync.action.chat.ClearChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.ClearChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,11 +33,6 @@ import java.util.List;
  * where {@code deleteStarred} is {@code "1"} (delete starred) or {@code "0"}
  * (keep starred), and {@code deleteMedia} is {@code "1"} (keep media) or
  * {@code "0"} (delete media).
- *
- * @implNote WAWebClearChatSync — singleton instance exported as {@code default};
- *           extends {@code ChatMessageRangeSyncdActionBase} with
- *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1},
- *           {@code getVersion() = 6}, {@code getAction() = "clearChat"}
  */
 @WhatsAppWebModule(moduleName = "WAWebClearChatSync")
 public final class ClearChatHandler implements WebAppStateActionHandler {
@@ -49,8 +42,6 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, {@code WAWebClearChatSync} exports a single instance
      * ({@code var f = new _(); l.default = f}).
-     *
-     * @implNote WAWebClearChatSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ClearChatHandler INSTANCE = new ClearChatHandler();
@@ -61,17 +52,12 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * <p>Per WhatsApp Web {@code WAWebClearChatSync}: the constructor sets
      * {@code chatJidIndex = 1}, so the chat JID is at {@code indexParts[1]}
      * (i.e. after the action name {@code "clearChat"} at slot {@code 0}).
-     *
-     * @implNote WAWebClearChatSync — class field {@code chatJidIndex = 1}
      */
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     private static final int CHAT_JID_INDEX = 1;
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebClearChatSync — class constructor sets
-     *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1}
      */
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ClearChatHandler() {
@@ -79,9 +65,6 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for clear chat actions.
-     *
-     * @implNote WAWebClearChatSync.getAction — returns
-     *           {@code WASyncdConst.Actions.ClearChat} ({@code "clearChat"})
      * @return the action name {@code "clearChat"}
      */
     @Override
@@ -95,9 +78,6 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, the clear chat handler's {@code collectionName} is set to
      * {@code WASyncdConst.CollectionName.RegularHigh} in the constructor.
-     *
-     * @implNote WAWebClearChatSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularHigh}
      * @return {@link SyncPatchType#REGULAR_HIGH}
      */
     @Override
@@ -108,32 +88,12 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for clear chat actions.
-     *
-     * @implNote WAWebClearChatSync.getVersion — returns {@code 6}
      * @return the version number {@code 6}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return ClearChatAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a clear chat mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebClearChatSync.applyMutations — per-mutation inner logic,
-     *           success check on the returned {@code SyncActionState}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -159,15 +119,13 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      *
      * <p>Non-{@code SET} operations return {@code Unsupported}. Exceptions are
      * caught and return {@code Failed}.
-     *
-     * @implNote WAWebClearChatSync.applyMutations — per-mutation inner function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = {"applyMutations", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -181,27 +139,27 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
             if (chatJidString == null || chatJidString.isEmpty()
                     || deleteStarredString == null || deleteStarredString.isEmpty()
                     || deleteMediaString == null || deleteMediaString.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             Jid chatJid;
             try {
                 chatJid = Jid.of(chatJidString);
             } catch (Exception e) {
-                return malformedActionIndex(); // ADAPTED: Jid.of throws for invalid JIDs; WA Web uses isWid() upfront
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName()); // ADAPTED: Jid.of throws for invalid JIDs; WA Web uses isWid() upfront
             }
 
             if (chatJid == null) { // ADAPTED: Jid.of returns null for null input
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().action().orElse(null) instanceof ClearChatAction clearChatAction)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var messageRange = clearChatAction.messageRange().orElse(null);
             if (messageRange == null) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chat = client.store().findChatByJid(chatJid);
@@ -250,8 +208,6 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      *     </ul>
      *   </li>
      * </ol>
-     *
-     * @implNote WAWebClearChatSync.resolveConflicts
      * @param localMutation  the local pending mutation
      * @param remoteMutation the incoming remote mutation
      * @return the conflict resolution indicating which mutation to keep
@@ -349,10 +305,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
      * without any messages. The WAM telemetry commit
      * ({@code MdSyncdDogfoodingFeatureUsageWamEvent}) is performed at the caller
      * ({@code WhatsAppClient.clearChat}) since this method has no
-     * {@link WamService} handle.
-     *
-     * @implNote WAWebClearChatSync.getClearChatMutation,
-     *           WAWebSyncdActionUtils.buildPendingMutation
+     * {@link com.github.auties00.cobalt.wam.WamService} handle.
      * @param timestamp     the mutation timestamp
      * @param chatJid       the JID of the chat to clear
      * @param deleteStarred whether starred messages should also be deleted
@@ -394,37 +347,5 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
                 version()
         );
         return new SyncPendingMutation(mutation, 0); // ADAPTED: WA Web returns the raw mutation object; Cobalt wraps it in SyncPendingMutation for the outgoing queue
-    }
-
-    /**
-     * Returns whether the mutation's chat JID is a LID-namespaced JID.
-     *
-     * <p>Per WhatsApp Web {@code ChatSyncdActionBase.isLidMutation}: reads the
-     * mutation index slot at {@code chatJidIndex} (= {@code 1} for clear-chat),
-     * constructs a Wid via {@code WAWebWidFactory.createWid}, and returns
-     * {@code wid.isLid()}. {@code ChatMessageRangeSyncdActionBase} (the WA Web
-     * superclass of {@code WAWebClearChatSync}) inherits this from
-     * {@code ChatSyncdActionBase}.
-     *
-     * @implNote WAWebSyncdAction.ChatSyncdActionBase.isLidMutation — index slot
-     *           lookup and {@code WAWebWidFactory.createWid(...).isLid()} check
-     * @param mutation the mutation to inspect
-     * @return {@code true} when the chat JID at index {@value #CHAT_JID_INDEX}
-     *         is in the LID domain, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebSyncdAction", exports = "ChatSyncdActionBase", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean isLidMutation(DecryptedMutation.Trusted mutation) {
-        try {
-            var indexParts = JSON.parseArray(mutation.index());
-            var chatJidString = indexParts.getString(CHAT_JID_INDEX);
-            if (chatJidString == null || chatJidString.isEmpty()) {
-                return false;
-            }
-            var chatJid = Jid.of(chatJidString);
-            return chatJid != null && chatJid.hasLidServer();
-        } catch (Exception e) { // ADAPTED: malformed index returns false rather than propagating
-            return false;
-        }
     }
 }

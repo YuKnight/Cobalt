@@ -49,10 +49,6 @@ public final class SmaxGroupsDeleteParentGroupRequest implements SmaxOperation.R
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <delete_parent/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsDeleteParentGroupRequest.makeDeleteParentGroupRequest}
-     *           composes {@code WASmaxOutGroupsBaseSetGroupMixin}
-     *           over a bare {@code <delete_parent/>} child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsDeleteParentGroupRequest",

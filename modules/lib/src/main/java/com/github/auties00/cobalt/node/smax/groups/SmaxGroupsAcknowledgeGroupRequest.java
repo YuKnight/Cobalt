@@ -51,12 +51,6 @@ public final class SmaxGroupsAcknowledgeGroupRequest implements SmaxOperation.Re
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <ack/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsAcknowledgeGroupRequest.makeAcknowledgeGroupRequest}
-     *           composes {@code WASmaxOutGroupsBaseSetGroupMixin}
-     *           ({@code xmlns="w:g2"}, {@code to=GROUP_JID(t)},
-     *           {@code id=generateId()}, {@code type="set"}) over a
-     *           bare {@code <ack/>} child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsAcknowledgeGroupRequest",

@@ -80,13 +80,6 @@ public final class SmaxAbPropsGetExperimentConfigRequest implements SmaxOperatio
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <props/>} payload
-     *
-     * @implNote {@code WASmaxOutAbPropsGetExperimentConfigRequest.makeGetExperimentConfigRequest}
-     *           composes {@code WASmaxOutAbPropsBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over a
-     *           {@code <props protocol="1" hash? refresh_id?/>} child
-     *           inside an {@code <iq xmlns="abt"
-     *           to=S_WHATSAPP_NET>} envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutAbPropsGetExperimentConfigRequest",

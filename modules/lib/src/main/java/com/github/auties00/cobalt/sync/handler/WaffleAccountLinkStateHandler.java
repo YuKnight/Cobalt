@@ -12,7 +12,6 @@ import com.github.auties00.cobalt.model.message.system.ProtocolMessageBuilder;
 import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestMessageBuilder;
 import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStateAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
@@ -43,40 +42,26 @@ import java.util.List;
  * linking nonce fetch via a peer data operation request.
  *
  * <p>Index format: {@code ["waffle_account_link_state"]}
- *
- * @implNote WAWebWaffleAccountLinkStateSync.default — module-level singleton
- *           {@code d = new c(); l.default = d} where {@code c} extends
- *           {@code WAWebSyncdAction.AccountSyncdActionBase}
  */
 @WhatsAppWebModule(moduleName = "WAWebWaffleAccountLinkStateSync")
 public final class WaffleAccountLinkStateHandler implements WebAppStateActionHandler {
     /**
-     * The singleton instance of {@code WaffleAccountLinkStateHandler}.
-     *
-     * @implNote WAWebWaffleAccountLinkStateSync.default — WA Web exports a single
-     *           pre-instantiated handler ({@code d = new c; l.default = d})
+     * The WAM telemetry service used to commit the non-message peer data
+     * request event when triggering a WAFFLE linking nonce fetch.
      */
-    @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public static final WaffleAccountLinkStateHandler INSTANCE = new WaffleAccountLinkStateHandler();
+    private final WamService wamService;
 
     /**
-     * Constructs the singleton instance.
-     *
-     * @implNote WAWebWaffleAccountLinkStateSync — WA Web instantiates the handler
-     *           once via {@code new c()}; the constructor sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularHigh}
+     * Constructs a {@code WaffleAccountLinkStateHandler}.
+     * @param wamService the WAM telemetry service used by this handler
      */
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    private WaffleAccountLinkStateHandler() {
-
+    public WaffleAccountLinkStateHandler(WamService wamService) {
+        this.wamService = wamService;
     }
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebWaffleAccountLinkStateSync.getAction — returns
-     *           {@code WASyncdConst.Actions.WaffleAccountLinkState} which equals
-     *           {@code "waffle_account_link_state"}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
@@ -86,10 +71,6 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebWaffleAccountLinkStateSync — sets
-     *           {@code this.collectionName = WASyncdConst.CollectionName.RegularHigh}
-     *           in the constructor
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
@@ -104,23 +85,6 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return WaffleAccountLinkStateAction.ACTION_VERSION;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>WhatsApp Web exposes only a batch entry point ({@code applyMutations});
-     * Cobalt's interface contract additionally requires a single-mutation path,
-     * which is implemented here by delegating to {@link #applyMutationResult}.
-     *
-     * @implNote ADAPTED: WAWebWaffleAccountLinkStateSync.applyMutations — WA Web
-     *           only processes mutations as a batch; the single-mutation entry
-     *           point is a Cobalt interface adaptation
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: single-path adapter for batch-only WA Web entry
     }
 
     /**
@@ -150,12 +114,10 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      * <p>WA Web also emits {@code WALogger.WARN} entries with the unsupported
      * and malformed mutation counts; these telemetry warnings are intentionally
      * omitted in Cobalt and the return semantics are preserved exactly.
-     *
-     * @implNote WAWebWaffleAccountLinkStateSync.applyMutations
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var accountLinkingEnabled = client.abPropsService().getBool(ABProp.WEB_WAFFLE);
         DecryptedMutation.Trusted latest = null;
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
@@ -172,7 +134,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
 
             if (!(mutation.value().action().orElse(null) instanceof WaffleAccountLinkStateAction action)
                     || action.linkState().isEmpty()) {
-                results.add(malformedActionValue());
+                results.add(SyncdIndexUtils.malformedActionValue(collectionName().name()));
                 continue;
             }
 
@@ -184,10 +146,10 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
         if (latest != null) {
             var action = (WaffleAccountLinkStateAction) latest.value().action().orElseThrow();
             var linkState = action.linkState().orElseThrow();
-            client.store().setWaffleAccountLinkState(linkState); // ADAPTED: WAWebAccountLinkingDBOperations_DO_NOT_USE_DIRECTLY.createOrUpdateAccountLinkingState — Cobalt flattens the account-linking record into store fields
-            client.store().setWaffleAccountLinkStateTimestamp(latest.timestamp()); // ADAPTED: createOrUpdateAccountLinkingState linkTimestamp field
+            client.store().setLinkedMetaAccountState(linkState); // ADAPTED: WAWebAccountLinkingDBOperations_DO_NOT_USE_DIRECTLY.createOrUpdateAccountLinkingState — Cobalt flattens the account-linking record into store fields
+            client.store().setLinkedMetaAccountStateTimestamp(latest.timestamp()); // ADAPTED: createOrUpdateAccountLinkingState linkTimestamp field
             if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
-                requestNonceFromPrimary(client, wamService);
+                requestNonceFromPrimary(client);
             }
         }
 
@@ -206,15 +168,10 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      * timestamp are persisted to the store and {@code SUCCESS} is returned.
      * If the persisted link state is {@code Active}, the handler also triggers
      * {@code requestNonceFromPrimary}.
-     *
-     * @implNote ADAPTED: WAWebWaffleAccountLinkStateSync.applyMutations — WA Web
-     *           only defines a batch entry point; this single-mutation path
-     *           applies the same per-mutation logic with no batch-level latest
-     *           selection
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!client.abPropsService().getBool(ABProp.WEB_WAFFLE)) {
             return MutationApplicationResult.unsupported();
         }
@@ -225,14 +182,14 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
 
         if (!(mutation.value().action().orElse(null) instanceof WaffleAccountLinkStateAction action)
                 || action.linkState().isEmpty()) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var linkState = action.linkState().orElseThrow();
-        client.store().setWaffleAccountLinkState(linkState); // ADAPTED: WAWebAccountLinkingDBOperations_DO_NOT_USE_DIRECTLY.createOrUpdateAccountLinkingState — Cobalt flattens the account-linking record into store fields
-        client.store().setWaffleAccountLinkStateTimestamp(mutation.timestamp()); // ADAPTED: createOrUpdateAccountLinkingState linkTimestamp field
+        client.store().setLinkedMetaAccountState(linkState); // ADAPTED: WAWebAccountLinkingDBOperations_DO_NOT_USE_DIRECTLY.createOrUpdateAccountLinkingState — Cobalt flattens the account-linking record into store fields
+        client.store().setLinkedMetaAccountStateTimestamp(mutation.timestamp()); // ADAPTED: createOrUpdateAccountLinkingState linkTimestamp field
         if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
-            requestNonceFromPrimary(client, wamService);
+            requestNonceFromPrimary(client);
         }
         return MutationApplicationResult.success();
     }
@@ -254,14 +211,11 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      * micro-optimization is intentionally omitted here because sync mutations
      * are processed sequentially in Cobalt.
      *
-     * @param client     the WhatsApp client used to dispatch the peer message
-     * @param wamService the WAM telemetry service used to commit the non-message peer data request event
-     * @implNote WAWebAccountLinkingNonceFetchAPI.requestNonceFromPrimary,
-     *           WAWebSendNonMessageDataRequest.sendPeerDataOperationRequest
+     * @param client the WhatsApp client used to dispatch the peer message
      */
     @WhatsAppWebExport(moduleName = "WAWebAccountLinkingNonceFetchAPI", exports = "requestNonceFromPrimary", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSendNonMessageDataRequest", exports = "sendPeerDataOperationRequest", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void requestNonceFromPrimary(WhatsAppClient client, WamService wamService) {
+    private void requestNonceFromPrimary(WhatsAppClient client) {
         var me = client.store().jid().orElse(null); // ADAPTED: WAWebSendNonMessageDataRequest.D: getMePnUserOrThrow_DO_NOT_USE() / getMeDevicePnOrThrow_DO_NOT_USE()
         if (me == null) {
             return; // ADAPTED: defensive guard against missing own JID; WA Web throws via getMePnUserOrThrow_DO_NOT_USE
@@ -281,7 +235,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
         // WAFFLE_LINKING_NONCE_FETCH WAWebNonMessageDataRequestLoggingUtils.d returns 1,
         // and peerDataRequestSessionId is the outbound peer message key id (t.id.id).
         var sessionId = MessageIdGenerator.generate(MessageIdVersion.V2, me);
-        wamService.commit(new NonMessagePeerDataRequestEventBuilder()
+        this.wamService.commit(new NonMessagePeerDataRequestEventBuilder()
                 .peerDataRequestCount(1)
                 .peerDataRequestType(PeerDataRequestType.WAFFLE_LINKING_NONCE_FETCH)
                 .peerDataRequestSessionId(sessionId)

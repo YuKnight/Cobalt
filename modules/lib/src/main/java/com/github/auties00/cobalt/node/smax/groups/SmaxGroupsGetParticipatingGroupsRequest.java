@@ -66,11 +66,6 @@ public final class SmaxGroupsGetParticipatingGroupsRequest implements SmaxOperat
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         {@code <participating/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsGetParticipatingGroupsRequest.makeGetParticipatingGroupsRequest}
-     *           composes
-     *           {@code <participating>HAS_OPTIONAL_CHILD(participants)
-     *           HAS_OPTIONAL_CHILD(description)</participating>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGetParticipatingGroupsRequest",

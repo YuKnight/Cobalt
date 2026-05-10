@@ -70,11 +70,6 @@ public final class InactiveGroupLidMigrationService {
     /**
      * Tracks whether the inactive-group LID migration has already
      * completed for this session.
-     *
-     * @implNote WhatsApp Web persists this flag through
-     *           {@code WAWebUserPrefsStore}; Cobalt keeps a process-local
-     *           {@link AtomicBoolean} because the single boolean does not
-     *           justify replicating the UserPrefs persistence layer.
      */
     private final AtomicBoolean complete;
 
@@ -145,9 +140,6 @@ public final class InactiveGroupLidMigrationService {
 
     /**
      * Marks the inactive-group LID migration as complete for this client.
-     *
-     * @implNote The WA Web export takes no parameter and always writes
-     *           {@code true}; the flag is never cleared once set.
      */
     @WhatsAppWebExport(moduleName = "WAWebInactiveGroupLidMigration",
             exports = "setInactiveGroupLidMigrationComplete",
@@ -162,11 +154,6 @@ public final class InactiveGroupLidMigrationService {
      * <p>Checks the AB prop, finds PN-mode groups, queries their metadata
      * one by one, and either marks the migration complete or schedules a
      * retry when groups remain.
-     *
-     * @implNote WA Web batches the queries through
-     *           {@code queryAndUpdateAllGroupMetadata}; Cobalt issues one
-     *           query per group because the batched API is not exposed
-     *           through {@link WhatsAppClient}.
      */
     @WhatsAppWebExport(moduleName = "WAWebInactiveGroupLidMigrationJob",
             exports = "migrateInactiveGroupsToLid",
@@ -236,11 +223,6 @@ public final class InactiveGroupLidMigrationService {
      * <p>Walks the stored chats on the group-or-community server, loads
      * their cached metadata, and returns only those that have not yet
      * been flipped to LID and are not suspended or terminated.
-     *
-     * @implNote WA Web checks membership explicitly via
-     *           {@code bulkCheckMyMembership}; Cobalt's store already
-     *           holds only chats the user participates in, so the
-     *           membership filter is implicit.
      * @return the JIDs of the groups that have not migrated to LID
      */
     @WhatsAppWebExport(moduleName = "WAWebInactiveGroupLidMigrationJob",

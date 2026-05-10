@@ -60,14 +60,6 @@ public final class SmaxPreKeysFetchKeyBundlesRequest implements SmaxOperation.Re
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <key/>} payload
-     *
-     * @implNote {@code WASmaxOutPreKeysFetchKeyBundlesRequest.makeFetchKeyBundlesRequest}
-     *           composes
-     *           {@code WASmaxOutPreKeysClientRequestMixin}
-     *           ({@code id=generateId()}, {@code xmlns="encrypt"},
-     *           {@code to=S_WHATSAPP_NET}) over a {@code <key/>} child
-     *           carrying {@code REPEATED_CHILD(<user jid reason?/>, 1,
-     *           100000)}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPreKeysFetchKeyBundlesRequest",
@@ -122,10 +114,6 @@ public final class SmaxPreKeysFetchKeyBundlesRequest implements SmaxOperation.Re
      * target user JID with the optional
      * {@code reason="identity"} hint that asks the relay to include the
      * device-identity attestation in the response.
-     *
-     * @implNote {@code WASmaxOutPreKeysFetchKeyBundlesRequest.makeFetchKeyBundlesRequestKeyUser}
-     *           emits {@code <user jid=JID(t) reason?=OPTIONAL_LITERAL("identity",
-     *           hasUserReasonIdentity)/>}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutPreKeysFetchKeyBundlesRequest")
     public static final class UserKeyRequest {

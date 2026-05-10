@@ -81,12 +81,6 @@ public final class SmaxGroupsLinkSubGroupsRequest implements SmaxOperation.Reque
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <links><link/></links>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsLinkSubGroupsRequest.makeLinkSubGroupsRequest}
-     *           composes
-     *           {@code WASmaxOutGroupsBaseSetGroupMixin} over
-     *           {@code <links><link link_type="sub_group">REPEATED_CHILD(<group jid> [hidden_group])</link></links>}.
-     *           Cobalt mirrors the same nesting.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsLinkSubGroupsRequest",

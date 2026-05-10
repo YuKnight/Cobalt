@@ -46,9 +46,6 @@ public sealed interface IqSetAboutResponse extends IqOperation.Response
      * The {@code Success} reply variant. Carries the integer
      * revision identifier the relay assigned to the new about-text
      * version.
-     *
-     * @implNote {@code WAWebSetAboutJob.aboutResponse}:
-     *           {@code attrInt("id")} on the {@code <iq>} element.
      */
     @WhatsAppWebModule(moduleName = "WAWebSetAboutJob")
     final class Success implements IqSetAboutResponse {

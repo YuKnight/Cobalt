@@ -19,16 +19,18 @@ import java.util.Optional;
  * exposes a companion {@link #parseError(Node)} that extracts the
  * {@code <error code="…" text="…"/>} child carried by every error
  * envelope.
- *
- * @implNote {@code WASmaxInGroupsIQErrorResponseMixin.parseIQErrorResponseMixin}
- *           is the per-RPC analogue. Cobalt collapses every copy into the
- *           single helper here. The {@code parseError} extraction is
- *           lifted out separately because {@code ClientError} variants
- *           combine the envelope check with a per-RPC client-error-code
- *           enum lookup, while {@code ServerError} variants only need the
- *           generic {@code <error/>} child.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInGroupsIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInAbPropsIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizAccessTokenIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizCtwaAdAccountIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizLinkingIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizMsgUserFeedbackIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBizSettingsIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBlocklistsIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBotIQErrorResponseMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInBugReportingIQErrorResponseMixin")
 public final class SmaxIqErrorResponseMixin {
 
     /**
@@ -51,34 +53,56 @@ public final class SmaxIqErrorResponseMixin {
      * @return {@code true} when {@code reply} is an error envelope echoing
      *         {@code request}'s identifiers; {@code false} otherwise
      * @throws NullPointerException if either argument is {@code null}
-     *
-     * @implNote {@code WASmaxInGroupsIQErrorResponseMixin.parseIQErrorResponseMixin}
-     *           runs the same checks. Cobalt collapses the structured
-     *           projection to a boolean.
      */
     @WhatsAppWebExport(moduleName = "WASmaxInGroupsIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInAbPropsIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizAccessTokenIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaAdAccountIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizLinkingIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizMsgUserFeedbackIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizSettingsIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBlocklistsIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBotIQErrorResponseMixin",
+            exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBugReportingIQErrorResponseMixin",
             exports = "parseIQErrorResponseMixin", adaptation = WhatsAppAdaptation.ADAPTED)
     public static boolean validate(Node reply, Node request) {
         Objects.requireNonNull(reply, "reply cannot be null");
         Objects.requireNonNull(request, "request cannot be null");
+        // WASmaxInAbPropsIQErrorResponseMixin.parseIQErrorResponseMixin: assertTag(reply, "iq")
         if (!reply.hasDescription("iq")) {
             return false;
         }
+        // WASmaxInAbPropsIQErrorResponseMixin.parseIQErrorResponseMixin: literal(attrString, reply, "type", "error")
         if (!reply.hasAttribute("type", "error")) {
             return false;
         }
+        // WASmaxInAbPropsIQErrorResponseMixin.parseIQErrorResponseMixin: attrStringFromReference(request, ["id"])
         var requestId = request.getAttributeAsString("id").orElse(null);
         if (requestId == null) {
             return false;
         }
+        // WASmaxInAbPropsIQErrorResponseMixin.parseIQErrorResponseMixin: literal(attrString, reply, "id", request.id)
         if (!reply.hasAttribute("id", requestId)) {
             return false;
         }
+        // WASmaxInAbPropsIQErrorResponseMixin.parseIQErrorResponseMixin: attrStringFromReference(request, ["to"])
         var requestTo = request.getAttributeAsString("to").orElse(null);
-        if (requestTo != null && !reply.hasAttribute("from", requestTo)) {
+        if (requestTo == null) {
             return false;
         }
-        return true;
+        // WASmaxInAbPropsIQErrorResponseMixin.parseIQErrorResponseMixin: literal(attrString, reply, "from", request.to)
+        return reply.hasAttribute("from", requestTo);
     }
 
     /**

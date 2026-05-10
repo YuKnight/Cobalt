@@ -101,11 +101,6 @@ public final class LidMigrationService {
     /**
      * Stub message types that the LID migration considers safe and can
      * be ignored when deciding whether a chat may be deleted.
-     *
-     * @implNote Mirrors the two-condition predicate that WA Web spells
-     *           out as {@code getIsInitialE2ENotification ||
-     *           getIsDisappearingModeSystemMessage}, mapped onto the
-     *           Cobalt stub-type enum.
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "X",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -138,10 +133,6 @@ public final class LidMigrationService {
 
     /**
      * Flat store that persists chats, contacts, and LID/PN mappings.
-     *
-     * @implNote WA Web shards this data across UserPrefsIdb and several
-     *           IndexedDB tables; Cobalt reads and writes through the
-     *           single {@link WhatsAppStore} facade.
      */
     private final WhatsAppStore store;
 
@@ -182,11 +173,6 @@ public final class LidMigrationService {
     /**
      * Caches the original LID seen on a chat at creation time, keyed by
      * the chat's phone-number user part.
-     *
-     * @implNote WA Web stores this directly on each chat object as
-     *           {@code chat.originalLid}; Cobalt's {@link Chat} model
-     *           does not carry that field, so a service-scoped map holds
-     *           the same information.
      */
     private final ConcurrentHashMap<String, Jid> originalLidCache;
 
@@ -246,9 +232,6 @@ public final class LidMigrationService {
 
     /**
      * Returns whether the Syncd session has been migrated to LID.
-     *
-     * @implNote The WA Web export is a stub that unconditionally returns
-     *           {@code false}; Cobalt preserves the observable behaviour.
      * @return {@code false}
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1MigrationGating", exports = "Lid1X1MigrationUtils",
@@ -259,10 +242,6 @@ public final class LidMigrationService {
 
     /**
      * Returns whether a new PN-addressed chat should still be created.
-     *
-     * @implNote The WA Web export is a stub that unconditionally returns
-     *           {@code false}; once the migration is enabled server-side
-     *           every new chat is created with LID addressing.
      * @return {@code false}
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1MigrationGating", exports = "Lid1X1MigrationUtils",
@@ -274,10 +253,6 @@ public final class LidMigrationService {
     /**
      * Returns whether the runtime state disagrees with the persisted LID
      * migration flag.
-     *
-     * @implNote The WA Web check is structurally unreachable because both
-     *           sides read the same UserPrefs key; Cobalt preserves the
-     *           observable behaviour by always returning {@code false}.
      * @return {@code false}
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1MigrationGating", exports = "Lid1X1MigrationUtils",
@@ -312,14 +287,6 @@ public final class LidMigrationService {
      * A value of zero disables timeout scheduling, matching the early
      * return that WA Web's {@code shouldScheduleTimeoutForMissingPeerMessage}
      * exposes.
-     *
-     * @implNote WA Web computes the timeout relative to the primary
-     *           migration timestamp via {@code timeoutForAt(now,
-     *           primaryMigrationTime, timeoutSeconds)}; Cobalt schedules
-     *           a flat delay from the AB prop flip because the primary
-     *           migration timestamp is not yet available at that point.
-     *           The callback re-checks the state instead of re-running
-     *           the predicate.
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "checkIfMigrationEnabled",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -613,11 +580,6 @@ public final class LidMigrationService {
     /**
      * Records a single mapping entry from the primary device's protocol
      * message into the primary caches.
-     *
-     * @implNote WA Web defers contact and store updates to
-     *           {@code learnMappingsInBulk}; Cobalt eagerly mirrors the
-     *           pairing onto any existing contact so downstream
-     *           consumers see the mapping immediately.
      * @param mapping the mapping entry to process
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationPrimaryCache", exports = "lidPnMigrationPrimaryCache",
@@ -656,12 +618,6 @@ public final class LidMigrationService {
      * <p>If the compatibility AB prop
      * {@link ABProp#LID_ONE_ON_ONE_MIGRATION_COMPATIBLE} is off the
      * migration is aborted via the configurable error handler.
-     *
-     * @implNote WAM events are emitted at the same five sites as in WA
-     *           Web: started, unsupported-version short-circuit, success
-     *           tail, logout-based failure from
-     *           {@link #resolveThread(Chat, Set)}, and the catch-all
-     *           internal error.
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "migrate1x1Chats",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -778,11 +734,6 @@ public final class LidMigrationService {
      * whether the primary device has an assigned LID for the contact,
      * whether a locally known LID can be used as a fallback, and finally
      * whether the chat is safe to delete when no LID is known.
-     *
-     * @implNote The split-thread collision check that WA Web performs
-     *           inside the {@code migrate1x1Chats} executor is inlined
-     *           here using the precomputed {@code existingLidThreads}
-     *           set.
      * @param chat               the chat to resolve
      * @param existingLidThreads the user-level JIDs of existing LID
      *                           threads, used to detect split-thread
@@ -916,21 +867,16 @@ public final class LidMigrationService {
      * message is either a safe stub or a call-log entry (with at least
      * one call-log entry present), or when the broadcast exemption
      * already applied.
-     *
-     * @implNote The {@code ne} ContactInfoCard subtype check from WA
-     *           Web is omitted because Cobalt's protobuf-based
-     *           {@link ChatMessageInfo} model does not expose the
-     *           subtype field. The {@code createdLocally} guard is also
-     *           skipped because the field is not tracked by
-     *           {@link Chat}; the message-content check at the end
-     *           keeps the heuristic conservative enough to remain safe.
      * @param chat the chat to evaluate
      * @return {@code true} if the chat can be safely deleted
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "K",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean canDeleteChat(Chat chat) {
-        var messages = chat.messages();
+        List<ChatMessageInfo> messages;
+        try (var stream = chat.messages()) {
+            messages = stream.toList();
+        }
 
         var broadcastExempt = false;
         if (allMessagesAreSafeStubsOrBroadcast(messages)) {
@@ -1138,11 +1084,6 @@ public final class LidMigrationService {
     /**
      * Applies the pre-computed resolutions to the store, swallowing per
      * resolution errors so a single failure does not abort the sweep.
-     *
-     * @implNote WA Web batches updates into arrays and issues a single
-     *           {@code bulkCreateOrMerge} and {@code bulkRemove} pair;
-     *           Cobalt executes each resolution individually because the
-     *           store does not expose a batched write API.
      * @param resolutions the resolutions to execute, in order
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "migrate1x1Chats",
@@ -1241,11 +1182,6 @@ public final class LidMigrationService {
      *
      * <p>Called by the chat-creation path when the local client already
      * knows the LID for a phone-number chat before migration has begun.
-     *
-     * @implNote WA Web stores this on the chat object as
-     *           {@code chat.originalLid}; Cobalt's {@link Chat} model
-     *           does not have that field, so the value is held in the
-     *           service-scoped {@link #originalLidCache}.
      * @param phoneJid the phone-number JID of the chat
      * @param lid      the LID known at chat-creation time
      */
@@ -1311,16 +1247,6 @@ public final class LidMigrationService {
     /**
      * Returns whether the migration sweep should run immediately after
      * the primary-device mapping has been stored.
-     *
-     * @implNote Cobalt only reaches this method from
-     *           {@link #processProtocolMessage(LIDMigrationMappingSyncPayload)}
-     *           with the state already on
-     *           {@link LidMigrationState#READY}, so the return value is
-     *           always {@code true}. The dependent-task registry from
-     *           WA Web's {@code ThreadMigrationManager} is omitted
-     *           because those tasks (favourites, labels, carts,
-     *           blocklist, PNH threads) target IndexedDB tables that
-     *           Cobalt's flat store does not have.
      * @return {@code true}
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1x1MigrationManager", exports = "ThreadMigrationManager",
@@ -1335,10 +1261,6 @@ public final class LidMigrationService {
      * Reports a migration error by flipping the state to
      * {@link LidMigrationState#FAILED} and delegating to the client's
      * configurable error handler.
-     *
-     * @implNote WA Web performs inline recovery via {@code socketLogout};
-     *           Cobalt raises the exception through the pluggable error
-     *           handler instead.
      * @param error the migration exception to surface
      */
     private void handleError(WhatsAppLidMigrationException error) {
@@ -1356,11 +1278,6 @@ public final class LidMigrationService {
      * already in a terminal state. Terminal states are preserved so a
      * session bounce does not reopen a migration that has already
      * completed, failed, or been disabled.
-     *
-     * @implNote The primary caches are kept across reconnects because
-     *           WA Web's only callers of {@code clear()} are a
-     *           re-population guard and a debug rollback utility, both
-     *           of which are out of scope here.
      */
     public void reset() {
         var timeout = mappingTimeoutFuture;
@@ -1381,11 +1298,6 @@ public final class LidMigrationService {
      * <p>Checks the primary assigned cache first, then falls back to
      * the store's bidirectional mapping table so mappings learned
      * outside the primary-device flow are still found.
-     *
-     * @implNote WA Web returns only the assigned-cache value; Cobalt
-     *           additionally consults {@code store.findLidByPhone} so
-     *           mappings learned through history sync are reachable
-     *           from the same call site.
      * @param phoneJid the phone-number JID to look up, may be
      *                 {@code null}
      * @return the LID if one is known, otherwise an empty
@@ -1758,10 +1670,6 @@ public final class LidMigrationService {
     /**
      * Returns the raw participant JID of a message key, or {@code null}
      * when no participant is set.
-     *
-     * @implNote {@link MessageKey#senderJid()} falls back to the parent
-     *           JID when the sender is unset, so this helper detects
-     *           that fallback by comparing the sender to the parent.
      * @param msgKey the message key
      * @return the raw participant JID, or {@code null} if not set
      */
@@ -1944,17 +1852,6 @@ public final class LidMigrationService {
      * returned. The "me" user takes a fast path that consults the
      * store's own JID and LID before any mapping lookup, so the
      * current user can be flipped without a store roundtrip.
-     *
-     * @implNote Three WA Web exports are folded into this single
-     *           method. The dispatcher {@code getAlternateUserWid}
-     *           drops its {@code device != null} throw because every
-     *           caller in Cobalt already passes a user-level JID. The
-     *           {@code getPhoneNumber} and {@code getCurrentLid}
-     *           helpers fold their me-user fast paths into the LID
-     *           branch and the PN branch respectively. Cobalt accepts
-     *           a {@code null} JID and returns {@code null} so callers
-     *           can chain the result through the existing
-     *           fall-through logic.
      * @param userJid the user JID, already stripped of device and
      *                agent data
      * @return the alternate JID, or {@code null} if none is known

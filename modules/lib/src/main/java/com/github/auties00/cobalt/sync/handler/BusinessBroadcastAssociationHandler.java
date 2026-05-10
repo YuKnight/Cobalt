@@ -5,19 +5,18 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.BroadcastListParticipant;
+import com.github.auties00.cobalt.model.business.BroadcastListParticipantBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.BroadcastListParticipantAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastAssociationAction;
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastListAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.List;
 
 /**
  * Handles business broadcast association sync actions ({@code "broadcast_jid"}).
@@ -49,33 +48,17 @@ import java.util.HashMap;
  * {@code [actionName, ...indexArgs]}, but every behavioural step here is
  * Cobalt-inferred until WA Web ships the matching {@code WAWebBroadcastJidSync}
  * module.
- *
- * @implNote NO_WA_BASIS: no WA Web sync handler exists for
- *           {@code WASyncdConst.Actions.BroadcastJid}; only the action constant
- *           and the {@code SyncActionValue.BusinessBroadcastAssociationAction}
- *           protobuf shape are present in
- *           {@code WAWebProtobufSyncAction.pb}. Closest WA Web reference for
- *           the surrounding model is {@code WAWebBroadcastListSync.applyMutations}
- *           which mutates the broadcast list participants in bulk.
  */
 @WhatsAppWebModule(moduleName = "WAWebBroadcastListSync")
 public final class BusinessBroadcastAssociationHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code BusinessBroadcastAssociationHandler}.
-     *
-     * @implNote NO_WA_BASIS: WA Web has no sync handler module for
-     *           {@code "broadcast_jid"}; the singleton mirrors the
-     *           {@code l.default = new u()} pattern used by every other Cobalt
-     *           sync handler.
      */
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final BusinessBroadcastAssociationHandler INSTANCE = new BusinessBroadcastAssociationHandler();
 
     /**
      * Private constructor to enforce the singleton pattern.
-     *
-     * @implNote NO_WA_BASIS: no WA Web counterpart constructor; mirrors the
-     *           Cobalt handler convention.
      */
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private BusinessBroadcastAssociationHandler() {
@@ -84,10 +67,6 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote NO_WA_BASIS: returns the canonical
-     *           {@code WASyncdConst.Actions.BroadcastJid} value
-     *           ({@code "broadcast_jid"}) declared in {@code WASyncdConst}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getAction", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -97,12 +76,6 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote NO_WA_BASIS: WA Web does not declare a collection for this
-     *           action since no handler module exists; Cobalt assigns
-     *           {@code REGULAR} to match the related
-     *           {@code WAWebBroadcastListSync} which uses
-     *           {@code WASyncdConst.CollectionName.Regular}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -112,36 +85,11 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote NO_WA_BASIS: WA Web has no version constant for this action;
-     *           Cobalt defaults to {@code 1} matching every other unmigrated
-     *           sync action handler.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getVersion", adaptation = WhatsAppAdaptation.ADAPTED)
     public int version() {
         return BusinessBroadcastAssociationAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a business broadcast association mutation.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and reports {@code true} only when the resolved
-     * {@link MutationApplicationResult#actionState()} is
-     * {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebBroadcastListSync.applyMutations — WA Web returns
-     *           {@code WASyncdConst.SyncActionState} per mutation; Cobalt's
-     *           {@link WebAppStateActionHandler} contract uses a boolean return.
-     * @param client   the WhatsAppClient instance linked to the mutation
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -177,22 +125,13 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      *   <li>Persist the mutated participant list back into the broadcast list
      *       and write the parent map to the store.</li>
      * </ol>
-     *
-     * @implNote NO_WA_BASIS: no WA Web sync handler implements
-     *           {@code "broadcast_jid"}. The closest reference is
-     *           {@code WAWebBroadcastListSync.applyMutations} which mutates
-     *           {@code BusinessBroadcastListAction.participants} in bulk via
-     *           {@code WAWebBroadcastListStorageUtils.updateBroadcastListStorage}.
-     *           Cobalt's per-recipient SET/delete shape is inferred from the
-     *           protobuf ({@code deleted: bool}) and the
-     *           {@code SyncActionValue.BroadcastListParticipant} layout.
      * @param client   the WhatsAppClient instance linked to the mutation
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -213,33 +152,35 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
         }
 
         // ADAPTED: WAWebBroadcastListSync resolves the parent broadcast list via
-        // ConcurrentHashMap on WhatsAppStore.
-        var lists = new HashMap<>(client.store().businessBroadcastLists());
-        var broadcastList = lists.get(listId);
-        if (broadcastList == null) {
+        // the typed broadcast-list quintet on WhatsAppStore.
+        var existing = client.store().findBusinessBroadcastList(listId).orElse(null);
+        if (existing == null) {
             return MutationApplicationResult.orphan(listId, "BroadcastList");
         }
 
         var recipientJid = Jid.of(recipientJidString);
-        var participants = new ArrayList<>(broadcastList.participants()); // ADAPTED: WAWebBroadcastListSync uses BroadcastListParticipantAction[]; Cobalt copies to a mutable list before mutating
+        List<BroadcastListParticipant> participants = new ArrayList<>(existing.participants()); // ADAPTED: WAWebBroadcastListSync uses BroadcastListParticipantAction[]; Cobalt copies to a mutable list before mutating
         participants.removeIf(participant ->
                 recipientJid.equals(participant.lidJid())
                         || participant.pnJid().filter(recipientJid::equals).isPresent()
         );
         if (!action.deleted()) {
-            var participant = new BroadcastListParticipantAction();
+            BroadcastListParticipant participant;
             if (recipientJid.hasLidServer() || recipientJid.hasHostedLidServer()) {
-                participant.setLidJid(recipientJid);
+                participant = new BroadcastListParticipantBuilder()
+                        .lidJid(recipientJid)
+                        .build();
             } else {
-                participant.setPnJid(recipientJid);
-                participant.setLidJid(client.store().getLidByPhoneNumber(recipientJid).orElse(recipientJid)); // ADAPTED: WhatsAppStore.getLidByPhoneNumber resolves the LID/PN map maintained by Cobalt
+                participant = new BroadcastListParticipantBuilder()
+                        .lidJid(client.store().getLidByPhoneNumber(recipientJid).orElse(recipientJid)) // ADAPTED: WhatsAppStore.getLidByPhoneNumber resolves the LID/PN map maintained by Cobalt
+                        .pnJid(recipientJid)
+                        .build();
             }
             participants.add(participant);
         }
 
-        broadcastList.setParticipants(participants); // ADAPTED: WAWebBroadcastListSync writes participants via WAWebBroadcastListStorageUtils.updateBroadcastListStorage
-        lists.put(listId, broadcastList);
-        client.store().setBusinessBroadcastLists(lists);
+        existing.setParticipants(participants.isEmpty() ? null : participants); // ADAPTED: WAWebBroadcastListSync writes participants via WAWebBroadcastListStorageUtils.updateBroadcastListStorage
+        client.store().putBusinessBroadcastList(existing);
         return MutationApplicationResult.success();
     }
 }

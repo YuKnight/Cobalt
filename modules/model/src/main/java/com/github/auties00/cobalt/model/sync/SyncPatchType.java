@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.model.sync;
 import it.auties.protobuf.annotation.ProtobufEnum;
 import it.auties.protobuf.annotation.ProtobufEnumIndex;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
@@ -83,7 +84,7 @@ public enum SyncPatchType {
      */
     SyncPatchType(@ProtobufEnumIndex int index) {
         this.index = index;
-        this.bytes = toString().getBytes();
+        this.bytes = toString().getBytes(StandardCharsets.UTF_8);
     }
 
     /**

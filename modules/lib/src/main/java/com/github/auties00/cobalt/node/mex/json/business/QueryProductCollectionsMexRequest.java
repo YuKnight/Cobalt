@@ -119,17 +119,6 @@ public final class QueryProductCollectionsMexRequest implements MexOperation.Req
     /**
      * Builds the IQ stanza that dispatches this operation to the WhatsApp
      * relay.
-     *
-     * @implNote Mirrors the {@code request.collections} variable shape with
-     *           {@code biz_jid}, {@code collection_limit}, {@code item_limit},
-     *           {@code after}, {@code width}, {@code height},
-     *           {@code direct_connection_encrypted_info},
-     *           {@code variant_info_fields}, {@code variant_thumbnail_height}
-     *           and {@code variant_thumbnail_width}, in that order, with
-     *           every numeric field stringified as WA expects. Optional
-     *           string fields and the {@code after} cursor are emitted as
-     *           JSON {@code null} when absent to preserve byte-for-byte
-     *           parity with the WA Web payload.
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised GraphQL variables
      */

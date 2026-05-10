@@ -12,10 +12,6 @@ import java.util.Optional;
  * indicates the relay returned a {@code code="401"} marker because the peer's
  * privacy settings hide the status. {@code Optional.empty()} indicates the
  * peer has no status set.
- *
- * @implNote The JS parser returns one of {@code string | "" | null}. Cobalt
- *     collapses all three into an {@link Optional} with the empty-string
- *     discriminator preserved.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncStatus")
 public final class StatusResult implements UsyncProtocolResponse {

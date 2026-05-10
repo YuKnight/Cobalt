@@ -108,10 +108,6 @@ public sealed interface IqQueryDisappearingModeResponse extends IqOperation.Resp
          * @return an {@link Optional} carrying the parsed variant,
          *         or empty when the stanza does not match the
          *         success schema
-         *
-         * @implNote {@code WAWebQueryDisappearingModeJob.dmParser}:
-         *           {@code child("disappearing_mode")
-         *           .attrInt("duration"), .attrInt("t")}.
          */
         @WhatsAppWebExport(moduleName = "WAWebQueryDisappearingModeJob",
                 exports = "dmParser",

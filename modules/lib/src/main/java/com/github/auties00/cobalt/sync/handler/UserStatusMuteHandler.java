@@ -9,7 +9,6 @@ import com.github.auties00.cobalt.model.chat.group.GroupMetadata;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -17,8 +16,6 @@ import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteAction
 import com.github.auties00.cobalt.model.sync.action.contact.UserStatusMuteActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 
@@ -35,27 +32,17 @@ import java.util.List;
  *
  * <p>Index format: {@code ["userStatusMute", widString]} where {@code widString}
  * is a user wid (legacy form) or a group wid.
- *
- * @implNote WAWebUserStatusMuteSync.default — singleton instance of the user status
- *           mute sync action handler extending {@code AccountSyncdActionBase} with
- *           {@code collectionName = WASyncdConst.CollectionName.RegularHigh}
  */
 @WhatsAppWebModule(moduleName = "WAWebUserStatusMuteSync")
 public final class UserStatusMuteHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of this handler.
-     *
-     * @implNote WAWebUserStatusMuteSync — module-level singleton {@code p = new m()}
-     *           assigned to {@code l.default = p}
      */
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final UserStatusMuteHandler INSTANCE = new UserStatusMuteHandler();
 
     /**
      * Private constructor preventing external instantiation.
-     *
-     * @implNote WAWebUserStatusMuteSync — class {@code m} constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.RegularHigh}
      */
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private UserStatusMuteHandler() {
@@ -64,9 +51,6 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for this handler.
-     *
-     * @implNote WAWebUserStatusMuteSync.getAction — returns
-     *           {@code WASyncdConst.Actions.UserStatusMute} (value: {@code "userStatusMute"})
      * @return the action name string
      */
     @Override
@@ -77,9 +61,6 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection this handler belongs to.
-     *
-     * @implNote WAWebUserStatusMuteSync — constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.RegularHigh}
      * @return the sync patch type
      */
     @Override
@@ -90,30 +71,12 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for this handler.
-     *
-     * @implNote WAWebUserStatusMuteSync.getVersion — returns {@code 7}
      * @return the version number
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return UserStatusMuteAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single user status mute mutation and returns whether it succeeded.
-     *
-     * @implNote WAWebUserStatusMuteSync.applyMutations — per-mutation logic within
-     *           the batch handler, delegating to
-     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -134,25 +97,13 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      * </ul>
      *
      * <p>For non-{@code SET} operations, returns {@code UNSUPPORTED}.
-     *
-     * @implNote WAWebUserStatusMuteSync.applyMutations — per-mutation processing
-     *           within the batch {@code applyMutations(t)} method. WA Web pre-fetches
-     *           the set of existing user/group ids via {@code c(t)} (a single
-     *           {@code WAWebLidAwareContactsDB.bulkGet} + {@code GroupMetadataTable.bulkGet})
-     *           then for each mutation checks {@code i.has(u)}: if true the mutation is
-     *           buffered into {@code l} (users) or {@code d} (groups) and returns
-     *           {@code Success}; otherwise returns {@code Orphan} with
-     *           {@code modelType: SyncModelType.UserStatusMute}. Cobalt does the
-     *           per-mutation lookup directly via {@code findContactByJid} /
-     *           {@code findChatByJid} since the store is in-memory and there is no
-     *           bulk-fetch advantage.
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -163,18 +114,18 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
         var indexArray = JSON.parseArray(mutation.index());
         var widString = indexArray.getString(1);
         if (widString == null || widString.isEmpty()) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         Jid wid;
         try {
             wid = Jid.of(widString);
         } catch (RuntimeException e) {
-            return malformedActionIndex();
+            return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         if (!(mutation.value().action().orElse(null) instanceof UserStatusMuteAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         // MISMATCH (COALESCE): WA Web specifically tests {@code c === void 0} where {@code c = userStatusMuteAction.muted}.
@@ -216,8 +167,6 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      *       {@code indexArgs = [e.toString({legacy: true})]}, {@code operation = SET},
      *       {@code timestamp = n}, {@code value}, and {@code version = this.getVersion()}</li>
      * </ol>
-     *
-     * @implNote WAWebUserStatusMuteSync.getMutationForStatusMute
      * @param wid       the JID of the user (or group) whose status mute state is being updated
      * @param muted     the new status mute state
      * @param timestamp the mutation timestamp

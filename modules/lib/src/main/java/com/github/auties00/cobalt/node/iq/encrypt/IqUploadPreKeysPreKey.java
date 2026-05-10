@@ -13,10 +13,6 @@ import java.util.Objects;
 /**
  * Typed container for a single one-time pre-key entry inside the
  * {@code <list/>} wrapper.
- *
- * @implNote Mirrors {@code WAWebSignalUtilsApi.xmppPreKey} —
- *           {@code <key>(<id> 3-byte big-endian-id <value>
- *           pubkey)*}.
  */
 @WhatsAppWebModule(moduleName = "WAWebSignalUtilsApi")
 public final class IqUploadPreKeysPreKey {

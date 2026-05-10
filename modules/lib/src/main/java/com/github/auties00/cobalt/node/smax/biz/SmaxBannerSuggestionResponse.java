@@ -6,9 +6,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -22,7 +19,6 @@ public sealed interface SmaxBannerSuggestionResponse extends SmaxOperation.Respo
 
     /**
      * Tries to parse the inbound notification.
-     *
      * @param node the inbound notification stanza received from the
      *             relay; never {@code null}
      * @return an {@link Optional} carrying the parsed notification,
@@ -40,8 +36,6 @@ public sealed interface SmaxBannerSuggestionResponse extends SmaxOperation.Respo
     /**
      * The {@code Notification} variant. Carries the banner
      * suggestion plus envelope echoes.
-     *
-     * @implNote {@code WASmaxInBizCtwaActionBannerSuggestionRequest.parseBannerSuggestionRequest}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionBannerSuggestionRequest")
     @WhatsAppWebModule(moduleName = "WASmaxInBizCtwaActionServerNotificationMixin")
@@ -159,6 +153,9 @@ public sealed interface SmaxBannerSuggestionResponse extends SmaxOperation.Respo
          */
         @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaActionBannerSuggestionRequest",
                 exports = "parseBannerSuggestionRequest",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizCtwaActionServerNotificationMixin",
+                exports = "parseServerNotificationMixin",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Notification> of(Node node) {
             Objects.requireNonNull(node, "node cannot be null");

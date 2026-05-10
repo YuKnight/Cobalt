@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
+import com.github.auties00.cobalt.model.newsletter.NewsletterLinkPreview;
 import com.github.auties00.cobalt.message.preview.model.LinkDetails;
 import com.github.auties00.cobalt.message.preview.model.LinkThumbnail;
 import com.github.auties00.cobalt.message.preview.model.ResolvedPreview;
@@ -20,8 +21,6 @@ import java.util.Optional;
  * <p>Newsletter chats route through this server-mediated MEX query
  * because the previewability of an arbitrary URL inside a channel is
  * gated by server-side rules that cannot be evaluated client-side.
- *
- * @implNote WAWebNewsletterFetchLinkPreviewAction.fetchPlaintextLinkPreviewAction.
  */
 @WhatsAppWebModule(moduleName = "WAWebNewsletterFetchLinkPreviewAction")
 public final class NewsletterPreviewResolver {
@@ -49,7 +48,7 @@ public final class NewsletterPreviewResolver {
         if (client == null || url == null) {
             return Optional.empty();
         }
-        Optional<com.github.auties00.cobalt.node.mex.json.misc.FetchPlaintextLinkPreviewMexResponse> response;
+        Optional<NewsletterLinkPreview> response;
         try {
             response = client.queryNewsletterLinkPreview(url);
         } catch (RuntimeException ignored) {
@@ -69,12 +68,12 @@ public final class NewsletterPreviewResolver {
         // outgoing message so receivers can download the HQ thumbnail on demand. The
         // base64 thumbData stays as the inline JPEG fallback rendered while the HQ
         // download is in flight.
-        var thumbHash = resolved.hash().map(NewsletterPreviewResolver::decodeBase64).orElse(null);
-        var width = resolved.width().map(NewsletterPreviewResolver::parsePositiveInt).orElse(null);
-        var height = resolved.height().map(NewsletterPreviewResolver::parsePositiveInt).orElse(null);
+        var thumbHash = resolved.thumbnailHash().map(NewsletterPreviewResolver::decodeBase64).orElse(null);
+        var width = resolved.thumbnailWidth().isPresent() ? resolved.thumbnailWidth().getAsInt() : null;
+        var height = resolved.thumbnailHeight().isPresent() ? resolved.thumbnailHeight().getAsInt() : null;
         var thumbnail = new LinkThumbnail(
-                resolved.thumbData().map(NewsletterPreviewResolver::decodeBase64).orElse(null),
-                resolved.directPath().orElse(null),
+                resolved.thumbnailData().map(NewsletterPreviewResolver::decodeBase64).orElse(null),
+                resolved.thumbnailDirectPath().orElse(null),
                 thumbHash,
                 null,
                 null,
@@ -83,21 +82,6 @@ public final class NewsletterPreviewResolver {
                 height
         );
         return Optional.of(new ResolvedPreview(details, thumbnail));
-    }
-
-    /**
-     * Parses a positive non-zero integer from {@code value}.
-     *
-     * @param value the string to parse
-     * @return the integer, or {@code null} when {@code value} is not a
-     *         positive integer
-     */
-    private static Integer parsePositiveInt(String value) {
-        try {
-            return Integer.parseUnsignedInt(value);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
     }
 
     /**

@@ -25,14 +25,6 @@ import java.util.Optional;
  * compiled GraphQL artifact projects two scalar fields,
  * {@code success} and {@code error_message}, on the
  * {@code XWA2IntegrityChallengeResponsePayload} root.
- *
- * @implNote WAWebMexIntegrityChallengeResponse: adapts the
- * {@code mexSubmitPasskeyChallengeResponse} GraphQL mutation, which in WA
- * Web is invoked via {@code WAWebMexClient.fetchQuery} and whose response
- * is unwrapped by the same module to expose the
- * {@code xwa2_submit_integrity_challenge_response} root verbatim. Cobalt
- * models the request and response as sibling variants of a sealed
- * interface rather than a free-standing async function.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexIntegrityChallengeResponse")
 public final class IntegrityChallengeResponseMexRequest implements MexOperation.Request.Json {
@@ -70,10 +62,6 @@ public final class IntegrityChallengeResponseMexRequest implements MexOperation.
     /**
      * Constructs a request that submits the given passkey-signed challenge
      * response to the relay.
-     *
-     * @implNote Cobalt accepts the already JSON-serialised assertion as a raw
-     * byte array and base64-encodes it inline during {@link #toNode()},
-     * mirroring the JS {@code btoa(JSON.stringify(e))} call site.
      * @param signedChallenge the raw bytes of the JSON-serialised WebAuthn
      *                        assertion, must not be {@code null}
      * @param prfAvailable    whether the assertion carries a {@code prf_output}

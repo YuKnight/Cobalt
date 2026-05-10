@@ -5,14 +5,11 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.AvatarUpdatedAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.ABProp;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Handles {@code avatar_updated_action} app-state sync mutations.
  *
@@ -33,25 +30,17 @@ import com.github.auties00.cobalt.wam.WamService;
  * </ol>
  *
  * <p>Index format: {@code ["avatar_updated_action"]}.
- *
- * @implNote WAWebStickersAvatarUpdatedSyncAction
  */
 @WhatsAppWebModule(moduleName = "WAWebStickersAvatarUpdatedSyncAction")
 public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
     /**
      * Singleton instance shared by the {@code WebAppStateHandlerRegistry}.
-     *
-     * @implNote WAWebStickersAvatarUpdatedSyncAction: {@code var m=new d}—the module exports
-     *           a single instance of the handler class.
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final AvatarUpdatedHandler INSTANCE = new AvatarUpdatedHandler();
 
     /**
      * Constructs a new handler.
-     *
-     * @implNote WAWebStickersAvatarUpdatedSyncAction: the JS class is constructed once at
-     *           module load time; Cobalt enforces this by exposing only {@link #INSTANCE}.
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private AvatarUpdatedHandler() {
@@ -60,8 +49,6 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebStickersAvatarUpdatedSyncAction.getAction: {@code return WASyncdConst.Actions.AvatarUpdated}.
      * @return the canonical {@code "avatar_updated_action"} identifier
      */
     @Override
@@ -72,9 +59,6 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebStickersAvatarUpdatedSyncAction: {@code this.collectionName=WASyncdConst.CollectionName.Regular}
-     *           assigned in the constructor of the handler.
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
@@ -85,8 +69,6 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebStickersAvatarUpdatedSyncAction.getVersion: {@code return 7}.
      * @return {@code 7}
      */
     @Override
@@ -98,41 +80,17 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
     /**
      * {@inheritDoc}
      *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and reports {@code true} only when the result is
-     * {@link SyncActionState#SUCCESS}. {@code Unsupported}, {@code Malformed} and
-     * {@code Skipped} all map to {@code false} so the mutation does not
-     * progress further in callers that only consume the legacy boolean API.
-     *
-     * @implNote ADAPTED: WAWebStickersAvatarUpdatedSyncAction.applyMutations returns a
-     *           per-mutation {@code WASyncdConst.SyncActionState}; Cobalt collapses every
-     *           non-{@code Success} value to {@code false} for the legacy boolean entry point.
-     * @param client   the WhatsApp client linked to the mutation
-     * @param mutation the mutation to apply
-     * @return {@code true} if the action state is {@code SUCCESS}, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: collapses Unsupported/Malformed/Skipped to false
-    }
-
-    /**
-     * {@inheritDoc}
-     *
      * <p>Implements the body of {@code WAWebStickersAvatarUpdatedSyncAction.applyMutations}
      * for a single mutation. The WA Web counter logging that aggregates
      * {@code notSupported}, {@code malformed} and {@code skipped} mutations
      * is intentionally omitted (WAM/telemetry).
-     *
-     * @implNote WAWebStickersAvatarUpdatedSyncAction.applyMutations
      * @param client   the WhatsApp client linked to the mutation
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         //   if (!WAWebAvatarGatingUtils.avatarsOnWebEnabled())
         //     return mutations.map(() => ({actionState: Unsupported}))
         //   return WAWebABProps.getABPropConfigValue("enable_avatars_on_web_companion")
@@ -148,11 +106,11 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
         //   var l = e.value.avatarUpdatedAction?.eventType
         //   if (l == null) return malformed++, malformedActionValue(this.collectionName)
         if (!(mutation.value().action().orElse(null) instanceof AvatarUpdatedAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
         var eventType = action.eventType().orElse(null);
         if (eventType == null) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         //   var s = WAWebUserPrefsMultiDevice.getPairingTimestamp()

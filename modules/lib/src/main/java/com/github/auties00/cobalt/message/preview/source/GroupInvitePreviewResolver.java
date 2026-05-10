@@ -21,21 +21,12 @@ import java.util.Optional;
  * {@code chat.whatsapp.com} group invite links by querying the server
  * for the target group's metadata via
  * {@link WhatsAppClient#queryGroupInfoByInviteCode(String)}.
- *
- * @implNote WAWebLinkPreviewGroupUtils.getGroupInviteLinkPreview: the
- *           JS implementation reads the cached
- *           {@code WAWebGroupMetadataCollection} entry and the cached
- *           profile picture; Cobalt always issues a fresh server query
- *           because there is no in-memory cache for groups the user has
- *           not joined.
  */
 @WhatsAppWebModule(moduleName = "WAWebLinkPreviewGroupUtils")
 public final class GroupInvitePreviewResolver {
     /**
      * Default description used when no community/sub-group hint is
      * available, mirroring WA Web's fbt-localised string.
-     *
-     * @implNote WAWebLinkPreviewGroupUtils.GROUP_INVITE_DEFAULT_DESCRIPTION.
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewGroupUtils", exports = "GROUP_INVITE_DEFAULT_DESCRIPTION",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -133,14 +124,6 @@ public final class GroupInvitePreviewResolver {
      *                 at a sub-group
      * @param metadata the resolved group metadata
      * @return the preview description string
-     * @implNote WAWebLinkPreviewGroupUtils.getInviteLinkDescription:
-     *           returns localized strings keyed off the JS
-     *           {@code WAWebGroupType.GroupType} enum. Cobalt maps the
-     *           four cases off the metadata's
-     *           {@code parentCommunityJid}/{@code defaultSubgroup}/
-     *           {@code announce} flags. Cobalt does not localise the
-     *           strings (no FBT runtime); the English literals are
-     *           emitted verbatim.
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewGroupUtils", exports = "getInviteLinkDescription",
             adaptation = WhatsAppAdaptation.ADAPTED)

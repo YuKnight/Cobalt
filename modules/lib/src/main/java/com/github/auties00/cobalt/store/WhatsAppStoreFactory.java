@@ -12,66 +12,75 @@ import java.util.UUID;
  * Factory contract for constructing and loading {@link WhatsAppStore}
  * instances.
  *
- * <p>Each factory encapsulates a specific storage strategy (fully in-memory
- * with protobuf file persistence, or a future persistent backend) and
- * exposes a uniform API to create a brand-new session store or to load an
- * existing one by UUID, by phone number, or by most recently used
+ * <p>Each factory encapsulates a specific storage strategy (RAM only,
+ * or metadata snapshot on disk plus an LMDB env for messages) and
+ * exposes a uniform API to create a brand-new session store or to load
+ * an existing one by UUID, by phone number, or by most recently used
  * selection.
  *
- * <p>Concrete factories are obtained via the static factory methods on this
- * interface. Callers should not depend on the concrete factory types
- * directly.
+ * <p>Concrete factories are obtained via the static factory methods on
+ * this interface. Callers should not depend on the concrete factory
+ * types directly.
  */
 public interface WhatsAppStoreFactory {
     /**
-     * Returns a factory that keeps the entire store in memory and persists
-     * it to protobuf files in the default Cobalt session directory under
+     * Returns a factory that keeps the entire store in RAM and never
+     * touches disk. Restarting the program loses every chat,
+     * newsletter, message and key. Suitable for tests, ephemeral bots
+     * and scratch programs.
+     *
+     * @return a new RAM-only factory
+     */
+    static WhatsAppStoreFactory temporary() {
+        return TemporaryStoreFactory.INSTANCE;
+    }
+
+    /**
+     * Returns a factory that snapshots session metadata to a single
+     * {@code store.proto} file and stores message bodies in an embedded
+     * LMDB environment under the default Cobalt session directory in
      * the user's home directory.
      *
-     * @return a new in-memory factory using the default storage directory
-     */
-    static WhatsAppStoreFactory inMemory() {
-        return new InMemoryStoreFactory();
-    }
-
-    /**
-     * Returns a factory that keeps the entire store in memory and persists
-     * it to protobuf files under the given directory.
-     *
-     * @param directory the root directory under which per-session folders
-     *                  are created
-     * @return a new in-memory factory using the given storage directory
-     */
-    static WhatsAppStoreFactory inMemory(Path directory) {
-        return new InMemoryStoreFactory(directory);
-    }
-
-    /**
-     * Returns a factory that lazily decodes the store from persistent
-     * storage.
-     *
-     * @return a persistent factory
-     * @throws UnsupportedOperationException always: persistent stores are
-     *         not yet implemented
+     * @return a persistent factory using the default storage directory
      */
     static WhatsAppStoreFactory persistent() {
-        // FIXME
-        throw new UnsupportedOperationException();
+        return new PersistentStoreFactory();
     }
 
     /**
-     * Returns a factory that lazily decodes the store from persistent
-     * storage under the given directory.
+     * Returns a factory that snapshots session metadata to a single
+     * {@code store.proto} file and stores message bodies in an embedded
+     * LMDB environment under the given directory.
      *
-     * @param directory the root directory under which per-session folders
-     *                  are created
+     * @param directory the root directory under which per-session
+     *                  folders are created
      * @return a persistent factory using the given storage directory
-     * @throws UnsupportedOperationException always: persistent stores are
-     *         not yet implemented
      */
     static WhatsAppStoreFactory persistent(Path directory) {
-        // FIXME
-        throw new UnsupportedOperationException();
+        return new PersistentStoreFactory(directory);
+    }
+
+    /**
+     * Returns a factory that snapshots session metadata to a single
+     * {@code store.proto} file and stores message bodies in an embedded
+     * LMDB environment under the given directory, configured with the
+     * given initial map size.
+     *
+     * <p>The map size is the maximum LMDB env file size (in bytes); the
+     * env is automatically doubled on overflow, so this value functions
+     * as a starting point rather than a hard cap. On Windows the file
+     * is preallocated as sparse, so very large defaults can look
+     * alarming in Explorer.
+     *
+     * @param directory the root directory under which per-session
+     *                  folders are created
+     * @param mapSize   the initial LMDB map size in bytes; must be
+     *                  positive
+     * @return a persistent factory using the given storage directory
+     *         and map size
+     */
+    static WhatsAppStoreFactory persistent(Path directory, long mapSize) {
+        return new PersistentStoreFactory(directory, mapSize);
     }
 
     /**
@@ -96,21 +105,6 @@ public interface WhatsAppStoreFactory {
      * @throws IOException if the store file cannot be read or decoded
      */
     Optional<WhatsAppStore> load(WhatsAppClientType clientType, long phoneNumber) throws IOException;
-
-    /**
-     * Loads an existing session store identified by the phone number
-     * extracted from a six-parts pairing key bundle.
-     *
-     * @param clientType the client type (web or mobile) to look up
-     * @param keys       the six-parts keys whose phone number is used for
-     *                   lookup
-     * @return the loaded store, or {@link Optional#empty()} if no session
-     *         exists for that phone number
-     * @throws IOException if the store file cannot be read or decoded
-     */
-    default Optional<WhatsAppStore> load(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys keys) throws IOException {
-        return load(clientType, keys.phoneNumber());
-    }
 
     /**
      * Loads the most recently persisted session for the given client type.
@@ -145,4 +139,15 @@ public interface WhatsAppStoreFactory {
      * @throws IOException if the store directory cannot be created
      */
     WhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) throws IOException;
+
+    /**
+     * Creates a new session store using the data in {@code sixPartsKeys}
+     *
+     * @param clientType  the client type (web or mobile) for the new
+     *                    session
+     * @param sixPartsKeys the six parts key data
+     * @return the newly created store
+     * @throws IOException if the store directory cannot be created
+     */
+    WhatsAppStore create(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys sixPartsKeys) throws IOException;
 }

@@ -40,10 +40,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CtwaAttributionStanza {
     /**
      * In-memory store of external entry points keyed by chat JID string.
-     *
-     * @implNote WA Web persists this map via
-     * {@code WAWebUserPrefsStore.setUser(KEYS.EXTERNAL_ENTRY_POINT, ...)}; Cobalt's
-     * unified store-system collapses UserPrefs into in-memory state.
      */
     private final ConcurrentHashMap<String, ExternalEntryPoint> entryPoints;
 
@@ -368,18 +364,12 @@ public final class CtwaAttributionStanza {
             return false;
         }
 
-        var count = 0;
-        for (var msg : chat.messages()) {
-            if (isSystemMessage(msg)) {
-                continue;
-            }
-
-            count++;
-            if (count > 1) {
-                return true;
-            }
+        try (var stream = chat.messages()) {
+            return stream.filter(msg -> !isSystemMessage(msg))
+                    .skip(1)
+                    .findAny()
+                    .isPresent();
         }
-        return false;
     }
 
     /**
@@ -393,9 +383,6 @@ public final class CtwaAttributionStanza {
      *
      * @param msg the message to check
      * @return {@code true} if the message is a system type
-     * @implNote ADAPTED: Cobalt approximates the JS classification by treating any
-     * message with a non-null {@code stubType} as a system message and additionally
-     * flags protocol messages.
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgType", exports = "SYSTEM_MESSAGE_TYPES",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -440,8 +427,6 @@ public final class CtwaAttributionStanza {
      *
      * @param map the key-value pairs to serialise
      * @return the JSON string
-     * @implNote ECMA-262 {@code QuoteJSONString} defines the escape set; Cobalt mirrors
-     * the subset that {@code JSON.stringify} actually emits.
      */
     private String serializeJson(LinkedHashMap<String, Object> map) {
         var sb = new StringBuilder("{");

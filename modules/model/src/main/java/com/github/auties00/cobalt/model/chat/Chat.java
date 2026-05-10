@@ -16,6 +16,7 @@ import it.auties.protobuf.model.ProtobufType;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * Represents a single conversation (chat) inside WhatsApp and the entire set
@@ -576,12 +577,30 @@ public non-sealed abstract class Chat implements JidProvider {
     }
 
     /**
-     * Returns the messages in this chat as an unmodifiable sequenced collection
-     * of {@link ChatMessageInfo}.
+     * Returns the messages in this chat as a {@link Stream} of
+     * {@link ChatMessageInfo}, in insertion order.
      *
-     * @return a non-null, unmodifiable sequenced collection of chat messages
+     * <p>The returned stream is {@link AutoCloseable}: implementations that
+     * back the chat with an external resource (for example a key-value store)
+     * keep that resource open for the lifetime of the stream and release it
+     * when the stream is closed. Callers MUST consume the stream inside a
+     * try-with-resources block, otherwise the underlying resource is leaked.
+     *
+     * @return a non-null stream of chat messages, in insertion order
      */
-    public abstract SequencedCollection<ChatMessageInfo> messages();
+    public abstract Stream<ChatMessageInfo> messages();
+
+    /**
+     * Returns the number of messages in this chat.
+     *
+     * <p>This is provided as a dedicated accessor so that callers do not have
+     * to consume the entire {@link #messages()} stream just to count. Both the
+     * in-memory and the persistent backing implementations answer this in
+     * constant time.
+     *
+     * @return the number of messages currently stored in this chat
+     */
+    public abstract int messageCount();
 
     /**
      * Adds a message to this chat.
@@ -1154,8 +1173,8 @@ public non-sealed abstract class Chat implements JidProvider {
      */
     public void transferMessages(Chat source) {
         Objects.requireNonNull(source);
-        for (var msg : source.messages()) {
-            addMessage(msg);
+        try (var stream = source.messages()) {
+            stream.forEach(this::addMessage);
         }
         source.removeMessages();
     }

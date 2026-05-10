@@ -38,12 +38,6 @@ import java.util.Map;
  *
  * <p>This class is not thread-safe. All calls must be made from the
  * single WAM flush thread.
- *
- * @implNote Adapts {@code WAWebWamPrivateStats}, which initialises
- *     PS IDs from IndexedDB, generates random hex identifiers, and
- *     rotates them on configurable day-aligned periods. The eight
- *     rotation groups and their hash and period values are defined
- *     by {@code WAWebWamGlobals.PrivateStatsAllIds}.
  */
 @WhatsAppWebModule(moduleName = "WAWebWamPrivateStats")
 @WhatsAppWebModule(moduleName = "WAWebWamGlobals")
@@ -63,11 +57,6 @@ public final class WamPrivateStatsId {
      * Constructs a new {@code WamPrivateStatsId} instance and
      * initialises all eight rotation groups with fresh random
      * identifiers.
-     *
-     * @implNote The rotation-group tuples (key name, key hash int,
-     *           rotation period in days) replicate the JavaScript
-     *           literal {@code WAWebWamGlobals.PrivateStatsAllIds}
-     *           exactly.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamGlobals", exports = "PrivateStatsAllIds", adaptation = WhatsAppAdaptation.DIRECT)
     public WamPrivateStatsId() {
@@ -136,7 +125,8 @@ public final class WamPrivateStatsId {
         for (var mapEntry : entries.entrySet()) {
             var entry = mapEntry.getValue();
             if (shouldRotate(entry, now)) {
-                var value = DataUtils.randomHex(32);
+                // WAWebWamPrivateStats: m[e].value=o("WARandomHex").randomHex(16) (32 uppercase hex chars)
+                var value = DataUtils.randomHex(16);
                 var newEntry = new Entry(entry.key, entry.keyHashInt, entry.rotationDays, value, now);
                 mapEntry.setValue(newEntry);
                 rotated.add(new RotationInfo(entry.keyHashInt, entry.rotationDays));
@@ -191,7 +181,8 @@ public final class WamPrivateStatsId {
      *                     when the entry never rotates
      */
     private void addEntry(String key, int keyHashInt, int rotationDays) {
-        var value = DataUtils.randomHex(32);
+        // WAWebWamPrivateStats: m[e].value=o("WARandomHex").randomHex(16) (32 uppercase hex chars)
+        var value = DataUtils.randomHex(16);
         var epoch = Instant.now().getEpochSecond();
         var entry = new Entry(key, keyHashInt, rotationDays, value, epoch);
         entries.put(keyHashInt, entry);
@@ -228,59 +219,24 @@ public final class WamPrivateStatsId {
      *                     {@code PsIdUpdateEvent}
      */
     public record RotationInfo(int keyHashInt, int rotationDays) {
+
     }
 
     /**
      * A single rotation group entry, holding the current identifier
      * value and the timestamp at which it was generated.
+     *
+     * @param key              Human-readable key name, for example {@code "DefaultPsId"}.
+     * @param keyHashInt       Hash integer key, written into the on-wire {@code psId}
+     *                         global.
+     * @param rotationDays     Rotation period in days, or {@code -1} when the entry
+     *                         never rotates.
+     * @param value            The 32-character hex identifier currently assigned to this
+     *                         entry.
+     * @param creationEpochSec Unix epoch seconds at which {@link #value()} was generated,
+     *                         used to detect period boundaries.
      */
-    private static final class Entry {
-        /**
-         * Human-readable key name, for example {@code "DefaultPsId"}.
-         */
-        final String key;
+    private record Entry(String key, int keyHashInt, int rotationDays, String value, long creationEpochSec) {
 
-        /**
-         * Hash integer key, written into the on-wire {@code psId}
-         * global.
-         */
-        final int keyHashInt;
-
-        /**
-         * Rotation period in days, or {@code -1} when the entry
-         * never rotates.
-         */
-        final int rotationDays;
-
-        /**
-         * The 32-character hex identifier currently assigned to this
-         * entry.
-         */
-        final String value;
-
-        /**
-         * Unix epoch seconds at which {@link #value} was generated,
-         * used to detect period boundaries.
-         */
-        final long creationEpochSec;
-
-        /**
-         * Constructs a new entry binding all immutable fields.
-         *
-         * @param key              the human-readable key name
-         * @param keyHashInt       the wire-level hash integer
-         * @param rotationDays     the rotation period in days or
-         *                         {@code -1}
-         * @param value            the current 32-character hex
-         *                         identifier
-         * @param creationEpochSec the creation Unix epoch seconds
-         */
-        Entry(String key, int keyHashInt, int rotationDays, String value, long creationEpochSec) {
-            this.key = key;
-            this.keyHashInt = keyHashInt;
-            this.rotationDays = rotationDays;
-            this.value = value;
-            this.creationEpochSec = creationEpochSec;
-        }
     }
 }

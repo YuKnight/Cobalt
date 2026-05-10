@@ -16,12 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxMdCompanionFinishRPC.sendCompanionFinishRPC}
- *           tries {@code Success} → {@code Error} in order. Cobalt
- *           subdivides the {@code Error} side into {@code ClientError}
- *           ({@code 4xx}) and {@code ServerError} ({@code 5xx}) for
- *           parity with the rest of the SMAX domain shape.
  */
 public sealed interface SmaxMdCompanionFinishResponse extends SmaxOperation.Response
         permits SmaxMdCompanionFinishResponse.Success, SmaxMdCompanionFinishResponse.ClientError, SmaxMdCompanionFinishResponse.ServerError {
@@ -53,10 +47,6 @@ public sealed interface SmaxMdCompanionFinishResponse extends SmaxOperation.Resp
     /**
      * The {@code Success} reply variant. The relay accepted the
      * finish step and the device is now linked.
-     *
-     * @implNote {@code WASmaxInMdCompanionFinishResponseSuccess.parseCompanionFinishResponseSuccess}
-     *           validates the bare {@code <iq type="result">}
-     *           envelope without payload projection.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInMdCompanionFinishResponseSuccess")
     final class Success implements SmaxMdCompanionFinishResponse {
@@ -106,11 +96,6 @@ public sealed interface SmaxMdCompanionFinishResponse extends SmaxOperation.Resp
      * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} bad-request or internal-error mapped
      * to client range.
-     *
-     * @implNote {@code WASmaxInMdCompanionFinishResponseError.parseCompanionFinishResponseError}
-     *           composes
-     *           {@code parseIQErrorResponseMixin} with
-     *           {@code WASmaxInMdCompanionFinishErrors.parseCompanionFinishErrors}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInMdCompanionFinishResponseError")
     final class ClientError implements SmaxMdCompanionFinishResponse {
@@ -202,9 +187,6 @@ public sealed interface SmaxMdCompanionFinishResponse extends SmaxOperation.Resp
     /**
      * The {@code ServerError} reply variant. The relay encountered
      * a transient internal failure ({@code 5xx}).
-     *
-     * @implNote Layered onto Cobalt's domain via the shared
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     final class ServerError implements SmaxMdCompanionFinishResponse {
         /**

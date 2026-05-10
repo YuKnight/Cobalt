@@ -205,11 +205,6 @@ public final class IqQueryGroupInviteProfilePicRequest implements IqOperation.Re
      * Builds the {@link IqQueryGroupInviteProfilePicMode#INVITE_LINK} variant.
      *
      * @return the IQ envelope builder
-     *
-     * @implNote {@code WAWebQueryGroupInviteProfilePicApi.queryGroupInviteLinkProfilePic}:
-     *           {@code wap("iq",{to:GROUP_JID(a),type:"get",
-     *           xmlns:"w:g2",id}, wap("picture",{id, type, query,
-     *           invite:CUSTOM_STRING(r)}))}.
      */
     private NodeBuilder buildInviteLinkStanza() {
         // WAWebQueryGroupInviteProfilePicApi: wap("picture",{id, type, query, invite})
@@ -238,13 +233,6 @@ public final class IqQueryGroupInviteProfilePicRequest implements IqOperation.Re
      * Builds the {@link IqQueryGroupInviteProfilePicMode#INVITE_MESSAGE} variant.
      *
      * @return the IQ envelope builder
-     *
-     * @implNote {@code WAWebQueryGroupInviteProfilePicApi.queryGroupInviteMessageProfilePic}:
-     *           {@code wap("iq",{to:S_WHATSAPP_NET, type:"get",
-     *           target:GROUP_JID(l), xmlns:"w:profile:picture",
-     *           id}, wap("picture",{id, type, query},
-     *           wap("add_request",{code, expiration,
-     *           admin:USER_JID(r)})))}.
      */
     private NodeBuilder buildInviteMessageStanza() {
         // WAWebQueryGroupInviteProfilePicApi: wap("add_request",{code, expiration, admin:USER_JID(r)})

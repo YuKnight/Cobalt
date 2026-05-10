@@ -24,10 +24,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -407,7 +409,7 @@ final class ApnsCourierConnection {
                         FIELD_GET_TOKEN_TOPIC, topicHash,
                         FIELD_GET_TOKEN_PADDING, new byte[]{0x00, 0x00}),
                 p -> p.tag() == ApnsPayloadTag.TOKEN_RESPONSE
-                        && java.util.Arrays.equals(p.fields().get(FIELD_TOKEN_RESPONSE_TOPIC), topicHash));
+                        && Arrays.equals(p.fields().get(FIELD_TOKEN_RESPONSE_TOPIC), topicHash));
         var bytes = packet.fields().get(FIELD_TOKEN);
         if (bytes == null) {
             throw new IOException("TOKEN_RESPONSE missing token field");
@@ -802,7 +804,7 @@ final class ApnsCourierConnection {
             var response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() / 100 != 2) {
                 throw new IOException("APNS bag HTTP " + response.statusCode() + ": "
-                        + new String(response.body(), java.nio.charset.StandardCharsets.UTF_8));
+                        + new String(response.body(), StandardCharsets.UTF_8));
             }
             return response.body();
         } catch (InterruptedException ie) {

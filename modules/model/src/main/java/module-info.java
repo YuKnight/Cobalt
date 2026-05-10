@@ -28,6 +28,7 @@ module com.github.auties00.cobalt.model {
     exports com.github.auties00.cobalt.model.device.pairing;
     exports com.github.auties00.cobalt.model.device.sync;
     exports com.github.auties00.cobalt.model.error;
+    exports com.github.auties00.cobalt.model.federated;
     exports com.github.auties00.cobalt.model.jid;
     exports com.github.auties00.cobalt.model.jid.migration;
     exports com.github.auties00.cobalt.model.location;
@@ -62,6 +63,9 @@ module com.github.auties00.cobalt.model {
     exports com.github.auties00.cobalt.model.privacy;
     exports com.github.auties00.cobalt.model.reporting;
     exports com.github.auties00.cobalt.model.setting;
+    exports com.github.auties00.cobalt.model.setting.notice;
+    exports com.github.auties00.cobalt.model.setting.privacy;
+    exports com.github.auties00.cobalt.model.setting.push;
     exports com.github.auties00.cobalt.model.signal;
     exports com.github.auties00.cobalt.model.sync;
     exports com.github.auties00.cobalt.model.sync.action.bot;
@@ -81,4 +85,6 @@ module com.github.auties00.cobalt.model {
     exports com.github.auties00.cobalt.model.business.ctwa;
     exports com.github.auties00.cobalt.model.business.compliance;
     exports com.github.auties00.cobalt.model.business.postcode;
+    exports com.github.auties00.cobalt.model.business.linking;
+    exports com.github.auties00.cobalt.model.business.marketing;
 }

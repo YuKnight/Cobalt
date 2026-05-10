@@ -2,13 +2,10 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.MusicUserIdAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Handles {@link MusicUserIdAction} sync mutations ({@code "music_user_id"}).
  *
@@ -46,37 +43,19 @@ import com.github.auties00.cobalt.wam.WamService;
  *
  * <p>The Cobalt handler is a forward-looking implementation: it follows the
  * Cobalt sync handler conventions used by every other registered handler
- * (singleton, {@code applyMutationResult} producing a typed
+ * (singleton, {@code applyMutation} producing a typed
  * {@link MutationApplicationResult}, eager store update on {@code SET}). Every
  * behavioural step here is Cobalt-inferred until WA Web ships the matching
  * {@code WAWebMusicUserIdSync} module.
- *
- * @implNote NO_WA_BASIS: no WA Web sync handler exists for
- *           {@code "music_user_id"}. Only the protobuf shape
- *           {@code SyncActionValue.MusicUserIdAction} (two optional fields,
- *           {@code musicUserId: string} at index {@code 1} and
- *           {@code musicUserIdMap: map<string, string>} at index {@code 2},
- *           from {@code WAWebProtobufSyncAction.pb}) is present in the WA Web
- *           snapshot. {@code WAWebCollectionHandlerActions.ActionHandlers}
- *           does not include a music user id handler.
  */
 public final class MusicUserIdHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code MusicUserIdHandler}.
-     *
-     * @implNote NO_WA_BASIS: WA Web has no sync handler module for
-     *           {@code "music_user_id"}; the singleton mirrors the
-     *           {@code l.default = new u()} pattern used by every other Cobalt
-     *           sync handler.
      */
     public static final MusicUserIdHandler INSTANCE = new MusicUserIdHandler();
 
     /**
      * Private constructor that enforces the singleton pattern.
-     *
-     * @implNote NO_WA_BASIS: no WA Web counterpart constructor; mirrors the
-     *           Cobalt handler convention of a private no-arg constructor with
-     *           a public {@code INSTANCE} field.
      */
     private MusicUserIdHandler() {
 
@@ -84,13 +63,6 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote NO_WA_BASIS: returns the canonical {@code "music_user_id"}
-     *           action name declared on {@link MusicUserIdAction#ACTION_NAME}.
-     *           This name matches the protobuf field name
-     *           {@code musicUserIdAction} in {@code WAWebProtobufSyncAction.pb}
-     *           but no WA Web {@code WASyncdConst.Actions} entry references
-     *           it.
      * @return the canonical {@code "music_user_id"} string
      */
     @Override
@@ -102,18 +74,6 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
      * {@inheritDoc}
      *
      * <p>Returns {@link SyncPatchType#REGULAR} as an inferred default.
-     *
-     * @implNote NO_WA_BASIS: WA Web does not declare a collection for this
-     *           action since no handler module exists. Cobalt assigns
-     *           {@link SyncPatchType#REGULAR} to keep the value consistent
-     *           with other identifier-shaped account-level handlers (e.g.
-     *           {@code WamoUserIdentifierHandler},
-     *           {@code PrivacySettingChannelsPersonalisedRecommendationHandler})
-     *           that operate on a single global user-account value stored on
-     *           the flattened Cobalt store. The model class
-     *           {@link MusicUserIdAction} (a context file) does not yet expose
-     *           a {@code COLLECTION_NAME} constant, so the value is inlined
-     *           here.
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
@@ -123,42 +83,11 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote NO_WA_BASIS: WA Web has no version constant for this action;
-     *           Cobalt defaults to {@link MusicUserIdAction#ACTION_VERSION}
-     *           ({@code 1}) matching every other unmigrated sync action
-     *           handler.
      * @return the integer version constant declared on the action class
      */
     @Override
     public int version() {
         return MusicUserIdAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a music user id mutation.
-     *
-     * <p>Boolean adapter on top of
-     * {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}:
-     * returns {@code true} only when the underlying result is
-     * {@link SyncActionState#SUCCESS}. {@code MALFORMED} and
-     * {@code UNSUPPORTED} both map to {@code false}, mirroring the convention
-     * used by every other Cobalt sync handler.
-     *
-     * @implNote ADAPTED: NO_WA_BASIS — there is no WA Web
-     *           {@code WAWebMusicUserIdSync.applyMutations} to map to. The
-     *           boolean collapse mirrors the
-     *           {@code SUCCESS == true, everything-else == false} pattern used
-     *           by all other Cobalt sync handlers.
-     * @param client   the {@link WhatsAppClient} instance linked to the
-     *                 mutation
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was successfully applied,
-     *         {@code false} otherwise
-     */
-    @Override
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: NO_WA_BASIS — boolean collapse over the typed result
     }
 
     /**
@@ -188,23 +117,13 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
      * {@code setMusicUserIdState(...)} already exist on
      * {@code WhatsAppStore} / {@code AbstractWhatsAppStore}; this handler is
      * the sole writer.
-     *
-     * @implNote NO_WA_BASIS: no WA Web sync handler implements
-     *           {@code "music_user_id"}. The shape of this method —
-     *           only-{@code SET}, identifier-style payload, single store
-     *           setter — is inferred from the protobuf
-     *           {@code SyncActionValue.MusicUserIdAction} (two optional
-     *           fields, {@code musicUserId} and {@code musicUserIdMap}) and
-     *           from sibling identifier-style handlers (e.g.
-     *           {@code WamoUserIdentifierHandler}) which follow the same
-     *           {@code identifier -> single store setter} pattern.
      * @param client   the {@link WhatsAppClient} instance linked to the
      *                 mutation
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }

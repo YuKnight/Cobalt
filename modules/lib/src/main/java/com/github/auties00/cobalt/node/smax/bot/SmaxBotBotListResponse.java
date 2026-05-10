@@ -6,7 +6,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
 import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
@@ -48,6 +47,32 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
             return v3;
         }
         return Error.of(node, request);
+    }
+
+    /**
+     * Reports whether the given JID's server is one accepted by
+     * {@code WAJids.validateUserJid}, i.e. a phone, interop, msgr,
+     * lid, or bot user JID.
+     *
+     * <p>The bot directory wire format addresses bot personas with
+     * {@code @bot} JIDs and the "bot of the day" default with a
+     * standard phone or LID JID. Both flavours satisfy the WA Web
+     * {@code attrUserJid} admit set carried by every {@code <bot jid="">}
+     * and {@code <default jid="">} attribute reference inside the
+     * V2 / V3 reply.
+     * @param jid the JID to test; never {@code null}
+     * @return {@code true} when {@code jid.server()} is one of the
+     *         user-JID server domains, {@code false} otherwise
+     */
+    @WhatsAppWebExport(moduleName = "WAJids",
+            exports = "validateUserJid", adaptation = WhatsAppAdaptation.ADAPTED)
+    private static boolean isUserJidServer(Jid jid) {
+        return jid.hasServer(JidServer.user())
+                || jid.hasServer(JidServer.legacyUser())
+                || jid.hasServer(JidServer.interop())
+                || jid.hasServer(JidServer.messenger())
+                || jid.hasServer(JidServer.lid())
+                || jid.hasServer(JidServer.bot());
     }
 
     /**
@@ -150,29 +175,36 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
                 exports = "parseBotListResponseSuccessV2",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<SuccessV2> of(Node node, Node request) {
+            // WASmaxInBotBotListResponseSuccessV2.parseBotListResponseSuccessV2:
+            // assertTag(e,"iq") + parseIQResultResponseMixin(e,t)
             if (!SmaxIqResultResponseMixin.validate(node, request)) {
                 return Optional.empty();
             }
+            // flattenedChildWithTag(e,"bot")
             var botChild = node.getChild("bot").orElse(null);
             if (botChild == null) {
                 return Optional.empty();
             }
-            // literal(attrString, "v", "2")
+            // literal(attrString, r.value, "v", "2")
             if (!botChild.hasAttribute("v", "2")) {
                 return Optional.empty();
             }
+            // flattenedChildWithTag(r.value,"default")
             var defaultChild = botChild.getChild("default").orElse(null);
             if (defaultChild == null) {
                 return Optional.empty();
             }
+            // attrUserJid(a.value,"jid") -> attrValidate(..., WAJids.validateUserJid, "UserJid")
             var defaultJid = defaultChild.getAttributeAsJid("jid").orElse(null);
-            if (defaultJid == null) {
+            if (defaultJid == null || !isUserJidServer(defaultJid)) {
                 return Optional.empty();
             }
+            // attrString(a.value,"persona_id")
             var defaultPersonaId = defaultChild.getAttributeAsString("persona_id").orElse(null);
             if (defaultPersonaId == null) {
                 return Optional.empty();
             }
+            // mapChildrenWithTag(r.value, "section", 1, 1/0, u)
             var sections = new ArrayList<Section>();
             for (var sectionNode : botChild.getChildren("section")) {
                 var section = Section.of(sectionNode).orElse(null);
@@ -440,24 +472,31 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
                     adaptation = WhatsAppAdaptation.ADAPTED)
             public static Optional<BotEntry> of(Node node) {
                 Objects.requireNonNull(node, "node cannot be null");
+                // assertTag(t,"bot")
                 if (!node.hasDescription("bot")) {
                     return Optional.empty();
                 }
+                // attrUserJid(t,"jid") -> attrValidate(..., WAJids.validateUserJid, "UserJid")
                 var jid = node.getAttributeAsJid("jid").orElse(null);
-                if (jid == null) {
+                if (jid == null || !isUserJidServer(jid)) {
                     return Optional.empty();
                 }
+                // attrString(t,"persona_id")
                 var personaId = node.getAttributeAsString("persona_id").orElse(null);
                 if (personaId == null) {
                     return Optional.empty();
                 }
-                var countAttr = node.getAttributeAsInt("count").orElse(-1);
+                // optional(attrInt, t, "count"): present-and-parseable -> int,
+                // absent -> null, present-but-malformed -> fail
                 Integer count = null;
-                if (countAttr >= 0) {
-                    count = countAttr;
-                } else if (node.hasAttribute("count")) {
-                    return Optional.empty();
+                if (node.hasAttribute("count")) {
+                    var countAttr = node.getAttributeAsInt("count");
+                    if (countAttr.isEmpty()) {
+                        return Optional.empty();
+                    }
+                    count = countAttr.getAsInt();
                 }
+                // mapChildrenWithTag(t,"theme",0,2,e)
                 var themes = new ArrayList<ThemeBundle>();
                 for (var themeNode : node.getChildren("theme")) {
                     var theme = ThemeBundle.of(themeNode).orElse(null);
@@ -774,21 +813,26 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
                 exports = "parseBotListResponseSuccessV3",
                 adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<SuccessV3> of(Node node, Node request) {
+            // assertTag(e,"iq") + parseIQResultResponseMixin(e,t)
             if (!SmaxIqResultResponseMixin.validate(node, request)) {
                 return Optional.empty();
             }
+            // flattenedChildWithTag(e,"bot")
             var botChild = node.getChild("bot").orElse(null);
             if (botChild == null) {
                 return Optional.empty();
             }
-            // literal(attrString, "v", "3")
+            // literal(attrString, r.value, "v", "3")
             if (!botChild.hasAttribute("v", "3")) {
                 return Optional.empty();
             }
+            // attrString(r.value,"bhash")
             var bhash = botChild.getAttributeAsString("bhash").orElse(null);
             if (bhash == null) {
                 return Optional.empty();
             }
+            // optionalChildWithTag(r.value,"default",u): absent -> null,
+            // present-and-parseable -> DefaultEntry, present-but-malformed -> fail
             DefaultEntry defaultEntry = null;
             var defaultChild = botChild.getChild("default").orElse(null);
             if (defaultChild != null) {
@@ -797,6 +841,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
                     return Optional.empty();
                 }
             }
+            // mapChildrenWithTag(r.value,"section",0,1/0,s): 0 sections is valid
             var sections = new ArrayList<Section>();
             for (var sectionNode : botChild.getChildren("section")) {
                 var section = Section.of(sectionNode).orElse(null);
@@ -894,13 +939,16 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
                     adaptation = WhatsAppAdaptation.ADAPTED)
             public static Optional<DefaultEntry> of(Node node) {
                 Objects.requireNonNull(node, "node cannot be null");
+                // assertTag(e,"default")
                 if (!node.hasDescription("default")) {
                     return Optional.empty();
                 }
+                // attrUserJid(e,"jid") -> attrValidate(..., WAJids.validateUserJid, "UserJid")
                 var jid = node.getAttributeAsJid("jid").orElse(null);
-                if (jid == null) {
+                if (jid == null || !isUserJidServer(jid)) {
                     return Optional.empty();
                 }
+                // attrString(e,"persona_id")
                 var personaId = node.getAttributeAsString("persona_id").orElse(null);
                 if (personaId == null) {
                     return Optional.empty();
@@ -1029,13 +1077,16 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
                     adaptation = WhatsAppAdaptation.ADAPTED)
             public static Optional<Section> of(Node node) {
                 Objects.requireNonNull(node, "node cannot be null");
+                // assertTag(t,"section")
                 if (!node.hasDescription("section")) {
                     return Optional.empty();
                 }
+                // attrString(t,"name")
                 var name = node.getAttributeAsString("name").orElse(null);
                 if (name == null) {
                     return Optional.empty();
                 }
+                // attrStringEnum(t,"type", ENUM_ALL_CATEGORY_FEATURED)
                 var typeAttr = node.getAttributeAsString("type").orElse(null);
                 if (typeAttr == null) {
                     return Optional.empty();
@@ -1044,6 +1095,8 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
                 if (type == null) {
                     return Optional.empty();
                 }
+                // attrStringEnum(t,"display_type",
+                //   ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW)
                 var displayTypeAttr = node.getAttributeAsString("display_type").orElse(null);
                 if (displayTypeAttr == null) {
                     return Optional.empty();
@@ -1052,6 +1105,7 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
                 if (displayType == null) {
                     return Optional.empty();
                 }
+                // mapChildrenWithTag(t,"bot",0,1/0,e): 0 bots is valid
                 var bots = new ArrayList<BotEntry>();
                 for (var botNode : node.getChildren("bot")) {
                     var bot = BotEntry.of(botNode).orElse(null);
@@ -1186,24 +1240,31 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
                     adaptation = WhatsAppAdaptation.ADAPTED)
             public static Optional<BotEntry> of(Node node) {
                 Objects.requireNonNull(node, "node cannot be null");
+                // assertTag(t,"bot")
                 if (!node.hasDescription("bot")) {
                     return Optional.empty();
                 }
+                // attrUserJid(t,"jid") -> attrValidate(..., WAJids.validateUserJid, "UserJid")
                 var jid = node.getAttributeAsJid("jid").orElse(null);
-                if (jid == null) {
+                if (jid == null || !isUserJidServer(jid)) {
                     return Optional.empty();
                 }
+                // attrString(t,"persona_id")
                 var personaId = node.getAttributeAsString("persona_id").orElse(null);
                 if (personaId == null) {
                     return Optional.empty();
                 }
+                // optional(attrString, t, "card_title")
                 var cardTitle = node.getAttributeAsString("card_title").orElse(null);
-                var countAttr = node.getAttributeAsInt("count").orElse(-1);
+                // optional(attrInt, t, "count"): present-and-parseable -> int (incl. negatives),
+                // absent -> null, present-but-malformed -> fail
                 Integer count = null;
-                if (countAttr >= 0) {
-                    count = countAttr;
-                } else if (node.hasAttribute("count")) {
-                    return Optional.empty();
+                if (node.hasAttribute("count")) {
+                    var countAttr = node.getAttributeAsInt("count");
+                    if (countAttr.isEmpty()) {
+                        return Optional.empty();
+                    }
+                    count = countAttr.getAsInt();
                 }
                 return Optional.of(new BotEntry(jid, personaId, cardTitle, count));
             }
@@ -1303,9 +1364,14 @@ public sealed interface SmaxBotBotListResponse extends SmaxOperation.Response
         @WhatsAppWebExport(moduleName = "WASmaxInBotBotListResponseError",
                 exports = "parseBotListResponseError",
                 adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBotBotListErrors",
+                exports = "parseBotListErrors",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Error> of(Node node, Node request) {
-            // The bot Error disjunction mixes 400/403/405 (client-range) and 500
-            // (server-range), so try both helpers and accept whichever envelope matches.
+            // WASmaxInBotBotListErrors.parseBotListErrors: tries IQErrorInternalServerError (500),
+            // then IQErrorForbidden (403), IQErrorBadRequest (400), IQErrorNotAllowed (405).
+            // Cobalt routes the 500 arm through parseServerError and the 400/403/405 arms
+            // through parseClientError; the (code, text) pair preserves variant identity.
             var serverEnvelope = SmaxBaseServerErrorMixin.parseServerError(node, request).orElse(null);
             if (serverEnvelope != null) {
                 return Optional.of(new Error(serverEnvelope.code(), serverEnvelope.text()));

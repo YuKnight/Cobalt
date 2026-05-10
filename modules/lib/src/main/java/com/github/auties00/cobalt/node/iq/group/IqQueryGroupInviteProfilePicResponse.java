@@ -52,10 +52,6 @@ public sealed interface IqQueryGroupInviteProfilePicResponse extends IqOperation
      * The {@code Success} reply variant — carries the
      * {@code <picture>} grandchild's identifier, MIME type, CDN URL
      * and direct path.
-     *
-     * @implNote {@code WAWebQueryGroupInviteProfilePicApi.queryGroupProfilePicParser}:
-     *           {@code child("picture")} -> {@code {id, type, url,
-     *           direct_path}}.
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryGroupInviteProfilePicApi")
     final class Success implements IqQueryGroupInviteProfilePicResponse {

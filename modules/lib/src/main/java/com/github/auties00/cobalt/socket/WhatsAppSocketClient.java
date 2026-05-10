@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.socket;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.proxy.WhatsAppProxy;
 import com.github.auties00.cobalt.client.WhatsAppWebClientHistory;
 import com.github.auties00.cobalt.exception.WhatsAppSessionException;
@@ -76,6 +79,8 @@ import java.util.Objects;
  * Node -&gt; serialize -&gt; Noise encrypt + int24 prefix -&gt; TCP
  * </pre>
  */
+@WhatsAppWebModule(moduleName = "WANoiseSocket")
+@WhatsAppWebModule(moduleName = "WAFrameSocket")
 public sealed abstract class WhatsAppSocketClient {
     /**
      * 32-byte Ed25519 public key of the WhatsApp Noise root CA.
@@ -269,12 +274,14 @@ public sealed abstract class WhatsAppSocketClient {
     /**
      * AES write key derived from the Noise handshake.
      */
+    @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     private volatile SecretKeySpec writeKey;
 
     /**
      * Monotonic nonce counter for outbound datagrams; incremented under
      * the {@link #sendBinary(ByteBuffer...)} monitor on every send.
      */
+    @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.DIRECT)
     private long writeCounter;
 
     /**
@@ -285,12 +292,14 @@ public sealed abstract class WhatsAppSocketClient {
     /**
      * AES read key derived from the Noise handshake.
      */
+    @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     private volatile SecretKeySpec readKey;
 
     /**
      * Monotonic nonce counter for inbound datagrams; incremented by the
      * decrypting listener as each datagram is consumed.
      */
+    @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.DIRECT)
     private long readCounter;
 
     /**
@@ -354,6 +363,7 @@ public sealed abstract class WhatsAppSocketClient {
      *                 and the close event
      * @throws IOException if the connection or handshake fails
      */
+    @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     public final void connect(WhatsAppSocketListener listener) throws IOException {
         Objects.requireNonNull(listener, "listener cannot be null");
         this.listener = listener;
@@ -439,6 +449,7 @@ public sealed abstract class WhatsAppSocketClient {
      * {@link SecretKeySpec#destroy()} so the secrets do not linger in
      * heap memory beyond the lifetime of the connection.
      */
+    @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     public final void disconnect() {
         if (readKey != null) {
             try {
@@ -488,6 +499,8 @@ public sealed abstract class WhatsAppSocketClient {
      * @throws IOException if the payload exceeds int24, the cipher
      *         fails, or the underlying write fails
      */
+    @WhatsAppWebExport(moduleName = "WAFrameSocket", exports = "FrameSocket", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     public final synchronized void sendBinary(ByteBuffer... buffers) throws IOException {
         if (writeKey == null) {
             sendRaw(buffers);
@@ -857,11 +870,12 @@ public sealed abstract class WhatsAppSocketClient {
          * <p>A bad MAC tears down the connection through
          * {@link WhatsAppSessionException.BadMac}; any other failure
          * surfaces as
-         * {@link com.github.auties00.cobalt.exception.WhatsAppStreamException.MalformedNode}.
+         * {@link WhatsAppStreamException.MalformedNode}.
          *
          * @param datagram the raw inbound datagram, in read mode
          */
         @Override
+        @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.ADAPTED)
         public void onDatagram(ByteBuffer datagram) {
             try {
                 var plaintext = decrypt(datagram);
@@ -898,6 +912,7 @@ public sealed abstract class WhatsAppSocketClient {
          *         not authenticate or the datagram is too short to
          *         contain a tag
          */
+        @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.ADAPTED)
         private ByteBuffer decrypt(ByteBuffer datagram) {
             if (readKey == null) {
                 return datagram;

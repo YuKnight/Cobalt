@@ -28,11 +28,6 @@ import java.util.concurrent.ThreadLocalRandom;
  * through the backing array, writable direct buffers are masked in
  * place through a {@link MemorySegment}, and read-only buffers are
  * rejected so the caller learns to pass writable input.
- *
- * @implNote Masking uses the Vector API for bulk throughput with an
- *     int-wise scalar fallback for short tails. Below
- *     {@link #VECTORIZE_THRESHOLD} the SIMD path is skipped so small
- *     frames pay no vector setup cost.
  */
 public final class WebSocketFrameEncoder {
 

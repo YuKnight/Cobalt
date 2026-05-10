@@ -357,8 +357,6 @@ public final class BotProfileResult implements UsyncProtocolResponse {
 
     /**
      * Tristate flag for the bot's "posing as professional" classification.
-     *
-     * @implNote Mirrors {@code WAWebBotTypes.BotPosingAsProfessionalType}.
      */
     @WhatsAppWebModule(moduleName = "WAWebBotTypes")
     public enum PosingAsProfessional {

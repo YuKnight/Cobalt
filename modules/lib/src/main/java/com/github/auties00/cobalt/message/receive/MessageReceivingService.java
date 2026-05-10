@@ -28,11 +28,6 @@ import java.util.Objects;
  *
  * <p>A pending-message dedup cache prevents duplicate processing when the same
  * message is delivered more than once during offline/online transitions.
- *
- * @implNote WA Web splits this routing across {@code WAWebCommsHandleMessagingStanza}
- * (for non-newsletter E2E messages) and {@code WAWebCommsHandleWorkerCompatibleStanza}
- * (newsletter fallback). Cobalt unifies both paths here, while receipt handling lives
- * in the separate {@code ReceiptStreamHandler} at the socket stream level.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleMessagingStanza")
 @WhatsAppWebModule(moduleName = "WAWebHandleMsg")

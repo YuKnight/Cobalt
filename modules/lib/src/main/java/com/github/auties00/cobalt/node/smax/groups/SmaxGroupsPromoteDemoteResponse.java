@@ -16,10 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsPromoteDemoteRPC.sendPromoteDemoteRPC}
- *           tries {@code SuccessPromote} → {@code SuccessDemote} →
- *           {@code ClientError} → {@code ServerError}.
  */
 public sealed interface SmaxGroupsPromoteDemoteResponse extends SmaxOperation.Response
         permits SmaxGroupsPromoteDemoteResponse.SuccessPromote, SmaxGroupsPromoteDemoteResponse.SuccessDemote,
@@ -56,15 +52,6 @@ public sealed interface SmaxGroupsPromoteDemoteResponse extends SmaxOperation.Re
     /**
      * The {@code SuccessPromote} reply variant — the relay processed
      * a promotion list and returned the per-participant outcomes.
-     *
-     * @implNote {@code WASmaxInGroupsPromoteDemoteResponseSuccessPromote.parsePromoteDemoteResponseSuccessPromote}
-     *           validates the IQ-result envelope, asserts the
-     *           {@code <promote>} child, parses the optional
-     *           {@code addressing_mode} mixin, then projects each
-     *           {@code <participant>} via the
-     *           {@code ENUM_404_419} error projection
-     *           ({@code 404} = not in group / not registered,
-     *           {@code 419} = legal hold).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsPromoteDemoteResponseSuccessPromote")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupAddressingModeMixin")
@@ -331,12 +318,6 @@ public sealed interface SmaxGroupsPromoteDemoteResponse extends SmaxOperation.Re
     /**
      * The {@code SuccessDemote} reply variant — the relay processed
      * a demotion list and returned the per-participant outcomes.
-     *
-     * @implNote {@code WASmaxInGroupsPromoteDemoteResponseSuccessDemote.parsePromoteDemoteResponseSuccessDemote}
-     *           projects each {@code <participant>} via the
-     *           {@code ENUM_404_406} error projection
-     *           ({@code 404} = not in group, {@code 406} = not an
-     *           admin).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsPromoteDemoteResponseSuccessDemote")
     final class SuccessDemote implements SmaxGroupsPromoteDemoteResponse {

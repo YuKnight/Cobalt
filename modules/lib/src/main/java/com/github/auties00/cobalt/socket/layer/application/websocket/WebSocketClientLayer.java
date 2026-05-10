@@ -27,17 +27,6 @@ import java.util.Objects;
  * the selector pipeline; after the upgrade completes the connection
  * transitions to asynchronous data flow and decoded payloads flow up
  * the chain to the listener.
- *
- * @implNote The upgrade response parser in
- *     {@link #consumeAndValidateHeaders(long, byte[])} uses a two-tier
- *     strategy. When the line fits in the 8 KiB read buffer (the
- *     common case for a 101 response) header names are matched with a
- *     bulk
- *     {@link HttpResponseReader#regionMatchesIgnoreCase(int, byte[], int)}
- *     call and values are validated through direct buffer peeking,
- *     avoiding any per-byte method calls. The cross-buffer fallback
- *     lives in {@link #consumeHeaderLineSlow(long, int, byte[])} so
- *     the JIT can always inline the fast path.
  */
 public final class WebSocketClientLayer implements SocketClientApplicationLayer<WebSocketClientLayerContext> {
     /**

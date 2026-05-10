@@ -7,10 +7,6 @@ import java.util.Optional;
 
 /**
  * One {@code <user/>} entry in the outbound user list.
- *
- * @implNote {@code WAWebSetPrivacyJob.createLidUserNode} for the LID
- *           variant. {@code WAWebSetPrivacyJob.g} (function {@code g})
- *           for the PN variant.
  */
 @WhatsAppWebModule(moduleName = "WAWebSetPrivacyJob")
 public final class IqSetPrivacyUserEntry {

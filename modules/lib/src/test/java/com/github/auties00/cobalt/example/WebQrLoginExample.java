@@ -1,16 +1,16 @@
+import com.github.auties00.cobalt.call.CallOptions;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.client.WhatsAppDevice;
 import com.github.auties00.cobalt.client.WhatsAppWebClientHistory;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 import com.github.auties00.cobalt.util.SchedulerUtils;
 
 void main() throws IOException {
     WhatsAppClient.builder()
-            .webClient(WhatsAppStoreFactory.inMemory())
+            .webClient(WhatsAppStoreFactory.temporary())
             .createConnection()
             .device(WhatsAppDevice.desktop())
             .historySetting(WhatsAppWebClientHistory.extended(true))
@@ -18,12 +18,14 @@ void main() throws IOException {
             .addLoggedInListener(api -> {
                 System.out.printf("Connected: %s%n", api.store().privacySettings());
                 SchedulerUtils.scheduleDelayed(Duration.ofSeconds(10), () -> {
-                    try {
-                        System.out.println("Sending");
-                        api.sendMessage(Jid.of(393495089819L), MessageContainer.of("Hello, world!"));
-                        System.out.println("Sent");
-                    } catch (Throwable e) {
-                        e.printStackTrace();
+                    System.out.println("Starting call");
+                    try(var call = api.startCall(Jid.of(393457877997L), CallOptions.audio())) {
+                        System.out.println("Call started: " + call.callId());
+                        TimeUnit.SECONDS.sleep(10);
+                        System.out.println("Closing call");
+                    }catch(Throwable throwable) {
+                        System.err.println("Call failed");
+                        throwable.printStackTrace();
                     }
                 });
             })
@@ -36,7 +38,7 @@ void main() throws IOException {
             .addNodeSentListener((_, outgoing) -> System.out.printf("Sent node %s%n", outgoing))
             .addWebAppStateActionListener((_, action, info) -> System.out.printf("New action: %s, info: %s%n", action, info))
             .addMessageStatusListener((_, info) -> System.out.printf("Message status update for %s%n", info.key().id()))
-            .addWebHistorySyncMessagesListener((_, chat, last) -> System.out.printf("%s now has %s messages: %s(oldest message: %s)%n", chat.name(), chat.messages().size(), !last ? "waiting for more" : "done", chat.oldestMessage().flatMap(ChatMessageInfo::timestamp).orElse(null)))
+            .addWebHistorySyncMessagesListener((_, chat, last) -> System.out.printf("%s now has %s messages: %s(oldest message: %s)%n", chat.name(), chat.messageCount(), !last ? "waiting for more" : "done", chat.oldestMessage().flatMap(ChatMessageInfo::timestamp).orElse(null)))
             .addDisconnectedListener((_, reason) -> System.out.printf("Disconnected: %s%n", reason))
             .connect()
             .waitForDisconnection();

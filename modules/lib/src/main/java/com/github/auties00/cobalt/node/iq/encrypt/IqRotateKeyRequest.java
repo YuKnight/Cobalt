@@ -47,11 +47,6 @@ public final class IqRotateKeyRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <rotate>} payload
-     *
-     * @implNote {@code WAWebRotateKeyJob.uploadKeys} composes the IQ
-     *           via {@code wap("iq", {xmlns:"encrypt", type:"set",
-     *           to:S_WHATSAPP_NET, id}, wap("rotate", null,
-     *           xmppSignedPreKey(t)))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebRotateKeyJob",

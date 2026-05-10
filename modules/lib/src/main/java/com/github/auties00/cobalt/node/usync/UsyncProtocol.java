@@ -35,13 +35,6 @@ import java.util.Optional;
  *
  * <p>The eleven permitted implementations correspond one-to-one with the
  * eleven {@code WAWebUsync*Protocol} JS classes.
- *
- * @implNote The JS module {@code WAWebUsync} enumerates the protocols in the
- *     constants object {@code c}. Cobalt keeps the same closed enumeration by
- *     sealing this interface. The
- *     {@link com.github.auties00.cobalt.node.usync.protocol} sub-package holds
- *     the implementations and {@link com.github.auties00.cobalt.node.usync.result}
- *     holds the result types so this file stays a thin contract surface.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public sealed interface UsyncProtocol permits
@@ -86,9 +79,6 @@ public sealed interface UsyncProtocol permits
      *
      * @param user the user the {@code <user>} entry refers to
      * @return the protocol-specific child element, or empty
-     * @implNote The JS counterpart {@code WAWebUsync*Protocol.getUserElement}
-     *     returns either a {@code WAWap.wap(...)} expression or {@code null}.
-     *     {@link Optional#empty()} mirrors {@code null}.
      */
     Optional<Node> buildUserElement(UsyncUser user);
 

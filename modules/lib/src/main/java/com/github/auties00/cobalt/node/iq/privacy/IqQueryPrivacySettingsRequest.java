@@ -15,12 +15,6 @@ import com.github.auties00.cobalt.node.iq.IqOperation;
  * (last-seen, online, profile, about, read-receipts, group-add,
  * call-add, messages, defense-mode) by sending an
  * {@code <iq xmlns="privacy" type="get"><privacy/></iq>} stanza.
- *
- * @implNote {@code WAWebQueryPrivacySettingsJob.getPrivacy} optionally routes
- *           through MEX when the {@code mex_get_privacy_settings_mode} A/B
- *           flag is enabled. Cobalt models only the legacy XML path here.
- *           The MEX path is a separate module
- *           ({@code WAWebMexGetPrivacySetting}).
  */
 @WhatsAppWebModule(moduleName = "WAWebQueryPrivacySettingsJob")
 public final class IqQueryPrivacySettingsRequest implements IqOperation.Request {
@@ -34,10 +28,6 @@ public final class IqQueryPrivacySettingsRequest implements IqOperation.Request 
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WAWebQueryPrivacySettingsJob.getPrivacy} composes
-     *           {@code wap("iq",{xmlns:"privacy", to:S_WHATSAPP_NET,
-     *           type:"get", id:generateId()}, wap("privacy",null))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQueryPrivacySettingsJob",

@@ -14,11 +14,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WASmaxWaffleStateExistsRPC.sendStateExistsRPC}
- *           tries {@code Success} → {@code Error}; Cobalt routes the
- *           single error variant through the standard
- *           {@code ClientError}/{@code ServerError} code-range split.
  */
 public sealed interface SmaxWaffleStateExistsResponse extends SmaxOperation.Response
         permits SmaxWaffleStateExistsResponse.Success, SmaxWaffleStateExistsResponse.ClientError, SmaxWaffleStateExistsResponse.ServerError {
@@ -193,12 +188,6 @@ public sealed interface SmaxWaffleStateExistsResponse extends SmaxOperation.Resp
     /**
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed or unauthorised.
-     *
-     * @implNote {@code WASmaxInWaffleStateExistsResponseError.parseStateExistsResponseError}
-     *           routes the {@code <error/>} child through
-     *           {@code WASmaxInWaffleStateExistsErrors}; Cobalt
-     *           collapses to the raw {@code (code, text)} pair via
-     *           the {@code 4xx} code-range filter.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleStateExistsResponseError")
     final class ClientError implements SmaxWaffleStateExistsResponse {
@@ -289,10 +278,6 @@ public sealed interface SmaxWaffleStateExistsResponse extends SmaxOperation.Resp
     /**
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure.
-     *
-     * @implNote Same wire-shape as {@link ClientError}; Cobalt routes
-     *           through {@link SmaxBaseServerErrorMixin} with the
-     *           {@code 5xx} code-range filter.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleStateExistsResponseError")
     final class ServerError implements SmaxWaffleStateExistsResponse {

@@ -48,10 +48,6 @@ import java.util.stream.Collectors;
  * library. A minimal Play FDFE schema is declared as nested
  * {@code @ProtobufMessage} records and the annotation processor emits
  * the matching {@code *Spec} decoders at compile time.
- *
- * @implNote The Aurora dispenser URL, encoded-targets blob, and fallback
- *     Finsky user-agent match the values shipped by {@code gplaydl} and
- *     the Aurora Store so upstream compatibility is maintained.
  */
 public final class PlayStoreUtils {
     /**
@@ -143,10 +139,6 @@ public final class PlayStoreUtils {
     /**
      * Emulator-derived x86_64 device profile loaded from
      * {@link #DEVICE_PROFILE_RESOURCE}.
-     *
-     * @implNote The full list of capabilities matters because the Play
-     *     FDFE API filters which apps are visible to the caller based on
-     *     the device features the token was minted for.
      */
     private static final Map<String, Object> DEVICE_PROFILE = loadDeviceProfile();
 
@@ -222,15 +214,6 @@ public final class PlayStoreUtils {
     /**
      * Builds the shared {@link HttpClient} used by
      * {@link #downloadApk(String)} and {@link #downloadApk(String, int)}.
-     *
-     * @implNote The instance is deliberately not wrapped in
-     *     try-with-resources at the call site, because
-     *     {@link HttpClient#close()} blocks until every streaming body
-     *     handler is drained and our streams are handed back to the
-     *     caller. The JDK releases the client's resources when it becomes
-     *     unreachable and all requests have completed, so the returned
-     *     streams keep it alive and GC reclaims it once the caller closes
-     *     the {@link DownloadedApk}.
      * @return a freshly built {@link HttpClient}
      */
     private static HttpClient newClient() {
@@ -680,7 +663,7 @@ public final class PlayStoreUtils {
      * @param mccMnc optional MCC+MNC string reported via
      *     {@code X-DFE-MCCMNC}, or {@code null}
      */
-    record AuthContext(
+    private record AuthContext(
             String authToken,
             String gsfId,
             String dfeCookie,
@@ -904,13 +887,6 @@ public final class PlayStoreUtils {
      *     other entries are OBB/asset-pack metadata and are ignored
      * @param splits split APK descriptors, empty for apps that ship as
      *     a single base APK
-     *
-     * @implNote Field tag {@code 4} is overloaded by the upstream schema
-     *     between cookies and OBB entries. The Cobalt protobuf decoder
-     *     cannot represent that union in a single type, so the field is
-     *     decoded here as a list of raw byte slices and disambiguated by
-     *     tag-byte inspection in
-     *     {@link PlayStoreUtils#fetchDelivery(HttpClient, String, int, Map)}.
      */
     @ProtobufMessage
     record AppDeliveryData(

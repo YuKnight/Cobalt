@@ -5,19 +5,18 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.chat.InteractiveMessageState;
+import com.github.auties00.cobalt.model.chat.InteractiveMessageStateBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction;
 import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageAction.InteractiveMessageActionMode;
 import com.github.auties00.cobalt.model.sync.action.chat.InteractiveMessageActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collection;
 
 /**
  * Handles interactive message sync actions.
@@ -30,11 +29,6 @@ import java.util.Map;
  * {@code getAction() = WASyncdConst.Actions.InteractiveMessageAction}.
  *
  * <p>Index format: {@code ["interactive_message_action", chatJid, messageId, fromMe, participant, subId]}
- *
- * @implNote WAWebInteractiveMessageSync — singleton instance exported as {@code default};
- *           extends {@code MessageSyncdActionBase} with
- *           {@code collectionName = RegularLow}, {@code chatJidIndex = 1},
- *           {@code getVersion() = 1}, {@code getAction() = InteractiveMessageAction}
  */
 @WhatsAppWebModule(moduleName = "WAWebInteractiveMessageSync")
 public final class InteractiveMessageHandler implements WebAppStateActionHandler {
@@ -43,17 +37,12 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      *
      * <p>Per WhatsApp Web, {@code WAWebInteractiveMessageSync} exports a single
      * instance ({@code var _ = new p(); l.default = _}).
-     *
-     * @implNote WAWebInteractiveMessageSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final InteractiveMessageHandler INSTANCE = new InteractiveMessageHandler();
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebInteractiveMessageSync — class constructor sets
-     *           {@code collectionName = RegularLow}, {@code chatJidIndex = 1}
      */
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private InteractiveMessageHandler() {
@@ -62,10 +51,6 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
 
     /**
      * Returns the action name for interactive message actions.
-     *
-     * @implNote WAWebInteractiveMessageSync.getAction — returns
-     *           {@code WASyncdConst.Actions.InteractiveMessageAction}
-     *           ({@code "interactive_message_action"})
      * @return the action name {@code "interactive_message_action"}
      */
     @Override
@@ -76,9 +61,6 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
 
     /**
      * Returns the sync collection for interactive message actions.
-     *
-     * @implNote WAWebInteractiveMessageSync — constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -89,30 +71,12 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
 
     /**
      * Returns the mutation format version for interactive message actions.
-     *
-     * @implNote WAWebInteractiveMessageSync.getVersion — returns {@code 1}
      * @return {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return InteractiveMessageAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single interactive message mutation by delegating to
-     * {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}.
-     *
-     * @implNote WAWebInteractiveMessageSync.applyMutations — per-mutation application
-     *           logic within the batch handler
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -153,16 +117,13 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * before the batch is iterated. Cobalt collapses this into a direct
      * {@code findChatByJid} lookup per mutation, since both incoming and local
      * chat JIDs are canonicalized in the local store.
-     *
-     * @implNote WAWebInteractiveMessageSync.applyMutations — per-mutation logic in
-     *           the {@code e.map} callback for SET operations
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
@@ -170,7 +131,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
 
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() < 6) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chatJidString = indexArray.getString(1);
@@ -182,18 +143,18 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
             if (isNullOrEmpty(chatJidString) || isNullOrEmpty(messageId)
                     || isNullOrEmpty(fromMeString) || isNullOrEmpty(participantString)
                     || isNullOrEmpty(subIdString)) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().action().orElse(null) instanceof InteractiveMessageAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var incomingMsgKey = SyncdIndexUtils.syncKeyToMsgKey(
                     client.store(), chatJidString, messageId, fromMeString, participantString
             );
             if (incomingMsgKey.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             // ADAPTED: Cobalt resolves chat directly from the index JID without the
@@ -217,15 +178,16 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
             var maybeMessage = client.store().findMessageById(localChat.get(), messageId);
 
             // ADAPTED: Cobalt backend records the agmId->action state directly (no frontend bridge).
-            // Snapshot the current states once so both agmId and messageId writes land atomically.
-            var states = new HashMap<>(client.store().interactiveMessageStates()); // ADAPTED: unmodifiable map -> mutable snapshot
             if (agmId != null) {
-                states.put("agmId|" + agmId, action); // ADAPTED: WAWebBackendApi.frontendFireAndForget("addGalaxyDisableCTAByAgmId", {agmId: k, chatId: v})
+                client.store().putInteractiveMessageState(new InteractiveMessageStateBuilder()
+                        .messageId("agmId|" + agmId)
+                        .type(action.type())
+                        .agmId(action.agmId().orElse(null))
+                        .build()); // ADAPTED: WAWebBackendApi.frontendFireAndForget("addGalaxyDisableCTAByAgmId", {agmId: k, chatId: v})
             }
 
             if (maybeMessage.isEmpty()) {
                 if (agmId != null) {
-                    client.store().setInteractiveMessageStates(states); // ADAPTED: commit agmId state
                     return MutationApplicationResult.success();
                 }
 
@@ -238,20 +200,21 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
             var chatMessage = maybeMessage.get();
 
             if (action.type() != InteractiveMessageActionMode.DISABLE_CTA) {
-                if (agmId != null) {
-                    client.store().setInteractiveMessageStates(states); // ADAPTED: still commit agmId state before returning skipped
-                }
                 return MutationApplicationResult.skipped();
             }
 
             // ADAPTED: Cobalt backend records the messageId->action state and the full composite index->action state
             var messageKeyId = chatMessage.key().id().orElse(messageId);
-            states.put("messageId|" + messageKeyId, action); // ADAPTED: WAWebBackendApi.frontendFireAndForget("addGalaxyDisableCTAMessageId", {messageId: I.id.toString()})
-            states.put( // ADAPTED: composite index key for per-subId lookups
-                    "%s|%s|%s|%s|%s".formatted(chatJidString, messageId, fromMeString, participantString, subIdString),
-                    action
-            );
-            client.store().setInteractiveMessageStates(states); // ADAPTED: commit all state writes
+            client.store().putInteractiveMessageState(new InteractiveMessageStateBuilder()
+                    .messageId("messageId|" + messageKeyId)
+                    .type(action.type())
+                    .agmId(action.agmId().orElse(null))
+                    .build()); // ADAPTED: WAWebBackendApi.frontendFireAndForget("addGalaxyDisableCTAMessageId", {messageId: I.id.toString()})
+            client.store().putInteractiveMessageState(new InteractiveMessageStateBuilder() // ADAPTED: composite index key for per-subId lookups
+                    .messageId("%s|%s|%s|%s|%s".formatted(chatJidString, messageId, fromMeString, participantString, subIdString))
+                    .type(action.type())
+                    .agmId(action.agmId().orElse(null))
+                    .build());
             return MutationApplicationResult.success();
         } catch (Exception e) {
             return MutationApplicationResult.failed();
@@ -274,10 +237,6 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * action payload itself, leaving downstream code to wrap it in a
      * {@link com.github.auties00.cobalt.model.sync.SyncActionValue} and construct
      * the {@link com.github.auties00.cobalt.model.sync.SyncPendingMutation}.
-     *
-     * @implNote WAWebInteractiveMessageSync.$InteractiveMessageSync$p_1 — Cobalt
-     *           reduces the WA Web {@code p_1} helper to a payload constructor since
-     *           mutation wrapping/signing is centralized
      * @param type  the interactive message action mode (typically
      *              {@link InteractiveMessageActionMode#DISABLE_CTA})
      * @param agmId the optional Galaxy AGM identifier, or {@code null}
@@ -297,9 +256,6 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      *
      * <p>Used to replicate WA Web's JavaScript falsy check ({@code !value})
      * on index part strings.
-     *
-     * @implNote ADAPTED: WAWebInteractiveMessageSync.applyMutations — JS falsy check
-     *           {@code !i || !s || !u || !c || !d} maps to null/empty check in Java
      * @param value the string to check
      * @return {@code true} if the string is {@code null} or empty
      */
@@ -309,16 +265,12 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
 
     /**
      * Returns an immutable snapshot of the currently-tracked interactive message
-     * action states. Test hook that reflects the same map exposed by
+     * action states. Test hook that reflects the same collection exposed by
      * {@link com.github.auties00.cobalt.store.WhatsAppStore#interactiveMessageStates()}.
-     *
-     * @implNote ADAPTED: WAWebInteractiveMessageSync does not expose a public
-     *           accessor for its frontend-recorded disable-CTA state; Cobalt
-     *           surfaces the state through the store directly
      * @param client the WhatsApp client whose store should be queried
-     * @return the interactive message action states map
+     * @return the interactive message action states collection
      */
-    public Map<String, InteractiveMessageAction> interactiveMessageStates(WhatsAppClient client) {
+    public Collection<InteractiveMessageState> interactiveMessageStates(WhatsAppClient client) {
         return client.store().interactiveMessageStates(); // ADAPTED: proxy to store for handler-level access
     }
 }

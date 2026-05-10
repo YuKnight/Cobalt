@@ -46,12 +46,6 @@ public sealed interface SmaxGroupsGetParticipatingGroupsResponse extends SmaxOpe
      * The {@code Success} reply variant — carries the
      * {@code <groups>} wrapper with one {@code <group>} child per
      * participating group.
-     *
-     * @implNote {@code WASmaxInGroupsGetParticipatingGroupsResponseSuccess.parseGetParticipatingGroupsResponseSuccess}
-     *           projects every {@code <group>} child via
-     *           {@code WASmaxInGroupsGroupInfoOrTruncatedGroupInfoGroupInfoMixinGroup}.
-     *           Cobalt exposes the raw {@code <group>} nodes; callers
-     *           use {@link Node} accessors to read group attributes.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetParticipatingGroupsResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupInfoOrTruncatedGroupInfoGroupInfoMixinGroup")

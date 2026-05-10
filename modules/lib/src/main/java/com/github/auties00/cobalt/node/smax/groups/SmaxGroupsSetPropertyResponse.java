@@ -16,11 +16,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsSetPropertyRequest}.
- *
- * @implNote {@code WASmaxGroupsSetPropertyRPC.sendSetPropertyRPC} tries
- *           {@code Success} → {@code ClientError} → {@code ServerError}
- *           in order and throws on no-match. Cobalt returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGroupsSetPropertyResponse extends SmaxOperation.Response
         permits SmaxGroupsSetPropertyResponse.Success, SmaxGroupsSetPropertyResponse.ClientError, SmaxGroupsSetPropertyResponse.ServerError {
@@ -62,15 +57,6 @@ public sealed interface SmaxGroupsSetPropertyResponse extends SmaxOperation.Resp
      * {@code <ephemeral/>} echo is decomposed into its {@code expiration}
      * and {@code trigger} attributes, and the membership-approval echo
      * is exposed as the raw join-mode string.
-     *
-     * @implNote {@code WASmaxInGroupsSetPropertyResponseSuccess.parseSetPropertyResponseSuccess}
-     *           validates the IQ result envelope, scans for each
-     *           toggle child, and emits
-     *           {@code hasLocked}/{@code hasAnnouncement}/etc.
-     *           presence flags plus typed values for the
-     *           {@code <ephemeral/>} and
-     *           {@code <membership_approval_mode/>} children. Cobalt
-     *           preserves the same shape with typed accessors.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsSetPropertyResponseSuccess")
     final class Success implements SmaxGroupsSetPropertyResponse {
@@ -528,11 +514,6 @@ public sealed interface SmaxGroupsSetPropertyResponse extends SmaxOperation.Resp
      * The {@code ClientError} reply variant — the relay rejected the
      * request as malformed (mutually exclusive toggles, empty
      * payload), unauthorised, or referencing a non-existent group.
-     *
-     * @implNote {@code WASmaxInGroupsSetPropertyResponseClientError.parseSetPropertyResponseClientError}
-     *           parses the {@code <error code text/>} child and routes
-     *           it through the per-RPC client-error enum. Cobalt
-     *           collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsSetPropertyResponseClientError")
     final class ClientError implements SmaxGroupsSetPropertyResponse {
@@ -625,11 +606,6 @@ public sealed interface SmaxGroupsSetPropertyResponse extends SmaxOperation.Resp
     /**
      * The {@code ServerError} reply variant — the relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInGroupsSetPropertyResponseServerError.parseSetPropertyResponseServerError}
-     *           delegates to {@code WASmaxInGroupsBaseServerErrorMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsSetPropertyResponseServerError")
     final class ServerError implements SmaxGroupsSetPropertyResponse {

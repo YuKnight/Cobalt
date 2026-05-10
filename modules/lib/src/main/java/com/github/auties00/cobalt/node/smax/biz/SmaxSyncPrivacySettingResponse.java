@@ -36,15 +36,6 @@ public sealed interface SmaxSyncPrivacySettingResponse extends SmaxOperation.Res
     /**
      * The {@code Notification} variant. Carries the optional
      * post-update consent value plus the standard envelope echoes.
-     *
-     * @implNote {@code WASmaxInBizSettingsSyncPrivacySettingRequest.parseSyncPrivacySettingRequest}
-     *           validates the notification tag, asserts the literal
-     *           {@code from="s.whatsapp.net"}, the literal
-     *           {@code type="business"}, then projects the optional
-     *           {@code <smb_data_sharing_with_meta_consent>} attribute.
-     *           Cobalt mirrors the optional-projection semantics.
-     *           The JS uses {@code success ? value : null} on the
-     *           inner mixin, so the field is genuinely optional.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizSettingsSyncPrivacySettingRequest")
     @WhatsAppWebModule(moduleName = "WASmaxInBizSettingsSmbDataSharingSettingMixin")
@@ -62,7 +53,7 @@ public sealed interface SmaxSyncPrivacySettingResponse extends SmaxOperation.Res
          * The optional consent value from the
          * {@code <smb_data_sharing_with_meta_consent value="..."/>}
          * inner. One of {@code "true"} / {@code "false"} /
-         * {@code "notSet"} or {@code null} when the relay cleared
+         * {@code "notset"} or {@code null} when the relay cleared
          * the preference.
          */
         private final String dataSharingConsent;
@@ -111,6 +102,15 @@ public sealed interface SmaxSyncPrivacySettingResponse extends SmaxOperation.Res
         @WhatsAppWebExport(moduleName = "WASmaxInBizSettingsSyncPrivacySettingRequest",
                 exports = "parseSyncPrivacySettingRequest",
                 adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizSettingsServerNotificationMixin",
+                exports = "parseServerNotificationMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizSettingsSmbDataSharingSettingMixin",
+                exports = "parseSmbDataSharingSettingMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizSettingsSmbDataSharingSettingValueMixin",
+                exports = "parseSmbDataSharingSettingValueMixin",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<Notification> of(Node node) {
             Objects.requireNonNull(node, "node cannot be null");
             if (!node.hasDescription("notification")) {
@@ -131,7 +131,13 @@ public sealed interface SmaxSyncPrivacySettingResponse extends SmaxOperation.Res
             String consent = null;
             var consentNode = privacy.getChild("smb_data_sharing_with_meta_consent").orElse(null);
             if (consentNode != null) {
-                consent = consentNode.getAttributeAsString("value").orElse(null);
+                var value = consentNode.getAttributeAsString("value").orElse(null);
+                // WASmaxInBizSettingsSmbDataSharingSettingValueMixin.parseSmbDataSharingSettingValueMixin:
+                // attrStringEnum(e, "value", WASmaxInBizSettingsEnums.ENUM_FALSE_NOTSET_TRUE) under
+                // optionalMerge — keep null when the inner mixin parse fails (success ? value : null).
+                if (value != null && SmaxBizSettingsFalseNotsetTrueFlag.of(value).isPresent()) {
+                    consent = value;
+                }
             }
             return Optional.of(new Notification(to, consent));
         }

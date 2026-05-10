@@ -17,11 +17,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsRevokeRequestCodeRequest}.
- *
- * @implNote {@code WASmaxGroupsRevokeRequestCodeRPC.sendRevokeRequestCodeRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order and throws on no-match.
- *           Cobalt returns {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGroupsRevokeRequestCodeResponse extends SmaxOperation.Response
         permits SmaxGroupsRevokeRequestCodeResponse.Success, SmaxGroupsRevokeRequestCodeResponse.ClientError, SmaxGroupsRevokeRequestCodeResponse.ServerError {
@@ -60,15 +55,6 @@ public sealed interface SmaxGroupsRevokeRequestCodeResponse extends SmaxOperatio
     /**
      * The {@code Success} reply variant — the relay processed the
      * revocation and returned a per-participant outcome list.
-     *
-     * @implNote {@code WASmaxInGroupsRevokeRequestCodeResponseSuccess.parseRevokeRequestCodeResponseSuccess}
-     *           validates the IQ-result envelope, asserts the
-     *           {@code <revoke>} child, lifts the optional
-     *           {@code addressing_mode} echo via
-     *           {@code WASmaxInGroupsGroupAddressingModeMixin},
-     *           then projects every {@code <participant>} child
-     *           through
-     *           {@code parseRevokeRequestCodeResponseSuccessRevokeParticipant}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsRevokeRequestCodeResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupAddressingModeMixin")
@@ -287,14 +273,6 @@ public sealed interface SmaxGroupsRevokeRequestCodeResponse extends SmaxOperatio
              *         not match
              * @throws NullPointerException if {@code node} is
              *                              {@code null}
-             *
-             * @implNote {@code WASmaxInGroupsRevokeRequestCodeResponseSuccess.parseRevokeRequestCodeResponseSuccessRevokeParticipant}
-             *           asserts the {@code participant} tag,
-             *           extracts the user-JID {@code jid}
-             *           attribute, projects the optional literal
-             *           {@code error="404"} marker, and applies
-             *           the {@code PhoneNumberMixin} /
-             *           {@code UsernameAttMixin} echoes.
              */
             @WhatsAppWebExport(moduleName = "WASmaxInGroupsRevokeRequestCodeResponseSuccess",
                     exports = "parseRevokeRequestCodeResponseSuccessRevokeParticipant",
@@ -348,14 +326,6 @@ public sealed interface SmaxGroupsRevokeRequestCodeResponse extends SmaxOperatio
      * The {@code ClientError} reply variant — the relay rejected
      * the request as malformed, unauthorised, or referencing a
      * non-existent group.
-     *
-     * @implNote {@code WASmaxInGroupsRevokeRequestCodeResponseClientError.parseRevokeRequestCodeResponseClientError}
-     *           parses the {@code <error code text/>} child and
-     *           routes it through
-     *           {@code WASmaxInGroupsClientErrors.parseClientErrors}.
-     *           Cobalt collapses to the raw {@code (code, text)}
-     *           pair surfaced by
-     *           {@link SmaxBaseServerErrorMixin#parseClientError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsRevokeRequestCodeResponseClientError")
     final class ClientError implements SmaxGroupsRevokeRequestCodeResponse {
@@ -450,12 +420,6 @@ public sealed interface SmaxGroupsRevokeRequestCodeResponse extends SmaxOperatio
      * The {@code ServerError} reply variant — the relay
      * encountered a transient internal failure while processing
      * the request.
-     *
-     * @implNote {@code WASmaxInGroupsRevokeRequestCodeResponseServerError.parseRevokeRequestCodeResponseServerError}
-     *           delegates to
-     *           {@code WASmaxInGroupsBaseServerErrorMixin}, which
-     *           Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsRevokeRequestCodeResponseServerError")
     final class ServerError implements SmaxGroupsRevokeRequestCodeResponse {

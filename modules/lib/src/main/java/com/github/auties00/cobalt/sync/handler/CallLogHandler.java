@@ -7,7 +7,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.call.CallLog;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -15,12 +14,9 @@ import com.github.auties00.cobalt.model.sync.action.call.CallLogAction;
 import com.github.auties00.cobalt.model.sync.action.call.CallLogActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import com.alibaba.fastjson2.JSON;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -38,8 +34,6 @@ import java.util.List;
  * {@code WAWebVoipActionWriteCallLogSync.generateCallLogFromCallSyncRecord} to
  * write it as a VoIP call log message. In Cobalt, the record is stored directly
  * in the {@code callLogStates} map of the store.
- *
- * @implNote WAWebCallLogSync — singleton instance exported as {@code default}
  */
 @WhatsAppWebModule(moduleName = "WAWebCallLogSync")
 public final class CallLogHandler implements WebAppStateActionHandler {
@@ -48,18 +42,12 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, {@code WAWebCallLogSync} exports a single instance
      * ({@code var f = new _(); l.default = f}).
-     *
-     * @implNote WAWebCallLogSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final CallLogHandler INSTANCE = new CallLogHandler();
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebCallLogSync — class constructor (inherits from
-     *           {@code AccountSyncdActionBase}, sets
-     *           {@code collectionName = WASyncdConst.CollectionName.Regular})
      */
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private CallLogHandler() {
@@ -68,9 +56,6 @@ public final class CallLogHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for call log actions.
-     *
-     * @implNote WAWebCallLogSync.getAction — returns
-     *           {@code WASyncdConst.Actions.CallLog} ({@code "call_log"})
      * @return the action name {@code "call_log"}
      */
     @Override
@@ -84,9 +69,6 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, the call log handler's {@code collectionName} is set
      * to {@code WASyncdConst.CollectionName.Regular} in the constructor.
-     *
-     * @implNote WAWebCallLogSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.Regular}
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
@@ -97,32 +79,12 @@ public final class CallLogHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for call log actions.
-     *
-     * @implNote WAWebCallLogSync.getVersion — returns {@code 1}
      * @return the version number {@code 1}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return CallLogAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a call log mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebCallLogSync.applyMutations — per-mutation inner logic,
-     *           success check on the returned {@code actionState}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -152,27 +114,22 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      * log message to a chat. The pairing timestamp and time-window checks are
      * omitted because they control browser-specific UI behavior (whether to show
      * the call in the conversation view).
-     *
-     * @implNote ADAPTED: WAWebCallLogSync.applyMutations — Cobalt stores the
-     *           {@code CallLog} record in the store instead of calling
-     *           {@code WAWebVoipActionWriteCallLogSync.generateCallLogFromCallSyncRecord}.
-     *           Pairing timestamp and time-window checks are omitted (browser UI concern).
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() == SyncdOperation.SET) {
                 if (!(mutation.value().action().orElse(null) instanceof CallLogAction action)) {
-                    return malformedActionValue();
+                    return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
                 var log = action.log().orElse(null);
                 if (log == null) {
-                    return malformedActionValue();
+                    return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
                 // ADAPTED: WA Web checks pairingTimestamp and happenedWithin(timestamp, MINUTE_SECONDS)
@@ -182,34 +139,29 @@ public final class CallLogHandler implements WebAppStateActionHandler {
                 // message to a chat. Cobalt stores the record in callLogStates keyed by index parts.
                 var indexArray = JSON.parseArray(mutation.index());
                 if (indexArray.size() < 4) {
-                    return malformedActionValue();
+                    return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
                 var peer = indexArray.getString(1);
                 var callId = indexArray.getString(2);
                 var fromMe = indexArray.getString(3);
                 if (peer == null || callId == null || fromMe == null) {
-                    return malformedActionValue();
+                    return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
-                var key = peer + "|" + callId + "|" + fromMe;
-                var states = new HashMap<>(client.store().callLogStates());
-                states.put(key, log);
-                client.store().setCallLogStates(states);
+                if (log.callId().isEmpty()) { // ADAPTED: addCallLog requires a non-empty callId on the log itself; bail out instead of fabricating a composite key
+                    return SyncdIndexUtils.malformedActionValue(collectionName().name());
+                }
+                client.store().addCallLog(log);
 
                 return MutationApplicationResult.success();
             } else if (mutation.operation() == SyncdOperation.REMOVE) {
                 // ADAPTED: WA Web simply returns Success for remove. Cobalt also removes from store.
                 var indexArray = JSON.parseArray(mutation.index());
                 if (indexArray.size() >= 4) {
-                    var peer = indexArray.getString(1);
                     var callId = indexArray.getString(2);
-                    var fromMe = indexArray.getString(3);
-                    if (peer != null && callId != null && fromMe != null) {
-                        var key = peer + "|" + callId + "|" + fromMe;
-                        var states = new HashMap<>(client.store().callLogStates());
-                        states.remove(key);
-                        client.store().setCallLogStates(states);
+                    if (callId != null) {
+                        client.store().removeCallLog(callId);
                     }
                 }
                 return MutationApplicationResult.success();
@@ -238,8 +190,6 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      *
      * <p>In Cobalt, the caller must supply the pre-computed caller JID and the
      * {@code CallLog} record directly.
-     *
-     * @implNote WAWebCallLogSync.getCallLogMutation
      * @param timestamp the mutation timestamp
      * @param callerJid the JID to use as the first index key (the resolved
      *                  caller or peer JID)

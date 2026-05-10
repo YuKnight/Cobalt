@@ -98,13 +98,6 @@ public sealed interface SmaxWaffleGetCertificateResponse extends SmaxOperation.R
     /**
      * The {@code Success} reply variant. The relay returned the
      * requested PEM subset.
-     *
-     * @implNote {@code WASmaxInWaffleGetCertificateResponseSuccess.parseGetCertificateResponseSuccess}
-     *           projects the {@code <reply/>} envelope's
-     *           {@code timestamp} attribute plus the optional
-     *           {@code <encryption_pem/>}, {@code <signature_pem/>},
-     *           and {@code <password_pem/>} children; Cobalt mirrors
-     *           that with three nullable {@link Pem} fields.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleGetCertificateResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleGetCertificateResponseMixin")
@@ -269,10 +262,6 @@ public sealed interface SmaxWaffleGetCertificateResponse extends SmaxOperation.R
 
     /**
      * The {@code ClientError} reply variant.
-     *
-     * @implNote {@code WASmaxInWaffleGetCertificateResponseError.parseGetCertificateResponseError}
-     *           routes through {@code WASmaxInWaffleGetCertificateErrors};
-     *           Cobalt collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInWaffleGetCertificateResponseError")
     final class ClientError implements SmaxWaffleGetCertificateResponse {

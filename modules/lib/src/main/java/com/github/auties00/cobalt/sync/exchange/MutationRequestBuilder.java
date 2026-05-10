@@ -48,9 +48,6 @@ import java.util.logging.Logger;
  * <p>Per WhatsApp Web behavior, outgoing patches are serialized as
  * {@code SyncdPatch} protobuf blobs containing encrypted mutations,
  * computed snapshotMac and patchMac, key ID, and device metadata.
- *
- * @implNote WAWebSyncdRequestBuilder.default, WAWebSyncdRequestBuilderBuild.buildSyncIqNode,
- *           WAWebSyncdRequestBuilderBuild._generateMutationsToUpload
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdRequestBuilder")
 @WhatsAppWebModule(moduleName = "WAWebSyncdRequestBuilderBuild")
@@ -81,9 +78,6 @@ public final class MutationRequestBuilder {
 
     /**
      * Constructs a new mutation request builder.
-     *
-     * @implNote ADAPTED: WAWebSyncdRequestBuilder, WAWebSyncdRequestBuilderBuild — module-level imports replaced
-     *           with constructor DI per Cobalt architecture
      * @param whatsapp       the WhatsApp client instance
      * @param abPropsService the AB props service for threshold configuration
      * @param wamService     the WAM telemetry service for committing media-upload events
@@ -107,15 +101,6 @@ public final class MutationRequestBuilder {
      * single-collection set: compacts mutation ids (pre-compaction) per
      * WA Web's {@code compactMap(t, e => e.id)}, then delegates to
      * {@code buildSyncIqNode}.
-     *
-     * @implNote WAWebSyncdRequestBuilder.buildAppStateSyncRequest
-     *           (single-collection variant),
-     *           WAWebSyncdRequestBuilderBuild.buildSyncIqNode,
-     *           WAWebSyncdRequestBuilderBuild._buildCollectionNodes.
-     *           ADAPTED: WA Web always batches across the dirty set; Cobalt
-     *           additionally exposes a single-collection variant for the
-     *           individual retry path in
-     *           {@code WAWebSyncdServerSync.serverSync}.
      * @param patchType the collection type to sync
      * @param patches   the pending mutations to include
      * @return the sync request containing the IQ node and optional upload info
@@ -190,7 +175,6 @@ public final class MutationRequestBuilder {
      *
      * @param bytes      the serialized {@code SyncdPatch} protobuf bytes
      * @param uploadInfo the upload metadata for post-response processing
-     * @implNote WAWebSyncdRequestBuilderBuild._buildCollectionNodes (inner function b/v return value)
      */
     private record PatchBuildResult(byte[] bytes, SyncRequest.UploadedPatchInfo uploadInfo) {
     }
@@ -203,7 +187,6 @@ public final class MutationRequestBuilder {
      * @param node           the IQ request node builder
      * @param uploadInfos    per-collection upload metadata for post-response processing
      * @param skippedUploads collections whose patches were skipped (e.g., compacted to empty)
-     * @implNote WAWebSyncdRequestBuilder.buildAppStateSyncRequest (return value structure)
      */
     public record BatchedSyncRequest(
             NodeBuilder node,
@@ -218,20 +201,6 @@ public final class MutationRequestBuilder {
      *
      * <p>Also captures upload metadata for post-response processing via
      * {@link SyncRequest.UploadedPatchInfo}.
-     *
-     * @implNote WAWebSyncdRequestBuilderBuild._buildCollectionNodes (inner function C/b),
-     *           WAWebSyncdRequestBuilderBuild._generateMutationsToUpload (orphan REMOVE filter
-     *           step — function D lines filtering REMOVE mutations whose index is not in
-     *           {@code getSyncActionsByCollectionsInTransaction}; the rotation-mutation
-     *           generation step is delegated to {@link #buildKeyRotationMutations}),
-     *           WAWebSyncdAntiTampering.computeOutgoingSnapshotAndPatchMacs,
-     *           WAWebSyncdMMSUpload.exceedInlineMutationCount (function g — inlined threshold check on
-     *           {@code syncdMutations.size()} vs {@code min(2000, max(100, abProp))}),
-     *           WAWebSyncdMMSUpload.exceedPatchProtobufSize (function h — inlined threshold check on
-     *           encoded patch bytes vs {@code min(100, max(10, abProp)) * 1000}),
-     *           WAWebSyncdMMSUpload.uploadPatch (function d/m — delegated to
-     *           {@link #uploadExternalMutations(List)}),
-     *           WAWebSyncdRequestBuilderBuild.L (inline patch builder)
      * @param patchType       the collection type
      * @param patches         the compacted pending mutations
      * @param hashState       the current hash state for this collection
@@ -430,8 +399,6 @@ public final class MutationRequestBuilder {
      * <p>Per WhatsApp Web {@code WAWebSyncdEncryptMutationsWrapper.encryptMutation}:
      * for SET operations the latest key is used, for REMOVE operations the
      * original key from the stored entry is looked up and used instead.
-     *
-     * @implNote WAWebSyncdEncryptMutationsWrapper.encryptMutation
      * @param patchType   the collection type
      * @param patches     the pending mutations to encrypt
      * @param derivedKeys the derived keys from the latest sync key
@@ -496,54 +463,6 @@ public final class MutationRequestBuilder {
      * every stored entry whose index appears as a SET in the batch and whose key
      * is not the latest. This tells the server to explicitly remove the old-key
      * entry before the new-key entry is applied.
-     *
-     * @implNote WAWebSyncdRequestBuilderBuild._generateMutationsToUpload (function T/D),
-     *           WAWebSyncdRequestBuilderBuild.x (rotation SET generation),
-     *           WAWebSyncdRequestBuilderBuild.$ (rotation REMOVE generation),
-     *           WAWebSyncdRequestBuilderTypesConverter.syncActionsToPendingMutations (inlined
-     *           at both rotation sites — Cobalt's {@link SyncActionEntry} already holds the
-     *           decoded {@link com.github.auties00.cobalt.model.sync.SyncActionValue}, so the
-     *           WA Web decode/re-encode pipeline collapses to wrapping the value in a
-     *           {@link DecryptedMutation.Trusted} paired with the caller-supplied operation;
-     *           the {@code binarySyncData → value → binarySyncAction} round-trip is absorbed
-     *           by {@link EncryptedMutation#of(SyncPendingMutation, MutationKeys, byte[])}
-     *           which re-serializes the value when it builds the outgoing {@code SyncActionData}.
-     *           Per-field mapping for the WA Web pending-mutation object literal:
-     *           {@code collection: e.collection} is flattened — the rotation generator runs
-     *           inside a {@code patchType}-scoped loop so the collection name is implicit;
-     *           {@code index: e.index} maps to {@code entry.actionIndex()};
-     *           {@code binarySyncAction: a} (the re-encoded {@code SyncActionValue} bytes) is
-     *           produced lazily inside {@link EncryptedMutation#of(SyncPendingMutation, MutationKeys, byte[])}
-     *           rather than eagerly here, so {@link DecryptedMutation.Trusted} carries the
-     *           decoded {@link com.github.auties00.cobalt.model.sync.SyncActionValue} and lets
-     *           the encryption step serialize once;
-     *           {@code operation: t} maps to the caller-supplied {@link SyncdOperation}
-     *           ({@code SET} for the rotation-set path, {@code REMOVE} for the rotation-remove
-     *           path);
-     *           {@code version: e.version} maps to {@code entry.actionVersion()};
-     *           {@code timestamp: e.timestamp} is not preserved on
-     *           {@link DecryptedMutation.Trusted} because Cobalt's {@link SyncActionEntry}
-     *           does not store a per-action timestamp (WA Web's {@code SyncActionEntry} carries
-     *           one only because it is populated from a freshly received mutation that has the
-     *           timestamp from the wire). Cobalt synthesizes {@link Instant#now()}
-     *           solely to satisfy the {@code Trusted} record's non-null contract; the field is
-     *           never read on the rotation path — neither
-     *           {@link EncryptedMutation#of(SyncPendingMutation, MutationKeys, byte[])} (which
-     *           uses {@link com.github.auties00.cobalt.model.sync.SyncActionValue#timestamp()}
-     *           from the decoded value) nor the upload-metadata pairing in
-     *           {@link #buildPatchProtobuf} (which only reads {@code index}, {@code value},
-     *           {@code actionVersion}) consume it;
-     *           {@code action: e.action} has no Cobalt counterpart — WA Web's stored
-     *           {@code action} mirror is the higher-level {@code SyncActionMessage} envelope
-     *           used for in-memory reactive collections, while Cobalt collapses that envelope
-     *           into the {@link com.github.auties00.cobalt.model.sync.SyncActionValue} held by
-     *           {@code entry.actionValue()}, which is the same payload re-derived on demand.
-     *           WAWebSyncdWamAppState.addKeyRotationRemoveCount (skipped per Cobalt's
-     *           telemetry policy — WA Web reports the rotation REMOVE count as a WAM metric).
-     *           ADAPTED: the orphan-REMOVE filter step of {@code _generateMutationsToUpload}
-     *           lives in the caller ({@link #buildPatchProtobuf}) because Cobalt encrypts the
-     *           user mutations first and delegates rotation generation here; the concatenation
-     *           of user mutations + rotation SETs + rotation REMOVEs happens at the call site.
      * @param patchType   the collection type
      * @param patches     the core mutations being sent (to exclude from rotation)
      * @param storedEntries the stored sync action entries for this collection, reused from the caller
@@ -690,24 +609,6 @@ public final class MutationRequestBuilder {
      * Cobalt does not implement the experimental KMP engine path; the AB
      * prop defaults to {@code false} so this is a no-op under default
      * configuration.
-     *
-     * @implNote WAWebSyncdRequestBuilder.buildAppStateSyncRequest,
-     *           WAWebSyncdRequestBuilderBuild.buildSyncIqNode,
-     *           WAWebSyncdRequestBuilderBuild._buildCollectionNodes.
-     *           ADAPTED: WA Web loads pending mutations internally via
-     *           {@code getSyncPendingMutationsByCollectionInTransaction};
-     *           Cobalt accepts pre-loaded mutations via the
-     *           {@code collectionPatches} parameter (caller performs the
-     *           load). The return shape is also restructured:
-     *           {@code collectionWithPendingMutationsIds},
-     *           {@code collectionWithEncryptedMutations}, and
-     *           {@code localCollectionVersions} are carried per-collection
-     *           inside each {@link SyncRequest.UploadedPatchInfo} in
-     *           {@code uploadInfos} rather than as separate top-level maps;
-     *           {@code pendingCollectionsInBootstrap} maps to
-     *           {@code skippedUploads}. The KMP engine fallback
-     *           ({@code kmp_syncd_engine_outgoing_processor_enabled}) is
-     *           not implemented (default {@code false}).
      * @param collectionPatches map of collection types to their pending mutations
      * @return the batched sync request containing the IQ node, per-collection upload metadata, and skipped uploads
      */
@@ -802,17 +703,6 @@ public final class MutationRequestBuilder {
      * then the mediaKey and encFilehash are base64-decoded into the returned
      * reference. In Cobalt the {@code MediaConnection.upload} method handles
      * encryption, upload, and field population in a single call.
-     *
-     * @implNote WAWebSyncdMMSUpload.uploadPatch (function d/m), WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch,
-     *           WAWebSyncdMMSUpload.buildExternalBlobReference (function p/_),
-     *           WAWebSyncdRequestEncode.encodeSyncdMutations.
-     *           ADAPTED: WA Web's three-step pipeline (uploadSyncExternalPatch → buildExternalBlobReference →
-     *           f encodes SyncdPatch) is collapsed: uploadSyncExternalPatch + buildExternalBlobReference are
-     *           fused into {@code MediaConnection.upload} which encrypts, uploads, and populates the
-     *           {@link ExternalBlobReference} fields ({@code mediaKey}, {@code directPath}, {@code handle},
-     *           {@code fileSizeBytes}, {@code fileSha256}, {@code fileEncSha256}) in a single call; the
-     *           final {@code f} step (encoding SyncdPatch with externalMutations) is performed by the caller
-     *           in {@link #buildPatchProtobuf} after this method returns
      * @param mutations the list of mutations to upload externally
      * @return the populated {@code ExternalBlobReference} with CDN metadata
      */
@@ -865,14 +755,6 @@ public final class MutationRequestBuilder {
      * {@code markOverallCumT}; Cobalt collapses the CDN upload into one
      * {@code MediaConnection.upload} call and reports the end-to-end duration
      * as {@code overallT}.
-     *
-     * @implNote WAWebCreateMediaUploadMetrics.handleUploadSuccess invoked from
-     * WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch via
-     * WAWebUploadManager.encryptAndUpload with {@code type="md-app-state"} and
-     * {@code uploadOrigin=UNKNOWN} (the Web reference passes
-     * {@code UPLOAD_ORIGIN.UNKNOWN} because app-state uploads are not bound to
-     * a chat; Cobalt reports {@code MESSAGE_HISTORY_SYNC} to align with the
-     * download-side {@code MediaDownload2Event} that the same flow emits).
      * @param uploadStart the instant at which the upload attempt began
      */
     @WhatsAppWebExport(moduleName = "WAWebCreateMediaUploadMetrics",
@@ -909,10 +791,6 @@ public final class MutationRequestBuilder {
      * code records it on {@code uploadHttpCode} and {@code finalizeHttpCode}
      * (matching the {@code u.uploadHttpCode = n; u.finalizeHttpCode = n}
      * assignments in the WA Web reference).
-     *
-     * @implNote WAWebCreateMediaUploadMetrics.handleUploadError invoked from
-     * WAWebSyncdNetCallbacksApi.uploadSyncExternalPatch when the underlying
-     * {@code encryptAndUpload} call rejects.
      * @param uploadStart the instant at which the upload attempt began
      * @param throwable   the error that aborted the upload
      */
@@ -951,8 +829,6 @@ public final class MutationRequestBuilder {
      * {@code HttpStatusCodeError}); Cobalt collapses the MMS error classes
      * into {@link WhatsAppMediaException.Upload} with an optional HTTP status
      * code, so the classifier dispatches on the status code when present.
-     *
-     * @implNote WAWebWamMediaMetricUtils.getMetricUploadErrorResultType.
      * @param throwable the error that aborted the upload
      * @return the matching {@link MediaUploadResultType}
      */
@@ -992,8 +868,6 @@ public final class MutationRequestBuilder {
      *
      * <p>Mirrors {@code WAWebWamMediaMetricUtils.getStatusCode}, which reads
      * the {@code status} attribute from {@code HttpStatusCodeError} instances.
-     *
-     * @implNote WAWebWamMediaMetricUtils.getStatusCode.
      * @param throwable the error to inspect
      * @return the HTTP status code, or {@code null} when the error does not
      *         carry one
@@ -1028,25 +902,6 @@ public final class MutationRequestBuilder {
      * applies a {@code unique-by-key} filter (internal helper {@code c}) keyed
      * on {@code e.index}, then reverses the result so that the last occurrence
      * of each index is preserved in its original relative position.
-     *
-     * @implNote WAWebSyncdRequestBuilderUtils.compactPatch (and its internal
-     *           unique-by-key helper {@code c}). ADAPTED: WA Web reverses the
-     *           input array in place via {@code e.reverse()}; Cobalt makes a
-     *           defensive copy before reversing so the caller's
-     *           {@link SequencedCollection} is not mutated. The key function
-     *           {@code e => e.index} maps to {@code patch.mutation().index()}
-     *           because Cobalt's {@link SyncPendingMutation} wraps the mutation
-     *           inside a {@link DecryptedMutation.Trusted} record rather than
-     *           exposing {@code index} as a direct property. The sibling
-     *           exports {@code compactKmpPatch} and {@code compactKmpPatchArray}
-     *           in the same WA Web module are not ported: they exist only as
-     *           JS-to-Kotlin FFI glue for the experimental KMP syncd engine
-     *           ({@code WAWebKmpSyncdRequestBuilder.buildOutgoingRequestWithKmp}),
-     *           which Cobalt intentionally does not implement (see the
-     *           {@code kmp_syncd_engine_outgoing_processor_enabled} AB prop
-     *           handling above). Those helpers dedupe by {@code encodedIndex}
-     *           on the Kotlin-side mutation shape; Cobalt's JVM-only
-     *           {@link SyncPendingMutation} has no {@code encodedIndex} field.
      * @param patches the pending mutations to compact
      * @return the compacted mutations
      */
@@ -1073,12 +928,6 @@ public final class MutationRequestBuilder {
      * <p>Wraps the protobuf serialization in error handling that converts any encoding
      * failure into a fatal {@link WhatsAppWebAppStateSyncException.UnexpectedError},
      * matching WA Web's {@code SyncdFatalError("patch protobuf serialization failed")}.
-     *
-     * @implNote WAWebSyncdRequestEncode.encodeSyncdPatch — WAM fatal-error metric
-     *           {@code reportSyncdFatalError(PATCH_PROTOBUF_SERIALIZATION_FAILED)} is
-     *           skipped per Cobalt's telemetry policy; the thrown
-     *           {@link WhatsAppWebAppStateSyncException.UnexpectedError} matches WA Web's
-     *           {@code SyncdFatalError("patch protobuf serialization failed")}
      * @param patch the syncd patch to encode
      * @return the protobuf-encoded bytes
      * @throws WhatsAppWebAppStateSyncException.UnexpectedError if protobuf serialization fails
@@ -1100,12 +949,6 @@ public final class MutationRequestBuilder {
      * <p>Wraps the protobuf serialization in error handling that converts any encoding
      * failure into a fatal {@link WhatsAppWebAppStateSyncException.UnexpectedError},
      * matching WA Web's {@code SyncdFatalError("mutations protobuf serialization failed")}.
-     *
-     * @implNote WAWebSyncdRequestEncode.encodeSyncdMutations — WAM fatal-error metric
-     *           {@code reportSyncdFatalError(MUTATIONS_PROTOBUF_SERIALIZATION_FAILED)} is
-     *           skipped per Cobalt's telemetry policy; the thrown
-     *           {@link WhatsAppWebAppStateSyncException.UnexpectedError} matches WA Web's
-     *           {@code SyncdFatalError("mutations protobuf serialization failed")}
      * @param mutations the syncd mutations to encode
      * @return the protobuf-encoded bytes
      * @throws WhatsAppWebAppStateSyncException.UnexpectedError if protobuf serialization fails

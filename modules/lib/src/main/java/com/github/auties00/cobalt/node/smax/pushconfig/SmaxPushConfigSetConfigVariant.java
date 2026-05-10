@@ -16,11 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of platform-specific {@code <config>} payloads.
- *
- * @implNote {@code WASmaxOutPushConfigConfigMixins.mergeConfigMixins}
- *           switches over the
- *           {@code (fBClient, androidClient, appleClient, wNSClient,
- *           enterpriseClient, webClient)} sextet.
  */
 public sealed interface SmaxPushConfigSetConfigVariant
         permits SmaxPushConfigSetConfigVariant.FbConfig, SmaxPushConfigSetConfigVariant.AndroidConfig,
@@ -148,14 +143,6 @@ public sealed interface SmaxPushConfigSetConfigVariant
     /**
      * The Android-client {@code <config>} variant. Wraps a list of
      * per-group mute items.
-     *
-     * @implNote {@code WASmaxOutPushConfigAndroidClientMixin.mergeAndroidClientMixin}
-     *           emits a bare {@code <config>} carrying
-     *           {@code REPEATED_CHILD(item, 0, ∞)} of
-     *           {@code <item jid=GROUP_JID mute=INT/>} and then
-     *           merges in
-     *           {@code WASmaxOutPushConfigAndroidClientConfigMixin}
-     *           for the trailing platform-specific attributes.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutPushConfigAndroidClientMixin")
     @WhatsAppWebModule(moduleName = "WASmaxOutPushConfigAndroidClientConfigMixin")
@@ -319,11 +306,6 @@ public sealed interface SmaxPushConfigSetConfigVariant
     /**
      * The Apple-client {@code <config platform>} variant. A thick
      * record of APNs / iOS-specific attributes.
-     *
-     * @implNote {@code WASmaxOutPushConfigAppleClientMixin.mergeAppleClientMixin}
-     *           carries 24 separate optional attributes plus a
-     *           per-{@code item} list. Cobalt models the full
-     *           shape verbatim.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutPushConfigAppleClientMixin")
     final class AppleConfig implements SmaxPushConfigSetConfigVariant {

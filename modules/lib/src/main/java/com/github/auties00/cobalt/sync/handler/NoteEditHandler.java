@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.NoteStateBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -15,14 +16,11 @@ import com.github.auties00.cobalt.model.sync.action.media.NoteEditActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -51,16 +49,11 @@ import java.util.logging.Logger;
  * {@code frontendFireAndForget("removeNotes", ...)} and
  * {@code frontendFireAndForget("upsertNotesFromSyncd", ...)}. Cobalt's store
  * mutations are applied directly, so the frontend dispatch is omitted.
- *
- * @implNote WAWebNoteSync.default — singleton instance of the handler class that
- *           extends {@code WAWebSyncdAction.AccountSyncdActionBase}
  */
 @WhatsAppWebModule(moduleName = "WAWebNoteSync")
 public final class NoteEditHandler implements WebAppStateActionHandler {
     /**
      * Logger for this handler.
-     *
-     * @implNote ADAPTED: WAWebNoteSync uses WALogger.WARN; Cobalt uses java.util.logging
      */
     private static final Logger LOGGER = Logger.getLogger(NoteEditHandler.class.getName());
 
@@ -69,16 +62,12 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web {@code WAWebNoteSync}, the module creates a single
      * instance ({@code var h = new g()}) and exports it as the default export.
-     *
-     * @implNote WAWebNoteSync — {@code var h = new g(); l.default = h}
      */
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final NoteEditHandler INSTANCE = new NoteEditHandler();
 
     /**
      * Constructs the singleton note edit handler.
-     *
-     * @implNote WAWebNoteSync — private constructor for singleton pattern
      */
     private NoteEditHandler() {
 
@@ -86,9 +75,6 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action type name this handler processes.
-     *
-     * @implNote WAWebNoteSync.getAction — returns
-     *           {@code WASyncdConst.Actions.NoteEdit} ({@code "note_edit"})
      * @return the action type name
      */
     @Override
@@ -99,9 +85,6 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection this handler's action belongs to.
-     *
-     * @implNote WAWebNoteSync constructor — sets {@code collectionName}
-     *           to {@code WASyncdConst.CollectionName.RegularLow}
      * @return the sync patch type / collection name
      */
     @Override
@@ -112,31 +95,12 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for this handler.
-     *
-     * @implNote WAWebNoteSync.getVersion — returns {@code 7}
      * @return the handler's supported mutation version
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return NoteEditAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single note edit mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebNoteSync.applyMutations — per-mutation application logic
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -161,16 +125,13 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      *   <li>Build the note record and call {@code addOrEditNote}</li>
      *   <li>Return {@code Success}</li>
      * </ol>
-     *
-     * @implNote WAWebNoteSync.applyMutations — the per-mutation handler within
-     *           the Promise.all mapping function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
@@ -178,24 +139,21 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
 
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() < 2) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             var noteId = indexArray.getString(1);
             if (noteId == null || noteId.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().action().orElse(null) instanceof NoteEditAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
-
-            var states = new HashMap<>(client.store().noteStates());
 
             //     yield getNoteTable().remove(s); v.push(s); return {actionState: Success}
             // }
             if (action.deleted()) {
-                states.remove(noteId);
-                client.store().setNoteStates(states);
+                client.store().removeNoteState(noteId);
                 return MutationApplicationResult.success();
             }
 
@@ -205,10 +163,10 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
             var createdAtOpt = action.createdAt();
 
             if (type == null) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
             if (rawChatJid == null) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
             // ADAPTED: WAWebNoteSync.applyMutations — validateChatJid(c); Cobalt uses Jid.of which is more lenient than validateChatJid
             var validatedChatJid = rawChatJid;
@@ -244,18 +202,16 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
             // }
             // ADAPTED: WAWebNoteSync.applyMutations — WA Web stores a flattened note record
             // ({id, type, chatJid, content, modifiedAt, createdAt}) in the NoteTable IDB. Cobalt
-            // stores the NoteEditAction itself in the flat noteStates map keyed by the resolved
-            // note id, preserving the action's type enum and createdAt in native units (ms).
-            var record = new NoteEditActionBuilder()
+            // stores the mirrored fields directly on the NoteState wrapper keyed by the resolved
+            // note id, preserving the action's type enum and createdAt as a native Instant.
+            client.store().putNoteState(new NoteStateBuilder()
+                    .id(resolvedNoteId)
                     .type(type)
                     .chatJid(resolvedChatJid)
                     .createdAt(createdAtOpt.orElse(Instant.EPOCH))
                     .deleted(false) // ADAPTED: explicit false for the non-deleted branch
                     .unstructuredContent(content != null ? content : "")
-                    .build();
-
-            states.put(resolvedNoteId, record);
-            client.store().setNoteStates(states);
+                    .build());
 
             return MutationApplicationResult.success();
         } catch (Exception e) {
@@ -278,10 +234,6 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      * from the mutation index. If both jids match, the original note id is used;
      * otherwise the note id is derived from the SHA-256 of the resolved chat jid
      * (base64-encoded).
-     *
-     * @implNote WAWebNoteSync.resolveNoteId — {@code t === e ? n : generateNoteId(t)}
-     *           where {@code generateNoteId} is {@code WAWebNotesIdUtils.generateNoteId}
-     *           which delegates to {@code WACryptoSha256.sha256Str} (SHA-256, base64)
      * @param actionChatJid the validated chat jid from the action payload
      * @param resolvedChatJid the canonical chat jid resolved from the store
      * @param indexNoteId the note id from the mutation index
@@ -304,10 +256,6 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      * }</pre>
      * where {@code sha256Str} produces SHA-256 bytes of the UTF-8 code points and
      * then base64-encodes them via {@code WABase64.encodeB64}.
-     *
-     * @implNote WAWebNotesIdUtils.generateNoteId — {@code sha256Str(e)};
-     *           {@code WACryptoSha256.sha256Str} hashes the UTF-8 bytes and
-     *           {@code WABase64.encodeB64} produces the standard base64 encoding
      * @param input the string to hash
      * @return the base64-encoded SHA-256 hash of the input
      * @throws IllegalStateException if the SHA-256 algorithm is unavailable on the JVM
@@ -335,10 +283,6 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      * <p>When {@code deleted} is {@code true} the {@code unstructuredContent}
      * and {@code chatJid} fields are still populated because WA Web's inbound
      * handler reads them before branching on the deletion flag.
-     *
-     * @implNote WAWebNoteSync — outgoing SET mutation shape mirrors the
-     *           inbound payload consumed by
-     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
      * @param noteId  the note identifier used as the mutation index
      * @param chatJid the chat the note is attached to
      * @param content the note text, may be {@code null} for deletions

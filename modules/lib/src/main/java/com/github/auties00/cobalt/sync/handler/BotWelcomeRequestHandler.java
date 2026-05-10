@@ -5,9 +5,9 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.bot.BotWelcomeRequestStateBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -15,10 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
 import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -34,8 +31,6 @@ import java.util.List;
  * provides shared chat-based mutation processing. The handler's
  * {@code chatJidIndex} is {@code 1}, {@code collectionName} is
  * {@code RegularLow}, and {@code getVersion()} returns {@code 2}.
- *
- * @implNote WAWebBotWelcomeRequestSync — singleton instance exported as {@code default}
  */
 @WhatsAppWebModule(moduleName = "WAWebBotWelcomeRequestSync")
 public final class BotWelcomeRequestHandler implements WebAppStateActionHandler {
@@ -44,17 +39,12 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      *
      * <p>Per WhatsApp Web, {@code WAWebBotWelcomeRequestSync} exports a single
      * instance ({@code var d = new c(); l.default = d}).
-     *
-     * @implNote WAWebBotWelcomeRequestSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final BotWelcomeRequestHandler INSTANCE = new BotWelcomeRequestHandler();
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebBotWelcomeRequestSync — class {@code c} constructor
-     *           ({@code chatJidIndex = 1, collectionName = RegularLow})
      */
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private BotWelcomeRequestHandler() {
@@ -63,9 +53,6 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
 
     /**
      * Returns the action name for bot welcome request actions.
-     *
-     * @implNote WAWebBotWelcomeRequestSync.getAction — returns
-     *           {@code WASyncdConst.Actions.BotWelcomeRequest} ({@code "bot_welcome_request"})
      * @return the action name {@code "bot_welcome_request"}
      */
     @Override
@@ -79,9 +66,6 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      *
      * <p>Per WhatsApp Web, the bot welcome request handler's {@code collectionName}
      * is set to {@code WASyncdConst.CollectionName.RegularLow} in the constructor.
-     *
-     * @implNote WAWebBotWelcomeRequestSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -92,32 +76,12 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
 
     /**
      * Returns the mutation format version for bot welcome request actions.
-     *
-     * @implNote WAWebBotWelcomeRequestSync.getVersion — returns {@code 2}
      * @return the version number {@code 2}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return BotWelcomeRequestAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a bot welcome request mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebBotWelcomeRequestSync.applyMutations — per-mutation inner logic,
-     *           success check on the returned {@code SyncActionState}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -137,15 +101,13 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      *
      * <p>{@code "remove"} operations return {@code Unsupported}. Any other operation
      * triggers an error (caught by the surrounding try/catch, returning {@code Failed}).
-     *
-     * @implNote WAWebBotWelcomeRequestSync.applyMutations — per-mutation inner function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() == SyncdOperation.REMOVE) {
             return MutationApplicationResult.unsupported();
         }
@@ -158,11 +120,11 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
             var indexArray = JSON.parseArray(mutation.index());
             var chatJidString = indexArray.getString(1);
             if (chatJidString == null || chatJidString.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().action().orElse(null) instanceof BotWelcomeRequestAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             // ADAPTED: WAWebBotWelcomeRequestSync.applyMutations: var c = n?.isSent; if (c == null) return malformedActionValue
@@ -176,11 +138,9 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            // ADAPTED: Cobalt stores hasRequestedWelcomeMsg in a separate map rather than on the chat record
-            var resolvedJid = chat.get().toJid().toString();
-            var states = new HashMap<>(client.store().botWelcomeRequestStates()); // ADAPTED: Cobalt uses a separate map for bot welcome request states
-            states.put(resolvedJid, action.isSent());
-            client.store().setBotWelcomeRequestStates(states);
+            // ADAPTED: Cobalt stores hasRequestedWelcomeMsg in a typed quintet keyed by bot JID rather than on the chat record
+            var resolvedJid = chat.get().toJid();
+            client.store().putBotWelcomeRequestState(new BotWelcomeRequestStateBuilder().botJid(resolvedJid).requested(action.isSent()).build());
 
             // ADAPTED: Cobalt does not have frontend event dispatching; the store update is sufficient
             return MutationApplicationResult.success();
@@ -200,8 +160,6 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      *   <li>Builds the pending mutation via {@code WAWebSyncdActionUtils.buildPendingMutation}
      *       with collection, index, value, version, operation SET, and current unix time</li>
      * </ol>
-     *
-     * @implNote WAWebBotWelcomeRequestSync.getBotWelcomeRequestSetMutation
      * @param chatJid the JID of the bot chat
      * @param isSent  whether the welcome message has been sent
      * @return the pending mutation for the bot welcome request action

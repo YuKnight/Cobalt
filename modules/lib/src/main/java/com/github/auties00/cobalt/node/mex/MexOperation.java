@@ -25,14 +25,6 @@ import java.util.Optional;
  * additionally implements either {@link Request.Json} or {@link Request.Argo}
  * to declare its payload encoding, and each {@code Response} mirrors the same
  * choice through {@link Response.Json} or {@link Response.Argo}.
- *
- * @implNote The {@code params.id} and {@code params.name} scalars fed into
- *           {@code MexPerfTracker} by {@code WAWebMexClient.fetchQuery} are
- *           surfaced by {@link Request#id()} and {@link Request#name()}, and
- *           the variables payload is the body that
- *           {@link Request.Json#createMexNode} or
- *           {@link Request.Argo#createMexNode} wraps in the canonical
- *           {@code <iq xmlns="w:mex"><query query_id="..."/></iq>} envelope.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexClient")
 public sealed interface MexOperation permits MexOperation.Request, MexOperation.Response {
@@ -85,14 +77,6 @@ public sealed interface MexOperation permits MexOperation.Request, MexOperation.
             /**
              * Builds the MEX IQ stanza that wraps a JSON-encoded GraphQL
              * query.
-             *
-             * @implNote WA Web passes the JSON payload as a {@code Uint8Array}
-             *           via {@code Binary.build(...).readByteArrayView()}.
-             *           Cobalt accepts a {@code String} here because the WAWap
-             *           encoder produces identical wire bytes for either
-             *           representation. The IQ {@code id} attribute is
-             *           injected by {@code WhatsAppClient.sendNode} when
-             *           missing, mirroring WA Web's {@code generateId()} call.
              * @param queryId     the numeric query identifier assigned to the
              *                    compiled GraphQL operation by the WA relay
              * @param jsonPayload the JSON string containing the serialised
@@ -128,12 +112,6 @@ public sealed interface MexOperation permits MexOperation.Request, MexOperation.
          * stanza with the {@code w:mex} namespace wrapping a {@code <query>}
          * node tagged with {@code query_id}. Only the body of the query and
          * the server reply differ, carrying raw Argo-encoded bytes.
-         *
-         * @implNote The current WA Web snapshot dispatches every MEX operation
-         *           through the JSON path. The Argo branch is preserved here
-         *           as a forward-looking extension that emits an identical
-         *           outer IQ envelope so it can be enabled without further
-         *           changes.
          */
         @WhatsAppWebModule(moduleName = "WAWebMexClient")
         @WhatsAppWebModule(moduleName = "WAWebMexNativeClient")
@@ -142,10 +120,6 @@ public sealed interface MexOperation permits MexOperation.Request, MexOperation.
             /**
              * Builds the MEX IQ stanza that wraps an Argo-encoded GraphQL
              * query.
-             *
-             * @implNote The Argo payload occupies the same byte-array body
-             *           slot the JSON variant uses for its UTF-8 envelope, and
-             *           the outer IQ attributes are byte-for-byte identical.
              * @param queryId     the numeric query identifier assigned to the
              *                    compiled GraphQL operation by the WA relay
              * @param argoPayload the Argo-encoded GraphQL variables

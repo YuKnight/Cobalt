@@ -11,11 +11,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
  * <p>Mirrors the cascading ternary of {@code WAWebWamNumberToSizeBucket},
  * which is the helper used by virtually every WAM emission that carries a
  * {@code deviceSizeBucket} property.
- *
- * @implNote WAWebWamNumberToSizeBucket: the single default-exported function
- *     returns the first matching {@link SizeBucket} in ascending-threshold
- *     order and falls through to {@link SizeBucket#LARGEST_BUCKET} for values
- *     at or above 5000.
  */
 @WhatsAppWebModule(moduleName = "WAWebWamNumberToSizeBucket")
 public final class WamSizeBuckets {
@@ -35,9 +30,6 @@ public final class WamSizeBuckets {
      *
      * @param count the count to classify
      * @return the matching {@link SizeBucket}; never {@code null}
-     *
-     * @implNote WAWebWamNumberToSizeBucket: the cascading ternary on the
-     *     default export; Cobalt mirrors the exact thresholds.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamNumberToSizeBucket",
             exports = "default",

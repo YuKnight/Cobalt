@@ -107,7 +107,7 @@ public final class CsTokenStanza {
             return null;
         }
 
-        var salt = store.nctSalt().orElse(null);
+        var salt = store.notificationContentTokenSalt().orElse(null);
         if (salt == null) {
             LOGGER.log(System.Logger.Level.WARNING, "[nct-cstoken] no salt available in store");
             return null;
@@ -167,9 +167,6 @@ public final class CsTokenStanza {
      *
      * @param jid the JID to check
      * @return {@code true} if the JID is a regular user
-     * @implNote ADAPTED: Cobalt does not have a PSA check; the PSA account is rare and
-     * irrelevant for NCT tokens, so {@code isUser() && !isBot()} is used as a
-     * sufficient approximation.
      */
     @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isRegularUser",
             adaptation = WhatsAppAdaptation.ADAPTED)

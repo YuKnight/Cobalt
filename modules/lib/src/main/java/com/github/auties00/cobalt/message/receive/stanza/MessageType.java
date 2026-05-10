@@ -12,10 +12,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
  * subsequent decision in the receive pipeline: {@code DeviceSentMessage} unwrapping
  * rules, receipt type selection, sender key distribution processing, and debug
  * placeholder generation all branch on this value.
- *
- * @implNote The first six values mirror WA Web's {@code MESSAGE_TYPE} enum directly.
- * {@link #PEER_CHAT} is a Cobalt-specific adaptation that fuses the {@code CHAT} type
- * with the {@code MSG_CATEGORY.peer} check that WA Web performs separately downstream.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgTypes.flow")
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgCommon")

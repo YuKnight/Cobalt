@@ -7,7 +7,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.setting.LocaleSetting;
@@ -15,8 +14,6 @@ import com.github.auties00.cobalt.model.sync.action.setting.LocaleSettingBuilder
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -43,12 +40,6 @@ import java.util.Objects;
  * <p>As on WA Web, the mutation is skipped entirely on the Windows hybrid
  * client because locale management is delegated to the host operating
  * system there.
- *
- * @implNote WAWebLocaleSettingSync.default — concrete subclass of
- *           {@code WAWebSyncdAction.AccountSyncdActionBase} with
- *           {@code collectionName = CriticalBlock}, {@code getVersion() = 3},
- *           {@code getAction() = Actions.LocaleSetting} and
- *           {@code applyMutations()} implementing the per-mutation locale apply.
  */
 @WhatsAppWebModule(moduleName = "WAWebLocaleSettingSync")
 public final class LocaleSettingHandler implements WebAppStateActionHandler {
@@ -58,8 +49,6 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
      * <p>WA Web instantiates the handler exactly once at module evaluation
      * time via {@code var _ = new p; l.default = _;}. Cobalt mirrors that by
      * exposing a module-level constant.
-     *
-     * @implNote WAWebLocaleSettingSync — {@code var _ = new p; l.default = _}
      */
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final LocaleSettingHandler INSTANCE = new LocaleSettingHandler();
@@ -69,9 +58,6 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
      *
      * <p>The constructor is private because callers should always go through
      * {@link #INSTANCE}, matching the WA Web module-level singleton.
-     *
-     * @implNote WAWebLocaleSettingSync — hidden {@code function a()} constructor
-     *           that only initializes {@code this.collectionName = CriticalBlock}
      */
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private LocaleSettingHandler() {
@@ -80,10 +66,6 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name this handler processes.
-     *
-     * @implNote WAWebLocaleSettingSync.getAction — returns
-     *           {@code WASyncdConst.Actions.LocaleSetting}, which resolves to
-     *           the string {@code "setting_locale"}
      * @return the constant {@link LocaleSetting#ACTION_NAME}
      */
     @Override
@@ -97,8 +79,6 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
      *
      * <p>On WA Web this is set on the prototype inside the constructor as
      * {@code this.collectionName = CollectionName.CriticalBlock}.
-     *
-     * @implNote WAWebLocaleSettingSync — {@code this.collectionName = WASyncdConst.CollectionName.CriticalBlock}
      * @return the constant {@link LocaleSetting#COLLECTION_NAME}, always
      *         {@link SyncPatchType#CRITICAL_BLOCK}
      */
@@ -110,36 +90,12 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version this handler supports.
-     *
-     * @implNote WAWebLocaleSettingSync.getVersion — {@code return 3}
      * @return the constant {@link LocaleSetting#ACTION_VERSION}, always {@code 3}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return LocaleSetting.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single decoded locale mutation.
-     *
-     * <p>Thin bridge over {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * that reduces the richer {@link MutationApplicationResult} state to a
-     * legacy boolean: {@code true} only for {@link SyncActionState#SUCCESS},
-     * {@code false} for {@code MALFORMED}, {@code UNSUPPORTED}, {@code SKIPPED}
-     * and {@code FAILED}.
-     *
-     * @implNote ADAPTED: WAWebLocaleSettingSync.applyMutations — the WA Web
-     *           inner async callback returns a {@code SyncActionState}; Cobalt
-     *           exposes both a boolean and a richer result through two methods
-     * @param client   the WhatsApp client the mutation is being applied to
-     * @param mutation the trusted, decoded mutation to apply
-     * @return {@code true} if the apply succeeded, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -189,8 +145,6 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
      * Cobalt, exceptions are allowed to propagate and the configured
      * {@code WhatsAppClientErrorHandler} decides recovery, per Cobalt's
      * pluggable error model.
-     *
-     * @implNote WAWebLocaleSettingSync.applyMutations — per-mutation async body
      * @param client   the WhatsApp client the mutation is being applied to
      * @param mutation the trusted, decoded mutation to apply
      * @return {@link MutationApplicationResult#skipped()} on Windows hybrid or
@@ -201,7 +155,7 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (client.store().device() != null && client.store().device().platform() == ClientPlatformType.WINDOWS) {
             return MutationApplicationResult.skipped();
         }
@@ -248,11 +202,6 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
      * and {@code WAWebDisableLinkPreviewsSync.getMutation} — so the public
      * {@code WhatsAppClient.changeLocale} setter can build a single mutation
      * without hand-rolling the protobuf wrapping.
-     *
-     * @implNote ADAPTED: WAWebSyncdActionUtils.buildPendingMutation — shaped
-     *           after {@code WAWebDisableLinkPreviewsSync.getMutation} (same
-     *           {@code collection / indexArgs=[] / value / version / operation=SET
-     *           / timestamp / action} payload).
      * @param timestamp the mutation timestamp
      * @param locale    the new BCP-47 locale tag (e.g. {@code "en_US"})
      * @return a pending mutation carrying the {@code setting_locale} action

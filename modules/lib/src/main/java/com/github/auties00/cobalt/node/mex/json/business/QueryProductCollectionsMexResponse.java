@@ -38,12 +38,6 @@ public final class QueryProductCollectionsMexResponse implements MexOperation.Re
 
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
-     *
-     * @implNote When the relay returns a GraphQL error with code
-     *           {@code 2498052} WA Web surfaces an empty response. Cobalt
-     *           applies the same behaviour by treating a missing
-     *           {@code xwa_product_catalog_get_collections} field as an
-     *           empty page.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
      * @return the parsed response, or empty if the expected JSON shape is
      *         absent
@@ -106,12 +100,6 @@ public final class QueryProductCollectionsMexResponse implements MexOperation.Re
     /**
      * Parses an array of GraphQL collection objects into a list of
      * {@link BusinessCatalog} values.
-     *
-     * @implNote Cobalt drops the {@code status_info} and {@code canAppeal}
-     *           side-channels since {@link BusinessCatalog} does not expose
-     *           them yet. The inner {@code products} array is parsed via
-     *           {@link CatalogProductParser#parseProducts(JSONArray)} to
-     *           share field handling with the catalog query.
      * @param array the GraphQL collections array, possibly {@code null}
      * @return the parsed collections, never {@code null}
      */

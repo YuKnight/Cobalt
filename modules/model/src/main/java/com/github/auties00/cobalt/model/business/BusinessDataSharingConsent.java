@@ -35,9 +35,9 @@ public enum BusinessDataSharingConsent {
     /**
      * The user has not yet been prompted to make a choice. The client
      * surfaces the consent dialog whenever this value is observed. Wire
-     * value {@code "notSet"}.
+     * value {@code "notset"}.
      */
-    NOT_SET(2, "notSet");
+    NOT_SET(2, "notset");
 
     /**
      * The protobuf wire-format index associated with this consent value.

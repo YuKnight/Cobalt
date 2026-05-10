@@ -15,13 +15,6 @@ import java.util.Optional;
  * The regular (non-hosted) companion's pair-success reply, carrying
  * the signed device-identity bundle plus the optional key-attestation
  * and gpia material.
- *
- * @implNote {@code WASmaxOutMdRegularCompanionSetRegResponseBundleMixin.mergeRegularCompanionSetRegResponseBundleMixin}
- *           wraps {@code <iq id to="s.whatsapp.net" type="result">}
- *           around {@code <pair-device-sign>} →
- *           {@code <device-identity key-index=…/>} plus optional
- *           {@code <key_attestation key_id?/>} and {@code <gpia/>}
- *           children.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutMdSetRegResponseClientResponse")
 @WhatsAppWebModule(moduleName = "WASmaxOutMdRegularCompanionSetRegResponseBundleMixin")
@@ -136,10 +129,6 @@ public final class SmaxMdSetRegResponseClient implements SmaxOperation.Request {
      * Builds the outbound regular pair-success reply stanza.
      *
      * @return a {@link NodeBuilder} carrying the reply envelope
-     *
-     * @implNote {@code WASmaxOutMdSetRegResponseClientResponse.makeSetRegResponseClientResponse}
-     *           composes
-     *           {@code mergeRegularCompanionSetRegResponseBundleMixin}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutMdSetRegResponseClientResponse",

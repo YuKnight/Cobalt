@@ -13,10 +13,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link IqDeleteTosRequest}.
- *
- * @implNote {@code WAWebTosJob.deleteTosState} routes through a no-op
- *           parser. Cobalt projects the three IQ shapes for caller
- *           visibility.
  */
 public sealed interface IqDeleteTosResponse extends IqOperation.Response
         permits IqDeleteTosResponse.Success, IqDeleteTosResponse.ClientError, IqDeleteTosResponse.ServerError {

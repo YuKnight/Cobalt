@@ -17,8 +17,6 @@ import java.util.Optional;
 /**
  * Sealed disjunction over the required pagination cursor. Either
  * {@code before} or {@code after} a server-id.
- *
- * @implNote {@code WASmaxOutNewslettersMessageUpdatesBeforeOrAfterMixinMixinGroup.mergeMessageUpdatesBeforeOrAfterMixinMixinGroup}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersMessageUpdatesBeforeOrAfterMixinMixinGroup")
 public sealed interface SmaxNewslettersGetNewsletterMessageUpdatesDirection permits SmaxNewslettersGetNewsletterMessageUpdatesDirection.Before, SmaxNewslettersGetNewsletterMessageUpdatesDirection.After {
@@ -26,8 +24,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessageUpdatesDirection perm
     /**
      * The {@code before} cursor. Fetch updates with server-ids
      * strictly less than the given pivot.
-     *
-     * @implNote {@code WASmaxOutNewslettersMessageUpdatesBeforeMixinMixin.mergeMessageUpdatesBeforeMixinMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersMessageUpdatesBeforeMixinMixin")
     final class Before implements SmaxNewslettersGetNewsletterMessageUpdatesDirection {
@@ -73,8 +69,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessageUpdatesDirection perm
     /**
      * The {@code after} cursor. Fetch updates with server-ids
      * strictly greater than the given pivot.
-     *
-     * @implNote {@code WASmaxOutNewslettersMessageUpdatesAfterMixinMixin.mergeMessageUpdatesAfterMixinMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersMessageUpdatesAfterMixinMixin")
     final class After implements SmaxNewslettersGetNewsletterMessageUpdatesDirection {

@@ -80,16 +80,6 @@ public final class SmaxGroupsUnlinkGroupsRequest implements SmaxOperation.Reques
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <unlink/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsUnlinkGroupsRequest.makeUnlinkGroupsRequest}
-     *           composes
-     *           {@code WASmaxOutGroupsBaseSetGroupMixin} over
-     *           {@code <unlink unlink_type="sub_group">REPEATED_CHILD(<group jid [remove_orphaned_members]/>)</unlink>}.
-     *           Cobalt mirrors the same nesting; the
-     *           {@code remove_orphaned_members} attribute is emitted
-     *           as the literal string {@code "true"} (matching the
-     *           server-side {@code OPTIONAL_LITERAL("true", flag)}
-     *           semantics).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsUnlinkGroupsRequest",

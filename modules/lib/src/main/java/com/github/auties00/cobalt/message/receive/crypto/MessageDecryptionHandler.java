@@ -38,9 +38,6 @@ public final class MessageDecryptionHandler {
     /**
      * Error types that block further decryption attempts when observed on a
      * non-SKMSG payload.
-     *
-     * @implNote Mirrors the WA Web {@code C = new Set([y.SignalRetryable])} constant.
-     * Only {@code SIGNAL_RETRYABLE} blocks further attempts via {@code canDecryptNext}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingDecryptionHandler", exports = "createDecryptionHandler",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -180,11 +177,6 @@ public final class MessageDecryptionHandler {
      *
      * @param error the exception to classify
      * @return the classified error type
-     *
-     * @implNote WA Web sub-classifies {@code SignalDecryptionError} by checking the
-     * error message text for {@code "errDuplicateMsg"}. In Cobalt the exception
-     * hierarchy already separates {@code DuplicateMessage} from other Signal errors
-     * at the source.
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingDecryptionHandler", exports = "createDecryptionHandler",
             adaptation = WhatsAppAdaptation.ADAPTED)

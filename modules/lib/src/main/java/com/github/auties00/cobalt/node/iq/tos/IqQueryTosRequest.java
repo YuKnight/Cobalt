@@ -51,11 +51,6 @@ public final class IqQueryTosRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <request>} payload
-     *
-     * @implNote {@code WAWebTosJob.queryTosState} composes the IQ via
-     *           {@code wap("iq", {xmlns:"tos", id, type:"get",
-     *           to:S_WHATSAPP_NET}, wap("request", null,
-     *           e.map(id =&#42;> wap("notice", {id}))))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTosJob",

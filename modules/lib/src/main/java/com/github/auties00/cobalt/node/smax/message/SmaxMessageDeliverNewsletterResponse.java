@@ -15,22 +15,6 @@ import java.util.Optional;
  * The inbound projection of the
  * {@code <message type="media" from=NEWSLETTER_JID id server_id t
  * is_sender?>...</message>} stanza.
- *
- * @implNote {@code WASmaxInMessageDeliverNewsletterRequest.parseNewsletterRequest}
- *           composes
- *           {@code WASmaxInMessageDeliverNewsletterMessageWithJIDMixin}
- *           (envelope: {@code from=newsletterJid}, fanout id /
- *           server_id / t / is_sender, optional original-msg-t /
- *           msg-edit-t / admin-profile / paid-partnership-content
- *           markers, the disjunctive newsletter-fanout-content
- *           projection) with
- *           {@code WASmaxInMessageDeliverReceiverContentTypeMediaRCATMixin}
- *           (mandatory {@code type="media"}, mandatory
- *           {@code <plaintext mediatype="url"/>} child, mandatory
- *           {@code <rcat/>} child carrying raw bytes). Cobalt keeps
- *           the variable-shape fanout-content payload accessible as
- *           the raw {@link Node} since each of the 14 disjunctive
- *           variants ships a distinct child schema.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInMessageDeliverNewsletterRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInMessageDeliverNewsletterMessageWithJIDMixin")

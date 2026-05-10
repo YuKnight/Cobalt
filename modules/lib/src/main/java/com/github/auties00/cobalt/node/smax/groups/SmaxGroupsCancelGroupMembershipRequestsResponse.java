@@ -16,10 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsCancelGroupMembershipRequestsRPC.sendCancelGroupMembershipRequestsRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError}.
  */
 public sealed interface SmaxGroupsCancelGroupMembershipRequestsResponse extends SmaxOperation.Response
         permits SmaxGroupsCancelGroupMembershipRequestsResponse.Success, SmaxGroupsCancelGroupMembershipRequestsResponse.ClientError, SmaxGroupsCancelGroupMembershipRequestsResponse.ServerError {
@@ -52,17 +48,6 @@ public sealed interface SmaxGroupsCancelGroupMembershipRequestsResponse extends 
     /**
      * The {@code Success} reply variant — the relay processed the
      * cancellation list and returned the per-participant outcomes.
-     *
-     * @implNote {@code WASmaxInGroupsCancelGroupMembershipRequestsResponseSuccess.parseCancelGroupMembershipRequestsResponseSuccess}
-     *           validates the IQ-result envelope, asserts the
-     *           {@code <cancel_membership_requests>} child, parses
-     *           the optional {@code addressing_mode} mixin, then
-     *           projects every {@code <participant>} via the
-     *           {@code WASmaxInGroupsMembershipRequestsCancellationParticipantMixins}
-     *           disjunction
-     *           ({@code CancelGroupMembershipRequestsParticipantRequestNotFound}
-     *           vs.
-     *           {@code ParticipantNotAuthorized}).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsCancelGroupMembershipRequestsResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupAddressingModeMixin")

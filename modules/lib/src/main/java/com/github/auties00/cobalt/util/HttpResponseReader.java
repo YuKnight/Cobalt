@@ -23,14 +23,6 @@ import java.nio.ByteBuffer;
  * {@link #getBuffered(byte[], int, int)}, {@link #skipBuffered(int)},
  * {@link #bufferedRemaining()}, {@link #refillBuffered(long)}, and
  * {@link #accountHeaderBytes(int)}.
- *
- * @implNote The buffer is allocated lazily on first refill and reused
- *     across parses, since {@link #reset()} only clears cursors and never
- *     the array. {@link #skipHeaders(long)} and {@link #skipToEndOfLine(long)}
- *     use vectorised LF scanning when the remaining buffer is large enough
- *     to amortise the vector setup cost and fall back to scalar otherwise.
- *     WhatsApp Web has no counterpart because the browser handles the
- *     equivalent negotiations.
  */
 public final class HttpResponseReader {
     private static final int HTTP_VERSION_MAJOR = 1;
@@ -428,10 +420,6 @@ public final class HttpResponseReader {
      * Performs a case-insensitive comparison of {@code patternLen} bytes
      * starting at {@code bufPos + offset} against a lowercase ASCII
      * {@code pattern}.
-     *
-     * @implNote Case folding uses {@code (b | 0x20)}, correct for ASCII
-     *     letters and a no-op for digits, hyphens, colons, and other
-     *     non-letter bytes whose bit 5 is already set or irrelevant.
      * @param offset     the zero-based offset from the current position
      * @param pattern    the expected bytes, already lowercase
      * @param patternLen the number of bytes to compare
@@ -603,11 +591,6 @@ public final class HttpResponseReader {
     /**
      * Scans for a {@link #LINE_FEED} byte starting at {@code from},
      * dynamically choosing between a SIMD vector scan and a scalar loop.
-     *
-     * @implNote When the number of bytes to scan is below
-     *     {@link #VECTOR_SCAN_THRESHOLD}, the scalar fallback is used
-     *     because vector lane setup, mask extraction, and tail handling
-     *     would cost more than a simple byte loop over such a small range.
      * @param from the buffer index to start scanning from
      * @return the distance from {@code from} to the first LF (exclusive),
      *         or {@code -1} if no LF is found before {@link #bufLimit}
@@ -662,11 +645,6 @@ public final class HttpResponseReader {
      * Appends {@code count} bytes from the current buffer position to the
      * given {@link StringBuilder} as ISO-8859-1 characters and advances
      * the buffer position.
-     *
-     * @implNote ISO-8859-1 is a 1:1 byte to char mapping so no decoding
-     *     state is needed. Intended for slow-path header value reads where
-     *     the value spans multiple buffer refills and a {@code byte[]}
-     *     accumulator is undesirable.
      * @param sb    the target builder
      * @param count the number of bytes to append
      */

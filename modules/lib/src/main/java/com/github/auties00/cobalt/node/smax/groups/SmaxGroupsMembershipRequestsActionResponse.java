@@ -15,10 +15,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsMembershipRequestsActionRPC.sendMembershipRequestsActionRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError}.
  */
 public sealed interface SmaxGroupsMembershipRequestsActionResponse extends SmaxOperation.Response
         permits SmaxGroupsMembershipRequestsActionResponse.Success, SmaxGroupsMembershipRequestsActionResponse.ClientError, SmaxGroupsMembershipRequestsActionResponse.ServerError {
@@ -51,15 +47,6 @@ public sealed interface SmaxGroupsMembershipRequestsActionResponse extends SmaxO
      * The {@code Success} reply variant — the relay processed the
      * action and returned the per-participant outcomes split into
      * approved / rejected lists.
-     *
-     * @implNote {@code WASmaxInGroupsMembershipRequestsActionResponseSuccess.parseMembershipRequestsActionResponseSuccess}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope, then walks the
-     *           {@code <membership_requests_action>} child for
-     *           optional {@code <approve>} / {@code <reject>}
-     *           grand-children — each carrying its own
-     *           {@code 1..19999} {@code <participant>} list with
-     *           the corresponding mixin projection.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsMembershipRequestsActionResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupAddressingModeMixin")
@@ -216,15 +203,6 @@ public sealed interface SmaxGroupsMembershipRequestsActionResponse extends SmaxO
          * The per-participant approval outcome — surfaces the
          * approved JID and the optional identity-mixin payload
          * carried by the relay.
-         *
-         * @implNote {@code WASmaxInGroupsIdentityMixin} carries the
-         *           Signal-protocol identity key fingerprints used
-         *           by clients that pre-fetch sender keys for
-         *           imminent group messaging; Cobalt does not
-         *           project the inner mixin fields here, exposing
-         *           presence-only via
-         *           {@link #hasIdentityPayload()} for callers that
-         *           need to drive the identity refresh.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInGroupsIdentityMixin")
         @WhatsAppWebModule(moduleName = "WASmaxInGroupsMembershipRequestsActionAcceptParticipantMixins")

@@ -4,11 +4,9 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
 import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -16,12 +14,6 @@ import java.util.OptionalInt;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGetBusinessEligibilityRequest}.
- *
- * @implNote {@code WASmaxBizMarketingMessageGetBusinessEligibilityRPC.sendGetBusinessEligibilityRPC}
- *           tries {@code Success} → {@code Error} in order. Cobalt
- *           collapses the {@code Error} arm into the
- *           {@code ClientError}/{@code ServerError} pair via the
- *           shared {@link SmaxBaseServerErrorMixin} helpers.
  */
 public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation.Response
         permits SmaxGetBusinessEligibilityResponse.Success, SmaxGetBusinessEligibilityResponse.ClientError, SmaxGetBusinessEligibilityResponse.ServerError {
@@ -59,12 +51,6 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
     /**
      * The {@code Success} reply variant. Carries 0..3 optional
      * feature-eligibility projections.
-     *
-     * @implNote {@code WASmaxInBizMarketingMessageGetBusinessEligibilityResponseSuccess.parseGetBusinessEligibilityResponseSuccess}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope, then optionally projects the three
-     *           top-level children: {@code <meta_verified/>},
-     *           {@code <marketing_messages/>}, and {@code <genai/>}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageGetBusinessEligibilityResponseSuccess")
     final class Success implements SmaxGetBusinessEligibilityResponse {
@@ -555,12 +541,6 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
     /**
      * The {@code ClientError} reply variant. The relay rejected the
      * request with a {@code 4xx} error code.
-     *
-     * @implNote {@code WASmaxInBizMarketingMessageGetBusinessEligibilityResponseError.parseGetBusinessEligibilityResponseError}
-     *           routes the {@code <error/>} child through
-     *           {@code WASmaxInBizMarketingMessageIQErrorBadRequestOrForbiddenOrInternalServerErrorOrServiceUnavailableMixinGroup};
-     *           Cobalt collapses to the raw {@code (code, text)}
-     *           pair via the shared {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageGetBusinessEligibilityResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageIQErrorBadRequestOrForbiddenOrInternalServerErrorOrServiceUnavailableMixinGroup")
@@ -620,6 +600,9 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
         @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageGetBusinessEligibilityResponseError",
                 exports = "parseGetBusinessEligibilityResponseError",
                 adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageIQErrorBadRequestOrForbiddenOrInternalServerErrorOrServiceUnavailableMixinGroup",
+                exports = "parseIQErrorBadRequestOrForbiddenOrInternalServerErrorOrServiceUnavailableMixinGroup",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<ClientError> of(Node node, Node request) {
             var envelope = SmaxBaseServerErrorMixin.parseClientError(node, request).orElse(null);
             if (envelope == null) {
@@ -655,13 +638,9 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
     /**
      * The {@code ServerError} reply variant. The relay encountered
      * a transient internal failure ({@code 5xx}).
-     *
-     * @implNote Sourced from the {@code 5xx} arms of
-     *           {@code WASmaxInBizMarketingMessageIQErrorBadRequestOrForbiddenOrInternalServerErrorOrServiceUnavailableMixinGroup};
-     *           Cobalt routes through the shared
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageGetBusinessEligibilityResponseError")
+    @WhatsAppWebModule(moduleName = "WASmaxInBizMarketingMessageIQErrorBadRequestOrForbiddenOrInternalServerErrorOrServiceUnavailableMixinGroup")
     final class ServerError implements SmaxGetBusinessEligibilityResponse {
         /**
          * The numeric server-side error code.
@@ -715,6 +694,12 @@ public sealed interface SmaxGetBusinessEligibilityResponse extends SmaxOperation
          *         or empty when the stanza does not match the
          *         server-error schema
          */
+        @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageGetBusinessEligibilityResponseError",
+                exports = "parseGetBusinessEligibilityResponseError",
+                adaptation = WhatsAppAdaptation.ADAPTED)
+        @WhatsAppWebExport(moduleName = "WASmaxInBizMarketingMessageIQErrorBadRequestOrForbiddenOrInternalServerErrorOrServiceUnavailableMixinGroup",
+                exports = "parseIQErrorBadRequestOrForbiddenOrInternalServerErrorOrServiceUnavailableMixinGroup",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<ServerError> of(Node node, Node request) {
             var envelope = SmaxBaseServerErrorMixin.parseServerError(node, request).orElse(null);
             if (envelope == null) {

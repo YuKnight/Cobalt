@@ -22,8 +22,6 @@ import java.util.concurrent.TimeUnit;
  * Per WhatsApp Web WAWebSyncdStoreMissingKeys: when sync keys are missing,
  * a timeout is scheduled. If the keys are still missing after the timeout,
  * a fatal sync error is triggered.
- *
- * @implNote WAWebSyncdStoreMissingKeys, WAWebSyncdRequestAllSyncdMissingKeysJob
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdStoreMissingKeys")
 @WhatsAppWebModule(moduleName = "WAWebSyncdRequestAllSyncdMissingKeysJob")
@@ -35,8 +33,6 @@ public final class MissingSyncKeyTimeoutScheduler {
 
     /**
      * Interval in hours between periodic re-requests of missing sync keys.
-     *
-     * @implNote WAWebTasksDefinitions: HOUR_SECONDS * 6
      */
     private static final long RE_REQUEST_INTERVAL_HOURS = 6;
 
@@ -52,52 +48,38 @@ public final class MissingSyncKeyTimeoutScheduler {
 
     /**
      * The AB props service for reading timeout configuration.
-     *
-     * @implNote WAWebSyncdGatingUtils.getSyncdWaitForKeyTimeoutDays
      */
     private final ABPropsService abPropsService;
 
     /**
      * The request service for periodic re-requests of missing sync keys.
-     *
-     * @implNote WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob
      */
     private final MissingSyncKeyRequestService requestService;
 
     /**
      * Single-threaded scheduler for all timeout and periodic tasks.
-     *
-     * @implNote Replaces WA Web's {@code setTimeout}/{@code setInterval}.
      */
     private final ScheduledExecutorService scheduler;
 
     /**
      * The currently scheduled timeout check future, corresponding to WA Web's
      * module-level variable {@code S} which holds the timeout timer ID.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys: S (timeout timer)
      */
     private volatile ScheduledFuture<?> scheduledCheck;
 
     /**
      * The currently scheduled all-devices-responded grace period check future.
      * Independent of {@link #scheduledCheck}.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients: asyncSleep(5e3)
      */
     private volatile ScheduledFuture<?> allDevicesCheck;
 
     /**
      * The periodic re-request job future.
-     *
-     * @implNote WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob
      */
     private volatile ScheduledFuture<?> reRequestJob;
 
     /**
      * Creates a new timeout scheduler.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys (module-level state: var S for timeout timer)
      * @param client         the WhatsApp client
      * @param abPropsService the AB props service for timeout configuration
      * @param requestService the request service for periodic re-requests
@@ -121,8 +103,6 @@ public final class MissingSyncKeyTimeoutScheduler {
      * and schedules a check when that timeout expires. Wraps the internal
      * {@code _setMissingKeyTimeout} logic and is the equivalent of calling
      * {@code setMissingKeyTimeoutInTransaction} (exported as {@code k}).
-     *
-     * @implNote WAWebSyncdStoreMissingKeys.setMissingKeyTimeoutInTransaction, WAWebSyncdStoreMissingKeys._setMissingKeyTimeout
      */
     public synchronized void scheduleTimeoutCheck() {
         if (scheduledCheck != null && !scheduledCheck.isDone()) { // WAWebSyncdStoreMissingKeys._setMissingKeyTimeout: clearTimeout(S)
@@ -158,8 +138,6 @@ public final class MissingSyncKeyTimeoutScheduler {
      * re-verifies that keys are still missing before triggering a fatal error,
      * since they may have arrived between scheduling and firing. Triggers a
      * single global fatal error rather than per-key errors.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys._timeoutWhileWaitingForMissingKey, WAWebSyncdStoreMissingKeys.hasExpiredKeys
      */
     private void checkForExpiredKeys() {
         var currentMissingKeys = store.missingSyncKeys(); // WAWebSyncdStoreMissingKeys.hasExpiredKeys: getAllMissingKeysInTransaction()
@@ -204,8 +182,6 @@ public final class MissingSyncKeyTimeoutScheduler {
      * <p>This path is intentionally separate from the multi-day wait-for-key timeout:
      * after all devices have replied without the key, WhatsApp Web only applies a
      * short grace period before treating the key as unrecoverable.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients
      */
     private void checkForAllDevicesRespondedWithoutKey() {
         var currentMissingKeys = store.missingSyncKeys(); // WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients: yield t.getAll()
@@ -233,8 +209,6 @@ public final class MissingSyncKeyTimeoutScheduler {
 
     /**
      * Gets the timeout duration from AB props.
-     *
-     * @implNote WAWebSyncdGatingUtils.getSyncdWaitForKeyTimeoutDays
      * @return the timeout as a {@link Duration}
      */
     private Duration getTimeout() {
@@ -254,15 +228,6 @@ public final class MissingSyncKeyTimeoutScheduler {
      * timeout, then schedules {@code setMissingKeyTimeoutInTransaction} after
      * 20 seconds. {@code WAWebTasksDefinitions} drives the job every
      * {@code HOUR_SECONDS * 6} (6 hours).
-     *
-     * @implNote WAWebSyncdRequestAllSyncdMissingKeysJob.requestAllSyncdMissingKeysJob,
-     *     WAWebSyncdHandleMissingKeys.requestAllMissingKeys,
-     *     WAWebTasksDefinitions (6-hour cadence).
-     *     ADAPTED: Cobalt uses {@link ScheduledExecutorService#scheduleAtFixedRate}
-     *     instead of {@code NonPersistedJob} + {@code WAWebTasksDefinitions}.
-     *     The {@code BEST_EFFORT} priority and {@code maxTimeoutMs: 30_000}
-     *     wrapper have no Cobalt equivalent — the job is executed directly
-     *     on a virtual thread.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestAllSyncdMissingKeysJob",
             exports = "requestAllSyncdMissingKeysJob",
@@ -301,8 +266,6 @@ public final class MissingSyncKeyTimeoutScheduler {
      * <p>Per WhatsApp Web behavior, a 5-second grace period is added before
      * declaring a key as missing on all devices. This allows for late-arriving
      * key share responses that may resolve the missing key.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys._checkMissingKeyOnAllClients
      */
     public synchronized void scheduleAllDevicesRespondedCheck() {
         if (allDevicesCheck != null && !allDevicesCheck.isDone()) { // ADAPTED: cancel previous grace-period check if already pending
@@ -319,8 +282,6 @@ public final class MissingSyncKeyTimeoutScheduler {
      * Per WhatsApp Web {@code WAWebSyncdStoreMissingKeys._setMissingKeyTimeout}:
      * corresponds to the {@code clearTimeout(S); S = null} preamble when the
      * caller wants to cancel without rescheduling.
-     *
-     * @implNote WAWebSyncdStoreMissingKeys._setMissingKeyTimeout (clearTimeout(S); S = null)
      */
     public synchronized void cancel() {
         if (scheduledCheck != null && !scheduledCheck.isDone()) {
@@ -331,8 +292,6 @@ public final class MissingSyncKeyTimeoutScheduler {
     /**
      * Shuts down the scheduler, cancelling all pending timeout checks,
      * all-devices-responded grace period checks, and the periodic re-request job.
-     *
-     * @implNote NO_WA_BASIS: Java lifecycle management, WA Web relies on page unload
      */
     public void shutdown() {
         cancel();

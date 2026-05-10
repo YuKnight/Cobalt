@@ -31,9 +31,6 @@ public record ExternalEntryPoint(
     /**
      * Maximum age of an external entry point before it is considered expired and
      * discarded.
-     *
-     * @implNote WA Web reads this constant from {@code WATimeUtils.WEEK_MILLISECONDS},
-     * exported as {@code 6048e5} milliseconds (seven days).
      */
     @WhatsAppWebExport(moduleName = "WATimeUtils", exports = "WEEK_MILLISECONDS",
             adaptation = WhatsAppAdaptation.DIRECT)

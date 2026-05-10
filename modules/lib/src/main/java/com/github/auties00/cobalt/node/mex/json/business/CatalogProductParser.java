@@ -24,13 +24,6 @@ import java.util.Optional;
  * the catalog query and the product-collections query response decoders.
  * Cobalt centralises the projection here so that the two decoders share the
  * same field handling.
- *
- * @implNote Restricts the parse to the fields surfaced by
- *           {@link BusinessCatalogEntry} (id, retailer_id, name, description,
- *           url, currency, price, visibility, first image URL, status, stock
- *           availability). The remaining WA Web fields (variants, compliance,
- *           videos, sale price) are intentionally dropped since Cobalt does
- *           not expose them yet.
  */
 @WhatsAppWebModule(moduleName = "WAWebBizParseProductGraphql")
 @WhatsAppWebModule(moduleName = "WAWebBizParseProductGraphql_product.graphql")

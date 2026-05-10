@@ -16,10 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsPromoteDemoteAdminRPC.sendPromoteDemoteAdminRPC}
- *           tries {@code SuccessMultiAdmin} → {@code ClientError} →
- *           {@code ServerError}.
  */
 public sealed interface SmaxGroupsPromoteDemoteAdminResponse extends SmaxOperation.Response
         permits SmaxGroupsPromoteDemoteAdminResponse.SuccessMultiAdmin, SmaxGroupsPromoteDemoteAdminResponse.ClientError, SmaxGroupsPromoteDemoteAdminResponse.ServerError {
@@ -53,13 +49,6 @@ public sealed interface SmaxGroupsPromoteDemoteAdminResponse extends SmaxOperati
      * processed the admin roster change and returned the
      * per-participant outcomes under a uniform {@code <admin>}
      * envelope.
-     *
-     * @implNote {@code WASmaxInGroupsPromoteDemoteAdminResponseSuccessMultiAdmin.parsePromoteDemoteAdminResponseSuccessMultiAdmin}
-     *           validates the IQ-result envelope, asserts the
-     *           {@code <admin>} child, parses the optional
-     *           {@code addressing_mode} mixin, then projects each
-     *           {@code <participant>} via the
-     *           {@code ENUM_403_404_406_419} error projection.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsPromoteDemoteAdminResponseSuccessMultiAdmin")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGroupAddressingModeMixin")

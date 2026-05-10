@@ -168,7 +168,7 @@ public enum NewsletterCapability {
      * @return the matching capability constant, or {@link #UNKNOWN} when
      *         {@code name} is {@code null} or does not match any constant
      */
-    static NewsletterCapability of(String name) {
+    public static NewsletterCapability of(String name) {
         return name == null ? UNKNOWN : BY_NAME.getOrDefault(name.toLowerCase(), UNKNOWN);
     }
 

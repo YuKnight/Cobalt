@@ -96,13 +96,6 @@ public final class IqGroupExitRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <leave>} payload
-     *
-     * @implNote {@code WAWebGroupExitJob} composes
-     *           {@code WAWap.wap("iq", {to:G_US, type:"set",
-     *           xmlns:"w:g2", id}, wap("leave", null, [...children]))}
-     *           where each child is either
-     *           {@code wap("group", {id:GROUP_JID(t)})} or
-     *           {@code wap("linked_groups", {parent_group_jid:GROUP_JID(t)})}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebGroupExitJob",

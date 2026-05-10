@@ -15,15 +15,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WAWebQueryPrivacyDisallowedListPnJob.getPrivacyDisallowedListParser}
- *           projects the result as
- *           {@code {status: "match"}} when the relay omits the
- *           {@code <list>} grandchild (local copy authoritative)
- *           and {@code {status: "mismatch", users, dhash}} when it
- *           is present. Cobalt models the dichotomy as the typed
- *           {@link IqQueryPrivacyDisallowedListPnResponse.Match} / {@link IqQueryPrivacyDisallowedListPnResponse.Mismatch}
- *           sub-variants of {@link IqQueryPrivacyDisallowedListPnResponse.Success}.
  */
 public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperation.Response
         permits IqQueryPrivacyDisallowedListPnResponse.Success, IqQueryPrivacyDisallowedListPnResponse.ClientError, IqQueryPrivacyDisallowedListPnResponse.ServerError {
@@ -60,11 +51,6 @@ public sealed interface IqQueryPrivacyDisallowedListPnResponse extends IqOperati
      * query and either confirmed the local cache is authoritative
      * ({@link Match}) or shipped the up-to-date authoritative list
      * ({@link Mismatch}).
-     *
-     * @implNote {@code WAWebQueryPrivacyDisallowedListPnJob.getPrivacyDisallowedListParser}:
-     *           {@code maybeChild("list")} -> {@code "match"} when
-     *           absent, otherwise project
-     *           {@code {users, dhash}}.
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryPrivacyDisallowedListPnJob")
     sealed interface Success extends IqQueryPrivacyDisallowedListPnResponse permits Match, Mismatch {

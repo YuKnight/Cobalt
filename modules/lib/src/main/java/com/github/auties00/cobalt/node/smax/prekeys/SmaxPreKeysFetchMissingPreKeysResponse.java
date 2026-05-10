@@ -19,12 +19,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxPreKeysFetchMissingPreKeysRequest}.
- *
- * @implNote {@code WASmaxPreKeysFetchMissingPreKeysRPC.sendFetchMissingPreKeysRPC}
- *           tries {@code Success} → {@code RequestError} →
- *           {@code ServerError} in order. Cobalt mirrors the priority
- *           and renames {@code RequestError} to the consistent
- *           {@link SmaxPreKeysFetchMissingPreKeysResponse.ClientError} naming.
  */
 public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOperation.Response
         permits SmaxPreKeysFetchMissingPreKeysResponse.Success, SmaxPreKeysFetchMissingPreKeysResponse.ClientError, SmaxPreKeysFetchMissingPreKeysResponse.ServerError {
@@ -59,14 +53,6 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
      * {@code <list>} carrying one {@code <user>} entry per requested
      * user, each entry carrying one {@code <device>} per requested
      * device.
-     *
-     * @implNote {@code WASmaxInPreKeysFetchMissingPreKeysResponseSuccess.parseFetchMissingPreKeysResponseSuccess}
-     *           validates the {@code <iq type="result">} envelope,
-     *           extracts the {@code <list/>} child, and projects every
-     *           {@code <user/>} via the {@code UserSuccess} →
-     *           {@code UserError} → {@code UserErrorFallback}
-     *           disjunction. Cobalt collapses the two error sub-shapes
-     *           into the single {@link UserError} variant.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchMissingPreKeysResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysIQResultResponseMixin")
@@ -172,9 +158,6 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
              *                 {@code null}
              * @return an {@link Optional} carrying the parsed entry, or
              *         empty on no-match
-             *
-             * @implNote mirrors
-             *           {@code WASmaxInPreKeysUserFetchMissingPreKeysSuccessOrFetchMissingPreKeysErrorOrFetchMissingPreKeysErrorFallbackMixinGroup}.
              */
             static Optional<UserEntry> of(Node userNode) {
                 Objects.requireNonNull(userNode, "userNode cannot be null");
@@ -190,14 +173,6 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
          * The successful per-user projection. Carries one
          * {@link DeviceKeyBundle} per device the relay was able to
          * resolve.
-         *
-         * @implNote {@code WASmaxInPreKeysFetchMissingPreKeysUserSuccessMixin.parseFetchMissingPreKeysUserSuccessMixin}
-         *           projects {@code <user jid={UserJid}>(<device id>...)*}
-         *           where each {@code <device/>} carries the same
-         *           full bundle subtree as the {@code FetchKeyBundles}
-         *           per-user success projection plus a
-         *           {@code <registration/>} mixin pinning the bundle to
-         *           a specific registration id.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchMissingPreKeysUserSuccessMixin")
         public static final class UserDeviceBundle implements UserEntry {
@@ -310,11 +285,6 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
          * The per-device pre-key bundle projection. Carries every
          * piece of cryptographic material needed to seed a Signal
          * session for one device of a target user.
-         *
-         * @implNote {@code WASmaxInPreKeysFetchMissingPreKeysUserSuccessDevice}
-         *           projects {@code <device id=INT(t)>(<registration/>
-         *           <type/>? <identity/> <key/>? <skey/>
-         *           <device-identity/>?)}.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchMissingPreKeysUserSuccessMixin")
         @WhatsAppWebModule(moduleName = "WASmaxInPreKeysRegistrationIDMixin")
@@ -624,12 +594,6 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
         /**
          * The per-user error projection. Surfaces a relay-side
          * rejection for a single addressee.
-         *
-         * @implNote {@code WASmaxInPreKeysFetchMissingPreKeysUserErrorMixin.parseFetchMissingPreKeysUserErrorMixin}
-         *           parses the literal {@code code="500"} variant. The
-         *           companion
-         *           {@code WASmaxInPreKeysFetchMissingPreKeysUserErrorFallbackMixin}
-         *           accepts {@code code} in {@code [500, 599]}.
          */
         @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchMissingPreKeysUserErrorMixin")
         @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchMissingPreKeysUserErrorFallbackMixin")
@@ -761,11 +725,6 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
      * The {@code ClientError} reply variant. The relay rejected the
      * outer request as malformed, unauthorised, or referencing no valid
      * JIDs.
-     *
-     * @implNote {@code WASmaxInPreKeysFetchMissingPreKeysResponseRequestError.parseFetchMissingPreKeysResponseRequestError}
-     *           routes through {@code WASmaxInPreKeysRequestErrorsFetch};
-     *           Cobalt collapses to the raw {@code (code, text)} pair
-     *           filtered by the {@code [400, 500)} client-error range.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchMissingPreKeysResponseRequestError")
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysRequestErrorsFetch")
@@ -857,11 +816,6 @@ public sealed interface SmaxPreKeysFetchMissingPreKeysResponse extends SmaxOpera
     /**
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInPreKeysFetchMissingPreKeysResponseServerError.parseFetchMissingPreKeysResponseServerError}
-     *           routes through {@code WASmaxInPreKeysServerErrors};
-     *           Cobalt collapses to the raw {@code (code, text)} pair
-     *           filtered by the {@code [500, ∞)} server-error range.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysFetchMissingPreKeysResponseServerError")
     @WhatsAppWebModule(moduleName = "WASmaxInPreKeysServerErrors")

@@ -14,11 +14,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants. Only {@code Success} is
  * documented by WA Web for this RPC.
- *
- * @implNote {@code WASmaxPassiveModeActiveIQRPC.sendActiveIQRPC} tries
- *           {@code Success} and throws on no-match without a
- *           documented error variant. Cobalt mirrors the surface and
- *           returns {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxPassiveModeActiveIQResponse extends SmaxOperation.Response
         permits SmaxPassiveModeActiveIQResponse.Success {
@@ -52,14 +47,6 @@ public sealed interface SmaxPassiveModeActiveIQResponse extends SmaxOperation.Re
      * {@code s.whatsapp.net} per WA Web's
      * {@code literalJid(attrDomainJid, …, "s.whatsapp.net")}
      * assertion).
-     *
-     * @implNote {@code WASmaxInPassiveModeActiveIQResponseSuccess.parseActiveIQResponseSuccess}
-     *           validates the {@code <iq type="result"
-     *           from="s.whatsapp.net">} envelope and the presence of the
-     *           {@code <active/>} child, returning {@code (type, from)}.
-     *           Cobalt collapses to {@link #from()} since {@code type}
-     *           is always the literal {@code "result"} when the parse
-     *           succeeds.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPassiveModeActiveIQResponseSuccess")
     final class Success implements SmaxPassiveModeActiveIQResponse {

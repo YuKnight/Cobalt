@@ -52,16 +52,6 @@ public final class SmaxGroupsGetInviteGroupInfoRequest implements SmaxOperation.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised invite payload
-     *
-     * @implNote {@code WASmaxOutGroupsGetInviteGroupInfoRequest.makeGetInviteGroupInfoRequest}
-     *           composes {@code WASmaxOutGroupsBaseGetServerMixin}
-     *           ({@code xmlns="w:g2"}, {@code to=G_US}) with
-     *           {@code WASmaxOutGroupsBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over a
-     *           bare {@code <invite code=CUSTOM_STRING(t)/>} child.
-     *           Cobalt builds the same shape inline; the {@code id}
-     *           attribute is injected by
-     *           {@code WhatsAppClient.sendNode} when missing.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGetInviteGroupInfoRequest",

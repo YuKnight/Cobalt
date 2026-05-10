@@ -21,14 +21,6 @@ import java.util.Optional;
  * WASmaxOutWaffleRSAEncryptionMetadataMixin}/{@code
  * WASmaxInWaffleRSAEncryptionMetadataMixin} pair into the single value
  * class here; every Waffle RPC that needs the mixin embeds an instance.
- *
- * @implNote {@code WASmaxOutWaffleRSAEncryptionMetadataMixin.mergeRSAEncryptionMetadataMixin}
- *           composes {@code <encryption_metadata version="1"
- *           algorithm="rsa2048">} carrying four content-bytes children;
- *           {@code WASmaxInWaffleRSAEncryptionMetadataMixin.parseRSAEncryptionMetadataMixin}
- *           projects the same shape on the inbound side. Cobalt keeps the
- *           four byte arrays as package-private fields to mirror the WA
- *           Web call sites' field-access patterns.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutWaffleRSAEncryptionMetadataMixin")
 @WhatsAppWebModule(moduleName = "WASmaxInWaffleRSAEncryptionMetadataMixin")
@@ -151,14 +143,6 @@ public final class SmaxWaffleRsaEncryptionMetadata {
      * @return an {@link Optional} carrying the parsed mixin, or empty
      *         when the stanza doesn't match the expected shape
      * @throws NullPointerException if {@code node} is {@code null}
-     *
-     * @implNote {@code WASmaxInWaffleRSAEncryptionMetadataMixin.parseRSAEncryptionMetadataMixin}
-     *           runs the same checks plus content-bytes range assertions
-     *           ({@code [1, 2048]} for {@code encrypted_key},
-     *           {@code [1, 128]} for {@code nonce} and {@code auth_tag},
-     *           {@code [1, 8192]} for {@code encrypted_data}); Cobalt
-     *           drops the size assertions because every consumer
-     *           cryptographically validates the blobs anyway.
      */
     @WhatsAppWebExport(moduleName = "WASmaxInWaffleRSAEncryptionMetadataMixin",
             exports = "parseRSAEncryptionMetadataMixin", adaptation = WhatsAppAdaptation.ADAPTED)

@@ -10,10 +10,6 @@ import java.util.Optional;
  * Response variant for {@link AcceptNewsletterAdminInviteMexRequest} that
  * exposes the newsletter identifier echoed back by the server once the invite
  * is accepted.
- *
- * @implNote The body wraps the
- *           {@code data.xwa2_newsletter_admin_invite_accept} root of the JSON
- *           response.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexAcceptNewsletterAdminInviteJob")
 public final class AcceptNewsletterAdminInviteMexResponse implements MexOperation.Response.Json {

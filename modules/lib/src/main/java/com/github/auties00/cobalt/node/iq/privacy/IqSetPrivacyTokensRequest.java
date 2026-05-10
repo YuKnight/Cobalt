@@ -95,11 +95,6 @@ public final class IqSetPrivacyTokensRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <tokens>} payload
-     *
-     * @implNote {@code WAWebSetPrivacyTokensJob.issuePrivacyToken}:
-     *           {@code wap("iq",{to:S_WHATSAPP_NET,type:"set",
-     *           xmlns:"privacy",id}, wap("tokens", null,
-     *           types.map(...))) }.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSetPrivacyTokensJob",

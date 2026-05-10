@@ -135,7 +135,6 @@ public final class FailureStreamHandler implements SocketStream.Handler {
      * a disconnect.
      *
      * @param node the {@code <failure>} stanza node received from the server
-     * @implNote WA Web inlines logout, comms-stop and updater calls; Cobalt routes every recoverable case through {@link WhatsAppClient#handleFailure(WhatsAppException)} so the user-supplied error handler decides DISCARD, DISCONNECT, RECONNECT, LOG_OUT or BAN.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebHandleFailure", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)

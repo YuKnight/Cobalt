@@ -17,10 +17,6 @@ import java.util.Optional;
 /**
  * Parsed response of the {@link CreateInviteCodeMexRequest} mutation, exposing
  * the freshly minted invite code returned by the server.
- *
- * @implNote WA Web's {@code mexCreateInviteCode} unwraps the response by
- * reading {@code s.xwa2_growth_create_invite_code?.code}. Cobalt mirrors the
- * same projection and exposes the scalar as an {@link Optional}.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexCreateInviteCodeJob")
 public final class CreateInviteCodeMexResponse implements MexOperation.Response.Json {

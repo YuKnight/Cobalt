@@ -375,11 +375,6 @@ public final class WhatsAppDevice {
      * identity is Chrome on Windows so the server routes through the
      * WebSocket {@code /ws/chat} endpoint used by genuine browser
      * sessions.
-     *
-     * @implNote WAWebClientPayload.y: {@code platform:
-     *           ClientPayload$UserAgent$Platform.WEB} for every browser
-     *           surface; Chrome-on-Windows is the most common combination
-     *           shipped in production logs, hence the chosen defaults.
      * @return a new web-configured device descriptor
      */
     public static WhatsAppDevice web() {
@@ -407,15 +402,6 @@ public final class WhatsAppDevice {
      * a raw TCP+TLS transport (see {@code WhatsAppSocketClient.Desktop}).
      * Cobalt's socket layer selects that transport when the device
      * platform is {@code MACOS} or {@code WINDOWS}.
-     *
-     * @implNote WAWebClientPayload.b: {@code "Desktop" -> DESKTOP}
-     *           DeviceProps platformType; {@code WAWebEnvironment.isWindows}
-     *           branches inside {@code WAWebClientPayload.y} set the
-     *           {@code UWP} variant and add the Windows build quaternary
-     *           on the {@code appVersion}. The {@code UserAgent.platform}
-     *           remains {@code WEB} on the wire for every desktop build;
-     *           the Cobalt enum stored here only drives local transport
-     *           selection ({@code WhatsAppSocketClient.newCipheredSocketClient}).
      * @return a new desktop-configured device descriptor matching the
      *         host platform, or a Windows descriptor when the host is
      *         neither Windows nor macOS

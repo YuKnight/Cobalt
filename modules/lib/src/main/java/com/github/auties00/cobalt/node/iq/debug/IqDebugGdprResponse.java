@@ -49,14 +49,6 @@ public sealed interface IqDebugGdprResponse extends IqOperation.Response
      * cancel request. Carries the post-cancel GDPR status string
      * and the optional {@code expiration} timestamp echoed by the
      * relay (typically {@code 0} after a cancel).
-     *
-     * @implNote The reply is parsed by
-     *           {@code useWAWebGdprStatus.GdprStatusWapParser}
-     *           which is a hook-side projection that surfaces the
-     *           {@code <gdpr>} grandchild's {@code status} and
-     *           {@code expiration} attributes. Cobalt mirrors that
-     *           shape with optional fields since the cancel path
-     *           does not always populate the full status payload.
      */
     @WhatsAppWebModule(moduleName = "WAWebDebugGDPR")
     final class Success implements IqDebugGdprResponse {

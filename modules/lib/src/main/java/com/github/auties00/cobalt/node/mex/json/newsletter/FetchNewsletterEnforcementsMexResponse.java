@@ -21,9 +21,6 @@ import java.util.Optional;
 /**
  * The response variant of {@link FetchNewsletterEnforcementsMexResponse} that exposes the data
  * returned by the server after a successful query.
- *
- * @implNote WAWebMexFetchNewsletterEnforcementsJob: adapts the JSON root returned by the GraphQL
- * query into a Java value object.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterEnforcementsJob")
 public final class FetchNewsletterEnforcementsMexResponse implements MexOperation.Response.Json {
@@ -41,10 +38,6 @@ public final class FetchNewsletterEnforcementsMexResponse implements MexOperatio
 
     /**
      * Parses a MEX response from the given IQ response node.
-     *
-     * @implNote WAWebMexFetchNewsletterEnforcementsJob.mexFetchNewsletterEnforcements: WA Web relies on the
-     * GraphQL client to unwrap the response. Cobalt performs the
-     * unwrapping manually from the IQ {@code <result>} child.
      * @param node the IQ response node received from the relay
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the node is missing a result payload
@@ -1013,11 +1006,6 @@ public final class FetchNewsletterEnforcementsMexResponse implements MexOperatio
 
         /**
          * A parsed {@code content_data} polymorphic object.
-         *
-         * @implNote WAWebMexFetchNewsletterEnforcementsJobQuery.graphql: adapts the inline fragments on the
-         * {@code content_data} {@code LinkedField}, which selects
-         * {@code server_msg_id} from {@code XWA2ChannelServerMsgData} or
-         * {@code server_id} from {@code XWA2ChannelStatusData}.
          */
         public static final class ContentData {
             private final String typename;
@@ -1533,12 +1521,6 @@ public final class FetchNewsletterEnforcementsMexResponse implements MexOperatio
 
         /**
          * Returns the {@code country_codes} field.
-         *
-         * @implNote WAWebMexFetchNewsletterEnforcementsJob.mexFetchNewsletterEnforcements: WA Web maps each
-         * raw 2-letter ISO code through {@code WAWebAsISOCountryCode.asISOCountryCode}
-         * and enriches it with a localized country name from
-         * {@code WAWebLocaleModules.getCountryData()}. Cobalt exposes the
-         * raw codes only; locale enrichment is a UI concern left to callers.
          * @return the list of raw country codes, empty if absent
          */
         public List<String> countryCodes() {
@@ -2196,10 +2178,6 @@ public final class FetchNewsletterEnforcementsMexResponse implements MexOperatio
     /**
      * Parses a {@link FetchNewsletterEnforcementsMexResponse} from the raw JSON bytes of the
      * {@code <result>} child.
-     *
-     * @implNote WAWebMexFetchNewsletterEnforcementsJob.mexFetchNewsletterEnforcements: mirrors the implicit
-     * unwrapping that WA Web performs on the GraphQL response,
-     * extracting the {@code xwa2_channel_enforcements} root.
      * @param json the UTF-8 encoded JSON payload
      * @return an {@link Optional} containing the parsed response, or
      *         empty if the envelope is missing expected fields

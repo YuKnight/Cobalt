@@ -96,13 +96,6 @@ public final class SmaxGroupsMembershipRequestsActionRequest implements SmaxOper
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <membership_requests_action>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsMembershipRequestsActionRequest.makeMembershipRequestsActionRequest}
-     *           composes
-     *           {@code <iq><membership_requests_action>OPTIONAL_CHILD(approve)
-     *           OPTIONAL_CHILD(reject)</membership_requests_action></iq>};
-     *           each list child wraps
-     *           {@code REPEATED_CHILD(participant, 1, 19999)}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsMembershipRequestsActionRequest",

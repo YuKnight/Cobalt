@@ -52,9 +52,6 @@ public final class MessageReceiptHandler {
     /**
      * Retry count at which the prekey bundle is included in the retry receipt for
      * session re-establishment.
-     *
-     * @implNote Mirrors the WA Web {@code d = 2} threshold; the key section is built
-     * when {@code retryCount >= d}.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendRetryReceiptJob", exports = "sendRetryReceipt",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -156,13 +153,6 @@ public final class MessageReceiptHandler {
      * @param stanza      the parsed incoming stanza
      * @param retryReason the reason for the decryption failure
      * @param retryCount  the current retry attempt number (1-based)
-     *
-     * @implNote The retry stanza structure is:
-     * {@code <receipt id="..." to="..." type="retry" participant="..." category="..." recipient="...">
-     *   <retry v="1" count="..." id="..." t="..." error="..."/>
-     *   <registration>registrationId</registration>
-     *   [<keys>...</keys> if retryCount >= 2]
-     * </receipt>}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendRetryReceiptJob", exports = "sendRetryReceipt",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -323,11 +313,6 @@ public final class MessageReceiptHandler {
      * @param stanza        the parsed incoming stanza
      * @param errorCode     the integer error code to include in the NACK
      * @param failureReason the optional failure reason for InvalidProtobuf errors
-     *
-     * @implNote Attribute order on the {@code <ack>} stanza mirrors WA Web's
-     * object-literal order: {@code id, class, from, to, participant, type, error}.
-     * Error code constants live in {@code WAWebCreateNackFromStanza.NackReason}
-     * ({@code InvalidProtobuf=491}, {@code ParsingError=487}).
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgSendAck", exports = "sendNack",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -359,9 +344,6 @@ public final class MessageReceiptHandler {
      * example unavailable or fanout placeholders, media notify).
      *
      * @param stanza the parsed incoming stanza
-     *
-     * @implNote Attribute order mirrors WA Web's object-literal order:
-     * {@code id, class, from, to, participant, type}.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgSendAck", exports = "sendAck",
             adaptation = WhatsAppAdaptation.DIRECT)

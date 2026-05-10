@@ -10,7 +10,6 @@ import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncActionMessageRange;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -18,7 +17,6 @@ import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.List;
@@ -34,11 +32,6 @@ import java.util.List;
  * <p>Index format: {@code ["deleteChat", chatJid, deleteMedia]}
  * where {@code deleteMedia} is {@code "0"} (delete media) or {@code "1"}
  * (keep media).
- *
- * @implNote WAWebDeleteChatSync — singleton instance exported as {@code default};
- *           extends {@code ChatMessageRangeSyncdActionBase} with
- *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1},
- *           {@code getVersion() = 6}, {@code getAction() = "deleteChat"}
  */
 @WhatsAppWebModule(moduleName = "WAWebDeleteChatSync")
 public final class DeleteChatHandler implements WebAppStateActionHandler {
@@ -48,17 +41,12 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, {@code WAWebDeleteChatSync} exports a single instance
      * ({@code var f = new _(); l.default = f}).
-     *
-     * @implNote WAWebDeleteChatSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final DeleteChatHandler INSTANCE = new DeleteChatHandler();
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebDeleteChatSync — class constructor sets
-     *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1}
      */
     @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private DeleteChatHandler() {
@@ -67,9 +55,6 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for delete chat actions.
-     *
-     * @implNote WAWebDeleteChatSync.getAction — returns
-     *           {@code WASyncdConst.Actions.DeleteChat} ({@code "deleteChat"})
      * @return the action name {@code "deleteChat"}
      */
     @Override
@@ -83,9 +68,6 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, the delete chat handler's {@code collectionName} is set to
      * {@code WASyncdConst.CollectionName.RegularHigh} in the constructor.
-     *
-     * @implNote WAWebDeleteChatSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularHigh}
      * @return {@link SyncPatchType#REGULAR_HIGH}
      */
     @Override
@@ -96,32 +78,12 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for delete chat actions.
-     *
-     * @implNote WAWebDeleteChatSync.getVersion — returns {@code 6}
      * @return the version number {@code 6}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return DeleteChatAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a delete chat mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebDeleteChatSync.applyMutations — per-mutation inner logic,
-     *           success check on the returned {@code SyncActionState}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -145,15 +107,13 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      *
      * <p>Non-{@code SET} operations return {@code Unsupported}. Exceptions are
      * caught and return {@code Failed}.
-     *
-     * @implNote WAWebDeleteChatSync.applyMutations — per-mutation inner function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = {"applyMutations", "getMessageRange", "$DeleteChatSync$p_1", "deleteChat"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -165,27 +125,27 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
 
             if (chatJidString == null || chatJidString.isEmpty()
                     || deleteMediaString == null || deleteMediaString.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             Jid chatJid;
             try {
                 chatJid = Jid.of(chatJidString);
             } catch (Exception e) {
-                return malformedActionIndex(); // ADAPTED: Jid.of throws for invalid JIDs; WA Web uses isWid() upfront
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName()); // ADAPTED: Jid.of throws for invalid JIDs; WA Web uses isWid() upfront
             }
 
             if (chatJid == null) { // ADAPTED: Jid.of returns null for null input
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().action().orElse(null) instanceof DeleteChatAction deleteChatAction)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var messageRange = deleteChatAction.messageRange().orElse(null);
             if (messageRange == null) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chat = client.store().findChatByJid(chatJid);
@@ -238,8 +198,6 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      *     </ul>
      *   </li>
      * </ol>
-     *
-     * @implNote WAWebDeleteChatSync.resolveConflicts
      * @param localMutation  the local pending mutation
      * @param remoteMutation the incoming remote mutation
      * @return the conflict resolution indicating which mutation to keep
@@ -325,12 +283,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * IndexedDB concern). The WAM telemetry commit
      * ({@code MdSyncdDogfoodingFeatureUsageWamEvent}) is performed at the caller
      * ({@code WhatsAppClient.deleteChat}) since this method has no
-     * {@link WamService} handle.
-     *
-     * @implNote WAWebDeleteChatSync.getDeleteChatMutation,
-     *           WAWebDeleteChatSync.buildDeleteChatMutation,
-     *           WAWebDeleteChatSync.buildDeleteChatIndexArgs,
-     *           WAWebSyncdActionUtils.buildPendingMutation
+     * {@link com.github.auties00.cobalt.wam.WamService} handle.
      * @param timestamp        the mutation timestamp
      * @param chatJid          the JID of the chat to delete
      * @param deleteMediaFiles whether media files should be deleted

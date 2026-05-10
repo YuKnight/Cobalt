@@ -1,166 +1,486 @@
 package com.github.auties00.cobalt.wam.binary;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
+
 import static com.github.auties00.cobalt.wam.binary.WamTags.*;
 
 /**
- * An event-layer encoding facade on top of {@link WamEncoder} that
- * encapsulates the flag logic for event markers and event fields.
+ * A sink-agnostic encoder for the WhatsApp Metrics (WAM) custom binary
+ * protocol.
  *
- * <p>Generated {@code *Impl} classes call into this class instead of
- * computing {@link WamTags} flag combinations themselves. This keeps
- * the generated code readable and centralizes the flag semantics in
- * one place.
+ * <p>Two implementations are nested as private permitted subclasses:
  *
- * <p>Every method pair follows the same two-phase pattern used
- * throughout the WAM encoding stack: a {@code xxxSize} method that
- * returns the exact byte count, and a {@code writeXxx} method that
- * writes into a pre-allocated buffer and returns the new offset.
+ * <ul>
+ *   <li>{@code ByteArray} — writes into a pre-allocated {@code byte[]},
+ *       the fast path used by the upload buffer in {@code WamService}.
+ *   <li>{@code Stream} — streams directly into an {@link OutputStream},
+ *       used by the persistence path so that events can be written to
+ *       a file without holding the full buffer in memory.
+ * </ul>
  *
- * <p>This class is thread-safe as all methods are static and operate
- * on provided parameters without shared mutable state.
+ * <p>Construct either via the static {@code of(...)} factories.
  *
- * @see WamEncoder
+ * <p>The event-layer convenience methods ({@link #writeEventMarker},
+ * {@link #writeIntField}, {@link #writeBoolField},
+ * {@link #writeStringField}, {@link #writeFloatField}) are declared
+ * {@code final} on this class so that the generated {@code *Impl}
+ * bodies need only call into one type regardless of sink.
+ *
+ * <p>Use {@link WamEventSizes} to compute the byte count required by an
+ * encode operation when pre-allocating a fixed-size sink.
+ *
+ * @see WamEventSizes
+ * @see WamEventDecoder
  * @see WamTags
  */
-public final class WamEventEncoder {
+public abstract sealed class WamEventEncoder
+        permits WamEventEncoder.ByteArray, WamEventEncoder.Stream {
+
+    private static final VarHandle SHORT_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.LITTLE_ENDIAN);
+
+    private static final VarHandle INT_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
+
+    private static final VarHandle LONG_HANDLE =
+            MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
+
     /**
-     * Private constructor to prevent instantiation of this utility class.
-     *
-     * @throws UnsupportedOperationException always
+     * Constructs a new encoder. Subclasses should not perform any
+     * initialisation that depends on the sink being writable.
      */
     private WamEventEncoder() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 
     /**
-     * Returns the number of bytes required to encode an event marker
-     * with the given event identifier and sampling weight.
+     * Returns an encoder writing into the entire given byte array.
      *
-     * <p>The weight is negated on the wire so the server can apply
-     * statistical correction.
-     *
-     * @param eventId the numeric event identifier
-     * @param weight  the sampling weight (written as {@code -weight})
-     * @return the encoded size in bytes
+     * @param destination the destination array, must not be {@code null}
+     * @return a new byte-array-backed encoder
      */
-    public static int eventMarkerSize(int eventId, int weight) {
-        return WamEncoder.intSize(eventId, -weight);
+    public static WamEventEncoder of(byte[] destination) {
+        return new ByteArray(destination, 0, destination.length);
     }
 
     /**
-     * Writes an event marker into the output array.
+     * Returns an encoder writing into the given byte array slice
+     * starting at {@code offset} for at most {@code length} bytes.
+     *
+     * @param destination the destination array, must not be {@code null}
+     * @param offset      the starting offset within the array
+     * @param length      the maximum number of bytes that may be written
+     * @return a new byte-array-backed encoder
+     */
+    public static WamEventEncoder of(byte[] destination, int offset, int length) {
+        return new ByteArray(destination, offset, length);
+    }
+
+    /**
+     * Returns an encoder writing into the given output stream with no
+     * size limit.
+     *
+     * @param destination the destination stream, must not be {@code null}
+     * @return a new stream-backed encoder
+     */
+    public static WamEventEncoder of(OutputStream destination) {
+        return new Stream(destination, -1);
+    }
+
+    /**
+     * Returns an encoder writing into the given output stream with the
+     * given total byte budget.
+     *
+     * <p>Once {@code length} bytes have been written, any further write
+     * will throw {@link IndexOutOfBoundsException} so that callers can
+     * verify they wrote exactly the size they pre-computed via
+     * {@link WamEventSizes}.
+     *
+     * @param destination the destination stream, must not be {@code null}
+     * @param length      the byte budget; pass a negative value for no
+     *                    limit
+     * @return a new stream-backed encoder
+     */
+    public static WamEventEncoder of(OutputStream destination, int length) {
+        return new Stream(destination, length);
+    }
+
+    /**
+     * Returns the number of bytes written so far through this encoder.
+     *
+     * @return the number of bytes written
+     */
+    public abstract int written();
+
+    /**
+     * Writes a tag (flags byte + field identifier) into the sink.
+     *
+     * @param fieldId the numeric field or event identifier
+     * @param flags   the pre-computed flags byte (role + value-type +
+     *                {@link WamTags#LAST LAST})
+     */
+    public abstract void writeTag(int fieldId, int flags);
+
+    /**
+     * Writes an integer value entry (tag + payload) into the sink.
+     *
+     * @param fieldId the numeric field identifier
+     * @param flags   the role and continuation flags
+     * @param value   the integer value to encode
+     */
+    public abstract void writeInt(int fieldId, int flags, long value);
+
+    /**
+     * Writes a float (double) value entry into the sink.
+     *
+     * @param fieldId the numeric field identifier
+     * @param flags   the role and continuation flags
+     * @param value   the double-precision value to encode
+     */
+    public abstract void writeFloat(int fieldId, int flags, double value);
+
+    /**
+     * Writes a UTF-8 string value entry (tag + length prefix + payload)
+     * into the sink.
+     *
+     * @param fieldId the numeric field identifier
+     * @param flags   the role and continuation flags
+     * @param value   the string to encode, must not be {@code null}
+     */
+    public abstract void writeString(int fieldId, int flags, String value);
+
+    /**
+     * Writes a verbatim slice of pre-encoded bytes into the sink.
+     *
+     * @param source the source array, must not be {@code null}
+     * @param offset the starting offset within the source
+     * @param length the number of bytes to copy
+     */
+    public abstract void writeRaw(byte[] source, int offset, int length);
+
+    /**
+     * Writes a null value entry (tag-only) into the sink.
+     *
+     * @param fieldId the numeric field identifier
+     * @param flags   the role and continuation flags
+     *                (e.g. {@link WamTags#GLOBAL GLOBAL})
+     */
+    public final void writeNull(int fieldId, int flags) {
+        writeTag(fieldId, flags | VALUE_NULL);
+    }
+
+    /**
+     * Writes an event marker (event id + negative weight payload) into
+     * the sink.
      *
      * @param eventId   the numeric event identifier
      * @param weight    the sampling weight (written as {@code -weight})
      * @param hasFields {@code true} if at least one field follows
-     * @param output    the output byte array
-     * @param offset    the current offset in the output array
-     * @return the new offset after writing
      */
-    public static int writeEventMarker(int eventId, int weight, boolean hasFields, byte[] output, int offset) {
-        return WamEncoder.writeInt(eventId, EVENT | (hasFields ? 0 : LAST), -weight, output, offset);
+    public final void writeEventMarker(int eventId, int weight, boolean hasFields) {
+        writeInt(eventId, EVENT | (hasFields ? 0 : LAST), -weight);
     }
 
     /**
-     * Returns the number of bytes required to encode an integer field.
-     *
-     * @param fieldId the numeric field identifier
-     * @param value   the integer value
-     * @return the encoded size in bytes
-     */
-    public static int intFieldSize(int fieldId, long value) {
-        return WamEncoder.intSize(fieldId, value);
-    }
-
-    /**
-     * Writes an integer field into the output array.
+     * Writes an integer field entry into the sink.
      *
      * @param fieldId the numeric field identifier
      * @param value   the integer value
      * @param hasMore {@code true} if more fields follow in this event
-     * @param output  the output byte array
-     * @param offset  the current offset in the output array
-     * @return the new offset after writing
      */
-    public static int writeIntField(int fieldId, long value, boolean hasMore, byte[] output, int offset) {
-        return WamEncoder.writeInt(fieldId, FIELD | (hasMore ? 0 : LAST), value, output, offset);
+    public final void writeIntField(int fieldId, long value, boolean hasMore) {
+        writeInt(fieldId, FIELD | (hasMore ? 0 : LAST), value);
     }
 
     /**
-     * Returns the number of bytes required to encode a boolean field.
-     *
-     * <p>Booleans are encoded as integer values {@code 0} or {@code 1},
-     * both of which fit in the tag alone with zero payload bytes. The
-     * size is computed for the worst case (value {@code 1}).
-     *
-     * @param fieldId the numeric field identifier
-     * @return the encoded size in bytes
-     */
-    public static int boolFieldSize(int fieldId) {
-        return WamEncoder.intSize(fieldId, 1);
-    }
-
-    /**
-     * Writes a boolean field into the output array.
+     * Writes a boolean field entry into the sink, encoded as integer
+     * {@code 0} or {@code 1}.
      *
      * @param fieldId the numeric field identifier
      * @param value   the boolean value
      * @param hasMore {@code true} if more fields follow in this event
-     * @param output  the output byte array
-     * @param offset  the current offset in the output array
-     * @return the new offset after writing
      */
-    public static int writeBoolField(int fieldId, boolean value, boolean hasMore, byte[] output, int offset) {
-        return WamEncoder.writeInt(fieldId, FIELD | (hasMore ? 0 : LAST), value ? 1 : 0, output, offset);
+    public final void writeBoolField(int fieldId, boolean value, boolean hasMore) {
+        writeInt(fieldId, FIELD | (hasMore ? 0 : LAST), value ? 1 : 0);
     }
 
     /**
-     * Returns the number of bytes required to encode a string field.
-     *
-     * @param fieldId the numeric field identifier
-     * @param value   the string value, must not be {@code null}
-     * @return the encoded size in bytes
-     */
-    public static int stringFieldSize(int fieldId, String value) {
-        return WamEncoder.stringSize(fieldId, value);
-    }
-
-    /**
-     * Writes a string field into the output array.
+     * Writes a string field entry into the sink.
      *
      * @param fieldId the numeric field identifier
      * @param value   the string value, must not be {@code null}
      * @param hasMore {@code true} if more fields follow in this event
-     * @param output  the output byte array
-     * @param offset  the current offset in the output array
-     * @return the new offset after writing
      */
-    public static int writeStringField(int fieldId, String value, boolean hasMore, byte[] output, int offset) {
-        return WamEncoder.writeString(fieldId, FIELD | (hasMore ? 0 : LAST), value, output, offset);
+    public final void writeStringField(int fieldId, String value, boolean hasMore) {
+        writeString(fieldId, FIELD | (hasMore ? 0 : LAST), value);
     }
 
     /**
-     * Returns the number of bytes required to encode a float (double)
-     * field.
-     *
-     * @param fieldId the numeric field identifier
-     * @return the encoded size in bytes (tag + 8)
-     */
-    public static int floatFieldSize(int fieldId) {
-        return WamEncoder.floatSize(fieldId);
-    }
-
-    /**
-     * Writes a float (double) field into the output array.
+     * Writes a float field entry into the sink.
      *
      * @param fieldId the numeric field identifier
      * @param value   the double-precision value
      * @param hasMore {@code true} if more fields follow in this event
-     * @param output  the output byte array
-     * @param offset  the current offset in the output array
-     * @return the new offset after writing
      */
-    public static int writeFloatField(int fieldId, double value, boolean hasMore, byte[] output, int offset) {
-        return WamEncoder.writeFloat(fieldId, FIELD | (hasMore ? 0 : LAST), value, output, offset);
+    public final void writeFloatField(int fieldId, double value, boolean hasMore) {
+        writeFloat(fieldId, FIELD | (hasMore ? 0 : LAST), value);
+    }
+
+    /**
+     * Byte-array-backed encoder using {@link VarHandle} stores for
+     * multi-byte little-endian writes.
+     */
+    private static final class ByteArray extends WamEventEncoder {
+        private final byte[] buffer;
+        private final int start;
+        private final int limit;
+        private int offset;
+
+        private ByteArray(byte[] buffer, int offset, int length) {
+            Objects.requireNonNull(buffer, "buffer cannot be null");
+            Objects.checkFromIndexSize(offset, length, buffer.length);
+            this.buffer = buffer;
+            this.start = offset;
+            this.limit = offset + length;
+            this.offset = offset;
+        }
+
+        @Override
+        public int written() {
+            return offset - start;
+        }
+
+        @Override
+        public void writeTag(int fieldId, int flags) {
+            if (fieldId < 256) {
+                ensureCapacity(2);
+                buffer[offset++] = (byte) flags;
+                buffer[offset++] = (byte) fieldId;
+            } else {
+                ensureCapacity(3);
+                buffer[offset++] = (byte) (flags | WIDE_ID);
+                SHORT_HANDLE.set(buffer, offset, (short) fieldId);
+                offset += 2;
+            }
+        }
+
+        @Override
+        public void writeInt(int fieldId, int flags, long value) {
+            if (value == 0) {
+                writeTag(fieldId, flags | VALUE_INT_0);
+            } else if (value == 1) {
+                writeTag(fieldId, flags | VALUE_INT_1);
+            } else if (value >= -128 && value < 128) {
+                writeTag(fieldId, flags | VALUE_INT8);
+                ensureCapacity(1);
+                buffer[offset++] = (byte) value;
+            } else if (value >= -32768 && value < 32768) {
+                writeTag(fieldId, flags | VALUE_INT16);
+                ensureCapacity(2);
+                SHORT_HANDLE.set(buffer, offset, (short) value);
+                offset += 2;
+            } else if (value >= -2147483648L && value < 2147483648L) {
+                writeTag(fieldId, flags | VALUE_INT32);
+                ensureCapacity(4);
+                INT_HANDLE.set(buffer, offset, (int) value);
+                offset += 4;
+            } else {
+                writeFloat(fieldId, flags, (double) value);
+            }
+        }
+
+        @Override
+        public void writeFloat(int fieldId, int flags, double value) {
+            writeTag(fieldId, flags | VALUE_FLOAT64);
+            ensureCapacity(8);
+            LONG_HANDLE.set(buffer, offset, Double.doubleToRawLongBits(value));
+            offset += 8;
+        }
+
+        @Override
+        public void writeString(int fieldId, int flags, String value) {
+            var encoded = value.getBytes(StandardCharsets.UTF_8);
+            var encodedLength = encoded.length;
+            if (encodedLength < 256) {
+                writeTag(fieldId, flags | VALUE_STR8);
+                ensureCapacity(1 + encodedLength);
+                buffer[offset++] = (byte) encodedLength;
+            } else if (encodedLength < 65536) {
+                writeTag(fieldId, flags | VALUE_STR16);
+                ensureCapacity(2 + encodedLength);
+                SHORT_HANDLE.set(buffer, offset, (short) encodedLength);
+                offset += 2;
+            } else {
+                writeTag(fieldId, flags | VALUE_STR32);
+                ensureCapacity(4 + encodedLength);
+                INT_HANDLE.set(buffer, offset, encodedLength);
+                offset += 4;
+            }
+            System.arraycopy(encoded, 0, buffer, offset, encodedLength);
+            offset += encodedLength;
+        }
+
+        @Override
+        public void writeRaw(byte[] source, int offset, int length) {
+            ensureCapacity(length);
+            System.arraycopy(source, offset, buffer, this.offset, length);
+            this.offset += length;
+        }
+
+        private void ensureCapacity(int n) {
+            if (offset + n > limit) {
+                throw new IndexOutOfBoundsException(
+                        "WAM encode would overflow buffer: need " + n
+                                + " more bytes at offset " + offset
+                                + ", limit " + limit);
+            }
+        }
+    }
+
+    /**
+     * Stream-backed encoder that uses an internal 8-byte scratch buffer
+     * for staged little-endian writes.
+     */
+    private static final class Stream extends WamEventEncoder {
+        private final OutputStream out;
+        private final byte[] scratch;
+        private final int limit;
+        private int written;
+
+        private Stream(OutputStream out, int limit) {
+            this.out = Objects.requireNonNull(out, "out cannot be null");
+            this.scratch = new byte[8];
+            this.limit = limit;
+            this.written = 0;
+        }
+
+        @Override
+        public int written() {
+            return written;
+        }
+
+        @Override
+        public void writeTag(int fieldId, int flags) {
+            try {
+                if (fieldId < 256) {
+                    ensureCapacity(2);
+                    scratch[0] = (byte) flags;
+                    scratch[1] = (byte) fieldId;
+                    out.write(scratch, 0, 2);
+                    written += 2;
+                } else {
+                    ensureCapacity(3);
+                    scratch[0] = (byte) (flags | WIDE_ID);
+                    SHORT_HANDLE.set(scratch, 1, (short) fieldId);
+                    out.write(scratch, 0, 3);
+                    written += 3;
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        @Override
+        public void writeInt(int fieldId, int flags, long value) {
+            try {
+                if (value == 0) {
+                    writeTag(fieldId, flags | VALUE_INT_0);
+                } else if (value == 1) {
+                    writeTag(fieldId, flags | VALUE_INT_1);
+                } else if (value >= -128 && value < 128) {
+                    writeTag(fieldId, flags | VALUE_INT8);
+                    ensureCapacity(1);
+                    scratch[0] = (byte) value;
+                    out.write(scratch, 0, 1);
+                    written += 1;
+                } else if (value >= -32768 && value < 32768) {
+                    writeTag(fieldId, flags | VALUE_INT16);
+                    ensureCapacity(2);
+                    SHORT_HANDLE.set(scratch, 0, (short) value);
+                    out.write(scratch, 0, 2);
+                    written += 2;
+                } else if (value >= -2147483648L && value < 2147483648L) {
+                    writeTag(fieldId, flags | VALUE_INT32);
+                    ensureCapacity(4);
+                    INT_HANDLE.set(scratch, 0, (int) value);
+                    out.write(scratch, 0, 4);
+                    written += 4;
+                } else {
+                    writeFloat(fieldId, flags, (double) value);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        @Override
+        public void writeFloat(int fieldId, int flags, double value) {
+            try {
+                writeTag(fieldId, flags | VALUE_FLOAT64);
+                ensureCapacity(8);
+                LONG_HANDLE.set(scratch, 0, Double.doubleToRawLongBits(value));
+                out.write(scratch, 0, 8);
+                written += 8;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        @Override
+        public void writeString(int fieldId, int flags, String value) {
+            try {
+                var encoded = value.getBytes(StandardCharsets.UTF_8);
+                var encodedLength = encoded.length;
+                if (encodedLength < 256) {
+                    writeTag(fieldId, flags | VALUE_STR8);
+                    ensureCapacity(1 + encodedLength);
+                    scratch[0] = (byte) encodedLength;
+                    out.write(scratch, 0, 1);
+                    written += 1;
+                } else if (encodedLength < 65536) {
+                    writeTag(fieldId, flags | VALUE_STR16);
+                    ensureCapacity(2 + encodedLength);
+                    SHORT_HANDLE.set(scratch, 0, (short) encodedLength);
+                    out.write(scratch, 0, 2);
+                    written += 2;
+                } else {
+                    writeTag(fieldId, flags | VALUE_STR32);
+                    ensureCapacity(4 + encodedLength);
+                    INT_HANDLE.set(scratch, 0, encodedLength);
+                    out.write(scratch, 0, 4);
+                    written += 4;
+                }
+                out.write(encoded, 0, encodedLength);
+                written += encodedLength;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        @Override
+        public void writeRaw(byte[] source, int offset, int length) {
+            try {
+                ensureCapacity(length);
+                out.write(source, offset, length);
+                written += length;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        private void ensureCapacity(int n) {
+            if (limit >= 0 && written + n > limit) {
+                throw new IndexOutOfBoundsException(
+                        "WAM encode would exceed stream budget: need " + n
+                                + " more bytes after " + written
+                                + ", limit " + limit);
+            }
+        }
     }
 }

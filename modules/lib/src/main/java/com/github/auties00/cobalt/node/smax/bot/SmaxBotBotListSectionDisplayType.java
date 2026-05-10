@@ -3,16 +3,7 @@ package com.github.auties00.cobalt.node.smax.bot;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+
 import java.util.Optional;
 
 /**
@@ -21,33 +12,68 @@ import java.util.Optional;
  * {@code WASmaxInBotEnums.ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInBotEnums")
+@WhatsAppWebExport(
+        moduleName = "WASmaxInBotEnums",
+        exports = "ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW",
+        adaptation = WhatsAppAdaptation.ADAPTED
+)
 public enum SmaxBotBotListSectionDisplayType {
     /**
      * The section is hidden from the directory sheet.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     HIDDEN("hidden"),
     /**
      * The section renders as a horizontal scroller (default).
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     HSCROLL("hscroll"),
     /**
      * The section renders as a horizontal scroller carrying
      * "icebreaker" prompt cards.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     HSCROLL_ICEBREAKERS("hscroll_icebreakers"),
     /**
      * The section renders as a horizontal scroller with large bot
      * cards.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     HSCROLL_LARGE("hscroll_large"),
     /**
      * The section renders as a horizontal scroller with small bot
      * cards.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     HSCROLL_SMALL("hscroll_small"),
     /**
      * The section renders as a vertical list.
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     LISTVIEW("listview");
 
     /**
@@ -82,6 +108,11 @@ public enum SmaxBotBotListSectionDisplayType {
      * @return an {@link Optional} carrying the resolved enum
      *         constant, or empty when the literal is unknown
      */
+    @WhatsAppWebExport(
+            moduleName = "WASmaxInBotEnums",
+            exports = "ENUM_HIDDEN_HSCROLL_HSCROLLICEBREAKERS_HSCROLLLARGE_HSCROLLSMALL_LISTVIEW",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     public static Optional<SmaxBotBotListSectionDisplayType> ofWire(String wireValue) {
         if (wireValue == null) {
             return Optional.empty();

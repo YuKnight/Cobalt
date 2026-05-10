@@ -259,7 +259,6 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      *
      * @param jid the JID from the chatstate stanza
      * @return the resolved contact, or {@code null} if the JID cannot be resolved
-     * @implNote Cobalt collapses WA Web's LID migration logic (isLidMigrated, toUserLid, getChatRecordByAccountLid) into a single findPhoneByLid lookup because Cobalt stores contacts by PN.
      */
     private Contact getOrCreateContact(Jid jid) {
         if (jid == null) {
@@ -283,7 +282,6 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
      *
      * @param conversation the JID of the conversation where the presence changed (same as participant for 1:1 chats, group JID for groups)
      * @param participant  the JID of the participant whose presence changed
-     * @implNote WA Web propagates presence through PresenceCollection model observation; Cobalt uses explicit listener notification.
      */
     private void notifyPresence(Jid conversation, Jid participant) {
         for (var listener : whatsapp.store().listeners()) {

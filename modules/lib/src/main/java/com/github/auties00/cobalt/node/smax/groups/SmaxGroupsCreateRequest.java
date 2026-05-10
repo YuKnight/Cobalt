@@ -543,17 +543,6 @@ public final class SmaxGroupsCreateRequest implements SmaxOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <create/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsCreateRequest.makeCreateRequest}
-     *           composes
-     *           {@code WASmaxOutGroupsBaseSetServerMixin}
-     *           ({@code xmlns="w:g2"}, {@code to="g.us"}) over the
-     *           {@code <create/>} root, layering up to four
-     *           attribute mixins (dedup / member-add /
-     *           member-link / member-share-history) and the
-     *           {@code subject} attribute via the
-     *           {@code NamedSubjectOrUnnamedSubjectFallbackMixinGroup}.
-     *           Cobalt mirrors the same shape inline.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsCreateRequest",

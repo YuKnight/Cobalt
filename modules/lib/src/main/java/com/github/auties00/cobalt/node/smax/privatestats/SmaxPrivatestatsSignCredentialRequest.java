@@ -69,16 +69,6 @@ public final class SmaxPrivatestatsSignCredentialRequest implements SmaxOperatio
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <sign_credential>} payload
-     *
-     * @implNote {@code WASmaxOutPrivatestatsSignCredentialRequest.makeSignCredentialRequest}
-     *           emits
-     *           {@code <iq xmlns="privatestats" id=generateId()
-     *           type="get" to=S_WHATSAPP_NET>
-     *             <sign_credential version="2">
-     *               <blinded_credential>{bytes}</blinded_credential>
-     *               <project_name>{string}</project_name>
-     *             </sign_credential>
-     *           </iq>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPrivatestatsSignCredentialRequest",

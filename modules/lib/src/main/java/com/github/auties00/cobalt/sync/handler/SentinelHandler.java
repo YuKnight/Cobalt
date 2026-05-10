@@ -6,7 +6,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
@@ -15,8 +14,6 @@ import com.github.auties00.cobalt.model.sync.action.device.KeyExpirationActionBu
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,15 +33,11 @@ import java.util.logging.Logger;
  * <p>Per WhatsApp Web, the sentinel handler extends {@code AccountSyncdActionBase}
  * with collection name {@code RegularLow}, version {@code 3}, and action
  * {@code "sentinel"}.
- *
- * @implNote WAWebSentinelMutationSync (default export singleton)
  */
 @WhatsAppWebModule(moduleName = "WAWebSentinelMutationSync")
 public final class SentinelHandler implements WebAppStateActionHandler {
     /**
      * Logger for sentinel mutation sync operations.
-     *
-     * @implNote WAWebSentinelMutationSync: WATagsLogger.TAGS(["syncd","SentinelMutationSync"])
      */
     private static final Logger LOGGER = Logger.getLogger(SentinelHandler.class.getName());
 
@@ -53,16 +46,12 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, the module exports a frozen singleton instance
      * of the sentinel handler class.
-     *
-     * @implNote WAWebSentinelMutationSync: var f = new _; Object.freeze(f); l.default = f
      */
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final SentinelHandler INSTANCE = new SentinelHandler();
 
     /**
      * Constructs the singleton sentinel handler.
-     *
-     * @implNote WAWebSentinelMutationSync: constructor sets collectionName = CollectionName.RegularLow
      */
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private SentinelHandler() {
@@ -74,8 +63,6 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web {@code WAWebSentinelMutationSync.getAction()}: returns
      * {@code WASyncdConst.Actions.Sentinel} which resolves to {@code "sentinel"}.
-     *
-     * @implNote WAWebSentinelMutationSync.getAction
      * @return the sentinel action name {@code "sentinel"}
      */
     @Override
@@ -90,8 +77,6 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * <p>Per WhatsApp Web {@code WAWebSentinelMutationSync}: the constructor sets
      * {@code this.collectionName = CollectionName.RegularLow} which resolves to
      * {@code "regular_low"}.
-     *
-     * @implNote WAWebSentinelMutationSync: this.collectionName = WASyncdConst.CollectionName.RegularLow
      * @return the sync patch type {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -104,33 +89,12 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * Returns the mutation format version for sentinel mutations.
      *
      * <p>Per WhatsApp Web {@code WAWebSentinelMutationSync.getVersion()}: returns {@code 3}.
-     *
-     * @implNote WAWebSentinelMutationSync.getVersion
      * @return the version number {@code 3}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return KeyExpirationAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single sentinel mutation and returns whether it succeeded.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and checks whether the result state is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote ADAPTED: WAWebSentinelMutationSync.applyMutations — WA Web processes
-     *           the full batch via {@code Promise.all(r.map(...))}; Cobalt processes
-     *           individual mutations via the interface's default batch method
-     * @param client   the WhatsApp client instance
-     * @param mutation the sentinel mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -148,26 +112,24 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      *       {@code {actionState: Unsupported}}.</li>
      *   <li>On exception: returns {@code {actionState: Failed}}.</li>
      * </ul>
-     *
-     * @implNote WAWebSentinelMutationSync.applyMutations (per-mutation logic within Promise.all map)
      * @param client   the WhatsApp client instance
      * @param mutation the sentinel mutation to apply
      * @return the mutation application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().action().orElse(null) instanceof KeyExpirationAction action)) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var expiredEpoch = action.expiredKeyEpoch();
         if (expiredEpoch.isEmpty()) {
-            return malformedActionValue();
+            return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().expireAppStateKeysByEpoch(expiredEpoch.getAsInt());
@@ -190,8 +152,6 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      *
      * <p>This is called by the sentinel scheduling logic (equivalent to
      * {@code WAWebSentinel.default}) before marking all collections for sync.
-     *
-     * @implNote WAWebSentinelMutationSync.getSentinelMutations
      * @param client the WhatsApp client instance for accessing the store
      * @return a list of pending mutations, one per collection type, or an empty
      *         list if no sync key pairs exist

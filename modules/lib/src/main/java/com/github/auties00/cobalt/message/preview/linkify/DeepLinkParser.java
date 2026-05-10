@@ -26,34 +26,22 @@ import java.util.regex.Pattern;
  * matched as one of the four supported types yields
  * {@link DeepLink.NotApplicable#INSTANCE} and proceeds to the regular
  * fetch path, mirroring WA's outcome on this code path.
- *
- * @implNote WAWebApiParse.parseAPICmd. The catalog and product
- *           regex families cover {@code wa.me}, {@code whatsapp:}
- *           scheme, and {@code whatsapp.com} origin variants for
- *           both numeric and retailer-id product identifiers.
  */
 @WhatsAppWebModule(moduleName = "WAWebApiParse")
 public final class DeepLinkParser {
     /**
      * Origin prefix accepted as the WhatsApp web origin. Mirrors
      * {@code WAWebApiParseUtils.ORIGIN}.
-     *
-     * @implNote WAWebApiParseUtils.ORIGIN: covers
-     *           {@code https?://(?:web\.|chat\.)?whatsapp\.com}.
      */
     private static final String WEB_ORIGIN = "https?://(?:web\\.|chat\\.)?whatsapp\\.com";
 
     /**
      * Optional {@code /<lang>} segment that may follow the origin.
-     *
-     * @implNote WAWebApiParseUtils.OPTIONAL_NON_CAPTURING_PATH_PART.
      */
     private static final String OPTIONAL_PATH_PART = "(?:/(?:[a-z]{2}|[a-z]{2}-[a-z]{2}))?";
 
     /**
      * {@code chat.whatsapp.com/...} accept-style group invite URLs.
-     *
-     * @implNote WAWebApiParse {@code _} pattern.
      */
     private static final Pattern ACCEPT_GROUP_INVITE = Pattern.compile(
             "^" + WEB_ORIGIN + OPTIONAL_PATH_PART + "/accept/?\\?code=(\\w+)(?:&.*)?$",
@@ -61,8 +49,6 @@ public final class DeepLinkParser {
 
     /**
      * {@code chat.whatsapp.com/invite/<code>} URLs.
-     *
-     * @implNote WAWebApiParse {@code f} pattern.
      */
     private static final Pattern INVITE_GROUP_INVITE = Pattern.compile(
             "^https?://chat\\.whatsapp\\.com/invite/(\\w+)(?:\\?.*)?$",
@@ -70,8 +56,6 @@ public final class DeepLinkParser {
 
     /**
      * {@code chat.whatsapp.com/<code>} URLs.
-     *
-     * @implNote WAWebApiParse {@code g} pattern.
      */
     private static final Pattern SHORT_GROUP_INVITE = Pattern.compile(
             "^https?://chat\\.whatsapp\\.com/(\\w+)(?:\\?.*)?$",
@@ -79,8 +63,6 @@ public final class DeepLinkParser {
 
     /**
      * {@code whatsapp://chat?code=<code>} URLs.
-     *
-     * @implNote WAWebApiParse {@code h} pattern.
      */
     private static final Pattern SCHEME_GROUP_INVITE = Pattern.compile(
             "^whatsapp://chat/?\\?code=(\\w+)(?:&.*)?$",
@@ -88,8 +70,6 @@ public final class DeepLinkParser {
 
     /**
      * {@code wa.me/c/<jid>} URLs.
-     *
-     * @implNote WAWebApiParse {@code Te} pattern.
      */
     private static final Pattern WAME_CATALOG = Pattern.compile(
             "^https?://wa\\.me/c/([0-9]{0,20})(?:\\?.*)?$",
@@ -97,8 +77,6 @@ public final class DeepLinkParser {
 
     /**
      * {@code whatsapp://catalog/<jid>} URLs.
-     *
-     * @implNote WAWebApiParse {@code De} pattern.
      */
     private static final Pattern SCHEME_CATALOG = Pattern.compile(
             "^whatsapp://catalog/([0-9]{0,20})(?:\\?.*)?$",
@@ -107,8 +85,6 @@ public final class DeepLinkParser {
     /**
      * Catalog URLs hosted on the {@code whatsapp.com} origin: e.g.
      * {@code https://whatsapp.com/catalog/<jid>}.
-     *
-     * @implNote WAWebApiParse {@code xe}/{@code $e} patterns.
      */
     private static final Pattern WEB_CATALOG = Pattern.compile(
             "^" + WEB_ORIGIN + OPTIONAL_PATH_PART + "/catalog/([0-9]{0,20})(/?.*)?$",
@@ -116,8 +92,6 @@ public final class DeepLinkParser {
 
     /**
      * {@code wa.me/p/<productId>/<businessJid>} URLs (numeric ids).
-     *
-     * @implNote WAWebApiParse {@code G} pattern.
      */
     private static final Pattern WAME_PRODUCT = Pattern.compile(
             "^https?://wa\\.me/p/([0-9]{0,20})/([0-9]{0,20})(?:\\?.*)?$",
@@ -125,8 +99,6 @@ public final class DeepLinkParser {
 
     /**
      * {@code whatsapp://product/<productId>/<businessJid>} URLs.
-     *
-     * @implNote WAWebApiParse {@code z}/{@code Q} patterns.
      */
     private static final Pattern SCHEME_PRODUCT = Pattern.compile(
             "^whatsapp://product/([0-9]{0,20})/([0-9]{0,20})(?:\\?.*)?$",
@@ -135,8 +107,6 @@ public final class DeepLinkParser {
     /**
      * Product URLs hosted on the {@code whatsapp.com} origin: e.g.
      * {@code https://whatsapp.com/product/<productId>/<businessJid>}.
-     *
-     * @implNote WAWebApiParse {@code j}/{@code X} patterns.
      */
     private static final Pattern WEB_PRODUCT = Pattern.compile(
             "^" + WEB_ORIGIN + OPTIONAL_PATH_PART + "/product/([0-9]{0,20})/([0-9]{0,20})(/?.*)?$",
@@ -145,8 +115,6 @@ public final class DeepLinkParser {
     /**
      * {@code wa.me/p/<retailerId>/<businessJid>} URLs where the
      * product identifier is a free-form retailer id (non-numeric).
-     *
-     * @implNote WAWebApiParse {@code Y}/{@code ee} patterns.
      */
     private static final Pattern WAME_PRODUCT_RETAILER = Pattern.compile(
             "^https?://wa\\.me/p/([^/]{0,200})/([0-9]{0,20})(?:\\?.*)?$",
@@ -154,8 +122,6 @@ public final class DeepLinkParser {
 
     /**
      * {@code whatsapp://product/<retailerId>/<businessJid>} URLs.
-     *
-     * @implNote WAWebApiParse {@code J}/{@code te} patterns.
      */
     private static final Pattern SCHEME_PRODUCT_RETAILER = Pattern.compile(
             "^whatsapp://product/([^/]{0,200})/([0-9]{0,20})(?:\\?.*)?$",
@@ -163,8 +129,6 @@ public final class DeepLinkParser {
 
     /**
      * Retailer-product URLs hosted on the {@code whatsapp.com} origin.
-     *
-     * @implNote WAWebApiParse {@code Z}/{@code ne} patterns.
      */
     private static final Pattern WEB_PRODUCT_RETAILER = Pattern.compile(
             "^" + WEB_ORIGIN + OPTIONAL_PATH_PART + "/product/([^/]{0,200})/([0-9]{0,20})(/?.*)?$",
@@ -239,11 +203,6 @@ public final class DeepLinkParser {
     /**
      * Tagged union of the deep-link shapes the preview pipeline cares
      * about.
-     *
-     * @implNote WAWebApiParse {@code APICmd}: the JS export is a string
-     *           enum surfaced through {@code WAWebApi.APICmd}; Cobalt
-     *           uses a sealed interface so each variant carries its own
-     *           data.
      */
     public sealed interface DeepLink {
         /**

@@ -44,9 +44,6 @@ public final class SenderContentBindingStanza {
      * @param messageInfo the outgoing message
      * @param selfJid     the sender's user JID
      * @return the sender content binding node, or {@code null}
-     * @implNote ADAPTED: the guard checks from {@code genContentBindingForMsg}
-     * (chat type, URL message, isSentByMe) are applied here at the call site instead of
-     * inside the token generator.
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.DIRECT)

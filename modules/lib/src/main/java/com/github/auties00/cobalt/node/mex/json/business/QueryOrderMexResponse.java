@@ -40,11 +40,6 @@ public final class QueryOrderMexResponse implements MexOperation.Response.Json {
 
     /**
      * Parses the MEX response carried by an inbound IQ stanza.
-     *
-     * @implNote WA Web reads {@code data.xwa_checkout_get_order_info.order}
-     *           and raises {@code ServerStatusCodeError(500)} when the
-     *           projection is missing. Cobalt returns empty so callers can
-     *           branch on absence without a try/catch.
      * @param node the inbound IQ stanza carrying the {@code <result>} child
      * @return the parsed response, or empty if the expected JSON shape is
      *         absent

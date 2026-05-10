@@ -612,13 +612,6 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
      * The {@code SuccessNoData} reply variant. The entity has no
      * picture / avatar set; the relay returns a bare result IQ
      * envelope with no payload children.
-     *
-     * @implNote {@code WASmaxInProfilePictureGetResponseSuccessNoData.parseGetResponseSuccessNoData}
-     *           is just the IQ-result envelope check. Cobalt
-     *           additionally verifies the absence of the
-     *           {@code <picture>} and {@code <avatar>} children to
-     *           avoid false positives against the four
-     *           picture-bearing variants which are tried first.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInProfilePictureGetResponseSuccessNoData")
     final class SuccessNoData implements SmaxProfilePictureGetResponse {
@@ -687,14 +680,6 @@ public sealed interface SmaxProfilePictureGetResponse extends SmaxOperation.Resp
      *   <li>{@code (501, "feature-not-implemented")}
      *   <li>{@code (503, "service-unavailable")}
      * </ul>
-     *
-     * @implNote {@code WASmaxInProfilePictureGetResponseError.parseGetResponseError}
-     *           validates the IQ-error envelope and projects the
-     *           {@code <error/>} child through
-     *           {@code WASmaxInProfilePictureProfilePictureGetErrors}
-     *          . A disjunction over the seven sub-mixins above.
-     *           Cobalt collapses all seven into the single
-     *           {@code (errorCode, errorText)} pair below.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInProfilePictureGetResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInProfilePictureProfilePictureGetErrors")

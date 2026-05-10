@@ -60,12 +60,6 @@ public sealed interface IqJoinGroupByInviteCodeResponse extends IqOperation.Resp
      * two paths: {@code true} means the entry is queued for
      * approval, {@code false} means the caller is already a
      * member.
-     *
-     * @implNote {@code WAWebGroupInviteJob.joinGroupViaInviteParser}:
-     *           {@code maybeChild(t ? "membership_approval_request"
-     *           : "group")} -> {@code {gid: groupJidToWid(...)}};
-     *           the alternate child triggers
-     *           {@code UnexpectedJoinGroupViaInviteResponse}.
      */
     @WhatsAppWebModule(moduleName = "WAWebGroupInviteJob")
     final class Success implements IqJoinGroupByInviteCodeResponse {
@@ -194,15 +188,6 @@ public sealed interface IqJoinGroupByInviteCodeResponse extends IqOperation.Resp
      * carrying the actual group JID and a boolean indicating the
      * actual shape; Cobalt surfaces both as typed fields and routes
      * the variant through the {@link IqJoinGroupByInviteCodeResponse#of(Node, Node)} chain.
-     *
-     * @implNote {@code WAWebGroupInviteJob.joinGroupViaInviteParser}:
-     *           when the expected child is absent and the alternate
-     *           is present, throws
-     *           {@code UnexpectedJoinGroupViaInviteResponse(gid, !t)}.
-     *           Cobalt always returns this variant whenever the
-     *           expected child is absent and the alternate present
-     *           — the dispatcher layer correlates against the
-     *           Request flag to surface the discrepancy.
      */
     @WhatsAppWebModule(moduleName = "WAWebGroupInviteJob")
     final class UnexpectedJoinShape implements IqJoinGroupByInviteCodeResponse {

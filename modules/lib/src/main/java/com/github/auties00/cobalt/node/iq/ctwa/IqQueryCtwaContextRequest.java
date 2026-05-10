@@ -82,16 +82,6 @@ public final class IqQueryCtwaContextRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the three grandchildren
-     *
-     * @implNote {@code WAWebQueryCtwaContextJob.default}:
-     *           {@code wap("iq",{xmlns:"fb:thrift_iq", id,
-     *           type:"get", to:S_WHATSAPP_NET,
-     *           smax_id:CtwaGetContext}, [wap("account_number",
-     *           null, biz), wap("code", null, code),
-     *           wap("expected_source_url", null, src)])}.
-     *           Cobalt drops the {@code smax_id} attribute — the
-     *           dispatcher reassigns it from the operation type at
-     *           send time.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQueryCtwaContextJob",

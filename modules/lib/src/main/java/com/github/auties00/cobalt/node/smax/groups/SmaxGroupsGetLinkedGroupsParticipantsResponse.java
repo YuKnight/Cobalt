@@ -16,11 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsGetLinkedGroupsParticipantsRPC.sendGetLinkedGroupsParticipantsRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order and throws on no-match;
- *           Cobalt returns {@link Optional#empty()} instead.
  */
 public sealed interface SmaxGroupsGetLinkedGroupsParticipantsResponse extends SmaxOperation.Response
         permits SmaxGroupsGetLinkedGroupsParticipantsResponse.Success, SmaxGroupsGetLinkedGroupsParticipantsResponse.ClientError, SmaxGroupsGetLinkedGroupsParticipantsResponse.ServerError {
@@ -54,12 +49,6 @@ public sealed interface SmaxGroupsGetLinkedGroupsParticipantsResponse extends Sm
     /**
      * The {@code Success} reply variant — carries the union of
      * participants across the addressed community's sub-groups.
-     *
-     * @implNote {@code WASmaxInGroupsGetLinkedGroupsParticipantsResponseSuccess.parseGetLinkedGroupsParticipantsResponseSuccess}
-     *           validates the IQ envelope, then projects every
-     *           {@code <participant>} child via
-     *           {@code WASmaxInGroupsParticipantWithJidMixin} +
-     *           {@code WASmaxInGroupsPhoneNumberMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetLinkedGroupsParticipantsResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsParticipantWithJidMixin")
@@ -153,13 +142,6 @@ public sealed interface SmaxGroupsGetLinkedGroupsParticipantsResponse extends Sm
      * Per-participant projection — carries the addressing JID and
      * the optional phone-number JID surfaced by the relay's PN-LID
      * mapping.
-     *
-     * @implNote {@code parseGetLinkedGroupsParticipantsResponseSuccessLinkedGroupsParticipantsParticipant}
-     *           composes
-     *           {@code WASmaxInGroupsParticipantWithJidMixin}
-     *           ({@code jid}) with the optional
-     *           {@code WASmaxInGroupsPhoneNumberMixin}
-     *           ({@code phone_number}).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsParticipantWithJidMixin")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsPhoneNumberMixin")
@@ -258,10 +240,6 @@ public sealed interface SmaxGroupsGetLinkedGroupsParticipantsResponse extends Sm
 
     /**
      * The {@code ClientError} reply variant.
-     *
-     * @implNote {@code WASmaxInGroupsGetLinkedGroupsParticipantsResponseClientError.parseGetLinkedGroupsParticipantsResponseClientError}
-     *           parses the {@code <error code text/>} child via the
-     *           shared base mixin.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetLinkedGroupsParticipantsResponseClientError")
     final class ClientError implements SmaxGroupsGetLinkedGroupsParticipantsResponse {
@@ -350,9 +328,6 @@ public sealed interface SmaxGroupsGetLinkedGroupsParticipantsResponse extends Sm
 
     /**
      * The {@code ServerError} reply variant.
-     *
-     * @implNote {@code WASmaxInGroupsGetLinkedGroupsParticipantsResponseServerError.parseGetLinkedGroupsParticipantsResponseServerError}
-     *           delegates to the shared base mixin.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetLinkedGroupsParticipantsResponseServerError")
     final class ServerError implements SmaxGroupsGetLinkedGroupsParticipantsResponse {

@@ -46,10 +46,6 @@ import java.util.concurrent.TimeUnit;
  *
  * @apiNote WAWebAdvDeviceInfoCheckJob: manages automated periodic verification and
  * expiration of device information lists for Advanced Device Verification.
- * @implNote WAWebAdvDeviceInfoCheckJob: the WA Web module uses a recursive
- * {@code setTimeout} pattern with an {@code AdvToSystemBridgeImpl} bridge class;
- * Cobalt inlines the bridge logic and uses {@code ScheduledExecutorService} with
- * virtual threads instead.
  */
 @WhatsAppWebModule(moduleName = "WAWebAdvDeviceInfoCheckJob")
 public final class DeviceADVChecker implements AutoCloseable {
@@ -118,11 +114,6 @@ public final class DeviceADVChecker implements AutoCloseable {
      * to avoid waiting a full 24 hours if a check was performed recently. If no
      * previous check exists, runs immediately but only records the timestamp
      * without performing the actual device info check.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck: clears any
-     * existing timeout, computes initial delay as
-     * {@code max(DAY_SECONDS - (now - lastCheck), 0)}, and schedules the callback
-     * which runs the check, records the timestamp, and recursively reschedules.
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
             exports = "scheduleAdvDeviceInfoCheck",
@@ -154,11 +145,6 @@ public final class DeviceADVChecker implements AutoCloseable {
      * immediately (the actual job is skipped on first run, only recording the
      * timestamp). If a check was performed within the last 24 hours, returns
      * the remaining time until the next interval.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck:
-     * {@code t != null ? Math.max(DAY_SECONDS - (e - t), 0) : 0} where
-     * {@code e} is current time and {@code t} is last check time. When
-     * {@code t == null}, delay is 0 and action is a no-op.
      * @return the computed initial delay
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
@@ -190,13 +176,6 @@ public final class DeviceADVChecker implements AutoCloseable {
      * invocations, retrieves all cached device lists, classifies them as expired
      * or close-to-expiration, handles companion removal (including logout on own
      * device expiration), and queues proactive device syncs.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.runAdvDeviceInfoCheck: creates a
-     * singleton {@code p} runner with an {@code AdvToSystemBridgeImpl} bridge
-     * and calls {@code run(unixTimeWithoutClockSkewCorrection())}. The runner
-     * calls {@code getUsersForExpiration}, {@code removeCompanions},
-     * {@code sendADVStoredTimestampExpiredEvents}, and
-     * {@code sendOrQueueDeviceUsyncQuery}.
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
             exports = "runAdvDeviceInfoCheck",
@@ -262,12 +241,6 @@ public final class DeviceADVChecker implements AutoCloseable {
      * For each remaining list, checks timestamp-based expiration via
      * {@link DeviceExpectedTsUtils#isDeviceListStale} and proximity-to-expiration
      * via {@link DeviceExpectedTsUtils#isDeviceListCloseToExpiration}.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.getUsersForExpiration:
-     * iterates all device lists, skipping deleted and primary-only entries
-     * (function {@code v}), then classifies using functions {@code S} (expired)
-     * and {@code R} (close to expiration). Returns
-     * {@code {usersExpired, usersCloseToExpiration}} maps.
      * @param deviceLists      the device lists to analyze
      * @param now              the current time
      * @param expiryThreshold  the threshold for full expiration
@@ -315,9 +288,6 @@ public final class DeviceADVChecker implements AutoCloseable {
      *
      * <p>Returns {@code true} when the list has exactly one device and that
      * device's ID equals the default (primary) device ID.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.v:
-     * {@code e.devices.length === 1 && e.devices[0].id === DEFAULT_DEVICE_ID}
      * @param deviceList the device list to check
      * @return {@code true} if the list contains only the primary device
      */
@@ -331,9 +301,6 @@ public final class DeviceADVChecker implements AutoCloseable {
 
     /**
      * Checks whether the client should log out when its own device list has expired.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.removeCompanions:
-     * checks {@code WAWebABProps.getABPropConfigValue("web_adv_logout_on_self_device_list_expired")}
      * @return {@code true} if the AB prop indicates logout on self device list expiration
      */
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
@@ -347,11 +314,6 @@ public final class DeviceADVChecker implements AutoCloseable {
      * Clears an expired device record by removing Signal sessions for all
      * companion devices, rotating group sender keys, and marking the device
      * list as deleted.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.removeCompanions:
-     * calls {@code WAWebIdentityUpdateDeviceTableApi.clearDeviceRecord(wid, devices)}
-     * with only the user JID and devices array (no account type parameters),
-     * so {@code deletedChangedToHost} is never set in this code path.
      * @param deviceList the expired device list to clear
      */
     private void clearExpiredDeviceRecord(DeviceList deviceList) {
@@ -389,12 +351,6 @@ public final class DeviceADVChecker implements AutoCloseable {
      * is committed through the client's {@code WamService}. Lists whose
      * overshoot is negative (not yet past the expiration cutoff) are skipped,
      * matching WA Web's inline {@code if (!(r < 0))} guard.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.sendADVStoredTimestampExpiredEvents:
-     * iterates the {@code usersExpired} map computing
-     * {@code r = now - (t.timestamp + numDaysKeyIndexListExpiration * DAY_SECONDS)}
-     * and, when {@code r >= 0}, emits
-     * {@code new AdvStoredTimestampExpiredWamEvent({advExpireTimeInHours: Math.round(r/HOUR_SECONDS)}).commit()}.
      * @param expiredLists    the device lists classified as expired
      * @param now             the reference instant used to compute overshoot
      * @param expiryThreshold the configured key-index-list expiration threshold
@@ -424,10 +380,6 @@ public final class DeviceADVChecker implements AutoCloseable {
      *
      * <p>Adds all specified JIDs to the pending device sync queue and triggers
      * the pending sync process.
-     *
-     * @implNote WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.sendOrQueueDeviceUsyncQuery:
-     * calls {@code WAWebApiPendingDeviceSync.addUserToPendingDeviceSync(jids.map(toString))}
-     * followed by {@code WAWebApiPendingDeviceSync.doPendingDeviceSync()}.
      * @param jids the JIDs of users needing device sync
      */
     private void scheduleProactiveSync(List<Jid> jids) {
@@ -439,10 +391,6 @@ public final class DeviceADVChecker implements AutoCloseable {
 
     /**
      * Stops the ADV check scheduler and cancels pending checks.
-     *
-     * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob.scheduleAdvDeviceInfoCheck:
-     * WA Web clears the timeout via {@code clearTimeout(g); g = null}; Cobalt
-     * shuts down the {@link ScheduledExecutorService}.
      */
     @Override
     public void close() {
@@ -458,11 +406,6 @@ public final class DeviceADVChecker implements AutoCloseable {
 
     /**
      * Result of analyzing cached device lists for expiration and staleness.
-     *
-     * @implNote ADAPTED: WAWebAdvDeviceInfoCheckJob.AdvToSystemBridgeImpl.getUsersForExpiration:
-     * WA Web returns {@code {usersExpired: Map, usersCloseToExpiration: Map}} and
-     * separately checks self-expiration in {@code removeCompanions}; Cobalt
-     * consolidates into a single result record.
      * @param selfExpired    {@code true} if the current user's device list is expired
      * @param expiredLists   the list of expired device lists
      * @param jidsNeedingSync the JIDs needing proactive device sync (expired + close-to-expiration)

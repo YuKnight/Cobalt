@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.node.iq.syncd;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -15,16 +16,6 @@ import java.util.SequencedCollection;
  * {@code <collection type? error? has_more_patches?>} attributes, plus
  * the optional {@code version} attribute and the optional
  * {@code <snapshot/>} / {@code <patches/>} payloads.
- *
- * @implNote {@code WAWebSyncdResponseParser.syncResponseParser}: the
- *           parser walks {@code child("sync").mapChildrenWithTag("collection",
- *           ...)} and projects each collection into a record-style object
- *           with {@code name}, {@code state}, {@code version},
- *           {@code patches}, and {@code snapshot} fields. Cobalt mirrors
- *           the projection verbatim. The binary {@code patches}
- *           payloads are exposed as raw {@code byte[]} entries since the
- *           syncd subsystem owns the
- *           {@code WAWebSyncdDecode.decodeSyncdPatch} pipeline.
  */
 public final class IqSyncdServerSyncResponseCollection {
     /**
@@ -142,12 +133,12 @@ public final class IqSyncdServerSyncResponseCollection {
                 && this.state == that.state
                 && Objects.equals(this.version, that.version)
                 && Objects.equals(this.patches, that.patches)
-                && java.util.Arrays.equals(this.snapshot, that.snapshot);
+                && Arrays.equals(this.snapshot, that.snapshot);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, state, version, patches, java.util.Arrays.hashCode(snapshot));
+        return Objects.hash(name, state, version, patches, Arrays.hashCode(snapshot));
     }
 
     @Override

@@ -25,16 +25,6 @@ import java.io.UncheckedIOException;
  * each entry carrying {@code aead_id}, {@code expiration_date},
  * {@code kdf_id}, {@code kem_id}, {@code key_id},
  * {@code last_updated_time} and {@code public_key}.
- *
- * @implNote WAWebFetchOHAIKeyConfigJob.mexFetchOHAIKeyConfig: WA Web's
- * {@code function*()} dispatches the compiled
- * {@code WAWebFetchOHAIKeyConfigJobQuery} via
- * {@code WAWebMexClient.fetchQuery} with an empty variables object and
- * reduces the resulting {@code ohai_configs} array to the entry with the
- * earliest {@code expiration_date}. Cobalt models the request as a
- * variable-less MEX query and exposes the full configuration list through
- * the matching {@link FetchOHAIKeyConfigMexResponse} so callers can pick
- * the active entry themselves.
  */
 @WhatsAppWebModule(moduleName = "WAWebFetchOHAIKeyConfigJob")
 public final class FetchOHAIKeyConfigMexRequest implements MexOperation.Request.Json {
@@ -55,10 +45,6 @@ public final class FetchOHAIKeyConfigMexRequest implements MexOperation.Request.
 
     /**
      * Constructs a {@link FetchOHAIKeyConfigMexRequest}.
-     *
-     * @implNote The compiled GraphQL artifact takes no variables. WA Web
-     * dispatches the query with an empty variables object
-     * ({@code fetchQuery(s, {})}).
      */
     public FetchOHAIKeyConfigMexRequest() {
     }

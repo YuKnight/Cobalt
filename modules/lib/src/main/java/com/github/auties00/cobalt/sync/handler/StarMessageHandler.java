@@ -11,13 +11,10 @@ import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.contact.StarAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Handles star message sync actions for starring or unstarring individual
  * messages.
@@ -32,8 +29,6 @@ import com.github.auties00.cobalt.wam.WamService;
  * which is itself a {@code ChatSyncdActionBase}. The collection is
  * {@code RegularHigh} and the version is {@code 2}. Cobalt collapses the
  * inheritance hierarchy into a single sealed implementation.
- *
- * @implNote WAWebStarMessageSync — singleton instance exported as {@code default}
  */
 @WhatsAppWebModule(moduleName = "WAWebStarMessageSync")
 public final class StarMessageHandler implements WebAppStateActionHandler {
@@ -42,17 +37,12 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, {@code WAWebStarMessageSync} exports a single instance
      * ({@code var h = new g(); l.default = h}).
-     *
-     * @implNote WAWebStarMessageSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebStarMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final StarMessageHandler INSTANCE = new StarMessageHandler();
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebStarMessageSync — class {@code g} constructor (sets
-     *           {@code collectionName = RegularHigh}, {@code chatJidIndex = 1})
      */
     @WhatsAppWebExport(moduleName = "WAWebStarMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private StarMessageHandler() {
@@ -61,9 +51,6 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action name for star message actions.
-     *
-     * @implNote WAWebStarMessageSync.getAction — returns
-     *           {@code WASyncdConst.Actions.Star} ({@code "star"})
      * @return the action name {@code "star"}
      */
     @Override
@@ -77,9 +64,6 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
      *
      * <p>Per WhatsApp Web, the star handler's {@code collectionName} is set to
      * {@code WASyncdConst.CollectionName.RegularHigh} in the constructor.
-     *
-     * @implNote WAWebStarMessageSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularHigh}
      * @return {@link SyncPatchType#REGULAR_HIGH}
      */
     @Override
@@ -90,32 +74,12 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for star message actions.
-     *
-     * @implNote WAWebStarMessageSync.getVersion — returns {@code 2}
      * @return the version number {@code 2}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStarMessageSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return StarAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a star message mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebStarMessageSync.applyMutations — per-mutation inner logic,
-     *           success check on the returned {@code syncApplyActionResult}
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebStarMessageSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -158,15 +122,13 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
      * an {@code associationType} because association detachment is a WA Web
      * in-memory reactive collection bookkeeping concern that does not apply to
      * Cobalt's plain record store.
-     *
-     * @implNote WAWebStarMessageSync.applyMutations — per-mutation inner function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStarMessageSync", exports = {"applyMutations", "getMessageKey"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -174,7 +136,7 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() < 5) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chatJidString = indexArray.getString(1);
@@ -185,11 +147,11 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
                     || messageId == null || messageId.isEmpty()
                     || fromMeString == null || fromMeString.isEmpty()
                     || participantString == null || participantString.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().action().orElse(null) instanceof StarAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             // ADAPTED: Cobalt's StarAction.starred() coalesces a missing protobuf bool to false because
@@ -201,7 +163,7 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
 
             var msgKeyOpt = SyncdIndexUtils.syncKeyToMsgKey(client.store(), chatJidString, messageId, fromMeString, participantString);
             if (msgKeyOpt.isEmpty()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             var msgKey = msgKeyOpt.get();
 
@@ -209,7 +171,7 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
             try {
                 chatJid = Jid.of(chatJidString);
             } catch (Exception e) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             // Cobalt looks up the chat-local message directly via the flattened store.
@@ -247,10 +209,6 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
      * message record. {@link ChatMessageInfo#setStarred(Boolean)} accepts a
      * boxed value while {@link NewsletterMessageInfo#setStarred(boolean)}
      * accepts a primitive — both perform the same logical assignment.
-     *
-     * @implNote ADAPTED: WAWebStarMessageSync.applyMutations — replaces
-     *           {@code k.star = p} plus the {@code WAWebStarredMsgCollection}
-     *           add/remove with a direct setter call dispatched per message type
      * @param message the message whose star flag is being updated
      * @param starred {@code true} to star the message, {@code false} to unstar it
      */

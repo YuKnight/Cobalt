@@ -123,9 +123,6 @@ public final class ContentBindingToken {
      *
      * @param url the URL to parse
      * @return the 11-character video ID, or {@code null}
-     * @implNote ADAPTED: WA Web matches against three regular expressions after
-     * stripping {@code www.} via {@code WAWebURLUtils.withoutWww}; Cobalt replicates the
-     * same matching using prefix checks and substrings to avoid the regex cost.
      */
     @WhatsAppWebExport(moduleName = "WAWebUtilsYoutubeUrlParser", exports = "parseYoutubeVideoId",
             adaptation = WhatsAppAdaptation.ADAPTED)

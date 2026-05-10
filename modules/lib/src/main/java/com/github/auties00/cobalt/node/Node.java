@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.node;
 
 import com.github.auties00.cobalt.exception.WhatsAppMalformedJidException;
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.binary.NodeDecoder;
 import com.github.auties00.cobalt.node.binary.NodeEncoder;
@@ -64,6 +66,7 @@ import java.util.stream.Stream;
  */
 @WhatsAppWebModule(moduleName = "WAWap")
 @WhatsAppWebModule(moduleName = "WAXmlNode")
+@WhatsAppWebModule(moduleName = "WASmaxChildren")
 public sealed interface Node {
     /**
      * Returns the description (tag name) of this node.
@@ -1222,9 +1225,10 @@ public sealed interface Node {
     record EmptyNode(String description, SequencedMap<String, NodeAttribute> attributes) implements Node {
         /**
          * Builds an empty node, rejecting {@code null} arguments.
-         *
          * @throws NullPointerException if any argument is {@code null}
          */
+        @WhatsAppWebExport(moduleName = "WAXmlNode", exports = "XmlNode",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public EmptyNode {
             Objects.requireNonNull(description, "description cannot be null");
             Objects.requireNonNull(attributes, "attributes cannot be null");
@@ -1295,7 +1299,14 @@ public sealed interface Node {
             return Objects.hash(description, attributes);
         }
 
+        /**
+         * Returns a debug oriented string for this empty node.
+         * @return the debug string
+         */
         @Override
+        @WhatsAppWebExport(moduleName = "WAXmlNode",
+                exports = {"XmlNode", "attrsToString"},
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public String toString() {
             var result = new StringBuilder();
             result.append("Node[description=");
@@ -1326,9 +1337,10 @@ public sealed interface Node {
     record TextNode(String description, SequencedMap<String, NodeAttribute> attributes, String content) implements Node {
         /**
          * Builds a text node, rejecting {@code null} arguments.
-         *
          * @throws NullPointerException if any argument is {@code null}
          */
+        @WhatsAppWebExport(moduleName = "WAXmlNode", exports = "XmlNode",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public TextNode {
             Objects.requireNonNull(description, "description cannot be null");
             Objects.requireNonNull(attributes, "attributes cannot be null");
@@ -1414,7 +1426,14 @@ public sealed interface Node {
             return Objects.hash(description, attributes, content);
         }
 
+        /**
+         * Returns a debug oriented string for this text node.
+         * @return the debug string
+         */
         @Override
+        @WhatsAppWebExport(moduleName = "WAXmlNode",
+                exports = {"XmlNode", "attrsToString"},
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public String toString() {
             var result = new StringBuilder();
             result.append("Node[description=");
@@ -1450,9 +1469,10 @@ public sealed interface Node {
     record JidNode(String description, SequencedMap<String, NodeAttribute> attributes, Jid content) implements Node {
         /**
          * Builds a JID node, rejecting {@code null} arguments.
-         *
          * @throws NullPointerException if any argument is {@code null}
          */
+        @WhatsAppWebExport(moduleName = "WAXmlNode", exports = "XmlNode",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public JidNode {
             Objects.requireNonNull(description, "description cannot be null");
             Objects.requireNonNull(attributes, "attributes cannot be null");
@@ -1530,7 +1550,14 @@ public sealed interface Node {
             return Objects.hash(description, attributes, content);
         }
 
+        /**
+         * Returns a debug oriented string for this JID node.
+         * @return the debug string
+         */
         @Override
+        @WhatsAppWebExport(moduleName = "WAXmlNode",
+                exports = {"XmlNode", "attrsToString"},
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public String toString() {
             var result = new StringBuilder();
             result.append("Node[description=");
@@ -1565,9 +1592,10 @@ public sealed interface Node {
     record BytesNode(String description, SequencedMap<String, NodeAttribute> attributes, byte[] content) implements Node {
         /**
          * Builds a bytes node, rejecting {@code null} arguments.
-         *
          * @throws NullPointerException if any argument is {@code null}
          */
+        @WhatsAppWebExport(moduleName = "WAXmlNode", exports = "XmlNode",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public BytesNode {
             Objects.requireNonNull(description, "description cannot be null");
             Objects.requireNonNull(attributes, "attributes cannot be null");
@@ -1651,7 +1679,14 @@ public sealed interface Node {
             return Objects.hash(description, attributes, Arrays.hashCode(content));
         }
 
+        /**
+         * Returns a debug oriented string for this bytes node.
+         * @return the debug string
+         */
         @Override
+        @WhatsAppWebExport(moduleName = "WAXmlNode",
+                exports = {"XmlNode", "attrsToString", "uint8ArrayToDebugString"},
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public String toString() {
             var result = new StringBuilder();
             result.append("Node[description=");
@@ -1692,9 +1727,10 @@ public sealed interface Node {
     record ContainerNode(String description, SequencedMap<String, NodeAttribute> attributes, SequencedCollection<Node> children) implements Node {
         /**
          * Builds a container node, rejecting {@code null} arguments.
-         *
          * @throws NullPointerException if any argument is {@code null}
          */
+        @WhatsAppWebExport(moduleName = "WAXmlNode", exports = "XmlNode",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public ContainerNode {
             Objects.requireNonNull(description, "description cannot be null");
             Objects.requireNonNull(attributes, "attributes cannot be null");
@@ -1777,7 +1813,14 @@ public sealed interface Node {
             return Objects.hash(description, attributes, children);
         }
 
+        /**
+         * Returns a debug oriented string for this container node.
+         * @return the debug string
+         */
         @Override
+        @WhatsAppWebExport(moduleName = "WAXmlNode",
+                exports = {"XmlNode", "attrsToString"},
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public String toString() {
             var result = new StringBuilder();
             result.append("Node[description=");

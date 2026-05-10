@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.wam.privatestats;
 
+import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.wam.privatestats.ed25519.Ed25519HashToPoint;
 import com.github.auties00.cobalt.wam.privatestats.ed25519.Ed25519Point;
 
@@ -21,12 +23,16 @@ import java.util.Objects;
  * unblinded VOPRF output.
  *
  * <p>Mirrors {@code privateStatsToken.blindToken} and
- * {@code privateStatsToken.unblindToken}.
+ * {@code privateStatsToken.unblindToken} from the
+ * {@code WAWamPrivateStatsToken} module, which is exposed to
+ * {@code WAWebIssuePrivateStatsToken} under the alias
+ * {@code privateStatsToken}.
  *
  * @apiNote The scalar {@code k} must be uniformly random and used at
  * most once per message. Reusing {@code k} across messages leaks the
  * unblinded outputs of prior messages.
  */
+@WhatsAppWebModule(moduleName = "WAWamPrivateStatsToken")
 @WhatsAppWebModule(moduleName = "WAWebIssuePrivateStatsToken")
 public final class WamPrivateStatsTokenBlinder {
     /**
@@ -64,6 +70,11 @@ public final class WamPrivateStatsTokenBlinder {
      * @throws IllegalArgumentException if {@code scalar} is not exactly
      *                                  {@value #TOKEN_BYTES} bytes
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWamPrivateStatsToken",
+            exports = "blindToken",
+            adaptation = WhatsAppAdaptation.DIRECT
+    )
     public static byte[] blind(byte[] message, byte[] scalar) {
         Objects.requireNonNull(message, "message must not be null");
         Objects.requireNonNull(scalar, "scalar must not be null");
@@ -91,7 +102,6 @@ public final class WamPrivateStatsTokenBlinder {
      * {@code unblind(signed, scalar, pk) = signed - scalar*pk}.
      *
      * <p>Mirrors {@code privateStatsToken.unblindToken}.
-     *
      * @param signed       the server-signed blinded token, exactly
      *                     {@value #TOKEN_BYTES} bytes
      * @param scalar       the same client scalar passed to
@@ -110,6 +120,11 @@ public final class WamPrivateStatsTokenBlinder {
      *                                  {@code serverPubKey} is not a
      *                                  valid Edwards point
      */
+    @WhatsAppWebExport(
+            moduleName = "WAWamPrivateStatsToken",
+            exports = "unblindToken",
+            adaptation = WhatsAppAdaptation.ADAPTED
+    )
     public static byte[] unblind(byte[] signed, byte[] scalar, byte[] serverPubKey) {
         Objects.requireNonNull(signed, "signed must not be null");
         Objects.requireNonNull(scalar, "scalar must not be null");
@@ -155,7 +170,9 @@ public final class WamPrivateStatsTokenBlinder {
      *
      * <p>The clamp bounds the scalar to the safe range
      * {@code [2^254, 2^255)} with low-order bits zeroed, matching the
-     * private {@code u} helper inside {@code privateStatsToken}.
+     * private {@code u} helper inside the
+     * {@code WAWamPrivateStatsToken} module (also reachable through the
+     * {@code privateStatsToken} alias).
      *
      * @param scalar the scalar bytes, exactly {@value #TOKEN_BYTES}
      *               bytes

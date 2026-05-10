@@ -19,11 +19,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsGetGroupProfilePicturesRequest}.
- *
- * @implNote {@code WASmaxGroupsGetGroupProfilePicturesRPC.sendGetGroupProfilePicturesRPC}
- *           tries {@code SuccessGroupPictures} → {@code ClientError}
- *           → {@code ServerError} in order and throws on no-match;
- *           Cobalt returns {@link Optional#empty()} instead.
  */
 public sealed interface SmaxGroupsGetGroupProfilePicturesResponse extends SmaxOperation.Response
         permits SmaxGroupsGetGroupProfilePicturesResponse.Success, SmaxGroupsGetGroupProfilePicturesResponse.ClientError, SmaxGroupsGetGroupProfilePicturesResponse.ServerError {
@@ -63,16 +58,6 @@ public sealed interface SmaxGroupsGetGroupProfilePicturesResponse extends SmaxOp
      * The {@code SuccessGroupPictures} reply variant — carries a
      * {@code <pictures>} wrapper holding one {@link Picture} per
      * requested group.
-     *
-     * @implNote {@code WASmaxInGroupsGetGroupProfilePicturesResponseSuccessGroupPictures.parseGetGroupProfilePicturesResponseSuccessGroupPictures}
-     *           composes the standard
-     *           {@code WASmaxInGroupsIQResultResponseMixin}
-     *           envelope check with
-     *           {@code WASmaxInGroupsGetGroupProfilePicturesProfilePicturesResponseMixin}.
-     *           Cobalt projects each {@code <picture/>} into a typed
-     *           {@link Picture} record carrying both the addressing
-     *           jid and either the URL+direct-path bytes or the
-     *           inline blob.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetGroupProfilePicturesResponseSuccessGroupPictures")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetGroupProfilePicturesProfilePicturesResponseMixin")
@@ -180,11 +165,6 @@ public sealed interface SmaxGroupsGetGroupProfilePicturesResponse extends SmaxOp
      * {@code <picture/>} child is exposed verbatim via
      * {@link #raw()} so callers can inspect any sub-marker the
      * partial branch may carry.
-     *
-     * @implNote {@code WASmaxInGroupsGetGroupProfilePicturesSuccessProfilePictureResponseMixin}
-     *           +
-     *           {@code WASmaxInGroupsGetGroupProfilePicturesPartialProfilePictureResponseMixin}
-     *           form the disjunction; Cobalt unifies them.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetGroupProfilePicturesSuccessProfilePictureResponseMixin")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetGroupProfilePicturesPartialProfilePictureResponseMixin")
@@ -410,11 +390,6 @@ public sealed interface SmaxGroupsGetGroupProfilePicturesResponse extends SmaxOp
     /**
      * The {@code ClientError} reply variant — the relay rejected
      * the request as malformed or unauthorised.
-     *
-     * @implNote {@code WASmaxInGroupsGetGroupProfilePicturesResponseClientError.parseGetGroupProfilePicturesResponseClientError}
-     *           parses the {@code <error code text/>} child via the
-     *           shared base mixin; Cobalt collapses to the raw
-     *           {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetGroupProfilePicturesResponseClientError")
     final class ClientError implements SmaxGroupsGetGroupProfilePicturesResponse {
@@ -504,10 +479,6 @@ public sealed interface SmaxGroupsGetGroupProfilePicturesResponse extends SmaxOp
     /**
      * The {@code ServerError} reply variant — the relay encountered
      * a transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInGroupsGetGroupProfilePicturesResponseServerError.parseGetGroupProfilePicturesResponseServerError}
-     *           delegates to the shared base mixin which Cobalt has
-     *           consolidated under {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetGroupProfilePicturesResponseServerError")
     final class ServerError implements SmaxGroupsGetGroupProfilePicturesResponse {

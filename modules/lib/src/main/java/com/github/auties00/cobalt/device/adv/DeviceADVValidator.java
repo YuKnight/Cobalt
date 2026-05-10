@@ -41,15 +41,6 @@ import java.util.Optional;
  * <p>Used by
  * {@link com.github.auties00.cobalt.device.DeviceService} and
  * {@link com.github.auties00.cobalt.device.stanza.DeviceUSyncResponseParser}.
- *
- * @implNote WAWebAdvSignatureApi: provides signature verification for E2EE and hosted devices.
- * WAWebHandleAdvDeviceNotificationUtils: handles key index list validation. The
- * {@code decodeSignedKeyIndexBytesBatchInWorker} export is intentionally omitted: it is a
- * Web Worker offload of {@code decodeSignedKeyIndexBytes} that exists purely to keep the
- * main JS thread responsive. Cobalt has no worker realm and uses virtual threads; callers
- * invoke {@link #validateAndDecodeSignedKeyIndexList(byte[])} directly per item, which is
- * semantically equivalent.
- * WAWebBizCoexGatingUtils: provides bizHostedDevicesEnabled gating.
  */
 @WhatsAppWebModule(moduleName = "WAWebAdvSignatureApi")
 @WhatsAppWebModule(moduleName = "WAWebHandleAdvDeviceNotificationUtils")
@@ -139,12 +130,6 @@ public final class DeviceADVValidator {
 
     /**
      * Extracts and validates a local device identity from a pairing response.
-     *
-     * @implNote WAWebHandlePairSuccess: validates {@code ADVSignedDeviceIdentityHMAC} during
-     * pairing, verifies account signature via
-     * {@code WAWebAdvSignatureApi.verifyDeviceIdentityAccountSignature}, and generates device
-     * signature via {@code WAWebAdvSignatureApi.generateDeviceSignature} using local identity key.
-     * Uses advSecretKey (not companion public key) for HMAC verification.
      * @param deviceIdentityNode the device identity node from pairing response
      * @return the validated signed device identity with generated device signature
      * @throws WhatsAppAdvValidationException if validation fails
@@ -254,13 +239,6 @@ public final class DeviceADVValidator {
 
     /**
      * Extracts and validates a remote device identity from a prekey response.
-     *
-     * @implNote WAWebAdvSignatureApi.validateADVwithIdentityKey: validates both account signature
-     * (via internal function {@code x/verifyDeviceIdentityAccountSignature}) and device signature
-     * (via internal function {@code A}) for companion devices. Uses stored identity key as
-     * fallback when {@code accountSignatureKey} is missing from protobuf. Header selection uses
-     * {@code deviceType} from protobuf for account signature (gated by
-     * {@code bizHostedDevicesEnabled}), and {@code isHosted} parameter for device signature.
      * @param remoteJid          the remote device JID
      * @param remoteIdentityNode the remote device identity node
      * @param remoteIdentityKey  the remote device's claimed identity key (32 bytes)
@@ -361,12 +339,6 @@ public final class DeviceADVValidator {
 
     /**
      * Validates and decodes a signed key index list from raw bytes.
-     *
-     * @implNote WAWebHandleAdvDeviceNotificationUtils.verifySKeyIndexWithAccSigKey: decodes
-     * protobuf and validates account signature using ONLY the embedded
-     * {@code accountSignatureKey}. Returns {@code null} if the embedded key is missing --
-     * no fallback to stored key. Signature verification delegates to
-     * {@code WAWebAdvKeyIndexSignatureVerify.verifyKeyIndexListAccountSignature}.
      * @param signedKeyIndexBytes the raw signed key index list bytes
      * @return the validated key index list data, or empty if validation fails
      */

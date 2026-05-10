@@ -16,11 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxGroupsGetMembershipApprovalRequestsRPC.sendGetMembershipApprovalRequestsRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order; Cobalt returns
- *           {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGroupsGetMembershipApprovalRequestsResponse extends SmaxOperation.Response
         permits SmaxGroupsGetMembershipApprovalRequestsResponse.Success, SmaxGroupsGetMembershipApprovalRequestsResponse.ClientError, SmaxGroupsGetMembershipApprovalRequestsResponse.ServerError {
@@ -56,11 +51,6 @@ public sealed interface SmaxGroupsGetMembershipApprovalRequestsResponse extends 
      * pending {@link Approval} entries plus the echoed
      * {@link #requestorFetch} flag (which is non-{@code null} only
      * when the caller asked for the rich projection).
-     *
-     * @implNote {@code WASmaxInGroupsGetMembershipApprovalRequestsResponseSuccess.parseGetMembershipApprovalRequestsResponseSuccess}
-     *           validates the IQ envelope, then projects every
-     *           {@code <membership_approval_request>} child via
-     *           {@code WASmaxInGroupsGetMembershipApprovalRequestsMembershipApprovalRequestMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetMembershipApprovalRequestsResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetMembershipApprovalRequestsRequestorFetchMixin")
@@ -177,10 +167,6 @@ public sealed interface SmaxGroupsGetMembershipApprovalRequestsResponse extends 
      * projection), the request timestamp, and the optional request
      * method enum (one of {@code "InviteLink"},
      * {@code "LinkedGroupJoin"}, {@code "NonAdminAdd"}).
-     *
-     * @implNote {@code WASmaxInGroupsGetMembershipApprovalRequestsMembershipApprovalRequestMixin.parseGetMembershipApprovalRequestsMembershipApprovalRequestMixin}
-     *           +
-     *           {@code WASmaxInGroupsMembershipRequestMethodAttributeMixin.parseMembershipRequestMethodAttributeMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetMembershipApprovalRequestsMembershipApprovalRequestMixin")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsMembershipRequestMethodAttributeMixin")
@@ -393,10 +379,6 @@ public sealed interface SmaxGroupsGetMembershipApprovalRequestsResponse extends 
 
     /**
      * The {@code ClientError} reply variant.
-     *
-     * @implNote {@code WASmaxInGroupsGetMembershipApprovalRequestsResponseClientError.parseGetMembershipApprovalRequestsResponseClientError}
-     *           parses the {@code <error code text/>} child via the
-     *           shared base mixin.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetMembershipApprovalRequestsResponseClientError")
     final class ClientError implements SmaxGroupsGetMembershipApprovalRequestsResponse {
@@ -485,9 +467,6 @@ public sealed interface SmaxGroupsGetMembershipApprovalRequestsResponse extends 
 
     /**
      * The {@code ServerError} reply variant.
-     *
-     * @implNote {@code WASmaxInGroupsGetMembershipApprovalRequestsResponseServerError.parseGetMembershipApprovalRequestsResponseServerError}
-     *           delegates to the shared base mixin.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsGetMembershipApprovalRequestsResponseServerError")
     final class ServerError implements SmaxGroupsGetMembershipApprovalRequestsResponse {

@@ -64,12 +64,6 @@ public final class SmaxGroupsReportMessagesRequest implements SmaxOperation.Requ
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         report payload
-     *
-     * @implNote {@code WASmaxOutGroupsReportMessagesRequest.makeReportMessagesRequest}
-     *           composes
-     *           {@code <reports><report message_id=STANZA_ID(t)/></reports>}
-     *           wrapped in
-     *           {@code WASmaxOutGroupsBaseSetGroupMixin}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsReportMessagesRequest",

@@ -23,13 +23,6 @@ import java.util.Optional;
  * {@code XWA2CommunityDefaultSubGroup}, {@code XWA2CommunitySubGroup}).
  * The query collapses the four inline fragments into a single boolean by
  * walking the response shape that the relay actually populates.
- *
- * @implNote WAWebMexFetchGroupIsInternalJob: adapts the
- * {@code mexFetchGroupIsInternal} GraphQL query, which in WA Web is
- * invoked via {@code WAWebMexClient.fetchQuery} and whose response is
- * unwrapped by the same module to expose the {@code internal} scalar.
- * Cobalt models the request and response as sibling variants of a sealed
- * interface rather than a free-standing async function.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchGroupIsInternalJob")
 public final class FetchGroupIsInternalMexRequest implements MexOperation.Request.Json {
@@ -53,9 +46,6 @@ public final class FetchGroupIsInternalMexRequest implements MexOperation.Reques
     /**
      * Constructs a request that asks the relay whether the given group is
      * flagged as internal.
-     *
-     * @implNote The compiled query injects the literal {@code query_context:
-     * "INTERACTIVE"} alongside the {@code id} variable.
      * @param groupId the group identifier emitted as the {@code id} variable
      */
     public FetchGroupIsInternalMexRequest(String groupId) {

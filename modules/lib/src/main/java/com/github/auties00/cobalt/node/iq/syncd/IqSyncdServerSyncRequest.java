@@ -25,17 +25,6 @@ import java.util.SequencedCollection;
  * {@code version} attributes. Entries that ship local mutations
  * additionally attach a {@code <patch>} grandchild carrying the encoded
  * {@code SyncdPatch} protobuf bytes.
- *
- * @implNote {@code WAWebSyncdRequestBuilderBuild.buildSyncIqNode}:
- *           {@code wap("iq", {id: generateId(), to: S_WHATSAPP_NET, type:
- *           "set", xmlns: "w:sync:app:state"}, wap("sync", null,
- *           collectionNodes))}. Each collection node emits
- *           {@code wap("collection", {name: CUSTOM_STRING, return_snapshot:
- *           "true"|"false", version: INT(version ??
- *           DEFAULT_COLLECTION_VERSION)}, optionalPatchNode)}. The
- *           default collection version is {@code 0} per
- *           {@code WASyncdConst.DEFAULT_COLLECTION_VERSION}. Cobalt
- *           projects the same fallback.
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdServerSync")
 @WhatsAppWebModule(moduleName = "WAWebSyncdRequestBuilderBuild")
@@ -43,11 +32,6 @@ public final class IqSyncdServerSyncRequest implements IqOperation.Request {
     /**
      * The default collection version used in the {@code version}
      * attribute when the caller has never synced a collection.
-     *
-     * @implNote {@code WASyncdConst.DEFAULT_COLLECTION_VERSION}: WA
-     *           Web's syncd subsystem ships the literal {@code 0}
-     *           through this constant. Cobalt mirrors the value
-     *           verbatim.
      */
     @WhatsAppWebExport(moduleName = "WASyncdConst",
             exports = "DEFAULT_COLLECTION_VERSION", adaptation = WhatsAppAdaptation.DIRECT)
@@ -90,13 +74,6 @@ public final class IqSyncdServerSyncRequest implements IqOperation.Request {
      *         {@code <iq xmlns="w:sync:app:state" type="set">} envelope
      *         and the typed {@code <sync>}/{@code <collection>}
      *         payload
-     *
-     * @implNote {@code WAWebSyncdRequestBuilderBuild.buildSyncIqNode}:
-     *           Cobalt rebuilds the WA Web node tree from typed data
-     *           rather than accepting a pre-built {@link com.github.auties00.cobalt.node.Node}.
-     *           The {@code id} attribute is injected by
-     *           {@code WhatsAppClient.sendNode} when missing, mirroring
-     *           {@code WAWap.generateId()}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderBuild",

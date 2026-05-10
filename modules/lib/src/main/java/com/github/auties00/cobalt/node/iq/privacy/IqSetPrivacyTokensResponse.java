@@ -12,11 +12,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WAWebSetPrivacyTokensJob.issuePrivacyToken} folds
- *           every non-result envelope into {@code ServerStatusCodeError}.
- *           Cobalt splits the failure path into typed
- *           {@code ClientError}/{@code ServerError} variants.
  */
 public sealed interface IqSetPrivacyTokensResponse extends IqOperation.Response
         permits IqSetPrivacyTokensResponse.Success, IqSetPrivacyTokensResponse.ClientError, IqSetPrivacyTokensResponse.ServerError {
@@ -52,11 +47,6 @@ public sealed interface IqSetPrivacyTokensResponse extends IqOperation.Response
      * The {@code Success} reply variant. The relay accepted the
      * batch and registered every token. Carries no payload beyond
      * the envelope echo.
-     *
-     * @implNote {@code WAWebSetPrivacyTokensJob.setPrivacyTokensParser}
-     *           projects only {@code {stanzaId}}. Cobalt's
-     *           {@link Success} mirrors the no-payload shape with
-     *           the singleton type marker.
      */
     @WhatsAppWebModule(moduleName = "WAWebSetPrivacyTokensJob")
     final class Success implements IqSetPrivacyTokensResponse {

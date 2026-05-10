@@ -10,10 +10,6 @@ import java.util.Optional;
 /**
  * Response variant for {@link CreateNewsletterAdminInviteMexRequest} exposing
  * the invite identifier and its expiration timestamp.
- *
- * @implNote The body wraps the
- *           {@code data.xwa2_newsletter_admin_invite_create} root of the JSON
- *           response.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexCreateNewsletterAdminInviteJob")
 public final class CreateNewsletterAdminInviteMexResponse implements MexOperation.Response.Json {

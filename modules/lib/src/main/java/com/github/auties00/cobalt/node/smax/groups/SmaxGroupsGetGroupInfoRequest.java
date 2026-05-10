@@ -143,18 +143,6 @@ public final class SmaxGroupsGetGroupInfoRequest implements SmaxOperation.Reques
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <query/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsGetGroupInfoRequest.makeGetGroupInfoRequest}
-     *           composes {@code WASmaxOutGroupsBaseGetGroupMixin}
-     *           ({@code xmlns="w:g2"}, {@code to=GROUP_JID(t)}) with
-     *           {@code WASmaxOutGroupsBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over a
-     *           {@code <query phash="…">} child. The optional
-     *           {@code <add_request expiration admin? code?/>}
-     *           sub-child is merged via
-     *           {@code WASmaxOutGroupsAddRequestMixin} +
-     *           {@code WASmaxOutGroupsCodeMixin} when the caller
-     *           supplies the V4-invite-link probe.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGetGroupInfoRequest",

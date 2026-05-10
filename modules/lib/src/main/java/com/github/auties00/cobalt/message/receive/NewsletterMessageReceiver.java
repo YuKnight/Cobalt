@@ -21,11 +21,6 @@ import java.time.Instant;
  * protobuf bytes inside a {@code <plaintext>} child of the message node. The stanza
  * also carries a server-assigned {@code server_id}, a timestamp, and an
  * {@code is_sender} attribute indicating whether the current user authored the post.
- *
- * @implNote WA Web routes newsletters through three separate modules
- * ({@code WAWebNewsletterMsgParser}, {@code WAWebNewsletterMsgProcessor},
- * {@code WAWebNewsletterMsgUtils}). Cobalt folds them into one method since neither
- * preprocessing nor SMAX envelope handling has an independent Java counterpart.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleNewsletterMsg")
 final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageInfo> {

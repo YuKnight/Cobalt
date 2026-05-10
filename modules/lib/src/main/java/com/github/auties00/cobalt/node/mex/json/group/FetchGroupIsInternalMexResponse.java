@@ -16,11 +16,6 @@ import java.util.Optional;
 /**
  * Parsed response of the {@link FetchGroupIsInternalMexRequest} query,
  * exposing whether the queried group is flagged as internal by the relay.
- *
- * @implNote WA Web's {@code mexFetchGroupIsInternal} unwraps the response by
- * reading {@code n.xwa2_group_query_by_id?.properties?.internal === true}.
- * Cobalt mirrors the same triple-strict-equality projection so {@code null},
- * absent objects and explicit {@code false} all collapse to {@code false}.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchGroupIsInternalJob")
 public final class FetchGroupIsInternalMexResponse implements MexOperation.Response.Json {

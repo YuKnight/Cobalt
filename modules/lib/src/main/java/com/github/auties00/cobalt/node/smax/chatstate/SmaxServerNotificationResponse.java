@@ -97,6 +97,9 @@ public final class SmaxServerNotificationResponse implements SmaxOperation.Respo
     @WhatsAppWebExport(moduleName = "WASmaxInChatstateServerNotificationRequest",
             exports = "parseServerNotificationRequest",
             adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInChatstateInternalTestMixin",
+            exports = "parseInternalTestMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<SmaxServerNotificationResponse> of(Node node) {
         Objects.requireNonNull(node, "node cannot be null");
         if (!node.hasDescription("chatstate")) {

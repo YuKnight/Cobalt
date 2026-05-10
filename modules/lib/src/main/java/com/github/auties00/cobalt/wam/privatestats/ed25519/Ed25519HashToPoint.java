@@ -19,12 +19,6 @@ import java.security.NoSuchAlgorithmException;
  * for this class therefore relies on KAT vectors captured from the
  * live WhatsApp Web JavaScript bundle rather than an independent
  * specification.
- *
- * @implNote Mirrors {@code WACryptoEd25519.hashToPoint} together
- *     with its private helpers {@code E}, {@code k}, {@code D},
- *     {@code x}, {@code $}, {@code W}, {@code V}, {@code A},
- *     {@code F}, {@code O}, {@code M}, {@code P}, {@code N}, and
- *     {@code B}.
  */
 @WhatsAppWebModule(moduleName = "WACryptoEd25519")
 public final class Ed25519HashToPoint {

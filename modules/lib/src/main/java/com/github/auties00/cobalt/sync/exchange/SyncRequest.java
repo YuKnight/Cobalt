@@ -22,9 +22,6 @@ import java.util.List;
  * @param node       the IQ request node builder
  * @param uploadInfo the upload metadata, or {@code null} if no mutations
  *                   were included in this request
- * @implNote Holds the encoded push/pull IQ plus the state needed by
- *     {@code WAWebSyncdServerSync._uploadSuccessful} to finalise the
- *     local collection after the server acknowledges the push.
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdServerSync")
 public record SyncRequest(

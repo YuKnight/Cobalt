@@ -25,11 +25,6 @@ public final class IqQueryMediaConnsRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <media_conn/>} payload
-     *
-     * @implNote {@code WAWebQueryMediaConnsJob.queryMediaConn}
-     *           composes the IQ via {@code wap("iq", {to:S_WHATSAPP_NET,
-     *           xmlns:"w:m", type:"set", id}, wap("media_conn",
-     *           null))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQueryMediaConnsJob",

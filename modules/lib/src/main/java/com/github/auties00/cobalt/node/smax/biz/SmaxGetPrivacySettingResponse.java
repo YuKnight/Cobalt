@@ -34,6 +34,8 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
      */
     @WhatsAppWebExport(moduleName = "WASmaxBizSettingsGetPrivacySettingRPC",
             exports = "sendGetPrivacySettingRPC", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInBizSettingsPrivacySettingErrors",
+            exports = "parsePrivacySettingErrors", adaptation = WhatsAppAdaptation.ADAPTED)
     static Optional<? extends SmaxGetPrivacySettingResponse> of(Node node, Node request) {
         Objects.requireNonNull(node, "node cannot be null");
         Objects.requireNonNull(request, "request cannot be null");
@@ -51,15 +53,6 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
     /**
      * The {@code Success} reply variant. The relay returned the
      * current SMB-data-sharing consent value.
-     *
-     * @implNote {@code WASmaxInBizSettingsGetPrivacySettingResponseSuccess.parseGetPrivacySettingResponseSuccess}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope, asserts a {@code <privacy/>} child exists,
-     *           and projects the
-     *           {@code WASmaxInBizSettingsSmbDataSharingSettingMixin}'s
-     *           inner {@code <smb_data_sharing_with_meta_consent value="..."/>}
-     *           {@code value} attribute as a tri-state enum
-     *           ({@code "true"} / {@code "false"} / {@code "notSet"}).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizSettingsGetPrivacySettingResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInBizSettingsSmbDataSharingSettingMixin")
@@ -68,7 +61,7 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
         /**
          * The {@code value} attribute of the
          * {@code <smb_data_sharing_with_meta_consent>} child. One of
-         * the {@code "true"} / {@code "false"} / {@code "notSet"}
+         * the {@code "true"} / {@code "false"} / {@code "notset"}
          * enum literals.
          */
         private final String dataSharingConsent;
@@ -123,7 +116,10 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
                 return Optional.empty();
             }
             var value = consent.getAttributeAsString("value").orElse(null);
-            if (value == null) {
+            // WASmaxInBizSettingsSmbDataSharingSettingValueMixin.parseSmbDataSharingSettingValueMixin:
+            // attrStringEnum(e, "value", WASmaxInBizSettingsEnums.ENUM_FALSE_NOTSET_TRUE)
+            // — strict dictionary match; reject any value outside {"true","false","notset"}.
+            if (SmaxBizSettingsFalseNotsetTrueFlag.of(value).isEmpty()) {
                 return Optional.empty();
             }
             return Optional.of(new Success(value));
@@ -157,13 +153,6 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
      * The {@code ClientError} reply variant. The relay rejected the
      * request with a documented privacy-setting error code in the
      * {@code 4xx} range.
-     *
-     * @implNote {@code WASmaxInBizSettingsGetPrivacySettingResponseError.parseGetPrivacySettingResponseError}
-     *           routes the {@code <error/>} child through
-     *           {@code WASmaxInBizSettingsPrivacySettingErrors};
-     *           Cobalt collapses to the raw {@code (code, text)}
-     *           pair via the shared
-     *           {@link SmaxBaseServerErrorMixin#parseClientError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizSettingsGetPrivacySettingResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInBizSettingsPrivacySettingErrors")
@@ -258,11 +247,6 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure ({@code 5xx}) while processing the
      * request.
-     *
-     * @implNote Sourced from the {@code 5xx} arms of
-     *           {@code WASmaxInBizSettingsPrivacySettingErrors};
-     *           Cobalt routes through the shared
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBizSettingsGetPrivacySettingResponseError")
     final class ServerError implements SmaxGetPrivacySettingResponse {
@@ -317,6 +301,9 @@ public sealed interface SmaxGetPrivacySettingResponse extends SmaxOperation.Resp
          *         empty when the stanza does not match the
          *         server-error schema
          */
+        @WhatsAppWebExport(moduleName = "WASmaxInBizSettingsGetPrivacySettingResponseError",
+                exports = "parseGetPrivacySettingResponseError",
+                adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<ServerError> of(Node node, Node request) {
             var envelope = SmaxBaseServerErrorMixin.parseServerError(node, request).orElse(null);
             if (envelope == null) {

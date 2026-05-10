@@ -47,12 +47,6 @@ public final class IqSetReadReceiptRequest implements IqOperation.Request {
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <privacy>} payload
-     *
-     * @implNote {@code WAWebSetReadReceiptJob.default}:
-     *           {@code wap("iq",{to:S_WHATSAPP_NET,type:"set",
-     *           xmlns:"privacy",id}, wap("privacy", null,
-     *           wap("category",{name:"readreceipts",
-     *           value: t ? "all" : "none"})))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSetReadReceiptJob",

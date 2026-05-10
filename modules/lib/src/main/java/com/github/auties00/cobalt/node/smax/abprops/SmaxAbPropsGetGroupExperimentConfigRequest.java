@@ -80,12 +80,6 @@ public final class SmaxAbPropsGetGroupExperimentConfigRequest implements SmaxOpe
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <props/>} payload
-     *
-     * @implNote {@code WASmaxOutAbPropsGetGroupExperimentConfigRequest.makeGetGroupExperimentConfigRequest}
-     *           composes {@code WASmaxOutAbPropsBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over a
-     *           {@code <props group=GROUP_JID hash?/>} child inside
-     *           an {@code <iq xmlns="abt" to=S_WHATSAPP_NET>} envelope.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutAbPropsGetGroupExperimentConfigRequest",

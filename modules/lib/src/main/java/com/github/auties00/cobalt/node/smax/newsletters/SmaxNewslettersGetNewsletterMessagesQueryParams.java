@@ -17,8 +17,6 @@ import java.util.Optional;
 /**
  * Sealed disjunction over the newsletter addressing modes. Either a
  * JID-keyed query or an invite-key query.
- *
- * @implNote {@code WASmaxOutNewslettersQueryNewsletterParams.mergeQueryNewsletterParams}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersQueryNewsletterParams")
 public sealed interface SmaxNewslettersGetNewsletterMessagesQueryParams permits SmaxNewslettersGetNewsletterMessagesQueryParams.ByJid, SmaxNewslettersGetNewsletterMessagesQueryParams.ByInvite {
@@ -26,8 +24,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesQueryParams permits 
     /**
      * Addressing the newsletter by its JID, optionally with a
      * {@code view_role} string the relay uses for ACL projection.
-     *
-     * @implNote {@code WASmaxOutNewslettersQueryNewsletterJIDParamsMixin.mergeQueryNewsletterJIDParamsMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersQueryNewsletterJIDParamsMixin")
     final class ByJid implements SmaxNewslettersGetNewsletterMessagesQueryParams {
@@ -101,8 +97,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesQueryParams permits 
     /**
      * Addressing the newsletter by its invite key (the public link
      * token), optionally with a {@code view_role} string.
-     *
-     * @implNote {@code WASmaxOutNewslettersQueryNewsletterInviteParamsMixin.mergeQueryNewsletterInviteParamsMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersQueryNewsletterInviteParamsMixin")
     final class ByInvite implements SmaxNewslettersGetNewsletterMessagesQueryParams {

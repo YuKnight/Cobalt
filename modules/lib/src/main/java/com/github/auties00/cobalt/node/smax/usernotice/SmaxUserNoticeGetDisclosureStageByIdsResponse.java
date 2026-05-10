@@ -16,10 +16,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxUserNoticeGetDisclosureStageByIdsRPC.sendGetDisclosureStageByIdsRPC}
- *           tries {@code ClientSuccess} → {@code ClientError} →
- *           {@code ServerError} in order.
  */
 public sealed interface SmaxUserNoticeGetDisclosureStageByIdsResponse extends SmaxOperation.Response
         permits SmaxUserNoticeGetDisclosureStageByIdsResponse.ClientSuccess, SmaxUserNoticeGetDisclosureStageByIdsResponse.ClientError, SmaxUserNoticeGetDisclosureStageByIdsResponse.ServerError {
@@ -57,14 +53,6 @@ public sealed interface SmaxUserNoticeGetDisclosureStageByIdsResponse extends Sm
     /**
      * The {@code ClientSuccess} reply variant. The relay returned
      * zero or more disclosure-stage entries.
-     *
-     * @implNote {@code WASmaxInUserNoticeGetDisclosureStageByIdsResponseClientSuccess.parseGetDisclosureStageByIdsResponseClientSuccess}
-     *           validates the IQ-result envelope and projects every
-     *           {@code <notice>} child via
-     *           {@code mapChildrenWithTag(notice, 0, ∞)}. Per-notice
-     *           {@code version} and {@code type} are optional in
-     *           this variant (unlike {@link SmaxUserNoticeGetDisclosures}
-     *           where they are required).
      */
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeGetDisclosureStageByIdsResponseClientSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeIQResultResponseMixin")
@@ -328,10 +316,6 @@ public sealed interface SmaxUserNoticeGetDisclosureStageByIdsResponse extends Sm
     /**
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed (always {@code 400 bad-request}).
-     *
-     * @implNote {@code WASmaxInUserNoticeGetDisclosureStageByIdsResponseClientError.parseGetDisclosureStageByIdsResponseClientError}
-     *           composes the IQ-error envelope check with
-     *           {@code WASmaxInUserNoticeIQErrorBadRequestMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeGetDisclosureStageByIdsResponseClientError")
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeIQErrorBadRequestMixin")
@@ -427,10 +411,6 @@ public sealed interface SmaxUserNoticeGetDisclosureStageByIdsResponse extends Sm
      * ({@code internal-server-error/500}, {@code rate-overlimit/429});
      * Cobalt collapses them into the single
      * {@code (errorCode, errorText)} pair.
-     *
-     * @implNote {@code WASmaxInUserNoticeGetDisclosureStageByIdsResponseServerError.parseGetDisclosureStageByIdsResponseServerError}
-     *           composes the error-envelope check with
-     *           {@code WASmaxInUserNoticeUserNoticeServerError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeGetDisclosureStageByIdsResponseServerError")
     @WhatsAppWebModule(moduleName = "WASmaxInUserNoticeUserNoticeServerError")

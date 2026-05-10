@@ -89,10 +89,6 @@ public final class SmaxSubscribeRequest implements SmaxOperation.Request {
      * @return a {@link NodeBuilder} carrying the
      *         {@code <presence type="subscribe" to=… name? context?/>}
      *         envelope
-     *
-     * @implNote {@code WASmaxOutPresenceSubscribeRequest.makeSubscribeRequest}
-     *           emits {@code smax("presence", {type:"subscribe",
-     *           to:JID, name:OPTIONAL, context:OPTIONAL_GROUP_JID})}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPresenceSubscribeRequest",

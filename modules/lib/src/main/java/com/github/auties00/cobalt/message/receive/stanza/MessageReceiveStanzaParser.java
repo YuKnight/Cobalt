@@ -21,11 +21,6 @@ import java.util.Objects;
  * migration attributes), the encryption payloads, bot and business metadata, reporting
  * tokens, broadcast participant lists, payment information, and every {@code <meta>}
  * attribute.
- *
- * @implNote WA Web extracts the same data into separate {@code msgInfo}, {@code msgMeta},
- * {@code encs}, {@code deviceIdentity}, {@code bizInfo}, {@code hsmInfo},
- * {@code paymentInfo}, {@code rcat}, {@code msgBotInfo}, and {@code reportingTokenInfo}
- * objects. Cobalt folds them all into a single cohesive parse result.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgParser")
 public final class MessageReceiveStanzaParser {
@@ -42,21 +37,24 @@ public final class MessageReceiveStanzaParser {
     /**
      * Parses a raw {@code <message>} node into a structured {@link MessageReceiveStanza}.
      *
-     * <p>The {@code selfJid} argument is required for the {@code isMeAccount} checks
-     * that distinguish peer-broadcast from other-broadcast and direct-peer-status from
-     * other-status. When {@code null}, the parser falls back to conservative defaults
-     * (treating ambiguous cases as non-self).
+     * <p>The {@code selfPnJid} and {@code selfLidJid} arguments are required for the
+     * {@code isMeAccount} checks that distinguish peer-broadcast from other-broadcast
+     * and direct-peer-status from other-status. When both are {@code null}, the parser
+     * falls back to conservative defaults (treating ambiguous cases as non-self).
      *
-     * @param node    the incoming {@code <message>} node
-     * @param selfJid the current user's JID (nullable), used for message type
-     *                classification
+     * @param node       the incoming {@code <message>} node
+     * @param selfPnJid  the current user's PN JID (nullable), used for message type
+     *                   classification
+     * @param selfLidJid the current user's LID (nullable), used for the LID branch of
+     *                   {@code isMeAccount} so messages broadcast via LID addressing
+     *                   are correctly classified as self-originated
      * @return the parsed stanza with all extracted metadata
      * @throws NullPointerException     if {@code node} is {@code null}
      * @throws IllegalArgumentException if required attributes are missing
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgParser", exports = "incomingMsgParser",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public static MessageReceiveStanza parse(Node node, Jid selfJid) {
+    public static MessageReceiveStanza parse(Node node, Jid selfPnJid, Jid selfLidJid) {
         Objects.requireNonNull(node, "node cannot be null");
 
         var id = node.getRequiredAttributeAsString("id");
@@ -96,7 +94,7 @@ public final class MessageReceiveStanzaParser {
 
         var encs = parseEncryptedPayloads(node);
 
-        var messageType = resolveMessageType(fromJid, participant, selfJid, encs, category);
+        var messageType = resolveMessageType(fromJid, participant, selfPnJid, selfLidJid, encs, category);
 
         var deviceIdentity = node.getChild("device-identity")
                 .flatMap(Node::toContentBytes)
@@ -273,7 +271,8 @@ public final class MessageReceiveStanzaParser {
      *
      * @param fromJid     the {@code from} attribute JID
      * @param participant the {@code participant} attribute JID, or {@code null}
-     * @param selfJid     the current user's JID, or {@code null}
+     * @param selfPnJid   the current user's PN JID, or {@code null}
+     * @param selfLidJid  the current user's LID, or {@code null}
      * @param encs        the parsed encrypted payloads, used for the isDirect check
      *                    on status messages
      * @param category    the stanza message category
@@ -284,7 +283,8 @@ public final class MessageReceiveStanzaParser {
     private static MessageType resolveMessageType(
             Jid fromJid,
             Jid participant,
-            Jid selfJid,
+            Jid selfPnJid,
+            Jid selfLidJid,
             List<MessageReceiveEncryptedPayload> encs,
             String category) {
         if (fromJid.hasUserServer() || fromJid.hasLidServer() || fromJid.hasBotServer()) {
@@ -301,7 +301,7 @@ public final class MessageReceiveStanzaParser {
 
         if (fromJid.hasBroadcastServer()) {
             var isStatus = fromJid.isStatusBroadcastAccount();
-            var isSelf = isMeAccount(participant, selfJid);
+            var isSelf = isMeAccount(participant, selfPnJid, selfLidJid);
             if (!isStatus) {
                 return isSelf ? MessageType.PEER_BROADCAST : MessageType.OTHER_BROADCAST;
             }
@@ -320,21 +320,29 @@ public final class MessageReceiveStanzaParser {
 
     /**
      * Returns whether the given participant JID represents the logged-in user's
-     * account.
+     * account, matching either the PN or the LID identity.
      *
      * <p>Comparison is performed on user-level JIDs so companion-device addressing is
-     * treated as the same account as the primary.
+     * treated as the same account as the primary. The LID branch lets a self-originated
+     * status broadcast be recognised when the addressing is via LID rather than PN.
      *
      * @param participant the participant JID, or {@code null}
-     * @param selfJid     the current user's JID, or {@code null}
-     * @return {@code true} when both represent the same account
+     * @param selfPnJid   the current user's PN JID, or {@code null}
+     * @param selfLidJid  the current user's LID, or {@code null}
+     * @return {@code true} when {@code participant} matches either the PN or the LID
+     *         identity at user level
      */
     @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser", exports = "isMeAccount",
-            adaptation = WhatsAppAdaptation.DIRECT)
-    private static boolean isMeAccount(Jid participant, Jid selfJid) {
-        return selfJid != null
-                && participant != null
-                && participant.toUserJid().equals(selfJid.toUserJid());
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private static boolean isMeAccount(Jid participant, Jid selfPnJid, Jid selfLidJid) {
+        if (participant == null) {
+            return false;
+        }
+        var participantUser = participant.toUserJid();
+        if (selfPnJid != null && participantUser.equals(selfPnJid.toUserJid())) {
+            return true;
+        }
+        return selfLidJid != null && participantUser.equals(selfLidJid.toUserJid());
     }
 
     /**

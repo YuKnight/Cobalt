@@ -24,11 +24,6 @@ import java.util.logging.Logger;
  * {@link UsyncContext#MESSAGE} and {@link UsyncContext#VOIP} exempt the
  * {@code devices} protocol because the resulting send would otherwise be
  * impossible to encrypt.
- *
- * @implNote In the JS module the map and the wait function are module-private.
- *     Cobalt promotes them to a final class with a thread-safe
- *     {@link ConcurrentHashMap} so multiple virtual threads can register
- *     backoffs concurrently.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncBackoff")
 public final class UsyncBackoff {
@@ -41,11 +36,6 @@ public final class UsyncBackoff {
     /**
      * Holds the absolute expiry instant for each protocol with an active
      * backoff window.
-     *
-     * @implNote The JS counterpart {@code WAWebUsyncBackoff.c} stores a
-     *     {@code Map<string, Promise>}. Cobalt records the absolute expiry
-     *     instant rather than a pending promise because virtual threads make
-     *     timed waits trivial.
      */
     private final ConcurrentMap<String, Instant> backoffs;
 
@@ -62,9 +52,6 @@ public final class UsyncBackoff {
      * @param protocolName the protocol name (e.g. {@code "devices"},
      *                     {@code "contact"})
      * @param backoffMs    the duration of the backoff window, in milliseconds
-     * @implNote The JS counterpart schedules a {@code setTimeout(_, ms)} and
-     *     stores the resulting promise in the module map. Cobalt records the
-     *     absolute expiry instant instead.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsyncBackoff",
             exports = "setProtocolBackoffMs", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -88,9 +75,6 @@ public final class UsyncBackoff {
      * @param query the query about to be dispatched
      * @throws InterruptedException if the current thread is interrupted while
      *                              sleeping
-     * @implNote The JS function returns a {@code Promise.all} of the
-     *     per-protocol promises. Cobalt iterates and sleeps inline because
-     *     virtual threads make {@code Thread.sleep} cheap.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsyncBackoff",
             exports = "waitForBackoff", adaptation = WhatsAppAdaptation.ADAPTED)

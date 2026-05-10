@@ -42,12 +42,6 @@ public final class ReportingToken {
 
     /**
      * Storage size for a valid reporting token entry.
-     *
-     * @implNote Used by the IndexedDB-backed storage layer
-     * ({@code WAWebDBReportingTokenUtils}) to allocate fixed-size rows. Cobalt does not
-     * persist reporting tokens because outgoing tokens are computed on demand and
-     * incoming-side validation is not implemented; the constant is preserved for parity
-     * with the WA Web export surface.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "REPORTING_TOKEN_STORAGE_SIZE",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -55,10 +49,6 @@ public final class ReportingToken {
 
     /**
      * Storage size sentinel for an invalid reporting token entry.
-     *
-     * @implNote WA Web writes this length when a reporting token failed validation,
-     * distinguishing it from a missing record. Cobalt does not persist reporting tokens;
-     * the constant is preserved for parity.
      */
     @WhatsAppWebExport(moduleName = "WAWebReportingTokenUtils", exports = "REPORTING_TOKEN_INVALID_STORAGE_SIZE",
             adaptation = WhatsAppAdaptation.DIRECT)

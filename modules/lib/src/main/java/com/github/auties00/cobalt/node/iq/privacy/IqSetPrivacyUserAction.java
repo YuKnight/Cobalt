@@ -4,8 +4,6 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 
 /**
  * Per-user action enum.
- *
- * @implNote {@code WAWebSetPrivacyJob.PrivacyUserAction}.
  */
 @WhatsAppWebModule(moduleName = "WAWebSetPrivacyJob")
 public enum IqSetPrivacyUserAction {

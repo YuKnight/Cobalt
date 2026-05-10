@@ -39,11 +39,6 @@ import java.util.Objects;
  * Parses receipt nodes into typed receipt objects and processes them by updating
  * message status and receipt metadata in the local store. Also handles retry
  * receipt requests by re-sending the originally encrypted message.
- *
- * @implNote WAWebHandleMsgReceipt.default, WAWebHandleMsgReceiptParser.msgReceiptParser,
- *           WAWebHandleMessageRetryRequest.handleMessageRetryRequest,
- *           WAWebHandleRetryRequest.handleRetryRequest,
- *           WAWebHandleRetryRequest.getTargetChat
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgReceipt")
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgReceiptParser")
@@ -53,8 +48,6 @@ import java.util.Objects;
 public final class MessageReceiptStreamHandler implements SocketStream.Handler {
     /**
      * Logger instance for this handler.
-     *
-     * @implNote WAWebHandleMsgReceipt (uses WALogger)
      */
     private static final System.Logger LOGGER = System.getLogger(MessageReceiptStreamHandler.class.getName());
 
@@ -65,15 +58,11 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
 
     /**
      * The WhatsApp client instance providing access to the store and networking.
-     *
-     * @implNote Constructor-injected dependency replacing WA Web module-level imports
      */
     private final WhatsAppClient whatsapp;
 
     /**
      * Service responsible for sending and re-sending messages.
-     *
-     * @implNote Constructor-injected dependency replacing WA Web module-level imports
      */
     private final MessageService messageService;
 
@@ -88,7 +77,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param whatsapp       the WhatsApp client instance
      * @param messageService the message service for re-sending on retry
      * @param wamService     the WAM telemetry service for committing receipt events
-     * @implNote WAWebHandleMsgReceipt module-level constructor
      */
     public MessageReceiptStreamHandler(WhatsAppClient whatsapp, MessageService messageService, WamService wamService) {
         this.whatsapp = whatsapp;
@@ -171,8 +159,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param parsed  the parsed receipt carrying {@code from},
      *                {@code ackString}, {@code offline}, and (for simple
      *                receipts) the external id list
-     * @implNote WAWebCreateReceiptStanzaReceiveMetric.createReceiptStanzaReceiveMetric,
-     *           WAWebHandleMsgReceipt.b (commit gate)
      */
     private void commitReceiptMetric(ReceiptStanzaReceiveEventBuilder builder, ParsedReceipt parsed) {
         // attribute was absent. Cobalt records that attribute via
@@ -228,9 +214,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param from the {@code from} attribute of the incoming receipt
      *             stanza
      * @return the resolved WAM message-type classification
-     * @implNote WAWebCreateReceiptStanzaReceiveMetric.s,
-     *           WAWebWid.isStatus, WAWebWid.isGroup, WAWebWid.isBroadcast,
-     *           WAWebWid.isNewsletter
      */
     private static MessageType resolveMessageType(Jid from) {
         if (from == null) {
@@ -259,7 +242,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * is skipped.
      *
      * @param receipt the parsed simple receipt
-     * @implNote WAWebHandleMsgReceipt.v (handleSimpleReceipt dispatch)
      */
     private void handleSimple(SimpleReceipt receipt) {
         // In Cobalt, peer message deletion is handled elsewhere
@@ -292,7 +274,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * and that only group or broadcast sources are supported.
      *
      * @param receipt the parsed aggregated-by-type receipt
-     * @implNote WAWebHandleMsgReceipt.S (handleAggregateReceipt)
      */
     private void handleAggregatedByType(AggregatedByTypeReceipt receipt) {
         if (receipt.ack() == ReceiptAck.CONTENT_GONE) {
@@ -328,7 +309,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * receipt updates, one per participant. Each participant carries its own ack type.
      *
      * @param receipt the parsed aggregated-by-message receipt
-     * @implNote WAWebHandleMsgReceipt.R (handleAggregateByMessageReceipt)
      */
     private void handleAggregatedByMessage(AggregatedByMessageReceipt receipt) {
         // uses its own ack/ackString from the per-user element
@@ -356,13 +336,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * Sends an ack with the retry type regardless of whether re-send succeeds.
      *
      * @param node the retry receipt stanza node
-     * @implNote WAWebHandleMessageRetryRequest.handleMessageRetryRequest — entry-point
-     *           dispatcher: parses the retry request, validates the stanza id,
-     *           builds the {@code class="receipt", type="retry"} ack, and forwards
-     *           to {@code WAWebHandleRetryRequest.handleRetryRequest}. Cobalt fuses
-     *           parsing, validation, dispatch, and ack into a single method whose
-     *           finally-block guarantees the ack is sent in the same conditions as
-     *           the WA Web async return.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMessageRetryRequest",
             exports = "handleMessageRetryRequest",
@@ -392,7 +365,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * key bundle, and then attempts to re-send the original message.
      *
      * @param node the retry receipt stanza node
-     * @implNote WAWebHandleRetryRequest.handleRetryRequest, WAWebHandleRetryRequest.E (processRetryDetails)
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleRetryRequest",
             exports = "handleRetryRequest",
@@ -472,8 +444,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param participant the participant JID, used as fallback for broadcast lookups
      * @param id          the original message ID
      * @return the message info if found, or {@code null}
-     * @implNote WAWebHandleRetryRequest.getTargetChat (D function) combined with
-     *           WAWebHandleRetryRequest.E message lookup
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleRetryRequest",
             exports = "getTargetChat",
@@ -505,7 +475,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param from        the JID that sent the retry request
      * @param participant the participant JID from the retry stanza
      * @return {@code true} if this is a self-retry on a broadcast
-     * @implNote WAWebHandleRetryRequest.getTargetChat (D function) — self-account check
      */
     private boolean isBroadcastSelfRetry(MessageInfo message, Jid from, Jid participant) {
         var parentJid = message.key().parentJid().orElse(null);
@@ -533,11 +502,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *
      * @param node         the retry receipt stanza node containing keys
      * @param remoteDevice the remote device JID to associate the session with
-     * @implNote WAWebRetryRequestParser (default): wire decode of
-     *           {@code <registration>}, {@code <keys><identity></identity>
-     *           <skey><id/><value/><signature/></skey>[<key><id/><value/></key>]}.
-     *           WAWebUpdateLocalSignalSession.updateLocalSignalSession,
-     *           WAWebProcessRetryKeyBundle (session rebuild).
      */
     @WhatsAppWebExport(moduleName = "WAWebRetryRequestParser",
             exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -626,7 +590,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param byteCount the number of leading bytes to interpret
      * @return the resulting big-endian unsigned integer
      * @throws IllegalArgumentException if {@code bytes} has fewer than {@code byteCount} bytes
-     * @implNote WAParsableXmlNode.convertBytesToUint: identical accumulator implementation.
      */
     @WhatsAppWebExport(moduleName = "WAParsableXmlNode",
             exports = "convertBytesToUint",
@@ -653,9 +616,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param requester the device-level JID whose presence is being checked
      * @param deviceId  the device id to locate; {@code 0} means primary
      * @return {@code true} if the device is known for the user; {@code false} otherwise
-     * @implNote WAWebApiDeviceList.hasDevice — Cobalt inlines the lookup rather
-     *           than depending on {@code DeviceService} to keep this handler
-     *           decoupled from the device-service constructor parameter graph.
      */
     private boolean isDeviceKnown(Jid requester, int deviceId) {
         if (deviceId == DeviceConstants.PRIMARY_DEVICE_ID) {
@@ -680,8 +640,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param offline  whether the original {@code <receipt>} stanza carried the
      *                 {@code offline} attribute (i.e. the retry was delivered from
      *                 the offline-processing queue)
-     * @implNote WAWebHandleRetryRequest.E — emission line
-     *           {@code new MdRetryFromUnknownDeviceWamEvent({offline, senderType}).commit()}
      */
     private void emitRetryFromUnknownDevice(int deviceId, boolean offline) {
         var senderType = deviceId == DeviceConstants.PRIMARY_DEVICE_ID
@@ -701,7 +659,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param participant the participant JID, used for broadcast fallback
      * @param id          the message ID to search for
      * @return the message info if found, or {@code null}
-     * @implNote WAWebHandleDirectChatReceipt, WAWebHandleGroupChatReceipt — message lookup
      */
     private MessageInfo findMessage(Jid provider, Jid participant, String id) {
         var direct = whatsapp.store()
@@ -731,8 +688,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param participantDevice the device JID of the participant
      * @param ack              the ack level of this receipt
      * @param timestamp        the timestamp of this receipt event
-     * @implNote WAWebHandleDirectChatReceipt.handleChatSimpleReceipt,
-     *           WAWebHandleGroupChatReceipt.handleGroupSimpleReceipt — receipt update logic
      */
     private void updateMessage(
             ReceiptLike receipt,
@@ -811,7 +766,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * included as a device JID.
      *
      * @param node the retry receipt stanza node
-     * @implNote WAWebHandleMessageRetryRequest.handleMessageRetryRequest — retry ack construction
      */
     private void sendRetryAck(Node node) {
         var id = node.getAttributeAsString("id", null);
@@ -888,7 +842,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param ackString the raw ack type string
      * @param offline   whether the receipt has the offline attribute
      * @return the parsed simple receipt
-     * @implNote WAWebHandleMsgReceiptParser.p (parseSimpleReceipt)
      */
     private ParsedReceipt parseSimple(
             Node node,
@@ -970,7 +923,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param participantsNode the {@code <participants>} node
      * @param offline          whether the receipt has the offline attribute
      * @return the parsed aggregated receipt, or {@code null} if the key attribute is missing
-     * @implNote WAWebHandleMsgReceiptParser.d (parseAggregatedByTypeReceipt)
      */
     private ParsedReceipt parseAggregatedByType(
             String id,
@@ -1020,7 +972,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param participantsNode the {@code <participants>} node
      * @param offline          whether the receipt has the offline attribute
      * @return the parsed aggregated receipt, or {@code null} if the message_id attribute is missing
-     * @implNote WAWebHandleMsgReceiptParser.m (parseAggregatedByMessageReceipt)
      */
     private ParsedReceipt parseAggregatedByMessage(
             String id,
@@ -1074,7 +1025,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param node the node to read the attribute from
      * @param key  the attribute name
      * @return the parsed instant, or {@code null} if the attribute is missing
-     * @implNote WAWebHandleMsgReceiptParser — attrTime calls
      */
     private static Instant attributeInstant(Node node, String key) {
         return node.getAttributeAsLong(key)
@@ -1094,7 +1044,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param participant the participant device JID
      * @param recipient   the recipient JID
      * @return the resolved user JID, or {@code null} if none can be determined
-     * @implNote WAWebHandleDirectChatReceipt, WAWebHandleGroupChatReceipt — user resolution
      */
     private static Jid resolveReceiptUser(Jid from, Jid participant, Jid recipient) {
         if (participant != null) {
@@ -1114,7 +1063,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *
      * @param ack the receipt ack level
      * @return the corresponding message status
-     * @implNote WAWebAck.ACK values mapped to MessageStatus enum
      */
     private static MessageStatus mapStatus(ReceiptAck ack) {
         return switch (ack) {
@@ -1132,7 +1080,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *
      * @param ack the receipt ack level
      * @return {@code true} if the ack is delivery-like
-     * @implNote WAWebHandleDirectChatReceipt — receipt timestamp assignment logic
      */
     private static boolean isDeliveryLike(ReceiptAck ack) {
         return ack != ReceiptAck.READ && ack != ReceiptAck.PLAYED;
@@ -1148,7 +1095,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param userJid          the user JID to match against
      * @param participantDevice the specific device JID that delivered the receipt
      * @return a receipt update containing delivered and pending device lists
-     * @implNote WAWebHandleDirectChatReceipt — device tracking logic
      */
     private ReceiptUpdate resolveDeviceUpdate(String messageId, Jid userJid, Jid participantDevice) {
         if (messageId == null || userJid == null) {
@@ -1198,7 +1144,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param pendingDevices   the list of devices still pending delivery
      * @param deliveredDevices the list of devices that have delivered
      * @return the updated receipt list
-     * @implNote WAWebHandleDirectChatReceipt, WAWebHandleGroupChatReceipt — receipt merge
      */
     private List<MessageReceipt> mergeReceipt(
             MessageInfo info,
@@ -1262,7 +1207,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param current  the current message status, may be {@code null}
      * @param incoming the incoming message status, may be {@code null}
      * @return the merged status
-     * @implNote WAWebHandleDirectChatReceipt — status merge logic
      */
     private MessageStatus mergeStatus(MessageStatus current, MessageStatus incoming) {
         if (current == null) {
@@ -1284,7 +1228,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * Notifies all registered listeners about a message status change.
      *
      * @param info the message whose status has changed
-     * @implNote WAWebHandleDirectChatReceipt — listener notification
      */
     private void notifyMessageStatus(MessageInfo info) {
         for (var listener : whatsapp.store().listeners()) {
@@ -1298,7 +1241,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param left  the first JID
      * @param right the second JID
      * @return {@code true} if both JIDs have the same user JID
-     * @implNote WAWebWidFactory.asUserWidOrThrow — user-level JID comparison
      */
     private boolean sameUser(Jid left, Jid right) {
         return left != null
@@ -1311,7 +1253,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *
      * @param node the receipt stanza node
      * @return {@code true} if the type attribute is "retry" or "enc_rekey_retry"
-     * @implNote WAWebRetryRequestParser — type assertion check
      */
     private static boolean isRetryReceipt(Node node) {
         var type = node.getAttributeAsString("type", null);
@@ -1328,7 +1269,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *
      * @param type the raw {@code type} attribute string from the receipt stanza
      * @return {@code true} if the string is a recognized {@code RECEIPT_TYPES_TO_ACK} key
-     * @implNote WAWebHandleMsgReceiptParser.RECEIPT_TYPES_TO_ACK — keyset membership test
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgReceiptParser",
             exports = "RECEIPT_TYPES_TO_ACK", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1348,15 +1288,12 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *
      * @param deliveredDevices the devices that have confirmed delivery
      * @param pendingDevices   the devices still pending delivery
-     * @implNote WAWebHandleDirectChatReceipt — device tracking result
      */
     private record ReceiptUpdate(List<Jid> deliveredDevices, List<Jid> pendingDevices) {
     }
 
     /**
      * Sealed interface for all parsed receipt types.
-     *
-     * @implNote WAWebHandleMsgReceiptParser — receipt type union
      */
     private sealed interface ParsedReceipt extends ReceiptLike
             permits SimpleReceipt, AggregatedByTypeReceipt, AggregatedByMessageReceipt {
@@ -1364,15 +1301,12 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
 
     /**
      * Common interface for all receipt-like objects providing shared accessors.
-     *
-     * @implNote WAWebHandleMsgReceiptParser — shared receipt fields
      */
     private interface ReceiptLike {
         /**
          * Returns the sender JID.
          *
          * @return the from JID
-         * @implNote WAWebHandleMsgReceiptParser — from field
          */
         Jid from();
 
@@ -1380,7 +1314,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
          * Returns the recipient JID.
          *
          * @return the recipient JID, or {@code null}
-         * @implNote WAWebHandleMsgReceiptParser — recipient field
          */
         Jid recipient();
 
@@ -1388,7 +1321,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
          * Returns the receipt timestamp.
          *
          * @return the timestamp, or {@code null}
-         * @implNote WAWebHandleMsgReceiptParser — ts field
          */
         Instant timestamp();
 
@@ -1396,7 +1328,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
          * Returns the raw ack type string.
          *
          * @return the ack string, or {@code null}
-         * @implNote WAWebHandleMsgReceiptParser — ackString field
          */
         String ackString();
 
@@ -1404,7 +1335,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
          * Returns whether this receipt arrived while offline.
          *
          * @return {@code true} if the receipt was received offline
-         * @implNote WAWebHandleMsgReceiptParser — offline field
          */
         boolean offline();
     }
@@ -1426,7 +1356,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param offline             whether the receipt was received offline
      * @param isLidBot            whether the participant is a LID-based bot
      * @param bizInfo             optional business metadata from the biz child
-     * @implNote WAWebHandleMsgReceiptParser.p — simple receipt structure
      */
     private record SimpleReceipt(
             String stanzaId,
@@ -1459,7 +1388,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param externalId the message ID this receipt covers
      * @param receipts   the list of per-participant receipts
      * @param offline    whether the receipt was received offline
-     * @implNote WAWebHandleMsgReceiptParser.d — aggregated-by-type receipt structure
      */
     private record AggregatedByTypeReceipt(
             String stanzaId,
@@ -1489,7 +1417,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param externalId the message ID this receipt covers
      * @param receipts   the list of per-participant receipts with individual ack types
      * @param offline    whether the receipt was received offline
-     * @implNote WAWebHandleMsgReceiptParser.m — aggregated-by-message receipt structure
      */
     private record AggregatedByMessageReceipt(
             String stanzaId,
@@ -1514,8 +1441,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param timestamp           the receipt timestamp for this participant
      * @param ack                 the ack level for this participant
      * @param ackString           the raw ack type string for this participant
-     * @implNote WAWebHandleMsgReceiptParser.d, WAWebHandleMsgReceiptParser.m —
-     *           per-user receipt fields
      */
     private record ParticipantReceipt(
             Jid participant,
@@ -1533,9 +1458,6 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param actualActors   the actual actors enum value
      * @param hostStorage    the host storage enum value
      * @param privacyModeTs  the privacy mode timestamp
-     * @implNote WAWebHandleMsgReceiptParser.p — biz child parsing,
-     *           WAWebHandleMsgTypes.flow.ActualActorsEnumType,
-     *           WAWebHandleMsgTypes.flow.HostStorageEnumType
      */
     private record BizInfo(
             int actualActors,

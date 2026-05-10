@@ -16,13 +16,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay for an
  * {@link IqQueryPrivacySettingsRequest}.
- *
- * @implNote {@code WAWebQueryPrivacySettingsJob.getPrivacy} parses the
- *           result via {@code privacyParser} and throws
- *           {@code ServerStatusCodeError} on failure. Cobalt routes the
- *           {@code 4xx} / {@code 5xx} split through
- *           {@link IqQueryPrivacySettingsResponse.ClientError} and
- *           {@link IqQueryPrivacySettingsResponse.ServerError}.
  */
 @WhatsAppWebModule(moduleName = "WAWebQueryPrivacySettingsJob")
 public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Response
@@ -60,14 +53,6 @@ public sealed interface IqQueryPrivacySettingsResponse extends IqOperation.Respo
      * The {@code Success} reply variant. The relay returned a
      * {@code <privacy>} envelope listing every privacy category and its
      * current value.
-     *
-     * @implNote {@code WAWebQueryPrivacySettingsJob.privacyParser}
-     *           projects the per-category settings as a flat record.
-     *           Cobalt projects them as a
-     *           {@link IqQueryPrivacySettingsCategoryName} →
-     *           {@link IqQueryPrivacySettingsVisibility} map, dropping
-     *           entries whose value failed enum resolution (mirroring
-     *           WA Web's skip-on-error behaviour).
      */
     @WhatsAppWebModule(moduleName = "WAWebQueryPrivacySettingsJob")
     final class Success implements IqQueryPrivacySettingsResponse {

@@ -4,6 +4,7 @@ import javax.security.auth.x500.X500Principal;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -323,6 +324,6 @@ public final class ApnsActivationCrypto {
             sb.append(base64, i, Math.min(base64.length(), i + CSR_LINE_BLOCK)).append('\n');
         }
         sb.append(footer).append('\n');
-        return sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 }

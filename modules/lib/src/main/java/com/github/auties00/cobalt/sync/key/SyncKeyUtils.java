@@ -27,8 +27,6 @@ import java.util.Collection;
  * <p>Additionally mirrors utility functions from {@code WAWebSyncdCryptoUtils}
  * for buffer concatenation/splitting, hex conversions, 64-bit network order
  * encoding, and key ID comparison.
- *
- * @implNote WAWebSyncdCryptoUtils, WASyncdKeyManagementUtils, WAWebSyncdGatingUtils
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdCryptoUtils")
 @WhatsAppWebModule(moduleName = "WASyncdKeyManagementUtils")
@@ -43,8 +41,6 @@ public final class SyncKeyUtils {
 
     /**
      * Private constructor to prevent instantiation.
-     *
-     * @implNote NO_WA_BASIS
      */
     private SyncKeyUtils() {
     }
@@ -59,7 +55,6 @@ public final class SyncKeyUtils {
      * @param buffers the byte arrays to concatenate
      * @return a single byte array containing all input bytes in order
      * @throws IllegalArgumentException if {@code buffers} is empty
-     * @implNote WAWebSyncdCryptoUtils.combine (function e)
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCryptoUtils", exports = "combine", adaptation = WhatsAppAdaptation.DIRECT)
     public static byte[] combine(byte[]... buffers) {
@@ -101,7 +96,6 @@ public final class SyncKeyUtils {
      * @param length the length of the middle segment
      * @return a three-element array of byte arrays: prefix, middle, suffix
      * @throws IllegalArgumentException if {@code offset} or {@code length} is negative
-     * @implNote WAWebSyncdCryptoUtils.split (function s)
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCryptoUtils", exports = "split", adaptation = WhatsAppAdaptation.DIRECT)
     public static byte[][] split(byte[] buffer, int offset, int length) {
@@ -124,7 +118,6 @@ public final class SyncKeyUtils {
      *
      * @param hex the space-separated hex string (e.g., {@code "a 1f 0"})
      * @return the decoded byte array
-     * @implNote WAWebSyncdCryptoUtils.hexToUint8Array (function u)
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCryptoUtils", exports = "hexToUint8Array", adaptation = WhatsAppAdaptation.DIRECT)
     public static byte[] hexToUint8Array(String hex) {
@@ -145,9 +138,6 @@ public final class SyncKeyUtils {
      *
      * @param keyId the raw key ID bytes
      * @return the hex string (e.g., {@code "a 1f 0"})
-     * @implNote WAWebSyncdCryptoUtils.syncKeyIdToHex (function c);
-     *           {@code WASyncdKeyTypes.fromSyncKeyId} is the identity function,
-     *           so it reduces to a direct byte iteration here.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCryptoUtils", exports = "syncKeyIdToHex", adaptation = WhatsAppAdaptation.DIRECT)
     public static String syncKeyIdToHex(byte[] keyId) {
@@ -177,7 +167,6 @@ public final class SyncKeyUtils {
      *
      * @param key the sync key
      * @return the hex string, or {@code "unknown"} if the key ID is absent
-     * @implNote ADAPTED: WAWebSyncdCryptoUtils.syncKeyIdToHex with Optional unwrapping
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCryptoUtils", exports = "syncKeyIdToHex", adaptation = WhatsAppAdaptation.ADAPTED)
     public static String syncKeyIdToHex(AppStateSyncKey key) {
@@ -197,10 +186,6 @@ public final class SyncKeyUtils {
      *
      * @param data the byte array to convert
      * @return the zero-padded hex string (e.g., {@code "0a1f00"})
-     * @implNote WAWebSyncdCryptoUtils.arrayBufferToHexPadded (function d).
-     *           The JDK-native equivalent is {@code java.util.HexFormat.of().formatHex(data)};
-     *           the explicit loop is retained only to keep the {@code null}/empty guard
-     *           that returns the empty string instead of throwing.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCryptoUtils", exports = "arrayBufferToHexPadded", adaptation = WhatsAppAdaptation.DIRECT)
     public static String arrayBufferToHexPadded(byte[] data) {
@@ -228,11 +213,6 @@ public final class SyncKeyUtils {
      *
      * @param value the value to convert (treated as unsigned 32-bit)
      * @return an 8-byte array in big-endian network order
-     * @implNote WAWebSyncdCryptoUtils.to64BitNetworkOrder (function m).
-     *           The JDK-native equivalent is
-     *           {@code ByteBuffer.allocate(8).putInt(4, (int) value).array()};
-     *           the manual byte writes are retained for clarity and to avoid allocating
-     *           a wrapper {@link ByteBuffer} per invocation.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCryptoUtils", exports = "to64BitNetworkOrder", adaptation = WhatsAppAdaptation.DIRECT)
     public static byte[] to64BitNetworkOrder(long value) {
@@ -258,10 +238,6 @@ public final class SyncKeyUtils {
      * @param keyId1 the first key ID bytes
      * @param keyId2 the second key ID bytes
      * @return {@code true} if both key IDs contain the same bytes
-     * @implNote WAWebSyncdCryptoUtils.syncKeyIdsEqual (function p);
-     *           {@code WASyncdKeyTypes.fromSyncKeyId} is the identity function and
-     *           {@code WACryptoUtils.arrayBuffersEqual} is a constant-time byte comparison,
-     *           mapped to {@link MessageDigest#isEqual(byte[], byte[])} here.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCryptoUtils", exports = "syncKeyIdsEqual", adaptation = WhatsAppAdaptation.DIRECT)
     public static boolean syncKeyIdsEqual(byte[] keyId1, byte[] keyId2) {
@@ -286,7 +262,6 @@ public final class SyncKeyUtils {
      *
      * @param keyId the raw key ID bytes (must be at least 6 bytes)
      * @return the device ID, or {@code -1} if the key ID is malformed
-     * @implNote WASyncdKeyManagementUtils.getKeyDeviceId
      */
     @WhatsAppWebExport(moduleName = "WASyncdKeyManagementUtils", exports = "getKeyDeviceId", adaptation = WhatsAppAdaptation.ADAPTED)
     public static int getKeyDeviceId(byte[] keyId) {
@@ -304,7 +279,6 @@ public final class SyncKeyUtils {
      *
      * @param keyId the raw key ID bytes (must be at least 6 bytes)
      * @return the key epoch, or {@code -1} if the key ID is malformed
-     * @implNote WASyncdKeyManagementUtils.getKeyEpoch
      */
     public static int getKeyEpoch(byte[] keyId) {
         if (keyId == null || keyId.length < KEY_ID_LENGTH) { // ADAPTED: Java null-safety guard
@@ -318,7 +292,6 @@ public final class SyncKeyUtils {
      *
      * @param key the sync key
      * @return the key epoch, or {@code -1} if the key or key ID is absent/malformed
-     * @implNote ADAPTED: convenience overload wrapping WASyncdKeyManagementUtils.getKeyEpoch with Optional unwrapping
      */
     public static int getKeyEpoch(AppStateSyncKey key) {
         return key.keyId() // ADAPTED: WASyncdKeyManagementUtils.getKeyEpoch - Optional unwrapping
@@ -334,7 +307,6 @@ public final class SyncKeyUtils {
      *
      * @param keyId the current key ID bytes
      * @return the next epoch value
-     * @implNote WASyncdKeyManagementUtils.generateNewKeyEpoch
      */
     public static int generateNewKeyEpoch(byte[] keyId) {
         return getKeyEpoch(keyId) + 1; // WASyncdKeyManagementUtils.generateNewKeyEpoch: getKeyEpoch(e) + 1
@@ -350,7 +322,6 @@ public final class SyncKeyUtils {
      * @param deviceId the device ID of the creator
      * @param keyEpoch the key epoch
      * @return the 6-byte key ID
-     * @implNote WAWebSyncdRotateKey.rotateKey (key ID construction)
      */
     public static byte[] buildKeyId(int deviceId, int keyEpoch) {
         var buffer = ByteBuffer.allocate(KEY_ID_LENGTH); // WAWebSyncdRotateKey.rotateKey: new Uint8Array(6)
@@ -365,10 +336,6 @@ public final class SyncKeyUtils {
      *
      * @param keys the available sync keys
      * @return the newest key, or {@code null} if none exist
-     * @implNote WAWebSyncdKeyManagement.getNewestKeyPair (function h) —
-     *           helper extracted so both {@link SyncKeyRotationService#getNewestKeyPair()}
-     *           and the upload path ({@code MutationRequestBuilder.buildPatchProtobuf})
-     *           share identical max-epoch / min-deviceId selection semantics.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdKeyManagement",
             exports = "getNewestKeyPair",
@@ -423,7 +390,6 @@ public final class SyncKeyUtils {
      *
      * @param abPropsService the AB props service to read the configuration from
      * @return the maximum key use days from the AB prop
-     * @implNote WAWebSyncdGatingUtils.getSyncdKeyMaxUseDays (function e)
      */
     public static int getSyncdKeyMaxUseDays(ABPropsService abPropsService) {
         return abPropsService.getInt(ABProp.SYNCD_KEY_MAX_USE_DAYS); // WAWebSyncdGatingUtils.getSyncdKeyMaxUseDays
@@ -440,7 +406,6 @@ public final class SyncKeyUtils {
      *
      * @param abPropsService the AB props service to read the configuration from
      * @return the sentinel timeout in seconds from the AB prop
-     * @implNote WAWebSyncdGatingUtils.getSyncdSentinelTimeoutSeconds (function s)
      */
     public static int getSyncdSentinelTimeoutSeconds(ABPropsService abPropsService) {
         return abPropsService.getInt(ABProp.SYNCD_SENTINEL_TIMEOUT_SECONDS); // WAWebSyncdGatingUtils.getSyncdSentinelTimeoutSeconds
@@ -459,7 +424,6 @@ public final class SyncKeyUtils {
      *
      * @param abPropsService the AB props service to read the configuration from
      * @return the maximum inline mutation count from the AB prop
-     * @implNote WAWebSyncdGatingUtils.getSyncdInlineMutationsMaxCount (function u)
      */
     public static int getSyncdInlineMutationsMaxCount(ABPropsService abPropsService) {
         return abPropsService.getInt(ABProp.SYNCD_INLINE_MUTATIONS_MAX_COUNT); // WAWebSyncdGatingUtils.getSyncdInlineMutationsMaxCount
@@ -478,7 +442,6 @@ public final class SyncKeyUtils {
      *
      * @param abPropsService the AB props service to read the configuration from
      * @return the maximum patch protobuf size (in kilobytes) from the AB prop
-     * @implNote WAWebSyncdGatingUtils.getSyncdPatchProtobufMaxSize (function c)
      */
     public static int getSyncdPatchProtobufMaxSize(ABPropsService abPropsService) {
         return abPropsService.getInt(ABProp.SYNCD_PATCH_PROTOBUF_MAX_SIZE); // WAWebSyncdGatingUtils.getSyncdPatchProtobufMaxSize
@@ -495,7 +458,6 @@ public final class SyncKeyUtils {
      *
      * @param abPropsService the AB props service to read the configuration from
      * @return the wait-for-key timeout in days from the AB prop
-     * @implNote WAWebSyncdGatingUtils.getSyncdWaitForKeyTimeoutDays (function d)
      */
     public static int getSyncdWaitForKeyTimeoutDays(ABPropsService abPropsService) {
         return abPropsService.getInt(ABProp.SYNCD_WAIT_FOR_KEY_TIMEOUT_DAYS); // WAWebSyncdGatingUtils.getSyncdWaitForKeyTimeoutDays
@@ -514,7 +476,6 @@ public final class SyncKeyUtils {
      *
      * @param abPropsService the AB props service to read the configuration from
      * @return {@code true} if key persistence should wait for server ACK
-     * @implNote WAWebSyncdGatingUtils.getEnableSyncdKeyPersistenceOnlyAfterServerAck (function m)
      */
     public static boolean getEnableSyncdKeyPersistenceOnlyAfterServerAck(ABPropsService abPropsService) {
         return abPropsService.getBool(ABProp.WA_WEB_ENABLE_SYNCD_KEY_PERSISTENCE_ONLY_AFTER_SERVER_ACK); // WAWebSyncdGatingUtils.getEnableSyncdKeyPersistenceOnlyAfterServerAck

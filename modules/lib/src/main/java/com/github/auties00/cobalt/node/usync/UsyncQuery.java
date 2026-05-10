@@ -62,15 +62,6 @@ import java.util.logging.Logger;
  * {@code UsyncQuery} can dispatch in parallel without coordination because
  * the underlying transport and the shared {@link UsyncBackoff} registry are
  * concurrency-safe.
- *
- * @implNote The JS instance fields {@code context}, {@code mode},
- *     {@code protocols}, {@code users}, and {@code $1} (the LID-added flag)
- *     are mirrored. The internal {@code $3} method is split into
- *     {@link #toNode()}; the JS {@code execute} method moves to
- *     {@code WhatsAppClient.executeUsyncQuery} so the transport layer owns
- *     dispatch and backoff orchestration. The single-thread-builder contract
- *     matches WA Web's JS where {@code USyncQuery} is also used in a
- *     single-threaded build-then-execute pattern.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public final class UsyncQuery {
@@ -382,7 +373,6 @@ public final class UsyncQuery {
      * calls are no-ops.
      *
      * @return this builder
-     * @implNote The JS guard is the {@code this.$1} flag.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery.withLidProtocol", adaptation = WhatsAppAdaptation.DIRECT)

@@ -15,11 +15,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
  *
  * <p>Each constant carries the literal wire string emitted on the
  * {@code mode="..."} attribute via {@link #wireValue()}.
- *
- * @implNote The default JS instance uses {@code this.mode = "query"} and
- *     exposes {@code withMode(mode)} that takes the wire string directly.
- *     Cobalt models the legal values explicitly so callers cannot pass an
- *     arbitrary string.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public enum UsyncMode {

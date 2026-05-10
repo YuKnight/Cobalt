@@ -93,12 +93,6 @@ public final class QueryOrderMexRequest implements MexOperation.Request.Json {
     /**
      * Builds the IQ stanza that dispatches this operation to the WhatsApp
      * relay.
-     *
-     * @implNote Mirrors the WA Web {@code request.order} variable shape
-     *           with {@code jid}, {@code token.sensitive_string_value},
-     *           {@code id}, {@code image_dimensions.height},
-     *           {@code image_dimensions.width} and
-     *           {@code direct_connection_encrypted_info} (omitted here).
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised GraphQL variables
      */

@@ -2,13 +2,10 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.UsernameChatStartModeAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Applies {@code usernameChatStartMode} mutations decoded from app state sync.
  *
@@ -49,12 +46,6 @@ import com.github.auties00.cobalt.wam.WamService;
  * {@code e === c.USERNAME_CHAT_START_MODE ? u.REGULAR}, so when WA Web ships
  * the real {@code WAWebUsernameChatStartModeSync} this file should already be
  * wire-compatible.
- *
- * @implNote NO_WA_BASIS &mdash; forward-looking handler. The protobuf schema
- *           exists in {@code WAWebProtobufSyncAction.pb} but
- *           {@code WAWebCollectionHandlerActions} does not yet register a sync
- *           module for it. Re-validate when WA Web introduces the corresponding
- *           {@code WAWebUsernameChatStartModeSync}.
  */
 public final class UsernameChatStartModeHandler implements WebAppStateActionHandler {
     /**
@@ -66,8 +57,6 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      * such as {@code WAWebLocaleSettingSync} and {@code WAWebPushNameSync} all
      * follow this convention, and Cobalt's dispatcher expects a single shared
      * instance per handler class.
-     *
-     * @implNote NO_WA_BASIS &mdash; placeholder mirroring sibling singleton handlers
      */
     public static final UsernameChatStartModeHandler INSTANCE = new UsernameChatStartModeHandler();
 
@@ -77,8 +66,6 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      * <p>The constructor is private because callers should always go through
      * {@link #INSTANCE}, matching the WA Web module-level singleton pattern
      * used by other sync handlers.
-     *
-     * @implNote NO_WA_BASIS &mdash; placeholder mirroring sibling private constructors
      */
     private UsernameChatStartModeHandler() {
 
@@ -86,9 +73,6 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
 
     /**
      * Returns the action name this handler processes.
-     *
-     * @implNote WAWebProtobufSyncAction.pb &mdash; {@code CollectionName.USERNAME_CHAT_START_MODE}
-     *           maps to the literal {@code "usernameChatStartMode"}
      * @return the constant {@link UsernameChatStartModeAction#ACTION_NAME},
      *         always {@code "usernameChatStartMode"}
      */
@@ -104,8 +88,6 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      * {@code getMutationProps$CollectionName} resolver branches on
      * {@code e === c.USERNAME_CHAT_START_MODE} and returns {@code u.REGULAR},
      * so the mutation is stored in the regular-priority sync collection.
-     *
-     * @implNote WAWebProtobufSyncAction.pb &mdash; {@code e === c.USERNAME_CHAT_START_MODE ? u.REGULAR}
      * @return {@link SyncPatchType#REGULAR}
      */
     @Override
@@ -122,36 +104,12 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      * the initial version {@code 1} as a forward-looking default. The actual
      * value should be re-checked when WA Web ships the matching
      * {@code WAWebUsernameChatStartModeSync} module.
-     *
-     * @implNote NO_WA_BASIS &mdash; {@link UsernameChatStartModeAction#ACTION_VERSION}
-     *           is the initial version assumed by Cobalt
      * @return the constant {@link UsernameChatStartModeAction#ACTION_VERSION},
      *         always {@code 1}
      */
     @Override
     public int version() {
         return UsernameChatStartModeAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single decoded username chat start mode mutation.
-     *
-     * <p>Thin bridge over {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * that reduces the richer {@link MutationApplicationResult} state to a
-     * legacy boolean: {@code true} only for {@link SyncActionState#SUCCESS},
-     * {@code false} for {@code MALFORMED}, {@code UNSUPPORTED}, {@code SKIPPED}
-     * and {@code FAILED}.
-     *
-     * @implNote ADAPTED: sibling handlers such as {@code WAWebLocaleSettingSync.applyMutations}
-     *           return a {@code SyncActionState} per mutation; Cobalt exposes
-     *           both a boolean and a richer result through two methods
-     * @param client   the WhatsApp client the mutation is being applied to
-     * @param mutation the trusted, decoded mutation to apply
-     * @return {@code true} if the apply succeeded, {@code false} otherwise
-     */
-    @Override
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS; // ADAPTED: sibling WAWeb*Sync.applyMutations return SyncActionState directly
     }
 
     /**
@@ -187,10 +145,6 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      * {@code {actionState: Failed}}. In Cobalt, exceptions are allowed to
      * propagate and the configured {@code WhatsAppClientErrorHandler} decides
      * recovery, per Cobalt's pluggable error model.
-     *
-     * @implNote NO_WA_BASIS &mdash; derived from the {@code WAWebProtobufSyncAction.pb}
-     *           schema and the canonical sibling-handler shape; re-validate
-     *           when WA Web introduces {@code WAWebUsernameChatStartModeSync}
      * @param client   the WhatsApp client the mutation is being applied to
      * @param mutation the trusted, decoded mutation to apply
      * @return {@link MutationApplicationResult#unsupported()} for non-{@code SET}
@@ -200,7 +154,7 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      *         {@link MutationApplicationResult#success()} otherwise
      */
     @Override
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         // ADAPTED: sibling WAWeb*Sync.applyMutations: if (e.operation === "set") { ... } p++; return {actionState: Unsupported}
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();

@@ -16,7 +16,6 @@ import com.github.auties00.cobalt.model.sync.action.setting.UnarchiveChatsSettin
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -35,8 +34,6 @@ import java.util.Objects;
  * <p>Per WhatsApp Web, this handler extends {@code AccountSyncdActionBase}
  * and only applies the last mutation in a batch (all earlier mutations are
  * skipped). The collection is {@code RegularLow} and the version is {@code 4}.
- *
- * @implNote WAWebArchiveSettingSync — singleton instance exported as {@code default}
  */
 @WhatsAppWebModule(moduleName = "WAWebArchiveSettingSync")
 public final class UnarchiveChatsSettingHandler implements WebAppStateActionHandler {
@@ -45,17 +42,12 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      *
      * <p>Per WhatsApp Web, {@code WAWebArchiveSettingSync} exports a single
      * instance ({@code var g = new f(); l.default = g}).
-     *
-     * @implNote WAWebArchiveSettingSync.default — module-level singleton
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final UnarchiveChatsSettingHandler INSTANCE = new UnarchiveChatsSettingHandler();
 
     /**
      * Private constructor to enforce singleton pattern.
-     *
-     * @implNote WAWebArchiveSettingSync — class {@code f} constructor sets
-     *           {@code collectionName = WASyncdConst.CollectionName.RegularLow}
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private UnarchiveChatsSettingHandler() {
@@ -64,10 +56,6 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
 
     /**
      * Returns the action name for the unarchive chats setting action.
-     *
-     * @implNote WAWebArchiveSettingSync.getAction — returns
-     *           {@code WASyncdConst.Actions.UnarchiveChatsSetting}
-     *           ({@code "setting_unarchiveChats"})
      * @return the action name {@code "setting_unarchiveChats"}
      */
     @Override
@@ -81,9 +69,6 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      *
      * <p>Per WhatsApp Web, the handler's {@code collectionName} is set to
      * {@code WASyncdConst.CollectionName.RegularLow} in the constructor.
-     *
-     * @implNote WAWebArchiveSettingSync.collectionName — set in constructor to
-     *           {@code WASyncdConst.CollectionName.RegularLow}
      * @return {@link SyncPatchType#REGULAR_LOW}
      */
     @Override
@@ -94,32 +79,12 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
 
     /**
      * Returns the mutation format version for the unarchive chats setting action.
-     *
-     * @implNote WAWebArchiveSettingSync.getVersion — returns {@code 4}
      * @return the version number {@code 4}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return UnarchiveChatsSetting.ACTION_VERSION;
-    }
-
-    /**
-     * Applies an unarchive chats setting mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebArchiveSettingSync.applyMutations — per-mutation inner logic,
-     *           success check on the returned action state
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -133,16 +98,13 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      * mutations array logs a warning and returns {@code [{actionState: Failed}]},
      * but since the caller should not dispatch empty batches, Cobalt returns an
      * empty list for API consistency with other handlers.
-     *
-     * @implNote WAWebArchiveSettingSync.applyMutations — takes {@code e[e.length - 1]}
-     *           and applies only that mutation
      * @param client    the WhatsApp client instance
      * @param mutations the batch of mutations to apply
      * @return a list of results parallel to the input
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatchResults(WhatsAppClient client, WamService wamService, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.isEmpty()) {
             return List.of();
         }
@@ -151,7 +113,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
         for (var i = 0; i < mutations.size() - 1; i++) {
             results.add(MutationApplicationResult.skipped());
         }
-        results.add(applyMutationResult(client, wamService, mutations.getLast()));
+        results.add(applyMutation(client, mutations.getLast()));
         return results;
     }
 
@@ -171,22 +133,20 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      *
      * <p>Non-{@code SET} operations return {@code Unsupported}. Exceptions are
      * caught and return {@code Failed}.
-     *
-     * @implNote WAWebArchiveSettingSync.applyMutations — per-mutation inner function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
 
         try {
             if (!(mutation.value().action().orElse(null) instanceof UnarchiveChatsSetting setting)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             // ADAPTED: WA Web checks (_.unarchiveChats == null) and returns malformedActionValue.
@@ -219,8 +179,6 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      *       {@code $ArchiveSettingSync$p_2} which finds chats with successful
      *       archive sync actions and re-archives them</li>
      * </ul>
-     *
-     * @implNote WAWebArchiveSettingSync.updateSideEffectOnChats
      * @param client         the WhatsApp client instance
      * @param unarchiveChats the new unarchive chats setting value
      */
@@ -263,9 +221,6 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      * unarchives all archived chats that have a successful archive sync action entry.
      * This matches the practical effect since the setting change implies the user
      * wants archived chats to auto-unarchive on new messages.
-     *
-     * @implNote ADAPTED: WAWebArchiveSettingSync.$ArchiveSettingSync$p_1 — simplified
-     *           without active message range infrastructure and message range construction
      * @param client the WhatsApp client instance
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -348,9 +303,6 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      *   <li>Resolves the chat for each entry</li>
      *   <li>Sets the chat as archived</li>
      * </ol>
-     *
-     * @implNote ADAPTED: WAWebArchiveSettingSync.$ArchiveSettingSync$p_2 — uses
-     *           Cobalt's store API instead of WAWebSyncdDb.getSyncActionsRows
      * @param client the WhatsApp client instance
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -400,10 +352,6 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      * <p>Per WhatsApp Web, the archive action index is formatted as
      * {@code ["archive", chatJidString]}. This method parses the JSON array
      * and extracts the second element.
-     *
-     * @implNote WAWebArchiveSettingSync.$ArchiveSettingSync$p_1,
-     *           WAWebArchiveSettingSync.$ArchiveSettingSync$p_2 —
-     *           {@code JSON.parse(e.index)[1]} / {@code JSON.parse(e.index)[1]}
      * @param actionIndex the action index string (JSON array format)
      * @return the parsed chat JID, or {@code null} if parsing fails
      */
@@ -432,9 +380,6 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      * Cobalt surfaces a typed helper so the public
      * {@code WhatsAppClient.changeUnarchiveChatsOnNewMessage} setter can build a
      * single mutation without hand-rolling the protobuf wrapping.
-     *
-     * @implNote ADAPTED: WAWebSyncdActionUtils.buildPendingMutation — shaped
-     *           after {@code WAWebDisableLinkPreviewsSync.getMutation}
      * @param timestamp       the mutation timestamp
      * @param unarchiveChats  {@code true} to enable auto-unarchive on new
      *                        message, {@code false} otherwise

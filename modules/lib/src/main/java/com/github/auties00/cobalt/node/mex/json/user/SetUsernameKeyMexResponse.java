@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.node.NodeBuilder;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -54,6 +55,18 @@ public final class SetUsernameKeyMexResponse implements MexOperation.Response.Js
      */
     public Optional<String> result() {
         return Optional.ofNullable(result);
+    }
+
+    /**
+     * Returns whether the username-key mutation succeeded. Mirrors the WA Web check
+     * {@code result?.xwa2_username_pin_set?.result === "SUCCESS"}.
+     *
+     * @return {@code true} if the {@code result} field equals {@code "SUCCESS"}, {@code false} otherwise
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMexSetUsernameKeyJob", exports = "mexSetUsernameKeyQueryJob",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public boolean isSuccess() {
+        return Objects.equals(result, "SUCCESS");
     }
 
     /**

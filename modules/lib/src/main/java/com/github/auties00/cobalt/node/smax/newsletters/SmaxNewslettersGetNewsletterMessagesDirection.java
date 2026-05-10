@@ -17,8 +17,6 @@ import java.util.Optional;
 /**
  * Sealed disjunction over the pagination cursor. Either {@code before}
  * or {@code after} a server-id, or none for the latest slice.
- *
- * @implNote {@code WASmaxOutNewslettersMessageDirections.mergeMessageDirections}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersMessageDirections")
 public sealed interface SmaxNewslettersGetNewsletterMessagesDirection permits SmaxNewslettersGetNewsletterMessagesDirection.Before, SmaxNewslettersGetNewsletterMessagesDirection.After {
@@ -26,8 +24,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesDirection permits Sm
     /**
      * The {@code before} cursor. Fetch messages with server-ids
      * strictly less than the given pivot.
-     *
-     * @implNote {@code WASmaxOutNewslettersBeforeMixinMixin.mergeBeforeMixinMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersBeforeMixinMixin")
     final class Before implements SmaxNewslettersGetNewsletterMessagesDirection {
@@ -73,8 +69,6 @@ public sealed interface SmaxNewslettersGetNewsletterMessagesDirection permits Sm
     /**
      * The {@code after} cursor. Fetch messages with server-ids
      * strictly greater than the given pivot.
-     *
-     * @implNote {@code WASmaxOutNewslettersAfterMixinMixin.mergeAfterMixinMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxOutNewslettersAfterMixinMixin")
     final class After implements SmaxNewslettersGetNewsletterMessagesDirection {

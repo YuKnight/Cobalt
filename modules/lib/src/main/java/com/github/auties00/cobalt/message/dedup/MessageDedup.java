@@ -31,12 +31,6 @@ import java.util.concurrent.ConcurrentMap;
  * multiple cooperating call sites without being prematurely evicted. The
  * cache is flushed in bulk via {@link #maybeClear(int)} when the
  * offline-delivery counter reaches zero.
- *
- * @implNote The JS module owns a module-level {@code Map}. Cobalt wraps the
- * map behind an instance so each
- * {@link com.github.auties00.cobalt.message.receive.MessageReceivingService}
- * can own its own cache, and the storage uses a {@link ConcurrentHashMap} to
- * remain safe under virtual-thread fanout.
  */
 @WhatsAppWebModule(moduleName = "WAWebMessageDedupUtils")
 public final class MessageDedup {
@@ -47,11 +41,6 @@ public final class MessageDedup {
 
     /**
      * Map from composite dedup key to the current reference count.
-     *
-     * @implNote WA Web uses a plain {@code Map}, which is only safe because
-     * the JS runtime is single-threaded. Cobalt substitutes a
-     * {@link ConcurrentHashMap} to preserve the same semantics under parallel
-     * virtual-thread callers.
      */
     @WhatsAppWebExport(moduleName = "WAWebMessageDedupUtils", exports = {"addPendingMessage", "hasPendingMessage", "maybeClearPendingMessages"},
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -73,10 +62,6 @@ public final class MessageDedup {
      * redeploy. Cobalt callers should do the same. They check this predicate
      * before invoking {@link #add(String)} or
      * {@link #add(MessageKey, Instant, List)}.
-     *
-     * @implNote Cobalt routes the AB-prop lookup through {@link ABPropsService}
-     * because AB props are injected via DI rather than reached through a
-     * module-level singleton.
      * @param abPropsService the AB props service used to read the
      *                       {@link ABProp#WEB_PENDING_MESSAGE_CACHE_ENABLED} flag
      * @return {@code true} when the server has flipped the
@@ -215,11 +200,6 @@ public final class MessageDedup {
     /**
      * Decrements the reference count for a message key and removes the entry
      * once the count reaches zero.
-     *
-     * @implNote This method has no WA Web counterpart. The JS module only
-     * evicts entries in bulk via {@code maybeClearPendingMessages}. Cobalt's
-     * send-side dedup pattern registers a key before the send and removes it
-     * once the send completes, so per-entry removal is required.
      * @param key the composite dedup key
      * @throws NullPointerException if {@code key} is {@code null}
      */

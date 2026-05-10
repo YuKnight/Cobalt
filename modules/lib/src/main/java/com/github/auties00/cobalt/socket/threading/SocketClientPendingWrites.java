@@ -16,12 +16,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <p>{@link #offer(ByteBuffer)} is lock-free; the common path executes
  * a single atomic increment and one release store with no allocation.
- *
- * @implNote The chunked, append-only design avoids contention by
- *     handing each producer its own slot through an atomic
- *     fetch-and-add on {@code Chunk.index}; the consumer never
- *     synchronises with producers and sees writes through release and
- *     acquire fences on the array element {@link VarHandle}.
  */
 public final class SocketClientPendingWrites {
     private static final VarHandle ELEMENT;

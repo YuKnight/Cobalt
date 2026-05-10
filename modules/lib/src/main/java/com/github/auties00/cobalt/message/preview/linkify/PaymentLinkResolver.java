@@ -24,14 +24,6 @@ import java.util.regex.PatternSyntaxException;
  * whose values are PSP labels. The compiled patterns are cached per
  * AB-prop value so a single AB-prop refresh costs one parse, not one
  * per outgoing message.
- *
- * @implNote WAWebPaymentLinkUrlMetaData.getPaymentLinkUrlMetaData: the
- *           JS module reads the AB-prop string, parses it as JSON,
- *           iterates the regex keys until one matches, and pairs the
- *           PSP with {@code shouldDetectInComposer:
- *           WAWebMobilePlatforms.isSMB()}. Cobalt mirrors the algorithm
- *           and reuses {@link JSON} which is
- *           already on the classpath, so no new dependency is needed.
  */
 @WhatsAppWebModule(moduleName = "WAWebPaymentLinkUrlMetaData")
 final class PaymentLinkResolver {
@@ -121,7 +113,6 @@ final class PaymentLinkResolver {
      * @param client the WhatsApp client
      * @return {@code true} when the device platform is one of the
      *         {@code _BUSINESS} variants
-     * @implNote WAWebMobilePlatforms.isSMB.
      */
     @WhatsAppWebExport(moduleName = "WAWebMobilePlatforms", exports = "isSMB",
             adaptation = WhatsAppAdaptation.ADAPTED)

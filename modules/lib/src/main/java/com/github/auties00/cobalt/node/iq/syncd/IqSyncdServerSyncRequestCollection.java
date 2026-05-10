@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.node.iq.syncd;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -10,17 +11,6 @@ import java.util.Optional;
  * is empty) or for the patches above a known version. When the local client
  * also has pending mutations to push, an encrypted patch payload is
  * attached via {@link #patch()}.
- *
- * @implNote {@code WAWebSyncdRequestBuilderBuild.buildSyncIqNode}: the
- *           inner {@code _buildCollectionNodes} helper emits one
- *           {@code <collection name return_snapshot version>} child per
- *           entry, with an optional {@code <patch>} grandchild carrying
- *           the encoded {@code SyncdPatch} protobuf bytes. The
- *           {@code return_snapshot} attribute is derived from whether a
- *           local version is known: {@code "true"} when the caller has
- *           never synced this collection, {@code "false"} otherwise.
- *           Cobalt projects the same derivation through the
- *           {@code version()}-empty fallback in {@link IqSyncdServerSyncRequest}.
  */
 public final class IqSyncdServerSyncRequestCollection {
     /**
@@ -102,12 +92,12 @@ public final class IqSyncdServerSyncRequestCollection {
         var that = (IqSyncdServerSyncRequestCollection) obj;
         return Objects.equals(this.name, that.name)
                 && Objects.equals(this.version, that.version)
-                && java.util.Arrays.equals(this.patch, that.patch);
+                && Arrays.equals(this.patch, that.patch);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, version, java.util.Arrays.hashCode(patch));
+        return Objects.hash(name, version, Arrays.hashCode(patch));
     }
 
     @Override

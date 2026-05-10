@@ -6,13 +6,6 @@ import java.util.Optional;
 
 /**
  * Closed set of visibility values that a privacy category can take.
- *
- * @implNote Union of {@code WAWebPrivacySettings.VISIBILITY},
- *           {@code ONLINE_VISIBILITY}, {@code ALL_NONE}, {@code CALL_ADD},
- *           {@code DEFENSE_MODE_STATE}. The {@code error} marker is not
- *           modelled. When the relay emits {@code value="error"} for
- *           a category, the Cobalt parser skips that entry mirroring
- *           WA Web's logging behaviour.
  */
 @WhatsAppWebModule(moduleName = "WAWebPrivacySettings")
 public enum IqQueryPrivacySettingsVisibility {

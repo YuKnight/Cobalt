@@ -5,9 +5,9 @@ import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.chat.ChatAssignmentBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentOpenedStatusAction;
@@ -15,10 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentOpenedSta
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -33,25 +30,17 @@ import java.util.List;
  *
  * <p>Per WhatsApp Web, this handler extends {@code ChatSyncdActionBase}
  * with {@code chatJidIndex = 1} and collection {@code Regular}.
- *
- * @implNote WAWebChatAssignmentOpenedStatusSync.default
  */
 @WhatsAppWebModule(moduleName = "WAWebChatAssignmentOpenedStatusSync")
 public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code ChatAssignmentOpenedStatusHandler}.
-     *
-     * @implNote WAWebChatAssignmentOpenedStatusSync.default, the module exports
-     *           a singleton {@code new s()} where {@code s} is the handler class
      */
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentOpenedStatusSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final ChatAssignmentOpenedStatusHandler INSTANCE = new ChatAssignmentOpenedStatusHandler();
 
     /**
      * Creates a new {@code ChatAssignmentOpenedStatusHandler}.
-     *
-     * @implNote WAWebChatAssignmentOpenedStatusSync.default, constructor sets
-     *           {@code chatJidIndex = 1} and {@code collectionName = Regular}
      */
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentOpenedStatusSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private ChatAssignmentOpenedStatusHandler() {
@@ -60,10 +49,6 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
 
     /**
      * Returns the action name for chat assignment opened status sync.
-     *
-     * @implNote WAWebChatAssignmentOpenedStatusSync.getAction --
-     *           returns {@code WASyncdConst.Actions.ChatAssignmentOpenedStatus}
-     *           which is {@code "agentChatAssignmentOpenedStatus"}
      * @return the action name string
      */
     @Override
@@ -74,9 +59,6 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
 
     /**
      * Returns the sync collection for this handler.
-     *
-     * @implNote WAWebChatAssignmentOpenedStatusSync constructor --
-     *           sets {@code collectionName = WASyncdConst.CollectionName.Regular}
      * @return the {@link SyncPatchType#REGULAR} collection
      */
     @Override
@@ -87,30 +69,12 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
 
     /**
      * Returns the mutation format version for chat assignment opened status.
-     *
-     * @implNote WAWebChatAssignmentOpenedStatusSync.getVersion --
-     *           returns {@code WASyncdConst.CHAT_ASSIGNMENT_SYNC_VERSION} which is {@code 7}
      * @return the version number
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentOpenedStatusSync", exports = "getVersion", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return ChatAssignmentOpenedStatusAction.ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single chat assignment opened status mutation.
-     *
-     * @implNote WAWebChatAssignmentOpenedStatusSync.applyMutations, delegates to
-     *           {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)} and checks for success
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebChatAssignmentOpenedStatusSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -128,21 +92,19 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
      * which updates the ChatAssignment collection models and bulk-merges to IDB.
      * In Cobalt, the store update is applied inline per mutation via the
      * {@code chatAssignmentOpenedStates} map.
-     *
-     * @implNote WAWebChatAssignmentOpenedStatusSync.applyMutations
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentOpenedStatusSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             var chatJidString = indexArray.getString(1);
             var agentId = indexArray.getString(2);
             if (chatJidString == null || agentId == null) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (mutation.operation() != SyncdOperation.SET) {
@@ -156,21 +118,21 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
             }
 
             if (!(mutation.value().action().orElse(null) instanceof ChatAssignmentOpenedStatusAction action)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
-            var resolvedChatJid = chat.get().toJid().toString();
-            var assignmentKey = resolvedChatJid + "_" + agentId;
-
-            if (!client.store().chatAssignmentOpenedStates().containsKey(assignmentKey) // ADAPTED: WAWebChatAssignmentOpenedStatusSync.applyMutations: var m = ChatAssignmentCollection.get(d); if (m == null)
-                    && !agentId.equals(client.store().chatAssignmentStates().get(resolvedChatJid))) { // ADAPTED: fallback check via chatAssignmentStates
-                return MutationApplicationResult.orphan(assignmentKey, "ChatAssignment");
+            var resolvedChatJid = chat.get().toJid();
+            var existing = client.store().findChatAssignment(resolvedChatJid).orElse(null); // ADAPTED: WAWebChatAssignmentOpenedStatusSync.applyMutations: var m = ChatAssignmentCollection.get(d); if (m == null)
+            if (existing == null || !agentId.equals(existing.agentId().orElse(null))) {
+                return MutationApplicationResult.orphan(resolvedChatJid + "_" + agentId, "ChatAssignment");
             }
 
             var chatOpened = action.chatOpened(); // ADAPTED: WAWebChatAssignmentOpenedStatusSync.applyMutations: var c = u.chatOpened; if (c == null) return malformedActionValue, Cobalt coalesces null to false per project convention
-            var states = new HashMap<>(client.store().chatAssignmentOpenedStates()); // ADAPTED: WAWebChatAssignmentOpenedStatusSync.applyMutations: a.push({...}); updateLocalOpenedState(a), inline update instead of batch
-            states.put(assignmentKey, chatOpened);
-            client.store().setChatAssignmentOpenedStates(states);
+            client.store().putChatAssignment(new ChatAssignmentBuilder() // ADAPTED: WAWebChatAssignmentOpenedStatusSync.applyMutations: updateLocalOpenedState — Cobalt updates the unified ChatAssignment record's opened flag
+                    .chatJid(resolvedChatJid)
+                    .agentId(existing.agentId().orElse(null))
+                    .opened(chatOpened)
+                    .build());
             return MutationApplicationResult.success();
         } catch (Exception e) {
             return MutationApplicationResult.failed();
@@ -186,8 +148,6 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
      * the mutation carries a {@link ChatAssignmentOpenedStatusAction} whose
      * {@code chatOpened} flag records the agent's open state. The index is
      * {@code ["agentChatAssignmentOpenedStatus", chatJid, agentId]}.
-     *
-     * @implNote WAWebChatAssignmentOpenedStatusSync.default.createChatOpenedMutations
      * @param chatJid     the JID of the chat
      * @param agentId     the agent identifier
      * @param chatOpened  {@code true} when the agent has opened the chat

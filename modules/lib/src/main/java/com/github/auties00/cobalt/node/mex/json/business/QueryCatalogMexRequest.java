@@ -112,18 +112,6 @@ public final class QueryCatalogMexRequest implements MexOperation.Request.Json {
     /**
      * Builds the IQ stanza that dispatches this operation to the WhatsApp
      * relay.
-     *
-     * @implNote Mirrors the exact WA Web {@code request.product_catalog}
-     *           variable shape with {@code jid}, {@code allow_shop_source}
-     *           (enum string), {@code width}, {@code height},
-     *           {@code direct_connection_encrypted_info} (always
-     *           {@code null} from this surface), {@code limit}, {@code after}
-     *           (always emitted, possibly {@code null}),
-     *           {@code catalog_session_id}, {@code variant_info_fields},
-     *           {@code variant_thumbnail_height} and
-     *           {@code variant_thumbnail_width}. WA Web emits explicit
-     *           {@code null} values for the optional fields rather than
-     *           omitting the keys.
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         serialised GraphQL variables
      */

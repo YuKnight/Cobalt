@@ -39,8 +39,11 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.wam.binary.WamEventDecoder;
+import com.github.auties00.cobalt.wam.binary.WamEventEncoder;
 import com.github.auties00.cobalt.wam.binary.WamGlobalEncoder;
 import com.github.auties00.cobalt.wam.event.PsIdUpdateEventBuilder;
+import com.github.auties00.cobalt.wam.event.WamEventRegistry;
 import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsTokenIssuer;
 import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsUploader;
 import com.github.auties00.cobalt.wam.event.SendDocumentEventBuilder;
@@ -58,6 +61,7 @@ import com.github.auties00.cobalt.wam.type.MessageType;
 import com.github.auties00.cobalt.wam.type.PsIdAction;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
@@ -88,26 +92,12 @@ import java.util.logging.Logger;
  * in-flight data as ephemeral, so buffers that have not been uploaded
  * when the service is closed are silently discarded.
  *
- * @apiNote Emits {@code WamClientErrorsWamEvent} with
- * {@code wamClientBufferDropErrorCount = 1} when a buffer is dropped
- * because it exceeds {@link #MAX_UPLOAD_SIZE}, mirroring WhatsApp
- * Web's {@code _executePending} and {@code oe} (upload) self-metric
- * paths. This service does not emit {@code WamDroppedEventWamEvent}
- * for per-event validation failures. WhatsApp Web uses that event to
- * track items rejected by {@code runPreCommitValidation} for
- * operational visibility, while Cobalt logs a warning instead.
- *
- * @implNote Adapts the WhatsApp Web WAM telemetry pipeline. Buffer
- *     rotation and flush come from {@code WAWebWam}, AB-prop
- *     sampling overrides from {@code WAWebEventSampling}, beacon
- *     sequence numbers from {@code WAWebWamBeaconing}, and
- *     private-stats identifier rotation from
- *     {@code WAWebWamPrivateStats}.
  * @see WamEventSpec
  * @see WamGlobalEncoder
  * @see WamChannel
  */
 @WhatsAppWebModule(moduleName = "WAWebWam")
+@WhatsAppWebModule(moduleName = "WAWebWamCodegenWamEvent")
 @WhatsAppWebModule(moduleName = "WAWebL10NCountryCodes")
 @WhatsAppWebModule(moduleName = "WAWebBrowserApi")
 @WhatsAppWebModule(moduleName = "WAWebWamMsgUtils")
@@ -192,14 +182,16 @@ public final class WamService {
     private static final int MAX_SEQUENCE_NUMBER = 0xFFFF;
 
     /**
+     * Wire field id of the commit-time global, mirroring
+     * {@code WamGlobalEncoder.COMMIT_TIME}. Used by
+     * {@link #restorePendingBuffers} to recognise the per-event
+     * commit-time entry that precedes each persisted event.
+     */
+    private static final int COMMIT_TIME_FIELD_ID = 47;
+
+    /**
      * Device classification value for DESKTOP, matching the
      * JavaScript enum {@code DEVICE_CLASSIFICATION.DESKTOP}.
-     *
-     * @implNote Adapts
-     *     {@code WAWebFalcoCanonicalDeviceClassification}, which
-     *     returns the string {@code "desktop"}. This numeric constant
-     *     is the encoded form written into the Falco global
-     *     {@code deviceClassification} (14507).
      */
     @WhatsAppWebExport(moduleName = "WAWebFalcoCanonicalDeviceClassification", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private static final int DEVICE_CLASSIFICATION_DESKTOP = 4;
@@ -306,7 +298,7 @@ public final class WamService {
 
     /**
      * Platform identifier written as global {@code 11}. Resolved from
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientType} at
+     * {@link WhatsAppClientType} at
      * initialization.
      */
     private volatile long platform;
@@ -324,14 +316,6 @@ public final class WamService {
     /**
      * Approximate device memory class in megabytes, reported as the
      * WAM global with index {@code 655} ({@code memClass}).
-     *
-     * @implNote In WA Web this is derived from
-     *           {@code self.navigator.deviceMemory * 1000}, short-circuiting
-     *           to {@code 1000} when gkx {@code 17565} (prod low-end device)
-     *           is set. Cobalt runs headless on the JVM where
-     *           {@code navigator.deviceMemory} has no analog, so the value
-     *           is approximated from {@link Runtime#maxMemory()}, and the
-     *           low-end-device override is not applicable.
      */
     @WhatsAppWebExport(
             moduleName = "WAWebBrowserApi",
@@ -343,13 +327,6 @@ public final class WamService {
     /**
      * Number of logical CPUs reported as the WAM global with index
      * {@code 10317} ({@code numCpu}).
-     *
-     * @implNote WhatsApp Web reads
-     *     {@code self.navigator.hardwareConcurrency}, short-circuiting
-     *     to {@code 1} when gkx {@code 17565} (prod low-end device)
-     *     is set. Cobalt runs headless on the JVM and uses
-     *     {@link Runtime#availableProcessors()}. The low-end-device
-     *     override does not apply.
      */
     @WhatsAppWebExport(
             moduleName = "WAWebBrowserApi",
@@ -457,17 +434,6 @@ public final class WamService {
      *
      * <p>This method should be called once after the client has
      * authenticated and the store's JID and version are available.
-     *
-     * @implNote Adapts {@code WAWebWam.initWamRuntime}: the JS routine
-     *     resolves {@code WAWebWamGlobals.PrivateStatsAllIds}, calls
-     *     {@code WAWebWamPrivateStats.initPrivateStats}, starts the
-     *     {@code WAShiftTimer} that drains pending events, registers the
-     *     runtime singleton with {@code WAWebWamRuntimeProvider}, then
-     *     replays the queue of pre-init {@code commit} / {@code set}
-     *     calls. Cobalt collapses the registration into constructor DI
-     *     and the {@code commitOnSet} toggle around {@code Global.set} is
-     *     not needed because Cobalt does not back globals with a reactive
-     *     proxy. The pre-init queue is implemented by {@link #initQueue}.
      */
     @WhatsAppWebExport(moduleName = "WAWebWam", exports = "initWamRuntime", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebWam", exports = "commitOnSet", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -500,6 +466,9 @@ public final class WamService {
             samplingOverride.replaceAll(configs);
         }
 
+        primeSequenceNumbers();
+        restorePendingBuffers();
+
         this.initialized = true;
 
         Runnable action;
@@ -528,22 +497,6 @@ public final class WamService {
     /**
      * Derives the PS country code from the user's phone number, matching
      * WhatsApp Web's {@code WAWebL10NCountryCodes.getCountryShortcodeByPhone}.
-     *
-     * @implNote WA Web walks a hand-maintained prefix trie
-     *           (leading-digit -&gt; next-digit -&gt; ... -&gt; {@code c} leaf)
-     *           hardcoded inside {@code WAWebL10NCountryCodes}, with two
-     *           special-case rules applied on top: a leading {@code 1}
-     *           that does not match a NANP sub-prefix falls back to
-     *           {@code "US"}, and a leading {@code 7} that would match
-     *           {@code "RU"} is remapped to {@code "KZ"} when the second
-     *           digit is {@code 6} or {@code 7}. Cobalt defers the prefix
-     *           analysis to Google's {@code libphonenumber}, whose
-     *           region-code database encodes the same NANP fallback and
-     *           the Kazakhstan {@code 7-6xx}/{@code 7-7xx} split as
-     *           authoritative prefix data. The output format (ISO 3166-1
-     *           alpha-2) is identical, and libphonenumber is kept up to
-     *           date with ITU E.164 allocations rather than a handwritten
-     *           trie snapshot.
      * @return the two-letter ISO 3166-1 alpha-2 country code in
      *         lowercase, or {@code null} if not derivable
      */
@@ -580,9 +533,9 @@ public final class WamService {
      *
      * <p>For {@link WamChannel#REALTIME} events, an immediate flush is
      * scheduled.
-     *
      * @param event the event to commit, must not be {@code null}
      */
+    @WhatsAppWebExport(moduleName = "WAWebWamCodegenWamEvent", exports = "WamEvent", adaptation = WhatsAppAdaptation.ADAPTED)
     public void commit(WamEventSpec event) {
         Objects.requireNonNull(event, "event cannot be null");
         if (!event.markCommitted()) {
@@ -590,6 +543,7 @@ public final class WamService {
             return;
         }
 
+        // WAWebWamCodegenWamEvent.WamEvent.runPreCommitValidation: try { runPreCommitValidation() } catch { ... commit DroppedEvent }
         if (!event.validate()) {
             LOGGER.warning("WAM event failed validation: " + event.getClass().getSimpleName());
             return;
@@ -622,12 +576,12 @@ public final class WamService {
      *
      * <p>This matches WhatsApp Web's {@code commitAndWaitForFlush()}
      * which returns a Promise resolved on buffer flush.
-     *
      * @param event the event to commit, must not be {@code null}
      * @return a future that completes when the event's buffer is flushed,
      *         or completes immediately if the event was sampled out or
      *         failed validation
      */
+    @WhatsAppWebExport(moduleName = "WAWebWamCodegenWamEvent", exports = "WamEvent", adaptation = WhatsAppAdaptation.ADAPTED)
     public CompletableFuture<Void> commitAndWaitForFlush(WamEventSpec event) {
         Objects.requireNonNull(event, "event cannot be null");
         if (!event.markCommitted()) {
@@ -706,19 +660,6 @@ public final class WamService {
      *
      * <p>The pending list is atomically swapped to {@code null} so
      * that new events committed during the flush are not lost.
-     *
-     * @implNote Adapts {@code WAWebWam.sendAllLogs}. The JavaScript
-     *     routine reads pending buffers from {@code WAWebWamStorage}
-     *     (IndexedDB) for a single buffer-key, uploads each to either
-     *     {@code WAWebUploadStatsBackend} or
-     *     {@code WAWebUploadPrivateStatsBackend}, drops oversize
-     *     buffers while emitting a {@code WamClientErrorsWamEvent}
-     *     with {@code wamClientBufferDropErrorCount = 1}, and on
-     *     partial success re-persists the failed payloads. Cobalt
-     *     does not persist pending buffers to disk, so this method
-     *     is the direct in-memory equivalent. {@code flushChannel}
-     *     drains the pending list and {@code buildAndSend} performs
-     *     the equivalent oversize drop and self-metric emission.
      */
     @WhatsAppWebExport(moduleName = "WAWebWam", exports = "sendAllLogs", adaptation = WhatsAppAdaptation.ADAPTED)
     public void flush() {
@@ -895,17 +836,19 @@ public final class WamService {
         }
 
         var buffer = new byte[size];
-        var offset = writeHeader(buffer, channel);
-        System.arraycopy(globalsBytes, 0, buffer, offset, globalsBytes.length);
-        offset += globalsBytes.length;
+        var encoder = WamEventEncoder.of(buffer);
+        writeHeader(encoder, channel);
+        encoder.writeRaw(globalsBytes, 0, globalsBytes.length);
 
         for (var i = from; i < to; i++) {
             var pe = events.get(i);
-            offset = writePerEventGlobals(pe, channel, beacons[i], buffer, offset);
-            offset = pe.event().encode(buffer, offset, weights[i]);
+            writePerEventGlobals(pe, channel, beacons[i], encoder);
+            pe.event().encode(encoder, weights[i]);
         }
 
-        assert offset == size : "Buffer size mismatch: wrote " + offset + " but allocated " + size;
+        assert encoder.written() == size : "Buffer size mismatch: wrote " + encoder.written() + " but allocated " + size;
+
+        var saveKey = persistBuffer(events, weights, from, to);
 
         if (channel == WamChannel.PRIVATE) {
             sendPrivateWithRetry(buffer);
@@ -913,6 +856,7 @@ public final class WamService {
             sendWithRetry(buffer);
         }
 
+        removePersistedBuffer(saveKey);
         completeFutures(events, from, to);
     }
 
@@ -977,12 +921,12 @@ public final class WamService {
         }
 
         var bytes = new byte[size];
-        var offset = 0;
+        var encoder = WamEventEncoder.of(bytes);
         for (var entry : dirty) {
-            offset = WamGlobalEncoder.writeDynamicGlobal(entry.getKey(), entry.getValue(), bytes, offset);
+            WamGlobalEncoder.writeDynamicGlobal(entry.getKey(), entry.getValue(), encoder);
         }
         for (var fieldId : nullTransitions) {
-            offset = WamGlobalEncoder.writeNullGlobal(fieldId, bytes, offset);
+            WamGlobalEncoder.writeNullGlobal(fieldId, encoder);
         }
 
         prevSessionGlobals.put(channel, current);
@@ -1086,25 +1030,22 @@ public final class WamService {
 
     /**
      * Writes the per-event globals (commit time, beaconing sequence,
-     * private stats id) into the output buffer.
+     * private stats id) into the encoder.
      *
      * @param pe      the pending event
      * @param channel the transport channel
      * @param beacon  the pre-computed beacon sequence number
-     * @param buffer  the output byte array
-     * @param offset  the current offset
-     * @return the new offset after writing
+     * @param encoder the destination encoder
      */
-    private int writePerEventGlobals(WamPendingEvent pe, WamChannel channel, OptionalInt beacon, byte[] buffer, int offset) {
-        offset = WamGlobalEncoder.writeCommitTime(pe.commitTimeSeconds(), buffer, offset);
+    private void writePerEventGlobals(WamPendingEvent pe, WamChannel channel, OptionalInt beacon, WamEventEncoder encoder) {
+        WamGlobalEncoder.writeCommitTime(pe.commitTimeSeconds(), encoder);
         if (beacon.isPresent()) {
-            offset = WamGlobalEncoder.writeBeaconSessionId(beacon.getAsInt(), buffer, offset);
+            WamGlobalEncoder.writeBeaconSessionId(beacon.getAsInt(), encoder);
         }
         if (channel == WamChannel.PRIVATE) {
             var psId = privateStatsId.getValueForHash(pe.event().privateStatsId());
-            offset = WamGlobalEncoder.writePsId(psId, buffer, offset);
+            WamGlobalEncoder.writePsId(psId, encoder);
         }
-        return offset;
     }
 
     /**
@@ -1142,22 +1083,19 @@ public final class WamService {
     }
 
     /**
-     * Writes the 8-byte WAM buffer header.
+     * Writes the 8-byte WAM buffer header into the encoder.
      *
-     * @param buffer  the output buffer
+     * @param encoder the destination encoder
      * @param channel the transport channel
-     * @return the offset after the header (always {@value HEADER_SIZE})
      */
-    private int writeHeader(byte[] buffer, WamChannel channel) {
-        var offset = 0;
-        System.arraycopy(WAM_MAGIC, 0, buffer, offset, WAM_MAGIC.length);
-        offset += WAM_MAGIC.length;
-        buffer[offset++] = (byte) PROTOCOL_VERSION;
-        buffer[offset++] = (byte) STREAM_ID;
-        SHORT_HANDLE.set(buffer, offset, (short) nextSequenceNumber(channel));
-        offset += 2;
-        buffer[offset++] = (byte) channel.id();
-        return offset;
+    private void writeHeader(WamEventEncoder encoder, WamChannel channel) {
+        var headerBytes = new byte[HEADER_SIZE];
+        System.arraycopy(WAM_MAGIC, 0, headerBytes, 0, WAM_MAGIC.length);
+        headerBytes[3] = (byte) PROTOCOL_VERSION;
+        headerBytes[4] = (byte) STREAM_ID;
+        SHORT_HANDLE.set(headerBytes, 5, (short) nextSequenceNumber(channel));
+        headerBytes[7] = (byte) channel.id();
+        encoder.writeRaw(headerBytes, 0, HEADER_SIZE);
     }
 
     /**
@@ -1172,11 +1110,141 @@ public final class WamService {
      * @return the next sequence number in {@code [1, 65535]}
      */
     private int nextSequenceNumber(WamChannel channel) {
-        return sequenceNumbers.get(channel).getAndUpdate(current -> {
+        var counter = sequenceNumbers.get(channel);
+        var oldValue = counter.getAndUpdate(current -> {
             var next = current + 1;
             return next > MAX_SEQUENCE_NUMBER ? 1 : next;
         });
+        client.store().putWamSequenceNumber(channel, counter.get());
+        return oldValue;
     }
+
+    /**
+     * Primes the in-memory sequence-number counters from the persisted
+     * values in the store, ensuring the wire-level sequence does not
+     * reset across sessions.
+     */
+    private void primeSequenceNumbers() {
+        var store = client.store();
+        for (var channel : WamChannel.values()) {
+            var stored = store.findWamSequenceNumber(channel);
+            if (stored.isPresent()) {
+                sequenceNumbers.get(channel).set(stored.getAsInt());
+            }
+        }
+    }
+
+    /**
+     * Persists the events in {@code [from, to)} to a new file under the
+     * store-managed buffer directory and returns the save key that
+     * identifies the file.
+     *
+     * <p>The file format is a stream of WAM event entries, each preceded
+     * by a {@code commitTime} global written via
+     * {@link WamGlobalEncoder#writeCommitTime}. On the next session the
+     * events are decoded by {@link #restorePendingBuffers} and re-injected
+     * into the pending list for their channel.
+     *
+     * @param events  the full event list
+     * @param weights the resolved sampling weights parallel to events
+     * @param from    the inclusive start index
+     * @param to      the exclusive end index
+     * @return the save key on success, or {@code null} on I/O failure
+     */
+    private String persistBuffer(List<WamPendingEvent> events, int[] weights, int from, int to) {
+        if (from >= to) {
+            return null;
+        }
+        var saveKey = generateSaveKey();
+        try (var out = client.store().openWamPendingBufferWriter(saveKey)) {
+            var encoder = WamEventEncoder.of(out);
+            for (var i = from; i < to; i++) {
+                var pe = events.get(i);
+                WamGlobalEncoder.writeCommitTime(pe.commitTimeSeconds(), encoder);
+                pe.event().encode(encoder, weights[i]);
+            }
+        } catch (IOException error) {
+            LOGGER.warning("Failed to persist WAM buffer " + saveKey + ": " + error.getMessage());
+            return null;
+        }
+        return saveKey;
+    }
+
+    /**
+     * Removes a previously-persisted buffer file.
+     *
+     * @param saveKey the save key returned by {@link #persistBuffer},
+     *                or {@code null} for a no-op
+     */
+    private void removePersistedBuffer(String saveKey) {
+        if (saveKey == null) {
+            return;
+        }
+        try {
+            client.store().removeWamPendingBuffer(saveKey);
+        } catch (IOException error) {
+            LOGGER.warning("Failed to remove persisted WAM buffer " + saveKey + ": " + error.getMessage());
+        }
+    }
+
+    /**
+     * Reads every previously-persisted buffer file, decodes the events
+     * back into {@link WamPendingEvent}s, and re-injects them into the
+     * pending list for their respective channels.
+     *
+     * <p>Each file is deleted as soon as its contents have been
+     * re-injected; the next flush cycle will re-persist whatever still
+     * needs to ship.
+     */
+    private void restorePendingBuffers() {
+        var keys = client.store().wamPendingBufferKeys();
+        for (var saveKey : keys) {
+            try {
+                var stream = client.store().openWamPendingBufferReader(saveKey);
+                if (stream.isEmpty()) {
+                    continue;
+                }
+                try (var in = stream.get()) {
+                    var decoder = WamEventDecoder.of(in);
+                    while (decoder.hasMore()) {
+                        var header = decoder.readHeader();
+                        if (WamEventDecoder.fieldIdOf(header) != COMMIT_TIME_FIELD_ID) {
+                            LOGGER.warning("Persisted WAM buffer " + saveKey
+                                    + " has unexpected leading field "
+                                    + WamEventDecoder.fieldIdOf(header));
+                            break;
+                        }
+                        var commitTime = decoder.readInt(header);
+                        var event = WamEventRegistry.decode(decoder);
+                        var pendingEvent = new WamPendingEvent(event, commitTime);
+                        pending.compute(event.channel(), (_, list) -> {
+                            if (list == null) {
+                                list = new ArrayList<>();
+                            }
+                            list.add(pendingEvent);
+                            return list;
+                        });
+                    }
+                }
+                client.store().removeWamPendingBuffer(saveKey);
+            } catch (Exception error) {
+                LOGGER.warning("Failed to restore persisted WAM buffer " + saveKey + ": " + error.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Generates a fresh save key for a persisted buffer, combining a
+     * monotonic timestamp suffix with a random prefix to avoid
+     * collisions when many buffers are flushed in rapid succession.
+     *
+     * @return a filesystem-safe save key
+     */
+    private static String generateSaveKey() {
+        return Long.toUnsignedString(ThreadLocalRandom.current().nextLong(), 36)
+                + "_" + System.currentTimeMillis();
+    }
+
 
     /**
      * Waits for the client to be connected before attempting a buffer
@@ -1398,11 +1466,6 @@ public final class WamService {
      * {@code "sandcastle" -> "dev"}, {@code "trunkstable" -> "C1"};
      * unmapped phases pass through. When the {@code 26256} gatekeeper is
      * set the value is forced to {@code "jest-e2e"}.
-     *
-     * @implNote Cobalt is a third-party client without an internal
-     *     {@code PUSH_PHASE} build constant or jest-e2e harness, so this
-     *     method always returns {@code null} and {@code webcWebArch}
-     *     remains absent from emitted globals.
      * @return the push-phase string, or {@code null} when not applicable
      */
     @WhatsAppWebExport(moduleName = "WAWebWam", exports = "getPushPhase", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1437,11 +1500,6 @@ public final class WamService {
      * @return the WAM media-type classification for the resolved
      * payload, or {@link MediaType#NONE} if no matching classification
      * exists
-     *
-     * @implNote WAWebWamMsgUtils.getWamMediaType accepts a {@code Msg}
-     * model; Cobalt's closest equivalent is {@link ChatMessageInfo},
-     * so the helper unwraps {@link ChatMessageInfo#message()} before
-     * forwarding to the container-level overload.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMediaType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1465,12 +1523,6 @@ public final class WamService {
      *                  {@link MediaType#NONE}
      * @return the WAM media-type classification for the resolved
      * payload
-     *
-     * @implNote Adapts the {@code switch (e.type)} cascade in
-     * {@code WAWebWamMsgUtils.getWamMediaType}. Only the branches that
-     * Cobalt's message model can currently distinguish are implemented;
-     * payloads that have no dedicated Cobalt counterpart fall through to
-     * {@link MediaType#NONE}.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMediaType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1525,12 +1577,6 @@ public final class WamService {
      * @return the WAM message-type classification, defaulting to
      * {@link MessageType#INDIVIDUAL} when the destination does not match any
      * recognised server category
-     *
-     * @implNote Adapts the flat {@code if} cascade in
-     * {@code WAWebWamMsgUtils.getWamMessageType}. Cobalt's message model does
-     * not expose {@code getBroadcastId()} / non-status broadcasts distinctly,
-     * so the helper treats any non-status broadcast JID as
-     * {@link MessageType#BROADCAST}.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMessageType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1558,10 +1604,6 @@ public final class WamService {
      * @return the WAM message-type classification, defaulting to
      * {@link MessageType#INDIVIDUAL} when the server is a user / LID / bot
      * domain or unrecognised
-     *
-     * @implNote Adapts the {@code WAWebWamMsgUtils.getWamMessageType} fallback
-     * table; the {@code STATUS} check precedes the {@code BROADCAST} check to
-     * match WA Web's disambiguation order.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMessageType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1604,11 +1646,6 @@ public final class WamService {
      * @return the WAM message-type classification, defaulting to
      * {@link MessageType#INDIVIDUAL} when the parser-level type maps to
      * {@code CHAT} or {@code PEER_CHAT} or is {@code null}
-     *
-     * @implNote Adapts {@code WAWebWamMsgUtils.getMessageTypeFromMsgInfoType}.
-     * The WA Web function throws on unmatched values; Cobalt falls back to
-     * {@link MessageType#INDIVIDUAL} so callers in the receive pipeline
-     * cannot crash on unexpected enum values introduced upstream.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getMessageTypeFromMsgInfoType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1643,14 +1680,6 @@ public final class WamService {
      *                  {@code null} when the account is not yet bound
      * @return the WAM classification, or {@code null} when the sender is
      * not a user/LID JID, matching WA Web's {@code instanceof Wid} guard
-     *
-     * @implNote Adapts {@code WAWebWamMsgUtils.getWamE2eSenderType}.
-     * WA Web's {@code e instanceof Wid} gate is approximated here by
-     * accepting any non-null JID: the receive pipeline only ever calls
-     * the helper with a resolved sender JID parsed from a stanza, so the
-     * check is redundant. {@code isMeAccount} is realised through the
-     * {@code selfJid.toUserJid().equals(senderJid.toUserJid())} check
-     * that the rest of the receive pipeline uses.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamE2eSenderType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1694,13 +1723,6 @@ public final class WamService {
      *                    {@link MediaType#NONE}
      * @return the WAM media-type classification for the interactive
      * variant, or {@link MediaType#NONE} when no variant is set
-     *
-     * @implNote Adapts {@code WAWebWamMsgUtils.getInteractiveWamType}.
-     * WA Web reads {@code e.interactiveType} (a string from
-     * {@code WAWebInteractiveMessageType}); Cobalt switches on the
-     * {@link InteractiveMessageContent} sealed hierarchy returned by
-     * {@link InteractiveMessage#content()}, which carries the same
-     * variant information.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getInteractiveWamType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1735,12 +1757,6 @@ public final class WamService {
      * @return {@link MediaType#NONE} when the native flow is the
      * {@code CTA_FLOW} (galaxy) variant, otherwise
      * {@link MediaType#INTERACTIVE_NFM}
-     *
-     * @implNote Adapts {@code WAWebWamMsgUtils.d}, the inner helper that
-     * post-processes a native flow interactive payload.
-     * {@code WAWebInteractiveMessagesNativeFlowName.CTA_FLOW} resolves to
-     * the literal {@code "galaxy_message"}, which Cobalt matches via the
-     * first button name on the native flow message.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getInteractiveWamType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1774,12 +1790,6 @@ public final class WamService {
      *                      {@code getIsBotQuery} and {@code getIsMetaBotResponse}
      * @return the WAM agent-engagement classification, or {@code null}
      * when the message is unrelated to a bot conversation
-     *
-     * @implNote Adapts {@code WAWebWamMsgUtils.getWamAgentEngagementType}.
-     * Cobalt does not track {@code isBotQuery} / {@code isMetaBotResponse}
-     * on its message model, so the disjunction is exposed as an explicit
-     * caller-supplied flag rather than recomputed here. The
-     * {@code remote.isBot()} guard is realised through {@link Jid#isBot()}.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamAgentEngagementType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1818,12 +1828,6 @@ public final class WamService {
      *                      {@code BizBotAutomatedType.FULL_3P}
      * @return the matching WAM bot type, defaulting to
      * {@link BotType#UNKNOWN}
-     *
-     * @implNote Adapts {@code WAWebWamMsgUtils.getWamBotType}. Cobalt does
-     * not currently model {@code BizBotType} or {@code BizBotAutomatedType}
-     * as Java enums, so the two boolean flags are exposed in their stead;
-     * any future {@code BizBotType} enum can be added here without
-     * disturbing callers.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamBotType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1853,13 +1857,6 @@ public final class WamService {
      *                 incoming stanza; may be {@code null}
      * @return {@link InvisibleMessageCategoryType#PEER} for {@code "peer"},
      * otherwise {@code null}
-     *
-     * @implNote Adapts {@code WAWebWamMsgUtils.getWamInvisibleMessageCatgoryType}.
-     * The helper preserves WA Web's misspelling of {@code Catgory} in the
-     * export name while exposing a corrected Java method name. The category
-     * lookup uses the {@code WAWebHandleMsgCommon.MSG_CATEGORY} constants;
-     * Cobalt mirrors that table inline because the only recognised value
-     * is the literal {@code "peer"}.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamInvisibleMessageCatgoryType",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1899,13 +1896,6 @@ public final class WamService {
      *                            attribute on a group stanza is LID-addressed
      * @return {@code true} when the relevant JID for the chat type is
      * LID-addressed, otherwise {@code false}
-     *
-     * @implNote Adapts {@code WAWebWamMsgUtils.msgIsLid}. The
-     * {@code chatType.isGroup() / chatType.isStatus()} branch checks are
-     * recovered here through the WAM {@link MessageType} classification
-     * already produced by {@link #getWamMessageType(Jid)}, so callers do
-     * not need a {@code Wid}-style helper. The fall-through case checks
-     * both endpoints, matching WA Web's {@code e.from.isLid() || e.to.isLid()}.
      */
     @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "msgIsLid",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -1938,9 +1928,6 @@ public final class WamService {
      * extension. Unknown extensions fall back to
      * {@link DocumentType#OTHER} with an empty {@code documentExt}, again
      * mirroring WA Web.
-     *
-     * @implNote WAWebProcessRawMediaLogging: module-level {@code Map}
-     * literal that seeds the classification.
      */
     @WhatsAppWebExport(moduleName = "WAWebProcessRawMediaLogging", exports = "default",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -2041,11 +2028,6 @@ public final class WamService {
      *                   empty string, matching WA Web's
      *                   {@code e?.split(".").pop() ?? ""} fallback
      * @param size       the raw decrypted document size in bytes
-     *
-     * @implNote WAWebProcessRawMediaLogging.logSendDocumentEvent: the
-     * single call site that constructs and commits the event, invoked by
-     * {@code WAWebProcessRawMedia.processRawMedia} when the selected
-     * media is classified as {@code "document"}.
      */
     @WhatsAppWebExport(moduleName = "WAWebProcessRawMediaLogging", exports = "logSendDocumentEvent",
             adaptation = WhatsAppAdaptation.DIRECT)

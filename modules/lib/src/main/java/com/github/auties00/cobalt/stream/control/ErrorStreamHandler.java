@@ -23,16 +23,6 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * tag inside {@link SocketStream}, mirroring the
  * {@code WAWebCommsHandleLoggedInStanza} switch arm
  * {@code case "error": return WABackendHandleError.handleError(e)}.
- *
- * @implNote WA Web wraps the parser in a {@code WADeprecatedWapParser}
- * named {@code "errorParser"} that asserts the tag and reads the
- * {@code code} attribute via {@code attrInt}; Cobalt collapses both steps
- * into the {@code handle} method below because the {@link SocketStream}
- * dispatcher already routes by tag and {@link Node#getAttributeAsInt} is
- * the equivalent attribute accessor. WA Web's {@code handleError} also
- * returns {@code Promise.resolve("NO_ACK")} so that the dispatcher does
- * not emit an XMPP ack; Cobalt's dispatcher never auto-acks, so no
- * equivalent token is needed.
  */
 @WhatsAppWebModule(moduleName = "WABackendHandleError")
 public final class ErrorStreamHandler implements SocketStream.Handler {
@@ -44,9 +34,6 @@ public final class ErrorStreamHandler implements SocketStream.Handler {
     /**
      * Reason code emitted by the server when the client sent a stanza that
      * failed validation against the server-side schema.
-     *
-     * @implNote Mirrors the {@code c.SMAX_INVALID = 479} constant defined
-     * at the top of {@code WABackendHandleError}.
      */
     @WhatsAppWebExport(moduleName = "WABackendHandleError", exports = "SMAX_INVALID", adaptation = WhatsAppAdaptation.DIRECT)
     private static final int SMAX_INVALID_CODE = 479;
@@ -80,17 +67,11 @@ public final class ErrorStreamHandler implements SocketStream.Handler {
      * </ul>
      *
      * @param node the {@code <error>} stanza received from the server
-     * @implNote WA Web's {@code handleError} returns
-     * {@code Promise.resolve("NO_ACK")} so that the surrounding
-     * {@code WAWebCommsHandleLoggedInStanza} dispatcher suppresses the
-     * automatic XMPP ack. Cobalt's {@link SocketStream} dispatcher does
-     * not auto-ack any stanza, so the {@code "NO_ACK"} token is dropped
-     * (see the class-level javadoc).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WABackendHandleError", exports = "handleError", adaptation = WhatsAppAdaptation.ADAPTED)
     public void handle(Node node) {
-        var code = node.getAttributeAsInt("code", (Integer) null);
+        var code = node.getAttributeAsInt("code", null);
         if (code == null) {
             // Cobalt logs and returns so that a malformed error stanza never propagates; WA Web's parser would throw XmppParsingFailure.
             LOGGER.log(System.Logger.Level.WARNING, "Received error stanza without code: {0}", node);

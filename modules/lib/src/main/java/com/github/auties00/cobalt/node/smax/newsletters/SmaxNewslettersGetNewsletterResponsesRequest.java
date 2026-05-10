@@ -152,19 +152,6 @@ public final class SmaxNewslettersGetNewsletterResponsesRequest implements SmaxO
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <question_responses>} payload
-     *
-     * @implNote {@code WASmaxOutNewslettersGetNewsletterResponsesRequest.makeGetNewsletterResponsesRequest}
-     *           composes
-     *           {@code WASmaxOutNewslettersNewsletterIQGetRequestMixin}
-     *           ({@code <iq to=NEWSLETTER_JID xmlns="newsletter">})
-     *           with {@code WASmaxOutNewslettersBaseIQGetRequestMixin}
-     *           ({@code id=generateId() type="get"}) over a
-     *           {@code <question_responses server_id count>} root,
-     *           then layers
-     *           {@code mergeBeforeQuestionResponseMixinMixin},
-     *           {@code mergeFilterQuestionResponseMixinMixin}, and
-     *           {@code mergeSearchQuestionResponseMixinMixin} as
-     *           optional attribute / sibling overlays.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersGetNewsletterResponsesRequest",

@@ -67,11 +67,6 @@ public final class IqJoinGroupByInviteCodeRequest implements IqOperation.Request
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <invite>} payload
-     *
-     * @implNote {@code WAWebGroupInviteJob.joinGroupViaInvite}:
-     *           {@code wap("iq",{type:"set", xmlns:"w:g2",
-     *           to:G_US, id}, wap("invite",
-     *           {code:CUSTOM_STRING(e)}))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebGroupInviteJob",

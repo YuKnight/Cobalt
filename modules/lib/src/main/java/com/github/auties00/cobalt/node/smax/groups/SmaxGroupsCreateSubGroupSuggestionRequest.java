@@ -72,15 +72,6 @@ public final class SmaxGroupsCreateSubGroupSuggestionRequest implements SmaxOper
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <sub_group_suggestion/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsCreateSubGroupSuggestionRequest.makeCreateSubGroupSuggestionRequest}
-     *           composes
-     *           {@code WASmaxOutGroupsBaseSetGroupMixin} over a
-     *           {@code <sub_group_suggestion/>} root that gets merged
-     *           with either the new-group or existing-groups mixin.
-     *           Cobalt builds the same shape inline; the
-     *           {@code id} attribute is injected by
-     *           {@code WhatsAppClient.sendNode}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsCreateSubGroupSuggestionRequest",

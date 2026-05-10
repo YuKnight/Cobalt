@@ -120,9 +120,6 @@ public final class UsyncFeatureProtocol implements UsyncProtocol {
     /**
      * Enumerates every feature key the relay currently understands inside the
      * {@code <feature>} query.
-     *
-     * @implNote The JS counterpart is module-level constant {@code s} in
-     *     {@code WAWebUsyncFeature}.
      */
     @WhatsAppWebModule(moduleName = "WAWebUsyncFeature")
     public enum FeatureQuery {

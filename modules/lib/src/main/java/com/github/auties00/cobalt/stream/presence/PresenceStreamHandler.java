@@ -71,7 +71,6 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
      * </ol>
      *
      * @param node the non-{@code null} presence stanza node
-     * @implNote WA Web's handler also dispatches GroupAvailable and GroupUnavailable variants to WAWebChangeGroupPresenceHandlerAction; Cobalt does not model group-presence counts (the server emits them only for UI participant-count badges) so those branches are absent.
      */
     @WhatsAppWebExport(moduleName = "WAWebHandlePresence", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -210,7 +209,6 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
      *
      * @param conversation the JID of the conversation where the presence changed
      * @param participant  the JID of the participant whose presence changed
-     * @implNote WA Web's non-group presence update triggers UI refresh via model observation; Cobalt uses an explicit listener notification.
      */
     private void notifyPresence(Jid conversation, Jid participant) {
         for (var listener : whatsapp.store().listeners()) {

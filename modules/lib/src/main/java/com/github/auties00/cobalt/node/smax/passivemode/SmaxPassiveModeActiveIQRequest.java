@@ -3,13 +3,9 @@ package com.github.auties00.cobalt.node.smax.passivemode;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import java.util.Objects;
-import java.util.Optional;
 
 /**
  * The outbound stanza variant. Wraps the bare {@code <active/>} payload
@@ -30,10 +26,6 @@ public final class SmaxPassiveModeActiveIQRequest implements SmaxOperation.Reque
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <active/>} payload
-     *
-     * @implNote {@code WASmaxOutPassiveModeActiveIQRequest.makeActiveIQRequest}
-     *           emits {@code <iq id=generateId() type="set"
-     *           xmlns="passive" to=S_WHATSAPP_NET><active/></iq>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutPassiveModeActiveIQRequest",

@@ -51,12 +51,6 @@ public final class SmaxGroupsGetReportedMessagesRequest implements SmaxOperation
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         {@code <reports/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsGetReportedMessagesRequest.makeGetReportedMessagesRequest}
-     *           wraps a bare {@code <reports/>} in
-     *           {@code WASmaxOutGroupsBaseGetGroupMixin}
-     *           ({@code xmlns="w:g2"}, {@code to=GROUP_JID(t)},
-     *           {@code id=generateId()}, {@code type="get"}).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGetReportedMessagesRequest",

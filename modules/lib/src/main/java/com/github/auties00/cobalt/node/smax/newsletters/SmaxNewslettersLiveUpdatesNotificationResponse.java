@@ -16,13 +16,6 @@ import java.util.Optional;
  * The inbound notification. The relay's "your newsletter has new
  * messages" hint carrying the affected newsletter JID, optional
  * timestamp, and the affected {@code <message>} entries.
- *
- * @implNote {@code WASmaxInNewslettersLiveUpdatesNotificationRequest.parseLiveUpdatesNotificationRequest}
- *           validates the {@code <notification type="newsletter"
- *           from=NEWSLETTER_JID>} envelope, extracts the
- *           {@code <live_updates><messages>} child, and projects every
- *           {@code <message>} grandchild via
- *           {@code parseNewsletterMessageHistoryWithAddOnsMixin}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxInNewslettersLiveUpdatesNotificationRequest")
 @WhatsAppWebModule(moduleName = "WASmaxInNewslettersCommonNotificationMixin")
@@ -219,15 +212,6 @@ public final class SmaxNewslettersLiveUpdatesNotificationResponse implements Sma
     /**
      * One newsletter message entry carried in the live-updates
      * delta.
-     *
-     * @implNote {@code WASmaxInNewslettersNewsletterMessageHistoryWithAddOnsMixin.parseNewsletterMessageHistoryWithAddOnsMixin}
-     *           composes
-     *           {@code parseNewsletterMessageHistoryMixin} (id /
-     *           server_id / t / is_sender / optional history-content)
-     *           with the optional add-on mixins (reactions,
-     *           poll-votes, responses count, forwards count, views).
-     *           Cobalt projects the top-level scalars and exposes the
-     *           raw {@link Node} for downstream add-on parsing.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersNewsletterMessageHistoryWithAddOnsMixin")
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersNewsletterMessageHistoryMixin")

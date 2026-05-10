@@ -121,15 +121,6 @@ public final class SmaxGroupsSubGroupSuggestionsActionRequest implements SmaxOpe
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <sub_group_suggestions_action/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsSubGroupSuggestionsActionRequest.makeSubGroupSuggestionsActionRequest}
-     *           composes
-     *           {@code WASmaxOutGroupsBaseSetGroupMixin} over a
-     *           {@code <sub_group_suggestions_action/>} root with
-     *           up to three optional children:
-     *           {@code <approve/>}, {@code <reject/>},
-     *           {@code <cancel/>}, each carrying 1..1000 repeated
-     *           {@code <sub_group_suggestion/>} entries.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsSubGroupSuggestionsActionRequest",

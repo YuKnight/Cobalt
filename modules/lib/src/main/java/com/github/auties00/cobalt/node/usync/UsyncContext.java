@@ -25,10 +25,6 @@ public enum UsyncContext {
     /**
      * Interactive context. The user is waiting on the result of this query and
      * backoff is skipped entirely.
-     *
-     * @implNote {@code WAWebUsyncBackoff.waitForBackoff} returns a resolved
-     *     promise without consulting the per-protocol backoff map when the
-     *     context equals {@code "interactive"}.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery", adaptation = WhatsAppAdaptation.DIRECT)
@@ -38,10 +34,6 @@ public enum UsyncContext {
      * Outbound-message context. Used when the query is needed to encrypt an
      * outgoing message. The {@code devices} protocol is exempt from backoff
      * because failing here would block the send.
-     *
-     * @implNote The combination of {@code context="message"} and the
-     *     {@code devices} protocol bypasses the backoff timer in
-     *     {@code WAWebUsyncBackoff.waitForBackoff}.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsyncBackoff",
             exports = "waitForBackoff", adaptation = WhatsAppAdaptation.DIRECT)
@@ -58,9 +50,6 @@ public enum UsyncContext {
     /**
      * Background context. The query was issued by an idle task and the client
      * is willing to wait through any per-protocol backoff.
-     *
-     * @implNote Emitted by background syncs such as
-     *     {@code WAWebSyncContactsJob} during periodic refreshes.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery", adaptation = WhatsAppAdaptation.DIRECT)
@@ -69,9 +58,6 @@ public enum UsyncContext {
     /**
      * Notification context. Used for queries triggered by an inbound
      * notification stanza such as account-sync.
-     *
-     * @implNote Emitted by {@code WAWebHandleAccountSyncNotification} when a
-     *     notification forces a re-fetch.
      */
     @WhatsAppWebExport(moduleName = "WAWebUsync",
             exports = "USyncQuery", adaptation = WhatsAppAdaptation.DIRECT)

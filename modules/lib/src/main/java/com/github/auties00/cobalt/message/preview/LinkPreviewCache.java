@@ -25,22 +25,12 @@ import java.util.concurrent.ConcurrentMap;
  * {@code Map} usage. Real-world session lifetimes keep memory pressure
  * low; if it ever becomes a concern the implementation can swap in a
  * size-bounded eviction policy without touching the call sites.
- *
- * @implNote WAWebLinkPreviewCache: exposes
- *           {@code getPreviewCache}/{@code clearPreviewCache} and the
- *           newsletter-specific pair.
  */
 @WhatsAppWebModule(moduleName = "WAWebLinkPreviewCache")
 final class LinkPreviewCache {
     /**
      * Marker stored when a URL has been resolved but produced no
      * preview, so subsequent lookups short-circuit without re-fetching.
-     *
-     * @implNote WAWebLinkPreviewCache: the JS module stores
-     *           {@code undefined} on the Map for this case; Cobalt
-     *           cannot distinguish "missing key" from
-     *           "stored undefined" with {@link ConcurrentHashMap}, so a
-     *           sentinel preview object is used.
      */
     private static final ExtendedTextMessage NEGATIVE = new ExtendedTextMessageBuilder().build();
 
@@ -70,11 +60,6 @@ final class LinkPreviewCache {
      *                       newsletter chat
      * @return the cached preview, or {@link Optional#empty()} when the
      *         URL has not been resolved yet
-     * @implNote WAWebLinkPreviewCache.getPreviewCache /
-     *           getNewsletterPreviewCache: the JS callers do
-     *           {@code cache.has(url) ? cache.get(url) : ...}; Cobalt
-     *           collapses the two-step lookup into one return value
-     *           and uses a sentinel for negative caching.
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewCache", exports = "getPreviewCache",
             adaptation = WhatsAppAdaptation.ADAPTED)

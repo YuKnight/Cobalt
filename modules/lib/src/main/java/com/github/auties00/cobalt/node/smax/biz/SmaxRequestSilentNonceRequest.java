@@ -62,25 +62,22 @@ public final class SmaxRequestSilentNonceRequest implements SmaxOperation.Reques
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WASmaxOutBizAccessTokenRequestSilentNonceRequest.makeRequestSilentNonceRequest}
-     *           composes {@code WASmaxOutBizAccessTokenHackBaseIQGetRequestMixin}
-     *           ({@code from=USER_JID(t)?}, {@code to=S_WHATSAPP_NET})
-     *           over a bare {@code <iq xmlns="fb:thrift_iq">} with
-     *           {@code id=generateId()}, {@code type="get"} from the
-     *           {@code BaseIQGetRequestMixin}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBizAccessTokenRequestSilentNonceRequest",
             exports = "makeRequestSilentNonceRequest", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizAccessTokenHackBaseIQGetRequestMixin",
+            exports = "mergeHackBaseIQGetRequestMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizAccessTokenBaseIQGetRequestMixin",
+            exports = "mergeBaseIQGetRequestMixin", adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
         var builder = new NodeBuilder()
                 .description("iq")
-                .attribute("xmlns", "fb:thrift_iq")
-                .attribute("to", JidServer.user())
-                .attribute("type", "get");
+                .attribute("xmlns", "fb:thrift_iq") // WASmaxOutBizAccessTokenRequestSilentNonceRequest.makeRequestSilentNonceRequest: smax("iq", {xmlns: "fb:thrift_iq", smax_id: INT(118)})
+                .attribute("to", JidServer.user()) // WASmaxOutBizAccessTokenHackBaseIQGetRequestMixin.mergeHackBaseIQGetRequestMixin: to: WAWap.S_WHATSAPP_NET
+                .attribute("type", "get"); // WASmaxOutBizAccessTokenBaseIQGetRequestMixin.mergeBaseIQGetRequestMixin: type: "get" (id: generateId() is set by WhatsAppClient.sendNode dispatcher)
         if (fromUserJid != null) {
-            builder.attribute("from", fromUserJid);
+            builder.attribute("from", fromUserJid); // WASmaxOutBizAccessTokenHackBaseIQGetRequestMixin.mergeHackBaseIQGetRequestMixin: from: OPTIONAL(USER_JID, t)
         }
         return builder;
     }

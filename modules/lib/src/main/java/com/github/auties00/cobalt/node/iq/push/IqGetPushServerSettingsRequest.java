@@ -25,11 +25,6 @@ public final class IqGetPushServerSettingsRequest implements IqOperation.Request
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <settings/>} payload
-     *
-     * @implNote {@code WAWebGetPushServerSettingsJob} composes the IQ
-     *           via {@code WAWap.wap("iq", {to:S_WHATSAPP_NET,
-     *           type:"get", xmlns:"urn:xmpp:whatsapp:push", id},
-     *           wap("settings", null))}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebGetPushServerSettingsJob",

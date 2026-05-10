@@ -6,12 +6,7 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -19,11 +14,6 @@ import java.util.Optional;
  * Typed projection of a single {@code <media iv cipherKey type?
  * fileName?>{bytes}</media>} attachment carried by a
  * {@link SmaxBugReportingReportBugRequest}.
- *
- * @implNote {@code WASmaxOutBugReportingReportBugRequest.makeReportBugRequestMedia}
- *           emits the stanza shape. Cobalt models the
- *           {@code (iv, cipherKey, type?, fileName?, bytes)} tuple
- *           as a value-class field bundle.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutBugReportingReportBugRequest")
 public final class SmaxBugReportingReportBugMediaUpload {

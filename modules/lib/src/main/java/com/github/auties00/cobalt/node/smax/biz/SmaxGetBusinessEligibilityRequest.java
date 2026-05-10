@@ -3,22 +3,21 @@ package com.github.auties00.cobalt.node.smax.biz;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalInt;
 
 /**
  * The outbound stanza variant. Wraps the {@code <features/>} payload
- * in the canonical {@code <iq xmlns="w:biz" type="get">} envelope.
+ * in the canonical
+ * {@code <iq xmlns="w:biz" type="get" to="s.whatsapp.net">} envelope.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutBizMarketingMessageGetBusinessEligibilityRequest")
 @WhatsAppWebModule(moduleName = "WASmaxOutBizMarketingMessageHackBaseIQGetRequestMixin")
+@WhatsAppWebModule(moduleName = "WASmaxOutBizMarketingMessageBaseIQGetRequestMixin")
 public final class SmaxGetBusinessEligibilityRequest implements SmaxOperation.Request {
     /**
      * The optional {@code meta_verified} attribute toggle on the
@@ -37,14 +36,27 @@ public final class SmaxGetBusinessEligibilityRequest implements SmaxOperation.Re
     private final String featuresGenai;
 
     /**
-     * Constructs a request with all three feature toggles unset.
+     * The optional {@code from} attribute echoed onto the outbound IQ
+     * via the {@code HackBaseIQGetRequestMixin}. The active user JID
+     * is the only legal value; {@code null} omits the attribute, which
+     * is the default behavior because the upstream RPC
+     * ({@code WASmaxBizMarketingMessageGetBusinessEligibilityRPC.sendGetBusinessEligibilityRPC})
+     * never propagates an {@code iqFrom} into
+     * {@code makeGetBusinessEligibilityRequest}.
+     */
+    private final Jid fromUserJid;
+
+    /**
+     * Constructs a request with all three feature toggles unset and no
+     * {@code from} echo.
      */
     public SmaxGetBusinessEligibilityRequest() {
-        this(null, null, null);
+        this(null, null, null, null);
     }
 
     /**
-     * Constructs a request.
+     * Constructs a request with the three optional feature toggles and
+     * no {@code from} echo.
      *
      * @param featuresMetaVerified      the optional Meta-Verified
      *                                  toggle attribute; may be
@@ -60,9 +72,35 @@ public final class SmaxGetBusinessEligibilityRequest implements SmaxOperation.Re
     public SmaxGetBusinessEligibilityRequest(String featuresMetaVerified,
                    String featuresMarketingMessages,
                    String featuresGenai) {
+        this(featuresMetaVerified, featuresMarketingMessages, featuresGenai, null);
+    }
+
+    /**
+     * Constructs a request with the three optional feature toggles and
+     * an optional {@code from} echo.
+     *
+     * @param featuresMetaVerified      the optional Meta-Verified
+     *                                  toggle attribute; may be
+     *                                  {@code null}
+     * @param featuresMarketingMessages the optional
+     *                                  marketing-messages toggle
+     *                                  attribute; may be
+     *                                  {@code null}
+     * @param featuresGenai             the optional GenAI toggle
+     *                                  attribute; may be
+     *                                  {@code null}
+     * @param fromUserJid               the optional user JID to echo
+     *                                  onto the {@code from}
+     *                                  attribute; may be {@code null}
+     */
+    public SmaxGetBusinessEligibilityRequest(String featuresMetaVerified,
+                   String featuresMarketingMessages,
+                   String featuresGenai,
+                   Jid fromUserJid) {
         this.featuresMetaVerified = featuresMetaVerified;
         this.featuresMarketingMessages = featuresMarketingMessages;
         this.featuresGenai = featuresGenai;
+        this.fromUserJid = fromUserJid;
     }
 
     /**
@@ -96,22 +134,28 @@ public final class SmaxGetBusinessEligibilityRequest implements SmaxOperation.Re
     }
 
     /**
+     * Returns the optional {@code from} echo.
+     *
+     * @return an {@link Optional} carrying the user JID, or empty when
+     *         no echo was supplied
+     */
+    public Optional<Jid> fromUserJid() {
+        return Optional.ofNullable(fromUserJid);
+    }
+
+    /**
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and
      *         the {@code <features/>} payload
-     *
-     * @implNote {@code WASmaxOutBizMarketingMessageGetBusinessEligibilityRequest.makeGetBusinessEligibilityRequest}
-     *           composes
-     *           {@code WASmaxOutBizMarketingMessageHackBaseIQGetRequestMixin}
-     *           ({@code id=generateId()}, {@code type="get"}) over a
-     *           bare {@code <iq xmlns="w:biz" smax_id=139>} root
-     *           that carries a single {@code <features/>} child with
-     *           up to three optional attributes.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBizMarketingMessageGetBusinessEligibilityRequest",
             exports = "makeGetBusinessEligibilityRequest", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizMarketingMessageHackBaseIQGetRequestMixin",
+            exports = "mergeHackBaseIQGetRequestMixin", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBizMarketingMessageBaseIQGetRequestMixin",
+            exports = "mergeBaseIQGetRequestMixin", adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
         var featuresBuilder = new NodeBuilder()
                 .description("features");
@@ -125,11 +169,15 @@ public final class SmaxGetBusinessEligibilityRequest implements SmaxOperation.Re
             featuresBuilder.attribute("genai", featuresGenai);
         }
         var featuresNode = featuresBuilder.build();
-        return new NodeBuilder()
+        var builder = new NodeBuilder()
                 .description("iq")
-                .attribute("xmlns", "w:biz")
-                .attribute("type", "get")
-                .content(featuresNode);
+                .attribute("xmlns", "w:biz") // WASmaxOutBizMarketingMessageGetBusinessEligibilityRequest.makeGetBusinessEligibilityRequest: smax("iq", {xmlns: "w:biz", smax_id: INT(139)})
+                .attribute("to", JidServer.user()) // WASmaxOutBizMarketingMessageHackBaseIQGetRequestMixin.mergeHackBaseIQGetRequestMixin: to: WAWap.S_WHATSAPP_NET
+                .attribute("type", "get"); // WASmaxOutBizMarketingMessageBaseIQGetRequestMixin.mergeBaseIQGetRequestMixin: type: "get" (id=generateId() delegated to WhatsAppClient.sendNode)
+        if (fromUserJid != null) {
+            builder.attribute("from", fromUserJid); // WASmaxOutBizMarketingMessageHackBaseIQGetRequestMixin.mergeHackBaseIQGetRequestMixin: from: OPTIONAL(USER_JID, t)
+        }
+        return builder.content(featuresNode);
     }
 
     @Override
@@ -143,18 +191,20 @@ public final class SmaxGetBusinessEligibilityRequest implements SmaxOperation.Re
         var that = (SmaxGetBusinessEligibilityRequest) obj;
         return Objects.equals(this.featuresMetaVerified, that.featuresMetaVerified)
                 && Objects.equals(this.featuresMarketingMessages, that.featuresMarketingMessages)
-                && Objects.equals(this.featuresGenai, that.featuresGenai);
+                && Objects.equals(this.featuresGenai, that.featuresGenai)
+                && Objects.equals(this.fromUserJid, that.fromUserJid);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(featuresMetaVerified, featuresMarketingMessages, featuresGenai);
+        return Objects.hash(featuresMetaVerified, featuresMarketingMessages, featuresGenai, fromUserJid);
     }
 
     @Override
     public String toString() {
         return "SmaxGetBusinessEligibilityRequest[featuresMetaVerified=" + featuresMetaVerified
                 + ", featuresMarketingMessages=" + featuresMarketingMessages
-                + ", featuresGenai=" + featuresGenai + ']';
+                + ", featuresGenai=" + featuresGenai
+                + ", fromUserJid=" + fromUserJid + ']';
     }
 }

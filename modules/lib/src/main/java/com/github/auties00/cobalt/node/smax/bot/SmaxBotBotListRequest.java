@@ -5,12 +5,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
-import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
-import com.github.auties00.cobalt.node.smax.util.SmaxBaseServerErrorMixin;
-import com.github.auties00.cobalt.node.smax.util.SmaxIqResultResponseMixin;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -95,6 +91,15 @@ public final class SmaxBotBotListRequest implements SmaxOperation.Request {
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutBotBotListRequest",
             exports = "makeBotListRequest", adaptation = WhatsAppAdaptation.DIRECT)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBotBotListRequest",
+            exports = "makeBotListRequestBotBot",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBotBotListIQMixin",
+            exports = "mergeBotListIQMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxOutBotBaseIQGetRequestMixin",
+            exports = "mergeBaseIQGetRequestMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
     public NodeBuilder toNode() {
         var topBotBuilder = new NodeBuilder()
                 .description("bot");
@@ -104,6 +109,9 @@ public final class SmaxBotBotListRequest implements SmaxOperation.Request {
         if (botBhash != null) {
             topBotBuilder.attribute("bhash", botBhash);
         }
+        // ADAPTED: WASmaxOutBotBotListRequest.makeBotListRequestBotBot inlined
+        // as a loop body — the WA helper builds <bot jid="..."/> per botArg
+        // and is consumed only via REPEATED_CHILD here.
         for (var argJid : botArgs) {
             var argNode = new NodeBuilder()
                     .description("bot")
@@ -114,9 +122,9 @@ public final class SmaxBotBotListRequest implements SmaxOperation.Request {
         // smax("iq", {to: S_WHATSAPP_NET, xmlns: "bot", id: generateId(), type: "get"})
         return new NodeBuilder()
                 .description("iq")
-                .attribute("xmlns", "bot")
-                .attribute("to", JidServer.user())
-                .attribute("type", "get")
+                .attribute("xmlns", "bot") // WASmaxOutBotBotListIQMixin.mergeBotListIQMixin: xmlns: "bot"
+                .attribute("to", JidServer.user()) // WASmaxOutBotBotListIQMixin.mergeBotListIQMixin: to: WAWap.S_WHATSAPP_NET
+                .attribute("type", "get") // WASmaxOutBotBaseIQGetRequestMixin.mergeBaseIQGetRequestMixin: type: "get" (id=generateId() delegated to WhatsAppClient.sendNode)
                 .content(topBotBuilder.build());
     }
 

@@ -14,10 +14,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -36,58 +33,40 @@ import java.util.logging.Logger;
  * which are AB prop-based runtime checks. In Cobalt, these are adapted to a
  * {@code DeviceCapabilities.AiThread.SupportLevel} check since Cobalt does not
  * have an AB props subsystem.
- *
- * @implNote WAWebAiThreadDeleteSync.default singleton instance of the handler class
- *           that extends {@code WAWebSyncdAction.ChatSyncdActionBase}
  */
 @WhatsAppWebModule(moduleName = "WAWebAiThreadDeleteSync")
 public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
     /**
      * Logger for this handler.
-     *
-     * @implNote ADAPTED: WAWebAiThreadDeleteSync uses WALogger; Cobalt uses java.util.logging
      */
     private static final Logger LOGGER = Logger.getLogger(AiThreadDeleteHandler.class.getName());
 
     /**
      * Canonical WhatsApp Web action name for the AI thread delete action type.
-     *
-     * @implNote WAWebAiThreadDeleteSync.getAction returns
-     *           {@code WASyncdConst.Actions.AiThreadDelete} which is {@code "ai_thread_delete"}
      */
     @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public static final String ACTION_NAME = "ai_thread_delete";
 
     /**
      * Canonical WhatsApp Web mutation format version for this action type.
-     *
-     * @implNote WAWebAiThreadDeleteSync.getVersion returns {@code 7}
      */
     @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public static final int ACTION_VERSION = 7;
 
     /**
      * Canonical WhatsApp Web collection name for this action type.
-     *
-     * @implNote WAWebAiThreadDeleteSync constructor sets {@code collectionName}
-     *           to {@code WASyncdConst.CollectionName.RegularHigh}
      */
     @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR_HIGH;
 
     /**
      * Singleton instance of this handler.
-     *
-     * @implNote WAWebAiThreadDeleteSync the module creates a single instance
-     *           ({@code new u()}) and exports it as the default export
      */
     @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final AiThreadDeleteHandler INSTANCE = new AiThreadDeleteHandler();
 
     /**
      * Constructs the singleton AI thread delete handler.
-     *
-     * @implNote WAWebAiThreadDeleteSync private constructor for singleton pattern
      */
     @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private AiThreadDeleteHandler() {
@@ -96,9 +75,6 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the action type name this handler processes.
-     *
-     * @implNote WAWebAiThreadDeleteSync.getAction returns
-     *           {@code WASyncdConst.Actions.AiThreadDelete} ({@code "ai_thread_delete"})
      * @return the action type name
      */
     @Override
@@ -109,9 +85,6 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the sync collection this handler's action belongs to.
-     *
-     * @implNote WAWebAiThreadDeleteSync constructor sets {@code collectionName}
-     *           to {@code WASyncdConst.CollectionName.RegularHigh}
      * @return the sync patch type / collection name
      */
     @Override
@@ -122,31 +95,12 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
 
     /**
      * Returns the mutation format version for this handler.
-     *
-     * @implNote WAWebAiThreadDeleteSync.getVersion returns {@code 7}
      * @return the handler's supported mutation version
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     public int version() {
         return ACTION_VERSION;
-    }
-
-    /**
-     * Applies a single AI thread delete mutation to local state.
-     *
-     * <p>Delegates to {@link #applyMutationResult(WhatsAppClient, DecryptedMutation.Trusted)}
-     * and returns {@code true} if the result is {@link SyncActionState#SUCCESS}.
-     *
-     * @implNote WAWebAiThreadDeleteSync.applyMutations per-mutation application logic
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was applied successfully, {@code false} otherwise
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
     }
 
     /**
@@ -167,16 +121,13 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
      *
      * <p>Any exception thrown inside the block is caught and reported as
      * {@link SyncActionState#FAILED}, mirroring WA Web's {@code catch(e) { return {actionState: Failed} }}.
-     *
-     * @implNote WAWebAiThreadDeleteSync.applyMutations the per-mutation handler within
-     *           the Promise.all mapping function
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
@@ -184,19 +135,19 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
 
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() < 3) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chatJidString = indexArray.getString(1);
             var threadId = indexArray.getString(2);
             if (chatJidString == null || chatJidString.isBlank()
                     || threadId == null || threadId.isBlank()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chatJid = Jid.of(chatJidString);
             if (!chatJid.isBot()) {
-                return malformedActionIndex();
+                return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             // ADAPTED: WAWebAiThreadDeleteSync.applyMutations — WA Web checks isBotEnabled() && isAiChatThreadsInfraEnabled()
@@ -213,10 +164,9 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
 
             // ADAPTED: WAWebAiThreadDeleteSync.applyMutations — WA Web calls
             // createAiThreadFromMutationIndex(botWid, threadId) then resolveThreadForMutationIndex(thread).
-            // Cobalt collapses WA Web's ThreadsMetadata IDB table into the aiThreadTitles map.
-            var titles = new HashMap<>(client.store().aiThreadTitles());
+            // Cobalt collapses WA Web's ThreadsMetadata IDB table into the aiThreadTitles store.
             var key = chatJidString + "|" + threadId;
-            if (!titles.containsKey(key)) {
+            if (client.store().findAiThreadTitle(key).isEmpty()) {
                 // WA Web uses SyncModelType.Thread for orphan model type.
                 return MutationApplicationResult.orphan(key, "Thread");
             }
@@ -224,10 +174,9 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
             // ADAPTED: WAWebAiThreadDeleteSync.$AiThreadDeleteSync$p_1 — WA Web calls
             // bulkDeleteThreads(botWid, [thread]) which deletes metadata and messages from IDB,
             // then fires frontendFireAndForget("deleteChatAiThreads", {chatId, threadIds, msgIds}).
-            // Cobalt removes from the flat aiThreadTitles store map; the frontend notification
+            // Cobalt removes from the flat aiThreadTitles store; the frontend notification
             // is intentionally omitted because Cobalt has no browser frontend bridge.
-            titles.remove(key);
-            client.store().setAiThreadTitles(titles);
+            client.store().removeAiThreadTitle(key);
             return MutationApplicationResult.success();
         } catch (Exception e) {
             LOGGER.warning("AI thread delete mutation failed: " + e.getMessage());
@@ -243,11 +192,6 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
      * mutation at {@code ["ai_thread_delete", botJid, threadId]} in the
      * REGULAR_HIGH collection with {@code version = 7}. The action has no
      * dedicated sub-message payload the index alone identifies the thread.
-     *
-     * @implNote WAWebAiThreadDeleteSync outgoing SET mutation. The WA Web
-     *           {@code ai_thread_delete} action carries no value payload, so
-     *           the {@link SyncActionValueBuilder} is populated with only the
-     *           timestamp
      * @param chatJid  the bot JID owning the thread
      * @param threadId the AI thread identifier
      * @return the pending mutation ready to be pushed via

@@ -1,20 +1,17 @@
 package com.github.auties00.cobalt.props;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.exception.WhatsAppServerRuntimeException;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -42,10 +39,15 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @WhatsAppWebModule(moduleName = "WAWebAbPropsSyncJob")
 @WhatsAppWebModule(moduleName = "WAGetAbPropsProtocol")
+@WhatsAppWebModule(moduleName = "WAGetGroupAbPropsProtocol")
 @WhatsAppWebModule(moduleName = "WAWebApiAbPropConfig")
 @WhatsAppWebModule(moduleName = "WAWebApiAbPropEventSamplingConfig")
 @WhatsAppWebModule(moduleName = "WAWebABPropsLocalStorage")
 @WhatsAppWebModule(moduleName = "WAWebABPropsParseConfigValue")
+@WhatsAppWebModule(moduleName = "WASmaxInAbPropsSamplingConfigMixin")
+@WhatsAppWebModule(moduleName = "WASmaxInAbPropsConfigs")
+@WhatsAppWebModule(moduleName = "WASmaxInAbPropsExperimentOrSamplingConfigMixinGroup")
+@WhatsAppWebModule(moduleName = "WASmaxInAbPropsEnums")
 public final class ABPropsService {
     /**
      * Logger used for sync-cycle warnings, errors, and informational diagnostics.
@@ -85,6 +87,33 @@ public final class ABPropsService {
     private static final long REFRESH_DEFAULT_SECONDS = 86400L;
 
     /**
+     * Inclusive lower bound, in events, accepted for the {@code event_code}
+     * attribute on {@code SamplingConfig} {@code <prop>} children.
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxInAbPropsSamplingConfigMixin",
+            exports = "parseSamplingConfigMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static final int SAMPLING_EVENT_CODE_MIN = 1;
+
+    /**
+     * Inclusive lower bound accepted for the {@code sampling_weight}
+     * attribute on {@code SamplingConfig} {@code <prop>} children.
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxInAbPropsSamplingConfigMixin",
+            exports = "parseSamplingConfigMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static final int SAMPLING_WEIGHT_MIN = -10_000;
+
+    /**
+     * Inclusive upper bound accepted for the {@code sampling_weight}
+     * attribute on {@code SamplingConfig} {@code <prop>} children.
+     */
+    @WhatsAppWebExport(moduleName = "WASmaxInAbPropsSamplingConfigMixin",
+            exports = "parseSamplingConfigMixin",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static final int SAMPLING_WEIGHT_MAX = 10_000;
+
+    /**
      * Client used to issue the {@code <iq xmlns="abt">} stanza and to read or
      * mutate the AB-props slots on the shared store.
      */
@@ -105,10 +134,6 @@ public final class ABPropsService {
     /**
      * Codes of AB props that the host application has read at least once,
      * tracked for the WAM exposure-key attribute.
-     *
-     * @implNote WA Web persists the {@code hasAccessed} flag on the
-     *           IndexedDB row driving {@code expoKey}; Cobalt collapses that
-     *           on-disk flag into this set per the store-flattening pattern.
      */
     @WhatsAppWebExport(moduleName = "WAWebApiAbPropConfig", exports = "setConfigAccessed",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -176,9 +201,6 @@ public final class ABPropsService {
      * once a previous sync established it. On success the sync future is
      * completed so blocked queries can proceed; on terminal failure the
      * future is failed exceptionally.
-     *
-     * @implNote The JS export delays {@code 10 * 1000 * Math.random()}
-     *           milliseconds between attempts.
      * @param localRefreshId the refresh-id override used by the emergency
      *                       push branch, or {@code null} to take the
      *                       regular {@code propsHash} branch
@@ -230,12 +252,6 @@ public final class ABPropsService {
      * Performs a single sync round trip, choosing between the emergency
      * push branch (when {@code localRefreshId} is non-{@code null}) and the
      * regular {@code propsHash} branch.
-     *
-     * @implNote The JS export gates the emergency branch on justknobx
-     *           {@code 3330}. Cobalt does not model that server-driven
-     *           knob, so the branch is taken whenever the caller supplies a
-     *           non-{@code null} {@code localRefreshId}, matching the JS
-     *           behavior once the knob is enabled.
      * @param localRefreshId the refresh-id override that selects the
      *                       emergency push branch, or {@code null} to take
      *                       the regular branch
@@ -312,12 +328,6 @@ public final class ABPropsService {
      * the regular delta-update branch) or an optional {@code refresh_id}
      * (used by the emergency push branch). Callers normally populate
      * exactly one of the two depending on which branch they take.
-     *
-     * @implNote The stanza shape is contributed by
-     *           {@code WASmaxOutAbPropsGetExperimentConfigRequest.makeGetExperimentConfigRequest}
-     *           composed with
-     *           {@code WASmaxOutAbPropsBaseIQGetRequestMixin.mergeBaseIQGetRequestMixin},
-     *           which adds the {@code id} and {@code type="get"} attributes.
      * @param propsHash      the AB-props hash for delta updates, or
      *                       {@code null} to omit the attribute
      * @param propsRefreshId the refresh id used by the emergency push
@@ -360,16 +370,35 @@ public final class ABPropsService {
      * place even if they happen to carry sampling entries, matching the JS
      * gating on {@code !isDeltaUpdate}.
      *
-     * @implNote The {@code erid} byte blob in WA Web is persisted by
-     *           {@code WAWebEncryptedRid.setEncryptedRid} into UserPrefs.
-     *           Cobalt does not currently model that slot, so its presence
-     *           is logged for observability but otherwise ignored.
+     * <p>{@code SamplingConfig} entries are accepted only when
+     * {@code event_code >= }{@value #SAMPLING_EVENT_CODE_MIN} and
+     * {@code sampling_weight} lies in
+     * [{@value #SAMPLING_WEIGHT_MIN}, {@value #SAMPLING_WEIGHT_MAX}], matching
+     * the validation in
+     * {@code WASmaxInAbPropsSamplingConfigMixin.parseSamplingConfigMixin}.
+     *
+     * <p>Each {@code <prop>} child is dispatched through the disjunction
+     * defined in {@code WASmaxInAbPropsConfigs.parseConfigs} and the
+     * underlying {@code WASmaxInAbPropsExperimentOrSamplingConfigMixinGroup
+     * .parseExperimentOrSamplingConfigMixinGroup} wrapper: try
+     * {@code parseExperimentConfigMixin} first, fall back to
+     * {@code parseSamplingConfigMixin}, and log a warning equivalent to
+     * {@code WASmaxParseUtils.errorMixinDisjunction} when neither shape
+     * matches.
      * @param response the server response node
      * @return {@code true} when the response was parsed successfully,
      *         {@code false} when the {@code <props>} child was missing
      * @throws NullPointerException when {@code response} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebApiAbPropConfig", exports = "updateABPropConfigs",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInAbPropsSamplingConfigMixin",
+            exports = "parseSamplingConfigMixin",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInAbPropsConfigs", exports = "parseConfigs",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WASmaxInAbPropsExperimentOrSamplingConfigMixinGroup",
+            exports = "parseExperimentOrSamplingConfigMixinGroup",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean process(Node response) {
         Objects.requireNonNull(response, "response cannot be null");
@@ -390,9 +419,7 @@ public final class ABPropsService {
         var isDelta = propsNode.getAttributeAsBool("delta_update", false);
         if (!isDelta) {
             props.clear();
-            // The JS export treats a missing refresh as "no update" rather
-            // than clamping to the minimum, so null is forwarded as-is.
-            Long responseRefresh = responseRefreshOpt.isPresent() ? responseRefreshOpt.getAsLong() : null;
+            var responseRefresh = responseRefreshOpt.isPresent() ? responseRefreshOpt.getAsLong() : null;
             updateAttributesLocalStorage(responseAbKey, responseHash, responseRefresh, Instant.now());
         }
         propsNode.getAttributeAsLong("refresh_id")
@@ -413,7 +440,22 @@ public final class ABPropsService {
             var eventCode = propNode.getAttributeAsInt("event_code");
             var samplingWeight = propNode.getAttributeAsInt("sampling_weight");
             if (eventCode.isPresent() && samplingWeight.isPresent()) {
-                parsedSamplingConfigs.put(eventCode.getAsInt(), samplingWeight.getAsInt());
+                var eventCodeValue = eventCode.getAsInt();
+                var samplingWeightValue = samplingWeight.getAsInt();
+                if (eventCodeValue < SAMPLING_EVENT_CODE_MIN) {
+                    LOGGER.log(System.Logger.Level.WARNING,
+                            "Skipping SamplingConfig <prop>: event_code={0} below minimum {1}",
+                            eventCodeValue, SAMPLING_EVENT_CODE_MIN);
+                    continue;
+                }
+                if (samplingWeightValue < SAMPLING_WEIGHT_MIN
+                        || samplingWeightValue > SAMPLING_WEIGHT_MAX) {
+                    LOGGER.log(System.Logger.Level.WARNING,
+                            "Skipping SamplingConfig <prop>: sampling_weight={0} outside [{1}, {2}]",
+                            samplingWeightValue, SAMPLING_WEIGHT_MIN, SAMPLING_WEIGHT_MAX);
+                    continue;
+                }
+                parsedSamplingConfigs.put(eventCodeValue, samplingWeightValue);
                 continue;
             }
 
@@ -471,7 +513,9 @@ public final class ABPropsService {
     @WhatsAppWebExport(moduleName = "WAWebABPropsLocalStorage", exports = "getRefresh",
             adaptation = WhatsAppAdaptation.DIRECT)
     public long refresh() {
-        return client.store().abPropsRefresh();
+        return client.store()
+                .abPropsRefresh()
+                .orElse(REFRESH_DEFAULT_SECONDS);
     }
 
     /**
@@ -482,7 +526,8 @@ public final class ABPropsService {
      * @return the last sync timestamp, or empty when none has been recorded
      */
     public Optional<Instant> lastSyncTime() {
-        return client.store().abPropsLastSyncTime();
+        return client.store()
+                .abPropsLastSyncTime();
     }
 
     /**
@@ -509,10 +554,6 @@ public final class ABPropsService {
      * corresponding store field; {@code null} parameters keep the previous
      * value, matching the {@code abKey ?? m.abKey} fallback chain in the
      * JS source.
-     *
-     * @implNote The JS export clamps {@code refresh} into
-     *           {@code [REFRESH_MIN_SECONDS, REFRESH_MAX_SECONDS]} before
-     *           writing it.
      * @param abKey          the AB key to persist, or {@code null} to keep
      *                       the previous value
      * @param hash           the AB-props hash to persist, or {@code null}
@@ -532,7 +573,15 @@ public final class ABPropsService {
             store.setAbPropsHash(hash);
         }
         if (refreshSeconds != null) {
-            store.setAbPropsRefresh(refreshSeconds);
+            long clamped;
+            if (refreshSeconds < REFRESH_MIN_SECONDS) {
+                clamped = REFRESH_MIN_SECONDS;
+            } else if (refreshSeconds > REFRESH_MAX_SECONDS) {
+                clamped = REFRESH_MAX_SECONDS;
+            } else {
+                clamped = refreshSeconds;
+            }
+            store.setAbPropsRefresh(clamped);
         }
         store.setAbPropsLastSyncTime(lastSyncTime);
     }
@@ -541,16 +590,11 @@ public final class ABPropsService {
      * Returns the AB-props refresh id, used as the {@code propsRefreshId}
      * attribute on the next sync request when justknobx {@code 3330} is
      * enabled.
-     *
-     * @implNote WA Web eagerly writes {@code 0} on the first read so
-     *           subsequent reads return the same sentinel; Cobalt mirrors
-     *           this by initialising the underlying store field to
-     *           {@code 0}.
      * @return the AB-props refresh id, or {@code 0} when never set
      */
     @WhatsAppWebExport(moduleName = "WAWebABPropsLocalStorage", exports = "getRefreshId",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public long getRefreshId() {
+    public long refreshId() {
         return client.store().abPropsRefreshId();
     }
 
@@ -573,7 +617,7 @@ public final class ABPropsService {
      */
     @WhatsAppWebExport(moduleName = "WAWebABPropsLocalStorage", exports = "getWebRefreshId",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public long getWebRefreshId() {
+    public long webRefreshId() {
         return client.store().abPropsWebRefreshId();
     }
 
@@ -595,7 +639,7 @@ public final class ABPropsService {
      */
     @WhatsAppWebExport(moduleName = "WAWebABPropsLocalStorage", exports = "getGroupAbPropsRefreshId",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public long getGroupAbPropsRefreshId() {
+    public long groupAbPropsRefreshId() {
         return client.store().groupAbPropsRefreshId();
     }
 
@@ -619,7 +663,7 @@ public final class ABPropsService {
      */
     @WhatsAppWebExport(moduleName = "WAWebABPropsLocalStorage", exports = "getGroupAbPropsEmergencyPushTimestamp",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public Optional<Instant> getGroupAbPropsEmergencyPushTimestamp() {
+    public Optional<Instant> groupAbPropsEmergencyPushTimestamp() {
         return client.store().groupAbPropsEmergencyPushTimestamp();
     }
 
@@ -635,87 +679,63 @@ public final class ABPropsService {
     }
 
     /**
+     * Fetches the per-group AB-props bundle from the relay and projects
+     * the response into a typed {@link GroupAbPropsResult}.
+     *
+     * @param groupJid  the target group JID. Never {@code null}
+     * @param propsHash the cached group-props hash, or {@code null} for
+     *                  an unconditional fetch
+     * @return an {@link Optional} carrying the projected result on
+     *         success, empty on any failure variant
+     * @throws NullPointerException if {@code groupJid} is {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAGetGroupAbPropsProtocol", exports = "getGroupAbPropsProtocol",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Optional<GroupAbPropsResult> getGroupAbPropsProtocol(Jid groupJid, String propsHash) {
+        Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        try {
+            var bundle = client.fetchGroupExperimentConfig(groupJid, propsHash).orElse(null);
+            if (bundle == null) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "getGroupAbPropsProtocol failed: response did not parse as Success");
+                return Optional.empty();
+            }
+
+            var entries = new ArrayList<GroupAbPropsResult.Entry>(bundle.experiments().size());
+            for (var experiment : bundle.experiments().entrySet()) {
+                // The exposure key is dropped at the bundle layer; consumers
+                // observed via abPropConfigs() only key on configCode/configValue.
+                entries.add(new GroupAbPropsResult.Entry(experiment.getKey(), experiment.getValue(), null));
+            }
+            var result = new GroupAbPropsResult(
+                    groupJid,
+                    bundle.hash().orElse(null),
+                    bundle.refresh().orElse(null),
+                    bundle.refreshId().orElse(null),
+                    entries);
+            return Optional.of(result);
+        } catch (WhatsAppServerRuntimeException e) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "getGroupAbPropsProtocol failed: {0}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Returns an unmodifiable snapshot of every synced AB prop keyed by
      * its numeric {@code config_code}.
-     *
-     * @implNote The JS export awaits storage initialisation and returns
-     *           every row of the {@code abpropConfigs} IndexedDB table.
-     *           Cobalt collapses that table into {@link #props}, so no
-     *           initialisation await is needed.
      * @return a defensive copy of the {@code config_code -> config_value}
      *         map
      */
     @WhatsAppWebExport(moduleName = "WAWebApiAbPropConfig", exports = "getABPropConfigs",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Map<Integer, String> getABPropConfigs() {
+    public Map<Integer, String> abPropConfigs() {
         return Map.copyOf(props);
-    }
-
-    /**
-     * Coerces a raw AB-prop value to its typed default when either argument
-     * is missing.
-     *
-     * <p>The JS export dispatches on a runtime type tag and returns a
-     * heterogeneous {@code unknown}; Cobalt resolves the type at the call
-     * site through the typed accessors on this class
-     * ({@link #getBool}, {@link #getInt}, {@link #getLong},
-     * {@link #getDouble}), so this helper only applies the JS null-coalescing
-     * branch and returns the raw string otherwise.
-     *
-     * @implNote String to typed-value parsing is implemented in
-     *           {@link ABProp#toBoolean(String)},
-     *           {@link ABProp#toInt(String)},
-     *           {@link ABProp#toLong(String)}, and
-     *           {@link ABProp#toDouble(String)}.
-     * @param rawValue the raw value received from the server, possibly
-     *                 {@code null} when no override is present
-     * @param prop     the AB prop definition; when {@code null}, the JS
-     *                 function returns its {@code n} default unchanged
-     * @return the resolved value, or {@code null} when both arguments are
-     *         {@code null}
-     */
-    @WhatsAppWebExport(moduleName = "WAWebApiAbPropConfig", exports = "parseConfigValue",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    @WhatsAppWebExport(moduleName = "WAWebABPropsParseConfigValue", exports = "parseConfigValue",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public static String parseConfigValue(String rawValue, ABProp prop) {
-        if (rawValue == null || prop == null) {
-            return prop == null ? null : prop.defaultValue();
-        }
-        return rawValue;
-    }
-
-    /**
-     * Returns the raw stored value for {@code prop}, or its default when
-     * no row has been synced.
-     *
-     * @implNote The JS export keys by the prop's textual name and dispatches
-     *           through {@link #parseConfigValue(String, ABProp)}. Cobalt's
-     *           keys are {@link ABProp} constants directly (the same tuples
-     *           generated by {@code tooling/web-ab-props-extractor}), so the
-     *           runtime lookup against {@code ABPropConfigs} collapses into
-     *           the typed argument.
-     * @param prop the AB prop definition
-     * @return the raw stored value, or {@link ABProp#defaultValue()} when
-     *         no row has been synced
-     * @throws NullPointerException when {@code prop} is {@code null}
-     */
-    @WhatsAppWebExport(moduleName = "WAWebApiAbPropConfig", exports = "getConfigValue",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public String getConfigValue(ABProp prop) {
-        Objects.requireNonNull(prop, "prop cannot be null");
-        return getString(prop, true);
     }
 
     /**
      * Flags {@code prop} as having been read by the host application,
      * driving the WAM exposure-key attribute.
-     *
-     * @implNote WA Web persists {@code hasAccessed} on the on-disk row;
-     *           Cobalt collapses that flag into {@link #accessedConfigs}.
-     *           The boolean return value is {@code true} on first access
-     *           (mirroring the merge-needed branch) and {@code false} on
-     *           subsequent calls (mirroring the early-return branch).
      * @param prop the AB prop that was just read
      * @return {@code true} when this is the first access, {@code false}
      *         when the prop was already flagged
@@ -730,8 +750,7 @@ public final class ABPropsService {
 
     /**
      * Returns whether {@code prop} has previously been flagged as accessed
-     * via {@link #setConfigAccessed(ABProp)}. Provides read-side access to
-     * {@link #accessedConfigs} without exposing it for mutation.
+     * via {@link #setConfigAccessed(ABProp)}.
      *
      * @param prop the AB prop to query
      * @return {@code true} when {@link #setConfigAccessed(ABProp)} has
@@ -901,12 +920,6 @@ public final class ABPropsService {
 
     /**
      * Returns the sampling-weight override for the given WAM event code.
-     *
-     * @implNote WA Web reads a single row from the
-     *           {@code abprop-event-sampling-configs} IndexedDB table.
-     *           Cobalt collapses that table into {@link #samplingConfigs}
-     *           and returns an {@link OptionalInt} as the Java equivalent
-     *           of {@code undefined}.
      * @param eventCode the WAM event identifier
      * @return the override weight, or empty when none was synced for this
      *         event

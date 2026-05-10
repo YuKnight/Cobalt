@@ -75,13 +75,6 @@ public final class SmaxNewslettersMyAddOnsRequest implements SmaxOperation.Reque
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <my_addons/>} payload
-     *
-     * @implNote {@code WASmaxOutNewslettersMyAddOnsRequest.makeMyAddOnsRequest}
-     *           composes {@code WASmaxOutNewslettersSelfIQGetRequestMixin}
-     *           ({@code xmlns="newsletter"}, {@code to=S_WHATSAPP_NET},
-     *           {@code id=generateId()}, {@code type="get"}) over a
-     *           {@code <my_addons limit=INT(t) jid=OPTIONAL(JID, n)/>}
-     *           child.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutNewslettersMyAddOnsRequest",

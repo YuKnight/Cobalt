@@ -17,10 +17,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsAddParticipantsRequest}.
- *
- * @implNote {@code WASmaxGroupsAddParticipantsRPC.sendAddParticipantsRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError}.
  */
 public sealed interface SmaxGroupsAddParticipantsResponse extends SmaxOperation.Response
         permits SmaxGroupsAddParticipantsResponse.Success, SmaxGroupsAddParticipantsResponse.ClientError, SmaxGroupsAddParticipantsResponse.ServerError {
@@ -62,18 +58,6 @@ public sealed interface SmaxGroupsAddParticipantsResponse extends SmaxOperation.
      * was rejected at the participant-policy level; callers must
      * walk {@link #participants()} to detect partial / total
      * rejections.
-     *
-     * @implNote {@code WASmaxInGroupsAddParticipantsResponseSuccess.parseAddParticipantsResponseSuccess}
-     *           validates the {@code <iq from id type="result">}
-     *           envelope, asserts the {@code <add>} child exists,
-     *           parses the optional
-     *           {@code WASmaxInGroupsGroupAddressingModeMixin}
-     *           ({@code addressing_mode}) on the {@code <iq>}, then
-     *           projects every {@code <participant>} child as
-     *           {@code parseAddParticipantsParticipantAddedOrNonRegisteredWaUserParticipantErrorLidResponseMixinGroup}
-     *           — a disjunction over
-     *           {@code AddParticipantsParticipantAddedResponse} and
-     *           {@code NonRegisteredWaUserParticipantErrorLidResponse}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsAddParticipantsResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsAddParticipantsParticipantAddedOrNonRegisteredWaUserParticipantErrorLidResponseMixinGroup")
@@ -291,16 +275,6 @@ public sealed interface SmaxGroupsAddParticipantsResponse extends SmaxOperation.
              * @return an {@link Optional} carrying the parsed entry,
              *         or empty when the node does not match either
              *         disjunction arm
-             *
-             * @implNote {@code WASmaxInGroupsAddParticipantsResponseSuccess.parseAddParticipantsResponseSuccessAddParticipant}
-             *           routes through
-             *           {@code parseAddParticipantsParticipantAddedOrNonRegisteredWaUserParticipantErrorLidResponseMixinGroup};
-             *           Cobalt distinguishes the arms by the
-             *           presence of an {@code error} attribute on
-             *           the {@code <participant>} node (the
-             *           non-registered arm carries
-             *           {@code WASmaxInGroupsParticipantRequestCodeCanBeSentOrRequestCodeCannotBeCreatedForLegalConcernsOrHasInvalidPNMixinGroup}'s
-             *           error code, while the added arm omits it).
              */
             @WhatsAppWebExport(moduleName = "WASmaxInGroupsAddParticipantsResponseSuccess",
                     exports = "parseAddParticipantsResponseSuccessAddParticipant",
@@ -435,13 +409,6 @@ public sealed interface SmaxGroupsAddParticipantsResponse extends SmaxOperation.
      * The {@code ClientError} reply variant — the relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent group.
-     *
-     * @implNote {@code WASmaxInGroupsAddParticipantsResponseClientError.parseAddParticipantsResponseClientError}
-     *           validates the IQ-error envelope and projects the
-     *           {@code <error/>} child through
-     *           {@code WASmaxInGroupsAddParticipantsClientErrors}.
-     *           Cobalt collapses to the {@code (code, text)} pair via
-     *           {@link SmaxBaseServerErrorMixin#parseClientError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsAddParticipantsResponseClientError")
     final class ClientError implements SmaxGroupsAddParticipantsResponse {
@@ -533,12 +500,6 @@ public sealed interface SmaxGroupsAddParticipantsResponse extends SmaxOperation.
     /**
      * The {@code ServerError} reply variant — the relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInGroupsAddParticipantsResponseServerError.parseAddParticipantsResponseServerError}
-     *           delegates to
-     *           {@code WASmaxInGroupsBaseServerErrorMixin}, surfaced
-     *           in Cobalt as
-     *           {@link SmaxBaseServerErrorMixin#parseServerError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsAddParticipantsResponseServerError")
     final class ServerError implements SmaxGroupsAddParticipantsResponse {

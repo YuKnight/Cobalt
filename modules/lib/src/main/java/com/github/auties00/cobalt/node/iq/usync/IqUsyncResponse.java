@@ -15,12 +15,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WAWebUsync.usyncParser} projects the
- *           {@code <usync><result/><list/></usync>} structure
- *           into a {@code (perProtocolErrors, perProtocolRefresh,
- *           userResults)} triple. Cobalt mirrors the projection
- *           on {@link IqUsyncResponse.Success}.
  */
 public sealed interface IqUsyncResponse extends IqOperation.Response
         permits IqUsyncResponse.Success, IqUsyncResponse.ClientError, IqUsyncResponse.ServerError {
@@ -120,14 +114,6 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
          * @return an {@link Optional} carrying the parsed variant, or
          *         empty when the stanza does not match the success
          *         schema
-         *
-         * @implNote {@code WAWebUsync.usyncParser} projects
-         *           {@code child("usync").{child("result"),
-         *           child("list")}} into the per-protocol error
-         *           map and the per-user result list. Cobalt
-         *           preserves the structure with explicit
-         *           {@link ProtocolEnvelope} and
-         *           {@link UserResult} nested types.
          */
         @WhatsAppWebExport(moduleName = "WAWebUsync",
                 exports = "USyncQuery", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -190,11 +176,6 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
      * {@code <error/>} sub-envelope (per-protocol failure with
      * optional backoff hint) or a {@code refresh} attribute
      * (per-protocol cache TTL hint).
-     *
-     * @implNote {@code WAWebUsync.usyncParser} projects
-     *           {@code maybeChild("error").{code, text, backoff}}
-     *           or {@code attrInt("refresh", 0)} per protocol.
-     *           Cobalt models both projections.
      */
     @WhatsAppWebModule(moduleName = "WAWebUsync")
     final class ProtocolEnvelope {
@@ -371,14 +352,6 @@ public sealed interface IqUsyncResponse extends IqOperation.Response
      * {@code <picture/>}, etc.) which the caller routes through
      * the protocol-specific parsers depending on which protocols
      * were requested.
-     *
-     * @implNote {@code WAWebUsync.m()} projects
-     *           {@code attrDeviceJid("jid")} +
-     *           {@code attrDeviceJid("pn_jid")} plus the
-     *           per-protocol payload subtrees. Cobalt keeps the
-     *           payload subtrees as raw {@link Node} entries so
-     *           the caller can route through whichever
-     *           protocol-specific parser is appropriate.
      */
     @WhatsAppWebModule(moduleName = "WAWebUsync")
     final class UserResult {

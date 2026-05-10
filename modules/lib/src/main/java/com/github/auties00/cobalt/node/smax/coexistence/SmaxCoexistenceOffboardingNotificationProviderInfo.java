@@ -3,9 +3,7 @@ package com.github.auties00.cobalt.node.smax.coexistence;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,11 +11,6 @@ import java.util.Optional;
 /**
  * Projection of the {@code <provider_info/>} child carried by a
  * coexistence notification's payload child.
- *
- * @implNote {@code WASmaxInCoexistenceProviderInfoMixin.parseProviderInfoMixin}
- *           extracts three optional grandchildren:
- *           {@code <logo_url/>} (content bytes), {@code <name/>}
- *           (content bytes), and {@code <id/>} (content int).
  */
 @WhatsAppWebModule(moduleName = "WASmaxInCoexistenceProviderInfoMixin")
 public final class SmaxCoexistenceOffboardingNotificationProviderInfo {
@@ -84,24 +77,34 @@ public final class SmaxCoexistenceOffboardingNotificationProviderInfo {
      * @param parent the parent node carrying the {@code <provider_info/>}
      *               child. Never {@code null}
      * @return an {@link Optional} carrying the parsed projection, or
-     *         empty when the child is missing
+     *         empty when the child is missing or when {@code <id/>}
+     *         content cannot be parsed as a base-10 integer
      * @throws NullPointerException if {@code parent} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WASmaxInCoexistenceProviderInfoMixin",
-            exports = "parseProviderInfoMixin",
+            exports = {
+                    "parseProviderInfoMixin",
+                    "parseProviderInfoProviderInfoLogoUrl",
+                    "parseProviderInfoProviderInfoName",
+                    "parseProviderInfoProviderInfoId"
+            },
             adaptation = WhatsAppAdaptation.ADAPTED)
     public static Optional<SmaxCoexistenceOffboardingNotificationProviderInfo> of(Node parent) {
         Objects.requireNonNull(parent, "parent cannot be null");
+        // WASmaxInCoexistenceProviderInfoMixin.parseProviderInfoMixin: flattenedChildWithTag(t, "provider_info")
         var providerInfoNode = parent.getChild("provider_info").orElse(null);
         if (providerInfoNode == null) {
             return Optional.empty();
         }
+        // WASmaxInCoexistenceProviderInfoMixin.parseProviderInfoProviderInfoLogoUrl: assertTag("logo_url") + contentBytes
         var logoUrl = providerInfoNode.getChild("logo_url")
                 .flatMap(Node::toContentBytes)
                 .orElse(null);
+        // WASmaxInCoexistenceProviderInfoMixin.parseProviderInfoProviderInfoName: assertTag("name") + contentBytes
         var name = providerInfoNode.getChild("name")
                 .flatMap(Node::toContentBytes)
                 .orElse(null);
+        // WASmaxInCoexistenceProviderInfoMixin.parseProviderInfoProviderInfoId: assertTag("id") + contentInt
         var idBytes = providerInfoNode.getChild("id")
                 .flatMap(Node::toContentString)
                 .orElse(null);
@@ -110,6 +113,8 @@ public final class SmaxCoexistenceOffboardingNotificationProviderInfo {
             try {
                 id = Integer.parseInt(idBytes);
             } catch (NumberFormatException ignored) {
+                // ADAPTED: WASmaxParseUtils.contentInt: parseInt(e,10) NaN -> error;
+                // here a malformed id collapses the whole parse to Optional.empty().
                 return Optional.empty();
             }
         }

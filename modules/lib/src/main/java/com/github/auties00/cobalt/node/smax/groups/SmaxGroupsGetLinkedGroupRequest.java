@@ -125,14 +125,6 @@ public final class SmaxGroupsGetLinkedGroupRequest implements SmaxOperation.Requ
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         {@code <query_linked/>} payload
-     *
-     * @implNote {@code WASmaxOutGroupsGetLinkedGroupRequest.makeGetLinkedGroupRequest}
-     *           composes
-     *           {@code <query_linked type=CUSTOM_STRING(t)
-     *           jid=GROUP_JID(t) sub_group_jid?>}, wrapped in
-     *           {@code WASmaxOutGroupsBaseGetGroupMixin}
-     *           ({@code xmlns="w:g2"}, {@code to=GROUP_JID(t)},
-     *           {@code id=generateId()}, {@code type="get"}).
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGetLinkedGroupRequest",

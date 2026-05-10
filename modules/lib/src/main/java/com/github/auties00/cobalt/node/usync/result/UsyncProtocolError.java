@@ -24,11 +24,6 @@ import java.util.Optional;
  * attribute expressed as a {@link Duration}. When present, {@link UsyncQuery}
  * forwards it to {@link UsyncBackoff#setProtocolBackoffMs} so subsequent
  * queries for the same protocol observe the timeout.
- *
- * @implNote The JS shape from each {@code WAWebUsync*Protocol.parser} returns
- *     {@code {errorCode, errorText}}; the device parser also reads
- *     {@code error_backoff}. Cobalt always reads the optional backoff so
- *     every protocol benefits from rate-limit feedback.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 public final class UsyncProtocolError implements UsyncProtocolResult {

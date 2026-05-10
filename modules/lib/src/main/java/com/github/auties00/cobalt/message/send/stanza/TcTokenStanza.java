@@ -134,9 +134,6 @@ public final class TcTokenStanza {
      * @param mode the trusted-contact token role to query
      * @return the cutoff expressed in seconds since the Unix epoch
      * @throws NullPointerException if {@code mode} is {@code null}
-     * @implNote WA Web's {@code castToUnixTime} clamp to int32 is irrelevant for
-     * realistic bucket math and matches the value space of
-     * {@link Instant#getEpochSecond()}.
      */
     @WhatsAppWebExport(moduleName = "WAWebTrustedContactsUtils", exports = "tokenExpirationCutoff",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -183,9 +180,6 @@ public final class TcTokenStanza {
      * @param tokenTimestamp the prior sender-token timestamp, or {@code null} if no
      *                       token has been issued
      * @return {@code true} if a new token should be sent
-     * @implNote The JS function reads the raw {@code tctoken_duration_sender} AB prop
-     * directly without going through {@code getTcTokenDuration}, so the value is not
-     * clamped to {@link #MAX_TC_TOKEN_DURATION_SECONDS} here either.
      */
     @WhatsAppWebExport(moduleName = "WAWebTrustedContactsUtils", exports = "shouldSendNewToken",
             adaptation = WhatsAppAdaptation.DIRECT)

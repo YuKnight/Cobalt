@@ -7,13 +7,10 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.CustomerDataAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.WamService;
-
 /**
  * Handles customer data (CRM) actions.
  *
@@ -21,23 +18,17 @@ import com.github.auties00.cobalt.wam.WamService;
  * mutations for business customer relationship data associated with chat JIDs.
  *
  * <p>Index format: {@code ["customer_data", chatJid]}
- *
- * @implNote WAWebCustomerDataSync
  */
 @WhatsAppWebModule(moduleName = "WAWebCustomerDataSync")
 public final class CustomerDataHandler implements WebAppStateActionHandler {
     /**
      * The singleton instance of {@code CustomerDataHandler}.
-     *
-     * @implNote WAWebCustomerDataSync — module-level singleton: {@code var p = new m; l.default = p}
      */
     @WhatsAppWebExport(moduleName = "WAWebCustomerDataSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public static final CustomerDataHandler INSTANCE = new CustomerDataHandler();
 
     /**
      * Creates a new {@code CustomerDataHandler}.
-     *
-     * @implNote WAWebCustomerDataSync — private constructor for singleton pattern
      */
     @WhatsAppWebExport(moduleName = "WAWebCustomerDataSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private CustomerDataHandler() {
@@ -54,8 +45,6 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
 
     /**
      * {@inheritDoc}
-     *
-     * @implNote WAWebCustomerDataSync constructor — {@code this.collectionName = WASyncdConst.CollectionName.RegularLow}
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCustomerDataSync", exports = "collectionName", adaptation = WhatsAppAdaptation.DIRECT)
@@ -73,26 +62,6 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
     }
 
     /**
-     * Applies a customer data mutation.
-     *
-     * <p>Per WhatsApp Web {@code WAWebCustomerDataSync.applyMutations}:
-     * on SET, the customer data action is extracted and stored for the chat JID.
-     * On REMOVE, the customer data for the chat JID is removed.
-     *
-     * @implNote ADAPTED: WAWebCustomerDataSync.applyMutations — WA Web returns
-     *           {@code WASyncdConst.SyncActionState} values directly; Cobalt wraps
-     *           them in {@link MutationApplicationResult} for type safety
-     * @param client   the WhatsApp client instance
-     * @param mutation the mutation to apply
-     * @return {@code true} if the mutation was acknowledged
-     */
-    @Override
-    @WhatsAppWebExport(moduleName = "WAWebCustomerDataSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean applyMutation(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
-        return applyMutationResult(client, wamService, mutation).actionState() == SyncActionState.SUCCESS;
-    }
-
-    /**
      * Applies a customer data mutation and returns a detailed result.
      *
      * <p>Per WhatsApp Web {@code WAWebCustomerDataSync.applyMutations}, each mutation
@@ -105,26 +74,24 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
      *       record via {@code $CustomerDataSync$p_2}; otherwise silently succeeds.</li>
      *   <li><b>Unknown:</b> returns unsupported.</li>
      * </ul>
-     *
-     * @implNote WAWebCustomerDataSync.applyMutations
      * @param client   the WhatsApp client instance
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCustomerDataSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutationResult(WhatsAppClient client, WamService wamService, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var chatJidString = indexArray.size() >= 2 ? indexArray.getString(1) : null;
 
         if (mutation.operation() == SyncdOperation.SET) {
             if (chatJidString == null || chatJidString.isBlank()) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chatJid = Jid.of(chatJidString); // ADAPTED: WAWebCustomerDataSync.applyMutations — validateChatJid(u); Cobalt uses Jid.of which is more lenient than validateChatJid
             if (chatJid == null) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             if (mutation.value() == null) {
@@ -132,7 +99,7 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
             }
 
             if (!(mutation.value().action().orElse(null) instanceof CustomerDataAction)) {
-                return malformedActionValue();
+                return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             // ADAPTED: WAWebCustomerDataSync.$CustomerDataSync$p_1 — addOrEditCustomerData + frontendFireAndForget

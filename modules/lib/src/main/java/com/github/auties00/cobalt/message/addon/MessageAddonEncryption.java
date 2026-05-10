@@ -31,11 +31,6 @@ import java.util.Objects;
  * a random 12-byte IV and a 128-bit auth tag. Poll votes and event responses
  * additionally authenticate the stanza id and addon sender as AAD so the
  * server cannot rebind a vote from one user to another.
- *
- * @implNote The JS module also owns the dispatch from {@code WAWebMsgType.MsgKind}
- * values to the matching protobuf spec and use case. Cobalt leaves that
- * dispatch to the callers (see {@link EncMessageFactory}) and exposes only
- * the crypto primitive here.
  */
 @WhatsAppWebModule(moduleName = "WAWebAddonEncryption")
 @WhatsAppWebModule(moduleName = "WAUseCaseSecret")
@@ -85,10 +80,6 @@ public final class MessageAddonEncryption {
      * AES-256-GCM. When the {@link MessageAddonType} requires it (poll votes
      * and event responses) the stanza id and addon sender JID are
      * authenticated as AAD.
-     *
-     * @implNote WA Web throws {@code DualEncryptionValidationError} with
-     * {@code ENCRYPTION_ERROR}. Cobalt rethrows as {@link RuntimeException}
-     * because the crypto backend is JCA rather than the Web Crypto API.
      * @param plaintext      the addon payload to encrypt
      * @param messageSecret  the parent message's 32-byte {@code messageSecret}
      * @param stanzaId       the parent message's stanza id
@@ -258,11 +249,6 @@ public final class MessageAddonEncryption {
      * {@code stanzaId || originalSender || addonSender || useCaseType.value()}.
      * The helper preallocates a single byte array and copies each component
      * in sequence without inserting any separator.
-     *
-     * @implNote Built in WA Web via
-     * {@code WABinary.Binary.build(stanzaId, parentMsgOriginalSender, modificationSender, modificationType).readBuffer()}.
-     * {@code Binary.build} writes each string argument as UTF-8 bytes
-     * sequentially with no separator.
      * @param stanzaId       the parent message's stanza id
      * @param originalSender the JID of the parent message's author
      * @param addonSender    the JID of the addon author

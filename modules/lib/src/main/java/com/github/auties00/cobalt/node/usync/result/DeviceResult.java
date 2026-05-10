@@ -12,10 +12,6 @@ import java.util.Optional;
  *
  * <p>Carries the peer's full device list and, when present, their signed
  * key-index-list metadata.
- *
- * @implNote The JS parser returns {@code {deviceList, keyIndex}}. Cobalt
- *     models the per-device shape as a static nested class and the optional
- *     key-index shape similarly.
  */
 @WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
 public final class DeviceResult implements UsyncProtocolResponse {

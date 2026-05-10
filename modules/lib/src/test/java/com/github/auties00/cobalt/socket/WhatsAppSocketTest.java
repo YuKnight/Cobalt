@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
-import com.github.auties00.cobalt.misc.ProxyServer;
+import com.github.auties00.cobalt.infra.ProxyServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -201,7 +201,7 @@ class WhatsAppSocketTest {
 
     private static WhatsAppStore createMobileStore() {
         try {
-            return WhatsAppStoreFactory.inMemory()
+            return WhatsAppStoreFactory.temporary()
                     .create(WhatsAppClientType.MOBILE, 15551234567L);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -210,7 +210,7 @@ class WhatsAppSocketTest {
 
     private static WhatsAppStore createWebStore() {
         try {
-            var store = WhatsAppStoreFactory.inMemory()
+            var store = WhatsAppStoreFactory.temporary()
                     .create(WhatsAppClientType.WEB, UUID.randomUUID());
             store.setDevice(new WhatsAppDeviceBuilder()
                     .model("Surface Pro 4")

@@ -14,11 +14,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxPsaChatBlockGetRPC.sendChatBlockGetRPC} tries
- *           {@code Success} → {@code ServerError} in order and throws
- *           on no-match. Cobalt returns {@link Optional#empty()} on
- *           no-match.
  */
 public sealed interface SmaxPsaChatBlockGetResponse extends SmaxOperation.Response
         permits SmaxPsaChatBlockGetResponse.Success, SmaxPsaChatBlockGetResponse.ServerError {
@@ -144,15 +139,6 @@ public sealed interface SmaxPsaChatBlockGetResponse extends SmaxOperation.Respon
      * {@code request-timeout/408}, {@code service-unavailable/503},
      * {@code rate-overlimit/429}); Cobalt collapses them into the
      * single {@code (errorCode, errorText)} pair.
-     *
-     * @implNote {@code WASmaxInPsaChatBlockGetResponseServerError.parseChatBlockGetResponseServerError}
-     *           composes the error-envelope check with
-     *           {@code WASmaxInPsaChatBlockError.parseChatBlockError}
-     *           which is the disjunction of the four projected error
-     *           mixins. Cobalt routes through the shared
-     *           {@link SmaxBaseServerErrorMixin#parseServerError(Node, Node)}
-     *           which extracts the same {@code (code, text)} pair from
-     *           the {@code <error/>} child.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInPsaChatBlockGetResponseServerError")
     @WhatsAppWebModule(moduleName = "WASmaxInPsaChatBlockError")

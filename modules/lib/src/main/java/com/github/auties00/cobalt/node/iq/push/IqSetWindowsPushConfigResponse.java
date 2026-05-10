@@ -12,12 +12,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants produced by the relay.
- *
- * @implNote {@code WAWebSetWindowsPushConfig.setPushConfig} parser
- *           returns {@code undefined} on the success path and a
- *           {@code (errorCode, errorText)} pair on the error path.
- *           Cobalt splits the failure into typed {@code ClientError}
- *           / {@code ServerError} variants.
  */
 public sealed interface IqSetWindowsPushConfigResponse extends IqOperation.Response
         permits IqSetWindowsPushConfigResponse.Success, IqSetWindowsPushConfigResponse.ClientError, IqSetWindowsPushConfigResponse.ServerError {

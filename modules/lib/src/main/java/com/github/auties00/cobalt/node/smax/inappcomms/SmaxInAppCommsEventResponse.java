@@ -14,9 +14,6 @@ import java.util.Optional;
 
 /**
  * Sealed family of inbound reply variants.
- *
- * @implNote {@code WASmaxInAppCommsEventRPC.sendEventRPC} tries
- *           {@code Success} → {@code Error} in order.
  */
 public sealed interface SmaxInAppCommsEventResponse extends SmaxOperation.Response
         permits SmaxInAppCommsEventResponse.Success, SmaxInAppCommsEventResponse.Error {
@@ -49,11 +46,6 @@ public sealed interface SmaxInAppCommsEventResponse extends SmaxOperation.Respon
     /**
      * The {@code Success} reply variant. The relay accepted the
      * event report. Carries no payload beyond the envelope echo.
-     *
-     * @implNote {@code WASmaxInInAppCommsEventResponseSuccess.parseEventResponseSuccess}
-     *           validates the IQ-result envelope only. Cobalt routes
-     *           through the shared
-     *           {@link SmaxIqResultResponseMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInInAppCommsEventResponseSuccess")
     @WhatsAppWebModule(moduleName = "WASmaxInInAppCommsIQResultResponseMixin")
@@ -111,12 +103,6 @@ public sealed interface SmaxInAppCommsEventResponse extends SmaxOperation.Respon
      * {@code request-timeout/408},
      * {@code service-unavailable/503}. Cobalt collapses them into
      * the single {@code (errorCode, errorText)} pair.
-     *
-     * @implNote {@code WASmaxInInAppCommsEventResponseError.parseEventResponseError}
-     *           composes the IQ-error envelope check with
-     *           {@code WASmaxInInAppCommsEventErrorTypes.parseEventErrorTypes}
-     *           which is the disjunction of the three projected error
-     *           mixins.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInInAppCommsEventResponseError")
     @WhatsAppWebModule(moduleName = "WASmaxInInAppCommsEventErrorTypes")

@@ -10,9 +10,6 @@ import java.util.Optional;
  * Response variant for {@link ChangeNewsletterOwnerMexRequest} exposing the
  * newsletter identifier echoed back by the server once the ownership change
  * is applied.
- *
- * @implNote The body wraps the {@code data.xwa2_newsletter_change_owner} root
- *           of the JSON response.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexChangeNewsletterOwnerJob")
 public final class ChangeNewsletterOwnerMexResponse implements MexOperation.Response.Json {

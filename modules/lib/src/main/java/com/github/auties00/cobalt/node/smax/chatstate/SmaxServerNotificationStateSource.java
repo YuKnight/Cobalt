@@ -27,11 +27,39 @@ public sealed interface SmaxServerNotificationStateSource permits SmaxServerNoti
             exports = "parseStateSource", adaptation = WhatsAppAdaptation.ADAPTED)
     static Optional<? extends SmaxServerNotificationStateSource> of(Node node) {
         Objects.requireNonNull(node, "node cannot be null");
+        // WASmaxInChatstateStateSource.parseStateSource: try parseFromUserMixin first
         var fromUser = FromUser.of(node);
         if (fromUser.isPresent()) {
             return fromUser;
         }
+        // WASmaxInChatstateStateSource.parseStateSource: fall back to parseFromGroupMixin
         return FromGroup.of(node);
+    }
+
+    /**
+     * Reports whether the given JID's server is one accepted by
+     * {@code WAJids.validateUserJid}, i.e. a phone, interop, msgr,
+     * lid, or bot user JID.
+     *
+     * <p>This helper centralises the {@code USERJID_USERJID_USERJID}
+     * and {@code USERJID_USERJID_USERJID_USERJID} JID-enum admit set
+     * documented by {@code WASmaxInChatstateEnums}: each validator slot
+     * resolves to {@code WAJids.validateUserJid}, whose regular expressions
+     * accept the {@code @s.whatsapp.net}, {@code @interop}, {@code @msgr},
+     * {@code @lid}, and {@code @bot} server domains.
+     * @param jid the JID to test; never {@code null}
+     * @return {@code true} when {@code jid.server()} is one of the
+     *         user-JID server domains, {@code false} otherwise
+     */
+    @WhatsAppWebExport(moduleName = "WAJids",
+            exports = "validateUserJid", adaptation = WhatsAppAdaptation.ADAPTED)
+    private static boolean isUserJidServer(Jid jid) {
+        var server = jid.server().toString();
+        return "s.whatsapp.net".equals(server)
+                || "interop".equals(server)
+                || "msgr".equals(server)
+                || "lid".equals(server)
+                || "bot".equals(server);
     }
 
     /**
@@ -74,16 +102,18 @@ public sealed interface SmaxServerNotificationStateSource permits SmaxServerNoti
         @WhatsAppWebExport(moduleName = "WASmaxInChatstateFromUserMixin",
                 exports = "parseFromUserMixin", adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<FromUser> of(Node node) {
+            // WASmaxInChatstateFromUserMixin.parseFromUserMixin: assertTag(e,"chatstate")
             if (!node.hasDescription("chatstate")) {
                 return Optional.empty();
             }
+            // WASmaxInChatstateFromUserMixin.parseFromUserMixin: attrJidEnum(e,"from",USERJID_USERJID_USERJID_USERJID)
+            // The USERJID_USERJID_USERJID_USERJID enum runs WAJids.validateUserJid four times,
+            // which admits phone (s.whatsapp.net), interop, msgr, lid, and bot user JIDs.
             var from = node.getAttributeAsJid("from").orElse(null);
             if (from == null) {
                 return Optional.empty();
             }
-            var server = from.server().toString();
-            if (!"s.whatsapp.net".equals(server) && !"c.us".equals(server)
-                    && !"lid".equals(server)) {
+            if (!isUserJidServer(from)) {
                 return Optional.empty();
             }
             return Optional.of(new FromUser(from));
@@ -188,23 +218,33 @@ public sealed interface SmaxServerNotificationStateSource permits SmaxServerNoti
         @WhatsAppWebExport(moduleName = "WASmaxInChatstateFromGroupMixin",
                 exports = "parseFromGroupMixin", adaptation = WhatsAppAdaptation.ADAPTED)
         public static Optional<FromGroup> of(Node node) {
+            // WASmaxInChatstateFromGroupMixin.parseFromGroupMixin: assertTag(e,"chatstate")
             if (!node.hasDescription("chatstate")) {
                 return Optional.empty();
             }
+            // WASmaxInChatstateFromGroupMixin.parseFromGroupMixin: attrGroupJid(e,"from")
             var from = node.getAttributeAsJid("from").orElse(null);
             if (from == null || !"g.us".equals(from.server().toString())) {
                 return Optional.empty();
             }
+            // WASmaxInChatstateFromGroupMixin.parseFromGroupMixin: attrJidEnum(e,"participant",USERJID_USERJID_USERJID)
             var participant = node.getAttributeAsJid("participant").orElse(null);
             if (participant == null) {
                 return Optional.empty();
             }
-            var participantServer = participant.server().toString();
-            if (!"s.whatsapp.net".equals(participantServer) && !"c.us".equals(participantServer)
-                    && !"lid".equals(participantServer)) {
+            if (!isUserJidServer(participant)) {
                 return Optional.empty();
             }
-            var participantPn = node.getAttributeAsJid("participant_pn").orElse(null);
+            // WASmaxInChatstateFromGroupMixin.parseFromGroupMixin: optional(attrUserJid,e,"participant_pn")
+            // optional() only fails when the attribute is present AND the inner validator rejects it;
+            // an absent attribute yields a null value with success=true.
+            Jid participantPn = null;
+            if (node.getAttribute("participant_pn").isPresent()) {
+                participantPn = node.getAttributeAsJid("participant_pn").orElse(null);
+                if (participantPn == null || !isUserJidServer(participantPn)) {
+                    return Optional.empty();
+                }
+            }
             return Optional.of(new FromGroup(from, participant, participantPn));
         }
 

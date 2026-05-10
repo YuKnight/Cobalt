@@ -17,11 +17,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxGroupsLinkSubGroupsRequest}.
- *
- * @implNote {@code WASmaxGroupsLinkSubGroupsRPC.sendLinkSubGroupsRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order and throws on no-match.
- *           Cobalt returns {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxGroupsLinkSubGroupsResponse extends SmaxOperation.Response
         permits SmaxGroupsLinkSubGroupsResponse.Success, SmaxGroupsLinkSubGroupsResponse.ClientError, SmaxGroupsLinkSubGroupsResponse.ServerError {
@@ -64,12 +59,6 @@ public sealed interface SmaxGroupsLinkSubGroupsResponse extends SmaxOperation.Re
      * list of {@link LinkedGroup.ParticipantError} entries for
      * participants that could not be transferred (typically due to
      * privacy settings).
-     *
-     * @implNote {@code WASmaxInGroupsLinkSubGroupsResponseSuccess.parseLinkSubGroupsResponseSuccess}
-     *           validates the IQ result envelope, requires the
-     *           {@code <links><link link_type="sub_group">} skeleton,
-     *           and enumerates the {@code <group/>} children. Cobalt
-     *           preserves the same shape with typed accessors.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsLinkSubGroupsResponseSuccess")
     final class Success implements SmaxGroupsLinkSubGroupsResponse {
@@ -361,12 +350,6 @@ public sealed interface SmaxGroupsLinkSubGroupsResponse extends SmaxOperation.Re
      * The {@code ClientError} reply variant — the relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent parent / sub-group pair.
-     *
-     * @implNote {@code WASmaxInGroupsLinkSubGroupsResponseClientError.parseLinkSubGroupsResponseClientError}
-     *           parses the {@code <error code text/>} child and routes
-     *           it through
-     *           {@code WASmaxInGroupsLinkSubGroupsClientError}.
-     *           Cobalt collapses to the raw {@code (code, text)} pair.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsLinkSubGroupsResponseClientError")
     final class ClientError implements SmaxGroupsLinkSubGroupsResponse {
@@ -459,11 +442,6 @@ public sealed interface SmaxGroupsLinkSubGroupsResponse extends SmaxOperation.Re
     /**
      * The {@code ServerError} reply variant — the relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInGroupsLinkSubGroupsResponseServerError.parseLinkSubGroupsResponseServerError}
-     *           delegates to {@code WASmaxInGroupsBaseServerErrorMixin}
-     *           which Cobalt has consolidated under
-     *           {@link SmaxBaseServerErrorMixin}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInGroupsLinkSubGroupsResponseServerError")
     final class ServerError implements SmaxGroupsLinkSubGroupsResponse {

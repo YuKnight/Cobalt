@@ -126,12 +126,6 @@ public final class IqSetPrivacyRequest implements IqOperation.Request {
      * Builds the outbound IQ stanza ready for dispatch.
      *
      * @return a {@link NodeBuilder} carrying the IQ envelope
-     *
-     * @implNote {@code WAWebSetPrivacyJob.setPrivacy} composes
-     *           {@code wap("iq",{to:S_WHATSAPP_NET, type:"set",
-     *           xmlns:"privacy", id:generateId()}, p(...))}, where
-     *           {@code p} dispatches between the bare/{@code _},
-     *           LID/{@code f}, and PN/{@code g} category builders.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSetPrivacyJob",

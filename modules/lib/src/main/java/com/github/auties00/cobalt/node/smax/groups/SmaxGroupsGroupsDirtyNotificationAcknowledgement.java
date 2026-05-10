@@ -15,14 +15,6 @@ import java.util.Optional;
  * The outbound acknowledgement stanza — emitted by the client
  * back through the socket pipeline after consuming the
  * {@link SmaxGroupsGroupsDirtyNotificationResponse} notification.
- *
- * @implNote {@code WASmaxOutGroupsGroupsDirtyNotificationResponseAck.makeGroupsDirtyNotificationResponseAck}
- *           composes
- *           {@code WASmaxOutGroupsNotificationClientAckMixin} —
- *           an {@code <ack id to class="notification" type/>}
- *           stanza echoing the notification's {@code id},
- *           {@code from} (as the ack's {@code to}) and
- *           {@code type} attributes.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutGroupsGroupsDirtyNotificationResponseAck")
 @WhatsAppWebModule(moduleName = "WASmaxOutGroupsNotificationClientAckMixin")
@@ -120,11 +112,6 @@ public final class SmaxGroupsGroupsDirtyNotificationAcknowledgement implements S
      * Builds the outbound ack stanza.
      *
      * @return a {@link NodeBuilder} carrying the ack envelope
-     *
-     * @implNote {@code WASmaxOutGroupsNotificationClientAckMixin.mergeNotificationClientAckMixin}
-     *           produces
-     *           {@code <ack id=STANZA_ID(t) to=JID(n)
-     *           class="notification" type=CUSTOM_STRING(r)/>}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsGroupsDirtyNotificationResponseAck",

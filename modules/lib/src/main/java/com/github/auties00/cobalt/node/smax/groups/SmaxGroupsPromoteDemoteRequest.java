@@ -98,13 +98,6 @@ public final class SmaxGroupsPromoteDemoteRequest implements SmaxOperation.Reque
      * @return a {@link NodeBuilder} carrying the IQ envelope and the
      *         optional {@code <promote>} / {@code <demote>}
      *         children
-     *
-     * @implNote {@code WASmaxOutGroupsPromoteDemoteRequest.makePromoteDemoteRequest}
-     *           composes
-     *           {@code <iq>OPTIONAL_CHILD(promote)
-     *           OPTIONAL_CHILD(demote)</iq>}; each list child wraps
-     *           {@code REPEATED_CHILD(participant, 0, 1024)} of
-     *           {@code <participant jid=USER_JID(t)/>} entries.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WASmaxOutGroupsPromoteDemoteRequest",

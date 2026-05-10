@@ -15,16 +15,6 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * <p>This dispatcher owns one instance of each concrete account-category
  * handler and forwards each incoming node to the matching handler. Stanzas
  * with an unrecognised {@code type} are silently ignored.
- *
- * @implNote Adapts the {@code notification} branch of the {@code tag}-switch in
- *     {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza} that fans out
- *     account-related notification types to module-specific consumers such as
- *     {@code WAWebHandleAccountSyncNotification},
- *     {@code WAWebHandleContactNotification},
- *     {@code WAWebHandleDisappearingModeNotification},
- *     {@code WAWebHandlePrivacyTokensNotification},
- *     {@code WAWebHandleProfilePicNotification} and
- *     {@code WAWebHandleAboutNotification}.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class NotificationAccountDispatcher implements SocketStream.Handler {
@@ -73,14 +63,6 @@ public final class NotificationAccountDispatcher implements SocketStream.Handler
      * handler based on the stanza's {@code type} attribute.
      *
      * @param node the incoming notification stanza
-     * @implNote Mirrors the account-related cases of the inner
-     *     {@code switch(n.type)} inside the {@code case "notification"}
-     *     branch of {@code WAWebCommsHandleLoggedInStanza.handleLoggedInStanza}:
-     *     {@code account_sync}, {@code contacts}, {@code disappearing_mode},
-     *     {@code picture}, {@code privacy_token} and {@code status}. Stanzas
-     *     with a {@code null} or unrecognised {@code type} are ignored because
-     *     the remaining notification types are dispatched by sibling
-     *     category dispatchers.
      */
     @WhatsAppWebExport(moduleName = "WAWebCommsHandleLoggedInStanza", exports = "handleLoggedInStanza", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
@@ -105,10 +87,6 @@ public final class NotificationAccountDispatcher implements SocketStream.Handler
      * Fans out a reset call to every sub-handler so that any cached state
      * (pending acks, in-flight refresh jobs, etc.) is discarded on a socket
      * reconnect.
-     *
-     * @implNote Cobalt-specific lifecycle hook; WhatsApp Web handles this
-     *     via module-level reset calls scattered across the individual
-     *     notification modules.
      */
     @Override
     public void reset() {

@@ -55,13 +55,6 @@ public sealed interface IqGetIdentityKeysResponse extends IqOperation.Response
      * The {@code Success} reply variant — the relay returned a
      * mixed list of resolved identity entries and per-device
      * client-error envelopes.
-     *
-     * @implNote {@code WAWebGetIdentityKeysJob.identityKeysParser}
-     *           throws on per-user {@code <error/>} children;
-     *           Cobalt instead returns them as
-     *           {@link IdentityEntry.Failure} entries side-by-side
-     *           with the {@link IdentityEntry.Resolved} ones so the
-     *           caller can reason about partial-failure.
      */
     @WhatsAppWebModule(moduleName = "WAWebGetIdentityKeysJob")
     final class Success implements IqGetIdentityKeysResponse {

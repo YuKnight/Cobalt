@@ -17,11 +17,6 @@ import java.util.Optional;
 /**
  * Sealed family of inbound reply variants produced by the relay in
  * response to a {@link SmaxNewslettersGetNewsletterStatusUpdatesRequest}.
- *
- * @implNote {@code WASmaxNewslettersGetNewsletterStatusUpdatesRPC.sendGetNewsletterStatusUpdatesRPC}
- *           tries {@code Success} → {@code ClientError} →
- *           {@code ServerError} in order and throws on no-match.
- *           Cobalt returns {@link Optional#empty()} on no-match.
  */
 public sealed interface SmaxNewslettersGetNewsletterStatusUpdatesResponse extends SmaxOperation.Response
         permits SmaxNewslettersGetNewsletterStatusUpdatesResponse.Success, SmaxNewslettersGetNewsletterStatusUpdatesResponse.ClientError, SmaxNewslettersGetNewsletterStatusUpdatesResponse.ServerError {
@@ -59,16 +54,6 @@ public sealed interface SmaxNewslettersGetNewsletterStatusUpdatesResponse extend
     /**
      * The {@code Success} reply variant. The relay returned the
      * delta-of-status-updates batch.
-     *
-     * @implNote {@code WASmaxInNewslettersGetNewsletterStatusUpdatesResponseSuccess.parseGetNewsletterStatusUpdatesResponseSuccess}
-     *           validates the {@code <iq>} envelope through
-     *           {@code parseIQResultResponseMixin}. Asserts the
-     *           {@code <status_updates>} → {@code <statuses>} chain,
-     *           then projects every {@code <status>} via
-     *           {@code parseStatusNewsletterHistoryWithAddOnsMixin}.
-     *           Cobalt reuses
-     *           {@link SmaxNewslettersGetNewsletterStatusesResponse.NewsletterStatus}
-     *           since both RPCs share the same per-status projection.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersGetNewsletterStatusUpdatesResponseSuccess")
     final class Success implements SmaxNewslettersGetNewsletterStatusUpdatesResponse {
@@ -214,8 +199,6 @@ public sealed interface SmaxNewslettersGetNewsletterStatusUpdatesResponse extend
      * The {@code ClientError} reply variant. The relay rejected the
      * request as malformed, unauthorised, or referencing a
      * non-existent newsletter.
-     *
-     * @implNote {@code WASmaxInNewslettersGetNewsletterStatusUpdatesResponseClientError.parseGetNewsletterStatusUpdatesResponseClientError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersGetNewsletterStatusUpdatesResponseClientError")
     final class ClientError implements SmaxNewslettersGetNewsletterStatusUpdatesResponse {
@@ -307,8 +290,6 @@ public sealed interface SmaxNewslettersGetNewsletterStatusUpdatesResponse extend
     /**
      * The {@code ServerError} reply variant. The relay encountered a
      * transient internal failure while processing the request.
-     *
-     * @implNote {@code WASmaxInNewslettersGetNewsletterStatusUpdatesResponseServerError.parseGetNewsletterStatusUpdatesResponseServerError}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInNewslettersGetNewsletterStatusUpdatesResponseServerError")
     final class ServerError implements SmaxNewslettersGetNewsletterStatusUpdatesResponse {
