@@ -475,7 +475,7 @@ public final class SyncFixtures {
                 .keyId(keyId)
                 .keyData(keyData)
                 .build();
-        store.addWebAppStateKeys(List.of(key));
+        store.syncStore().addWebAppStateKeys(List.of(key));
         return store;
     }
 

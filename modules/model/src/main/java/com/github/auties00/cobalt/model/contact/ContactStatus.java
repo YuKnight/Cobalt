@@ -17,7 +17,7 @@ import java.util.Optional;
  * default: updates arrive automatically only when a contact sends a message
  * or appears in the recent contacts list. To receive real-time presence
  * updates for a specific contact, explicitly subscribe to that contact using
- * {@link com.github.auties00.cobalt.client.WhatsAppClient#subscribeToPresence(com.github.auties00.cobalt.model.jid.JidProvider)}.
+ * {@link com.github.auties00.cobalt.client.LinkedWhatsAppClient#subscribeToPresence(com.github.auties00.cobalt.model.jid.JidProvider)}.
  *
  * <p>This enum represents presence at the individual-contact level, reflecting
  * only the 1:1 conversation state. For the presence of a participant within a

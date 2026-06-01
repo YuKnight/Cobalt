@@ -201,9 +201,9 @@ public final class DeviceFixtures {
         try {
             var store = WhatsAppStoreFactory.temporary()
                     .create(WhatsAppClientType.WEB, Long.parseLong(selfPn.user()));
-            store.setJid(selfPn);
+            store.accountStore().setJid(selfPn);
             if (selfLid != null) {
-                store.setLid(selfLid);
+                store.accountStore().setLid(selfLid);
             }
             return store;
         } catch (IOException e) {

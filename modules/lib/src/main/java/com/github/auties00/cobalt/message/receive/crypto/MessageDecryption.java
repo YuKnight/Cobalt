@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.message.receive.crypto;
 
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.cobalt.message.send.bot.BotMessageSecret;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -129,7 +131,14 @@ public final class MessageDecryption {
     private final SignalGroupCipher groupCipher;
 
     /**
-     * Constructs the decryption service from its three collaborators.
+     * Holds the shared lock registry that serialises the non-atomic Signal session and sender-key ratchets so that
+     * inbound decryptions and the outbound {@link MessageEncryption} encryptions of the same device session or
+     * sender-key chain cannot interleave.
+     */
+    private final SignalCryptoLocks cryptoLocks;
+
+    /**
+     * Constructs the decryption service from its collaborators.
      *
      * @param store         the central session store used for sender-key and Signal
      *                      session lookups
@@ -139,6 +148,8 @@ public final class MessageDecryption {
      * @param groupCipher   the libsignal group cipher used for
      *                      {@link MessageEncryptionType#SKMSG} decryption and
      *                      sender-key import
+     * @param cryptoLocks   the lock registry shared with {@link MessageEncryption} that serialises concurrent
+     *                      session and sender-key ratchets
      * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingDecryptEnc", exports = "decryptEnc",
@@ -146,11 +157,13 @@ public final class MessageDecryption {
     public MessageDecryption(
             WhatsAppStore store,
             SignalSessionCipher sessionCipher,
-            SignalGroupCipher groupCipher
+            SignalGroupCipher groupCipher,
+            SignalCryptoLocks cryptoLocks
     ) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.sessionCipher = Objects.requireNonNull(sessionCipher, "sessionCipher cannot be null");
         this.groupCipher = Objects.requireNonNull(groupCipher, "groupCipher cannot be null");
+        this.cryptoLocks = Objects.requireNonNull(cryptoLocks, "cryptoLocks cannot be null");
     }
 
     /**
@@ -163,7 +176,10 @@ public final class MessageDecryption {
      * Signal-protocol PKCS#7 padding already stripped by {@link #removePadding(byte[])}.
      *
      * @implNote
-     * This implementation maps the libsignal exception hierarchy onto the sealed
+     * This implementation serialises the decrypt cycle for one device session through
+     * {@link SignalCryptoLocks#withSession}, shared with the outbound {@link MessageEncryption}, so an inbound decrypt
+     * and an outbound encrypt for the same session never ratchet it concurrently; WhatsApp Web never races them since
+     * its JavaScript runs single-threaded. It maps the libsignal exception hierarchy onto the sealed
      * {@link WhatsAppMessageException.Receive} subtypes so receipt selection can branch
      * on a strongly-typed exception rather than a string-match against the underlying
      * libsignal message; {@link MessageEncryptionType#SKMSG} and
@@ -195,7 +211,7 @@ public final class MessageDecryption {
         Objects.requireNonNull(encryptionType, "encryptionType cannot be null");
 
         var address = senderJid.toSignalAddress();
-        return switch (encryptionType) {
+        return cryptoLocks.withSession(address, () -> switch (encryptionType) {
             case PKMSG -> {
                 try {
                     var message = SignalPreKeyMessage.ofSerialized(ciphertext);
@@ -256,7 +272,7 @@ public final class MessageDecryption {
             }
             case SKMSG -> throw new IllegalArgumentException("Use decryptFromGroup for SKMSG encryption type");
             case MSMSG -> throw new IllegalArgumentException("Use decryptBotMessage for MSMSG encryption type");
-        };
+        });
     }
 
     /**
@@ -297,8 +313,12 @@ public final class MessageDecryption {
      * {@link #removePadding(byte[])}.
      *
      * @implNote
-     * This implementation maps the libsignal exception subtypes onto the sealed
-     * {@link WhatsAppMessageException.Receive} hierarchy:
+     * This implementation serialises the decrypt cycle for one sender-key chain through
+     * {@link SignalCryptoLocks#withSenderKey}, shared with the
+     * {@link #processSenderKeyDistribution(Jid, Jid, SignalSenderKeyDistributionMessage)} import and the outbound
+     * {@link MessageEncryption}, so concurrent decrypts and a distribution import never ratchet the same chain at once;
+     * WhatsApp Web never races them since its JavaScript runs single-threaded. It maps the libsignal exception subtypes
+     * onto the sealed {@link WhatsAppMessageException.Receive} hierarchy:
      * <ul>
      *   <li>a missing sender-key record becomes
      *       {@link WhatsAppMessageException.Receive.NoSenderKey}.</li>
@@ -336,30 +356,32 @@ public final class MessageDecryption {
 
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
 
-        try {
-            var paddedPlaintext = groupCipher.decrypt(senderKeyName, ciphertext);
-            return removePadding(paddedPlaintext);
-        } catch (SignalMissingSenderKeyException e) {
-            throw new WhatsAppMessageException.Receive.NoSenderKey(
-                    "No sender key exists for group: " + groupJid + " sender: " + senderJid, e);
-        } catch (SignalMissingSenderKeyStateException e) {
-            throw new WhatsAppMessageException.Receive.InvalidSenderKey(
-                    "Sender key state not found for ID " + e.id().orElse(-1) +
-                            " in group: " + groupJid + " sender: " + senderJid, e);
-        } catch (SignalDecryptException e) {
-            if (isDuplicateCounterError(e)) {
-                throw new WhatsAppMessageException.Receive.DuplicateMessage(
+        return cryptoLocks.withSenderKey(senderKeyName, () -> {
+            try {
+                var paddedPlaintext = groupCipher.decrypt(senderKeyName, ciphertext);
+                return removePadding(paddedPlaintext);
+            } catch (SignalMissingSenderKeyException e) {
+                throw new WhatsAppMessageException.Receive.NoSenderKey(
+                        "No sender key exists for group: " + groupJid + " sender: " + senderJid, e);
+            } catch (SignalMissingSenderKeyStateException e) {
+                throw new WhatsAppMessageException.Receive.InvalidSenderKey(
+                        "Sender key state not found for ID " + e.id().orElse(-1) +
+                                " in group: " + groupJid + " sender: " + senderJid, e);
+            } catch (SignalDecryptException e) {
+                if (isDuplicateCounterError(e)) {
+                    throw new WhatsAppMessageException.Receive.DuplicateMessage(
+                            "Group decryption failed for message from: " + senderJid + " in group: " + groupJid, e);
+                }
+                throw new WhatsAppMessageException.Receive.Unknown(
                         "Group decryption failed for message from: " + senderJid + " in group: " + groupJid, e);
+            } catch (SecurityException e) {
+                throw new WhatsAppMessageException.Receive.InvalidSenderKey(
+                        "Sender key signature verification failed from: " + senderJid + " in group: " + groupJid, e);
+            } catch (ProtobufDeserializationException e) {
+                throw new WhatsAppMessageException.Receive.InvalidMessage(
+                        "Invalid SenderKeyMessage format from: " + senderJid + " in group: " + groupJid, e);
             }
-            throw new WhatsAppMessageException.Receive.Unknown(
-                    "Group decryption failed for message from: " + senderJid + " in group: " + groupJid, e);
-        } catch (SecurityException e) {
-            throw new WhatsAppMessageException.Receive.InvalidSenderKey(
-                    "Sender key signature verification failed from: " + senderJid + " in group: " + groupJid, e);
-        } catch (ProtobufDeserializationException e) {
-            throw new WhatsAppMessageException.Receive.InvalidMessage(
-                    "Invalid SenderKeyMessage format from: " + senderJid + " in group: " + groupJid, e);
-        }
+        });
     }
 
     /**
@@ -497,6 +519,10 @@ public final class MessageDecryption {
      * <p>The caller verifies that the embedded group id matches the stanza chat JID
      * before invoking this method.
      *
+     * @implNote This implementation imports the distribution under the {@link SignalCryptoLocks#withSenderKey} lock,
+     * shared with {@link #decryptFromGroup(byte[], Jid, Jid)}, so the import cannot interleave with a concurrent decrypt
+     * of the same sender-key chain.
+     *
      * @param groupJid        the group JID
      * @param senderJid       the sender's device JID
      * @param distributionMsg the parsed Signal sender-key distribution message
@@ -512,7 +538,9 @@ public final class MessageDecryption {
         Objects.requireNonNull(distributionMsg, "distributionMsg cannot be null");
 
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
-        groupCipher.process(senderKeyName, distributionMsg);
+        cryptoLocks.withSenderKey(senderKeyName, () -> {
+            groupCipher.process(senderKeyName, distributionMsg);
+        });
     }
 
     /**
@@ -559,7 +587,7 @@ public final class MessageDecryption {
         Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
 
         var address = deviceJid.toSignalAddress();
-        return store.findSessionByAddress(address).isPresent();
+        return store.signalStore().findSessionByAddress(address).isPresent();
     }
 
     /**
@@ -580,7 +608,7 @@ public final class MessageDecryption {
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
 
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
-        return store.findSenderKeyByName(senderKeyName).isPresent();
+        return store.signalStore().findSenderKeyByName(senderKeyName).isPresent();
     }
 
     /**

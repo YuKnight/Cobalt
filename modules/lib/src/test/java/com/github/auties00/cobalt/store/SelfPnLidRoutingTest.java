@@ -7,8 +7,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Covers the self-send PN/LID round-trip through {@link AbstractWhatsAppStore#findLidByPhone(Jid)}
- * and {@link AbstractWhatsAppStore#findPhoneByLid(Jid)}: a message addressed to the local user's
+ * Covers the self-send PN/LID round-trip through {@link com.github.auties00.cobalt.store.ContactStore#findLidByPhone(Jid)}
+ * and {@link com.github.auties00.cobalt.store.ContactStore#findPhoneByLid(Jid)}: a message addressed to the local user's
  * own phone-number JID must resolve to a LID and that LID must map back to the same PN.
  *
  * <p>The expectations come from a captured live oracle
@@ -26,11 +26,11 @@ class SelfPnLidRoutingTest {
 
         var store = DeviceFixtures.temporaryStore(pnInput, expectedLidBare);
 
-        var lookedUpLid = store.findLidByPhone(pnInput).orElseThrow();
+        var lookedUpLid = store.contactStore().findLidByPhone(pnInput).orElseThrow();
         assertEquals(expectedLidBare.toUserJid(), lookedUpLid.toUserJid(),
                 "findLidByPhone(<own PN>) must return the LID WA Web resolves on the same input");
 
-        var lookedUpPn = store.findPhoneByLid(expectedLidBare).orElseThrow();
+        var lookedUpPn = store.contactStore().findPhoneByLid(expectedLidBare).orElseThrow();
         assertEquals(pnInput.toUserJid(), lookedUpPn.toUserJid(),
                 "findPhoneByLid(<own LID>) must round-trip back to the same PN; "
                         + "before the symmetric self-special-case fix, this returned empty");

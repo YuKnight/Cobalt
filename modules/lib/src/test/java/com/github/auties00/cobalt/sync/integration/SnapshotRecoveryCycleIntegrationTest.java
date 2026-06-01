@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.sync.integration;
+import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
@@ -9,7 +10,7 @@ import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.SyncFixtures;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -48,17 +49,17 @@ class SnapshotRecoveryCycleIntegrationTest {
         var client = TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(props);
-        var wam = new DefaultWamService(client, props);
-        recovery = new SnapshotRecoveryService(client, props, wam);
+        var wam = new LiveWamService(client, props);
+        recovery = new LiveSnapshotRecoveryService(client, props, wam);
     }
 
     @Nested
-    @DisplayName("synthetic smoke — gating composition without IO")
+    @DisplayName("synthetic smoke â€” gating composition without IO")
     class Smoke {
         @Test
         @DisplayName("recovery is disabled when the primary doesn't advertise support")
         void disabledByPrimary() {
-            store.setPrimaryDeviceSupportsSyncdRecovery(false);
+            store.syncStore().setPrimaryDeviceSupportsSyncdRecovery(false);
             props.set(ABProp.ENABLE_PEER_SNAPSHOT_RECOVERY, true);
             assertFalse(recovery.isRecoveryEnabled());
         }
@@ -66,7 +67,7 @@ class SnapshotRecoveryCycleIntegrationTest {
         @Test
         @DisplayName("recovery is disabled when the AB prop is off")
         void disabledByAbProp() {
-            store.setPrimaryDeviceSupportsSyncdRecovery(true);
+            store.syncStore().setPrimaryDeviceSupportsSyncdRecovery(true);
             props.set(ABProp.ENABLE_PEER_SNAPSHOT_RECOVERY, false);
             assertFalse(recovery.isRecoveryEnabled());
         }
@@ -74,7 +75,7 @@ class SnapshotRecoveryCycleIntegrationTest {
         @Test
         @DisplayName("recovery is enabled when both gates pass")
         void enabledByDefault() {
-            store.setPrimaryDeviceSupportsSyncdRecovery(true);
+            store.syncStore().setPrimaryDeviceSupportsSyncdRecovery(true);
             props.set(ABProp.ENABLE_PEER_SNAPSHOT_RECOVERY, true);
             assertTrue(recovery.isRecoveryEnabled());
         }
@@ -82,7 +83,7 @@ class SnapshotRecoveryCycleIntegrationTest {
         @Test
         @DisplayName("CRITICAL_BLOCK never attempts recovery (collection-specific gate)")
         void criticalBlockExcluded() {
-            store.setPrimaryDeviceSupportsSyncdRecovery(true);
+            store.syncStore().setPrimaryDeviceSupportsSyncdRecovery(true);
             props.set(ABProp.ENABLE_PEER_SNAPSHOT_RECOVERY, true);
             props.set(ABProp.SNAPSHOT_RECOVERY_MAX_MUTATIONS_COUNT_ALLOWED, 1_000);
             assertFalse(recovery.shouldAttemptRecovery(SyncPatchType.CRITICAL_BLOCK, 0));
@@ -90,10 +91,10 @@ class SnapshotRecoveryCycleIntegrationTest {
     }
 
     @Nested
-    @DisplayName("captured cycle — oracle parity once fixtures land")
+    @DisplayName("captured cycle â€” oracle parity once fixtures land")
     class CapturedCycle {
         @Test
-        @DisplayName("forced MAC mismatch → recovery request → captured response replaces collection state")
+        @DisplayName("forced MAC mismatch â†’ recovery request â†’ captured response replaces collection state")
         void capturedRecoveryCycle() {
             if (!SyncFixtures.isAvailable("integration/snapshot-recovery-cycle/regular-low")) return;
             // Fixture replays the captured recovery response and asserts the store's

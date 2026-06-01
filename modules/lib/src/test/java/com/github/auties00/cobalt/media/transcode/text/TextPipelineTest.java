@@ -43,7 +43,7 @@ class TextPipelineTest {
     }
 
     @Test
-    @DisplayName("decorate: store.disableLinkPreviews()=true -> message body unchanged")
+    @DisplayName("decorate: store.settingsStore().disableLinkPreviews()=true -> message body unchanged")
     void disabledPreviewsLeaveMessageAlone() {
         var props = TestABPropsService.builder().build();
         var store = store(true);
@@ -54,7 +54,7 @@ class TextPipelineTest {
         service.run(PEER, msg);
 
         assertEquals("https://example.com", msg.text().orElseThrow(),
-                "text body is preserved verbatim — only preview metadata may be added by decorate");
+                "text body is preserved verbatim â€” only preview metadata may be added by decorate");
         assertTrue(msg.matchedText().isEmpty(),
                 "disabled preview: matchedText must remain absent");
         assertTrue(msg.title().isEmpty(),
@@ -119,7 +119,7 @@ class TextPipelineTest {
 
     private static WhatsAppStore store(boolean disableLinkPreviews) {
         var store = MessageFixtures.temporaryStore(SELF, null);
-        store.setDisableLinkPreviews(disableLinkPreviews);
+        store.settingsStore().setDisableLinkPreviews(disableLinkPreviews);
         return store;
     }
 }

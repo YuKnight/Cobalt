@@ -12,7 +12,7 @@ import it.auties.protobuf.annotation.ProtobufEnum;
  * administrators through the WhatsApp client. Each action modifies a
  * {@link Contact}'s relationship with a group {@link Chat} (one where
  * {@link Chat#isGroupOrCommunity()} returns {@code true}). The actions can be
- * executed using the participant management methods in {@code WhatsAppClient}.
+ * executed using the participant management methods in {@code LinkedWhatsAppClient}.
  *
  * <p>The {@link #data()} method returns the lowercase protocol-level identifier
  * for the action, which is used in the XMPP stanza sent to the server.

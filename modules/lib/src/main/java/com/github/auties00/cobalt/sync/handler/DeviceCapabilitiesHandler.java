@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -154,7 +154,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeviceCapabilitiesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.success();
         }
@@ -169,16 +169,16 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
         }
 
         var deviceJid = Jid.of(deviceJidString);
-        var previous = client.store().findDeviceCapabilitiesEntry(deviceJid)
+        var previous = client.store().contactStore().findDeviceCapabilitiesEntry(deviceJid)
                 .map(DeviceCapabilitiesEntry::capabilities)
                 .orElse(null);
-        client.store().putDeviceCapabilitiesEntry(new DeviceCapabilitiesEntryBuilder().deviceJid(deviceJid).capabilities(capabilities).build());
+        client.store().contactStore().putDeviceCapabilitiesEntry(new DeviceCapabilitiesEntryBuilder().deviceJid(deviceJid).capabilities(capabilities).build());
         if (Objects.equals(previous, capabilities)) {
             return MutationApplicationResult.success();
         }
 
         if (deviceJid.device() == PRIMARY_DEVICE) {
-            client.store().setPrimaryDeviceCapabilities(capabilities);
+            client.store().contactStore().setPrimaryDeviceCapabilities(capabilities);
             capabilities.userHasAvatar()
                     .ifPresent(avatar -> client.store().setHasAvatar(avatar.userHasAvatar()));
             capabilities.lidMigration()

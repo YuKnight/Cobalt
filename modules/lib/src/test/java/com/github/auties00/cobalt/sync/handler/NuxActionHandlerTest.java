@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers {@link NuxActionHandler}: a {@link SyncdOperation#SET} with {@code acknowledged=true} or
  * {@code acknowledged=false} writes a matching {@code dismissed} flag via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#putOnboardingHintState}, a missing
+ * {@link com.github.auties00.cobalt.store.SettingsStore#putOnboardingHintState}, a missing
  * {@code nuxAction} on the value coalesces to {@code dismissed=false} and still returns
  * {@link SyncActionState#SUCCESS}, a missing {@code indexParts[1]} surfaces as
  * {@link SyncActionState#MALFORMED}, {@link SyncdOperation#REMOVE} surfaces as
@@ -47,7 +47,7 @@ class NuxActionHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
     private static final String HINT_KEY = "lockchats_v1";
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -95,7 +95,7 @@ class NuxActionHandlerTest {
                     client, nuxMutation(HINT_KEY, Boolean.TRUE, SyncdOperation.SET, Instant.ofEpochSecond(1700000000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var state = client.store().findOnboardingHintState(HINT_KEY).orElseThrow();
+            var state = client.store().settingsStore().findOnboardingHintState(HINT_KEY).orElseThrow();
             assertEquals(HINT_KEY, state.hintId());
             assertTrue(state.dismissed());
         }
@@ -107,7 +107,7 @@ class NuxActionHandlerTest {
                     client, nuxMutation(HINT_KEY, Boolean.FALSE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var state = client.store().findOnboardingHintState(HINT_KEY).orElseThrow();
+            var state = client.store().settingsStore().findOnboardingHintState(HINT_KEY).orElseThrow();
             assertFalse(state.dismissed());
         }
 
@@ -125,7 +125,7 @@ class NuxActionHandlerTest {
             var result = new NuxActionHandler().applyMutation(client, mutation);
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var state = client.store().findOnboardingHintState(HINT_KEY).orElseThrow();
+            var state = client.store().settingsStore().findOnboardingHintState(HINT_KEY).orElseThrow();
             assertFalse(state.dismissed(),
                     "missing nuxAction must coalesce to acknowledged=false on the store record");
         }
@@ -142,7 +142,7 @@ class NuxActionHandlerTest {
 
             assertEquals(SyncActionState.SUCCESS, result.actionState(),
                     "NUX writes a new hint state row whenever the key is present");
-            assertTrue(client.store().findOnboardingHintState("totally_new_key").isPresent());
+            assertTrue(client.store().settingsStore().findOnboardingHintState("totally_new_key").isPresent());
         }
     }
 
@@ -173,7 +173,7 @@ class NuxActionHandlerTest {
                     client, nuxMutation(HINT_KEY, Boolean.TRUE, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(client.store().findOnboardingHintState(HINT_KEY).isEmpty(),
+            assertTrue(client.store().settingsStore().findOnboardingHintState(HINT_KEY).isEmpty(),
                     "REMOVE must not create a hint record");
         }
     }

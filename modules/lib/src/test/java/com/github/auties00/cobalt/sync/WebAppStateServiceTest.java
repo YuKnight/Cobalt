@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.sync;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
@@ -7,7 +8,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * a live connection and is out of scope. The service runs against {@link TestWhatsAppClient} and an
  * in-memory {@link WhatsAppStore} from {@link DeviceFixtures#temporaryStore(Jid, Jid)} so every test
  * runs without IO; the named JIDs are fictitious and carry no provenance from a real session. The
- * own JID is pinned via {@link WhatsAppStore#setJid(Jid)} so paths that consult {@code store.jid()}
+ * own JID is pinned via {@link com.github.auties00.cobalt.store.AccountStore#setJid(Jid)} so paths that consult {@code store.accountStore().jid()}
  * do not face an absent identity.
  */
 @DisplayName("WebAppStateService")
@@ -52,12 +53,12 @@ class WebAppStateServiceTest {
     void setUp() {
         props = TestABPropsService.builder().build();
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         client = TestWhatsAppClient.create().withStore(store);
-        var wam = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wam);
-        var snapshotRecovery = new SnapshotRecoveryService(client, props, wam);
-        service = new WebAppStateService(client, props, lidMigration, snapshotRecovery, wam, TestMediaConnectionService.create());
+        var wam = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wam);
+        var snapshotRecovery = new LiveSnapshotRecoveryService(client, props, wam);
+        service = new LiveWebAppStateService(client, props, lidMigration, snapshotRecovery, wam, TestMediaConnectionService.create());
     }
 
     @AfterEach

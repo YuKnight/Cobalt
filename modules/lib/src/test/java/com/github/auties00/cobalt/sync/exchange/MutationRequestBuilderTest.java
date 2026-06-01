@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,9 +47,9 @@ class MutationRequestBuilderTest {
     private static Harness build() {
         var props = TestABPropsService.builder().build();
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wam = new DefaultWamService(client, props);
+        var wam = new LiveWamService(client, props);
         return new Harness(client, new MutationRequestBuilder(client, props, wam, TestMediaConnectionService.create()), store);
     }
 
@@ -152,7 +152,7 @@ class MutationRequestBuilderTest {
         @DisplayName("after updateWebAppStateVersion the collection becomes bootstrapped (return_snapshot=\"false\")")
         void bootstrappedSkipsSnapshot() {
             var h = build();
-            h.store.updateWebAppStateVersion(SyncPatchType.REGULAR, 1L, MutationLTHash.EMPTY_HASH);
+            h.store.syncStore().updateWebAppStateVersion(SyncPatchType.REGULAR, 1L, MutationLTHash.EMPTY_HASH);
 
             var collection = h.builder.buildSyncRequest(SyncPatchType.REGULAR, List.of())
                     .node().build()

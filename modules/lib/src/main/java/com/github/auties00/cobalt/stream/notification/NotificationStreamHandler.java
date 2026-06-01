@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.stream.notification;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -14,7 +15,7 @@ import com.github.auties00.cobalt.stream.notification.account.NotificationAccoun
 import com.github.auties00.cobalt.stream.notification.business.NotificationBusinessDispatcher;
 import com.github.auties00.cobalt.stream.notification.device.NotificationDeviceDispatcher;
 import com.github.auties00.cobalt.stream.notification.group.NotificationGroupStreamHandler;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.wam.WamService;
 
@@ -57,10 +58,10 @@ import com.github.auties00.cobalt.wam.WamService;
  * and to share dependencies across thematically related notification
  * types. Unknown {@code type} values are dropped here without emitting a
  * NACK; WA Web instead routes the unknown stanza through a generic NACK
- * path, which Cobalt centralises in {@link SocketStream}'s error model.
+ * path, which Cobalt centralises in {@link NodeStreamService}'s error model.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
-public final class NotificationStreamHandler implements SocketStream.Handler {
+public final class NotificationStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * Holds the sub-dispatcher for notifications that affect the current
      * account's contact list, privacy settings, profile picture, or status
@@ -98,7 +99,7 @@ public final class NotificationStreamHandler implements SocketStream.Handler {
      * {@link #handle(Node)} reduces to a single switch-and-delegate, and so
      * that all per-family dependency wiring lives in one place.
      *
-     * @param whatsapp                     the {@link WhatsAppClient} shared
+     * @param whatsapp                     the {@link LinkedWhatsAppClient} shared
      *                                     by every sub-dispatcher
      * @param deviceLinkingService         the {@link CompanionPairingService}
      *                                     that owns the pairing-code
@@ -131,7 +132,7 @@ public final class NotificationStreamHandler implements SocketStream.Handler {
      *                                     {@code <ack>} stanza
      */
     public NotificationStreamHandler(
-            WhatsAppClient whatsapp,
+            LinkedWhatsAppClient whatsapp,
             CompanionPairingService deviceLinkingService,
             LidMigrationService lidMigrationService,
             ABPropsService abPropsService,
@@ -159,7 +160,7 @@ public final class NotificationStreamHandler implements SocketStream.Handler {
      * though WA Web wires that path through a separate handler; Cobalt
      * consolidates all notification routing here. Unknown {@code type}
      * values are dropped without a NACK because the unrecognised-stanza
-     * NACK policy is enforced centrally by {@link SocketStream}'s error
+     * NACK policy is enforced centrally by {@link NodeStreamService}'s error
      * model.
      */
     @Override

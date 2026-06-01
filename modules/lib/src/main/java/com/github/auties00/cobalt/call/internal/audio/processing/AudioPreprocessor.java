@@ -40,7 +40,7 @@ import java.util.Objects;
  */
 public final class AudioPreprocessor implements AutoCloseable {
     static {
-        NativeLibLoader.load("speexdsp", Arena.global());
+        NativeLibLoader.load("cobalt-native", Arena.global());
     }
 
     /**

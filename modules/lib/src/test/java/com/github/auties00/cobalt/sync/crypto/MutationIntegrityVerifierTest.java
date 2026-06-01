@@ -59,7 +59,7 @@ class MutationIntegrityVerifierTest {
     @BeforeEach
     void setUp() {
         store = SyncFixtures.temporaryStoreWithSyncKey(SELF_PN, null, SYNC_KEY_ID, SYNC_KEY_DATA);
-        store.setCheckPatchMacs(true);
+        store.syncStore().setCheckPatchMacs(true);
         verifier = new MutationIntegrityVerifier(store);
     }
 
@@ -291,7 +291,7 @@ class MutationIntegrityVerifierTest {
         @Test
         @DisplayName("when checkPatchMacs is disabled the verifier returns null")
         void disabledShortCircuit() throws GeneralSecurityException {
-            store.setCheckPatchMacs(false);
+            store.syncStore().setCheckPatchMacs(false);
             try (var keys = MutationKeys.ofSyncKey(SYNC_KEY_DATA)) {
                 var snapshot = new SyncdSnapshotBuilder()
                         .version(syncdVersion(1L))
@@ -436,7 +436,7 @@ class MutationIntegrityVerifierTest {
         @Test
         @DisplayName("checkPatchMacs disabled short-circuits to true")
         void disabledShortCircuit() {
-            store.setCheckPatchMacs(false);
+            store.syncStore().setCheckPatchMacs(false);
             var patch = new SyncdPatchBuilder()
                     .version(syncdVersion(1L))
                     .patchMac(filled(32, 0xFF))

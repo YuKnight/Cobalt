@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.call.internal.signaling;
 
 import com.github.auties00.cobalt.call.CallState;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
  * <p>Each constant other than {@link #UNKNOWN} maps to one literal carried by the {@code state}
  * attribute of an inbound {@code peer_state} payload. The receive side parses that literal into one of
  * these constants via {@link #fromWireValue(String)} and surfaces it to
- * {@link WhatsAppClientListener#onCallPeerStateChanged}, so listeners switch on a typed value rather
+ * {@link LinkedWhatsAppClientListener#onCallPeerStateChanged}, so listeners switch on a typed value rather
  * than comparing wire strings. Any literal that does not match a known constant resolves to
  * {@link #UNKNOWN}, whose {@link #wireValue()} is {@code null}.
  */

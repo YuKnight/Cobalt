@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -90,7 +90,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!abPropsService.getBool(ABProp.SHARE_OWN_PN_SYNC)) {
             return MutationApplicationResult.unsupported();
         }
@@ -110,9 +110,8 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
-        var contact = client.store()
-                .findContactByJid(lidJid)
-                .orElseGet(() -> client.store().addNewContact(lidJid));
+        var contact = client.store().contactStore().findContactByJid(lidJid)
+                .orElseGet(() -> client.store().contactStore().addNewContact(lidJid));
         contact.setPhoneNumberShared(true);
         return MutationApplicationResult.success();
     }

@@ -56,7 +56,7 @@ class AiThreadDeleteHandlerTest {
         var caps = new DeviceCapabilitiesBuilder()
                 .aiThread(aiThread)
                 .build();
-        store.setPrimaryDeviceCapabilities(caps);
+        store.contactStore().setPrimaryDeviceCapabilities(caps);
     }
 
     private static DecryptedMutation.Trusted setMutation(String index) {
@@ -180,14 +180,14 @@ class AiThreadDeleteHandlerTest {
         @DisplayName("existing thread title is removed and SUCCESS is reported")
         void removesExistingTitle() {
             primaryAiThreadSupport(DeviceCapabilities.AiThread.SupportLevel.FULL);
-            store.putAiThreadTitle(new AiThreadTitleBuilder()
+            store.businessStore().putAiThreadTitle(new AiThreadTitleBuilder()
                     .threadId(STORE_KEY).title("My AI Thread").build());
 
             var index = "[\"ai_thread_delete\",\"" + BOT_JID_STRING + "\",\"" + THREAD_ID + "\"]";
             var result = new AiThreadDeleteHandler().applyMutation(client, setMutation(index));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findAiThreadTitle(STORE_KEY).isEmpty(),
+            assertTrue(store.businessStore().findAiThreadTitle(STORE_KEY).isEmpty(),
                     "the matching title must be removed from the store");
         }
 
@@ -195,7 +195,7 @@ class AiThreadDeleteHandlerTest {
         @DisplayName("INFRA support level is sufficient (any non-NONE level passes the gate)")
         void infraLevelAlsoPasses() {
             primaryAiThreadSupport(DeviceCapabilities.AiThread.SupportLevel.INFRA);
-            store.putAiThreadTitle(new AiThreadTitleBuilder()
+            store.businessStore().putAiThreadTitle(new AiThreadTitleBuilder()
                     .threadId(STORE_KEY).title("My AI Thread").build());
 
             var index = "[\"ai_thread_delete\",\"" + BOT_JID_STRING + "\",\"" + THREAD_ID + "\"]";
@@ -212,7 +212,7 @@ class AiThreadDeleteHandlerTest {
         void notExercised() {
             // The index alone identifies the thread, so an empty SyncActionValue is still SUCCESS.
             primaryAiThreadSupport(DeviceCapabilities.AiThread.SupportLevel.FULL);
-            store.putAiThreadTitle(new AiThreadTitleBuilder()
+            store.businessStore().putAiThreadTitle(new AiThreadTitleBuilder()
                     .threadId(STORE_KEY).title("My AI Thread").build());
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var value = new SyncActionValueBuilder().timestamp(ts).build();
@@ -247,7 +247,7 @@ class AiThreadDeleteHandlerTest {
         @DisplayName("the handler does not override applyMutationBatch")
         void defaultDispatchPreserved() {
             primaryAiThreadSupport(DeviceCapabilities.AiThread.SupportLevel.FULL);
-            store.putAiThreadTitle(new AiThreadTitleBuilder()
+            store.businessStore().putAiThreadTitle(new AiThreadTitleBuilder()
                     .threadId(STORE_KEY).title("My AI Thread").build());
             var index = "[\"ai_thread_delete\",\"" + BOT_JID_STRING + "\",\"" + THREAD_ID + "\"]";
             var results = new AiThreadDeleteHandler().applyMutationBatch(client, List.of(setMutation(index)));

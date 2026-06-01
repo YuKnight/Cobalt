@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -21,7 +21,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * in chat. When the merchant edits the methods on another SMB device, the
  * server replays the resulting {@link CustomPaymentMethodsAction} here, and the
  * methods become readable through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#customPaymentMethods()}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#customPaymentMethods()}.
  *
  * @implNote
  * This implementation is gated on the device platform being SMB
@@ -32,7 +32,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * {@link MutationApplicationResult#unsupported()}. The WA Web
  * {@code setCustomPaymentMethods} fire-and-forget frontend event is
  * collapsed into a direct
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setCustomPaymentMethods}
+ * {@link com.github.auties00.cobalt.store.BusinessStore#setCustomPaymentMethods}
  * write because Cobalt has no browser frontend bridge.
  */
 @WhatsAppWebModule(moduleName = "WAWebCustomPaymentMethodsSync")
@@ -97,8 +97,8 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCustomPaymentMethodsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var platform = client.store().device().platform();
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        var platform = client.store().accountStore().device().platform();
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
             return MutationApplicationResult.unsupported();
         }
@@ -115,7 +115,7 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        client.store().setCustomPaymentMethods(action.customPaymentMethods());
+        client.store().businessStore().setCustomPaymentMethods(action.customPaymentMethods());
         return MutationApplicationResult.success();
     }
 

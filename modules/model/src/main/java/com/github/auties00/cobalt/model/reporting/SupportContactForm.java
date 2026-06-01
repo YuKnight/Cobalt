@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.sendSupportContactForm} —
+ * Input model for {@code LinkedWhatsAppClient.sendSupportContactForm} —
  * submits a support-ticket contact-form payload to the relay.
  *
  * <p>{@link #from}, {@link #description} and {@link #topic} are

@@ -16,10 +16,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 /**
- * The metadata-only {@link Chat} subtype used as the value type of {@link PersistentStore#chats}.
+ * The metadata-only {@link Chat} subtype used as the value type of {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#chats}.
  *
  * @apiNote
- * Cobalt embedders never construct this directly; {@link PersistentStore#addNewChat(Jid)} returns
+ * Cobalt embedders never construct this directly; {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#addNewChat(Jid)} returns
  * one as a {@link Chat} and the protobuf builder produces one on deserialisation. Every message
  * accessor delegates to the owning store's {@link PersistentMessageStore} so that chat bodies stay
  * out of the protobuf snapshot and live in the LMDB env instead.
@@ -57,7 +57,7 @@ final class PersistentChat extends Chat {
      * @apiNote
      * This constructor is package-private and intended for the generated {@code PersistentChatBuilder}
      * and the protobuf deserialiser. Callers obtain instances via
-     * {@link PersistentStore#addNewChat(Jid)}.
+     * {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#addNewChat(Jid)}.
      *
      * @implNote
      * This implementation initialises {@link #messageCount} to zero. The owning

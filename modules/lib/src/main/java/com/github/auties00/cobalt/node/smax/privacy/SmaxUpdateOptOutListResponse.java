@@ -457,7 +457,7 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
      * The malformed-request reply variant, returned when the relay rejects the request as invalid.
      *
      * <p>The {@link #errorCode()} and {@link #errorText()} pair is surfaced to the caller; WA Web maps this to the
-     * {@code invalid_request} error kind. It is selected for relay error codes below {@code 500}.
+     * {@code invalid_request} error kind. It is selected for WhatsApp Web GraphQL error codes below {@code 500}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateOptOutListResponseInvalidRequest")
     final class ClientError implements SmaxUpdateOptOutListResponse {
@@ -565,7 +565,7 @@ public sealed interface SmaxUpdateOptOutListResponse extends SmaxOperation.Respo
      * The transient server-error reply variant, returned when the relay reports a recoverable failure.
      *
      * <p>The {@link #errorCode()} and {@link #errorText()} pair is surfaced to the caller; WA Web maps this to the
-     * {@code server_error} error kind and leaves the retry policy to the caller. It is selected for relay error
+     * {@code server_error} error kind and leaves the retry policy to the caller. It is selected for WhatsApp Web GraphQL error
      * codes of {@code 500} or above.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateOptOutListResponseServerError")

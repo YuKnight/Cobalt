@@ -1,4 +1,6 @@
 package com.github.auties00.cobalt.sync.integration;
+import com.github.auties00.cobalt.sync.LiveWebHistorySyncService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
@@ -12,7 +14,7 @@ import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import com.github.auties00.cobalt.sync.WebHistorySyncService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -29,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * encrypted blob, AES-CBC decrypt it, validate the HMAC, inflate the gzip stream,
  * decode a {@link com.github.auties00.cobalt.model.sync.history.HistorySync}
  * payload, and fan the chunk out to
- * {@link com.github.auties00.cobalt.client.WhatsAppClientListener} callbacks and
+ * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener} callbacks and
  * the {@link LidMigrationService}. The pipeline is wired in-process via
  * {@link TestWhatsAppClient} with no network IO. The synthetic group asserts
  * null and empty inputs are non-fatal across every {@link HistorySyncType}; the
@@ -50,17 +52,17 @@ class HistorySyncCycleIntegrationTest {
     void setUp() {
         var props = TestABPropsService.builder().build();
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         var client = TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(props);
-        var wam = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wam);
-        service = new WebHistorySyncService(client, lidMigration, wam, TestMediaConnectionService.create());
+        var wam = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wam);
+        service = new LiveWebHistorySyncService(client, lidMigration, wam, TestMediaConnectionService.create());
     }
 
     @Nested
-    @DisplayName("synthetic smoke — null/empty inputs are non-fatal")
+    @DisplayName("synthetic smoke Ã¢â‚¬â€ null/empty inputs are non-fatal")
     class Smoke {
         @Test
         @DisplayName("process(null) returns immediately")
@@ -78,7 +80,7 @@ class HistorySyncCycleIntegrationTest {
     }
 
     @Nested
-    @DisplayName("captured cycle — per-chunk-type oracle parity once fixtures land")
+    @DisplayName("captured cycle Ã¢â‚¬â€ per-chunk-type oracle parity once fixtures land")
     class CapturedCycle {
         @ParameterizedTest(name = "{0}")
         @EnumSource(HistorySyncType.class)

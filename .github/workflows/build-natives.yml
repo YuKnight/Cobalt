@@ -81,7 +81,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: natives-${{ matrix.classifier }}
-          path: modules/lib/dependencies/*/bin/${{ matrix.classifier }}/
+          path: modules/lib/natives/bin/${{ matrix.classifier }}/
 
       - name: Upload vendored headers (linux-x86_64 only)
         if: matrix.classifier == 'linux-x86_64'
@@ -116,7 +116,10 @@ jobs:
         run: |
           set -e
           for d in artifacts/natives-*/; do
-            cp -r "$d"* modules/lib/dependencies/
+            cls="$(basename "$d")"; cls="${cls#natives-}"
+            mkdir -p "modules/lib/natives/bin/$cls"
+            find "$d" -type f \( -name '*.so' -o -name '*.so.*' -o -name '*.dylib' -o -name '*.dll' \) \
+              -exec cp {} "modules/lib/natives/bin/$cls/" \;
           done
           cp -r artifacts/headers/* modules/lib/dependencies/
 
@@ -124,6 +127,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
+
+      - name: Install Linux headers for bindings
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends linux-libc-dev libc6-dev
 
       - name: Cache jextract
         id: jextract-cache
@@ -157,6 +165,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A \
             modules/lib/dependencies \
+            modules/lib/natives \
             modules/lib/src/main/java \
             modules/lib/src/main/resources/META-INF/native-checksums.json
           if git diff --staged --quiet; then

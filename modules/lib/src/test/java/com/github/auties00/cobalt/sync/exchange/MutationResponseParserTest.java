@@ -110,13 +110,14 @@ class MutationResponseParserTest {
     @DisplayName("collection-level errors - codes route to specific exception subtypes")
     class CollectionErrors {
         @Test
-        @DisplayName("409 throws Conflict in parseSyncResponse (single-collection mode)")
-        void code409Throws() {
+        @DisplayName("409 surfaces Conflict on collectionError instead of throwing (single-collection mode)")
+        void code409Conflict() {
             var iq = iq("result", collection("regular", attrs -> attrs.attribute("type", "error"),
                     new NodeBuilder().description("error").attribute("code", "409").build()
             ));
-            assertThrows(WhatsAppWebAppStateSyncException.Conflict.class,
-                    () -> PARSER.parseSyncResponse(iq));
+            var response = PARSER.parseSyncResponse(iq);
+            assertInstanceOf(WhatsAppWebAppStateSyncException.Conflict.class,
+                    response.collectionError().orElseThrow());
         }
 
         @Test
@@ -127,9 +128,28 @@ class MutationResponseParserTest {
                     .attribute("has_more_patches", "true"),
                     new NodeBuilder().description("error").attribute("code", "409").build()
             ));
-            var exception = assertThrows(WhatsAppWebAppStateSyncException.Conflict.class,
-                    () -> PARSER.parseSyncResponse(iq));
-            assertTrue(exception.hasMorePatches(), "Conflict.hasMore must reflect collection-level has_more_patches");
+            var conflict = assertInstanceOf(WhatsAppWebAppStateSyncException.Conflict.class,
+                    PARSER.parseSyncResponse(iq).collectionError().orElseThrow());
+            assertTrue(conflict.hasMorePatches(), "Conflict.hasMore must reflect collection-level has_more_patches");
+        }
+
+        @Test
+        @DisplayName("409 surfaces the catch-up patches so the caller can apply them and retry")
+        void code409CarriesCatchUpPatches() {
+            var patchBytes = SyncdPatchSpec.encode(new SyncdPatchBuilder()
+                    .version(new SyncdVersionBuilder().version(1L).build())
+                    .keyId(new KeyIdBuilder().id(new byte[]{1, 2, 3}).build())
+                    .build());
+            var iq = iq("result", collection("regular", attrs -> attrs.attribute("type", "error"),
+                    new NodeBuilder().description("error").attribute("code", "409").build(),
+                    new NodeBuilder().description("patches").content(List.of(
+                            new NodeBuilder().description("patch").content(patchBytes).build()
+                    )).build()
+            ));
+            var response = PARSER.parseSyncResponse(iq);
+            assertInstanceOf(WhatsAppWebAppStateSyncException.Conflict.class,
+                    response.collectionError().orElseThrow());
+            assertEquals(1, response.patches().size(), "409 must surface the catch-up patches, not discard them");
         }
 
         @Test

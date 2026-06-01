@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -28,10 +28,10 @@ import java.util.logging.Logger;
  * @implNote
  * This implementation resolves each favourite JID against the chat table
  * first, then through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findPhoneByLid(Jid)}
+ * {@link com.github.auties00.cobalt.store.ContactStore#findPhoneByLid(Jid)}
  * when the raw JID carries the LID server, then falls back to the raw JID, and
  * persists the resolved list directly through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setFavoriteChats(List)}.
+ * {@link com.github.auties00.cobalt.store.ChatStore#setFavoriteChats(List)}.
  */
 @WhatsAppWebModule(moduleName = "WAWebFavoritesSync")
 public final class FavoritesHandler implements WebAppStateActionHandler {
@@ -82,7 +82,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      * <p>Walks the batch classifying each entry, tracks the
      * {@link DecryptedMutation.Trusted} with the highest timestamp, and applies
      * only that one through
-     * {@link #applyLatestMutation(WhatsAppClient, DecryptedMutation.Trusted)};
+     * {@link #applyLatestMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)};
      * every other valid entry still receives
      * {@link MutationApplicationResult#success()}. Non-{@link SyncdOperation#SET}
      * operations and entries whose payload is not a {@link FavoritesAction} are
@@ -96,7 +96,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         DecryptedMutation.Trusted latest = null;
         var unsupportedCount = 0;
         var malformedCount = 0;
@@ -139,7 +139,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      *
      * <p>Runs the same validation as the batch path but unconditionally applies
      * the supplied mutation through
-     * {@link #applyLatestMutation(WhatsAppClient, DecryptedMutation.Trusted)},
+     * {@link #applyLatestMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)},
      * so a single {@link FavoritesAction} dispatched outside a batch still
      * mutates the favourites collection. Non-{@link SyncdOperation#SET}
      * operations and payloads that are not a {@link FavoritesAction} are
@@ -147,7 +147,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
@@ -167,18 +167,18 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      * <p>Resolves each entry in iteration order: entries whose raw id is absent
      * are skipped, the chat table is consulted first, then a LID-to-phone
      * fallback via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#findPhoneByLid(Jid)}
+     * {@link com.github.auties00.cobalt.store.ContactStore#findPhoneByLid(Jid)}
      * is attempted when the raw {@link Jid} carries the LID server, and the raw
      * JID is preserved as a final fallback. The resolved list is persisted
-     * through {@link com.github.auties00.cobalt.store.WhatsAppStore#setFavoriteChats(List)}.
+     * through {@link com.github.auties00.cobalt.store.ChatStore#setFavoriteChats(List)}.
      *
-     * @param client   the {@link WhatsAppClient} whose store will be mutated
+     * @param client   the {@link LinkedWhatsAppClient} whose store will be mutated
      * @param mutation the source mutation whose
      *                 {@link FavoritesAction#favorites()} list is resolved and
      *                 persisted in iteration order
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void applyLatestMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    private void applyLatestMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var action = (FavoritesAction) mutation.value().action().orElseThrow();
         var favorites = new ArrayList<Jid>();
         for (var favorite : action.favorites()) {
@@ -188,14 +188,14 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
             }
 
             var rawJid = Jid.of(rawId);
-            var resolved = client.store().findChatByJid(rawJid)
+            var resolved = client.store().chatStore().findChatByJid(rawJid)
                     .map(entry -> entry.jid())
-                    .or(() -> rawJid.hasLidServer() ? client.store().findPhoneByLid(rawJid) : Optional.<Jid>empty())
+                    .or(() -> rawJid.hasLidServer() ? client.store().contactStore().findPhoneByLid(rawJid) : Optional.<Jid>empty())
                     .orElse(rawJid);
             favorites.add(resolved);
         }
 
-        client.store().setFavoriteChats(favorites);
+        client.store().chatStore().setFavoriteChats(favorites);
     }
 
 }

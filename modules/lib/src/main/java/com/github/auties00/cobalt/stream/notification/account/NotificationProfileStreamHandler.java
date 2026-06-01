@@ -1,14 +1,16 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.ContactTextStatusListener;
+import com.github.auties00.cobalt.client.listener.ProfilePictureChangedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -36,7 +38,7 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleProfilePicNotification")
 @WhatsAppWebModule(moduleName = "WAWebHandleAboutNotification")
-public final class NotificationProfileStreamHandler implements SocketStream.Handler {
+public final class NotificationProfileStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs warnings about malformed action children and debug messages about unhandled types.
@@ -59,7 +61,7 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
     /**
      * Holds the client used for store reads and server queries (picture, about).
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Holds the ack sender used to ship the post-processing {@code <ack class="notification">} stanza for
@@ -73,7 +75,7 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * @param whatsapp  the non-{@code null} client
      * @param ackSender the non-{@code null} ack sender
      */
-    public NotificationProfileStreamHandler(WhatsAppClient whatsapp, AckSender ackSender) {
+    public NotificationProfileStreamHandler(LinkedWhatsAppClient whatsapp, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.ackSender = ackSender;
     }
@@ -188,7 +190,7 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      *
      * @implNote This implementation persists the URI only for the local account; WA Web caches the thumb
      * bytes per-target, but Cobalt has no thumb cache and lets callers re-query on demand via
-     * {@link WhatsAppClient#queryPicture}.
+     * {@link LinkedWhatsAppClient#queryPicture}.
      *
      * @param targetJid  the non-{@code null} JID of the entity whose picture changed
      * @param actionType either {@code "set"} or {@code "delete"}
@@ -198,10 +200,10 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
     private void handlePictureSetOrDelete(Jid targetJid, String actionType, Node node, Node actionNode) {
         if (isSelf(targetJid)) {
             if ("delete".equals(actionType)) {
-                whatsapp.store().setProfilePicture((URI) null);
+                whatsapp.store().accountStore().setProfilePicture((URI) null);
             } else {
                 var picture = whatsapp.queryPicture(targetJid).orElse(null);
-                whatsapp.store().setProfilePicture(picture);
+                whatsapp.store().accountStore().setProfilePicture(picture);
             }
         }
 
@@ -296,12 +298,11 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
         }
 
         for (var jid : jidsToUpdate) {
-            var existingStatus = whatsapp.store()
-                    .findContactTextStatus(jid)
+            var existingStatus = whatsapp.store().contactStore().findContactTextStatus(jid)
                     .orElse(null);
             if (existingStatus != null && content != null) {
                 existingStatus.setText(content);
-                whatsapp.store().addContactTextStatus(jid.toUserJid(), existingStatus);
+                whatsapp.store().contactStore().addContactTextStatus(jid.toUserJid(), existingStatus);
                 notifyContactTextStatusChanged(jid.toUserJid(), existingStatus);
             } else {
                 LOGGER.log(System.Logger.Level.WARNING,
@@ -340,35 +341,47 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
 
         var userJid = resolvedJid.toUserJid();
 
-        var existingStatus = whatsapp.store()
-                .findContactTextStatus(userJid)
+        var existingStatus = whatsapp.store().contactStore().findContactTextStatus(userJid)
                 .orElse(null);
         if (existingStatus != null) {
             var refreshed = whatsapp.queryAbout(userJid).orElse(null);
             if (refreshed != null) {
                 existingStatus.setText(refreshed);
-                whatsapp.store().addContactTextStatus(userJid, existingStatus);
+                whatsapp.store().contactStore().addContactTextStatus(userJid, existingStatus);
                 notifyContactTextStatusChanged(userJid, existingStatus);
             }
         }
     }
 
     /**
-     * Walks the local contact store and returns the JID whose computed hash matches the target hash.
+     * Returns the JID whose computed hash matches the target hash, checking the local account first and
+     * then the contact store.
      *
-     * <p>Performs a linear scan over the in-memory contacts, computing each contact's hash via
-     * {@link #computeContactHash(String)} and returning the first JID that matches.</p>
+     * <p>Matches the logged-in account's own PN and LID JIDs before performing a linear scan over the
+     * in-memory contacts, computing each candidate's hash via {@link #computeContactHash(String)} and
+     * returning the first JID that matches. Including the local account lets a side-list notification
+     * about the user's own profile resolve, since the account is not stored as a contact.</p>
      *
-     * @implNote This implementation iterates
-     * {@link com.github.auties00.cobalt.store.AbstractWhatsAppStore#contacts} and re-computes the hash
-     * for every contact; for small directories (a few thousand entries) this is cheap, and a hash-keyed
-     * cache would help only at much higher contact counts.
+     * @implNote This implementation re-computes the hash for the self JIDs and for every contact in
+     * {@link com.github.auties00.cobalt.store.ContactStore#contacts}; for small directories (a
+     * few thousand entries) this is cheap, and a hash-keyed cache would help only at much higher contact
+     * counts.
      *
      * @param targetHash the base64-encoded 3-byte hash to resolve
-     * @return the matching JID, or {@code null} if no contact hashes to {@code targetHash}
+     * @return the matching JID, or {@code null} if neither the local account nor any contact hashes to
+     *         {@code targetHash}
      */
     private Jid resolveContactByHash(String targetHash) {
-        for (var contact : whatsapp.store().contacts()) {
+        var selfPn = whatsapp.store().accountStore().jid().map(Jid::withoutData).orElse(null);
+        if (selfPn != null && selfPn.user() != null && targetHash.equals(computeContactHash(selfPn.user()))) {
+            return selfPn;
+        }
+        var selfLid = whatsapp.store().accountStore().lid().map(Jid::withoutData).orElse(null);
+        if (selfLid != null && selfLid.user() != null && targetHash.equals(computeContactHash(selfLid.user()))) {
+            return selfLid;
+        }
+
+        for (var contact : whatsapp.store().contactStore().contacts()) {
             var jid = contact.jid();
             var user = jid.user();
             if (user == null) {
@@ -424,9 +437,9 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      */
     private Jid getAlternateUserJid(Jid jid) {
         if (jid.hasUserServer()) {
-            return whatsapp.store().findLidByPhone(jid).orElse(null);
+            return whatsapp.store().contactStore().findLidByPhone(jid).orElse(null);
         } else if (jid.hasLidServer()) {
-            return whatsapp.store().findPhoneByLid(jid).orElse(null);
+            return whatsapp.store().contactStore().findPhoneByLid(jid).orElse(null);
         }
         return null;
     }
@@ -441,7 +454,7 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      * @return {@code true} when {@code jid} matches the local account, {@code false} otherwise
      */
     private boolean isSelf(Jid jid) {
-        return whatsapp.store().jid()
+        return whatsapp.store().accountStore().jid()
                 .map(self -> self.isSameAccount(jid))
                 .orElse(false);
     }
@@ -460,10 +473,10 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
             return;
         }
 
-        var contact = whatsapp.store().findContactByJid(contactJid)
-                .orElseGet(() -> whatsapp.store().addNewContact(contactJid.toUserJid()));
+        var contact = whatsapp.store().contactStore().findContactByJid(contactJid)
+                .orElseGet(() -> whatsapp.store().contactStore().addNewContact(contactJid.toUserJid()));
         contact.setChosenName(chosenName);
-        whatsapp.store().addContact(contact);
+        whatsapp.store().contactStore().addContact(contact);
     }
 
     /**
@@ -476,7 +489,9 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      */
     private void fireProfilePictureChanged(Jid jid) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onProfilePictureChanged(whatsapp, jid));
+            if (listener instanceof ProfilePictureChangedListener typed) {
+                Thread.startVirtualThread(() -> typed.onProfilePictureChanged(whatsapp, jid));
+            }
         }
     }
 
@@ -491,7 +506,9 @@ public final class NotificationProfileStreamHandler implements SocketStream.Hand
      */
     private void notifyContactTextStatusChanged(Jid contactJid, ContactTextStatus status) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onContactTextStatus(whatsapp, contactJid, status));
+            if (listener instanceof ContactTextStatusListener typed) {
+                Thread.startVirtualThread(() -> typed.onContactTextStatus(whatsapp, contactJid, status));
+            }
         }
     }
 

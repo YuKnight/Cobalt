@@ -103,7 +103,7 @@ public final class SctpEngine {
      * @throws WhatsAppCallException.Sctp if {@code usrsctp_init_nothreads} fails
      */
     private SctpEngine() {
-        NativeLibLoader.load("usrsctp", arena);
+        NativeLibLoader.load("cobalt-native", arena);
         var connOutputStub = installConnOutputUpcall();
         try {
             UsrSctp.usrsctp_init_nothreads((short) 0, connOutputStub, MemorySegment.NULL);

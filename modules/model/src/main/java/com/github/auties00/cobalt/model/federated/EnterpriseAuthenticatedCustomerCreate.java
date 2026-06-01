@@ -10,7 +10,7 @@ import java.util.Objects;
 
 /**
  * Input model for
- * {@code WhatsAppClient.createEnterpriseAuthenticatedCustomer}. Carries
+ * {@code LinkedWhatsAppClient.createEnterpriseAuthenticatedCustomer}. Carries
  * every parameter required by the
  * {@code WASmaxWaffleGenerateWAEntACUserRPC} mutation: the RSA-encrypted
  * onboarding payload, the issuance timestamp, and the four disclosure

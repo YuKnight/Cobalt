@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeight;
@@ -96,7 +96,7 @@ public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler
      * {@code WhatsAppStore.setRecentEmojiWeights}.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -106,7 +106,7 @@ public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler
         }
 
         var weights = action.weights();
-        client.store().setRecentEmojiWeights(weights);
+        client.store().settingsStore().setRecentEmojiWeights(weights);
         return MutationApplicationResult.success();
     }
 }

@@ -92,6 +92,18 @@ public final class VoiceCallSession implements AutoCloseable {
     private DtlsSrtpDriver dtls;
 
     /**
+     * The 30-byte hop-by-hop key the relay handed out in the {@code <hbh_key>} relay-block element,
+     * or {@code null} when media keying falls back to the peer DTLS-SRTP export.
+     *
+     * <p>When set, the media {@link SrtpEndpoint} is keyed from this hop-by-hop key via
+     * {@link SrtpEndpoint#fromHopByHopKey(byte[])} rather than from the DTLS handshake, matching real
+     * WhatsApp where the relayed media RTP is protected hop-by-hop to the edge relay and the peer
+     * DTLS-SRTP path is disabled. Left {@code null} by the loopback test sessions, which key from a
+     * shared DTLS handshake instead.
+     */
+    private volatile byte[] hopByHopKey;
+
+    /**
      * The audio pipeline, instantiated once the handshake completes and preserved across reconnects;
      * {@code null} until then.
      */
@@ -108,6 +120,15 @@ public final class VoiceCallSession implements AutoCloseable {
      * window; {@code null} until then.
      */
     private RtpReceiver rtpReceiver;
+
+    /**
+     * The SRTP endpoint media is keyed with, set by {@link #wireMedia(SrtpEndpoint)}.
+     *
+     * <p>On the hop-by-hop relay path this is the {@link SrtpEndpoint#fromHopByHopKey(byte[])} endpoint
+     * rather than a DTLS-handshake export, so {@link #startVideoTrack(VideoTrackOptions)} reads it here
+     * (the DTLS driver's {@code srtpEndpoint()} is {@code null} when no peer DTLS handshake ran).
+     */
+    private volatile SrtpEndpoint activeSrtp;
 
     /**
      * The active video tracks, keyed by {@link VideoTrackOptions.Kind}.
@@ -169,13 +190,62 @@ public final class VoiceCallSession implements AutoCloseable {
     public VoiceCallSession(ActiveCall call, DatagramTransport transport,
                             SrtpRole role, DtlsCertificate localCert,
                             byte[] expectedPeerFingerprint, VoiceCallOptions options) {
+        this(call,
+                new DtlsSrtpDriver(
+                        Objects.requireNonNull(transport, "transport cannot be null"),
+                        Objects.requireNonNull(role, "role cannot be null"),
+                        Objects.requireNonNull(localCert, "localCert cannot be null"),
+                        Objects.requireNonNull(expectedPeerFingerprint, "expectedPeerFingerprint cannot be null")),
+                role, localCert, expectedPeerFingerprint, options);
+    }
+
+    /**
+     * Constructs a one-to-one voice-call session bound to the given call and an already-built
+     * {@link DtlsSrtpDriver}.
+     *
+     * <p>Used when the transport layer ({@link com.github.auties00.cobalt.call.internal.transport.ActiveCallTransport})
+     * has already constructed the driver, possibly already driven its handshake, so the session
+     * shares the same DTLS/SRTP demultiplexer as the SCTP data-channel transport. The role,
+     * certificate, and expected peer fingerprint are still passed in so the session can rebuild
+     * the driver on {@link #reconnect(DatagramTransport)}.
+     *
+     * @param call                    the active call whose media ports drive the session
+     * @param driver                  the pre-built DTLS-SRTP driver
+     * @param role                    the DTLS-SRTP role exchanged via signaling, either
+     *                                {@link SrtpRole#CLIENT} or {@link SrtpRole#SERVER}
+     * @param localCert               the local DTLS certificate
+     * @param expectedPeerFingerprint the peer's SHA-256 certificate fingerprint from signaling
+     * @param options                 the per-call configuration
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public VoiceCallSession(ActiveCall call, DtlsSrtpDriver driver,
+                            SrtpRole role, DtlsCertificate localCert,
+                            byte[] expectedPeerFingerprint, VoiceCallOptions options) {
         this.call = Objects.requireNonNull(call, "call cannot be null");
         this.options = Objects.requireNonNull(options, "options cannot be null");
         this.role = Objects.requireNonNull(role, "role cannot be null");
         this.localCert = Objects.requireNonNull(localCert, "localCert cannot be null");
         Objects.requireNonNull(expectedPeerFingerprint, "expectedPeerFingerprint cannot be null");
         this.expectedPeerFingerprint = expectedPeerFingerprint.clone();
-        this.dtls = new DtlsSrtpDriver(transport, role, localCert, expectedPeerFingerprint);
+        this.dtls = Objects.requireNonNull(driver, "driver cannot be null");
+    }
+
+    /**
+     * Keys the media {@link SrtpEndpoint} from the 30-byte hop-by-hop key the relay handed out in the
+     * {@code <hbh_key>} relay-block element instead of from the peer DTLS-SRTP export.
+     *
+     * <p>Must be called before {@link #start()}. When set, {@link #wireMedia(SrtpEndpoint)} replaces
+     * the DTLS-derived endpoint with {@link SrtpEndpoint#fromHopByHopKey(byte[])}, so the relayed
+     * media RTP is protected hop-by-hop to the edge relay as real WhatsApp does; the DTLS driver is
+     * still used as the byte transport and for the SCTP control channel. Passing {@code null} leaves
+     * the session on the DTLS-export keying used by the loopback tests.
+     *
+     * @param hbhKey the 30-byte hop-by-hop key, or {@code null} to keep DTLS-export keying
+     * @return this session, for chaining before {@link #start()}
+     */
+    public VoiceCallSession useHopByHopKey(byte[] hbhKey) {
+        this.hopByHopKey = hbhKey == null ? null : hbhKey.clone();
+        return this;
     }
 
     /**
@@ -252,7 +322,11 @@ public final class VoiceCallSession implements AutoCloseable {
      * budget bounds both the handshake wait and the wiring poll.
      */
     public void awaitConnected(long timeout, TimeUnit unit) throws IOException, InterruptedException {
-        dtls.awaitHandshake(timeout, unit);
+        // In hop-by-hop mode the SRTP keys are known up front, so there is no peer DTLS handshake to
+        // await; only wait for the media pipeline to wire. The DTLS path still awaits the handshake.
+        if (hopByHopKey == null) {
+            dtls.awaitHandshake(timeout, unit);
+        }
         var deadline = System.nanoTime() + unit.toNanos(timeout);
         while (audio == null) {
             if (System.nanoTime() > deadline) {
@@ -294,10 +368,10 @@ public final class VoiceCallSession implements AutoCloseable {
                     "video track for kind " + trackOptions.kind()
                             + " already running; call stopVideoTrack(kind) first");
         }
-        var srtp = dtls.srtpEndpoint();
+        var srtp = activeSrtp != null ? activeSrtp : dtls.srtpEndpoint();
         if (srtp == null) {
             throw new IllegalStateException(
-                    "DTLS handshake has not completed; cannot start a video track yet");
+                    "media is not yet keyed; cannot start a video track yet");
         }
         var codec = trackOptions.buildCodec();
         VideoPipeline pipeline = null;
@@ -313,6 +387,9 @@ public final class VoiceCallSession implements AutoCloseable {
             pipeline.start();
             videoTracks.put(trackOptions.kind(),
                     new VideoTrack(trackOptions, codec, pipeline, sender, receiver));
+            System.getLogger(VoiceCallSession.class.getName()).log(System.Logger.Level.INFO,
+                    "VIDEO TRACK STARTED kind=" + trackOptions.kind() + " ssrc=" + trackOptions.localVideoSsrc()
+                            + " pt=" + trackOptions.videoPayloadType());
         } catch (RuntimeException e) {
             try {
                 if (pipeline != null) pipeline.close();
@@ -427,6 +504,38 @@ public final class VoiceCallSession implements AutoCloseable {
     }
 
     /**
+     * Applies a freshly-published end-to-end rekey bundle to this session's SRTP endpoint.
+     *
+     * <p>Walks {@link com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload#keys()} and
+     * for each {@link com.github.auties00.cobalt.model.call.datachannel.RekeyKeyType#AUDIO AUDIO} or
+     * {@link com.github.auties00.cobalt.model.call.datachannel.RekeyKeyType#VIDEO VIDEO} entry calls
+     * {@link com.github.auties00.cobalt.call.internal.rtp.srtp.SrtpEndpoint#rotateMasterKey(byte[])}
+     * on the shared endpoint owned by this session's DTLS driver. The session uses one
+     * {@code SrtpEndpoint} for both audio and video tracks (they share DTLS-SRTP keys), so a payload
+     * carrying both an AUDIO and a VIDEO entry installs the AUDIO key first and then the VIDEO key
+     * second; in practice only the last entry's key is retained.
+     *
+     * <p>{@link com.github.auties00.cobalt.model.call.datachannel.RekeyKeyType#APPDATA APPDATA}
+     * entries describe the DataChannel rekey and do not touch this session's SRTP endpoint.
+     *
+     * @param payload the rekey bundle
+     * @throws NullPointerException if {@code payload} is {@code null}
+     */
+    public void applyRekey(com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload payload) {
+        Objects.requireNonNull(payload, "payload cannot be null");
+        var srtp = dtls.srtpEndpoint();
+        if (srtp == null) {
+            return;
+        }
+        for (var entry : payload.keys()) {
+            switch (entry.type()) {
+                case AUDIO, VIDEO -> srtp.rotateMasterKey(entry.key());
+                case APPDATA -> { /* DataChannel rekey; outside the SRTP endpoint */ }
+            }
+        }
+    }
+
+    /**
      * Tears down the session, closing every video track, the audio pipeline, and the DTLS driver
      * (which closes the transport).
      *
@@ -469,6 +578,14 @@ public final class VoiceCallSession implements AutoCloseable {
      * setup timeout.
      */
     private void completeAfterHandshake() {
+        // Hop-by-hop media keys come from the relay's <hbh_key>, not a peer DTLS-SRTP export: the
+        // relay forwards SRTP and the peer never runs a peer DTLS handshake (the WhatsApp P2P path is
+        // disabled). Wire media immediately over the relay transport; the driver moves raw SRTP via
+        // sendSrtp/srtpHandler regardless of DTLS handshake state (RFC 7983 byte-0 demux).
+        if (hopByHopKey != null) {
+            wireMedia(SrtpEndpoint.fromHopByHopKey(hopByHopKey));
+            return;
+        }
         var srtp = dtls.srtpEndpoint();
         if (srtp == null) {
             try {
@@ -495,6 +612,16 @@ public final class VoiceCallSession implements AutoCloseable {
         if (closed) {
             return;
         }
+        // Real WhatsApp keys the relayed media RTP from the hop-by-hop key the relay issues in the
+        // <hbh_key> relay-block element, not from a peer DTLS-SRTP export (the peer P2P path is
+        // disabled). When a hop-by-hop key was supplied, key the endpoint from it; the DTLS driver is
+        // still the byte transport and the SCTP control channel. The DTLS-export endpoint is retained
+        // only for the loopback tests, which share a handshake instead of a relay.
+        var hbh = this.hopByHopKey;
+        if (hbh != null) {
+            srtp = SrtpEndpoint.fromHopByHopKey(hbh);
+        }
+        this.activeSrtp = srtp;
         this.rtpSender = new RtpSender(options.opusPayloadType(), options.localAudioSsrc(),
                 options.audio().sampleRate(), srtp, dtls::sendSrtp);
         this.rtpReceiver = new RtpReceiver(srtp, options.remoteAudioSsrc(),
@@ -616,9 +743,20 @@ public final class VoiceCallSession implements AutoCloseable {
         }
         try {
             sender.send(packet.payload(), packet.ptsMs(), packet.keyFrame());
+            var n = videoFramesSent.incrementAndGet();
+            if (n == 1 || n % 50 == 0) {
+                System.getLogger(VoiceCallSession.class.getName()).log(System.Logger.Level.INFO,
+                        "VIDEO RTP SENT frames=" + n + " (last payload=" + packet.payload().length + "B, keyframe="
+                                + packet.keyFrame() + ")");
+            }
         } catch (RuntimeException _) {
         }
     }
+
+    /**
+     * Counts encoded outbound video frames shipped as RTP, for bring-up diagnostics.
+     */
+    private final AtomicLong videoFramesSent = new AtomicLong();
 
     /**
      * Packetises one encoded outbound Opus frame into RTP and ships it through the DTLS driver.

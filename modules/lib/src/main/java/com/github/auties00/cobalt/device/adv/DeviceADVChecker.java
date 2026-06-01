@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.device.adv;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.WhatsAppAdvCheckException;
@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.props.ABProp;
+import com.github.auties00.cobalt.node.usync.UsyncContext;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.AdvStoredTimestampExpiredEventBuilder;
@@ -64,7 +65,7 @@ public final class DeviceADVChecker implements AutoCloseable {
     /**
      * Holds the WhatsApp client used for store access and failure reporting.
      */
-    private final WhatsAppClient client;
+    private final LinkedWhatsAppClient client;
 
     /**
      * Holds the device service consulted for the last-check time and for queueing pending syncs.
@@ -101,7 +102,7 @@ public final class DeviceADVChecker implements AutoCloseable {
     @WhatsAppWebExport(moduleName = "WAWebAdvDeviceInfoCheckJob",
             exports = "runAdvDeviceInfoCheck",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public DeviceADVChecker(WhatsAppClient client, DeviceService deviceService, ABPropsService abPropsService, WamService wamService) {
+    public DeviceADVChecker(LinkedWhatsAppClient client, DeviceService deviceService, ABPropsService abPropsService, WamService wamService) {
         this.client = client;
         this.deviceService = deviceService;
         this.abPropsService = abPropsService;
@@ -187,7 +188,7 @@ public final class DeviceADVChecker implements AutoCloseable {
      *
      * @implNote
      * This implementation surfaces unexpected exceptions through
-     * {@link WhatsAppClient#handleFailure(WhatsAppException)} as a {@link WhatsAppAdvCheckException}
+     * {@link LinkedWhatsAppClient#handleFailure(WhatsAppException)} as a {@link WhatsAppAdvCheckException}
      * so the error pipeline routes them the same way as any other ADV failure. The WAM events fire
      * before the self-expired logout so telemetry is not lost on the logout path.
      */
@@ -208,12 +209,12 @@ public final class DeviceADVChecker implements AutoCloseable {
             var warningThreshold = Duration.ofDays(expiryDays - warningDays);
 
             var now = Instant.now();
-            var myUserJid = client.store().jid()
+            var myUserJid = client.store().accountStore().jid()
                     .map(Jid::toUserJid)
                     .orElse(null);
 
             var result = analyzeDeviceLists(
-                    client.store().deviceLists(),
+                    client.store().contactStore().deviceLists(),
                     now,
                     expiryThreshold,
                     warningThreshold,
@@ -346,15 +347,15 @@ public final class DeviceADVChecker implements AutoCloseable {
                 .stream()
                 .filter(device -> !device.isPrimary())
                 .map(device -> device.toDeviceJid(userJid.user(), userJid.server()))
-                .forEach(client.store()::cleanupSignalSessions);
+                .forEach(client.store().signalStore()::cleanupSignalSessions);
 
-        client.store().markKeyRotation(userJid);
+        client.store().signalStore().markKeyRotation(userJid);
 
         var deletedList = new DeviceListBuilder()
                 .userJid(userJid)
                 .deleted(true)
                 .build();
-        client.store().addDeviceList(deletedList);
+        client.store().contactStore().addDeviceList(deletedList);
 
         LOGGER.log(Level.DEBUG, "Marked device list as deleted for {0}, cleaned up {1} companion devices",
                 userJid, deviceList.devices().size() - 1);
@@ -407,8 +408,8 @@ public final class DeviceADVChecker implements AutoCloseable {
      */
     private void scheduleProactiveSync(List<Jid> jids) {
         LOGGER.log(Level.DEBUG, "Proactively syncing {0} device lists", jids.size());
-        var pendingSync = PendingDeviceSync.of(jids, "adv_expiration");
-        client.store().addPendingDeviceSync(pendingSync);
+        var pendingSync = PendingDeviceSync.of(jids, UsyncContext.BACKGROUND.wireValue());
+        client.store().syncStore().addPendingDeviceSync(pendingSync);
         deviceService.retryPendingSyncs();
     }
 

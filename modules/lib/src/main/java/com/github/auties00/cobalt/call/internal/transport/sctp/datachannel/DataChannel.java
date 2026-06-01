@@ -198,6 +198,19 @@ public final class DataChannel implements AutoCloseable {
      *                       an in-band open and {@link DataChannelState#OPEN} for a negotiated or
      *                       peer-opened channel
      */
+    /**
+     * Cached SCTP partial-reliability policy byte resolved at construction from
+     * {@link #maxRetransmits} / {@link #maxLifetimeMs}.
+     */
+    private final short prPolicy;
+
+    /**
+     * Cached SCTP partial-reliability policy operand resolved at construction: the
+     * {@code maxRetransmits} count for {@code SCTP_PR_SCTP_RTX}, the {@code maxLifetimeMs}
+     * value for {@code SCTP_PR_SCTP_TTL}, or zero when fully reliable.
+     */
+    private final int prValue;
+
     DataChannel(DataChannelTransport transport, int streamId, String label, String protocol,
                 boolean ordered, boolean negotiated, OptionalInt maxRetransmits, OptionalInt maxLifetimeMs,
                 DataChannelState initialState) {
@@ -210,6 +223,45 @@ public final class DataChannel implements AutoCloseable {
         this.maxRetransmits = maxRetransmits;
         this.maxLifetimeMs = maxLifetimeMs;
         this.state = new AtomicReference<>(initialState);
+        if (maxRetransmits.isPresent()) {
+            this.prPolicy = (short) com.github.auties00.cobalt.call.internal.transport.sctp.bindings.UsrSctp.SCTP_PR_SCTP_RTX();
+            this.prValue = maxRetransmits.getAsInt();
+        } else if (maxLifetimeMs.isPresent()) {
+            this.prPolicy = (short) com.github.auties00.cobalt.call.internal.transport.sctp.bindings.UsrSctp.SCTP_PR_SCTP_TTL();
+            this.prValue = maxLifetimeMs.getAsInt();
+        } else {
+            this.prPolicy = (short) com.github.auties00.cobalt.call.internal.transport.sctp.bindings.UsrSctp.SCTP_PR_SCTP_NONE();
+            this.prValue = 0;
+        }
+    }
+
+    /**
+     * Returns whether this channel's negotiated reliability requires the partial-reliability send
+     * path on every outbound message.
+     *
+     * @return {@code true} when {@link #maxRetransmits} or {@link #maxLifetimeMs} is set
+     */
+    boolean isPartiallyReliable() {
+        return maxRetransmits.isPresent() || maxLifetimeMs.isPresent();
+    }
+
+    /**
+     * Returns the cached SCTP partial-reliability policy byte (one of
+     * {@code SCTP_PR_SCTP_NONE / TTL / RTX}).
+     *
+     * @return the policy byte
+     */
+    short prPolicy() {
+        return prPolicy;
+    }
+
+    /**
+     * Returns the cached SCTP partial-reliability policy operand.
+     *
+     * @return the policy operand
+     */
+    int prValue() {
+        return prValue;
     }
 
     /**
@@ -345,12 +397,12 @@ public final class DataChannel implements AutoCloseable {
     public void send(String text) {
         Objects.requireNonNull(text, "text cannot be null");
         requireOpen();
-        if (text.isEmpty()) {
-            transport.sendDataMessage(streamId, DataChannelTransport.PPID_STRING_EMPTY,
-                    DataChannelTransport.EMPTY_PLACEHOLDER, ordered);
+        var payload = text.isEmpty() ? DataChannelTransport.EMPTY_PLACEHOLDER : text.getBytes(StandardCharsets.UTF_8);
+        var ppid = text.isEmpty() ? DataChannelTransport.PPID_STRING_EMPTY : DataChannelTransport.PPID_STRING;
+        if (isPartiallyReliable()) {
+            transport.sendDataMessage(streamId, ppid, payload, ordered, prPolicy, prValue);
         } else {
-            var payload = text.getBytes(StandardCharsets.UTF_8);
-            transport.sendDataMessage(streamId, DataChannelTransport.PPID_STRING, payload, ordered);
+            transport.sendDataMessage(streamId, ppid, payload, ordered);
         }
     }
 
@@ -369,11 +421,12 @@ public final class DataChannel implements AutoCloseable {
     public void send(byte[] data) {
         Objects.requireNonNull(data, "data cannot be null");
         requireOpen();
-        if (data.length == 0) {
-            transport.sendDataMessage(streamId, DataChannelTransport.PPID_BINARY_EMPTY,
-                    DataChannelTransport.EMPTY_PLACEHOLDER, ordered);
+        var payload = data.length == 0 ? DataChannelTransport.EMPTY_PLACEHOLDER : data;
+        var ppid = data.length == 0 ? DataChannelTransport.PPID_BINARY_EMPTY : DataChannelTransport.PPID_BINARY;
+        if (isPartiallyReliable()) {
+            transport.sendDataMessage(streamId, ppid, payload, ordered, prPolicy, prValue);
         } else {
-            transport.sendDataMessage(streamId, DataChannelTransport.PPID_BINARY, data, ordered);
+            transport.sendDataMessage(streamId, ppid, payload, ordered);
         }
     }
 

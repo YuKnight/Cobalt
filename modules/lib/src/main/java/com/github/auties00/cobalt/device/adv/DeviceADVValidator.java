@@ -178,11 +178,11 @@ public final class DeviceADVValidator {
     public ADVSignedDeviceIdentity extractAndValidateLocalSignedDeviceIdentity(Node deviceIdentityNode) {
         Objects.requireNonNull(deviceIdentityNode, "deviceIdentityNode cannot be null");
 
-        var localJid = store.jid()
+        var localJid = store.accountStore().jid()
                 .orElseThrow(() -> new IllegalStateException("Local JID not set in store"));
-        var advSecretKey = store.advSecretKey()
+        var advSecretKey = store.signalStore().advSecretKey()
                 .orElseThrow(() -> new IllegalStateException("ADV secret key not set in store"));
-        var localIdentityKeyPair = store.identityKeyPair();
+        var localIdentityKeyPair = store.signalStore().identityKeyPair();
 
         if (advSecretKey.length != 32) {
             throw new IllegalArgumentException("advSecretKey must be 32 bytes, got " + advSecretKey.length);
@@ -203,7 +203,7 @@ public final class DeviceADVValidator {
             byte[] hmacInput;
             var outerEncryptionType = deviceIdentityHmac.accountType()
                     .orElse(ADVEncryptionType.E2EE);
-            var platform = store.device().platform();
+            var platform = store.accountStore().device().platform();
             var isSMB = platform == ClientPlatformType.ANDROID_BUSINESS || platform == ClientPlatformType.IOS_BUSINESS;
             if (isSMB && outerEncryptionType == ADVEncryptionType.HOSTED) {
                 hmacInput = DataUtils.concatByteArrays(HOSTED_ACCOUNT_SIGNATURE_HEADER, details);
@@ -551,7 +551,7 @@ public final class DeviceADVValidator {
             return Optional.empty();
         }
         var address = new SignalProtocolAddress(deviceJid.user(), deviceJid.device());
-        return store.findIdentityByAddress(address)
+        return store.signalStore().findIdentityByAddress(address)
                 .map(SignalIdentityKey::toEncodedPoint);
     }
 
@@ -575,7 +575,7 @@ public final class DeviceADVValidator {
             return Optional.empty();
         }
         var address = new SignalProtocolAddress(jid.user(), 0);
-        return store.findIdentityByAddress(address)
+        return store.signalStore().findIdentityByAddress(address)
                 .map(SignalIdentityKey::toEncodedPoint);
     }
 

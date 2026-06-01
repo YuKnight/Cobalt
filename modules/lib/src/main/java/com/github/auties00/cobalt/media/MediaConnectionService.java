@@ -21,9 +21,7 @@ import java.util.SequencedCollection;
  * handshake; the transfer methods consume the most recently installed one.
  * This service is the entry point whenever Cobalt ships or materialises a
  * media-bearing message: {@link #upload(MediaProvider, MediaPayload)} for
- * outbound attachments, {@link #download(MediaProvider)} for inbound ones,
- * and {@link #deleteHistorySyncBlob(String, byte[], String, String)} to
- * release a consumed history-sync blob. {@link DefaultMediaConnectionService}
+ * outbound attachments, {@link #download(MediaProvider)} for inbound ones. {@link LiveMediaConnectionService}
  * is the production implementation that talks to the live CDN.
  *
  * @implSpec
@@ -31,7 +29,7 @@ import java.util.SequencedCollection;
  * handler may call {@link #update(Node)} concurrently with sender and
  * receiver pipelines invoking the transfer methods. The transfer methods
  * and the credential accessors require at least one {@link #update(Node)}
- * to have landed first; {@link DefaultMediaConnectionService} blocks the
+ * to have landed first; {@link LiveMediaConnectionService} blocks the
  * transfer methods on a first-refresh latch and throws
  * {@link IllegalStateException} from the accessors until then.
  */

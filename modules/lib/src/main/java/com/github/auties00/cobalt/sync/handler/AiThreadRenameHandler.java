@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -22,7 +22,7 @@ import java.util.logging.Logger;
  * <p>When a single AI conversation thread is renamed on another device, the
  * server replays the rename here and the stored title is updated; the new
  * title is read back through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findAiThreadTitle(String)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findAiThreadTitle(String)}.
  *
  * @implNote
  * This implementation collapses WA Web's full {@code ThreadsMetadata}
@@ -76,7 +76,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
      * <p>Validates the JSON index {@code ["ai_thread_rename", chatJid, threadId]}
      * and the {@link AiThreadRenameAction#newTitle()} payload, confirms the chat
      * JID is a bot, gates on AI-thread support, and stores the new title via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#putAiThreadTitle(com.github.auties00.cobalt.model.bot.AiThreadTitle)}.
+     * {@link com.github.auties00.cobalt.store.BusinessStore#putAiThreadTitle(com.github.auties00.cobalt.model.bot.AiThreadTitle)}.
      * Returns {@link SyncActionState#UNSUPPORTED} for non-{@link SyncdOperation#SET}
      * operations or when AI-thread support is off, {@link SyncActionState#ORPHAN}
      * when no matching thread is in the store, and {@link SyncActionState#FAILED}
@@ -93,7 +93,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
@@ -124,7 +124,7 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
             if (!chatJid.isBot()) {
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
-            var aiThreadSupported = client.store().primaryDeviceCapabilities()
+            var aiThreadSupported = client.store().contactStore().primaryDeviceCapabilities()
                     .flatMap(DeviceCapabilities::aiThread)
                     .flatMap(DeviceCapabilities.AiThread::supportLevel)
                     .filter(level -> level != DeviceCapabilities.AiThread.SupportLevel.NONE)
@@ -134,11 +134,11 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
             }
 
             var key = chatJidString + "|" + threadId;
-            if (client.store().findAiThreadTitle(key).isEmpty()) {
+            if (client.store().businessStore().findAiThreadTitle(key).isEmpty()) {
                 return MutationApplicationResult.orphan(key, "Thread");
             }
 
-            client.store().putAiThreadTitle(new AiThreadTitleBuilder().threadId(key).title(newTitle).build());
+            client.store().businessStore().putAiThreadTitle(new AiThreadTitleBuilder().threadId(key).title(newTitle).build());
             return MutationApplicationResult.success();
         } catch (Exception e) {
             LOGGER.warning("AI thread rename mutation failed: " + e.getMessage());

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.wam.binary;
 
+import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,7 +26,10 @@ import static com.github.auties00.cobalt.wam.binary.WamTags.*;
  *   <li>{@code Stream} — streams from an {@link InputStream}.
  * </ul>
  *
- * <p>Construct either via the static {@code of(...)} factories.
+ * <p>Construct either via the static {@code fromBytes(...)} or
+ * {@code fromStream(...)} factories; the {@code fromBufferedStream(...)} factories
+ * wrap the source in a {@link BufferedInputStream} and take ownership of it, so
+ * the decoder should be {@link #close() closed} to release it.
  *
  * <p>Tag bytes returned by {@link #readHeader} are packed into a single
  * {@code int} alongside the field identifier:
@@ -41,6 +45,7 @@ import static com.github.auties00.cobalt.wam.binary.WamTags.*;
  * @see WamTags
  */
 public abstract sealed class WamEventDecoder
+        implements AutoCloseable
         permits WamEventDecoder.ByteArray, WamEventDecoder.Stream {
 
     private static final VarHandle SHORT_HANDLE =
@@ -65,7 +70,7 @@ public abstract sealed class WamEventDecoder
      * @param source the source array, must not be {@code null}
      * @return a new byte-array-backed decoder
      */
-    public static WamEventDecoder of(byte[] source) {
+    public static WamEventDecoder fromBytes(byte[] source) {
         return new ByteArray(source, 0, source.length);
     }
 
@@ -78,7 +83,7 @@ public abstract sealed class WamEventDecoder
      * @param length the maximum number of bytes that may be read
      * @return a new byte-array-backed decoder
      */
-    public static WamEventDecoder of(byte[] source, int offset, int length) {
+    public static WamEventDecoder fromBytes(byte[] source, int offset, int length) {
         return new ByteArray(source, offset, length);
     }
 
@@ -86,10 +91,14 @@ public abstract sealed class WamEventDecoder
      * Returns a decoder reading from the given input stream with no
      * size limit.
      *
+     * <p>The decoder does not buffer; it reads tag and header bytes one at a
+     * time from {@code source}. Prefer {@link #fromBufferedStream(InputStream)}
+     * when the source is an unbuffered file, socket, or decompression stream.
+     *
      * @param source the source stream, must not be {@code null}
      * @return a new stream-backed decoder
      */
-    public static WamEventDecoder of(InputStream source) {
+    public static WamEventDecoder fromStream(InputStream source) {
         return new Stream(source, -1);
     }
 
@@ -101,8 +110,44 @@ public abstract sealed class WamEventDecoder
      * @param length the byte budget; pass a negative value for no limit
      * @return a new stream-backed decoder
      */
-    public static WamEventDecoder of(InputStream source, int length) {
+    public static WamEventDecoder fromStream(InputStream source, int length) {
         return new Stream(source, length);
+    }
+
+    /**
+     * Returns a decoder reading from the given input stream through a
+     * {@link BufferedInputStream} of the default size, so the decoder's
+     * byte-at-a-time header reads are served from memory rather than one
+     * underlying read each.
+     *
+     * <p>The decoder takes ownership of {@code source}: {@link #close()} closes
+     * the underlying stream.
+     *
+     * @param source the source stream, must not be {@code null}
+     * @return a new buffered stream-backed decoder
+     * @throws NullPointerException if {@code source} is {@code null}
+     */
+    public static WamEventDecoder fromBufferedStream(InputStream source) {
+        Objects.requireNonNull(source, "source cannot be null");
+        return new Stream(new BufferedInputStream(source), -1);
+    }
+
+    /**
+     * Returns a decoder reading from the given input stream through a
+     * {@link BufferedInputStream} of the given size.
+     *
+     * <p>The decoder takes ownership of {@code source}: {@link #close()} closes
+     * the underlying stream.
+     *
+     * @param source     the source stream, must not be {@code null}
+     * @param bufferSize the buffer size in bytes
+     * @return a new buffered stream-backed decoder
+     * @throws NullPointerException     if {@code source} is {@code null}
+     * @throws IllegalArgumentException if {@code bufferSize} is not positive
+     */
+    public static WamEventDecoder fromBufferedStream(InputStream source, int bufferSize) {
+        Objects.requireNonNull(source, "source cannot be null");
+        return new Stream(new BufferedInputStream(source, bufferSize), -1);
     }
 
     /**
@@ -160,6 +205,18 @@ public abstract sealed class WamEventDecoder
      * @param header the packed header returned by {@link #readHeader}
      */
     public abstract void skip(int header);
+
+    /**
+     * Releases the source.
+     *
+     * <p>For a byte-array source this is a no-op. For a stream source it closes
+     * the underlying {@link InputStream}, including the {@link BufferedInputStream}
+     * interposed by {@link #fromBufferedStream(InputStream)}.
+     *
+     * @throws UncheckedIOException if closing the underlying stream fails
+     */
+    @Override
+    public abstract void close();
 
     /**
      * Returns the field (or event) identifier from a packed header.
@@ -414,6 +471,11 @@ public abstract sealed class WamEventDecoder
                                 + ", limit " + limit);
             }
         }
+
+        @Override
+        public void close() {
+            // A byte-array source holds no resource to release.
+        }
     }
 
     /**
@@ -633,6 +695,15 @@ public abstract sealed class WamEventDecoder
                         "WAM decode would exceed stream budget: need " + n
                                 + " more bytes after " + read
                                 + ", limit " + limit);
+            }
+        }
+
+        @Override
+        public void close() {
+            try {
+                in.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
         }
     }

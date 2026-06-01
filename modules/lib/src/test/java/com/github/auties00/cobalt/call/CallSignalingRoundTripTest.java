@@ -1,11 +1,12 @@
 package com.github.auties00.cobalt.call;
+import com.github.auties00.cobalt.call.internal.TestLiveCallServiceFactory;
 
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.call.CallEndReason;
 import com.github.auties00.cobalt.call.internal.signaling.CallReceiver;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -32,7 +33,7 @@ import com.github.auties00.cobalt.call.internal.CallService;
  * {@code fixtures/call/} corpus. Each scenario seeds an inbound
  * {@code <call>} stanza through the receiver, drives a follow-up step
  * (accept, reject, or peer-terminate), and asserts the outgoing stanzas on
- * the wire, the {@link WhatsAppClientListener} fan-out, and the terminal
+ * the wire, the {@link LinkedWhatsAppClientListener} fan-out, and the terminal
  * state of the {@link CallService} registry.
  *
  * <p>Unlike
@@ -41,7 +42,7 @@ import com.github.auties00.cobalt.call.internal.CallService;
  * these tests intentionally exercise the receiver, service, and session
  * together in one shot.
  */
-@DisplayName("Call signaling round-trip — receiver + service + ActiveCall")
+@DisplayName("Call signaling round-trip â€” receiver + service + ActiveCall")
 class CallSignalingRoundTripTest {
 
     private static final Jid SELF_PN  = Jid.of("19153544650@s.whatsapp.net");
@@ -58,20 +59,26 @@ class CallSignalingRoundTripTest {
         Harness() {
             var store = MessageFixtures.temporaryStore(SELF_PN, SELF_LID);
             store.addListener(listener);
-            this.client = TestWhatsAppClient.create().withStore(store);
-            store.addListener(new WhatsAppClientListener() {
-                @Override public void onNodeSent(WhatsAppClient w, Node node) { sentNodes.add(node); }
+            this.client = TestWhatsAppClient.create()
+                    .withStore(store)
+                    .withSendNodeHandler(builder -> {
+                        var built = builder.build();
+                        sentNodes.add(built);
+                        return new NodeBuilder().description("ack").build();
+                    });
+            store.addListener(new LinkedWhatsAppClientListener() {
+                @Override public void onNodeSent(LinkedWhatsAppClient w, Node node) { sentNodes.add(node); }
             });
-            this.service = new CallService(client, null);
+            this.service = TestLiveCallServiceFactory.create(client, null);
             this.receiver = new CallReceiver(client, service, new AckSender(client));
         }
     }
 
-    private static final class Listener implements WhatsAppClientListener {
+    private static final class Listener implements LinkedWhatsAppClientListener {
         final ConcurrentLinkedQueue<IncomingCall> calls = new ConcurrentLinkedQueue<>();
         final ConcurrentLinkedQueue<EndedEvent> ended = new ConcurrentLinkedQueue<>();
-        @Override public void onCall(WhatsAppClient w, IncomingCall c) { calls.add(c); }
-        @Override public void onCallEnded(WhatsAppClient w, String callId, Jid fromJid, CallEndReason reason) {
+        @Override public void onCall(LinkedWhatsAppClient w, IncomingCall c) { calls.add(c); }
+        @Override public void onCallEnded(LinkedWhatsAppClient w, String callId, Jid fromJid, CallEndReason reason) {
             ended.add(new EndedEvent(callId, fromJid, reason));
         }
     }
@@ -110,7 +117,7 @@ class CallSignalingRoundTripTest {
     }
 
     @Test
-    @DisplayName("inbound offer → accept → peer terminate: listener + registry stay coherent")
+    @DisplayName("inbound offer â†’ accept â†’ peer terminate: listener + registry stay coherent")
     void offerAcceptPeerTerminateRoundTrip() throws InterruptedException {
         var h = new Harness();
 
@@ -148,7 +155,7 @@ class CallSignalingRoundTripTest {
     }
 
     @Test
-    @DisplayName("outbound place → peer-reject: outbound terminate not emitted, listener fires REJECT_*")
+    @DisplayName("outbound place â†’ peer-reject: outbound terminate not emitted, listener fires REJECT_*")
     void placeThenPeerRejectRoundTrip() throws InterruptedException {
         var h = new Harness();
         var session = h.service.placeCall(PEER_LID, CallOptions.audio());
@@ -177,7 +184,7 @@ class CallSignalingRoundTripTest {
     }
 
     @Test
-    @DisplayName("inbound offer → reject(REJECT_BLOCKED): outgoing reject + listener with REJECT_BLOCKED")
+    @DisplayName("inbound offer â†’ reject(REJECT_BLOCKED): outgoing reject + listener with REJECT_BLOCKED")
     void offerThenRejectRoundTrip() throws InterruptedException {
         var h = new Harness();
         h.receiver.handle(inboundOffer("CID-RJ-1", PEER_LID));

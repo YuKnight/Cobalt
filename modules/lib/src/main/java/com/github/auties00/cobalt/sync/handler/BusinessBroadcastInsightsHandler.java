@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -23,7 +23,7 @@ import java.util.logging.Logger;
  * <p>The analytics surface tracks recipient, delivered, read, replied, and
  * quick-reply counts per campaign. When the server publishes updated insights
  * for a campaign, the mutation lands here, and the result is read back through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findBusinessBroadcastInsight(String)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findBusinessBroadcastInsight(String)}.
  *
  * @implNote
  * This implementation drops two WA Web side effects: the
@@ -86,7 +86,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() <= 1) {
@@ -102,7 +102,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
-                client.store().putBusinessBroadcastInsight(new BusinessBroadcastInsightBuilder()
+                client.store().businessStore().putBusinessBroadcastInsight(new BusinessBroadcastInsightBuilder()
                         .id(campaignId)
                         .recipientCount(action.recipientCount().isPresent() ? action.recipientCount().getAsInt() : null)
                         .deliveredCount(action.deliveredCount().isPresent() ? action.deliveredCount().getAsInt() : null)
@@ -114,7 +114,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
             }
 
             if (mutation.operation() == SyncdOperation.REMOVE) {
-                client.store().removeBusinessBroadcastInsight(campaignId);
+                client.store().businessStore().removeBusinessBroadcastInsight(campaignId);
                 return MutationApplicationResult.success();
             }
 
@@ -128,7 +128,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      * {@inheritDoc}
      *
      * <p>Iterates the batch, applying each mutation via
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} and
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} and
      * aggregating the SET, REMOVE, and malformed counters for the per-batch
      * warning log.
      *
@@ -143,7 +143,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBusinessBroadcastInsightsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var malformedCount = 0;
         var setCount = 0;
         var removeCount = 0;

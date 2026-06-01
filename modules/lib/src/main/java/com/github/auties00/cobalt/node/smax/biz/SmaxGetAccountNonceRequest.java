@@ -19,7 +19,7 @@ import java.util.Optional;
  *
  * @implNote This implementation stamps the static {@code xmlns="fb:thrift_iq"} envelope; the
  * {@code id} attribute is not stamped here because Cobalt's send path delegates id generation to
- * {@code WhatsAppClient}.
+ * {@code LinkedWhatsAppClient}.
  */
 @WhatsAppWebModule(moduleName = "WASmaxOutBizLinkingGetAccountNonceRequest")
 @WhatsAppWebModule(moduleName = "WASmaxOutBizLinkingHackBaseIQGetRequestMixin")

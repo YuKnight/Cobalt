@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -42,7 +42,7 @@ import java.util.List;
  * JIDs are LID/HostedLID they are stored as {@code lidJid}
  * directly; phone-number recipients populate {@code pnJid} and
  * resolve {@code lidJid} via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findLidByPhone(Jid)},
+ * {@link com.github.auties00.cobalt.store.ContactStore#findLidByPhone(Jid)},
  * falling back to the phone-number JID itself when no LID is
  * known.
  */
@@ -95,16 +95,16 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
      * mutable {@link ArrayList} before mutating because the model
      * exposes an unmodifiable {@link List}; the parent list is then
      * upserted via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#putBusinessBroadcastList(com.github.auties00.cobalt.model.business.BusinessBroadcastList)}.
+     * {@link com.github.auties00.cobalt.store.BusinessStore#putBusinessBroadcastList(com.github.auties00.cobalt.model.business.BusinessBroadcastList)}.
      * Phone-number recipients resolve their LID via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#findLidByPhone(Jid)},
+     * {@link com.github.auties00.cobalt.store.ContactStore#findLidByPhone(Jid)},
      * falling back to the phone-number JID itself when no LID is known. An empty
      * participant array is normalized to {@code null} so the stored list shape
      * matches the wire shape.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -124,7 +124,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
             return MutationApplicationResult.malformed();
         }
 
-        var existing = client.store().findBusinessBroadcastList(listId).orElse(null);
+        var existing = client.store().businessStore().findBusinessBroadcastList(listId).orElse(null);
         if (existing == null) {
             return MutationApplicationResult.orphan(listId, "BroadcastList");
         }
@@ -143,7 +143,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
                         .build();
             } else {
                 participant = new BroadcastListParticipantBuilder()
-                        .lidJid(client.store().findLidByPhone(recipientJid).orElse(recipientJid))
+                        .lidJid(client.store().contactStore().findLidByPhone(recipientJid).orElse(recipientJid))
                         .pnJid(recipientJid)
                         .build();
             }
@@ -151,7 +151,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
         }
 
         existing.setParticipants(participants.isEmpty() ? null : participants);
-        client.store().putBusinessBroadcastList(existing);
+        client.store().businessStore().putBusinessBroadcastList(existing);
         return MutationApplicationResult.success();
     }
 }

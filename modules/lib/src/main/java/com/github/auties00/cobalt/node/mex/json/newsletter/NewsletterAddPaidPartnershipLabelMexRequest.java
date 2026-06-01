@@ -19,12 +19,9 @@ import java.util.Optional;
  * <p>This request backs the paid-partnership tagging flow: after a monetised newsletter creator
  * sends a sponsored message, this mutation attaches the legal disclosure label to the server-stored
  * message so the relay renders the disclosure badge to downstream subscribers. Construct it with the
- * newsletter Jid and the relay-issued message server-id, submit it through the MEX IQ dispatcher,
- * and check {@link NewsletterAddPaidPartnershipLabelMexResponse#id()} to confirm success.
- *
- * @implNote This implementation omits a {@code message_type} variable from the wire payload; the
- * relay accepts the shorter shape because the GraphQL schema defaults the field. TODO: surface
- * {@code message_type} for parity with the source mutation signature.
+ * newsletter Jid, the relay-issued message server-id, and the message type discriminator, submit it
+ * through the MEX IQ dispatcher, and check {@link NewsletterAddPaidPartnershipLabelMexResponse#id()}
+ * to confirm success.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexNewsletterAddPaidPartnershipLabelJob")
 public final class NewsletterAddPaidPartnershipLabelMexRequest implements MexOperation.Request.Json {
@@ -34,7 +31,7 @@ public final class NewsletterAddPaidPartnershipLabelMexRequest implements MexOpe
      * <p>Emitted as the {@code query_id} attribute of the outgoing {@code <query>} child; the relay
      * refuses requests whose persisted-query id is unknown.
      */
-    public static final String QUERY_ID = "25690501173969818";
+    public static final String QUERY_ID = "26102375079404865";
 
     /**
      * Holds the GraphQL operation name reported for this mutation.
@@ -54,18 +51,41 @@ public final class NewsletterAddPaidPartnershipLabelMexRequest implements MexOpe
     private final String serverId;
 
     /**
-     * Constructs a request targeting the given newsletter message.
+     * Holds the type discriminator of the message being labelled.
+     */
+    private final String messageType;
+
+    /**
+     * Constructs a request targeting the given newsletter message without a message-type
+     * discriminator.
      *
-     * <p>Both arguments are required for the relay to locate the message. A {@code null} value is
-     * preserved (the corresponding variable is simply omitted from the wire payload) so the relay
-     * returns a validation error rather than this request raising synchronously.
+     * <p>Both arguments help the relay locate the message; the {@code message_type} variable is
+     * omitted from the wire payload. A {@code null} value is preserved (the corresponding variable is
+     * simply omitted) so the relay returns a validation error rather than this request raising
+     * synchronously.
      *
      * @param newsletterId the Jid of the newsletter that owns the message
      * @param serverId     the relay-issued message server-id
      */
     public NewsletterAddPaidPartnershipLabelMexRequest(String newsletterId, String serverId) {
+        this(newsletterId, serverId, null);
+    }
+
+    /**
+     * Constructs a request targeting the given newsletter message.
+     *
+     * <p>All three arguments help the relay locate and classify the message. A {@code null} value is
+     * preserved (the corresponding variable is simply omitted from the wire payload) so the relay
+     * returns a validation error rather than this request raising synchronously.
+     *
+     * @param newsletterId the Jid of the newsletter that owns the message
+     * @param serverId     the relay-issued message server-id
+     * @param messageType  the type discriminator of the message being labelled
+     */
+    public NewsletterAddPaidPartnershipLabelMexRequest(String newsletterId, String serverId, String messageType) {
         this.newsletterId = newsletterId;
         this.serverId = serverId;
+        this.messageType = messageType;
     }
 
     /**
@@ -92,9 +112,9 @@ public final class NewsletterAddPaidPartnershipLabelMexRequest implements MexOpe
      * Serialises this request into a MEX IQ {@link NodeBuilder} ready to be dispatched through the
      * WhatsApp relay.
      *
-     * <p>Produces the {@code {variables: {newsletter_id?, server_id?}}} payload consumed by the
-     * persisted-query identified by {@link #QUERY_ID}. Both entries are omitted when {@code null} so
-     * the GraphQL schema never receives explicit {@code null} variables.
+     * <p>Produces the {@code {variables: {newsletter_id?, server_id?, message_type?}}} payload
+     * consumed by the persisted-query identified by {@link #QUERY_ID}. Each entry is omitted when
+     * {@code null} so the GraphQL schema never receives explicit {@code null} variables.
      *
      * @implNote This implementation writes the GraphQL variables directly through
      * {@link JSONWriter} and delegates IQ envelope construction to
@@ -123,6 +143,12 @@ public final class NewsletterAddPaidPartnershipLabelMexRequest implements MexOpe
                 writer.writeName("server_id");
                 writer.writeColon();
                 writer.writeString(serverId);
+            }
+
+            if (messageType != null) {
+                writer.writeName("message_type");
+                writer.writeColon();
+                writer.writeString(messageType);
             }
             writer.endObject();
             writer.endObject();

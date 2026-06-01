@@ -19,7 +19,7 @@ import java.util.Optional;
  *
  * @implNote
  * This implementation preserves a distinction that WA Web's parser discards: there the reply is
- * collapsed to a single status record that conflates the success path with relay errors.
+ * collapsed to a single status record that conflates the success path with WhatsApp Web GraphQL errors.
  */
 @WhatsAppWebModule(moduleName = "WAWebUnpairDeviceJob")
 public sealed interface IqUnpairDeviceResponse extends IqOperation.Response

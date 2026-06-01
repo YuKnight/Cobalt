@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -38,7 +38,7 @@ import java.util.logging.Logger;
 public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     /**
      * Logger used for diagnostic traces emitted by
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}.
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}.
      *
      * @implNote
      * This implementation logs at {@code FINE} for the success/clear paths and
@@ -106,7 +106,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() == SyncdOperation.REMOVE) {
             LOGGER.fine("[nct-salt-sync] Removing stored NCT salt");
             client.store().setNotificationContentTokenSalt(null);

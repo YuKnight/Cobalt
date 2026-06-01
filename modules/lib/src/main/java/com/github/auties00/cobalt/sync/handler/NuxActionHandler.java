@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -84,7 +84,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      * {@link NuxAction} coalesces {@link NuxAction#acknowledged()} to
      * {@code false} and STILL writes the hint state. The resolved key and
      * dismissed flag are persisted via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#putOnboardingHintState(com.github.auties00.cobalt.model.preference.OnboardingHintState)}.
+     * {@link com.github.auties00.cobalt.store.SettingsStore#putOnboardingHintState(com.github.auties00.cobalt.model.preference.OnboardingHintState)}.
      *
      * @implNote
      * This implementation drops the WA Web timestamp on the NUX data because
@@ -92,7 +92,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -109,7 +109,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
         var nuxAction = mutation.value().action().orElse(null);
         var acknowledged = nuxAction instanceof NuxAction action && action.acknowledged();
 
-        client.store().putOnboardingHintState(new OnboardingHintStateBuilder().hintId(nuxKey).dismissed(acknowledged).build());
+        client.store().settingsStore().putOnboardingHintState(new OnboardingHintStateBuilder().hintId(nuxKey).dismissed(acknowledged).build());
 
         return MutationApplicationResult.success();
     }

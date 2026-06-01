@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.wam.privatestats;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppPrivateStatsTokenIssuerException;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -28,7 +28,7 @@ import java.util.Objects;
  *       upload authentication key.</li>
  * </ul>
  *
- * <p>One issuer is used per {@link WhatsAppClient}; each {@link #issue()} call performs a fresh round-trip and
+ * <p>One issuer is used per {@link LinkedWhatsAppClient}; each {@link #issue()} call performs a fresh round-trip and
  * returns a single-use token. The token must not be reused across uploads; VOPRF unlinkability rests on each
  * scalar being used at most once.
  *
@@ -65,7 +65,7 @@ public final class WamPrivateStatsTokenIssuer {
     /**
      * The WhatsApp client used to dispatch the IQ.
      */
-    private final WhatsAppClient client;
+    private final LinkedWhatsAppClient client;
 
     /**
      * The cryptographic random source used to generate the token nonce and the blinding factor.
@@ -78,10 +78,10 @@ public final class WamPrivateStatsTokenIssuer {
     /**
      * Constructs a new issuer bound to the given client and a default-provider {@link SecureRandom}.
      *
-     * @param client the {@link WhatsAppClient} used to dispatch the IQ
+     * @param client the {@link LinkedWhatsAppClient} used to dispatch the IQ
      * @throws NullPointerException if {@code client} is {@code null}
      */
-    public WamPrivateStatsTokenIssuer(WhatsAppClient client) {
+    public WamPrivateStatsTokenIssuer(LinkedWhatsAppClient client) {
         this(client, new SecureRandom());
     }
 
@@ -91,11 +91,11 @@ public final class WamPrivateStatsTokenIssuer {
      * <p>Intended for behavioural tests that script the random source so the produced blinded credential and
      * unblinded token can be checked against captured live-bundle known-answer vectors.
      *
-     * @param client the {@link WhatsAppClient} used to dispatch the IQ
+     * @param client the {@link LinkedWhatsAppClient} used to dispatch the IQ
      * @param random the random source for the token and the blinding factor
      * @throws NullPointerException if either argument is {@code null}
      */
-    WamPrivateStatsTokenIssuer(WhatsAppClient client, SecureRandom random) {
+    WamPrivateStatsTokenIssuer(LinkedWhatsAppClient client, SecureRandom random) {
         this.client = Objects.requireNonNull(client, "client must not be null");
         this.random = Objects.requireNonNull(random, "random must not be null");
     }
@@ -120,7 +120,7 @@ public final class WamPrivateStatsTokenIssuer {
      * <ul>
      *   <li>draws two 32-byte sequences from {@link #random},</li>
      *   <li>blinds via {@link WamPrivateStatsTokenBlinder#blind(byte[], byte[])},</li>
-     *   <li>dispatches the IQ via {@link WhatsAppClient#sendNode(NodeBuilder)},</li>
+     *   <li>dispatches the IQ via {@link LinkedWhatsAppClient#sendNode(NodeBuilder)},</li>
      *   <li>parses {@code signed_credential} and {@code acs_public_key} under the {@code sign_credential}
      *       reply,</li>
      *   <li>unblinds via {@link WamPrivateStatsTokenBlinder#unblind(byte[], byte[], byte[])},</li>

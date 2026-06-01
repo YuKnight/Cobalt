@@ -9,7 +9,7 @@ import java.util.Optional;
 
 /**
  * Partial merchant-compliance update used as the input to
- * {@code WhatsAppClient.editMerchantCompliance}. Fields not set are left
+ * {@code LinkedWhatsAppClient.editMerchantCompliance}. Fields not set are left
  * untouched on the published merchant-compliance disclosure.
  */
 @ProtobufMessage

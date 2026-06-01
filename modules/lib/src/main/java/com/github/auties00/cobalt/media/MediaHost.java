@@ -572,7 +572,7 @@ public sealed interface MediaHost {
      * <p>Only {@link Primary} hosts can advertise a nested fallback;
      * {@link Fallback} hosts always return an empty optional. The nested
      * fallback is rotated to by
-     * {@link DefaultMediaConnectionService#selectHost(MediaHost, MediaHost, String, int, boolean)}
+     * {@link LiveMediaConnectionService#selectHost(MediaHost, MediaHost, String, int, boolean)}
      * when the previous attempt against the selected host failed.
      *
      * @return an {@link Optional} holding the fallback hostname
@@ -659,7 +659,7 @@ public sealed interface MediaHost {
      * <p>Primary hosts are the preferred endpoints picked by
      * {@link #routeSelection}. They may advertise a nested fallback hostname
      * with its own IP list, which the retry loop in
-     * {@link DefaultMediaConnectionService#selectHost(MediaHost, MediaHost, String, int, boolean)}
+     * {@link LiveMediaConnectionService#selectHost(MediaHost, MediaHost, String, int, boolean)}
      * rotates to before falling back to a fallback-class host.
      *
      * @param hostname         the hostname of this host

@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.registration.push;
 
-import com.github.auties00.cobalt.client.WhatsAppDevice;
-import com.github.auties00.cobalt.client.WhatsAppDevicePushClient;
+import com.github.auties00.cobalt.client.WhatsAppClientDevice;
+import com.github.auties00.cobalt.client.WhatsAppClientDevicePushClient;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 
 import java.util.Collections;
@@ -9,10 +9,10 @@ import java.util.EnumSet;
 import java.util.Set;
 
 /**
- * Provides a {@link WhatsAppDevicePushClient} that emits empty token and code values without
+ * Provides a {@link WhatsAppClientDevicePushClient} that emits empty token and code values without
  * contacting any push provider.
  *
- * <p>This client is the low-trust default returned by {@link WhatsAppDevicePushClient#noop()} when
+ * <p>This client is the low-trust default returned by {@link WhatsAppClientDevicePushClient#noop()} when
  * the embedder has not wired a real FCM or APNS client. The {@code push_token} and {@code push_code}
  * form fields are still sent on the registration request, but with empty values that the WhatsApp
  * registration server tolerates as a low-trust signal. It fits device profiles that are not
@@ -22,7 +22,7 @@ import java.util.Set;
  * This implementation is stateless and therefore inherently thread-safe; a single shared
  * {@link #INSTANCE} is exposed instead of allocating one per call.
  */
-public final class NoopMobilePushClient implements WhatsAppDevicePushClient {
+public final class NoopMobilePushClient implements WhatsAppClientDevicePushClient {
     /**
      * Holds the cached unmodifiable view of every {@link ClientPlatformType} entry returned by
      * {@link #supportedPlatforms()}.
@@ -40,7 +40,7 @@ public final class NoopMobilePushClient implements WhatsAppDevicePushClient {
     /**
      * Holds the process-wide shared instance of this client.
      *
-     * <p>This field gives {@link WhatsAppDevicePushClient#noop()} a stable reference to return so
+     * <p>This field gives {@link WhatsAppClientDevicePushClient#noop()} a stable reference to return so
      * that the stateless no-op client is never reallocated.
      */
     public static final NoopMobilePushClient INSTANCE = new NoopMobilePushClient();
@@ -49,7 +49,7 @@ public final class NoopMobilePushClient implements WhatsAppDevicePushClient {
      * Constructs the singleton no-op push client.
      *
      * <p>The constructor is private because the class is a singleton; the only instance is reached
-     * through {@link WhatsAppDevicePushClient#noop()} or {@link #INSTANCE}.
+     * through {@link WhatsAppClientDevicePushClient#noop()} or {@link #INSTANCE}.
      */
     private NoopMobilePushClient() {
 
@@ -75,7 +75,7 @@ public final class NoopMobilePushClient implements WhatsAppDevicePushClient {
      * and {@link #isAuthenticated()} already reports {@code true} unconditionally.
      */
     @Override
-    public void authenticate(WhatsAppDevice device) {
+    public void authenticate(WhatsAppClientDevice device) {
     }
 
     /**

@@ -291,13 +291,13 @@ public final class MutationLTHash {
         var collectionsData = new ArrayList<CollectionCheckData>();
         if (collection == null) {
             for (var patchType : SyncPatchType.values()) {
-                var metadata = store.findWebAppState(patchType);
-                var entries = store.getSyncActionEntries(patchType);
+                var metadata = store.syncStore().findWebAppState(patchType);
+                var entries = store.syncStore().getSyncActionEntries(patchType);
                 collectionsData.add(new CollectionCheckData(patchType, metadata.ltHash(), entries));
             }
         } else {
-            var metadata = store.findWebAppState(collection);
-            var entries = store.getSyncActionEntries(collection);
+            var metadata = store.syncStore().findWebAppState(collection);
+            var entries = store.syncStore().getSyncActionEntries(collection);
             collectionsData.add(new CollectionCheckData(collection, metadata.ltHash(), entries));
         }
 

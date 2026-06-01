@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPay
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -38,18 +38,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * their service with the capture session's self identity (PN {@code 393495089819}, LID
  * {@code 258252122116273}) so the me-fast-path matches the oracle.
  */
-@DisplayName("LidMigrationService live-oracle parity")
+@DisplayName("LiveLidMigrationService live-oracle parity")
 class LidMigrationServiceLiveOracleTest {
 
     private static final Jid SELF_PN = Jid.of("19254863482@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594056@lid");
 
-    private static LidMigrationService buildService() {
+    private static LiveLidMigrationService buildService() {
         var props = TestABPropsService.builder().build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        return new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        return new LiveLidMigrationService(client, props, wamService);
     }
 
     @Test
@@ -134,8 +134,8 @@ class LidMigrationServiceLiveOracleTest {
         var personalSelfLid = Jid.of("258252122116273@lid");
         var store = MigrationFixtures.temporaryStore(personalSelfPn, personalSelfLid);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
 
         var oracle = MigrationFixtures.loadOracle("to-common-addressing-mode");
         var pairs = oracle.getJSONArray("pairs");
@@ -173,18 +173,18 @@ class LidMigrationServiceLiveOracleTest {
             var props = TestABPropsService.builder().build();
             var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
             var client = TestWhatsAppClient.create().withStore(store);
-            var wamService = new DefaultWamService(client, props);
-            var service = new LidMigrationService(client, props, wamService);
+            var wamService = new LiveWamService(client, props);
+            var service = new LiveLidMigrationService(client, props, wamService);
 
             var jid = Jid.of(jidStr.replace("@c.us", "@s.whatsapp.net"));
-            var chat = store.addNewChat(jid);
+            var chat = store.chatStore().addNewChat(jid);
 
             // Install the same groupMetadata WA Web's oracle was given (where applicable).
             if (label.equals("group_lid_mode")) {
-                store.addChatMetadata(new GroupMetadataBuilder()
+                store.chatStore().addChatMetadata(new GroupMetadataBuilder()
                         .jid(jid).subject("Test Group").isLidAddressingMode(true).build());
             } else if (label.equals("group_pn_mode")) {
-                store.addChatMetadata(new GroupMetadataBuilder()
+                store.chatStore().addChatMetadata(new GroupMetadataBuilder()
                         .jid(jid).subject("Test Group").isLidAddressingMode(false).build());
             }
 
@@ -202,8 +202,8 @@ class LidMigrationServiceLiveOracleTest {
         var personalSelfLid = Jid.of("258252122116273@lid");
         var store = MigrationFixtures.temporaryStore(personalSelfPn, personalSelfLid);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
 
         var raw = MigrationFixtures.loadExpected("get-alternate-msg-key-1on1")
                 .getJSONObject("result")
@@ -244,8 +244,8 @@ class LidMigrationServiceLiveOracleTest {
         var personalSelfLid = Jid.of("258252122116273@lid");
         var store = MigrationFixtures.temporaryStore(personalSelfPn, personalSelfLid);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
 
         var raw = MigrationFixtures.loadExpected("get-alternate-msg-key-group")
                 .getJSONObject("result")
@@ -299,8 +299,8 @@ class LidMigrationServiceLiveOracleTest {
                 .build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
 
         service.initialize();
         service.enableMigration();
@@ -327,8 +327,8 @@ class LidMigrationServiceLiveOracleTest {
                 .build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
 
         // Build a Cobalt LIDMigrationMappingSyncPayload from the oracle's input numbers (the same
         // input the parser was given inline in the eval script).
@@ -361,7 +361,7 @@ class LidMigrationServiceLiveOracleTest {
         }
     }
 
-    private static void advanceToComplete(LidMigrationService service) {
+    private static void advanceToComplete(LiveLidMigrationService service) {
         service.initialize();
         service.enableMigration();
         var payload = new LIDMigrationMappingSyncPayloadBuilder()

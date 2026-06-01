@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -29,9 +29,9 @@ import java.util.List;
  *
  * @implNote
  * This implementation overrides
- * {@link #applyMutationBatch(WhatsAppClient, List)} to implement the
+ * {@link #applyMutationBatch(LinkedWhatsAppClient, List)} to implement the
  * latest-wins semantics inside a single store write; the single-mutation
- * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} adapter
+ * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} adapter
  * persists the same mutation immediately for callers that dispatch outside the
  * batch path. WA Web's {@code WARN} batch counters are dropped.
  */
@@ -94,7 +94,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         DecryptedMutation.Trusted latest = null;
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) {
@@ -116,7 +116,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
         }
         if (latest != null) {
             var pfa = (PrimaryFeatureAction) latest.value().action().orElseThrow();
-            client.store().setPrimaryFeatures(pfa.flags());
+            client.store().syncStore().setPrimaryFeatures(pfa.flags());
         }
 
         return results;
@@ -137,7 +137,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryFeatureSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -146,7 +146,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        client.store().setPrimaryFeatures(action.flags());
+        client.store().syncStore().setPrimaryFeatures(action.flags());
         return MutationApplicationResult.success();
     }
 }

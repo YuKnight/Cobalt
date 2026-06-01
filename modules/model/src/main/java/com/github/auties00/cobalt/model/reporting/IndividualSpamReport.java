@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.reportIndividualForSpam} —
+ * Input model for {@code LinkedWhatsAppClient.reportIndividualForSpam} —
  * reports a one-to-one contact for trust-and-safety review.
  *
  * <p>{@link #target} and {@link #spamFlow} are required.

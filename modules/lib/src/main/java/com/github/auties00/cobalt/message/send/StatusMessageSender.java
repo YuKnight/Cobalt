@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.message.send;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.ack.AckParser;
@@ -17,11 +17,13 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
+import com.github.auties00.cobalt.model.privacy.StatusPrivacyMode;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
@@ -86,7 +88,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * <p>Constructed once by {@link MessageSendingService}; embedders should not
      * instantiate directly.
      *
-     * @param client                the {@link WhatsAppClient} used to dispatch
+     * @param client                the {@link LinkedWhatsAppClient} used to dispatch
      *                              stanzas
      * @param encryption            the {@link MessageEncryption} service
      * @param deviceService         the {@link DeviceService} used for audience
@@ -103,7 +105,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
     StatusMessageSender(
-            WhatsAppClient client,
+            LinkedWhatsAppClient client,
             MessageEncryption encryption,
             DeviceService deviceService,
             ABPropsService abPropsService,
@@ -132,14 +134,13 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
     @Override
-    public AckResult send(Jid statusJid, ChatMessageInfo messageInfo) {
-        waitForOfflineDelivery();
+    public AckResult doSend(Jid statusJid, ChatMessageInfo messageInfo) {
         var container = messageInfo.message();
         var selfJid = requireSelfJid();
 
-        var fanout = deviceService.getGroupFanout(statusJid, selfLidOrPn());
+        var audienceDevices = deviceService.getStatusFanout(resolveStatusAudience());
 
-        var revokeResult = resolveRevokeDevices(container, fanout.devices());
+        var revokeResult = resolveRevokeDevices(container, audienceDevices);
         if (revokeResult.useDirect()) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Status revoke requires direct path for {0}", messageInfo.key().id());
@@ -154,14 +155,14 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         var skDistribDevices = new ArrayList<Jid>();
         var skExistingDevices = new ArrayList<Jid>();
         for (var device : allDevices) {
-            if (store.hasSenderKeyDistributed(statusJid, device)) {
+            if (store.signalStore().hasSenderKeyDistributed(statusJid, device)) {
                 skExistingDevices.add(device);
             } else {
                 skDistribDevices.add(device);
             }
         }
 
-        var rotateKey = store.clearKeyRotation(statusJid);
+        var rotateKey = store.signalStore().clearKeyRotation(statusJid);
         if (rotateKey) {
             encryption.rotateSenderKey(statusJid, selfJid);
             skDistribDevices.addAll(skExistingDevices);
@@ -210,7 +211,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
                 .content(participantsChildren)
                 .build();
 
-        store.updateIdentityRange(allDevices);
+        store.signalStore().updateIdentityRange(allDevices);
 
         var skmsgEncNode = new NodeBuilder()
                 .description("enc")
@@ -250,11 +251,47 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
 
         if (ack.isSuccess()) {
             for (var device : skDistribDevices) {
-                store.markSenderKeyDistributed(statusJid, device);
+                store.signalStore().markSenderKeyDistributed(statusJid, device);
             }
         }
 
         return ack;
+    }
+
+    /**
+     * Resolves the status audience user JIDs from the user's status privacy preference.
+     *
+     * <p>{@link StatusPrivacyMode#CONTACTS} returns every stored contact;
+     * {@link StatusPrivacyMode#WHITELIST} returns the configured allowlist;
+     * {@link StatusPrivacyMode#CONTACTS_EXCEPT} returns every stored contact minus the configured
+     * blocklist. An absent preference is treated as {@link StatusPrivacyMode#CONTACTS}. Mirrors WA
+     * Web's {@code getStatusList}, whose audience drives the status fanout instead of any group
+     * roster.
+     *
+     * @return the resolved audience user JIDs
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUserPrefsStatus", exports = "getStatusList",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private List<Jid> resolveStatusAudience() {
+        var privacy = store.settingsStore().statusPrivacy().orElse(null);
+        var mode = privacy == null
+                ? StatusPrivacyMode.CONTACTS
+                : privacy.mode().orElse(StatusPrivacyMode.CONTACTS);
+        return switch (mode) {
+            case WHITELIST -> List.copyOf(privacy.jids());
+            case CONTACTS_EXCEPT -> {
+                var excluded = Set.copyOf(privacy.jids());
+                yield store.contactStore().contacts().stream()
+                        .map(Contact::jid)
+                        .filter(jid -> !excluded.contains(jid))
+                        .distinct()
+                        .toList();
+            }
+            case CONTACTS -> store.contactStore().contacts().stream()
+                    .map(Contact::jid)
+                    .distinct()
+                    .toList();
+        };
     }
 
     /**
@@ -276,7 +313,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendStatusMsg", exports = "encryptAndSendStatusMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private String resolveStatusSetting() {
-        var entry = store.findPrivacySetting(PrivacySettingType.STATUS)
+        var entry = store.settingsStore().findPrivacySetting(PrivacySettingType.STATUS)
                 .orElse(null);
         if (entry == null) {
             return null;
@@ -332,7 +369,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
             currentUserJids.add(device.toUserJid().toString());
         }
 
-        var selfUserJid = store.jid().map(j -> j.toUserJid().toString()).orElse(null);
+        var selfUserJid = store.accountStore().jid().map(j -> j.toUserJid().toString()).orElse(null);
         var hasOutOfAudience = false;
 
         for (var recipient : originalRecipients) {

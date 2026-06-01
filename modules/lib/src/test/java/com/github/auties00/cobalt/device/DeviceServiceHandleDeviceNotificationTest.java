@@ -1,4 +1,7 @@
 package com.github.auties00.cobalt.device;
+import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
+import com.github.auties00.cobalt.sync.LiveWebAppStateService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.migration.LidMigrationService;
@@ -8,7 +11,7 @@ import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link DeviceService#handleDeviceNotification} and asserts the handler accepts the wire shape WA
  * Web actually sends, completing without throwing on the captured shapes.
  *
- * <p>Each test builds the full collaborator graph through {@link DefaultDeviceService} on a
+ * <p>Each test builds the full collaborator graph through {@link LiveDeviceService} on a
  * {@link TestWhatsAppClient} backed by a temporary store; no network is involved. Two captures live
  * in the corpus, both taken from the {@code personal} live session on 2026-05-11:
  * {@code adv-notification-link.jsonl} emitted after linking device id 78 (the wrapped
@@ -40,12 +43,12 @@ class DeviceServiceHandleDeviceNotificationTest {
         var props = TestABPropsService.builder().build();
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wamService);
-        var snapshotRecovery = new SnapshotRecoveryService(client, props, wamService);
-        var webAppState = new WebAppStateService(client, props, lidMigration, snapshotRecovery, wamService, TestMediaConnectionService.create());
-        var sessionCipher = new SignalSessionCipher(store);
-        var deviceService = new DefaultDeviceService(client, webAppState, props, sessionCipher, wamService);
+        var wamService = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wamService);
+        var snapshotRecovery = new LiveSnapshotRecoveryService(client, props, wamService);
+        var webAppState = new LiveWebAppStateService(client, props, lidMigration, snapshotRecovery, wamService, TestMediaConnectionService.create());
+        var sessionCipher = new SignalSessionCipher(store.signalStore());
+        var deviceService = new LiveDeviceService(client, webAppState, props, sessionCipher, wamService);
         return new Harness(client, deviceService);
     }
 
@@ -74,7 +77,7 @@ class DeviceServiceHandleDeviceNotificationTest {
 
         h.deviceService.handleDeviceNotification(devicesNode, "add", SELF_LID);
 
-        var stored = h.client.store().findDeviceList(SELF_LID.toUserJid());
+        var stored = h.client.store().contactStore().findDeviceList(SELF_LID.toUserJid());
         assertTrue(stored.isPresent() || stored.isEmpty(),
                 "handler completed without throwing (Optional check is structural)");
     }

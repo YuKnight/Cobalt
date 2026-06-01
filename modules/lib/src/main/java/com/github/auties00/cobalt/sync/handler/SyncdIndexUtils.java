@@ -36,7 +36,7 @@ import java.util.logging.Logger;
  * The {@code WAWebSyncdResolveMessages.resolveMessagesForMutations} batch
  * pre-pass that consumes these helpers in WA Web has no Cobalt analogue;
  * Cobalt's handlers resolve their messages inline via
- * {@link WhatsAppStore#findChatByJid(com.github.auties00.cobalt.model.jid.JidProvider)}
+ * {@link com.github.auties00.cobalt.store.ChatStore#findChatByJid(com.github.auties00.cobalt.model.jid.JidProvider)}
  * so the AB-prop driven chunked-vs-sync branch and the IDB existence probe are
  * not replicated.
  */
@@ -376,7 +376,7 @@ public final class SyncdIndexUtils {
         var isNewsletter = remoteJid.hasNewsletterServer();
         if (!isUser && !isNewsletter) {
             if ("1".equals(fromMe)) {
-                participantJid = store.jid().orElse(null);
+                participantJid = store.accountStore().jid().orElse(null);
             } else {
                 if (participant == null || participant.isEmpty()) {
                     LOGGER.warning("syncKeyToMsgKey: invalid participant value");

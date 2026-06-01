@@ -52,7 +52,7 @@ class DeviceFixturesTest {
         var pn = Jid.of("19254863482@s.whatsapp.net");
         var lid = Jid.of("83116928594056@lid");
         var store = DeviceFixtures.temporaryStore(pn, lid);
-        assertEquals(pn, store.jid().orElseThrow());
-        assertEquals(lid, store.lid().orElseThrow());
+        assertEquals(pn, store.accountStore().jid().orElseThrow());
+        assertEquals(lid, store.accountStore().lid().orElseThrow());
     }
 }

@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.sync;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -10,7 +11,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.handler.WebAppStateActionHandler;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,8 +48,8 @@ class WebAppStateHandlerRegistryTest {
         var props = TestABPropsService.builder().build();
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wam = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wam);
+        var wam = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wam);
         registry = new WebAppStateHandlerRegistry(props, lidMigration, wam);
     }
 
@@ -216,7 +217,7 @@ class WebAppStateHandlerRegistryTest {
     ) implements WebAppStateActionHandler {
         @Override
         public MutationApplicationResult applyMutation(
-                WhatsAppClient client,
+                LinkedWhatsAppClient client,
                 DecryptedMutation.Trusted mutation) {
             return MutationApplicationResult.success();
         }

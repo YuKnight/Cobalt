@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
  * Signal identity key has rotated without the user acknowledging the change. It backs the
  * per-send recipient selection exposed by
  * {@link com.github.auties00.cobalt.device.DeviceService#getUserFanout(Jid, String)} and
- * {@link com.github.auties00.cobalt.device.DeviceService#getGroupFanout(Jid, Jid)}; production
+ * {@link com.github.auties00.cobalt.device.DeviceService#getGroupFanout(Jid)}; production
  * senders reach it through {@link com.github.auties00.cobalt.device.DeviceService} and call it
  * directly only when bypassing that service, for example in tests.
  */

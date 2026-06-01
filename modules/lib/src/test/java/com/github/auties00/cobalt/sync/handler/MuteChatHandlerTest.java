@@ -93,12 +93,12 @@ class MuteChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation SET — happy path")
+    @DisplayName("applyMutation SET â€” happy path")
     class HappySet {
         @Test
         @DisplayName("muted=true with a future end timestamp stamps the chat mute")
         void mutesTheChat() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var muteUntil = Instant.ofEpochMilli(System.currentTimeMillis() + 60_000L);
 
@@ -112,7 +112,7 @@ class MuteChatHandlerTest {
         @Test
         @DisplayName("muted=false unmutes the chat (toEpochSecond returns 0)")
         void unmutesTheChat() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
 
             var result = handler.applyMutation(client,
                     muteMutation(false, null, PEER, Instant.ofEpochSecond(1_700_000_000L)));
@@ -125,7 +125,7 @@ class MuteChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — orphan")
+    @DisplayName("applyMutation â€” orphan")
     class Orphan {
         @Test
         @DisplayName("SET against an unknown chat JID returns ORPHAN with modelType=Chat")
@@ -141,12 +141,12 @@ class MuteChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed value")
+    @DisplayName("applyMutation â€” malformed value")
     class MalformedValue {
         @Test
         @DisplayName("a SyncActionValue carrying a pinAction instead of muteAction is MALFORMED")
         void wrongActionTypeIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var wrong = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .pinAction(new PinActionBuilder().pinned(true).build())
@@ -162,7 +162,7 @@ class MuteChatHandlerTest {
         @Test
         @DisplayName("muted=true without a muteEndTimestamp is MALFORMED")
         void mutedWithoutEndTimestampIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .muteAction(new MuteActionBuilder().muted(true).build())
@@ -177,12 +177,12 @@ class MuteChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed index")
+    @DisplayName("applyMutation â€” malformed index")
     class MalformedIndex {
         @Test
         @DisplayName("an empty chat JID at slot 1 is MALFORMED")
         void emptyChatJidIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var muteUntil = Instant.ofEpochMilli(System.currentTimeMillis() + 60_000L);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
@@ -198,12 +198,12 @@ class MuteChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — REMOVE")
+    @DisplayName("applyMutation â€” REMOVE")
     class RemoveOperation {
         @Test
         @DisplayName("REMOVE returns UNSUPPORTED")
         void removeReturnsUnsupported() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var mutation = new DecryptedMutation.Trusted(
                     JSON.toJSONString(List.of("mute", PEER.toString())),
                     new SyncActionValueBuilder()
@@ -218,10 +218,10 @@ class MuteChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("resolveConflicts — default timestamp-based behaviour")
+    @DisplayName("resolveConflicts â€” default timestamp-based behaviour")
     class ResolveConflicts {
         @Test
-        @DisplayName("older local vs. newer remote → APPLY_REMOTE_DROP_LOCAL")
+        @DisplayName("older local vs. newer remote â†’ APPLY_REMOTE_DROP_LOCAL")
         void newerRemoteWins() {
             var local = muteMutation(true, Instant.ofEpochMilli(2_000L), PEER, Instant.ofEpochSecond(100L));
             var remote = muteMutation(false, null, PEER, Instant.ofEpochSecond(200L));
@@ -231,7 +231,7 @@ class MuteChatHandlerTest {
         }
 
         @Test
-        @DisplayName("newer local vs. older remote → SKIP_REMOTE")
+        @DisplayName("newer local vs. older remote â†’ SKIP_REMOTE")
         void newerLocalWins() {
             var local = muteMutation(true, Instant.ofEpochMilli(2_000L), PEER, Instant.ofEpochSecond(300L));
             var remote = muteMutation(false, null, PEER, Instant.ofEpochSecond(200L));
@@ -242,9 +242,9 @@ class MuteChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("generateMuteMutation — builder helper (n/a)")
+    @DisplayName("generateMuteMutation â€” builder helper (n/a)")
     class BuilderHelpers {
-        // generateMuteMutation requires WhatsAppClient.abPropsService(), which TestWhatsAppClient
+        // generateMuteMutation requires LinkedWhatsAppClient.abPropsService(), which TestWhatsAppClient
         // does not stub. We assert metadata invariants of the produced mutation using a
         // muteEndSeconds=0 unmute call which does not branch through abPropsService
         // (the AB-prop branch only runs for groups, never for user JIDs in this test).

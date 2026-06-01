@@ -1,0 +1,38 @@
+package com.github.auties00.cobalt.client.listener;
+
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.store.WhatsAppStore;
+
+import java.util.Collection;
+
+/**
+ * A functional interface for the {@link LinkedWhatsAppClientListener#onBlockedContacts onBlockedContacts} event.
+ *
+ * <p>{@link LinkedWhatsAppClientListener} extends this interface and supplies an empty
+ * default implementation, so the event can also be observed in isolation as a
+ * lambda.
+ *
+ * @see LinkedWhatsAppClientListener
+ */
+@FunctionalInterface
+public interface BlockedContactsListener extends WhatsAppListener {
+    /**
+     * Notifies the listener that the Blocked Contacts privacy list was
+     * refreshed against the server.
+     *
+     * @apiNote
+     * Fires once each time
+     * {@link LinkedWhatsAppClient#refreshBlockList()} commits a fresh
+     * server-authoritative copy of the list, regardless of whether
+     * individual entries changed. Use to redraw the Blocked Contacts
+     * settings surface against the new authoritative set. The
+     * collection is the same view returned by
+     * {@link com.github.auties00.cobalt.store.ContactStore#blockedContacts()} after the refresh.
+     *
+     * @param whatsapp        the client emitting the event
+     * @param blockedContacts the new authoritative set of blocked
+     *                        contacts; may be empty
+     */
+    void onBlockedContacts(LinkedWhatsAppClient whatsapp, Collection<Jid> blockedContacts);
+}

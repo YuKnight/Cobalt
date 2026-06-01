@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Tests run against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * through {@link TestWhatsAppClient} so the
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#locale()} read-back can
+ * {@link com.github.auties00.cobalt.store.AccountStore#locale()} read-back can
  * be asserted directly.
  */
 @DisplayName("LocaleSettingHandler")
@@ -41,7 +41,7 @@ class LocaleSettingHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -95,7 +95,7 @@ class LocaleSettingHandlerTest {
             var result = new LocaleSettingHandler().applyMutation(client, localeMutation("pt_BR", SyncdOperation.SET, ts));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals("pt_BR", client.store().locale().orElseThrow(),
+            assertEquals("pt_BR", client.store().accountStore().locale().orElseThrow(),
                     "WAWebLocaleSettingSync.applyMutations writes the new locale via setLocale");
         }
 
@@ -106,7 +106,7 @@ class LocaleSettingHandlerTest {
             new LocaleSettingHandler().applyMutation(client, localeMutation("en_US", SyncdOperation.SET, ts));
             new LocaleSettingHandler().applyMutation(client, localeMutation("fr_FR", SyncdOperation.SET, ts.plusSeconds(10)));
 
-            assertEquals("fr_FR", client.store().locale().orElseThrow());
+            assertEquals("fr_FR", client.store().accountStore().locale().orElseThrow());
         }
     }
 
@@ -230,7 +230,7 @@ class LocaleSettingHandlerTest {
             assertEquals(2, results.size());
             assertEquals(SyncActionState.SUCCESS, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertEquals("fr", client.store().locale().orElseThrow(),
+            assertEquals("fr", client.store().accountStore().locale().orElseThrow(),
                     "the default batch path leaves the last applied SET as the visible state");
         }
     }

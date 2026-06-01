@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -75,7 +75,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      * mutation value and either marks the user as having an avatar
      * ({@code CREATED} / {@code UPDATED}) or as not having one ({@code DELETED}),
      * then drops the recent-avatar-sticker cache via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#removeAllRecentAvatarStickers()}.
+     * {@link com.github.auties00.cobalt.store.SettingsStore#removeAllRecentAvatarStickers()}.
      *
      * @implNote
      * This implementation gates on the
@@ -90,7 +90,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!abPropsService.getBool(ABProp.ENABLE_AVATARS_ON_WEB_COMPANION)) {
             return MutationApplicationResult.unsupported();
         }
@@ -117,7 +117,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
             case DELETED -> client.store().setHasAvatar(false);
         }
 
-        client.store().removeAllRecentAvatarStickers();
+        client.store().settingsStore().removeAllRecentAvatarStickers();
         return MutationApplicationResult.success();
     }
 }

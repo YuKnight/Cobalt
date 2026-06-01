@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * gating prop can be flipped per test and a real {@link UserStatusMuteHandler},
  * and runs against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * through {@link TestWhatsAppClient} so the
- * {@link WhatsAppStore#findContactByJid(Jid)} read-back can be asserted directly.
+ * {@link com.github.auties00.cobalt.store.ContactStore#findContactByJid(Jid)} read-back can be asserted directly.
  */
 @DisplayName("LidContactHandler")
 class LidContactHandlerTest {
@@ -54,7 +54,7 @@ class LidContactHandlerTest {
 
     private WhatsAppStore store;
     private TestABPropsService props;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private LidContactHandler handler;
 
     @BeforeEach
@@ -129,7 +129,7 @@ class LidContactHandlerTest {
             var result = handler.applyMutation(client, build(CONTACT_LID, action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var contact = store.findContactByJid(CONTACT_LID).orElseThrow();
+            var contact = store.contactStore().findContactByJid(CONTACT_LID).orElseThrow();
             assertEquals("Maria Garcia", contact.fullName().orElseThrow());
             assertEquals("Maria", contact.shortName().orElseThrow());
         }
@@ -141,7 +141,7 @@ class LidContactHandlerTest {
 
             handler.applyMutation(client, build(CONTACT_LID, action, SyncdOperation.SET, Instant.now()));
 
-            assertEquals("Maria", store.findContactByJid(CONTACT_LID).orElseThrow().shortName().orElseThrow());
+            assertEquals("Maria", store.contactStore().findContactByJid(CONTACT_LID).orElseThrow().shortName().orElseThrow());
         }
 
         @Test
@@ -151,7 +151,7 @@ class LidContactHandlerTest {
 
             handler.applyMutation(client, build(CONTACT_LID, action, SyncdOperation.SET, Instant.now()));
 
-            var contact = store.findContactByJid(CONTACT_LID).orElseThrow();
+            var contact = store.contactStore().findContactByJid(CONTACT_LID).orElseThrow();
             assertEquals("maria", contact.username().orElseThrow());
             assertTrue(contact.isAddedByUsername());
         }
@@ -163,7 +163,7 @@ class LidContactHandlerTest {
 
             handler.applyMutation(client, build(CONTACT_LID, action, SyncdOperation.SET, Instant.now()));
 
-            var contact = store.findContactByJid(CONTACT_LID).orElseThrow();
+            var contact = store.contactStore().findContactByJid(CONTACT_LID).orElseThrow();
             assertTrue(contact.username().isEmpty());
             assertFalse(contact.isAddedByUsername());
         }
@@ -249,7 +249,7 @@ class LidContactHandlerTest {
         @Test
         @DisplayName("REMOVE on a username-added contact clears its address-book fields")
         void removeClearsUsernameContact() {
-            var contact = store.addNewContact(CONTACT_LID);
+            var contact = store.contactStore().addNewContact(CONTACT_LID);
             contact.setFullName("Maria");
             contact.setShortName("Maria");
             contact.setUsername("maria");
@@ -267,7 +267,7 @@ class LidContactHandlerTest {
         @Test
         @DisplayName("REMOVE on a non-username-added contact leaves the record untouched")
         void removeIsNoopForNonUsernameContact() {
-            var contact = store.addNewContact(CONTACT_LID);
+            var contact = store.contactStore().addNewContact(CONTACT_LID);
             contact.setFullName("Maria");
             // addedByUsername stays false.
 

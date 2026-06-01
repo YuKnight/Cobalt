@@ -24,9 +24,9 @@ Custom protobuf library (`com.github.auties00:protobuf-serialization-plugin`), N
 - **Custom serializers:** `@ProtobufSerializer`/`@ProtobufDeserializer` on types (e.g., `Jid` has custom `of(ProtobufString)` deserializer).
 
 ### Store System
-Single `AbstractWhatsAppStore` flattens WA Web's multi-database architecture:
+Single `ProtobufWhatsAppStore` flattens WA Web's multi-database architecture:
 - WA Web uses ~12 IndexedDB databases, ~100 IDB tables, ~45 in-memory reactive Collections, and a key-value UserPrefs store.
-- Cobalt collapses ALL of this into one `AbstractWhatsAppStore` with `ConcurrentHashMap` fields per entity type.
+- Cobalt collapses ALL of this into one `ProtobufWhatsAppStore` with `ConcurrentHashMap` fields per entity type.
 - **Key WA Web store modules:** `WAWebSignalStorage` (Signal protocol), `WAWebModelStorageInitialize` (chats/contacts/messages/sync), `WAWebCollections` (in-memory), `WAWebUserPrefsBase` (user preferences).
 - **Cobalt DI pattern:** Services (store, client, etc.) are injected via constructor, NOT accessed via getters. Classes receive dependencies as constructor parameters and store them as fields.
 

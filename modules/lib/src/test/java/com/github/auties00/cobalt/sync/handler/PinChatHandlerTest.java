@@ -15,7 +15,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.PinChatMutationFactory;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the chat is unknown to the store, the malformed classification when the index JID is
  * empty or unparseable, and the {@link PinChatMutationFactory} builder helpers. Mutations
  * are built via the local {@code pinMutation} helper and the handler is wired to a
- * {@link DefaultWamService} so cap-eviction emissions are observable on the test client.
+ * {@link LiveWamService} so cap-eviction emissions are observable on the test client.
  */
 @DisplayName("PinChatHandler")
 class PinChatHandlerTest {
@@ -51,7 +51,7 @@ class PinChatHandlerTest {
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         client = TestWhatsAppClient.create().withStore(store);
         var props = TestABPropsService.builder().build();
-        var wam = new DefaultWamService(client, props);
+        var wam = new LiveWamService(client, props);
         handler = new PinChatHandler(wam);
     }
 
@@ -89,12 +89,12 @@ class PinChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation SET — happy path")
+    @DisplayName("applyMutation SET â€” happy path")
     class HappySet {
         @Test
         @DisplayName("pinned=true on an existing chat stamps the pinnedTimestamp and clears archive")
         void pinsTheChat() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.setArchived(true);
 
             var ts = Instant.ofEpochSecond(1_700_000_000L);
@@ -109,7 +109,7 @@ class PinChatHandlerTest {
         @Test
         @DisplayName("pinned=false clears the pinnedTimestamp")
         void unpinsTheChat() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.setPinnedTimestamp(Instant.ofEpochSecond(1L));
 
             var result = handler.applyMutation(client, pinMutation(false, PEER, Instant.ofEpochSecond(2L)));
@@ -120,7 +120,7 @@ class PinChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — orphan")
+    @DisplayName("applyMutation â€” orphan")
     class Orphan {
         @Test
         @DisplayName("SET on an unknown chat JID returns ORPHAN with modelType=Chat")
@@ -134,12 +134,12 @@ class PinChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed value")
+    @DisplayName("applyMutation â€” malformed value")
     class MalformedValue {
         @Test
         @DisplayName("a SyncActionValue carrying an archiveChatAction instead of pinAction is MALFORMED")
         void wrongActionTypeIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var wrong = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .archiveChatAction(new ArchiveChatActionBuilder().archived(true).build())
@@ -154,12 +154,12 @@ class PinChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed index")
+    @DisplayName("applyMutation â€” malformed index")
     class MalformedIndex {
         @Test
         @DisplayName("an empty chat JID at slot 1 is MALFORMED")
         void emptyChatJidIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .pinAction(new PinActionBuilder().pinned(true).build())
@@ -178,7 +178,7 @@ class PinChatHandlerTest {
         @Test
         @DisplayName("an unparseable chat JID at slot 1 is MALFORMED")
         void unparseableJidIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .pinAction(new PinActionBuilder().pinned(true).build())
@@ -193,12 +193,12 @@ class PinChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — REMOVE")
+    @DisplayName("applyMutation â€” REMOVE")
     class RemoveOperation {
         @Test
         @DisplayName("REMOVE returns UNSUPPORTED")
         void removeReturnsUnsupported() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.setPinnedTimestamp(Instant.ofEpochSecond(1L));
             var mutation = new DecryptedMutation.Trusted(
                     JSON.toJSONString(List.of("pin_v1", PEER.toString())),
@@ -222,7 +222,7 @@ class PinChatHandlerTest {
         @Test
         @DisplayName("re-pinning an already-pinned chat refreshes the timestamp without invoking the limit")
         void alreadyPinnedRefreshesTimestamp() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.setPinnedTimestamp(Instant.ofEpochSecond(1L));
 
             var newTs = Instant.ofEpochSecond(2L);
@@ -236,39 +236,39 @@ class PinChatHandlerTest {
         @DisplayName("when limit is reached and incoming is newer the oldest is kicked out and a pending unpin is queued")
         void kickOldestWhenIncomingIsNewer() {
             // Fill three slots with old timestamps.
-            var a = client.store().addNewChat(Jid.of("1@s.whatsapp.net"));
+            var a = client.store().chatStore().addNewChat(Jid.of("1@s.whatsapp.net"));
             a.setPinnedTimestamp(Instant.ofEpochSecond(100L)); // oldest
-            var b = client.store().addNewChat(Jid.of("2@s.whatsapp.net"));
+            var b = client.store().chatStore().addNewChat(Jid.of("2@s.whatsapp.net"));
             b.setPinnedTimestamp(Instant.ofEpochSecond(200L));
-            var c = client.store().addNewChat(Jid.of("3@s.whatsapp.net"));
+            var c = client.store().chatStore().addNewChat(Jid.of("3@s.whatsapp.net"));
             c.setPinnedTimestamp(Instant.ofEpochSecond(300L));
 
             var newcomer = Jid.of("4@s.whatsapp.net");
-            client.store().addNewChat(newcomer);
+            client.store().chatStore().addNewChat(newcomer);
             var incoming = Instant.ofEpochSecond(400L);
 
             var result = handler.applyMutation(client, pinMutation(true, newcomer, incoming));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
             assertTrue(a.pinnedTimestamp().isEmpty(), "oldest pin must be evicted");
-            assertEquals(incoming, client.store().findChatByJid(newcomer).orElseThrow().pinnedTimestamp().orElseThrow());
+            assertEquals(incoming, client.store().chatStore().findChatByJid(newcomer).orElseThrow().pinnedTimestamp().orElseThrow());
 
-            var pending = client.store().findPendingMutations(SyncPatchType.REGULAR_LOW);
+            var pending = client.store().syncStore().findPendingMutations(SyncPatchType.REGULAR_LOW);
             assertFalse(pending.isEmpty(), "a pending unpin must be queued for the evicted chat");
         }
 
         @Test
         @DisplayName("when limit is reached and incoming is older the incoming pin is rejected and an unpin is queued for it")
         void rejectIncomingWhenOlderThanOldest() {
-            var a = client.store().addNewChat(Jid.of("1@s.whatsapp.net"));
+            var a = client.store().chatStore().addNewChat(Jid.of("1@s.whatsapp.net"));
             a.setPinnedTimestamp(Instant.ofEpochSecond(1000L));
-            var b = client.store().addNewChat(Jid.of("2@s.whatsapp.net"));
+            var b = client.store().chatStore().addNewChat(Jid.of("2@s.whatsapp.net"));
             b.setPinnedTimestamp(Instant.ofEpochSecond(2000L));
-            var c = client.store().addNewChat(Jid.of("3@s.whatsapp.net"));
+            var c = client.store().chatStore().addNewChat(Jid.of("3@s.whatsapp.net"));
             c.setPinnedTimestamp(Instant.ofEpochSecond(3000L));
 
             var newcomer = Jid.of("4@s.whatsapp.net");
-            var newcomerChat = client.store().addNewChat(newcomer);
+            var newcomerChat = client.store().chatStore().addNewChat(newcomer);
             var incomingTs = Instant.ofEpochSecond(500L); // older than the oldest current pin
 
             var result = handler.applyMutation(client, pinMutation(true, newcomer, incomingTs));
@@ -277,17 +277,17 @@ class PinChatHandlerTest {
             assertTrue(newcomerChat.pinnedTimestamp().isEmpty(),
                     "newcomer is not pinned because it is older than the oldest current pin");
             assertTrue(a.pinnedTimestamp().isPresent(), "oldest pin remains");
-            var pending = client.store().findPendingMutations(SyncPatchType.REGULAR_LOW);
+            var pending = client.store().syncStore().findPendingMutations(SyncPatchType.REGULAR_LOW);
             assertFalse(pending.isEmpty(), "a pending unpin must be queued for the rejected newcomer");
         }
     }
 
     @Nested
-    @DisplayName("resolveConflicts — default timestamp-based behaviour")
+    @DisplayName("resolveConflicts â€” default timestamp-based behaviour")
     class ResolveConflicts {
         // PinChatHandler does NOT override resolveConflicts; the interface default applies.
         @Test
-        @DisplayName("older local vs. newer remote → APPLY_REMOTE_DROP_LOCAL")
+        @DisplayName("older local vs. newer remote â†’ APPLY_REMOTE_DROP_LOCAL")
         void newerRemoteWins() {
             var local = pinMutation(true, PEER, Instant.ofEpochSecond(100L));
             var remote = pinMutation(false, PEER, Instant.ofEpochSecond(200L));
@@ -297,7 +297,7 @@ class PinChatHandlerTest {
         }
 
         @Test
-        @DisplayName("newer local vs. older remote → SKIP_REMOTE")
+        @DisplayName("newer local vs. older remote â†’ SKIP_REMOTE")
         void newerLocalWins() {
             var local = pinMutation(true, PEER, Instant.ofEpochSecond(300L));
             var remote = pinMutation(false, PEER, Instant.ofEpochSecond(200L));
@@ -308,7 +308,7 @@ class PinChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("getPinMutation — static builder helper")
+    @DisplayName("getPinMutation â€” static builder helper")
     class BuilderHelpers {
         @Test
         @DisplayName("getPinMutation builds a SET mutation carrying the pinAction and the [\"pin_v1\", jid] index")

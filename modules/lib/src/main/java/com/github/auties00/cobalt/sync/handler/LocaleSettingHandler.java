@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.LocaleChangedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -24,9 +25,9 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote
  * This implementation persists the locale into
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setLocale(String)} and
+ * {@link com.github.auties00.cobalt.store.AccountStore#setLocale(String)} and
  * notifies every registered
- * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onLocaleChanged(WhatsAppClient, String, String)}
+ * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onLocaleChanged(LinkedWhatsAppClient, String, String)}
  * on its own virtual thread, since Cobalt has no UI layer to delegate to.
  */
 @WhatsAppWebModule(moduleName = "WAWebLocaleSettingSync")
@@ -82,7 +83,7 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLocaleSettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -96,10 +97,12 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.skipped();
         }
 
-        var oldLocale = client.store().locale().orElse(null);
-        client.store().setLocale(newLocale);
+        var oldLocale = client.store().accountStore().locale().orElse(null);
+        client.store().accountStore().setLocale(newLocale);
         for (var listener : client.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onLocaleChanged(client, oldLocale, newLocale));
+            if (listener instanceof LocaleChangedListener typed) {
+                Thread.startVirtualThread(() -> typed.onLocaleChanged(client, oldLocale, newLocale));
+            }
         }
 
         return MutationApplicationResult.success();

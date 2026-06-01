@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.message.receipt;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -69,7 +69,7 @@ public final class MessageReceiptHandler {
     /**
      * Holds the client used to dispatch the constructed receipt stanzas over the socket.
      */
-    private final WhatsAppClient client;
+    private final LinkedWhatsAppClient client;
 
     /**
      * Holds the central session store used to look up the local PN/LID, signed prekey pair,
@@ -80,7 +80,7 @@ public final class MessageReceiptHandler {
     /**
      * Constructs a receipt handler bound to the given client.
      * <p>
-     * The store is read from {@link WhatsAppClient#store()} so no separate store argument is
+     * The store is read from {@link LinkedWhatsAppClient#store()} so no separate store argument is
      * required.
      *
      * @param client the client used to dispatch receipt stanzas
@@ -88,7 +88,7 @@ public final class MessageReceiptHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgSendReceipt", exports = "sendReceipt",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public MessageReceiptHandler(WhatsAppClient client) {
+    public MessageReceiptHandler(LinkedWhatsAppClient client) {
         this.client = Objects.requireNonNull(client, "client cannot be null");
         this.store = client.store();
     }
@@ -199,7 +199,7 @@ public final class MessageReceiptHandler {
 
         var registrationNode = new NodeBuilder()
                 .description("registration")
-                .content(DataUtils.intToBytes(store.registrationId(), 4))
+                .content(DataUtils.intToBytes(store.signalStore().registrationId(), 4))
                 .build();
 
         var keysNode = retryCount >= RETRY_KEY_BUNDLE_THRESHOLD
@@ -213,7 +213,7 @@ public final class MessageReceiptHandler {
 
         if (from.hasUserServer() || from.hasLidServer()) {
             toJid = from;
-            var selfJid = store.jid().orElse(null);
+            var selfJid = store.accountStore().jid().orElse(null);
             if (selfJid != null && from.toUserJid().equals(selfJid.toUserJid())) {
                 if (stanza.isPeer()) {
                     categoryAttr = "peer";
@@ -347,7 +347,7 @@ public final class MessageReceiptHandler {
                 .description("ack")
                 .attribute("id", stanza.id())
                 .attribute("class", "message")
-                .attribute("from", store.jid().orElse(null))
+                .attribute("from", store.accountStore().jid().orElse(null))
                 .attribute("to", resolveFrom(stanza))
                 .attribute("participant",
                         resolveReceiptParticipant(stanza))
@@ -378,11 +378,11 @@ public final class MessageReceiptHandler {
             adaptation = WhatsAppAdaptation.DIRECT)
     private Node buildKeyBundleNode() {
         try {
-            var preKey = store.hasPreKeys()
-                    ? store.preKeys().getFirst()
+            var preKey = store.signalStore().hasPreKeys()
+                    ? store.signalStore().preKeys().getFirst()
                     : SignalPreKeyPair.random(1);
-            if (!store.hasPreKeys()) {
-                store.addPreKey(preKey);
+            if (!store.signalStore().hasPreKeys()) {
+                store.signalStore().addPreKey(preKey);
             }
 
             var typeNode = new NodeBuilder()
@@ -392,7 +392,7 @@ public final class MessageReceiptHandler {
 
             var identityNode = new NodeBuilder()
                     .description("identity")
-                    .content(store.identityKeyPair().publicKey().toEncodedPoint())
+                    .content(store.signalStore().identityKeyPair().publicKey().toEncodedPoint())
                     .build();
 
             var preKeyIdNode = new NodeBuilder()
@@ -408,7 +408,7 @@ public final class MessageReceiptHandler {
                     .content(preKeyIdNode, preKeyValueNode)
                     .build();
 
-            var signedKeyPair = store.signedKeyPair();
+            var signedKeyPair = store.signalStore().signedKeyPair();
             var skeyIdNode = new NodeBuilder()
                     .description("id")
                     .content(DataUtils.intToBytes(signedKeyPair.id(), 3))
@@ -426,7 +426,7 @@ public final class MessageReceiptHandler {
                     .content(skeyIdNode, skeyValueNode, skeySigNode)
                     .build();
 
-            var deviceIdentityNode = store.signedDeviceIdentity()
+            var deviceIdentityNode = store.signalStore().signedDeviceIdentity()
                     .map(id -> new NodeBuilder()
                             .description("device-identity")
                             .content(ADVSignedDeviceIdentitySpec.encode(id))
@@ -518,7 +518,7 @@ public final class MessageReceiptHandler {
             return null;
         }
 
-        var selfJid = store.jid().orElse(null);
+        var selfJid = store.accountStore().jid().orElse(null);
         if (selfJid == null) {
             return null;
         }
@@ -546,7 +546,7 @@ public final class MessageReceiptHandler {
     @WhatsAppWebExport(moduleName = "WAWebSendDeliveryReceiptJob", exports = "sendDeliveryReceiptsAfterDecryption",
             adaptation = WhatsAppAdaptation.DIRECT)
     private boolean isSenderReceipt(Jid from, Jid participant) {
-        var selfJid = store.jid().orElse(null);
+        var selfJid = store.accountStore().jid().orElse(null);
         if (selfJid == null) {
             return false;
         }

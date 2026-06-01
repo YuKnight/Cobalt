@@ -232,6 +232,38 @@ export function registerLiveDebugTools(server: McpServer, context: LiveToolsCont
   );
 
   server.tool(
+    "web_live_debug_eval_on_frame",
+    "Evaluates a JavaScript expression in the context of a specific paused call frame (returns by value). Pass a callFrameId from web_live_debug_paused_state; the expression sees that frame's locals and `this`. Works on JS frames (e.g. read a worker onmessage handler's `e.data`). Return JSON-serializable data (e.g. Array.from(new Uint8Array(buf)) or btoa(...)) since ArrayBuffer/typed-array values do not serialize by value.",
+    {
+      sessionId: sessionIdSchema,
+      callFrameId: z.string().describe("callFrameId of a paused frame (from web_live_debug_paused_state)."),
+      expression: z.string().describe("JavaScript expression evaluated in the frame's scope."),
+    },
+    async ({
+      sessionId,
+      callFrameId,
+      expression,
+    }: {
+      sessionId: string;
+      callFrameId: string;
+      expression: string;
+    }) => {
+      requireReady();
+      log.info(`web_live_debug_eval_on_frame: id=${sessionId} expr="${expression.slice(0, 100)}${expression.length > 100 ? "..." : ""}"`);
+      try {
+        const session = requireSession(sessionId);
+        const result = await session.evaluateOnCallFrame(callFrameId, expression);
+        return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
     "web_live_debug_remove_breakpoint",
     "Removes a breakpoint by id from a session.",
     {

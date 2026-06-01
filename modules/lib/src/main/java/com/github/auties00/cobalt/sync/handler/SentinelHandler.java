@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -74,7 +74,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * decoded action is not a {@link KeyExpirationAction} or whose
      * {@code expiredKeyEpoch} is empty is reported as malformed; otherwise the
      * named epoch is expired on the local store via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#expireAppStateKeysByEpoch(int)}.
+     * {@link com.github.auties00.cobalt.store.SyncStore#expireAppStateKeysByEpoch(int)}.
      *
      * @implNote
      * This implementation omits WA Web's {@code WALogger.ERROR}/{@code WARN}
@@ -85,7 +85,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -99,7 +99,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        client.store().expireAppStateKeysByEpoch(expiredEpoch.getAsInt());
+        client.store().syncStore().expireAppStateKeysByEpoch(expiredEpoch.getAsInt());
         return MutationApplicationResult.success();
     }
 

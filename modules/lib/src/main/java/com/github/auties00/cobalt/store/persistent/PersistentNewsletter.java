@@ -16,10 +16,10 @@ import java.util.stream.Stream;
 
 /**
  * The metadata-only {@link Newsletter} subtype used as the value type of
- * {@link PersistentStore#newsletters}.
+ * {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#newsletters}.
  *
  * @apiNote
- * Cobalt embedders never construct this directly; {@link PersistentStore#addNewNewsletter(Jid)}
+ * Cobalt embedders never construct this directly; {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#addNewNewsletter(Jid)}
  * returns one as a {@link Newsletter} and the protobuf builder produces one on deserialisation.
  * Every message accessor delegates to the owning store's {@link PersistentMessageStore} so that
  * newsletter bodies stay out of the protobuf snapshot and live in the LMDB env instead.
@@ -55,7 +55,7 @@ final class PersistentNewsletter extends Newsletter {
      * @apiNote
      * This constructor is package-private and intended for the generated
      * {@code PersistentNewsletterBuilder} and the protobuf deserialiser. Callers obtain instances
-     * via {@link PersistentStore#addNewNewsletter(Jid)}.
+     * via {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#addNewNewsletter(Jid)}.
      *
      * @param jid                  the newsletter JID
      * @param state                the newsletter state

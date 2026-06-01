@@ -85,11 +85,85 @@ public class SrtpEndpointTest {
     }
 
     @Test
+    public void rotateMasterKeyRoundTripsAcrossBothEnds() {
+        var keying = randomKeying();
+        try (var client = SrtpEndpoint.fromDtlsKeyingMaterial(keying, SrtpRole.CLIENT);
+             var server = SrtpEndpoint.fromDtlsKeyingMaterial(keying, SrtpRole.SERVER)) {
+            var pre = makeRtpPacket(SSRC, 1, 1000, "before".getBytes());
+            assertArrayEquals(pre, server.unprotectRtp(client.protectRtp(pre)),
+                    "pre-rotation packet must round-trip");
+
+            var newKey = new byte[16];
+            new SecureRandom().nextBytes(newKey);
+            client.rotateMasterKey(newKey);
+            server.rotateMasterKey(newKey);
+
+            var post = makeRtpPacket(SSRC, 2, 2000, "after rotation".getBytes());
+            assertArrayEquals(post, server.unprotectRtp(client.protectRtp(post)),
+                    "post-rotation packet must round-trip with the new master key");
+        }
+    }
+
+    @Test
+    public void rotateMasterKeyOnlyOnSenderBreaksDecrypt() {
+        var keying = randomKeying();
+        try (var client = SrtpEndpoint.fromDtlsKeyingMaterial(keying, SrtpRole.CLIENT);
+             var server = SrtpEndpoint.fromDtlsKeyingMaterial(keying, SrtpRole.SERVER)) {
+            var newKey = new byte[16];
+            new SecureRandom().nextBytes(newKey);
+            client.rotateMasterKey(newKey);
+
+            var pkt = makeRtpPacket(SSRC, 5, 5000, "asymmetric".getBytes());
+            var encrypted = client.protectRtp(pkt);
+            assertThrows(WhatsAppCallException.Srtp.class,
+                    () -> server.unprotectRtp(encrypted),
+                    "server should reject packets encrypted under a key it does not hold");
+        }
+    }
+
+    @Test
+    public void rotateMasterKeyRejectsWrongLength() {
+        var keying = randomKeying();
+        try (var endpoint = SrtpEndpoint.fromDtlsKeyingMaterial(keying, SrtpRole.CLIENT)) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> endpoint.rotateMasterKey(new byte[15]));
+            assertThrows(IllegalArgumentException.class,
+                    () -> endpoint.rotateMasterKey(new byte[17]));
+        }
+    }
+
+    @Test
     public void rejectsWrongKeyingMaterialLength() {
         assertThrows(IllegalArgumentException.class,
                 () -> SrtpEndpoint.fromDtlsKeyingMaterial(new byte[59], SrtpRole.CLIENT));
         assertThrows(IllegalArgumentException.class,
                 () -> SrtpEndpoint.fromDtlsKeyingMaterial(new byte[61], SrtpRole.CLIENT));
+    }
+
+    // The relayed-media leg keys both endpoints from the SAME 30-byte <hbh_key>; the directions are
+    // kept distinct by SSRC, not by separate keys. Two endpoints built from the one hop-by-hop key
+    // must round-trip RTP both ways, end to end.
+    @Test
+    public void hopByHopKeyRoundTripsBothDirections() {
+        var hbhKey = new byte[HbhKeyDerivation.HBH_KEY_LENGTH];
+        new SecureRandom().nextBytes(hbhKey);
+        try (var caller = SrtpEndpoint.fromHopByHopKey(hbhKey);
+             var relay = SrtpEndpoint.fromHopByHopKey(hbhKey)) {
+            var up = makeRtpPacket(0xCA11E400, 7, 700, "uplink frame".getBytes());
+            assertArrayEquals(up, relay.unprotectRtp(caller.protectRtp(up)),
+                    "uplink media must round-trip under the hop-by-hop key");
+            var down = makeRtpPacket(0x9E1A4000, 9, 900, "downlink frame".getBytes());
+            assertArrayEquals(down, caller.unprotectRtp(relay.protectRtp(down)),
+                    "downlink media must round-trip under the same hop-by-hop key");
+        }
+    }
+
+    @Test
+    public void hopByHopKeyRejectsWrongLength() {
+        assertThrows(IllegalArgumentException.class,
+                () -> SrtpEndpoint.fromHopByHopKey(new byte[29]));
+        assertThrows(IllegalArgumentException.class,
+                () -> SrtpEndpoint.fromHopByHopKey(new byte[31]));
     }
 
     // 60 bytes matches the length a real DTLS-SRTP handshake exports.

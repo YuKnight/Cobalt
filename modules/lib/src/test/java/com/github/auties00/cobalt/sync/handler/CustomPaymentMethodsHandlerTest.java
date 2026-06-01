@@ -81,7 +81,7 @@ class CustomPaymentMethodsHandlerTest {
      * Sets the local store's platform to {@code IOS_BUSINESS}.
      */
     private void smbPlatform() {
-        store.device().setPlatform(ClientPlatformType.IOS_BUSINESS);
+        store.accountStore().device().setPlatform(ClientPlatformType.IOS_BUSINESS);
     }
 
     /**
@@ -162,7 +162,7 @@ class CustomPaymentMethodsHandlerTest {
         @Test
         @DisplayName("IOS_BUSINESS platform is accepted")
         void iosBusinessAccepted() {
-            store.device().setPlatform(ClientPlatformType.IOS_BUSINESS);
+            store.accountStore().device().setPlatform(ClientPlatformType.IOS_BUSINESS);
             enableSync();
             var action = new CustomPaymentMethodsActionBuilder()
                     .customPaymentMethods(List.of(sampleMethod())).build();
@@ -174,7 +174,7 @@ class CustomPaymentMethodsHandlerTest {
         @Test
         @DisplayName("ANDROID_BUSINESS platform is accepted")
         void androidBusinessAccepted() {
-            store.device().setPlatform(ClientPlatformType.ANDROID_BUSINESS);
+            store.accountStore().device().setPlatform(ClientPlatformType.ANDROID_BUSINESS);
             enableSync();
             var action = new CustomPaymentMethodsActionBuilder()
                     .customPaymentMethods(List.of(sampleMethod())).build();
@@ -246,7 +246,7 @@ class CustomPaymentMethodsHandlerTest {
             var result = handler.applyMutation(testClient, setMutation(action));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var persisted = store.customPaymentMethods();
+            var persisted = store.businessStore().customPaymentMethods();
             assertEquals(1, persisted.size(),
                     "the stored list must match the action payload arity");
             assertEquals("cred-123", persisted.get(0).credentialId());
@@ -258,13 +258,13 @@ class CustomPaymentMethodsHandlerTest {
             smbPlatform();
             enableSync();
             // Seed a prior entry so we can observe the clear
-            store.setCustomPaymentMethods(List.of(sampleMethod()));
+            store.businessStore().setCustomPaymentMethods(List.of(sampleMethod()));
             var action = new CustomPaymentMethodsActionBuilder()
                     .customPaymentMethods(List.of()).build();
             var result = handler.applyMutation(testClient, setMutation(action));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(0, store.customPaymentMethods().size(),
+            assertEquals(0, store.businessStore().customPaymentMethods().size(),
                     "an empty SET must clear the stored list");
         }
     }

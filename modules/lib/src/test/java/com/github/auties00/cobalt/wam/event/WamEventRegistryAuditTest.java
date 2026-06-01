@@ -126,10 +126,10 @@ class WamEventRegistryAuditTest {
      */
     private static WamEventSpec decodeMinimalMarker(int eventId) {
         var buffer = new byte[MARKER_BUFFER];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeEventMarker(eventId, 0, false);
         var written = encoder.written();
-        var decoder = WamEventDecoder.of(buffer, 0, written);
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, written);
         return WamEventRegistry.decode(decoder);
     }
 

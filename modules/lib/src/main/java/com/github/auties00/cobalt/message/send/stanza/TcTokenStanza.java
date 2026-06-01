@@ -100,7 +100,7 @@ public final class TcTokenStanza {
             return null;
         }
 
-        var chat = store.findChatByJid(chatJid).orElse(null);
+        var chat = store.chatStore().findChatByJid(chatJid).orElse(null);
         if (chat == null) {
             return null;
         }

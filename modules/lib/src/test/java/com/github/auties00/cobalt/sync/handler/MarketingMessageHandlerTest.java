@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * fallbacks, the REMOVE rejection and the inherited timestamp-based conflict resolution.
  *
  * <p>The handler runs against an in-memory {@link DeviceFixtures#temporaryStore} via
- * {@link TestWhatsAppClient} so the {@link WhatsAppStore#findMarketingMessage(String)} read-back
+ * {@link TestWhatsAppClient} so the {@link com.github.auties00.cobalt.store.BusinessStore#findMarketingMessage(String)} read-back
  * can be asserted directly, including the preserved {@link MarketingMessageAction#isDeleted()} flag.
  */
 @DisplayName("MarketingMessageHandler")
@@ -108,7 +108,7 @@ class MarketingMessageHandlerTest {
                     buildMutation("tpl-1", action, SyncdOperation.SET, Instant.ofEpochSecond(1_700_002_000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findMarketingMessage("tpl-1").orElseThrow();
+            var stored = store.businessStore().findMarketingMessage("tpl-1").orElseThrow();
             assertEquals("tpl-1", stored.templateId());
             assertTrue(!stored.deleted(), "isDeleted=false propagates to the stored template");
         }
@@ -126,7 +126,7 @@ class MarketingMessageHandlerTest {
             handler.applyMutation(client,
                     buildMutation("tpl-tomb", action, SyncdOperation.SET, Instant.now()));
 
-            assertTrue(store.findMarketingMessage("tpl-tomb").orElseThrow().deleted());
+            assertTrue(store.businessStore().findMarketingMessage("tpl-tomb").orElseThrow().deleted());
         }
     }
 
@@ -147,7 +147,7 @@ class MarketingMessageHandlerTest {
                     buildMutation("brand-new", action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findMarketingMessage("brand-new").isPresent());
+            assertTrue(store.businessStore().findMarketingMessage("brand-new").isPresent());
         }
     }
 

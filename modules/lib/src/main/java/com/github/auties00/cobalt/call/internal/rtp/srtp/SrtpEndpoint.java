@@ -62,14 +62,23 @@ public final class SrtpEndpoint implements AutoCloseable {
     private static final int MIN_RTP_LENGTH = 12;
 
     /**
-     * Holds the outbound (sender-side) derived session keys.
+     * Holds the outbound (sender-side) derived session keys; replaced wholesale by
+     * {@link #rotateMasterKey(byte[])} on a mid-call rekey.
      */
-    private final SrtpDirection outbound;
+    private volatile SrtpDirection outbound;
 
     /**
-     * Holds the inbound (receiver-side) derived session keys.
+     * Holds the inbound (receiver-side) derived session keys; replaced wholesale by
+     * {@link #rotateMasterKey(byte[])} on a mid-call rekey.
      */
-    private final SrtpDirection inbound;
+    private volatile SrtpDirection inbound;
+
+    /**
+     * Guards {@link #rotateMasterKey(byte[])} so a concurrent rotation cannot interleave with
+     * itself; in-flight {@link #protectRtp(byte[])} / {@link #unprotectRtp(byte[])} calls on
+     * pre-rotation per-SSRC contexts complete unimpeded.
+     */
+    private final Object rotationLock = new Object();
 
     /**
      * Caches the per-SSRC outbound RTP contexts, created lazily on first use of each SSRC.
@@ -139,6 +148,33 @@ public final class SrtpEndpoint implements AutoCloseable {
             case CLIENT -> new SrtpEndpoint(clientKey, clientSalt, serverKey, serverSalt);
             case SERVER -> new SrtpEndpoint(serverKey, serverSalt, clientKey, clientSalt);
         };
+    }
+
+    /**
+     * Builds an endpoint that protects the relayed media RTP on the hop-by-hop client-to-relay leg,
+     * keyed from the 30-byte hop-by-hop key the relay hands out in the {@code <hbh_key>} element.
+     *
+     * <p>The hop-by-hop media key is non-directional: the {@code hbh srtp} label in the WhatsApp key
+     * schedule produces a single {@code AES_CM_128_HMAC_SHA1_80} master key and salt that the client
+     * applies to both the uplink it sends and the downlink it receives on this leg (the directions
+     * are kept distinct by SSRC, not by separate keys). Both endpoint directions are therefore keyed
+     * from the same {@link HbhKeyDerivation.Group#SRTP} keymat. Unlike
+     * {@link #fromDtlsKeyingMaterial(byte[], SrtpRole)}, no DTLS role is needed because the keying is
+     * symmetric.
+     *
+     * @param hopByHopKey the 30-byte hop-by-hop key decoded from the relay block {@code <hbh_key>}
+     * @return a fresh endpoint keyed on the hop-by-hop media SRTP keymat
+     * @throws NullPointerException       if {@code hopByHopKey} is {@code null}
+     * @throws IllegalArgumentException   if {@code hopByHopKey} is not exactly
+     *                                    {@link HbhKeyDerivation#HBH_KEY_LENGTH} bytes long
+     * @throws com.github.auties00.cobalt.exception.WhatsAppCallException.Srtp if the key schedule fails
+     */
+    public static SrtpEndpoint fromHopByHopKey(byte[] hopByHopKey) {
+        Objects.requireNonNull(hopByHopKey, "hopByHopKey cannot be null");
+        var keymat = HbhKeyDerivation.deriveKeymat(hopByHopKey, HbhKeyDerivation.Group.SRTP);
+        var masterKey = HbhKeyDerivation.masterKey(keymat);
+        var masterSalt = HbhKeyDerivation.masterSalt(keymat);
+        return new SrtpEndpoint(masterKey, masterSalt, masterKey.clone(), masterSalt.clone());
     }
 
     /**
@@ -232,6 +268,44 @@ public final class SrtpEndpoint implements AutoCloseable {
         return inboundRtcp
                 .computeIfAbsent(ssrc, s -> new SrtpRtcpContext(inbound, s, false))
                 .unprotect(srtcpPacket);
+    }
+
+    /**
+     * Replaces the master key for both directions in place, deriving fresh session keys against the
+     * existing master salts.
+     *
+     * <p>Used by the call layer's {@code <enc_rekey>} runtime to rotate SRTP keys on participant
+     * join and leave in a group call. The supplied 16-byte master key replaces both directions'
+     * master keys (the rekey published by WhatsApp's wasm is a single symmetric per-domain master
+     * key); the master salts originally exported from the DTLS handshake stay. Per-SSRC RTP and
+     * RTCP context caches are cleared so the next packet on each SSRC creates a fresh context
+     * keyed on the new session material.
+     *
+     * <p>Packet-protection calls already in flight on the old per-SSRC contexts continue with the
+     * pre-rotation keys; the rotation point is logical and atomic at the cache-clear, not at every
+     * outstanding {@link #protectRtp(byte[])} invocation.
+     *
+     * @param newMasterKey the new 16-byte SRTP master key published in the
+     *                     {@link com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload E2eRekeyPayload}
+     * @throws NullPointerException     if {@code newMasterKey} is {@code null}
+     * @throws IllegalArgumentException if {@code newMasterKey} is not exactly
+     *                                  {@value #MASTER_KEY_LENGTH} bytes long
+     */
+    public void rotateMasterKey(byte[] newMasterKey) {
+        Objects.requireNonNull(newMasterKey, "newMasterKey cannot be null");
+        if (newMasterKey.length != MASTER_KEY_LENGTH) {
+            throw new IllegalArgumentException(
+                    "newMasterKey must be " + MASTER_KEY_LENGTH
+                            + " bytes, got " + newMasterKey.length);
+        }
+        synchronized (rotationLock) {
+            this.outbound = new SrtpDirection(newMasterKey, this.outbound.masterSalt);
+            this.inbound = new SrtpDirection(newMasterKey, this.inbound.masterSalt);
+            outboundRtp.clear();
+            inboundRtp.clear();
+            outboundRtcp.clear();
+            inboundRtcp.clear();
+        }
     }
 
     /**

@@ -1,7 +1,7 @@
 // Pure, in-process WASM byte patcher. The write-counterpart to reading a module
 // binary: deterministic, length-preserving mutations used for RE intervention
 // (neutralizing a function to isolate behavior, forcing a constant, defeating a
-// build-time gate). Generalizes the hand-rolled patcher from the MLow work.
+// build-time gate).
 
 import type { WasmAnalysis } from "../types/wasm.js";
 

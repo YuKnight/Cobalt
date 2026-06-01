@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.call;
 
-import com.github.auties00.cobalt.call.internal.transport.OfferTransportSpec;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.ack.CallRelay;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.time.Instant;
@@ -14,18 +14,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * any media is exchanged.
  *
  * <p>An offer is delivered through
- * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onCall(WhatsAppClient, IncomingCall)}
+ * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onCall(LinkedWhatsAppClient, IncomingCall)}
  * when an inbound call offer arrives from the peer. The listener responds
  * by calling
- * {@link WhatsAppClient#acceptCall(IncomingCall, CallOptions)} or
- * {@link WhatsAppClient#rejectCall(IncomingCall, CallEndReason)}; an
+ * {@link LinkedWhatsAppClient#acceptCall(IncomingCall, CallOptions)} or
+ * {@link LinkedWhatsAppClient#rejectCall(IncomingCall, CallEndReason)}; an
  * unanswered offer expires on its own once the WhatsApp-imposed timeout
  * of around thirty seconds elapses.
  *
  * <p>This class is a pure value type carrying the protocol metadata of
  * the offer (call identifier, peer JID, timestamps, group and video
  * flags). The accept and reject operations live on
- * {@link WhatsAppClient}, which calls {@link #markResponded()} to enforce
+ * {@link LinkedWhatsAppClient}, which calls {@link #markResponded()} to enforce
  * one-shot semantics. It is distinct from {@link ActiveCall} because no
  * media ports or live state exist until the offer is accepted.
  *
@@ -94,17 +94,17 @@ public final class IncomingCall {
 
     /**
      * Holds the transport-layer setup carried inside the offer payload:
-     * relay endpoints, session tokens, and the call key.
+     * WhatsApp Web GraphQL endpoints, session tokens, and the call key.
      *
-     * <p>The spec is parsed by
+     * <p>The block is parsed by
      * {@link com.github.auties00.cobalt.call.internal.signaling.CallReceiver}
-     * via {@link OfferTransportSpec#parse(com.github.auties00.cobalt.node.Node)}
+     * via {@link CallRelay#parseOffer(com.github.auties00.cobalt.node.Node)}
      * and read by
      * {@link com.github.auties00.cobalt.call.internal.transport.ActiveCallTransport#start}
      * after the call is accepted. It is {@code null} for signaling-only
      * offers that omit the transport block.
      */
-    private final OfferTransportSpec transportSpec;
+    private final CallRelay transportSpec;
 
     /**
      * Constructs an offer with no transport spec.
@@ -147,7 +147,7 @@ public final class IncomingCall {
      */
     public IncomingCall(String callId, Jid peer, Jid chatJid, Instant timestamp,
                         boolean videoOffered, boolean group, Jid groupJid,
-                        boolean offlineOffer, OfferTransportSpec transportSpec) {
+                        boolean offlineOffer, CallRelay transportSpec) {
         this.callId = Objects.requireNonNull(callId, "callId cannot be null");
         this.peer = Objects.requireNonNull(peer, "peer cannot be null");
         this.chatJid = Objects.requireNonNull(chatJid, "chatJid cannot be null");
@@ -165,7 +165,7 @@ public final class IncomingCall {
      *
      * @return the spec, or {@link Optional#empty()}
      */
-    public Optional<OfferTransportSpec> transportSpec() {
+    public Optional<CallRelay> transportSpec() {
         return Optional.ofNullable(transportSpec);
     }
 
@@ -211,7 +211,7 @@ public final class IncomingCall {
      *
      * <p>The local side may still accept as audio-only by passing
      * {@link CallOptions#audio()} to
-     * {@link WhatsAppClient#acceptCall(IncomingCall, CallOptions)}.
+     * {@link LinkedWhatsAppClient#acceptCall(IncomingCall, CallOptions)}.
      *
      * @return {@code true} if video was offered
      */
@@ -252,7 +252,7 @@ public final class IncomingCall {
      * Atomically marks the offer as responded-to.
      *
      * <p>The first caller succeeds and every subsequent caller throws.
-     * The accept and reject operations on {@link WhatsAppClient} invoke
+     * The accept and reject operations on {@link LinkedWhatsAppClient} invoke
      * this before they touch the call engine, so accept-after-reject and
      * double-accept fail loudly instead of silently producing a second
      * {@link ActiveCall}.

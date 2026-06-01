@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Input model for {@code WhatsAppClient.createQuickReply}. Carries the
+ * Input model for {@code LinkedWhatsAppClient.createQuickReply}. Carries the
  * shortcut trigger, the message body, and an optional list of keywords.
  *
  * <p>{@link #shortcut} and {@link #message} are required; the relay

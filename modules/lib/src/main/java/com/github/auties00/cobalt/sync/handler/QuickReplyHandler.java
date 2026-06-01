@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -93,7 +93,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebQuickRepliesSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -110,7 +110,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
             }
 
             if (action.deleted()) {
-                client.store().removeQuickReply(quickReplyId);
+                client.store().settingsStore().removeQuickReply(quickReplyId);
                 return MutationApplicationResult.success();
             }
 
@@ -129,7 +129,7 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
                     .keywords(keywords)
                     .count(count)
                     .build();
-            client.store().addQuickReply(quickReply);
+            client.store().settingsStore().addQuickReply(quickReply);
             return MutationApplicationResult.success();
         } catch (Exception e) {
             return MutationApplicationResult.failed();

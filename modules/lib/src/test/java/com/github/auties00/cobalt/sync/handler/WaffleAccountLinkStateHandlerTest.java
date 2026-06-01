@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStat
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * Covers {@link WaffleAccountLinkStateHandler}: the wire-constant trio, the {@code WEB_WAFFLE}
  * AB-prop gate (closed by default in the fixture), the {@link SyncdOperation#REMOVE} unsupported
  * branch, and the default conflict-resolution tiebreaker. The handler is constructed per test with
- * its injected {@link DefaultWamService}, against a fresh temporary store and a fresh AB-props
+ * its injected {@link LiveWamService}, against a fresh temporary store and a fresh AB-props
  * snapshot, so gate-flip tests could opt in by mutating their local copy. The SET happy path and
  * the malformed surface sit behind the gate and need send-message infrastructure that
  * {@link TestWhatsAppClient} does not stub; those are exercised end-to-end in
@@ -40,7 +40,7 @@ class WaffleAccountLinkStateHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private TestABPropsService props;
     private WaffleAccountLinkStateHandler handler;
 
@@ -49,7 +49,7 @@ class WaffleAccountLinkStateHandlerTest {
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         client = TestWhatsAppClient.create().withStore(store);
         props = TestABPropsService.builder().build();
-        var wam = new DefaultWamService(client, props);
+        var wam = new LiveWamService(client, props);
         handler = new WaffleAccountLinkStateHandler(props, wam);
     }
 

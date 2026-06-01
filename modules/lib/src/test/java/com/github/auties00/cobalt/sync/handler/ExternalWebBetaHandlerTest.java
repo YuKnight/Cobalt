@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>The handler is built with a stubbed {@link TestABPropsService} so the
  * gating prop can be flipped per test, and runs against a fresh in-memory
  * {@link DeviceFixtures#temporaryStore} through {@link TestWhatsAppClient} so
- * the {@link WhatsAppStore#externalWebBeta()} read-back can be asserted directly.
+ * the {@link com.github.auties00.cobalt.store.SyncStore#externalWebBeta()} read-back can be asserted directly.
  */
 @DisplayName("ExternalWebBetaHandler")
 class ExternalWebBetaHandlerTest {
@@ -46,7 +46,7 @@ class ExternalWebBetaHandlerTest {
 
     private WhatsAppStore store;
     private TestABPropsService props;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private ExternalWebBetaHandler handler;
 
     @BeforeEach
@@ -99,21 +99,21 @@ class ExternalWebBetaHandlerTest {
         @Test
         @DisplayName("SET isOptIn=true writes the flag and returns SUCCESS")
         void setsTrue() {
-            assertFalse(store.externalWebBeta(), "precondition: starts false");
+            assertFalse(store.syncStore().externalWebBeta(), "precondition: starts false");
             var result = handler.applyMutation(client,
                     mutation(true, SyncdOperation.SET, Instant.ofEpochSecond(1_700_000_000L)));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.externalWebBeta());
+            assertTrue(store.syncStore().externalWebBeta());
         }
 
         @Test
         @DisplayName("SET isOptIn=false flips the flag back to false")
         void setsFalse() {
-            store.setExternalWebBeta(true);
+            store.syncStore().setExternalWebBeta(true);
             var result = handler.applyMutation(client,
                     mutation(false, SyncdOperation.SET, Instant.ofEpochSecond(1_700_000_000L)));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertFalse(store.externalWebBeta());
+            assertFalse(store.syncStore().externalWebBeta());
         }
     }
 
@@ -128,7 +128,7 @@ class ExternalWebBetaHandlerTest {
                     mutation(true, SyncdOperation.SET, Instant.now()));
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState(),
                     "WAWebExternalWebBetaSync.applyMutations short-circuits the whole batch when the AB-prop gate is closed");
-            assertFalse(store.externalWebBeta(), "store must remain untouched when the gate is closed");
+            assertFalse(store.syncStore().externalWebBeta(), "store must remain untouched when the gate is closed");
         }
     }
 
@@ -226,7 +226,7 @@ class ExternalWebBetaHandlerTest {
             assertEquals(2, results.size());
             assertEquals(SyncActionState.SUCCESS, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertFalse(store.externalWebBeta());
+            assertFalse(store.syncStore().externalWebBeta());
         }
     }
 

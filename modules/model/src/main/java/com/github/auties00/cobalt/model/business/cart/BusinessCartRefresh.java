@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.refreshBusinessCart}. Carries
+ * Input model for {@code LinkedWhatsAppClient.refreshBusinessCart}. Carries
  * the merchant JID, the product ids to re-quote, the requested image
  * dimensions, and an optional direct-connection encryption blob for
  * merchants that route via the direct-connection path.

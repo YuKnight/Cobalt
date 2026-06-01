@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.business.BusinessFeatureFlagBuilder;
 import com.github.auties00.cobalt.model.business.BusinessSubscriptionBuilder;
@@ -43,7 +43,7 @@ class SubscriptionHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -91,8 +91,8 @@ class SubscriptionHandlerTest {
         @Test
         @DisplayName("SET rewrites the subscription table and the feature-flag table")
         void rewritesTables() {
-            client.store().putBusinessSubscription(new BusinessSubscriptionBuilder().id("STALE").build());
-            client.store().putBusinessFeatureFlag(new BusinessFeatureFlagBuilder().name("stale_feature").enabled(true).build());
+            client.store().businessStore().putBusinessSubscription(new BusinessSubscriptionBuilder().id("STALE").build());
+            client.store().businessStore().putBusinessFeatureFlag(new BusinessFeatureFlagBuilder().name("stale_feature").enabled(true).build());
 
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var subs = List.of(new SubscriptionInfoBuilder().id("SUB-1").status("active")
@@ -102,14 +102,14 @@ class SubscriptionHandlerTest {
             var result = new SubscriptionHandler().applyMutation(client, setMutation(SyncdOperation.SET, ts, subs, features));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
 
-            assertTrue(client.store().findBusinessSubscription("STALE").isEmpty(),
+            assertTrue(client.store().businessStore().findBusinessSubscription("STALE").isEmpty(),
                     "WAWebSubscriptions.applySubscriptionsAndFeatureFlags 'rewrite' clears the stale subscription");
-            var newSub = client.store().findBusinessSubscription("SUB-1").orElseThrow();
+            var newSub = client.store().businessStore().findBusinessSubscription("SUB-1").orElseThrow();
             assertEquals("active", newSub.status().orElseThrow());
 
-            assertTrue(client.store().findBusinessFeatureFlag("stale_feature").isEmpty(),
+            assertTrue(client.store().businessStore().findBusinessFeatureFlag("stale_feature").isEmpty(),
                     "the stale feature flag is dropped on rewrite");
-            var newFeature = client.store().findBusinessFeatureFlag("marketing_messages").orElseThrow();
+            var newFeature = client.store().businessStore().findBusinessFeatureFlag("marketing_messages").orElseThrow();
             assertTrue(newFeature.enabled());
         }
 
@@ -120,7 +120,7 @@ class SubscriptionHandlerTest {
             var subs = List.of(new SubscriptionInfoBuilder().status("active").build());
             var result = new SubscriptionHandler().applyMutation(client, setMutation(SyncdOperation.SET, ts, subs, List.of()));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().businessSubscriptions().isEmpty());
+            assertTrue(client.store().businessStore().businessSubscriptions().isEmpty());
         }
 
         @Test
@@ -130,7 +130,7 @@ class SubscriptionHandlerTest {
             var features = List.of(new PaidFeatureBuilder().enabled(true).build());
             var result = new SubscriptionHandler().applyMutation(client, setMutation(SyncdOperation.SET, ts, List.of(), features));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().businessFeatureFlags().isEmpty());
+            assertTrue(client.store().businessStore().businessFeatureFlags().isEmpty());
         }
     }
 
@@ -187,11 +187,11 @@ class SubscriptionHandlerTest {
         @Test
         @DisplayName("REMOVE returns SUCCESS without touching state (per WA Web)")
         void removeReturnsSuccess() {
-            client.store().putBusinessSubscription(new BusinessSubscriptionBuilder().id("KEEP").build());
+            client.store().businessStore().putBusinessSubscription(new BusinessSubscriptionBuilder().id("KEEP").build());
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var result = new SubscriptionHandler().applyMutation(client, setMutation(SyncdOperation.REMOVE, ts, List.of(), List.of()));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().findBusinessSubscription("KEEP").isPresent(),
+            assertTrue(client.store().businessStore().findBusinessSubscription("KEEP").isPresent(),
                     "WAWebSubscriptionsSyncV2Sync's REMOVE branch only increments a counter and returns Success");
         }
     }
@@ -233,7 +233,7 @@ class SubscriptionHandlerTest {
             assertEquals(2, results.size());
             assertEquals(SyncActionState.SUCCESS, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertTrue(client.store().findBusinessFeatureFlag("f").isPresent());
+            assertTrue(client.store().businessStore().findBusinessFeatureFlag("f").isPresent());
         }
 
         @Test

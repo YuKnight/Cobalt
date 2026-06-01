@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.business.BusinessBroadcastListBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -44,7 +44,7 @@ class BusinessBroadcastAssociationHandlerTest {
     private static final String LIST_ID = "list-abc";
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private BusinessBroadcastAssociationHandler handler;
 
     @BeforeEach
@@ -75,7 +75,7 @@ class BusinessBroadcastAssociationHandlerTest {
 
     private void seedList(String id) {
         var list = new BusinessBroadcastListBuilder().id(id).build();
-        store.putBusinessBroadcastList(list);
+        store.businessStore().putBusinessBroadcastList(list);
     }
 
     @Nested
@@ -115,7 +115,7 @@ class BusinessBroadcastAssociationHandlerTest {
                     build(LIST_ID, CONTACT_LID, action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findBusinessBroadcastList(LIST_ID).orElseThrow();
+            var stored = store.businessStore().findBusinessBroadcastList(LIST_ID).orElseThrow();
             assertEquals(1, stored.participants().size(),
                     "the handler must append a single participant for the new LID recipient");
             assertEquals(CONTACT_LID, stored.participants().get(0).lidJid());
@@ -131,7 +131,7 @@ class BusinessBroadcastAssociationHandlerTest {
                     build(LIST_ID, CONTACT_PN, action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findBusinessBroadcastList(LIST_ID).orElseThrow();
+            var stored = store.businessStore().findBusinessBroadcastList(LIST_ID).orElseThrow();
             assertEquals(1, stored.participants().size());
             // The participant must carry the recipient phone JID as pnJid; the lidJid falls back
             // to the recipient itself when the store has no LID mapping for the phone number.
@@ -145,14 +145,14 @@ class BusinessBroadcastAssociationHandlerTest {
             handler.applyMutation(client, build(LIST_ID, CONTACT_LID,
                     new BusinessBroadcastAssociationActionBuilder().deleted(false).build(),
                     SyncdOperation.SET, Instant.now()));
-            assertFalse(store.findBusinessBroadcastList(LIST_ID).orElseThrow().participants().isEmpty());
+            assertFalse(store.businessStore().findBusinessBroadcastList(LIST_ID).orElseThrow().participants().isEmpty());
 
             var result = handler.applyMutation(client, build(LIST_ID, CONTACT_LID,
                     new BusinessBroadcastAssociationActionBuilder().deleted(true).build(),
                     SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findBusinessBroadcastList(LIST_ID).orElseThrow().participants().isEmpty());
+            assertTrue(store.businessStore().findBusinessBroadcastList(LIST_ID).orElseThrow().participants().isEmpty());
         }
     }
 

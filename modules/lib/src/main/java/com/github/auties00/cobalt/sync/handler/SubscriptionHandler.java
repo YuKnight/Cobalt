@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -107,20 +107,20 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() == SyncdOperation.SET) {
                 if (!(mutation.value().action().orElse(null) instanceof SubscriptionsSyncV2Action action)) {
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
-                client.store().clearBusinessFeatureFlags();
+                client.store().businessStore().clearBusinessFeatureFlags();
                 for (var feature : action.paidFeatures()) {
-                    feature.name().ifPresent(name -> client.store().putBusinessFeatureFlag(
+                    feature.name().ifPresent(name -> client.store().businessStore().putBusinessFeatureFlag(
                             new BusinessFeatureFlagBuilder().name(name).enabled(feature.enabled()).build()));
                 }
 
-                client.store().clearBusinessSubscriptions();
+                client.store().businessStore().clearBusinessSubscriptions();
                 for (var subscription : action.subscriptions()) {
                     var idOpt = subscription.id();
                     if (idOpt.isEmpty()) {
@@ -137,7 +137,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
                     if (creationTime.isPresent()) {
                         builder.createdAt(Instant.ofEpochSecond(creationTime.getAsLong()));
                     }
-                    client.store().putBusinessSubscription(builder.build());
+                    client.store().businessStore().putBusinessSubscription(builder.build());
                 }
 
                 return MutationApplicationResult.success();
@@ -157,7 +157,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * {@inheritDoc}
      *
      * <p>Applies each mutation through
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}, counts the
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}, counts the
      * successful {@link SyncdOperation#REMOVE} operations, and logs a single
      * batch-level warning when at least one was observed.
      *
@@ -169,7 +169,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSubscriptionsSyncV2Sync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var removeCount = 0;
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) {

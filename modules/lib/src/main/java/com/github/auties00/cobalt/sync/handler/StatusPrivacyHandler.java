@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -78,7 +78,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#malformed()}. A non-{@link SyncdOperation#SET}
      * singleton is reported as {@link MutationApplicationResult#unsupported()};
      * otherwise the singleton is delegated to
-     * {@link #applySetMutation(WhatsAppClient, DecryptedMutation.Trusted)} inside a
+     * {@link #applySetMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} inside a
      * {@code try/catch} that turns any exception into
      * {@link MutationApplicationResult#failed()}.
      *
@@ -88,7 +88,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.size() != 1) {
             var malformed = new ArrayList<MutationApplicationResult>(mutations.size());
             for (var i = 0; i < mutations.size(); i++) {
@@ -115,12 +115,12 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * <p>This is the single-mutation entry point used when the caller already
      * knows the batch contains exactly one mutation. It applies the same
      * {@link SyncdOperation#SET}-only filter and {@code try/catch} wrapper as
-     * {@link #applyMutationBatch(WhatsAppClient, List)} and delegates to
-     * {@link #applySetMutation(WhatsAppClient, DecryptedMutation.Trusted)}.
+     * {@link #applyMutationBatch(LinkedWhatsAppClient, List)} and delegates to
+     * {@link #applySetMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -153,12 +153,12 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      * because Cobalt's {@link StatusPrivacyAction} model does not carry the
      * {@code shareToFB} / {@code shareToIG} fields.
      *
-     * @param client   the {@link WhatsAppClient} whose store receives the entry
+     * @param client   the {@link LinkedWhatsAppClient} whose store receives the entry
      * @param mutation the {@code SET} mutation to apply
      * @return the detailed application result
      */
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    private MutationApplicationResult applySetMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    private MutationApplicationResult applySetMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!(mutation.value().action().orElse(null) instanceof StatusPrivacyAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
@@ -200,7 +200,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
         }
 
         if (entry != null) {
-            client.store().addPrivacySetting(entry);
+            client.store().settingsStore().addPrivacySetting(entry);
         }
         return MutationApplicationResult.success();
     }

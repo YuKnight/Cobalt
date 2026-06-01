@@ -3,17 +3,17 @@ package com.github.auties00.cobalt.client;
 import it.auties.protobuf.annotation.ProtobufEnum;
 
 /**
- * Names the product flavour a {@link WhatsAppClient} impersonates on the
+ * Names the product flavour a {@link LinkedWhatsAppClient} impersonates on the
  * wire.
  *
  * @apiNote
  * Picked at builder time and persisted in the store so the same flavour
  * is used on every reconnect. The value drives transport selection,
  * handshake payload shape, registration code paths, history-sync
- * behaviour, and which {@link WhatsAppClientListener} callbacks fire.
+ * behaviour, and which {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener} callbacks fire.
  *
- * @see WhatsAppClientBuilder
- * @see WhatsAppDevice
+ * @see LinkedWhatsAppClientBuilder
+ * @see WhatsAppClientDevice
  */
 @ProtobufEnum
 public enum WhatsAppClientType {
@@ -21,7 +21,7 @@ public enum WhatsAppClientType {
      * A companion that links to an existing primary mobile account.
      *
      * @apiNote
-     * Selected by {@link WhatsAppClientBuilder#webClient()}. The
+     * Selected by {@link LinkedWhatsAppClientBuilder#webClient()}. The
      * companion does not own a phone number; it goes through the linked-device
      * ceremony driven by {@link WhatsAppClientVerificationHandler.Web}
      * (QR code or pairing code) and inherits the primary device's
@@ -34,10 +34,10 @@ public enum WhatsAppClientType {
      * WhatsApp servers.
      *
      * @apiNote
-     * Selected by {@link WhatsAppClientBuilder#mobileClient()}. The
+     * Selected by {@link LinkedWhatsAppClientBuilder#mobileClient()}. The
      * client owns the phone number and runs the full SMS, voice, or
      * in-app verification flow, surfacing
-     * {@link WhatsAppClientListener#onRegistrationCode(WhatsAppClient, long)}
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onRegistrationCode(LinkedWhatsAppClient, long)}
      * during registration.
      */
     MOBILE

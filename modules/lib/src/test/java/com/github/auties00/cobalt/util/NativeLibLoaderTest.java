@@ -70,17 +70,18 @@ public class NativeLibLoaderTest {
         }
     }
 
-    // Regression: a second JVM that finds opus.dll already locked by an earlier System.load (Windows
-    // LoadLibrary opens it without FILE_SHARE_DELETE) must reuse the cached binary rather than crash
-    // with AccessDeniedException trying to rewrite the locked file. Reproduced in one JVM: load opus,
-    // then clearCache() drops the SymbolLookup cache without unloading the library so the OS lock
-    // persists, then load again re-enters extraction against the locked target like a parallel JVM.
+    // Regression: a second JVM that finds the combined library already locked by an earlier
+    // System.load (Windows LoadLibrary opens it without FILE_SHARE_DELETE) must reuse the cached
+    // binary rather than crash with AccessDeniedException trying to rewrite the locked file.
+    // Reproduced in one JVM: load cobalt-native, then clearCache() drops the SymbolLookup cache
+    // without unloading the library so the OS lock persists, then load again re-enters extraction
+    // against the locked target like a parallel JVM.
     @Test
     public void parallelExtractionDoesNotFailWhenTargetIsLocked() {
         try {
-            NativeLibLoader.load("opus", Arena.global());
+            NativeLibLoader.load("cobalt-native", Arena.global());
             NativeLibLoader.clearCache();
-            assertDoesNotThrow(() -> NativeLibLoader.load("opus", Arena.global()),
+            assertDoesNotThrow(() -> NativeLibLoader.load("cobalt-native", Arena.global()),
                     "second load on a target locked by an earlier System.load "
                             + "must reuse the cached binary, not re-extract over it");
         } finally {

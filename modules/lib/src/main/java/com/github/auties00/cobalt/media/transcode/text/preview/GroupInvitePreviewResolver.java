@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.media.transcode.text.link.DeepLinkParser;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -51,7 +51,7 @@ public final class GroupInvitePreviewResolver {
      * onto {@code message}.
      *
      * <p>Queries the server for the target group's metadata via
-     * {@link WhatsAppClient#queryInviteGroupInfo(String)} and downloads
+     * {@link LinkedWhatsAppClient#queryInviteGroupInfo(String)} and downloads
      * the group's profile picture as the inline JPEG thumbnail. On a
      * successful resolve the {@code title}, {@code description},
      * {@code previewType}, {@code doNotPlayInline}, and
@@ -78,7 +78,7 @@ public final class GroupInvitePreviewResolver {
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewGroupUtils", exports = "getGroupInviteLinkPreview",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public static boolean resolve(WhatsAppClient client, String code, HttpClient httpClient,
+    public static boolean resolve(LinkedWhatsAppClient client, String code, HttpClient httpClient,
                                   Duration timeout, ExtendedTextMessage message) {
         if (client == null || code == null || code.isEmpty() || message == null) {
             return false;
@@ -107,7 +107,7 @@ public final class GroupInvitePreviewResolver {
      * Resolves the group profile picture URL and downloads its bytes.
      *
      * <p>Resolves the picture URL through
-     * {@link WhatsAppClient#queryPicture(JidProvider)} and downloads it
+     * {@link LinkedWhatsAppClient#queryPicture(JidProvider)} and downloads it
      * via {@link PreviewThumbnailFetcher#download(HttpClient, java.net.URI, Duration)}.
      * Returns {@code null} when {@code groupJid} is {@code null}, when
      * the group has no picture set, or when the resolution or download
@@ -121,7 +121,7 @@ public final class GroupInvitePreviewResolver {
      * @return the downloaded JPEG bytes, or {@code null} when no picture
      *         was set or the download failed
      */
-    private static byte[] downloadGroupPicture(WhatsAppClient client,
+    private static byte[] downloadGroupPicture(LinkedWhatsAppClient client,
                                                Jid groupJid,
                                                HttpClient httpClient,
                                                Duration timeout) {
@@ -155,14 +155,14 @@ public final class GroupInvitePreviewResolver {
      */
     @WhatsAppWebExport(moduleName = "WAWebLinkPreviewGroupUtils", exports = "getInviteLinkDescription",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static String inviteLinkDescription(WhatsAppClient client,
+    private static String inviteLinkDescription(LinkedWhatsAppClient client,
                                                 GroupMetadata metadata) {
         if (metadata.isDefaultSubgroup()) {
             return "Announcements";
         }
         var parentCommunity = metadata.parentCommunityJid().orElse(null);
         if (parentCommunity != null) {
-            var parentTitle = client.store().findChatMetadata(parentCommunity)
+            var parentTitle = client.store().chatStore().findChatMetadata(parentCommunity)
                     .filter(GroupMetadata.class::isInstance)
                     .map(GroupMetadata.class::cast)
                     .map(GroupMetadata::subject)

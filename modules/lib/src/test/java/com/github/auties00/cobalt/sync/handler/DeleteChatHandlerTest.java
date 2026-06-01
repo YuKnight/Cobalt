@@ -113,14 +113,14 @@ class DeleteChatHandlerTest {
         @Test
         @DisplayName("SET removes the chat from the store")
         void removesTheChat() {
-            client.store().addNewChat(PEER);
-            assertTrue(client.store().findChatByJid(PEER).isPresent());
+            client.store().chatStore().addNewChat(PEER);
+            assertTrue(client.store().chatStore().findChatByJid(PEER).isPresent());
 
             var result = new DeleteChatHandler().applyMutation(client,
                     deleteMutation(PEER, Instant.ofEpochSecond(1L), rangeWithLast(1L), "0"));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().findChatByJid(PEER).isEmpty(),
+            assertTrue(client.store().chatStore().findChatByJid(PEER).isEmpty(),
                     "the chat must be removed from the store after a delete-chat SET");
         }
     }
@@ -146,7 +146,7 @@ class DeleteChatHandlerTest {
         @Test
         @DisplayName("a SyncActionValue carrying a pinAction instead of deleteChatAction is MALFORMED")
         void wrongActionTypeIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var wrong = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .pinAction(new PinActionBuilder().pinned(true).build())
@@ -162,7 +162,7 @@ class DeleteChatHandlerTest {
         @Test
         @DisplayName("a deleteChatAction without a messageRange is MALFORMED")
         void missingMessageRangeIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var mutation = deleteMutation(PEER, Instant.ofEpochSecond(1L), null, "0");
             var result = new DeleteChatHandler().applyMutation(client, mutation);
             assertEquals(SyncActionState.MALFORMED, result.actionState());
@@ -175,7 +175,7 @@ class DeleteChatHandlerTest {
         @Test
         @DisplayName("an empty deleteMedia slot is MALFORMED")
         void emptyDeleteMediaIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .deleteChatAction(new DeleteChatActionBuilder().messageRange(rangeWithLast(1L)).build())
@@ -195,7 +195,7 @@ class DeleteChatHandlerTest {
         @Test
         @DisplayName("REMOVE returns UNSUPPORTED")
         void removeReturnsUnsupported() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var mutation = new DecryptedMutation.Trusted(
                     JSON.toJSONString(List.of("deleteChat", PEER.toString(), "0")),
                     new SyncActionValueBuilder()
@@ -206,7 +206,7 @@ class DeleteChatHandlerTest {
 
             var result = new DeleteChatHandler().applyMutation(client, mutation);
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(client.store().findChatByJid(PEER).isPresent(),
+            assertTrue(client.store().chatStore().findChatByJid(PEER).isPresent(),
                     "REMOVE must not delete the chat");
         }
     }

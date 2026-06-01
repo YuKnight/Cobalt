@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -26,7 +26,7 @@ import java.util.Arrays;
  * {@link #updateChatTcToken(Jid, Jid, Instant, byte[])} already serialises updates.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandlePrivacyTokensNotification")
-final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
+final class NotificationPrivacyStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs warnings about malformed stanzas and debug messages about unknown token types.
@@ -36,7 +36,7 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
     /**
      * Holds the client used for store reads and presence re-subscription.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Holds the ack sender used to ship the post-processing
@@ -50,7 +50,7 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
      * @param whatsapp  the client
      * @param ackSender the ack sender
      */
-    NotificationPrivacyStreamHandler(WhatsAppClient whatsapp, AckSender ackSender) {
+    NotificationPrivacyStreamHandler(LinkedWhatsAppClient whatsapp, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.ackSender = ackSender;
     }
@@ -176,11 +176,11 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
      */
     private void updateChatTcToken(Jid senderPn, Jid senderLid, Instant tokenTimestamp, byte[] tcTokenContent) {
         var chat = (senderLid != null
-                ? whatsapp.store().findChatByJid(senderLid).orElse(null)
+                ? whatsapp.store().chatStore().findChatByJid(senderLid).orElse(null)
                 : null);
         if (chat == null) {
-            chat = whatsapp.store().findChatByJid(senderPn)
-                    .orElseGet(() -> whatsapp.store().addNewChat(senderPn));
+            chat = whatsapp.store().chatStore().findChatByJid(senderPn)
+                    .orElseGet(() -> whatsapp.store().chatStore().addNewChat(senderPn));
         }
 
         var existingToken = chat.tcToken().orElse(null);
@@ -192,6 +192,8 @@ final class NotificationPrivacyStreamHandler implements SocketStream.Handler {
 
         chat.setTcToken(tcTokenContent);
         chat.setTcTokenTimestamp(tokenTimestamp);
+
+        whatsapp.signalTrustedContactTokenUpdated();
     }
 
     /**

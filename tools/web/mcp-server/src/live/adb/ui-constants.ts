@@ -50,6 +50,17 @@ export const MAX_DIALOG_OK_BUTTON_IDS = bothPackages([
   "com.whatsapp:id/button1",
 ]);
 
+export const ONBOARDING_DISMISS_TEXT_PATTERNS: RegExp[] = [
+  /^not now$/i,
+  /^skip$/i,
+  /^skip for now$/i,
+  /^maybe later$/i,
+  /^no thanks$/i,
+  /^not_now$/i,
+];
+
+export const MAX_ONBOARDING_DISMISSALS = 5;
+
 export const OVERFLOW_MENU_BUTTON_IDS = bothPackages([
   "com.whatsapp:id/menuitem_overflow",
   "com.whatsapp:id/menuitem_settings",

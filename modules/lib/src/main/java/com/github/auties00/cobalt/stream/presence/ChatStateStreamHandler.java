@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.stream.presence;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.ContactPresenceListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -8,7 +10,7 @@ import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 
 /**
  * Updates the {@link Contact#lastKnownPresence()} of the contact identified by a {@code <chatstate>} stanza.
@@ -33,7 +35,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
 @WhatsAppWebModule(moduleName = "WACreateHandleChatState")
 @WhatsAppWebModule(moduleName = "WAHandleChatStateProtocol")
 @WhatsAppWebModule(moduleName = "WAWebChangePresenceHandlerAction")
-public final class ChatStateStreamHandler implements SocketStream.Handler {
+public final class ChatStateStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * Reports {@code <chatstate>} stanzas with missing or unsupported children at debug level.
      */
@@ -42,16 +44,16 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
     /**
      * Owns the store this handler mutates and the listeners that receive the resulting presence notifications.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
-     * Constructs a new {@link ChatStateStreamHandler} bound to the given {@link WhatsAppClient}.
+     * Constructs a new {@link ChatStateStreamHandler} bound to the given {@link LinkedWhatsAppClient}.
      *
-     * <p>The handler is constructed by the {@link SocketStream} wiring; embedders do not call this directly.
+     * <p>The handler is constructed by the {@link NodeStreamService} wiring; embedders do not call this directly.
      *
      * @param whatsapp the non-{@code null} client whose store is updated and whose listeners are notified
      */
-    public ChatStateStreamHandler(WhatsAppClient whatsapp) {
+    public ChatStateStreamHandler(LinkedWhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
     }
 
@@ -115,7 +117,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandleChatState", exports = "handleIndividualChatState",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleIndividualChatState(Jid from, ContactStatus state) {
-        var meJid = whatsapp.store().jid().orElse(null);
+        var meJid = whatsapp.store().accountStore().jid().orElse(null);
         if (meJid != null && isSelf(from, meJid)) {
             return;
         }
@@ -126,7 +128,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
         }
 
         contact.setLastKnownPresence(state);
-        whatsapp.store().addContact(contact);
+        whatsapp.store().contactStore().addContact(contact);
         notifyPresence(contact.toJid(), contact.toJid());
     }
 
@@ -159,7 +161,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
         }
 
         contact.setLastKnownPresence(state);
-        whatsapp.store().addContact(contact);
+        whatsapp.store().contactStore().addContact(contact);
         notifyPresence(from, contact.toJid());
     }
 
@@ -230,7 +232,7 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
             return true;
         }
         if (fromUser.hasLidServer()) {
-            var phoneJid = whatsapp.store().findPhoneByLid(fromUser).orElse(null);
+            var phoneJid = whatsapp.store().contactStore().findPhoneByLid(fromUser).orElse(null);
             return phoneJid != null && phoneJid.user().equals(meUser.user());
         }
         return false;
@@ -258,30 +260,31 @@ public final class ChatStateStreamHandler implements SocketStream.Handler {
         }
 
         var canonical = jid.toUserJid().hasLidServer()
-                ? whatsapp.store().findPhoneByLid(jid.toUserJid()).orElse(jid.toUserJid())
+                ? whatsapp.store().contactStore().findPhoneByLid(jid.toUserJid()).orElse(jid.toUserJid())
                 : jid.toUserJid();
-        return whatsapp.store()
-                .findContactByJid(canonical)
-                .orElseGet(() -> whatsapp.store().addNewContact(canonical));
+        return whatsapp.store().contactStore().findContactByJid(canonical)
+                .orElseGet(() -> whatsapp.store().contactStore().addNewContact(canonical));
     }
 
     /**
      * Fans out a presence notification to every registered
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener}.
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener}.
      *
      * <p>For a one-to-one chatstate update {@code conversation} and {@code participant} are equal; for a group update
      * {@code conversation} is the group JID and {@code participant} is the device that produced the composing state.
      *
      * @implNote
      * This implementation starts one virtual thread per listener so that a blocking listener cannot stall the
-     * {@link SocketStream} dispatch loop.
+     * {@link NodeStreamService} dispatch loop.
      *
      * @param conversation the JID of the conversation that experienced the composing transition
      * @param participant  the JID of the participant whose composing state changed
      */
     private void notifyPresence(Jid conversation, Jid participant) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onContactPresence(whatsapp, conversation, participant));
+            if (listener instanceof ContactPresenceListener typed) {
+                Thread.startVirtualThread(() -> typed.onContactPresence(whatsapp, conversation, participant));
+            }
         }
     }
 }

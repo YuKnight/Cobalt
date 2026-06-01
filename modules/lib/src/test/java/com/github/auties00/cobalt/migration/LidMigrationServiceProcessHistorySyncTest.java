@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
 import com.github.auties00.cobalt.model.setting.GlobalSettingsBuilder;
 import com.github.auties00.cobalt.model.sync.history.HistorySyncLightBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -35,14 +35,14 @@ class LidMigrationServiceProcessHistorySyncTest {
     private static final Jid PEER_PN = Jid.of("393495089819@s.whatsapp.net");
     private static final Jid PEER_LID = Jid.of("258252122116273@lid");
 
-    private record Harness(TestWhatsAppClient client, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, LiveLidMigrationService service) {}
 
     private static Harness build() {
         var props = TestABPropsService.builder().build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, service);
     }
 
@@ -51,14 +51,14 @@ class LidMigrationServiceProcessHistorySyncTest {
     void nullSync() {
         var h = build();
         h.service.processHistorySync(null);
-        assertFalse(h.client.store().findLidByPhone(PEER_PN).isPresent());
+        assertFalse(h.client.store().contactStore().findLidByPhone(PEER_PN).isPresent());
     }
 
     @Test
     @DisplayName("top-level mappings populate the store and mirror onto known contacts")
     void topLevelMappingsLearned() {
         var h = build();
-        h.client.store().addNewContact(PEER_PN);
+        h.client.store().contactStore().addNewContact(PEER_PN);
 
         var mapping = new PhoneNumberToLIDMappingBuilder()
                 .pnJid(PEER_PN)
@@ -70,16 +70,16 @@ class LidMigrationServiceProcessHistorySyncTest {
                 .build();
         h.service.processHistorySync(sync);
 
-        assertEquals(PEER_LID, h.client.store().findLidByPhone(PEER_PN).orElseThrow());
+        assertEquals(PEER_LID, h.client.store().contactStore().findLidByPhone(PEER_PN).orElseThrow());
         assertEquals(PEER_LID,
-                h.client.store().findContactByJid(PEER_PN).orElseThrow().lid().orElseThrow());
+                h.client.store().contactStore().findContactByJid(PEER_PN).orElseThrow().lid().orElseThrow());
     }
 
     @Test
     @DisplayName("top-level mappings do NOT populate the primary cache")
     void topLevelMappingsBypassPrimaryCache() {
         var h = build();
-        h.client.store().addNewContact(PEER_PN);
+        h.client.store().contactStore().addNewContact(PEER_PN);
 
         var mapping = new PhoneNumberToLIDMappingBuilder()
                 .pnJid(PEER_PN)
@@ -94,7 +94,7 @@ class LidMigrationServiceProcessHistorySyncTest {
         // primaryPnToLatestLidCache controls the ctwa-origin promotion in resolveThread.
         // Because history-sync mappings are reserved for the general store (not the primary cache),
         // a ctwa-LID chat must NOT be promoted to "general" after history sync alone.
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
         chat.setLidOriginType("ctwa");
         h.service.resolveThread(chat);
 
@@ -113,7 +113,7 @@ class LidMigrationServiceProcessHistorySyncTest {
                 .build();
 
         h.service.processHistorySync(sync);
-        assertFalse(h.client.store().findLidByPhone(PEER_PN).isPresent());
+        assertFalse(h.client.store().contactStore().findLidByPhone(PEER_PN).isPresent());
     }
 
     @Test
@@ -158,13 +158,13 @@ class LidMigrationServiceProcessHistorySyncTest {
     @DisplayName("processConversationLidData: LID-keyed conversation with phoneNumberJid -> store + chat.setLid + chat.setPhoneNumberJid")
     void conversationLidKeyed() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
         chat.setPhoneNumberJid(PEER_PN);
 
         var processed = h.service.processConversationLidData(chat);
 
         assertTrue(processed);
-        assertEquals(PEER_LID, h.client.store().findLidByPhone(PEER_PN).orElseThrow());
+        assertEquals(PEER_LID, h.client.store().contactStore().findLidByPhone(PEER_PN).orElseThrow());
         assertEquals(PEER_LID, chat.lid().orElseThrow());
         assertEquals(PEER_PN, chat.phoneNumberJid().orElseThrow());
     }
@@ -173,13 +173,13 @@ class LidMigrationServiceProcessHistorySyncTest {
     @DisplayName("processConversationLidData: PN-keyed conversation with lid -> bidirectional mapping + chat.setLid")
     void conversationPnKeyed() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(PEER_LID);
 
         var processed = h.service.processConversationLidData(chat);
 
         assertTrue(processed);
-        assertEquals(PEER_LID, h.client.store().findLidByPhone(PEER_PN).orElseThrow());
+        assertEquals(PEER_LID, h.client.store().contactStore().findLidByPhone(PEER_PN).orElseThrow());
         assertEquals(PEER_LID, chat.lid().orElseThrow());
     }
 
@@ -187,7 +187,7 @@ class LidMigrationServiceProcessHistorySyncTest {
     @DisplayName("processConversationLidData: non-user/non-LID conversation (group) -> skipped")
     void conversationNonUserOrLidServer() {
         var h = build();
-        var groupChat = h.client.store().addNewChat(Jid.of("120363012345678901@g.us"));
+        var groupChat = h.client.store().chatStore().addNewChat(Jid.of("120363012345678901@g.us"));
 
         var processed = h.service.processConversationLidData(groupChat);
 
@@ -205,7 +205,7 @@ class LidMigrationServiceProcessHistorySyncTest {
     @DisplayName("processConversationLidData: LID-keyed conversation without phoneNumberJid -> skipped (incomplete)")
     void conversationLidKeyedNoPnJid() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
         // No phoneNumberJid set.
         var processed = h.service.processConversationLidData(chat);
         assertFalse(processed);
@@ -215,7 +215,7 @@ class LidMigrationServiceProcessHistorySyncTest {
     @DisplayName("processConversationLidData: PN-keyed conversation without lid -> skipped (incomplete)")
     void conversationPnKeyedNoLid() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         // No lid set.
         var processed = h.service.processConversationLidData(chat);
         assertFalse(processed);

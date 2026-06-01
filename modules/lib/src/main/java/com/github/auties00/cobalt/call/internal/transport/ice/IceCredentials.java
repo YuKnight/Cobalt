@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.call.internal.transport.ice;
 
+import java.util.Base64;
 import java.util.Objects;
 
 /**
@@ -44,6 +45,41 @@ public record IceCredentials(
         if (remoteUfrag.isEmpty()) {
             throw new IllegalArgumentException("remoteUfrag cannot be empty");
         }
+    }
+
+    /**
+     * Builds an {@code IceCredentials} for a WhatsApp call from one relay's auth token and the
+     * per-call relay key.
+     *
+     * <p>WA's transport model has no peer-to-peer ICE: both endpoints authenticate to the relay
+     * using the same per-call credentials, so local and remote ufrag/password are identical. Per
+     * {@code WAWebVoipRelayConnectionUtils.replaceIceCredentials}:
+     * <ul>
+     *   <li>{@code ice-ufrag} = base64-encoded {@code auth_token} bytes (carried as text on the wire).</li>
+     *   <li>{@code ice-pwd} = the {@code relay_key} bytes.</li>
+     * </ul>
+     *
+     * <p>The {@code auth_token} comes from the relay-tokens block's {@code <auth_token>} child
+     * (one per relay). The {@code relay_key} comes from the {@code <key>} child and decodes to
+     * 16 bytes after stripping the wire's outer base64-string quotes.
+     *
+     * @param authTokenBytes the raw auth-token bytes for the chosen relay candidate; must not be
+     *                       {@code null} or empty
+     * @param relayKeyBytes  the per-call relay key bytes (16 bytes on the captured corpus); must not
+     *                       be {@code null}
+     * @return the {@code IceCredentials} for the relay handshake
+     * @throws NullPointerException     if either argument is {@code null}
+     * @throws IllegalArgumentException if {@code authTokenBytes} is empty
+     */
+    public static IceCredentials fromRelay(byte[] authTokenBytes, byte[] relayKeyBytes) {
+        Objects.requireNonNull(authTokenBytes, "authTokenBytes cannot be null");
+        Objects.requireNonNull(relayKeyBytes, "relayKeyBytes cannot be null");
+        if (authTokenBytes.length == 0) {
+            throw new IllegalArgumentException("authTokenBytes cannot be empty");
+        }
+        var ufrag = Base64.getEncoder().withoutPadding().encodeToString(authTokenBytes);
+        var pwd = relayKeyBytes.clone();
+        return new IceCredentials(ufrag, pwd, ufrag, pwd.clone());
     }
 
     /**

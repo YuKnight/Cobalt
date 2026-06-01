@@ -23,9 +23,11 @@ import java.util.logging.Logger;
  * {@link MutationSyncResponse} records.
  *
  * <p>Two parse modes share the bulk of the body. The single-collection mode
- * ({@link #parseSyncResponse(Node)}) raises on a collection-level error so a failed push can
- * roll back; the batched mode ({@link #parseBatchedSyncResponse(Node)}) captures the same
- * errors on each response record so the caller can process the surviving collections. Both
+ * ({@link #parseSyncResponse(Node)}) raises on a fatal or retryable collection-level error so a
+ * failed push can roll back, but returns a 409 conflict on the response (with its catch-up patches)
+ * so the push can apply them and retry; the batched mode ({@link #parseBatchedSyncResponse(Node)})
+ * captures every collection-level error on its response record so the caller can process the
+ * surviving collections. Both
  * share the same IQ-level error router ({@link #handleIqLevelError(int, String, Node)}) and
  * the same protobuf decoders for {@code <patch>} and {@code <snapshot>} children. The parser
  * is driven directly with the raw {@code <iq>} {@link Node} delivered by the WhatsApp socket;
@@ -50,10 +52,12 @@ public final class MutationResponseParser {
     /**
      * Parses a single-collection sync response.
      *
-     * <p>Used on the push response path where exactly one collection is expected and a
-     * collection-level error should propagate as a thrown exception so the push can roll back.
-     * IQ-level errors are routed first via {@link #handleIqLevelError(int, String, Node)}, then
-     * collection-level errors via {@link #handleErrorResponse(Node)}.
+     * <p>Used on the push response path where exactly one collection is expected. A fatal or
+     * retryable collection-level error propagates as a thrown exception so the push can roll back;
+     * a 409 conflict instead returns normally with the error surfaced on
+     * {@link MutationSyncResponse#collectionError()} and the catch-up patches populated, so the
+     * caller can apply them and retry rather than discard them. IQ-level errors are routed first
+     * via {@link #handleIqLevelError(int, String, Node)}.
      * Use {@link #parseBatchedSyncResponse(Node)} for pull responses that legitimately carry
      * multiple collections.
      *
@@ -63,8 +67,9 @@ public final class MutationResponseParser {
      * regardless of whether the response would otherwise have been an error.
      *
      * @param responseNode the raw IQ response node from the server
-     * @return the parsed {@link MutationSyncResponse}
-     * @throws WhatsAppWebAppStateSyncException.Conflict when the server returns a 409
+     * @return the parsed {@link MutationSyncResponse}; a 409 conflict carries its
+     *         {@link WhatsAppWebAppStateSyncException.Conflict} on
+     *         {@link MutationSyncResponse#collectionError()} alongside the catch-up patches
      * @throws WhatsAppWebAppStateSyncException.UnexpectedError when the server returns a fatal IQ or collection error
      * @throws WhatsAppWebAppStateSyncException.RetryableServerError when the server returns a retryable error
      */
@@ -94,11 +99,6 @@ public final class MutationResponseParser {
                         null
                 ));
 
-        var type = collectionNode.getAttributeAsString("type");
-        if (type.isPresent() && type.get().equals("error")) {
-            handleErrorResponse(collectionNode);
-        }
-
         var collectionName = collectionNode.getAttributeAsString("name")
                 .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
                         "Collection missing 'name' attribute",
@@ -110,6 +110,15 @@ public final class MutationResponseParser {
                         null
                 ));
 
+        WhatsAppWebAppStateSyncException collectionError = null;
+        var type = collectionNode.getAttributeAsString("type");
+        if (type.isPresent() && type.get().equals("error")) {
+            collectionError = buildCollectionError(collectionNode);
+            if (!(collectionError instanceof WhatsAppWebAppStateSyncException.Conflict)) {
+                throw collectionError;
+            }
+        }
+
         var version = collectionNode.getAttributeAsLong("version")
                 .orElse(0L);
 
@@ -120,7 +129,7 @@ public final class MutationResponseParser {
 
         var snapshotRef = snapshotNode.map(this::parseSnapshotReference).orElse(null);
         var patches = patchesNode.map(this::parsePatches).orElse(List.of());
-        return new MutationSyncResponse(patchType, version, hasMore, patches, snapshotRef);
+        return new MutationSyncResponse(patchType, version, hasMore, patches, snapshotRef, collectionError);
     }
 
     /**
@@ -202,13 +211,6 @@ public final class MutationResponseParser {
                         null
                 ));
 
-        var type = collectionNode.getAttributeAsString("type");
-        if (type.isPresent() && type.get().equals("error")) {
-            var collectionError = buildCollectionError(collectionNode);
-            var hasMore = collectionNode.hasAttribute("has_more_patches");
-            return new MutationSyncResponse(patchType, 0L, hasMore, List.of(), null, collectionError);
-        }
-
         var version = collectionNode.getAttributeAsLong("version")
                 .orElse(0L);
         var hasMore = collectionNode.hasAttribute("has_more_patches");
@@ -218,7 +220,13 @@ public final class MutationResponseParser {
 
         var snapshotRef = snapshotNode.map(this::parseSnapshotReference).orElse(null);
         var patches = patchesNode.map(this::parsePatches).orElse(List.of());
-        return new MutationSyncResponse(patchType, version, hasMore, patches, snapshotRef);
+
+        var type = collectionNode.getAttributeAsString("type");
+        WhatsAppWebAppStateSyncException collectionError = null;
+        if (type.isPresent() && type.get().equals("error")) {
+            collectionError = buildCollectionError(collectionNode);
+        }
+        return new MutationSyncResponse(patchType, version, hasMore, patches, snapshotRef, collectionError);
     }
 
     /**
@@ -250,21 +258,6 @@ public final class MutationResponseParser {
         };
     }
 
-    /**
-     * Throws the {@link WhatsAppWebAppStateSyncException} produced by
-     * {@link #buildCollectionError(Node)}.
-     *
-     * <p>Used only by the single-collection parse path {@link #parseSyncResponse(Node)}; the
-     * batched path captures the same exception on the response record instead.
-     *
-     * @param collectionNode the collection node carrying the error
-     * @throws WhatsAppWebAppStateSyncException.Conflict for 409 responses
-     * @throws WhatsAppWebAppStateSyncException.UnexpectedError for 400/404 responses
-     * @throws WhatsAppWebAppStateSyncException.RetryableServerError for any other code
-     */
-    private void handleErrorResponse(Node collectionNode) {
-        throw buildCollectionError(collectionNode);
-    }
 
     /**
      * Routes an IQ-level error code to the appropriate {@link WhatsAppWebAppStateSyncException}

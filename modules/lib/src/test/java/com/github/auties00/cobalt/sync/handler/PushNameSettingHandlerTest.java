@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -17,7 +17,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,8 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Covers {@link PushNameSettingHandler}: on {@link SyncdOperation#SET} a
- * {@code <presence name="..."/>} node is dispatched, {@link WhatsAppStore#setName(String)}
- * is updated, and the {@link WhatsAppClientListener#onNameChanged} listener fires; a
+ * {@code <presence name="..."/>} node is dispatched, {@link com.github.auties00.cobalt.store.AccountStore#setName(String)}
+ * is updated, and the {@link LinkedWhatsAppClientListener#onNameChanged} listener fires; a
  * missing or empty {@link PushNameSetting#name()} defaults to the empty string and still
  * returns {@link SyncActionState#SUCCESS}; {@link SyncdOperation#REMOVE} is
  * {@link SyncActionState#UNSUPPORTED}. Outgoing nodes are captured via an
@@ -48,7 +48,7 @@ class PushNameSettingHandlerTest {
 
     private WhatsAppStore store;
     private TestABPropsService props;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private List<Node> sentNodes;
     private PushNameSettingHandler handler;
 
@@ -57,16 +57,16 @@ class PushNameSettingHandlerTest {
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         props = TestABPropsService.builder().build();
         sentNodes = new ArrayList<>();
-        store.addListener(new WhatsAppClientListener() {
+        store.addListener(new LinkedWhatsAppClientListener() {
             @Override
-            public void onNodeSent(WhatsAppClient whatsapp, Node outgoing) {
+            public void onNodeSent(LinkedWhatsAppClient whatsapp, Node outgoing) {
                 sentNodes.add(outgoing);
             }
         });
         client = TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(props);
-        handler = new PushNameSettingHandler(new DefaultWamService(client, props));
+        handler = new PushNameSettingHandler(new LiveWamService(client, props));
     }
 
     private static DecryptedMutation.Trusted pushNameMutation(String name, SyncdOperation op, Instant ts) {
@@ -80,7 +80,7 @@ class PushNameSettingHandlerTest {
     }
 
     @Nested
-    @DisplayName("metadata — wire identity")
+    @DisplayName("metadata ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â wire identity")
     class Metadata {
         @Test
         @DisplayName("actionName() returns the PushNameSetting wire constant")
@@ -105,7 +105,7 @@ class PushNameSettingHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — happy SET")
+    @DisplayName("applyMutation ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â happy SET")
     class ApplySetHappy {
         @Test
         @DisplayName("persists the new pushname into the store, sends presence stanza, and returns SUCCESS")
@@ -115,7 +115,7 @@ class PushNameSettingHandlerTest {
             var result = handler.applyMutation(client, pushNameMutation("Maria", SyncdOperation.SET, ts));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals("Maria", store.name(),
+            assertEquals("Maria", store.accountStore().name().orElse(null),
                     "WAWebSetPushnameLocallyAction.setPushnameLocally writes the pushname into Conn.pushname; Cobalt collapses this into store.setName");
             assertEquals(1, sentNodes.size(), "WASendPresenceStatusProtocol.sendPresenceStatusProtocol dispatches one <presence/> stanza");
             var stanza = sentNodes.getFirst();
@@ -132,7 +132,7 @@ class PushNameSettingHandlerTest {
             var result = handler.applyMutation(client, pushNameMutation(null, SyncdOperation.SET, ts));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals("", store.name(),
+            assertEquals("", store.accountStore().name().orElse(null),
                     "WA Web: `_ || (a++, logCriticalBootstrapStageIfNecessary(PUSHNAME_INVALID), _=\"\")` falls back to empty string");
             assertEquals(1, sentNodes.size());
             assertEquals("", sentNodes.getFirst().getAttributeAsString("name").orElseThrow());
@@ -140,7 +140,7 @@ class PushNameSettingHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — orphan dimension is n/a")
+    @DisplayName("applyMutation ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â orphan dimension is n/a")
     class OrphanDimension {
         @Test
         @DisplayName("pushname is a global account setting, so there is no per-entity orphan path")
@@ -152,7 +152,7 @@ class PushNameSettingHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed action value")
+    @DisplayName("applyMutation ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â malformed action value")
     class MalformedActionValue {
         @Test
         @DisplayName("a SyncActionValue carrying a different action still applies as empty pushname (optional-chain semantics)")
@@ -168,12 +168,12 @@ class PushNameSettingHandlerTest {
 
             assertEquals(SyncActionState.SUCCESS, result.actionState(),
                     "WA Web: `_ = e.value.pushNameSetting?.name` tolerates a missing pushNameSetting via the optional chain and applies the empty-string default");
-            assertEquals("", store.name());
+            assertEquals("", store.accountStore().name().orElse(null));
         }
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed action index")
+    @DisplayName("applyMutation ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â malformed action index")
     class MalformedActionIndex {
         @Test
         @DisplayName("the pushname handler ignores the index shape (global setting)")
@@ -192,7 +192,7 @@ class PushNameSettingHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — REMOVE returns UNSUPPORTED")
+    @DisplayName("applyMutation ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â REMOVE returns UNSUPPORTED")
     class RemoveOperation {
         @Test
         @DisplayName("REMOVE is unsupported per the WA Web fall-through")
@@ -205,10 +205,10 @@ class PushNameSettingHandlerTest {
     }
 
     @Nested
-    @DisplayName("resolveConflicts — inherits default timestamp comparison")
+    @DisplayName("resolveConflicts ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â inherits default timestamp comparison")
     class ResolveConflicts {
         @Test
-        @DisplayName("newer remote → APPLY_REMOTE_DROP_LOCAL")
+        @DisplayName("newer remote ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ APPLY_REMOTE_DROP_LOCAL")
         void newerRemote() {
             var local = pushNameMutation("A", SyncdOperation.SET, Instant.ofEpochSecond(1_000));
             var remote = pushNameMutation("B", SyncdOperation.SET, Instant.ofEpochSecond(2_000));
@@ -217,7 +217,7 @@ class PushNameSettingHandlerTest {
         }
 
         @Test
-        @DisplayName("older remote → SKIP_REMOTE")
+        @DisplayName("older remote ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ SKIP_REMOTE")
         void olderRemoteSkipped() {
             var local = pushNameMutation("A", SyncdOperation.SET, Instant.ofEpochSecond(2_000));
             var remote = pushNameMutation("B", SyncdOperation.SET, Instant.ofEpochSecond(1_000));
@@ -227,7 +227,7 @@ class PushNameSettingHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutationBatch — inherits default sequential apply")
+    @DisplayName("applyMutationBatch ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â inherits default sequential apply")
     class ApplyBatch {
         @Test
         @DisplayName("default batch path applies each mutation in order")
@@ -239,7 +239,7 @@ class PushNameSettingHandlerTest {
             assertEquals(2, results.size());
             assertEquals(SyncActionState.SUCCESS, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertEquals("Bob", store.name());
+            assertEquals("Bob", store.accountStore().name().orElse(null));
         }
     }
 

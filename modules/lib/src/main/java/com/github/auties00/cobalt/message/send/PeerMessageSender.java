@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.message.send;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
@@ -52,7 +52,7 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
      * <p>Constructed once by {@link MessageSendingService}; embedders should not
      * instantiate directly.
      *
-     * @param client         the {@link WhatsAppClient} used to dispatch stanzas
+     * @param client         the {@link LinkedWhatsAppClient} used to dispatch stanzas
      * @param encryption     the {@link MessageEncryption} service
      * @param deviceService  the {@link DeviceService} used to manage Signal
      *                       sessions
@@ -64,7 +64,7 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebSendAppStateSyncMsgJob", exports = "encryptAndSendKeyMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
     PeerMessageSender(
-            WhatsAppClient client,
+            LinkedWhatsAppClient client,
             MessageEncryption encryption,
             DeviceService deviceService,
             ABPropsService abPropsService,
@@ -89,9 +89,7 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateDeviceStanza", exports = "createUserDeviceMsgStanza",
             adaptation = WhatsAppAdaptation.DIRECT)
     @Override
-    AckResult send(Jid targetDevice, ChatMessageInfo messageInfo) {
-        waitForOfflineDelivery();
-
+    AckResult doSend(Jid targetDevice, ChatMessageInfo messageInfo) {
         var container = messageInfo.message();
         var plaintext = MessageContainerSpec.encode(container);
 

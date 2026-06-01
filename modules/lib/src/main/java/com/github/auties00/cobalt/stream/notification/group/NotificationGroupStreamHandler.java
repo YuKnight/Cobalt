@@ -1,8 +1,9 @@
 package com.github.auties00.cobalt.stream.notification.group;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
@@ -16,7 +17,7 @@ import com.github.auties00.cobalt.model.chat.group.GroupPartipantRole;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.GroupJoinCEventBuilder;
 
@@ -49,7 +50,7 @@ import java.util.LinkedHashSet;
  * stream produce its own system messages.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleGroupNotification")
-public final class NotificationGroupStreamHandler implements SocketStream.Handler {
+public final class NotificationGroupStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs warnings about unhandled actions and debug messages about actions
@@ -60,7 +61,7 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
     /**
      * Provides store reads and group metadata queries.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Commits the {@code GroupJoinC} event when the user is added to a group
@@ -78,14 +79,14 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
     /**
      * Constructs the handler with its shared dependencies.
      *
-     * <p>Invoked once during {@link SocketStream} setup; the dependencies are
+     * <p>Invoked once during {@link NodeStreamService} setup; the dependencies are
      * retained as fields for the lifetime of the handler.
      *
      * @param whatsapp   the client providing store and metadata access
      * @param wamService the service that commits the {@code GroupJoinC} event
      * @param ackSender  the sender used to acknowledge processed notifications
      */
-    public NotificationGroupStreamHandler(WhatsAppClient whatsapp, WamService wamService, AckSender ackSender) {
+    public NotificationGroupStreamHandler(LinkedWhatsAppClient whatsapp, WamService wamService, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.wamService = wamService;
         this.ackSender = ackSender;
@@ -151,9 +152,8 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
             return;
         }
 
-        var chat = whatsapp.store()
-                .findChatByJid(groupJid)
-                .orElseGet(() -> whatsapp.store().addNewChat(groupJid));
+        var chat = whatsapp.store().chatStore().findChatByJid(groupJid)
+                .orElseGet(() -> whatsapp.store().chatStore().addNewChat(groupJid));
         var notificationTimestamp = resolveInstant(node, "t");
         if (notificationTimestamp != null) {
             chat.setConversationTimestamp(notificationTimestamp);
@@ -225,7 +225,7 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
             case "suspended" -> applySuspended(chat, groupJid, true);
             case "unsuspended" -> applySuspended(chat, groupJid, false);
             case "delete" -> {
-                whatsapp.store().removeChatMetadata(groupJid);
+                whatsapp.store().chatStore().removeChatMetadata(groupJid);
                 chat.setTerminated(true);
             }
             case "invite",
@@ -275,7 +275,7 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
     private void applyCreate(Node notification, Chat chat, Jid groupJid, Node action) {
         var groupNode = action.getChild("group").orElse(action);
         var notificationAuthor = notification.getAttributeAsJid("participant").orElse(null);
-        var mePnUser = whatsapp.store().jid().orElse(null);
+        var mePnUser = whatsapp.store().accountStore().jid().orElse(null);
         if (notificationAuthor == null
                 || mePnUser == null
                 || !notificationAuthor.toUserJid().equals(mePnUser.toUserJid())) {
@@ -1085,7 +1085,7 @@ public final class NotificationGroupStreamHandler implements SocketStream.Handle
      * @return the matching metadata, or {@code null}
      */
     private ChatMetadata currentMetadata(Jid groupJid) {
-        return whatsapp.store().findChatMetadata(groupJid).orElse(null);
+        return whatsapp.store().chatStore().findChatMetadata(groupJid).orElse(null);
     }
 
     /**

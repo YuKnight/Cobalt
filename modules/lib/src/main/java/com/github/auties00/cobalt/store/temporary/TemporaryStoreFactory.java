@@ -1,22 +1,24 @@
 package com.github.auties00.cobalt.store.temporary;
 
-import com.github.auties00.cobalt.store.AbstractWhatsAppStore;
+import com.github.auties00.cobalt.store.ProtobufAccountStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufContactStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufSettingsStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufSignalStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufSyncStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufWebSessionStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 import com.github.auties00.cobalt.client.WhatsAppClientSixPartsKeys;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
-import com.github.auties00.cobalt.client.WhatsAppDevice;
+import com.github.auties00.cobalt.client.WhatsAppClientDevice;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 
-import java.nio.file.Path;
 import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The {@link WhatsAppStoreFactory} that produces {@link TemporaryStore} sessions held entirely
@@ -144,7 +146,7 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
      *
      * @implNote
      * This implementation pre-allocates every collection with the {@code ConcurrentHashMap} or
-     * {@code LinkedHashMap} variant required by the {@link AbstractWhatsAppStore} contract; the
+     * {@code LinkedHashMap} variant required by the {@link ProtobufWhatsAppStore} contract; the
      * session directory is intentionally {@code null} because the transient variant has no disk
      * surface.
      *
@@ -159,34 +161,28 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
      */
     private static WhatsAppStore newStore(WhatsAppClientType clientType, UUID uuid, Long phoneNumber, SignalIdentityKeyPair noiseKeyPair, SignalIdentityKeyPair identityKeyPair, byte[] identityId, Jid jid) {
         var device = switch (clientType) {
-            case WEB -> WhatsAppDevice.desktop();
-            case MOBILE -> WhatsAppDevice.ios(false);
+            case WEB -> WhatsAppClientDevice.desktop();
+            case MOBILE -> WhatsAppClientDevice.ios(false);
         };
         return new TemporaryStore(
-                uuid, phoneNumber, clientType, Instant.now(), device, null,
-                false, null, null, null, null, null, jid, null, null, null, null, null, null, null, null,
-                new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
-                false, false, null, null, false,
-                false, false, false, false, false,
-                null, noiseKeyPair, identityKeyPair, null, null, new LinkedHashMap<>(),
-                null, null, null, identityId, null,
-                new ConcurrentHashMap<>(), new LinkedHashMap<>(), new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
-                false, false,
-                new ConcurrentHashMap<>(), new ConcurrentHashMap<>(), new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
-                null, null, null,
-                new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
-                null,
-                new ConcurrentHashMap<>(),
-                (Path) null,
-                false, false, false, false,
-                null, List.of(), List.of(),
-                new ConcurrentHashMap<>(), new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
-                0L, null, null, null, 0L, null, 0L, 0L, 0L,
-                new ConcurrentHashMap<>(), new ConcurrentHashMap<>(),
-                null, null,
-                null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null
-        );
+                new ProtobufSignalStoreBuilder()
+                        .noiseKeyPair(noiseKeyPair)
+                        .identityKeyPair(identityKeyPair)
+                        .identityId(identityId)
+                        .build(),
+                new ProtobufAccountStoreBuilder()
+                        .uuid(uuid)
+                        .phoneNumber(phoneNumber)
+                        .clientType(clientType)
+                        .initializationTimeStamp(Instant.now())
+                        .device(device)
+                        .jid(jid)
+                        .build(),
+                new ProtobufContactStoreBuilder().build(),
+                new ProtobufSyncStoreBuilder().build(),
+                new ProtobufSettingsStoreBuilder().build(),
+                null, null, null, null,
+                new ProtobufWebSessionStoreBuilder().build(),
+                new TemporaryChatStore(null, null));
     }
 }

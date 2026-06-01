@@ -196,11 +196,15 @@ public final class MutationSyncResponse {
     }
 
     /**
-     * Returns the collection-level error captured during a batched parse, if any.
+     * Returns the collection-level error captured during parsing, if any.
      *
-     * <p>Present only on responses produced by
-     * {@link MutationResponseParser#parseBatchedSyncResponse(com.github.auties00.cobalt.node.Node)};
-     * always empty on responses produced by the throwing single-collection parser.
+     * <p>The batched parser
+     * ({@link MutationResponseParser#parseBatchedSyncResponse(com.github.auties00.cobalt.node.Node)})
+     * captures every collection-level error here; the single-collection parser
+     * ({@link MutationResponseParser#parseSyncResponse(com.github.auties00.cobalt.node.Node)})
+     * throws fatal and retryable errors but surfaces a 409
+     * {@link WhatsAppWebAppStateSyncException.Conflict} here alongside the catch-up
+     * {@link #patches()}, so the caller can apply them and retry.
      *
      * @return the captured error wrapped in an {@link Optional}
      */

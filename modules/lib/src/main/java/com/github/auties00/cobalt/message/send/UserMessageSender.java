@@ -1,10 +1,11 @@
 package com.github.auties00.cobalt.message.send;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
+import com.github.auties00.cobalt.ack.MessageAck;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.stanza.*;
@@ -124,7 +125,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
      * <p>Constructed once by {@link MessageSendingService}; embedders should not
      * instantiate directly.
      *
-     * @param client              the {@link WhatsAppClient} used to dispatch
+     * @param client              the {@link LinkedWhatsAppClient} used to dispatch
      *                            stanzas
      * @param encryption          the {@link MessageEncryption} service
      * @param deviceService       the {@link DeviceService}
@@ -145,7 +146,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebSendUserMsgJob", exports = "encryptAndSendUserMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
     UserMessageSender(
-            WhatsAppClient client,
+            LinkedWhatsAppClient client,
             MessageEncryption encryption,
             DeviceService deviceService,
             LidMigrationService lidMigrationService,
@@ -181,9 +182,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebSendUserMsgJob", exports = "encryptAndSendUserMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
     @Override
-    AckResult send(Jid chatJid, ChatMessageInfo messageInfo) {
-        waitForOfflineDelivery();
-
+    AckResult doSend(Jid chatJid, ChatMessageInfo messageInfo) {
         var routedChatJid = maybeReplaceWidWithAccountLid(chatJid);
 
         var fanoutDevices = deviceService.getUserFanout(routedChatJid, null);
@@ -194,8 +193,10 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
 
         maybeRefreshLid(routedChatJid, ack);
 
-        ack.phash().ifPresent(serverPhash ->
-                handlePhashMismatch(routedChatJid, messageInfo, fanoutDevices, serverPhash));
+        if (ack instanceof MessageAck messageAck) {
+            messageAck.phash().ifPresent(serverPhash ->
+                    handlePhashMismatch(routedChatJid, messageInfo, fanoutDevices, serverPhash));
+        }
 
         return ack;
     }
@@ -227,12 +228,12 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             return chatJid;
         }
 
-        var selfPn = store.jid().map(Jid::toUserJid).orElse(null);
+        var selfPn = store.accountStore().jid().map(Jid::toUserJid).orElse(null);
         if (selfPn != null && chatJid.toUserJid().equals(selfPn)) {
-            return store.lid().map(Jid::toUserJid).orElse(chatJid);
+            return store.accountStore().lid().map(Jid::toUserJid).orElse(chatJid);
         }
 
-        return store.findChatByJid(chatJid)
+        return store.chatStore().findChatByJid(chatJid)
                 .flatMap(Chat::accountLid)
                 .orElse(chatJid);
     }
@@ -292,7 +293,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebSendUserMsgJob", exports = "maybeRefreshLid",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void maybeRefreshLid(Jid chatJid, AckResult ack) {
-        if (!ack.refreshLid()) {
+        if (!(ack instanceof MessageAck messageAck) || !messageAck.refreshLid()) {
             return;
         }
 
@@ -300,7 +301,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
                 "Server requested LID refresh for {0}", chatJid);
 
         var pnJid = chatJid.hasLidServer()
-                ? store.findPhoneByLid(chatJid.toUserJid()).orElse(null)
+                ? store.contactStore().findPhoneByLid(chatJid.toUserJid()).orElse(null)
                 : null;
         if (pnJid == null) {
             return;
@@ -447,7 +448,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             return null;
         }
 
-        return store.findChatByJid(chatJid)
+        return store.chatStore().findChatByJid(chatJid)
                 .flatMap(Chat::accountLid)
                 .orElse(null);
     }
@@ -476,14 +477,14 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             return null;
         }
 
-        var lidOriginType = store.findChatByJid(chatJid)
+        var lidOriginType = store.chatStore().findChatByJid(chatJid)
                 .flatMap(Chat::lidOriginType)
                 .orElse(null);
         if (LID_ORIGIN_TYPE_PNH_CTWA.equals(lidOriginType)) {
             return null;
         }
 
-        return store.findPhoneByLid(chatJid.toUserJid()).orElse(null);
+        return store.contactStore().findPhoneByLid(chatJid.toUserJid()).orElse(null);
     }
 
     /**
@@ -505,18 +506,18 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             return null;
         }
 
-        var chat = store.findChatByJid(chatJid).orElse(null);
+        var chat = store.chatStore().findChatByJid(chatJid).orElse(null);
         var lidOriginType = chat != null ? chat.lidOriginType().orElse(null) : null;
         if (lidOriginType != null && !LID_ORIGIN_TYPE_PNH_CTWA.equals(lidOriginType)) {
             return null;
         }
 
-        var contact = store.findContactByJid(chatJid).orElse(null);
+        var contact = store.contactStore().findContactByJid(chatJid).orElse(null);
         if (contact != null && contact.isPhoneNumberShared()) {
             return null;
         }
 
-        return store.findPhoneByLid(chatJid.toUserJid()).orElse(null);
+        return store.contactStore().findPhoneByLid(chatJid.toUserJid()).orElse(null);
     }
 
     /**
@@ -543,7 +544,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             return null;
         }
 
-        return store.findContactByJid(chatJid)
+        return store.contactStore().findContactByJid(chatJid)
                 .flatMap(Contact::username)
                 .orElse(null);
     }

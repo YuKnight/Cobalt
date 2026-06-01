@@ -2,10 +2,12 @@ package com.github.auties00.cobalt.call;
 
 import com.github.auties00.cobalt.call.frame.audio.*;
 import com.github.auties00.cobalt.call.frame.video.*;
+import com.github.auties00.cobalt.call.internal.session.GroupCallSession;
 import com.github.auties00.cobalt.call.internal.session.VoiceCallSession;
 import com.github.auties00.cobalt.call.CallEndReason;
 import com.github.auties00.cobalt.call.CallInteraction;
 import com.github.auties00.cobalt.call.internal.transport.ActiveCallTransport;
+import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.util.Objects;
@@ -98,7 +100,6 @@ public final class ActiveCall implements AutoCloseable {
      * Holds the chat the call's log entry belongs to: the peer JID for
      * one-to-one calls, the group JID for group calls.
      */
-    @SuppressWarnings("unused")
     private final Jid chatJid;
 
     /**
@@ -115,6 +116,17 @@ public final class ActiveCall implements AutoCloseable {
      * local user placed it, {@code false} when the local user accepted it.
      */
     private final boolean outgoing;
+
+    /**
+     * Indicates whether this call is a group call.
+     *
+     * <p>Mirrors {@link IncomingCall#isGroup()} for inbound calls; on outbound calls it is set by
+     * {@link com.github.auties00.cobalt.call.internal.CallService#placeGroupCall(java.util.Set, Jid, CallOptions)}.
+     * The call-layer media-plane bring-up switches on this flag to instantiate
+     * {@link com.github.auties00.cobalt.call.internal.session.GroupCallSession} rather than
+     * {@link com.github.auties00.cobalt.call.internal.session.VoiceCallSession}.
+     */
+    private final boolean group;
 
     /**
      * Holds the local side's call options: audio-only or audio-and-video,
@@ -204,6 +216,43 @@ public final class ActiveCall implements AutoCloseable {
     private final ActiveCallTransport transport;
 
     /**
+     * Holds the media-plane session, if one has been attached by the call layer through
+     * {@link #attachVoiceSession(VoiceCallSession)}.
+     *
+     * <p>Closed by {@link #end(CallEndReason, String)} so the SRTP and audio pipeline threads stop
+     * promptly rather than blocking on the underlying socket until it dies.
+     */
+    private volatile VoiceCallSession voiceSession;
+
+    /**
+     * Holds the media-plane session for group calls, if one has been attached through
+     * {@link #attachGroupSession(GroupCallSession)}.
+     *
+     * <p>Mutually exclusive with {@link #voiceSession}: a call is either 1:1 (uses
+     * {@link VoiceCallSession}) or a group call (uses {@link GroupCallSession}).
+     */
+    private volatile GroupCallSession groupSession;
+
+    /**
+     * Holds the most recent {@link E2eRekeyPayload} delivered through
+     * {@link #applyRekey(E2eRekeyPayload)}.
+     *
+     * <p>The bundle is preserved on the call so listeners or a future SRTP-rotation hook can read
+     * the latest per-domain master keys without re-decrypting the wire envelope.
+     */
+    private volatile E2eRekeyPayload latestRekey;
+
+    /**
+     * Tracks whether the peer has accepted this outbound offer.
+     *
+     * <p>Set once by {@link #onPeerAccept()} when the peer's {@code <accept>} stanza arrives. The
+     * caller-side media bring-up reads this to decide whether the peer-DTLS handshake may start: the
+     * remote side only allocates its own relay and opens its DataChannel after answering, so firing
+     * the handshake before acceptance drops every packet.
+     */
+    private volatile boolean peerAccepted;
+
+    /**
      * Constructs a live call session.
      *
      * @param engine   the owning engine
@@ -223,15 +272,52 @@ public final class ActiveCall implements AutoCloseable {
      */
     public ActiveCall(CallService engine, String callId, Jid peer, Jid chatJid,
                       Jid creator, boolean outgoing, CallOptions options) {
+        this(engine, callId, peer, chatJid, creator, outgoing, false, options);
+    }
+
+    /**
+     * Constructs a live call session, with an explicit group flag.
+     *
+     * @param engine   the owning engine
+     * @param callId   the unique call identifier
+     * @param peer     the peer JID; for group calls this is the call host's JID
+     * @param chatJid  the chat JID: peer for one-to-one, group for group calls
+     * @param creator  the call-creator JID
+     * @param outgoing {@code true} for an outbound call
+     * @param group    {@code true} when the call is a group call (SFU-mediated)
+     * @param options  the local-side options
+     * @throws NullPointerException if any required argument is {@code null}
+     */
+    public ActiveCall(CallService engine, String callId, Jid peer, Jid chatJid,
+                      Jid creator, boolean outgoing, boolean group, CallOptions options) {
         this.engine = Objects.requireNonNull(engine, "engine cannot be null");
         this.callId = Objects.requireNonNull(callId, "callId cannot be null");
         this.peer = Objects.requireNonNull(peer, "peer cannot be null");
         this.chatJid = Objects.requireNonNull(chatJid, "chatJid cannot be null");
         this.creator = Objects.requireNonNull(creator, "creator cannot be null");
         this.outgoing = outgoing;
+        this.group = group;
         this.options = Objects.requireNonNull(options, "options cannot be null");
         this.videoMuted = !options.videoEnabled();
         this.transport = new ActiveCallTransport();
+    }
+
+    /**
+     * Returns whether this call is a group call.
+     *
+     * @return {@code true} for a group call
+     */
+    public boolean isGroup() {
+        return group;
+    }
+
+    /**
+     * Returns the chat JID: the peer JID for 1:1 calls, the group JID for group calls.
+     *
+     * @return the chat JID
+     */
+    public Jid chatJid() {
+        return chatJid;
     }
 
     /**
@@ -393,9 +479,9 @@ public final class ActiveCall implements AutoCloseable {
      *
      * <p>The request asks the peer to switch to a video call; it is a no-op
      * once the call has ended. The peer's reply surfaces through
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onCallVideoStateChanged(com.github.auties00.cobalt.client.WhatsAppClient, String, Jid, boolean)}
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onCallVideoStateChanged(com.github.auties00.cobalt.client.LinkedWhatsAppClient, String, Jid, boolean)}
      * on acceptance or
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onCallEnded(com.github.auties00.cobalt.client.WhatsAppClient, String, Jid, CallEndReason)}
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onCallEnded(com.github.auties00.cobalt.client.LinkedWhatsAppClient, String, Jid, CallEndReason)}
      * on rejection.
      */
     public void requestVideoUpgrade() {
@@ -403,8 +489,12 @@ public final class ActiveCall implements AutoCloseable {
             if (state == CallState.ENDED) {
                 return;
             }
+            // Unmute local video so frames written to the video sink flow to the encoder; an audio call
+            // starts with video muted, which otherwise drops every outbound frame.
+            videoMuted = false;
         }
         engine.sendVideoUpgradeRequest(peer, creator, callId);
+        engine.startLocalVideo(callId);
     }
 
     /**
@@ -422,6 +512,7 @@ public final class ActiveCall implements AutoCloseable {
             videoMuted = false;
         }
         engine.sendVideoState(peer, creator, callId, true);
+        engine.startLocalVideo(callId);
     }
 
     /**
@@ -440,10 +531,27 @@ public final class ActiveCall implements AutoCloseable {
     }
 
     /**
+     * Starts sharing the local screen to the call.
+     *
+     * <p>Screen frames written to {@link #localVideoSink()} are encoded and sent to the peer as a
+     * screen-capture track, distinct from the camera feed so both can run at once. Local video is
+     * unmuted so frames are not dropped. A no-op once the call has ended.
+     */
+    public void startScreenShare() {
+        synchronized (lock) {
+            if (state == CallState.ENDED) {
+                return;
+            }
+            videoMuted = false;
+        }
+        engine.startScreenShare(callId);
+    }
+
+    /**
      * Broadcasts an emoji reaction to the call.
      *
      * <p>Other participants observe the reaction through
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onCallInteraction(com.github.auties00.cobalt.client.WhatsAppClient, String, Jid, CallInteraction)}.
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onCallInteraction(com.github.auties00.cobalt.client.LinkedWhatsAppClient, String, Jid, CallInteraction)}.
      *
      * @param emoji the emoji glyph, typically a single grapheme
      */
@@ -535,11 +643,130 @@ public final class ActiveCall implements AutoCloseable {
     /**
      * Records that the peer accepted the outbound offer.
      *
-     * <p>Invoked by {@link CallService} on acceptance.
+     * <p>Invoked by {@link CallService} on acceptance. Flips {@link #peerAccepted} so the caller-side
+     * media bring-up may run its deferred peer-DTLS handshake. The call remains in
+     * {@link CallState#CONNECTING} until the media session reports its handshake completed
+     * and the RTP pipeline is wired; the transition to {@link CallState#ACTIVE} is
+     * driven by {@link #notifyActive()} from that path.
      */
-    // TODO: drive the CONNECTING-to-ACTIVE transition here once the
-    //  transport and codec pipelines deliver flowing media.
     public void onPeerAccept() {
+        peerAccepted = true;
+    }
+
+    /**
+     * Returns whether the peer has accepted this outbound offer.
+     *
+     * @return {@code true} once {@link #onPeerAccept()} has run
+     */
+    public boolean peerAccepted() {
+        return peerAccepted;
+    }
+
+    /**
+     * Promotes the call from {@link CallState#CONNECTING} to {@link CallState#ACTIVE}.
+     *
+     * <p>Invoked by the media session once the DTLS handshake completes and the RTP
+     * pipelines are wired; a no-op when the call has already ended or is already active.
+     * Unblocks any thread waiting on {@link #awaitState(CallState)}.
+     */
+    public void notifyActive() {
+        synchronized (lock) {
+            if (state == CallState.CONNECTING) {
+                state = CallState.ACTIVE;
+                lock.notifyAll();
+            }
+        }
+    }
+
+    /**
+     * Attaches the media-plane session driving this call.
+     *
+     * <p>Once attached, the session's lifecycle is owned by the call: {@link #end(CallEndReason, String)}
+     * closes the session before tearing down the transport so the SRTP loop and audio pipeline stop
+     * promptly. If a session was previously attached, the older one is closed.
+     *
+     * @param session the media-plane session
+     * @throws NullPointerException if {@code session} is {@code null}
+     */
+    public void attachVoiceSession(VoiceCallSession session) {
+        Objects.requireNonNull(session, "session cannot be null");
+        var previous = this.voiceSession;
+        this.voiceSession = session;
+        if (previous != null && previous != session) {
+            try { previous.close(); } catch (RuntimeException _) { }
+        }
+    }
+
+    /**
+     * Returns the media-plane session if one has been attached.
+     *
+     * @return the session, or {@link Optional#empty()} when none has been attached
+     */
+    public Optional<VoiceCallSession> voiceSession() {
+        return Optional.ofNullable(voiceSession);
+    }
+
+    /**
+     * Attaches the group-call media-plane session driving this call.
+     *
+     * <p>Mutually exclusive with {@link #attachVoiceSession(VoiceCallSession)}; on a group call the
+     * {@link GroupCallSession} owns SRTP for the single outbound audio track and per-participant
+     * inbound audio. {@link #end(CallEndReason, String)} closes the session before tearing down the
+     * transport so the SRTP loops and audio pipeline stop promptly.
+     *
+     * @param session the media-plane session
+     * @throws NullPointerException if {@code session} is {@code null}
+     */
+    public void attachGroupSession(GroupCallSession session) {
+        Objects.requireNonNull(session, "session cannot be null");
+        var previous = this.groupSession;
+        this.groupSession = session;
+        if (previous != null && previous != session) {
+            try { previous.close(); } catch (RuntimeException _) { }
+        }
+    }
+
+    /**
+     * Returns the group-call media-plane session if one has been attached.
+     *
+     * @return the session, or {@link Optional#empty()} when none has been attached
+     */
+    public Optional<GroupCallSession> groupSession() {
+        return Optional.ofNullable(groupSession);
+    }
+
+    /**
+     * Applies a freshly-published end-to-end rekey bundle.
+     *
+     * <p>The bundle is stored on the call for inspection through {@link #latestRekey()} and is
+     * routed to the attached media-plane session (voice or group) which rotates its SRTP master
+     * keys via {@link com.github.auties00.cobalt.call.internal.rtp.srtp.SrtpEndpoint#rotateMasterKey(byte[])}.
+     * A {@code null} bundle is rejected so the caller spots the misuse rather than silently
+     * clearing the cached one.
+     *
+     * @param rekey the rekey bundle
+     * @throws NullPointerException if {@code rekey} is {@code null}
+     */
+    public void applyRekey(E2eRekeyPayload rekey) {
+        Objects.requireNonNull(rekey, "rekey cannot be null");
+        this.latestRekey = rekey;
+        var voice = this.voiceSession;
+        if (voice != null) {
+            voice.applyRekey(rekey);
+        }
+        var group = this.groupSession;
+        if (group != null) {
+            group.applyRekey(rekey);
+        }
+    }
+
+    /**
+     * Returns the most recent rekey bundle, if any.
+     *
+     * @return the latest bundle, or {@link Optional#empty()} when none has been observed
+     */
+    public Optional<E2eRekeyPayload> latestRekey() {
+        return Optional.ofNullable(latestRekey);
     }
 
     /**
@@ -580,7 +807,17 @@ public final class ActiveCall implements AutoCloseable {
         outboundVideo.offer(SENTINEL_VIDEO);
         inboundAudio.offer(SENTINEL_AUDIO);
         inboundVideo.offer(SENTINEL_VIDEO);
-        try { transport.close(); } catch (RuntimeException _) { /* swallow */ }
+        var session = this.voiceSession;
+        if (session != null) {
+            try { session.close(); } catch (RuntimeException _) { }
+            this.voiceSession = null;
+        }
+        var gSession = this.groupSession;
+        if (gSession != null) {
+            try { gSession.close(); } catch (RuntimeException _) { }
+            this.groupSession = null;
+        }
+        try { transport.close(); } catch (RuntimeException _) { }
         engine.unregister(callId);
         engine.notifyEnded(callId, peer, wireReason);
     }

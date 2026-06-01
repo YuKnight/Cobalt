@@ -35,7 +35,7 @@ import static java.lang.System.Logger.Level.WARNING;
 
 /**
  * A pluggable strategy for reacting to failures raised by a
- * {@link WhatsAppClient}.
+ * {@link LinkedWhatsAppClient}.
  *
  * <p>Cobalt deliberately avoids hardcoding recovery behaviour: whenever the
  * socket, stream, Signal pipeline, media pipeline, or synchronisation
@@ -54,7 +54,7 @@ import static java.lang.System.Logger.Level.WARNING;
  * recognised session-control exception subtypes.
  *
  * @see WhatsAppException
- * @see WhatsAppClient#handleFailure(WhatsAppException)
+ * @see LinkedWhatsAppClient#handleFailure(WhatsAppException)
  */
 @SuppressWarnings("unused")
 @FunctionalInterface
@@ -71,12 +71,12 @@ public interface WhatsAppClientErrorHandler {
      * as the provided defaults do.
      *
      * @param whatsapp  the client where the error originated; its
-     *                  {@link WhatsAppClient#store()} can be consulted for
+     *                  {@link LinkedWhatsAppClient#store()} can be consulted for
      *                  context such as the session JID
      * @param exception the exception that was raised
      * @return the recovery action to apply
      */
-    Result handleError(WhatsAppClient whatsapp, WhatsAppException exception);
+    Result handleError(LinkedWhatsAppClient whatsapp, WhatsAppException exception);
 
     /**
      * Returns an error handler that writes full stack traces to the
@@ -208,10 +208,11 @@ public interface WhatsAppClientErrorHandler {
      * @return a handler that logs, renders, and maps exceptions to a
      *         {@link Result}
      */
-    private static WhatsAppClientErrorHandler defaultErrorHandler(BiConsumer<WhatsAppClient, WhatsAppException> printer) {
+    private static WhatsAppClientErrorHandler defaultErrorHandler(BiConsumer<LinkedWhatsAppClient, WhatsAppException> printer) {
         return (whatsapp, exception) -> {
             var logger = System.getLogger("ErrorHandler");
             var jid = whatsapp.store()
+                    .accountStore()
                     .jid()
                     .map(Jid::user)
                     .orElse("UNKNOWN");
@@ -353,7 +354,7 @@ public interface WhatsAppClientErrorHandler {
      * Enumerates the recovery actions that an error handler can request.
      *
      * <p>The value returned from
-     * {@link WhatsAppClientErrorHandler#handleError(WhatsAppClient, WhatsAppException)}
+     * {@link WhatsAppClientErrorHandler#handleError(LinkedWhatsAppClient, WhatsAppException)}
      * is translated by the client into a concrete
      * {@link WhatsAppClientDisconnectReason}: {@code DISCARD} leaves the
      * session running, whereas the other values disconnect with the
@@ -383,7 +384,7 @@ public interface WhatsAppClientErrorHandler {
          *
          * <p>The client emits
          * {@link WhatsAppClientDisconnectReason#RECONNECTING} and, after
-         * notifying listeners, calls {@link WhatsAppClient#connect()}
+         * notifying listeners, calls {@link LinkedWhatsAppClient#connect()}
          * internally.
          */
         RECONNECT,

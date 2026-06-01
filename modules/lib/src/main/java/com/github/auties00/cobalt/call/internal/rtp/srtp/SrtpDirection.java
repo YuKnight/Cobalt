@@ -74,6 +74,13 @@ final class SrtpDirection {
     private static final int SALT_LEN = 14;
 
     /**
+     * Holds the master salt that produced this direction's derived session keys, retained so a
+     * mid-call rekey can re-derive a fresh direction against the same salt and a freshly published
+     * master key.
+     */
+    final byte[] masterSalt;
+
+    /**
      * Holds the derived SRTP session encryption key (AES-128).
      */
     final byte[] srtpEncKey;
@@ -111,6 +118,7 @@ final class SrtpDirection {
      * @param masterSalt the 14-byte master salt
      */
     SrtpDirection(byte[] masterKey, byte[] masterSalt) {
+        this.masterSalt   = masterSalt.clone();
         this.srtpEncKey   = derive(masterKey, masterSalt, LABEL_SRTP_ENC,   ENC_KEY_LEN);
         this.srtpAuthKey  = derive(masterKey, masterSalt, LABEL_SRTP_AUTH,  AUTH_KEY_LEN);
         this.srtpSalt     = derive(masterKey, masterSalt, LABEL_SRTP_SALT,  SALT_LEN);
@@ -127,6 +135,7 @@ final class SrtpDirection {
      * bytes.
      */
     void zero() {
+        Arrays.fill(masterSalt,   (byte) 0);
         Arrays.fill(srtpEncKey,   (byte) 0);
         Arrays.fill(srtpAuthKey,  (byte) 0);
         Arrays.fill(srtpSalt,     (byte) 0);

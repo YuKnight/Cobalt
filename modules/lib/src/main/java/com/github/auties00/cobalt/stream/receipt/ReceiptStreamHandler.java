@@ -1,17 +1,17 @@
 package com.github.auties00.cobalt.stream.receipt;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.call.internal.signaling.CallReceiptReceiver;
 import com.github.auties00.cobalt.wam.WamService;
 
 /**
  * Routes an incoming {@code <receipt>} stanza to the appropriate specialised
- * {@link SocketStream.Handler}.
+ * {@link SocketStreamHandler}.
  *
  * <p>WhatsApp multiplexes three disjoint flows onto the {@code <receipt>} tag,
  * and this dispatcher is the single registered consumer for all of them. VoIP
@@ -37,7 +37,7 @@ import com.github.auties00.cobalt.wam.WamService;
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleMessagingStanza")
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleStanzaUtils")
-public final class ReceiptStreamHandler implements SocketStream.Handler {
+public final class ReceiptStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * The {@link CallReceiptReceiver} that consumes VoIP signalling
      * receipts.
@@ -69,7 +69,7 @@ public final class ReceiptStreamHandler implements SocketStream.Handler {
      *                       sub-handlers for emitting outbound
      *                       {@code <ack>} stanzas
      */
-    public ReceiptStreamHandler(WhatsAppClient whatsapp, MessageService messageService, WamService wamService, AckSender ackSender) {
+    public ReceiptStreamHandler(LinkedWhatsAppClient whatsapp, MessageService messageService, WamService wamService, AckSender ackSender) {
         this.callReceiptHandler = new CallReceiptReceiver(whatsapp, ackSender);
         this.messageReceiptHandler = new MessageReceiptStreamHandler(whatsapp, messageService, wamService, ackSender);
     }

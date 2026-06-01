@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.privacy.PrivacySettingType;
@@ -47,7 +47,7 @@ class StatusPrivacyHandlerTest {
     private static final Jid PEER_B = Jid.of("12025550101@s.whatsapp.net");
     private static final Jid GROUP = Jid.of("99001112224@g.us");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -105,7 +105,7 @@ class StatusPrivacyHandlerTest {
             var result = new StatusPrivacyHandler().applyMutation(client,
                     statusMutation(StatusPrivacyAction.StatusDistributionMode.CONTACTS, List.of(), SyncdOperation.SET, ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var entry = client.store().findPrivacySetting(PrivacySettingType.STATUS).orElseThrow();
+            var entry = client.store().settingsStore().findPrivacySetting(PrivacySettingType.STATUS).orElseThrow();
             assertEquals(PrivacySettingValue.CONTACTS, entry.value());
             assertTrue(entry.excluded().isEmpty());
         }
@@ -118,7 +118,7 @@ class StatusPrivacyHandlerTest {
                     statusMutation(StatusPrivacyAction.StatusDistributionMode.ALLOW_LIST,
                             List.of(PEER_A, GROUP, PEER_B), SyncdOperation.SET, ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var entry = client.store().findPrivacySetting(PrivacySettingType.STATUS).orElseThrow();
+            var entry = client.store().settingsStore().findPrivacySetting(PrivacySettingType.STATUS).orElseThrow();
             assertEquals(PrivacySettingValue.CONTACTS_ONLY, entry.value());
             // Group JID is filtered out by isUser() predicate; only PEER_A and PEER_B survive
             assertEquals(List.of(PEER_A, PEER_B), entry.excluded(),
@@ -133,7 +133,7 @@ class StatusPrivacyHandlerTest {
                     statusMutation(StatusPrivacyAction.StatusDistributionMode.DENY_LIST,
                             List.of(PEER_A, PEER_B), SyncdOperation.SET, ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var entry = client.store().findPrivacySetting(PrivacySettingType.STATUS).orElseThrow();
+            var entry = client.store().settingsStore().findPrivacySetting(PrivacySettingType.STATUS).orElseThrow();
             assertEquals(PrivacySettingValue.CONTACTS_EXCEPT, entry.value());
             assertEquals(List.of(PEER_A, PEER_B), entry.excluded());
         }
@@ -146,7 +146,7 @@ class StatusPrivacyHandlerTest {
                     statusMutation(StatusPrivacyAction.StatusDistributionMode.CLOSE_FRIENDS, List.of(), SyncdOperation.SET, ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState(),
                     "WA Web's switch breaks out of the CLOSE_FRIENDS branch without writing any IDB entry");
-            assertTrue(client.store().findPrivacySetting(PrivacySettingType.STATUS).isEmpty());
+            assertTrue(client.store().settingsStore().findPrivacySetting(PrivacySettingType.STATUS).isEmpty());
         }
 
         @Test
@@ -156,7 +156,7 @@ class StatusPrivacyHandlerTest {
             var result = new StatusPrivacyHandler().applyMutation(client,
                     statusMutation(StatusPrivacyAction.StatusDistributionMode.CUSTOM_LIST, List.of(), SyncdOperation.SET, ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().findPrivacySetting(PrivacySettingType.STATUS).isEmpty());
+            assertTrue(client.store().settingsStore().findPrivacySetting(PrivacySettingType.STATUS).isEmpty());
         }
     }
 

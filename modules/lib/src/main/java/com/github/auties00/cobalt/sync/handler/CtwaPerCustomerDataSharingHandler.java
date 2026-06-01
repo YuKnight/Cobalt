@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -21,7 +21,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * the toggle changes on another device, the server replays the resulting
  * {@link CtwaPerCustomerDataSharingAction} here, and the flag becomes readable
  * through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findCtwaDataSharing(String)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findCtwaDataSharing(String)}.
  *
  * @implNote
  * This implementation drops two WA Web side effects: the
@@ -83,13 +83,13 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      * Cobalt model accessor is lossy on the boolean wire field so
      * the malformed branch on null-flag is unreachable here. The
      * REMOVE branch passes a possibly-null account LID through to
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#removeCtwaDataSharing(String)},
+     * {@link com.github.auties00.cobalt.store.BusinessStore#removeCtwaDataSharing(String)},
      * matching WA Web's IDB-no-op semantic when the index slot is
      * missing.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         var accountLid = indexArray.size() > 1 ? indexArray.getString(1) : null;
 
@@ -105,7 +105,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
 
                 var enabled = action.isCtwaPerCustomerDataSharingEnabled();
 
-                client.store().putCtwaDataSharing(new CtwaDataSharingPreferenceBuilder()
+                client.store().businessStore().putCtwaDataSharing(new CtwaDataSharingPreferenceBuilder()
                         .accountLid(accountLid)
                         .enabled(enabled)
                         .build());
@@ -113,7 +113,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
                 return MutationApplicationResult.success();
             }
             case REMOVE -> {
-                client.store().removeCtwaDataSharing(accountLid);
+                client.store().businessStore().removeCtwaDataSharing(accountLid);
 
                 return MutationApplicationResult.success();
             }

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -17,11 +17,11 @@ import com.alibaba.fastjson2.JSON;
  * <p>When a call is placed, received, or missed on another device, the server
  * replays the resulting call-log record here as a {@link CallLogAction}, and the
  * record is mirrored into the store via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#addCallLog(com.github.auties00.cobalt.model.call.CallLog)}.
+ * {@link com.github.auties00.cobalt.store.ChatStore#addCallLog(com.github.auties00.cobalt.model.call.CallLog)}.
  *
  * @implNote
  * This implementation stores the protobuf record directly via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#addCallLog(com.github.auties00.cobalt.model.call.CallLog)}
+ * {@link com.github.auties00.cobalt.store.ChatStore#addCallLog(com.github.auties00.cobalt.model.call.CallLog)}
  * keyed by the record's own {@link com.github.auties00.cobalt.model.call.CallLog#callId()},
  * rather than running WA Web's {@code generateCallLogFromCallSyncRecord} which
  * writes a VoIP-flavored chat message. The pairing-timestamp filter and the
@@ -84,7 +84,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCallLogSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() == SyncdOperation.SET) {
                 if (!(mutation.value().action().orElse(null) instanceof CallLogAction action)) {
@@ -111,7 +111,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
                 if (log.callId().isEmpty()) {
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
-                client.store().addCallLog(log);
+                client.store().chatStore().addCallLog(log);
 
                 return MutationApplicationResult.success();
             } else if (mutation.operation() == SyncdOperation.REMOVE) {
@@ -119,7 +119,7 @@ public final class CallLogHandler implements WebAppStateActionHandler {
                 if (indexArray.size() >= 4) {
                     var callId = indexArray.getString(2);
                     if (callId != null) {
-                        client.store().removeCallLog(callId);
+                        client.store().chatStore().removeCallLog(callId);
                     }
                 }
                 return MutationApplicationResult.success();

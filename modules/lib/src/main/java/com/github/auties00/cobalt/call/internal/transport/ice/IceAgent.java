@@ -12,7 +12,6 @@ import java.net.Inet6Address;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
@@ -485,18 +484,21 @@ public final class IceAgent {
     /**
      * Builds and sends a STUN binding request for the given pair, recording it as in flight.
      *
-     * <p>The request carries the USERNAME and a zeroed MESSAGE-INTEGRITY placeholder that is then
-     * stamped with the remote password. If the outbound send throws, the pair is failed.
+     * <p>The request carries only a zeroed MESSAGE-INTEGRITY placeholder that is then stamped with
+     * the remote password (the per-call relay key); if the outbound send throws, the pair is failed.
+     *
+     * @implNote This implementation omits the STUN USERNAME attribute. WhatsApp's relay connectivity
+     * checks authenticate solely through a shared-secret MESSAGE-INTEGRITY keyed by the per-call
+     * relay key, with no USERNAME on the wire; live {@code ws2_32!sendto} captures of the native
+     * client show binding requests of the form {@code [type][len]2112a442[txid:12]{PRIORITY}?[MI]}
+     * and never a {@code 0x0006} USERNAME. Including a USERNAME would shift the MESSAGE-INTEGRITY
+     * coverage and the relay would reject the check.
      *
      * @param pair the pair to check
      */
     private void fireBindingRequest(IceCandidatePair pair) {
         var txId = newTransactionId();
         var attrs = new ArrayList<WaRelayAttribute>();
-        attrs.add(new WaRelayAttribute(
-                // USERNAME = 0x0006 per RFC 5389 section 15.3
-                0x0006,
-                credentials.outboundUsername().getBytes(StandardCharsets.UTF_8)));
         attrs.add(new WaRelayAttribute(
                 WaRelayAttributeType.MESSAGE_INTEGRITY.wireValue(),
                 new byte[WaRelayMessageIntegrity.MAC_LENGTH]));

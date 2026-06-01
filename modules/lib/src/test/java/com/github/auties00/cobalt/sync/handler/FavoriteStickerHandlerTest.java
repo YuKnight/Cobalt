@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Tests run against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * through {@link TestWhatsAppClient} so the
- * {@link WhatsAppStore#findFavouriteSticker(String)} read-back can be asserted
+ * {@link com.github.auties00.cobalt.store.SettingsStore#findFavouriteSticker(String)} read-back can be asserted
  * directly. The {@code "favorite_sticker"} primary feature flag is toggled via
  * the store's primary-features set so the gating branch is deterministic.
  */
@@ -107,7 +107,7 @@ class FavoriteStickerHandlerTest {
         @Test
         @DisplayName("isFavorite=true on a fresh store adds the sticker and reports SUCCESS")
         void favoriteAdd() {
-            store.setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
             var action = new StickerActionBuilder()
                     .isFavorite(true)
                     .mimetype("image/webp")
@@ -119,44 +119,44 @@ class FavoriteStickerHandlerTest {
 
             assertEquals(MutationApplicationResult.success(), result,
                     "feature-enabled SET with non-empty hash must succeed");
-            assertTrue(store.findFavouriteSticker(STICKER_HASH).isPresent(),
+            assertTrue(store.settingsStore().findFavouriteSticker(STICKER_HASH).isPresent(),
                     "the sticker must be added to the favourite-stickers store");
         }
 
         @Test
         @DisplayName("isFavorite=true when the sticker already exists is a no-op SUCCESS (per WA Web addOrUpdate dedup)")
         void favoriteAddIdempotent() {
-            store.setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
-            store.addFavouriteSticker(STICKER_HASH, new StickerBuilder().build());
+            store.syncStore().setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
+            store.settingsStore().addFavouriteSticker(STICKER_HASH, new StickerBuilder().build());
 
             var action = new StickerActionBuilder().isFavorite(true).build();
             var index = "[\"favoriteSticker\",\"" + STICKER_HASH + "\"]";
             var result = new FavoriteStickerHandler().applyMutation(client, setMutation(action, index));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findFavouriteSticker(STICKER_HASH).isPresent(),
+            assertTrue(store.settingsStore().findFavouriteSticker(STICKER_HASH).isPresent(),
                     "pre-existing entry must still be present after no-op SUCCESS");
         }
 
         @Test
         @DisplayName("isFavorite=false on an existing sticker removes it and reports SUCCESS")
         void unfavoriteRemove() {
-            store.setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
-            store.addFavouriteSticker(STICKER_HASH, new StickerBuilder().build());
+            store.syncStore().setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
+            store.settingsStore().addFavouriteSticker(STICKER_HASH, new StickerBuilder().build());
 
             var action = new StickerActionBuilder().isFavorite(false).build();
             var index = "[\"favoriteSticker\",\"" + STICKER_HASH + "\"]";
             var result = new FavoriteStickerHandler().applyMutation(client, setMutation(action, index));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findFavouriteSticker(STICKER_HASH).isEmpty(),
+            assertTrue(store.settingsStore().findFavouriteSticker(STICKER_HASH).isEmpty(),
                     "unfavourite must drop the sticker from the favourite-stickers store");
         }
 
         @Test
         @DisplayName("isFavorite=false on a missing sticker is an idempotent SUCCESS no-op")
         void unfavouriteMissingIsNoop() {
-            store.setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
             var action = new StickerActionBuilder().isFavorite(false).build();
             var index = "[\"favoriteSticker\",\"" + STICKER_HASH + "\"]";
             var result = new FavoriteStickerHandler().applyMutation(client, setMutation(action, index));
@@ -183,7 +183,7 @@ class FavoriteStickerHandlerTest {
                     "ORPHAN must carry the sticker file hash as the model id");
             assertEquals("FavoriteSticker", result.modelType(),
                     "ORPHAN must tag the model type so the orphan store can match it later");
-            assertTrue(store.findFavouriteSticker(STICKER_HASH).isEmpty(),
+            assertTrue(store.settingsStore().findFavouriteSticker(STICKER_HASH).isEmpty(),
                     "no state change must occur when the feature is disabled");
         }
     }
@@ -194,7 +194,7 @@ class FavoriteStickerHandlerTest {
         @Test
         @DisplayName("SyncActionValue carrying a different action sub-message is MALFORMED")
         void wrongActionType() {
-            store.setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             // No stickerAction set - action().orElse(null) will be null or some other type
             var value = new SyncActionValueBuilder().timestamp(ts).build();
@@ -299,7 +299,7 @@ class FavoriteStickerHandlerTest {
         @Test
         @DisplayName("default applyMutationBatch is a per-item map of applyMutation results")
         void perItemDispatch() {
-            store.setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(FAVORITE_STICKER_FEATURE));
             var a = setMutation(new StickerActionBuilder().isFavorite(true).build(),
                     "[\"favoriteSticker\",\"hash-a\"]");
             var b = setMutation(new StickerActionBuilder().isFavorite(true).build(),
@@ -309,8 +309,8 @@ class FavoriteStickerHandlerTest {
             assertEquals(2, results.size(), "batch result list must mirror input arity");
             assertEquals(SyncActionState.SUCCESS, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertTrue(store.findFavouriteSticker("hash-a").isPresent());
-            assertTrue(store.findFavouriteSticker("hash-b").isPresent());
+            assertTrue(store.settingsStore().findFavouriteSticker("hash-a").isPresent());
+            assertTrue(store.settingsStore().findFavouriteSticker("hash-b").isPresent());
         }
     }
 

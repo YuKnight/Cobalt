@@ -17,7 +17,7 @@ import com.github.auties00.cobalt.model.sync.action.media.FavoritesAction;
 import com.github.auties00.cobalt.model.sync.action.media.FavoritesActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -46,7 +46,7 @@ class UserStatusMuteHandlerTest {
     private static final Jid CONTACT = Jid.of("12025550100@s.whatsapp.net");
     private static final Jid GROUP = Jid.of("12025550100-1609459200@g.us");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -94,14 +94,14 @@ class UserStatusMuteHandlerTest {
         @Test
         @DisplayName("flips the contact's statusMuted flag and returns SUCCESS")
         void appliesToContact() {
-            client.store().addContact(new ContactBuilder().jid(CONTACT).build());
+            client.store().contactStore().addContact(new ContactBuilder().jid(CONTACT).build());
 
             var result = new UserStatusMuteHandler().applyMutation(
                     client, mutationFor(CONTACT.toString(), Boolean.TRUE, SyncdOperation.SET, Instant.ofEpochSecond(1700000000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState(),
                     "muting a known contact must succeed");
-            assertTrue(client.store().findContactByJid(CONTACT).orElseThrow().statusMuted(),
+            assertTrue(client.store().contactStore().findContactByJid(CONTACT).orElseThrow().statusMuted(),
                     "the contact's statusMuted field must reflect the mutation");
         }
 
@@ -109,13 +109,13 @@ class UserStatusMuteHandlerTest {
         @DisplayName("a second mutation can flip the flag back to false")
         void canUnmute() {
             var contact = new ContactBuilder().jid(CONTACT).statusMuted(true).build();
-            client.store().addContact(contact);
+            client.store().contactStore().addContact(contact);
 
             var result = new UserStatusMuteHandler().applyMutation(
                     client, mutationFor(CONTACT.toString(), Boolean.FALSE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertFalse(client.store().findContactByJid(CONTACT).orElseThrow().statusMuted());
+            assertFalse(client.store().contactStore().findContactByJid(CONTACT).orElseThrow().statusMuted());
         }
     }
 
@@ -129,14 +129,14 @@ class UserStatusMuteHandlerTest {
                     .jid(GROUP)
                     .subject("Test Group")
                     .build();
-            client.store().addChatMetadata(metadata);
+            client.store().chatStore().addChatMetadata(metadata);
 
             var result = new UserStatusMuteHandler().applyMutation(
                     client, mutationFor(GROUP.toString(), Boolean.TRUE, SyncdOperation.SET, Instant.ofEpochSecond(1700000000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState(),
                     "muting a known group must succeed");
-            var stored = client.store().findChatMetadata(GROUP).orElseThrow();
+            var stored = client.store().chatStore().findChatMetadata(GROUP).orElseThrow();
             assertTrue(stored instanceof GroupMetadata, "group metadata row must be present");
             assertTrue(((GroupMetadata) stored).statusMuted(),
                     "the group's statusMuted field must reflect the mutation");
@@ -222,13 +222,13 @@ class UserStatusMuteHandlerTest {
         @Test
         @DisplayName("REMOVE is rejected before any side effect")
         void removeIsUnsupported() {
-            client.store().addContact(new ContactBuilder().jid(CONTACT).build());
+            client.store().contactStore().addContact(new ContactBuilder().jid(CONTACT).build());
 
             var result = new UserStatusMuteHandler().applyMutation(
                     client, mutationFor(CONTACT.toString(), Boolean.TRUE, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertFalse(client.store().findContactByJid(CONTACT).orElseThrow().statusMuted(),
+            assertFalse(client.store().contactStore().findContactByJid(CONTACT).orElseThrow().statusMuted(),
                     "REMOVE must not flip the contact's mute flag");
         }
     }

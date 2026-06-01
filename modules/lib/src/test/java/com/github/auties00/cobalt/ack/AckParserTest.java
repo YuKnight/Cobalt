@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.ack;
 
+import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -8,21 +9,26 @@ import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Synthetic-input cells for {@link AckParser}: each cell builds an {@code <ack ... />} node with a
- * specific attribute combination and asserts that the resulting {@link AckResult} extracts the
- * matching slots, covering success, the notable nack codes (421/478/479), {@code phash} presence,
- * {@code refresh_lid="true"}, the {@code sync}, {@code count}, and {@code addressing_mode}
- * attributes, and the failure cases (wrong tag, null node).
+ * specific attribute combination and asserts that the resulting {@link AckResult} subtype extracts
+ * the matching slots, covering success, the notable nack codes (421/478/479), {@code phash}
+ * presence, {@code refresh_lid="true"}, the {@code sync}, {@code count}, and
+ * {@code addressing_mode} attributes, and the failure cases (wrong tag, null node).
  *
  * <p>Pairs with {@link AckParserLiveOracleTest}, which feeds captured live wire acks through the
  * same parser to assert parity on the success shape.
  */
 @DisplayName("AckParser")
 class AckParserTest {
+
+    private static MessageAck parseMessage(Node ack) {
+        return assertInstanceOf(MessageAck.class, AckParser.parse(ack));
+    }
 
     @Test
     @DisplayName("success ack: only timestamp; error is empty")
@@ -32,7 +38,7 @@ class AckParserTest {
                 .attribute("t", "1700000000")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertEquals(Instant.ofEpochSecond(1700000000L), result.timestamp().orElseThrow());
         assertTrue(result.error().isEmpty(), "no error attribute means no error in result");
         assertTrue(result.isSuccess(), "no error code means success");
@@ -49,7 +55,7 @@ class AckParserTest {
                 .attribute("error", "421")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertEquals(421, result.error().orElseThrow());
         assertFalse(result.isSuccess());
     }
@@ -64,7 +70,7 @@ class AckParserTest {
                 .attribute("phash", "2:abcDEF")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertEquals(478, result.error().orElseThrow());
         assertEquals("2:abcDEF", result.phash().orElseThrow());
         assertTrue(result.hasPhashMismatch(), "phash present implies resend to delta devices");
@@ -82,7 +88,7 @@ class AckParserTest {
                 .attribute("error", "479")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertEquals(479, result.error().orElseThrow());
         assertFalse(result.isSuccess(), "error 479 is a server-side rejection, not a success");
     }
@@ -96,7 +102,7 @@ class AckParserTest {
                 .attribute("refresh_lid", "true")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertTrue(result.refreshLid(), "refresh_lid=true triggers a LID refresh on the receiver side");
     }
 
@@ -108,7 +114,7 @@ class AckParserTest {
                 .attribute("t", "1700000000")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertFalse(result.refreshLid(), "missing attribute must default to false, not throw");
     }
 
@@ -121,7 +127,7 @@ class AckParserTest {
                 .attribute("sync", "regular_low")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertEquals("regular_low", result.sync().orElseThrow());
     }
 
@@ -134,7 +140,7 @@ class AckParserTest {
                 .attribute("addressing_mode", "lid")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertEquals("lid", result.addressingMode().orElseThrow());
     }
 
@@ -147,7 +153,7 @@ class AckParserTest {
                 .attribute("count", "42")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertEquals(42, result.count().orElseThrow());
     }
 
@@ -165,7 +171,7 @@ class AckParserTest {
                 .attribute("error", "478")
                 .build();
 
-        var result = AckParser.parse(ack);
+        var result = parseMessage(ack);
         assertEquals(Instant.ofEpochSecond(1700000000L), result.timestamp().orElseThrow());
         assertEquals("regular", result.sync().orElseThrow());
         assertEquals("2:hash", result.phash().orElseThrow());
@@ -185,6 +191,51 @@ class AckParserTest {
         var result = AckParser.parse(ack);
         assertTrue(result.timestamp().isEmpty(),
                 "missing t attribute must not throw; produces an empty Optional");
+    }
+
+    @Test
+    @DisplayName("class=\"message\" parses as MessageAck")
+    void messageClassDispatch() {
+        var ack = new NodeBuilder()
+                .description("ack")
+                .attribute("class", "message")
+                .attribute("t", "1700000000")
+                .build();
+        assertInstanceOf(MessageAck.class, AckParser.parse(ack));
+    }
+
+    @Test
+    @DisplayName("class=\"receipt\" parses as ReceiptAck")
+    void receiptClassDispatch() {
+        var ack = new NodeBuilder()
+                .description("ack")
+                .attribute("class", "receipt")
+                .attribute("t", "1700000000")
+                .build();
+        assertInstanceOf(ReceiptAck.class, AckParser.parse(ack));
+    }
+
+    @Test
+    @DisplayName("class=\"notification\" parses as NotificationAck")
+    void notificationClassDispatch() {
+        var ack = new NodeBuilder()
+                .description("ack")
+                .attribute("class", "notification")
+                .attribute("t", "1700000000")
+                .build();
+        assertInstanceOf(NotificationAck.class, AckParser.parse(ack));
+    }
+
+    @Test
+    @DisplayName("class=\"call\" without <relay> parses as CallAck with empty relay")
+    void callClassDispatchNoRelay() {
+        var ack = new NodeBuilder()
+                .description("ack")
+                .attribute("class", "call")
+                .attribute("t", "1700000000")
+                .build();
+        var result = assertInstanceOf(CallAck.class, AckParser.parse(ack));
+        assertTrue(result.relay().isEmpty());
     }
 
     @Test

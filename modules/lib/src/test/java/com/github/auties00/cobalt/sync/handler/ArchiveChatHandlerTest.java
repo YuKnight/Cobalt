@@ -116,7 +116,7 @@ class ArchiveChatHandlerTest {
         @Test
         @DisplayName("SET archived=true on an existing chat archives it")
         void archivesTheChat() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             assertFalse(chat.archived());
 
             var result = new ArchiveChatHandler().applyMutation(
@@ -129,7 +129,7 @@ class ArchiveChatHandlerTest {
         @Test
         @DisplayName("SET archived=false on an archived chat unarchives it")
         void unarchivesTheChat() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.setArchived(true);
 
             var result = new ArchiveChatHandler().applyMutation(
@@ -162,7 +162,7 @@ class ArchiveChatHandlerTest {
         @Test
         @DisplayName("a SyncActionValue carrying a pinAction instead of archiveChatAction is rejected as MALFORMED")
         void wrongActionTypeIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var wrong = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1_700_000_000L))
                     .pinAction(new PinActionBuilder().pinned(true).build())
@@ -183,7 +183,7 @@ class ArchiveChatHandlerTest {
         @Test
         @DisplayName("an empty chat JID at slot 1 is MALFORMED")
         void emptyChatJidIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .archiveChatAction(new ArchiveChatActionBuilder().archived(true).messageRange(rangeWithLast(1L)).build())
@@ -200,7 +200,7 @@ class ArchiveChatHandlerTest {
         @Test
         @DisplayName("an empty index string is treated as failure (try/catch returns FAILED)")
         void emptyIndexIsFailed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .archiveChatAction(new ArchiveChatActionBuilder().archived(true).messageRange(rangeWithLast(1L)).build())
@@ -220,7 +220,7 @@ class ArchiveChatHandlerTest {
         @Test
         @DisplayName("a REMOVE operation returns UNSUPPORTED without touching the chat")
         void removeReturnsUnsupported() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.setArchived(true);
 
             var value = new SyncActionValueBuilder()

@@ -24,7 +24,7 @@ import static java.nio.file.Files.createTempFile;
 
 /**
  * A pluggable strategy for completing the authentication ceremony that
- * links or registers a {@link WhatsAppClient}.
+ * links or registers a {@link LinkedWhatsAppClient}.
  *
  * @apiNote
  * Two sub-hierarchies cover the supported flavours: {@link Web} drives
@@ -32,9 +32,9 @@ import static java.nio.file.Files.createTempFile;
  * clients (QR scan or pairing-code entry), and {@link Mobile} drives
  * the registration ceremony for {@link WhatsAppClientType#MOBILE}
  * clients (SMS, voice, or in-app verification code). Implementations
- * are wired in via {@link WhatsAppClientBuilder}.
+ * are wired in via {@link LinkedWhatsAppClientBuilder}.
  *
- * @see WhatsAppClientBuilder
+ * @see LinkedWhatsAppClientBuilder
  */
 public sealed interface WhatsAppClientVerificationHandler {
     /**

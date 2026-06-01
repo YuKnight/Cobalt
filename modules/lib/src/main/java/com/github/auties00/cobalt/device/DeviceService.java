@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.device;
 
-import com.github.auties00.cobalt.device.fanout.DeviceGroupFanoutResult;
 import com.github.auties00.cobalt.device.icdc.HostedIcdcResult;
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
 import com.github.auties00.cobalt.model.device.DeviceListMetadata;
@@ -22,7 +21,7 @@ import java.util.Set;
  * <p>This service is consulted whenever Cobalt needs the recipient's set of linked devices, needs
  * to refresh that set after an ADV change notification, needs to apply Identity Change Detection
  * Consistency metadata extracted from inbound messages, or needs to manage the local user's own
- * device identity. {@link DefaultDeviceService} is the production implementation that talks to the
+ * device identity. {@link LiveDeviceService} is the production implementation that talks to the
  * server via USync queries, the ADV pipeline, and the Signal protocol store.
  *
  * @implSpec
@@ -149,46 +148,87 @@ public interface DeviceService {
     Collection<Jid> getUserFanout(Jid chatJid, String expectedPhash);
 
     /**
-     * Returns the device fanout for a group chat plus the resolved phash.
+     * Returns the recipient device fanout for a group chat.
      *
-     * <p>This drives group-message sends. It resolves every group participant's device list,
-     * strips the sender's own device, and computes the phash the server will cross-check against.
+     * <p>This drives group-message sends. It refreshes the group metadata, resolves every
+     * participant's device list, and strips the sender's own device. The participant hash is not
+     * computed here: a send path filters this set by addressing mode and then hashes the result
+     * through {@link #computeGroupPhash(Collection, Jid, boolean, boolean)}, mirroring WA Web where
+     * {@code getFanOutList} returns devices and {@code phashV2} runs separately in the send job.
      *
      * @implSpec
-     * Implementations must exclude {@code senderDeviceJid} from the returned device list but must
-     * include it when computing the phash.
+     * Implementations must exclude the sender's own device from the returned set.
      *
-     * @param chatJid         the group JID
-     * @param senderDeviceJid the sender device JID, excluded from the fanout but included in the
-     *                        phash
-     * @return the fanout result with devices and phash
+     * @param chatJid the group JID
+     * @return the recipient device JIDs
      */
-    DeviceGroupFanoutResult getGroupFanout(Jid chatJid, Jid senderDeviceJid);
+    Set<Jid> getGroupFanout(Jid chatJid);
 
     /**
-     * Returns the device fanout for a business broadcast-list send plus the resolved phash.
+     * Computes the V2 participant hash for a group send over the final recipient set.
+     *
+     * <p>WhatsApp Web computes the {@code phash} attribute inside the send job, over the
+     * addressing-mode-filtered recipient device list ({@code skList} concatenated with
+     * {@code skDistribList}) folded together with the sender's own device in the conversation's
+     * addressing mode. This method exposes that computation so a send path hashes the exact device
+     * set it is about to address, after it has filtered the {@link #getGroupFanout(Jid)} set by
+     * addressing mode.
+     *
+     * @implSpec
+     * Implementations must fold {@code senderDeviceJid} into the hashed set and compute the V2
+     * phash; the bot gates are ANDed with the corresponding AB-prop checks so a non-bot group
+     * never injects a bot JID.
+     *
+     * @param recipientDevices the final, addressing-mode-filtered recipient device JIDs
+     * @param senderDeviceJid  the sender's own device JID in the conversation's addressing mode,
+     *                         folded into the hashed set
+     * @param openBotGroup     whether this is an open Meta AI bot group, gating open-bot injection
+     * @param teeBotGroup      whether this is a TEE Meta AI bot group, gating TEE-bot injection
+     * @return the {@code phash} attribute value, prefixed with {@code "2:"}
+     */
+    String computeGroupPhash(Collection<Jid> recipientDevices, Jid senderDeviceJid, boolean openBotGroup, boolean teeBotGroup);
+
+    /**
+     * Returns the recipient device fanout for a business broadcast-list send.
      *
      * <p>Broadcast lists are a client-only audience model. The recipient roster is stored locally
      * on {@link com.github.auties00.cobalt.model.business.BusinessBroadcastList} and never
      * round-tripped through server-side group metadata, so the caller passes the resolved
      * recipient user JIDs explicitly rather than expecting the SKMSG-target
      * {@code <id>@broadcast} JID to drive a server-side metadata lookup. The fanout calculator and
-     * identity filter mirror {@link #getGroupFanout(Jid, Jid)} verbatim; the phash is computed over
-     * the resolved device set plus {@code senderDeviceJid}.
+     * identity filter mirror {@link #getGroupFanout(Jid)} verbatim.
      *
      * @implSpec
-     * Implementations must compute the fanout over {@code recipientUserJids} alone, exclude
-     * {@code senderDeviceJid} from the device list, and fold it into the phash.
+     * Implementations must resolve devices over {@code recipientUserJids} together with the local
+     * user (so the sender's own other devices receive the broadcast sender key), merge alternate
+     * (PN/LID) devices, and exclude the sending device from the returned set.
      *
      * @param broadcastJid      the broadcast list JID ({@code <id>@broadcast}); used for
      *                          diagnostics only, not for metadata resolution
-     * @param senderDeviceJid   the sender device JID, included in the phash but not in the returned
-     *                          device list
      * @param recipientUserJids the resolved recipient user JIDs from the local broadcast list
      *                          roster
-     * @return the fanout result with devices and phash
+     * @return the recipient device JIDs
      */
-    DeviceGroupFanoutResult getBroadcastFanout(Jid broadcastJid, Jid senderDeviceJid, Collection<Jid> recipientUserJids);
+    Set<Jid> getBroadcastFanout(Jid broadcastJid, Collection<Jid> recipientUserJids);
+
+    /**
+     * Returns the recipient device fanout for a status broadcast over the given audience.
+     *
+     * <p>A status post has no server-side group metadata: its audience is derived from the user's
+     * status privacy preference and supplied here as resolved user JIDs. Mirrors WA Web's
+     * {@code encryptAndSendStatusMsg}, which resolves devices through
+     * {@code getFanOutList({wids: [...audience, meLidDevice], shouldMergeAltDevices: true})} rather
+     * than a group lookup, so this must never query group metadata.
+     *
+     * @implSpec
+     * Implementations must resolve devices over {@code audienceUserJids} together with the local
+     * user (so the poster's own other devices receive the status sender key), merge alternate
+     * (PN/LID) devices, and exclude the sending device from the returned set.
+     *
+     * @param audienceUserJids the resolved status audience user JIDs
+     * @return the recipient device JIDs
+     */
+    Set<Jid> getStatusFanout(Collection<Jid> audienceUserJids);
 
     /**
      * Computes the Identity Change Detection Consistency metadata for the given user.
@@ -240,6 +280,35 @@ public interface DeviceService {
      * @param userJid the user JID whose device list changed
      */
     void handleDeviceNotification(Node node, String action, Jid userJid);
+
+    /**
+     * Rebuilds the cached device-list record for one self identity from an inline {@code <devices>}
+     * account-sync payload.
+     *
+     * <p>The account-sync stream handler is responsible for the surrounding orchestration (deferring
+     * during resume-from-restart, fanning a self sender out to both the phone-number and LID
+     * identities, and falling back to a full self USync when no devices are listed); this method
+     * rebuilds the record for the single {@code wid} it is given. The payload carries the current
+     * companion {@code <device>} children and, when the primary signs an updated key index, an
+     * embedded {@code <key-index-list>}.
+     *
+     * @implSpec
+     * Implementations must verify the embedded {@code <key-index-list>} against {@code wid}'s primary
+     * (device {@code 0}) identity and rebuild the device set as the {@code <device>} children filtered
+     * to the signed {@code validIndexes}, merged with cached devices whose key index is newer than the
+     * signed {@code currentIndex}, plus the primary device. Implementations must populate the ADV
+     * fingerprint fields ({@code rawId}, {@code currentIndex}, {@code validIndexes}) from the signed
+     * list so the record stays consistent with the app-state sync key fingerprints the primary shares,
+     * and must not store the device-list {@code dhash} in the {@code rawId} slot. Implementations must
+     * leave a cached record untouched when the payload carries no verifiable key-index-list, when the
+     * notification predates the cached snapshot, or when the signed timestamp does not match the
+     * notification timestamp.
+     *
+     * @param wid         the self identity (phone-number or LID user JID) whose record is rebuilt
+     * @param devicesNode the {@code <devices>} child node carrying {@code <device>} children and an
+     *                    optional {@code <key-index-list>}
+     */
+    void refreshOwnDeviceList(Jid wid, Node devicesNode);
 
     /**
      * Synchronises the local user's own device list with the server.

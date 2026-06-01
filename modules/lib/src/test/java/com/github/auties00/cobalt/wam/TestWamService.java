@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.wam;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.wam.model.WamEventSpec;
@@ -11,7 +11,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Recording {@link WamService} test harness: a drop-in replacement for
- * {@link DefaultWamService} that captures every committed event without
+ * {@link LiveWamService} that captures every committed event without
  * driving the sampling, channel-routing, encoding, or upload pipeline.
  *
  * <p>{@link #commit(WamEventSpec)} appends the raw event into a
@@ -26,13 +26,13 @@ public final class TestWamService extends WamService {
 
     private volatile Instant now = Instant.ofEpochSecond(1_780_000_000L);
 
-    private TestWamService(WhatsAppClient client, ABPropsService props, WamBeaconingService beaconing) {
+    private TestWamService(LinkedWhatsAppClient client, ABPropsService props, WamBeaconingService beaconing) {
         super(client, props, beaconing);
     }
 
-    public static TestWamService create(WhatsAppClient client) {
+    public static TestWamService create(LinkedWhatsAppClient client) {
         var props = TestABPropsService.builder().build();
-        return new TestWamService(client, props, new DefaultWamBeaconingService());
+        return new TestWamService(client, props, new LiveWamBeaconingService());
     }
 
     public List<WamEventSpec> committedEvents() {

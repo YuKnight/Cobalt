@@ -33,8 +33,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * <ol>
  *   <li>Classpath bundle: looks up the binary at the path declared in the
  *       manifest entry (for example
- *       {@code dependencies/libopus/bin/linux-x86_64/libopus.so}), populated by
- *       the per-classifier {@code cobalt-VERSION-natives-<classifier>.jar}
+ *       {@code modules/lib/natives/bin/linux-x86_64/libcobalt-native.so}),
+ *       populated by the per-classifier {@code cobalt-VERSION-natives-<classifier>.jar}
  *       artifacts a consumer can opt into for offline / Maven-Central-only
  *       deployments.</li>
  *   <li>On-disk cache: checks
@@ -101,7 +101,7 @@ public final class NativeLibLoader {
      * <p>Used when the {@link #SYS_CACHE} system property is unset or blank.
      */
     private static final Path DEFAULT_CACHE_ROOT =
-            Paths.get(System.getProperty("user.home", "."), ".cobalt", "natives");
+            Paths.get(System.getProperty("user.home", "."), ".cobalt", "cache", "natives");
 
     /**
      * Holds the classifiers Cobalt publishes natives for.
@@ -217,12 +217,12 @@ public final class NativeLibLoader {
      *
      * <p>FFM bindings call this to obtain the {@link SymbolLookup} they pass to
      * {@link java.lang.foreign.Linker#downcallHandle(java.lang.foreign.MemorySegment, java.lang.foreign.FunctionDescriptor, java.lang.foreign.Linker.Option...)}.
-     * {@link Arena#global()} is passed for libraries that live for the JVM
-     * lifetime (opus, vpx, h264, sctp, speexdsp, ffmpeg). Repeat loads of the
-     * same {@code libraryName} short-circuit through the per-process cache and
-     * may pass any compatible arena.
+     * {@link Arena#global()} is passed for the combined {@code cobalt-native}
+     * library, which lives for the JVM lifetime. Repeat loads of the same
+     * {@code libraryName} short-circuit through the per-process cache and may
+     * pass any compatible arena.
      * {@snippet :
-     *     var lookup = NativeLibLoader.load("opus", Arena.global());
+     *     var lookup = NativeLibLoader.load("cobalt-native", Arena.global());
      *     var encoderCreate = Linker.nativeLinker().downcallHandle(
      *         lookup.find("opus_encoder_create").orElseThrow(),
      *         FunctionDescriptor.of(ADDRESS, JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS));
@@ -236,7 +236,7 @@ public final class NativeLibLoader {
      * {@link System#mapLibraryName(String)} on the system-library fallback.
      *
      * @param libraryName the platform-agnostic library name (for example
-     *                    {@code "opus"} or {@code "speexdsp"})
+     *                    {@code "cobalt-native"})
      * @param arena       the arena bounding the lookup's lifetime; pass
      *                    {@link Arena#global()} for JVM-lifetime libraries
      * @return a {@link SymbolLookup} for the library's exports
@@ -336,8 +336,8 @@ public final class NativeLibLoader {
      * manifest entry.
      *
      * <p>Probes the same
-     * {@code dependencies/<lib>/bin/<classifier>/<filename>} path the
-     * per-classifier JARs ship binaries under, matching the source-repo layout.
+     * {@code modules/lib/natives/bin/<classifier>/<filename>} path the
+     * per-classifier JARs ship the binary under, matching the source-repo layout.
      * Returns the extracted path on success, or {@code null} when no resource
      * exists.
      *
@@ -1023,7 +1023,7 @@ public final class NativeLibLoader {
      * @param sha256 lower-case hex SHA-256 of the binary's bytes
      * @param size   the binary's size in bytes
      * @param path   the binary's path inside the Cobalt repository (for example
-     *               {@code "dependencies/libopus/bin/linux-x86_64/libopus.so"})
+     *               {@code "modules/lib/natives/bin/linux-x86_64/libcobalt-native.so"})
      */
     record Entry(String sha256, long size, String path) {
         /**

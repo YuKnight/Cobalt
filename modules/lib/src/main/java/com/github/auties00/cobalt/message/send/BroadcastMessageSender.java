@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
@@ -47,7 +47,7 @@ import java.util.Objects;
  * devices that already hold a previously distributed key).
  *
  * <p>Embedders reach this sender through
- * {@link WhatsAppClient#sendBroadcast(com.github.auties00.cobalt.model.jid.JidProvider, MessageContainer)};
+ * {@link LinkedWhatsAppClient#sendBroadcast(com.github.auties00.cobalt.model.jid.JidProvider, MessageContainer)};
  * the routing on
  * {@link MessageSendingService#send(com.github.auties00.cobalt.model.message.MessageInfo)}
  * keys on the broadcast-server JID.
@@ -88,7 +88,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
 
     /**
      * Resolves the per-device fanout for the broadcast-list recipients via
-     * {@link DeviceService#getBroadcastFanout(Jid, Jid, java.util.Collection)}.
+     * {@link DeviceService#getBroadcastFanout(Jid, java.util.Collection)}.
      */
     private final DeviceService deviceService;
 
@@ -114,7 +114,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
      * <p>Constructed once by {@link MessageSendingService}; embedders never
      * instantiate directly.
      *
-     * @param client                the {@link WhatsAppClient} used to dispatch
+     * @param client                the {@link LinkedWhatsAppClient} used to dispatch
      *                              stanzas
      * @param encryption            the {@link MessageEncryption} service
      * @param deviceService         the {@link DeviceService} used to resolve the
@@ -131,7 +131,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebSendBroadcastMsgAction",
             exports = "sendBroadcastMsgAction", adaptation = WhatsAppAdaptation.ADAPTED)
     BroadcastMessageSender(
-            WhatsAppClient client,
+            LinkedWhatsAppClient client,
             MessageEncryption encryption,
             DeviceService deviceService,
             ABPropsService abPropsService,
@@ -161,7 +161,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
      *
      * @implNote
      * This implementation looks up the recipient roster from
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#findBusinessBroadcastList(String)};
+     * {@link com.github.auties00.cobalt.store.BusinessStore#findBusinessBroadcastList(String)};
      * a missing list surfaces as
      * {@link WhatsAppMessageException.Send.InvalidRecipient}, mirroring WA Web's
      * {@code NO_FANOUT_KEYS} sentinel that
@@ -176,29 +176,28 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebEncryptAndSendBroadcastMsg",
             exports = "encryptAndSendBroadcastMsg", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public AckResult send(Jid broadcastJid, ChatMessageInfo messageInfo) {
-        waitForOfflineDelivery();
+    public AckResult doSend(Jid broadcastJid, ChatMessageInfo messageInfo) {
         var container = messageInfo.message();
         var selfJid = requireSelfJid();
         var messageId = messageInfo.key().id().orElseThrow();
 
         var recipients = resolveRecipients(broadcastJid);
-        var fanout = deviceService.getBroadcastFanout(broadcastJid, selfLidOrPn(), recipients);
-        var allDevices = fanout.devices();
+        var allDevices = deviceService.getBroadcastFanout(broadcastJid, recipients);
+        var phash = deviceService.computeGroupPhash(allDevices, selfLidOrPn(), false, false);
 
         store.createOrMergeReceiptRecords(messageId, allDevices);
 
         var skDistribDevices = new ArrayList<Jid>();
         var skExistingDevices = new ArrayList<Jid>();
         for (var device : allDevices) {
-            if (store.hasSenderKeyDistributed(broadcastJid, device)) {
+            if (store.signalStore().hasSenderKeyDistributed(broadcastJid, device)) {
                 skExistingDevices.add(device);
             } else {
                 skDistribDevices.add(device);
             }
         }
 
-        var rotateKey = store.clearKeyRotation(broadcastJid);
+        var rotateKey = store.signalStore().clearKeyRotation(broadcastJid);
         if (rotateKey) {
             encryption.rotateSenderKey(broadcastJid, selfJid);
             skDistribDevices.addAll(skExistingDevices);
@@ -219,7 +218,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
         }
 
         var participantsNode = buildParticipantsNode(skDistPayloads, skExistingDevices);
-        store.updateIdentityRange(allDevices);
+        store.signalStore().updateIdentityRange(allDevices);
 
         var skmsgEncNode = new NodeBuilder()
                 .description("enc")
@@ -240,6 +239,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
                 .attribute("to", broadcastJid)
                 .attribute("type", resolveStanzaType(container))
                 .attribute("edit", resolveEditAttribute(container))
+                .attribute("phash", phash)
                 .content(
                         participantsNode,
                         skmsgEncNode,
@@ -254,7 +254,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
 
         if (ack.isSuccess()) {
             for (var device : skDistribDevices) {
-                store.markSenderKeyDistributed(broadcastJid, device);
+                store.signalStore().markSenderKeyDistributed(broadcastJid, device);
             }
             if (allDevices.isEmpty()) {
                 LOGGER.log(System.Logger.Level.WARNING,
@@ -299,7 +299,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private List<Jid> resolveRecipients(Jid broadcastJid) {
         var listId = broadcastJid.user();
-        var list = store.findBusinessBroadcastList(listId)
+        var list = store.businessStore().findBusinessBroadcastList(listId)
                 .orElseThrow(() -> new WhatsAppMessageException.Send.InvalidRecipient(
                         broadcastJid,
                         "Broadcast list " + listId + " is not in the local store"));

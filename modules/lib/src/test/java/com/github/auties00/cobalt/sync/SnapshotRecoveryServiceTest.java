@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecoveryBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -46,8 +46,8 @@ class SnapshotRecoveryServiceTest {
         props = TestABPropsService.builder().build();
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wam = new DefaultWamService(client, props);
-        recovery = new SnapshotRecoveryService(client, props, wam);
+        var wam = new LiveWamService(client, props);
+        recovery = new LiveSnapshotRecoveryService(client, props, wam);
     }
 
     @Nested
@@ -56,7 +56,7 @@ class SnapshotRecoveryServiceTest {
         @Test
         @DisplayName("primary unsupported is disabled regardless of AB prop")
         void primaryUnsupportedDisabled() {
-            store.setPrimaryDeviceSupportsSyncdRecovery(false);
+            store.syncStore().setPrimaryDeviceSupportsSyncdRecovery(false);
             props.set(ABProp.ENABLE_PEER_SNAPSHOT_RECOVERY, true);
             assertFalse(recovery.isRecoveryEnabled());
         }
@@ -64,7 +64,7 @@ class SnapshotRecoveryServiceTest {
         @Test
         @DisplayName("AB prop disabled is disabled regardless of primary support")
         void abPropDisabled() {
-            store.setPrimaryDeviceSupportsSyncdRecovery(true);
+            store.syncStore().setPrimaryDeviceSupportsSyncdRecovery(true);
             props.set(ABProp.ENABLE_PEER_SNAPSHOT_RECOVERY, false);
             assertFalse(recovery.isRecoveryEnabled());
         }
@@ -72,7 +72,7 @@ class SnapshotRecoveryServiceTest {
         @Test
         @DisplayName("both conditions true enables recovery")
         void bothTrueEnables() {
-            store.setPrimaryDeviceSupportsSyncdRecovery(true);
+            store.syncStore().setPrimaryDeviceSupportsSyncdRecovery(true);
             props.set(ABProp.ENABLE_PEER_SNAPSHOT_RECOVERY, true);
             assertTrue(recovery.isRecoveryEnabled());
         }
@@ -83,7 +83,7 @@ class SnapshotRecoveryServiceTest {
     class ShouldAttemptRecovery {
         @BeforeEach
         void enableRecovery() {
-            store.setPrimaryDeviceSupportsSyncdRecovery(true);
+            store.syncStore().setPrimaryDeviceSupportsSyncdRecovery(true);
             props.set(ABProp.ENABLE_PEER_SNAPSHOT_RECOVERY, true);
             props.set(ABProp.SNAPSHOT_RECOVERY_MAX_MUTATIONS_COUNT_ALLOWED, 100);
         }

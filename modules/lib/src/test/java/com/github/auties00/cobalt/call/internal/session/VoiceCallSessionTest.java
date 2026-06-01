@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.call.internal.session;
+import com.github.auties00.cobalt.call.internal.NoopCallService;
 
 import com.github.auties00.cobalt.call.ActiveCall;
 import com.github.auties00.cobalt.call.CallOptions;
@@ -50,8 +51,8 @@ public class VoiceCallSessionTest {
         var serverCert = DtlsCertificate.generate();
         var transports = LoopbackDatagramPair.pair();
 
-        var clientEngine = new RecordingEngine();
-        var serverEngine = new RecordingEngine();
+        var clientEngine = new NoopCallService();
+        var serverEngine = new NoopCallService();
         var clientCall = new ActiveCall(clientEngine, "id-vc-1",
                 PEER, PEER, SELF, true, CallOptions.audio());
         var serverCall = new ActiveCall(serverEngine, "id-vc-2",
@@ -93,14 +94,72 @@ public class VoiceCallSessionTest {
     }
 
     @Test
+    public void voiceCallRoundTripsAudioWithHopByHopKey() throws Exception {
+        // End-to-end through the production media-keying path: both sessions key SRTP from the same
+        // 30-byte hop-by-hop key the relay issues in <hbh_key> (via useHopByHopKey), not from the DTLS
+        // export. Audio must still complete the full encode -> RTP -> hbh-SRTP -> loopback -> decode
+        // round-trip. The directions stay distinct by SSRC, matching the client<->relay leg.
+        var clientCert = DtlsCertificate.generate();
+        var serverCert = DtlsCertificate.generate();
+        var transports = LoopbackDatagramPair.pair();
+
+        var clientCall = new ActiveCall(new NoopCallService(), "id-vc-hbh-1",
+                PEER, PEER, SELF, true, CallOptions.audio());
+        var serverCall = new ActiveCall(new NoopCallService(), "id-vc-hbh-2",
+                SELF, PEER, PEER, false, CallOptions.audio());
+
+        var clientSsrc = 0xAAAAAAAA;
+        var serverSsrc = 0xBBBBBBBB;
+        var clientOptions = new VoiceCallOptions(clientSsrc, serverSsrc, 111,
+                AudioPipelineOptions.defaults().withoutAec().withoutPreprocessor());
+        var serverOptions = new VoiceCallOptions(serverSsrc, clientSsrc, 111,
+                AudioPipelineOptions.defaults().withoutAec().withoutPreprocessor());
+
+        // The shared 30-byte hop-by-hop key both legs hold on the same relay hop.
+        var hbhKey = new byte[30];
+        new java.security.SecureRandom().nextBytes(hbhKey);
+
+        try (var clientSession = new VoiceCallSession(clientCall, transports[0],
+                SrtpRole.CLIENT, clientCert, serverCert.sha256Fingerprint(),
+                clientOptions);
+             var serverSession = new VoiceCallSession(serverCall, transports[1],
+                     SrtpRole.SERVER, serverCert, clientCert.sha256Fingerprint(),
+                     serverOptions)) {
+
+            clientSession.useHopByHopKey(hbhKey);
+            serverSession.useHopByHopKey(hbhKey);
+
+            serverSession.start();
+            clientSession.start();
+
+            clientSession.awaitConnected(15, TimeUnit.SECONDS);
+            serverSession.awaitConnected(15, TimeUnit.SECONDS);
+
+            assertTrue(clientSession.connected());
+            assertTrue(serverSession.connected());
+
+            for (var i = 0; i < 5; i++) {
+                clientCall.localAudioSink().write(
+                        new AudioFrame(sineFrame(1000), i * 10L));
+            }
+
+            var received = pollForFrame(serverCall, 5_000);
+            assertNotNull(received,
+                    "server must receive a decoded frame under hop-by-hop-keyed SRTP");
+            assertEquals(FRAME_SIZE, received.pcm().length,
+                    "decoded frame must match source frame size");
+        }
+    }
+
+    @Test
     public void reconnectReestablishesMedia() throws Exception {
         var clientCert = DtlsCertificate.generate();
         var serverCert = DtlsCertificate.generate();
         var transports = LoopbackDatagramPair.pair();
 
-        var clientCall = new ActiveCall(new RecordingEngine(), "id-vc-rc-1",
+        var clientCall = new ActiveCall(new NoopCallService(), "id-vc-rc-1",
                 PEER, PEER, SELF, true, CallOptions.audio());
-        var serverCall = new ActiveCall(new RecordingEngine(), "id-vc-rc-2",
+        var serverCall = new ActiveCall(new NoopCallService(), "id-vc-rc-2",
                 SELF, PEER, PEER, false, CallOptions.audio());
 
         var clientOptions = new VoiceCallOptions(0xCC, 0xDD, 111,
@@ -148,9 +207,9 @@ public class VoiceCallSessionTest {
         var serverCert = DtlsCertificate.generate();
         var transports = LoopbackDatagramPair.pair();
 
-        var clientCall = new ActiveCall(new RecordingEngine(), "id-vc-vid-1",
+        var clientCall = new ActiveCall(new NoopCallService(), "id-vc-vid-1",
                 PEER, PEER, SELF, true, CallOptions.video());
-        var serverCall = new ActiveCall(new RecordingEngine(), "id-vc-vid-2",
+        var serverCall = new ActiveCall(new NoopCallService(), "id-vc-vid-2",
                 SELF, PEER, PEER, false, CallOptions.video());
 
         var clientOpts = new VoiceCallOptions(0xA1, 0xB1, 111,
@@ -201,9 +260,9 @@ public class VoiceCallSessionTest {
         var serverCert = DtlsCertificate.generate();
         var transports = LoopbackDatagramPair.pair();
 
-        var clientCall = new ActiveCall(new RecordingEngine(), "id-vc-ss-1",
+        var clientCall = new ActiveCall(new NoopCallService(), "id-vc-ss-1",
                 PEER, PEER, SELF, true, CallOptions.video());
-        var serverCall = new ActiveCall(new RecordingEngine(), "id-vc-ss-2",
+        var serverCall = new ActiveCall(new NoopCallService(), "id-vc-ss-2",
                 SELF, PEER, PEER, false, CallOptions.video());
 
         var clientOpts = new VoiceCallOptions(0xCA1, 0xCA2, 111,
@@ -259,8 +318,8 @@ public class VoiceCallSessionTest {
         var bogusCert = DtlsCertificate.generate();
         var transports = LoopbackDatagramPair.pair();
 
-        var clientEngine = new RecordingEngine();
-        var serverEngine = new RecordingEngine();
+        var clientEngine = new NoopCallService();
+        var serverEngine = new NoopCallService();
         var clientCall = new ActiveCall(clientEngine, "id-vc-3",
                 PEER, PEER, SELF, true, CallOptions.audio());
         var serverCall = new ActiveCall(serverEngine, "id-vc-4",
@@ -423,10 +482,4 @@ public class VoiceCallSessionTest {
         }
     }
 
-    // Synthetic CallService-shaped stand-in for the call engine.
-    private static final class RecordingEngine extends CallService {
-        RecordingEngine() {
-            super(null, null);
-        }
-    }
 }

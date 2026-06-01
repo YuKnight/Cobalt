@@ -51,12 +51,12 @@ class DeviceADVValidatorTest {
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         // Companion-device JID form so findIdentityByAddress at (user, 0) falls through to the
         // remoteIdentities map instead of short-circuiting to the store's own identity key pair.
-        store.setJid(Jid.of("393495089819:75@s.whatsapp.net"));
+        store.accountStore().setJid(Jid.of("393495089819:75@s.whatsapp.net"));
 
         var address = new SignalProtocolAddress(SELF_PN.user(), 0);
-        store.saveIdentity(address, SignalIdentityPublicKey.ofDirect(primaryKey));
+        store.signalStore().saveIdentity(address, SignalIdentityPublicKey.ofDirect(primaryKey));
 
-        var retrieved = store.findIdentityByAddress(address);
+        var retrieved = store.signalStore().findIdentityByAddress(address);
         assertTrue(retrieved.isPresent(), "planted identity should be retrievable");
         Assertions.assertArrayEquals(primaryKey, retrieved.get().toEncodedPoint(),
                 "retrieved identity bytes should match planted bytes");
@@ -104,7 +104,7 @@ class DeviceADVValidatorTest {
     @DisplayName("decodeSignedKeyIndexBytes returns empty when no identity is stored")
     void decodeMissingIdentityReturnsEmpty() {
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(Jid.of("393495089819:75@s.whatsapp.net"));
+        store.accountStore().setJid(Jid.of("393495089819:75@s.whatsapp.net"));
         var validator = new DeviceADVValidator(store, TestABPropsService.builder().build());
 
         var oracleDoc = DeviceFixtures.loadExpected("adv-decode-self-oracle");
@@ -130,8 +130,8 @@ class DeviceADVValidatorTest {
         signedBytes[signedBytes.length / 2] ^= 0x42;
 
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(Jid.of("393495089819:75@s.whatsapp.net"));
-        store.saveIdentity(
+        store.accountStore().setJid(Jid.of("393495089819:75@s.whatsapp.net"));
+        store.signalStore().saveIdentity(
                 new SignalProtocolAddress(SELF_PN.user(), 0),
                 SignalIdentityPublicKey.ofDirect(primaryKey));
 

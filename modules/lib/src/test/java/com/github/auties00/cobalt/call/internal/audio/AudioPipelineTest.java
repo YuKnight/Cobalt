@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.call.internal.audio;
+import com.github.auties00.cobalt.call.internal.NoopCallService;
 
 import com.github.auties00.cobalt.call.ActiveCall;
 import com.github.auties00.cobalt.call.CallOptions;
@@ -30,7 +31,7 @@ public class AudioPipelineTest {
 
     @Test
     public void encodeAndDecodeRoundTrip() throws Exception {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-pipe-1", PEER, PEER, SELF, true, CallOptions.audio());
         var outbound = new LinkedBlockingQueue<OpusPacket>();
         try (var pipeline = new AudioPipeline(call, outbound::offer,
@@ -63,7 +64,7 @@ public class AudioPipelineTest {
 
     @Test
     public void vadPopulatesVoiceActiveFlag() throws Exception {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-pipe-2", PEER, PEER, SELF, true, CallOptions.audio());
         var outbound = new LinkedBlockingQueue<OpusPacket>();
         try (var pipeline = new AudioPipeline(call, outbound::offer,
@@ -87,7 +88,7 @@ public class AudioPipelineTest {
 
     @Test
     public void mismatchedInputDoesNotKillPipeline() throws Exception {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-pipe-3", PEER, PEER, SELF, true, CallOptions.audio());
         var outbound = new LinkedBlockingQueue<OpusPacket>();
         try (var pipeline = new AudioPipeline(call, outbound::offer,
@@ -105,7 +106,7 @@ public class AudioPipelineTest {
 
     @Test
     public void closeIsIdempotent() {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-pipe-4", PEER, PEER, SELF, true, CallOptions.audio());
         var pipeline = new AudioPipeline(call, p -> {
         }, AudioPipelineOptions.defaults().withoutAec().withoutPreprocessor());
@@ -125,9 +126,4 @@ public class AudioPipelineTest {
 
     // Stub CallService standing in for the call engine; mirrors the one in ActiveCallTest,
     // duplicated rather than shared to keep the suites independent.
-    private static final class RecordingEngine extends CallService {
-        RecordingEngine() {
-            super(null, null);
-        }
-    }
 }

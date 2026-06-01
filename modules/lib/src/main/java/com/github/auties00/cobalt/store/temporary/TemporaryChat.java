@@ -10,10 +10,10 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * The in-memory {@link Chat} subtype used as the value type of {@link TemporaryStore#chats}.
+ * The in-memory {@link Chat} subtype used as the value type of {@link com.github.auties00.cobalt.store.temporary.TemporaryChatStore#chats}.
  *
  * @apiNote
- * Cobalt embedders never construct this directly; {@link TemporaryStore#addNewChat(Jid)} returns
+ * Cobalt embedders never construct this directly; {@link com.github.auties00.cobalt.store.temporary.TemporaryChatStore#addNewChat(Jid)} returns
  * one as a {@link Chat}. Every message accessor reads or mutates a single
  * {@link ConcurrentLinkedHashMap} held in this instance, so the chat history is lost the moment
  * the JVM exits.
@@ -35,7 +35,7 @@ final class TemporaryChat extends Chat {
      * defaulted to {@code null}.
      *
      * @apiNote
-     * Package-private; called by {@link TemporaryStore#addNewChat(Jid)}. The defaulted metadata
+     * Package-private; called by {@link com.github.auties00.cobalt.store.temporary.TemporaryChatStore#addNewChat(Jid)}. The defaulted metadata
      * scalars are populated on demand as the receiver path observes the corresponding stanzas.
      *
      * @param jid the chat JID

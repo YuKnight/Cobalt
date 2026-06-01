@@ -1,0 +1,20 @@
+{
+  "name": "whatsapp-graphql-schema-extractor",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Extracts WhatsApp Web GraphQL (Relay persisted-query) request/response schemas, tagged by dispatch transport, and writes them to a JSON file",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/index.js"
+  },
+  "dependencies": {
+    "playwright": "^1.57.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.NewContactListener;
+import com.github.auties00.cobalt.client.listener.WhatsAppListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -17,7 +19,6 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterViewerMetadata;
 import com.github.auties00.cobalt.model.newsletter.NewsletterViewerRole;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStateAction;
-import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.ChatMessageCountsEventBuilder;
@@ -50,7 +51,7 @@ import java.util.function.Consumer;
 @WhatsAppWebModule(moduleName = "WAWebHandleQPPrefetchTimestampNotification")
 @WhatsAppWebModule(moduleName = "WAWebHandleWaChat")
 @WhatsAppWebModule(moduleName = "WAWebHandleNewsletterNotification")
-final class NotificationLinkingStreamHandler implements SocketStream.Handler {
+final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs warnings about parse failures and debug messages about ignored sub-types.
@@ -111,7 +112,7 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
     /**
      * Provides store reads, newsletter queries, message queries, and ack sends.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Drives the {@code primary_hello} and {@code refresh_code} steps of the pairing-code handshake
@@ -139,13 +140,13 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      *
      * <p>Called once by {@link NotificationDeviceDispatcher}.
      *
-     * @param whatsapp             the {@link WhatsAppClient}
+     * @param whatsapp             the {@link LinkedWhatsAppClient}
      * @param deviceLinkingService the {@link CompanionPairingService}, may be {@code null} when the local account is not a pairing companion
      * @param wamService           the {@link WamService}
      * @param ackSender            the {@link AckSender}
      */
     NotificationLinkingStreamHandler(
-            WhatsAppClient whatsapp,
+            LinkedWhatsAppClient whatsapp,
             CompanionPairingService deviceLinkingService,
             WamService wamService,
             AckSender ackSender
@@ -213,7 +214,7 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      */
     private void handleLinkCodeRefresh(Node node) {
         if (node.hasAttribute("type", "companion_reg_refresh")) {
-            whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32));
+            whatsapp.store().signalStore().setAdvSecretKey(DataUtils.randomByteArray(32));
             return;
         }
 
@@ -293,19 +294,19 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
 
         switch (event) {
             case WAFFLE_EVENT_STATE_SUSPENDED ->
-                    whatsapp.store().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.PAUSED);
+                    whatsapp.store().accountStore().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.PAUSED);
             case WAFFLE_EVENT_STATE_DELETED ->
-                    whatsapp.store().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.UNLINKED);
+                    whatsapp.store().accountStore().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.UNLINKED);
             case WAFFLE_EVENT_CLIENT_RESYNC ->
-                    whatsapp.store().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
+                    whatsapp.store().accountStore().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
             case WAFFLE_EVENT_ACCOUNT_UNLINKED -> {
                 if (clientResync) {
-                    whatsapp.store().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
+                    whatsapp.store().accountStore().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
                 }
             }
             case WAFFLE_EVENT_ACCOUNT_LINKED -> {
                 if (clientResync) {
-                    whatsapp.store().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
+                    whatsapp.store().accountStore().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
                 }
             }
             default -> LOGGER.log(System.Logger.Level.DEBUG,
@@ -340,8 +341,8 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
             if (onboardingStatus != null
                     && "completed".equals(onboardingStatus.onboardingStatusStatus())
                     && "automation".equals(onboardingStatus.onboardingStatusProductSurface())) {
-                whatsapp.store().setHostedAutomationOnboarded(true);
-                whatsapp.store().setDetectedOutcomesEnabled(true);
+                whatsapp.store().businessStore().setHostedAutomationOnboarded(true);
+                whatsapp.store().businessStore().setDetectedOutcomesEnabled(true);
             }
             return;
         }
@@ -349,8 +350,8 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
         if (node.hasChild("offboarding")) {
             var offboarding = SmaxCoexistenceOffboardingNotificationResponse.of(node).orElse(null);
             if (offboarding != null && "automation".equals(offboarding.offboardingProductSurface())) {
-                whatsapp.store().setHostedAutomationOnboarded(false);
-                whatsapp.store().setDetectedOutcomesEnabled(false);
+                whatsapp.store().businessStore().setHostedAutomationOnboarded(false);
+                whatsapp.store().businessStore().setDetectedOutcomesEnabled(false);
             }
             return;
         }
@@ -367,7 +368,7 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      * <p>Resolves the recipient JID from {@code <invite><receiver user="..."/></invite>} and
      * returns early when it is absent. An existing contact and chat are reused; otherwise a new
      * contact and chat are created. The contact's chosen name is refreshed from a name query (best
-     * effort; failures are debug-logged), and {@link WhatsAppClientListener#onNewContact} fires when
+     * effort; failures are debug-logged), and {@link NewContactListener#onNewContact} fires when
      * the contact did not previously exist.
      *
      * @implNote This implementation commits a {@code ChatMessageCounts} WAM event with
@@ -388,14 +389,12 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        var existed = whatsapp.store().findContactByJid(receiver).isPresent();
-        var contact = whatsapp.store()
-                .findContactByJid(receiver)
-                .orElseGet(() -> whatsapp.store().addNewContact(receiver));
-        var chatCreated = whatsapp.store().findChatByJid(receiver).isEmpty();
-        whatsapp.store()
-                .findChatByJid(receiver)
-                .orElseGet(() -> whatsapp.store().addNewChat(receiver));
+        var existed = whatsapp.store().contactStore().findContactByJid(receiver).isPresent();
+        var contact = whatsapp.store().contactStore().findContactByJid(receiver)
+                .orElseGet(() -> whatsapp.store().contactStore().addNewContact(receiver));
+        var chatCreated = whatsapp.store().chatStore().findChatByJid(receiver).isEmpty();
+        whatsapp.store().chatStore().findChatByJid(receiver)
+                .orElseGet(() -> whatsapp.store().chatStore().addNewChat(receiver));
         try {
             whatsapp.queryName(receiver).ifPresent(contact::setChosenName);
         } catch (Throwable throwable) {
@@ -404,10 +403,10 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
                     receiver,
                     throwable.getMessage());
         }
-        whatsapp.store().addContact(contact);
+        whatsapp.store().contactStore().addContact(contact);
 
         if (!existed) {
-            fireListeners(listener -> listener.onNewContact(whatsapp, contact));
+            fireListeners(NewContactListener.class, listener -> listener.onNewContact(whatsapp, contact));
         }
 
         if (chatCreated) {
@@ -529,9 +528,8 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
      * @return the matching {@link Newsletter}
      */
     private Newsletter ensureNewsletter(Jid newsletterJid) {
-        return whatsapp.store()
-                .findNewsletterByJid(newsletterJid)
-                .orElseGet(() -> whatsapp.store().addNewNewsletter(newsletterJid));
+        return whatsapp.store().chatStore().findNewsletterByJid(newsletterJid)
+                .orElseGet(() -> whatsapp.store().chatStore().addNewNewsletter(newsletterJid));
     }
 
     /**
@@ -565,15 +563,21 @@ final class NotificationLinkingStreamHandler implements SocketStream.Handler {
     }
 
     /**
-     * Fans the given callback out to every registered listener on its own virtual thread.
+     * Fans the given callback out to every registered listener of the given
+     * type on its own virtual thread.
      *
      * <p>Used only by {@link #handleGrowth(Node)} for the {@code onNewContact} listener fan-out.
      *
-     * @param consumer the callback to invoke against each listener
+     * @param type     the per-event listener interface to dispatch against
+     * @param consumer the callback to invoke against each matching listener
+     * @param <L>      the per-event listener interface
      */
-    private void fireListeners(Consumer<WhatsAppClientListener> consumer) {
+    private <L extends WhatsAppListener> void fireListeners(Class<L> type, Consumer<L> consumer) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> consumer.accept(listener));
+            if (type.isInstance(listener)) {
+                var typed = type.cast(listener);
+                Thread.startVirtualThread(() -> consumer.accept(typed));
+            }
         }
     }
 

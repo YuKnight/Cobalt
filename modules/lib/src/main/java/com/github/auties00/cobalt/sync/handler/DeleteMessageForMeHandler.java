@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -27,10 +27,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote
  * This implementation locates the chat directly via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findChatByJid} rather
+ * {@link com.github.auties00.cobalt.store.ChatStore#findChatByJid} rather
  * than through WA Web's {@code WAWebSyncdResolveMessages.resolveMessagesForMutations}
  * cache, and uses
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findMessageById}
+ * {@link com.github.auties00.cobalt.store.ChatStore#findMessageById}
  * filtered by {@code fromMe} and participant in place of the
  * {@code msgKeyToDbIdWithoutFromMeParticipant} prefix scan. Add-on cleanup,
  * {@code processDeleteForMeSingle} fallbacks, employee-only debug logging
@@ -90,7 +90,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = {"applyMutations", "getMessageKey"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -118,7 +118,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
         }
 
         var chatJid = Jid.of(chatJidString);
-        var chat = client.store().findChatByJid(chatJid);
+        var chat = client.store().chatStore().findChatByJid(chatJid);
         if (chat.isEmpty()) {
             return MutationApplicationResult.orphan(
                     SyncdIndexUtils.serializeMessageKey(msgKey.get()),
@@ -128,8 +128,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
 
         var fromMe = "1".equals(fromMeString);
         var participant = !"0".equals(participantString) ? Jid.of(participantString) : null;
-        var removed = client.store()
-                .findMessageById(chat.get(), messageId)
+        var removed = client.store().chatStore().findMessageById(chat.get(), messageId)
                 .filter(msg -> msg.key().fromMe() == fromMe)
                 .filter(msg -> participant == null || participant.toUserJid().equals(msg.key().senderJid().map(Jid::toUserJid).orElse(null)))
                 .flatMap(info -> info.key().id())

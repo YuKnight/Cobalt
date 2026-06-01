@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.socket.websocket;
 
+import com.github.auties00.cobalt.util.DataUtils;
+
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -7,7 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Performs the RFC 6455 section 1.3 WebSocket upgrade handshake on an
@@ -209,8 +210,7 @@ public final class WebSocketUpgrade {
      * @return the Base64-encoded key as ASCII bytes
      */
     private static byte[] createWebSocketKey() {
-        var raw = new byte[WEBSOCKET_KEY_BYTES];
-        ThreadLocalRandom.current().nextBytes(raw);
+        var raw = DataUtils.randomByteArray(WEBSOCKET_KEY_BYTES);
         return Base64.getEncoder().encode(raw);
     }
 

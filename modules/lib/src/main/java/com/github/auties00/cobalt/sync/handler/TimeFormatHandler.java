@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -16,7 +16,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * <p>The sync dispatcher routes incoming {@code time_format} mutations here
  * whenever the user toggles 12/24-hour display on another linked device. The
  * handler writes the boolean preference into
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setTwentyFourHourFormat(boolean)}
+ * {@link com.github.auties00.cobalt.store.SettingsStore#setTwentyFourHourFormat(boolean)}
  * so any UI built on top of Cobalt can render timestamps using the user-chosen
  * format.
  */
@@ -68,7 +68,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#unsupported()}; a value that does not decode
      * to a {@link TimeFormatAction} is reported as malformed; otherwise the boolean
      * is written to
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setTwentyFourHourFormat(boolean)}.
+     * {@link com.github.auties00.cobalt.store.SettingsStore#setTwentyFourHourFormat(boolean)}.
      *
      * @implNote
      * This implementation writes directly to the store in place of WA Web's
@@ -79,7 +79,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTimeFormatSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -88,7 +88,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
-        client.store().setTwentyFourHourFormat(action.isTwentyFourHourFormatEnabled());
+        client.store().settingsStore().setTwentyFourHourFormat(action.isTwentyFourHourFormatEnabled());
 
         return MutationApplicationResult.success();
     }

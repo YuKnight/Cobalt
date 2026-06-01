@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Input model for {@code WhatsAppClient.editQuickReply}. Carries the id
+ * Input model for {@code LinkedWhatsAppClient.editQuickReply}. Carries the id
  * of the quick reply being edited together with its new shortcut,
  * message body, and optional keyword list.
  *

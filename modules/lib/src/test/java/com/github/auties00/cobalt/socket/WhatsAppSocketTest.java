@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.socket;
 
 import com.github.auties00.cobalt.client.WhatsAppClientType;
-import com.github.auties00.cobalt.client.WhatsAppDeviceBuilder;
+import com.github.auties00.cobalt.client.WhatsAppClientDeviceBuilder;
 import com.github.auties00.cobalt.exception.WhatsAppException;
 import com.github.auties00.cobalt.ProxyServer;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
@@ -297,7 +297,7 @@ class WhatsAppSocketTest {
         try {
             var store = WhatsAppStoreFactory.temporary()
                     .create(WhatsAppClientType.WEB, UUID.randomUUID());
-            store.setDevice(new WhatsAppDeviceBuilder()
+            store.accountStore().setDevice(new WhatsAppClientDeviceBuilder()
                     .model("Surface Pro 4")
                     .manufacturer("Microsoft")
                     .platform(ClientPlatformType.WEB)
@@ -313,7 +313,7 @@ class WhatsAppSocketTest {
         try {
             var store = WhatsAppStoreFactory.temporary()
                     .create(WhatsAppClientType.WEB, UUID.randomUUID());
-            store.setDevice(new WhatsAppDeviceBuilder()
+            store.accountStore().setDevice(new WhatsAppClientDeviceBuilder()
                     .model("MacBook Pro")
                     .manufacturer("Apple")
                     .platform(ClientPlatformType.MACOS)

@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.reportNewsletterForSpam} —
+ * Input model for {@code LinkedWhatsAppClient.reportNewsletterForSpam} —
  * reports a newsletter (channel) for trust-and-safety review.
  *
  * <p>{@link #spamListJid} and {@link #spamListSpamFlow} are required.

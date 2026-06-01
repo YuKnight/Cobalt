@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -33,19 +33,19 @@ class LidMigrationServiceCanDeleteChatTest {
     private static final Jid SELF_LID = Jid.of("83116928594056@lid");
     private static final Jid PEER_PN = Jid.of("393495089819@s.whatsapp.net");
 
-    private record Harness(TestWhatsAppClient client, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, LiveLidMigrationService service) {}
 
     private static Harness build() {
         var props = TestABPropsService.builder().build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, service);
     }
 
     private static Chat newChat(Harness h) {
-        return h.client.store().addNewChat(PEER_PN);
+        return h.client.store().chatStore().addNewChat(PEER_PN);
     }
 
     private static ChatMessageInfo stubMessage(ChatMessageInfo.StubType stubType, Instant ts) {

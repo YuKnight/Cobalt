@@ -1,13 +1,14 @@
 package com.github.auties00.cobalt.call.internal.signaling;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.call.internal.CallService;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.CallEndedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.call.ActiveCall;
 import com.github.auties00.cobalt.call.CallEndReason;
 
@@ -23,7 +24,7 @@ import com.github.auties00.cobalt.call.CallEndReason;
  * terminates, so listener fan-out and registry cleanup converge regardless of envelope shape.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleVoipCall")
-public final class CallTerminateReceiver implements SocketStream.Handler {
+public final class CallTerminateReceiver extends SocketStreamHandler.Concurrent {
     /**
      * Logs parse traces for malformed terminate stanzas.
      */
@@ -32,7 +33,7 @@ public final class CallTerminateReceiver implements SocketStream.Handler {
     /**
      * Holds the owning client used for store access and listener fan-out.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Holds the call engine, which dispatches peer-side end transitions to the matching
@@ -48,7 +49,7 @@ public final class CallTerminateReceiver implements SocketStream.Handler {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleVoipCall", exports = "handleCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public CallTerminateReceiver(WhatsAppClient whatsapp, CallService engine) {
+    public CallTerminateReceiver(LinkedWhatsAppClient whatsapp, CallService engine) {
         this.whatsapp = whatsapp;
         this.engine = engine;
     }
@@ -79,7 +80,7 @@ public final class CallTerminateReceiver implements SocketStream.Handler {
                 : node.getAttributeAsJid("from", null);
 
         engine.onPeerTerminate(callId, reason);
-        whatsapp.store().removeCall(callId);
+        whatsapp.store().chatStore().removeCall(callId);
         notifyEnded(callId, fromJid, reason);
     }
 
@@ -99,7 +100,9 @@ public final class CallTerminateReceiver implements SocketStream.Handler {
     private void notifyEnded(String callId, Jid fromJid, String wireReason) {
         var parsed = CallEndReason.fromWireValue(wireReason);
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onCallEnded(whatsapp, callId, fromJid, parsed));
+            if (listener instanceof CallEndedListener typed) {
+                Thread.startVirtualThread(() -> typed.onCallEnded(whatsapp, callId, fromJid, parsed));
+            }
         }
     }
 }

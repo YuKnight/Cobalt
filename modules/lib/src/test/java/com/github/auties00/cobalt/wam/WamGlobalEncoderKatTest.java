@@ -57,7 +57,7 @@ class WamGlobalEncoderKatTest {
         var expectedHex = vector.getString("bytes");
 
         var buffer = new byte[MAX_BUFFER];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
 
         invokeWriter(encoder, name, fieldId, type, sampleValue);
 

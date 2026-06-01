@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.sync.handler;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.device.DeviceCapabilities;
@@ -15,7 +16,7 @@ import com.github.auties00.cobalt.model.sync.action.media.FavoritesActionBuilder
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * into {@link LidMigrationService}, which {@link TestWhatsAppClient} does not
  * stub, so it is exercised by the integration suite rather than here.
  *
- * <p>The handler is built with a real {@link DefaultWamService} and
+ * <p>The handler is built with a real {@link LiveWamService} and
  * {@link LidMigrationService} so the dependency graph matches production wiring;
  * A/B props are stubbed via {@link TestABPropsService}. Each test starts from a
  * clean {@link DeviceFixtures#temporaryStore}, so device-capability writes land
@@ -50,7 +51,7 @@ class DeviceCapabilitiesHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private DeviceCapabilitiesHandler handler;
 
     @BeforeEach
@@ -58,8 +59,8 @@ class DeviceCapabilitiesHandlerTest {
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         client = TestWhatsAppClient.create().withStore(store);
         var props = TestABPropsService.builder().build();
-        var wam = new DefaultWamService(client, props);
-        var lidMigrationService = new LidMigrationService(client, props, wam);
+        var wam = new LiveWamService(client, props);
+        var lidMigrationService = new LiveLidMigrationService(client, props, wam);
         handler = new DeviceCapabilitiesHandler(lidMigrationService, wam);
     }
 
@@ -112,7 +113,7 @@ class DeviceCapabilitiesHandlerTest {
                     client, capabilitiesMutation(companion.toString(), caps, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = client.store().findDeviceCapabilitiesEntry(companion).orElseThrow();
+            var stored = client.store().contactStore().findDeviceCapabilitiesEntry(companion).orElseThrow();
             assertEquals(companion, stored.deviceJid());
             assertNotNull(stored.capabilities());
         }
@@ -129,7 +130,7 @@ class DeviceCapabilitiesHandlerTest {
 
             assertEquals(SyncActionState.SUCCESS, result.actionState(),
                     "WA Web returns Success for non-SET operations rather than UNSUPPORTED");
-            assertTrue(client.store().findDeviceCapabilitiesEntry(SELF_PN).isEmpty(),
+            assertTrue(client.store().contactStore().findDeviceCapabilitiesEntry(SELF_PN).isEmpty(),
                     "REMOVE must not write a per-device entry");
         }
 
@@ -213,7 +214,7 @@ class DeviceCapabilitiesHandlerTest {
                     client, capabilitiesMutation(fresh.toString(), emptyCapabilities(), SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().findDeviceCapabilitiesEntry(fresh).isPresent(),
+            assertTrue(client.store().contactStore().findDeviceCapabilitiesEntry(fresh).isPresent(),
                     "the handler creates a per-device entry on first sight");
         }
     }

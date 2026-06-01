@@ -93,7 +93,7 @@ class IcdcComputerTest {
             var props = TestABPropsService.builder().build();
             var icdc = newComputer(store, props);
 
-            store.addDeviceList(list(PEER, List.of(), Instant.now(), null, true));
+            store.contactStore().addDeviceList(list(PEER, List.of(), Instant.now(), null, true));
 
             assertTrue(icdc.compute(PEER).isEmpty());
         }
@@ -106,7 +106,7 @@ class IcdcComputerTest {
             var icdc = newComputer(store, props);
 
             var timestamp = Instant.now();
-            store.addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), timestamp, null, false));
+            store.contactStore().addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), timestamp, null, false));
 
             var result = icdc.compute(PEER).orElseThrow();
             assertTrue(result.keyHash().isEmpty(), "primary-only list has no companion identity keys to hash");
@@ -122,11 +122,11 @@ class IcdcComputerTest {
             var icdc = newComputer(store, props);
 
             var devices = List.of(DeviceInfo.ofE2EE(0, 0), DeviceInfo.ofE2EE(2, 1));
-            store.addDeviceList(list(PEER, devices));
+            store.contactStore().addDeviceList(list(PEER, devices));
 
             // Only companion device id 2 gets an identity; the primary is excluded from the hash for non-self users
             var companion = Jid.of("393495089819:2@s.whatsapp.net");
-            store.saveIdentity(companion.toSignalAddress(), identity(0xCAFE));
+            store.signalStore().saveIdentity(companion.toSignalAddress(), identity(0xCAFE));
 
             var result = icdc.compute(PEER).orElseThrow();
             var keyHash = result.keyHash().orElseThrow(
@@ -143,7 +143,7 @@ class IcdcComputerTest {
             var icdc = newComputer(store, props);
 
             var devices = List.of(DeviceInfo.ofE2EE(0, 0), DeviceInfo.ofE2EE(2, 1));
-            store.addDeviceList(list(SELF_PN, devices));
+            store.contactStore().addDeviceList(list(SELF_PN, devices));
 
             var result = icdc.compute(SELF_PN).orElseThrow();
             assertTrue(result.keyHash().isPresent(),
@@ -160,9 +160,9 @@ class IcdcComputerTest {
             var icdc = newComputer(store, props);
 
             var devices = List.of(DeviceInfo.ofE2EE(0, 0), DeviceInfo.ofE2EE(2, 1));
-            store.addDeviceList(list(PEER, devices));
+            store.contactStore().addDeviceList(list(PEER, devices));
             var companion = Jid.of("393495089819:2@s.whatsapp.net");
-            store.saveIdentity(companion.toSignalAddress(), identity(0xBEEF));
+            store.signalStore().saveIdentity(companion.toSignalAddress(), identity(0xBEEF));
 
             var result = icdc.compute(PEER).orElseThrow();
             assertEquals(16, result.keyHash().orElseThrow().length,
@@ -179,9 +179,9 @@ class IcdcComputerTest {
             var icdc = newComputer(store, props);
 
             var devices = List.of(DeviceInfo.ofE2EE(0, 0), DeviceInfo.ofE2EE(2, 1));
-            store.addDeviceList(list(PEER, devices));
+            store.contactStore().addDeviceList(list(PEER, devices));
             var companion = Jid.of("393495089819:2@s.whatsapp.net");
-            store.saveIdentity(companion.toSignalAddress(), identity(0xBABE));
+            store.signalStore().saveIdentity(companion.toSignalAddress(), identity(0xBABE));
 
             var result = icdc.compute(PEER).orElseThrow();
             assertEquals(8, result.keyHash().orElseThrow().length,
@@ -197,7 +197,7 @@ class IcdcComputerTest {
                     .build();
             var icdc = newComputer(store, props);
 
-            store.addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), Instant.now(),
+            store.contactStore().addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), Instant.now(),
                     ADVEncryptionType.HOSTED, false));
 
             var result = icdc.compute(PEER).orElseThrow();
@@ -213,7 +213,7 @@ class IcdcComputerTest {
                     .build();
             var icdc = newComputer(store, props);
 
-            store.addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), Instant.now(),
+            store.contactStore().addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), Instant.now(),
                     ADVEncryptionType.HOSTED, false));
 
             var result = icdc.compute(PEER).orElseThrow();
@@ -297,7 +297,7 @@ class IcdcComputerTest {
             var icdc = newComputer(store, props);
 
             var recent = Instant.now();
-            store.addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), recent, null, false));
+            store.contactStore().addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), recent, null, false));
 
             var result = icdc.compute(PEER).orElseThrow();
             assertEquals(recent, result.timestamp().orElseThrow());
@@ -312,7 +312,7 @@ class IcdcComputerTest {
 
             // 40 days exceeds the 720h (30-day) RECENT_THRESHOLD, so the timestamp is dropped
             var stale = Instant.now().minus(Duration.ofDays(40));
-            store.addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), stale, null, false));
+            store.contactStore().addDeviceList(list(PEER, List.of(DeviceInfo.ofE2EE(0, 0)), stale, null, false));
 
             var result = icdc.compute(PEER).orElseThrow();
             assertTrue(result.timestamp().isEmpty(),

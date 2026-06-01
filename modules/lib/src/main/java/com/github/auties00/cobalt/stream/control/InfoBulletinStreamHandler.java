@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.stream.control;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.TosNoticesChangedListener;
 import com.github.auties00.cobalt.client.WhatsAppClientOfflineResumeState;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -11,7 +13,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.clientexpiration.SmaxClientExpirationResponse;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdAppStateDirtyBitsEventBuilder;
@@ -29,13 +31,13 @@ import java.util.stream.Collectors;
  * Handles {@code <ib>} (info bulletin) stanzas, the server's catch-all control-plane channel for asynchronous
  * notifications that do not fit any other stanza tag.
  *
- * <p>The handler is registered under the {@code "ib"} tag inside {@link SocketStream} and inspects child tags in a
+ * <p>The handler is registered under the {@code "ib"} tag inside {@link NodeStreamService} and inspects child tags in a
  * fixed priority order: {@code dirty} dirty-bit bundles that drive re-fetch of out-of-date subsystems,
  * {@code edge_routing} updates that steer the next reconnect, {@code offline} backlog counters that close the
  * offline-resume state machine, {@code priority_offline_complete} markers, {@code offline_preview} pre-delivery
  * snapshots, {@code tos} Terms-of-Service notice lists, {@code thread_metadata} per-thread offline timestamps and
  * {@code client_expiration} server-mandated client expiration overrides. The first matching child drives dispatch;
- * later children are ignored. The offline-resume side effects surface through {@link WhatsAppClient}.
+ * later children are ignored. The offline-resume side effects surface through {@link LinkedWhatsAppClient}.
  *
  * @implNote This implementation collapses WA Web's two-phase parse-then-dispatch flow into a single ordered
  * {@code if/else} chain, one private method per branch, and wraps the dispatch in a {@link Throwable} catch so a
@@ -47,7 +49,7 @@ import java.util.stream.Collectors;
 @WhatsAppWebModule(moduleName = "WAWebHandleRoutingInfo")
 @WhatsAppWebModule(moduleName = "WAWebHandleServerClientExpiration")
 @WhatsAppWebModule(moduleName = "WASmaxClientExpirationClientExpirationRPC")
-public final class InfoBulletinStreamHandler implements SocketStream.Handler {
+public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * The system logger used for diagnostic output during info bulletin processing.
      */
@@ -138,9 +140,9 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
     private static final long CLIENT_EXPIRATION_MIN_FLOOR_SECONDS = 3L * 86_400L;
 
     /**
-     * The {@link WhatsAppClient} used for store access, outbound stanza dispatch and delegated service calls.
+     * The {@link LinkedWhatsAppClient} used for store access, outbound stanza dispatch and delegated service calls.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * The {@link WebAppStateService} used to retry orphan app-state mutations whenever a bulletin signals that
@@ -180,7 +182,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * Constructs a new info bulletin handler bound to the given client, web app-state service, shared reporter, WAM
      * service and device service.
      *
-     * @param whatsapp                     the {@link WhatsAppClient}; must not be {@code null}
+     * @param whatsapp                     the {@link LinkedWhatsAppClient}; must not be {@code null}
      * @param webAppStateService           the {@link WebAppStateService} used for orphan-mutation retries; must not be
      *                                     {@code null}
      * @param offlineNotificationsReporter the shared reporter flushed when the offline bulletin arrives; must not be
@@ -192,7 +194,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public InfoBulletinStreamHandler(WhatsAppClient whatsapp, WebAppStateService webAppStateService, OfflineNotificationsReporter offlineNotificationsReporter, WamService wamService, DeviceService deviceService) {
+    public InfoBulletinStreamHandler(LinkedWhatsAppClient whatsapp, WebAppStateService webAppStateService, OfflineNotificationsReporter offlineNotificationsReporter, WamService wamService, DeviceService deviceService) {
         this.whatsapp = whatsapp;
         this.webAppStateService = webAppStateService;
         this.offlineNotificationsReporter = offlineNotificationsReporter;
@@ -283,7 +285,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
      * sent to the server.
      *
      * @implNote This implementation aggregates the {@code syncd_app_state} collections into a single
-     * {@link WhatsAppClient#pullWebAppState(SyncPatchType...)} call rather than firing one mark-for-sync per entry, and
+     * {@link LinkedWhatsAppClient#pullWebAppState(SyncPatchType...)} call rather than firing one mark-for-sync per entry, and
      * commits the dirty-bits WAM event inline based on the pull's return value rather than via a sync-completed
      * subscription. Account-sync subsystem refreshes are deferred to the next caller through the
      * {@code setSyncedXxx(false)} flags rather than issued imperatively.
@@ -297,6 +299,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
         var allDirtyEntries = new ArrayList<Node>();
         var supportedTypes = new ArrayList<String>();
         var unsupportedTypes = new ArrayList<String>();
+        var syncOwnDevices = false;
 
         for (var dirtyNode : node.getChildren(INFO_TYPE_DIRTY)) {
             allDirtyEntries.add(dirtyNode);
@@ -310,19 +313,21 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
                         continue;
                     }
                     switch (protocol) {
-                        case "devices" ->
-                                LOGGER.log(System.Logger.Level.DEBUG,
-                                        "Dirty bit account_sync/devices: device list refresh needed");
+                        case "devices" -> {
+                            syncOwnDevices = true;
+                            LOGGER.log(System.Logger.Level.DEBUG,
+                                    "Dirty bit account_sync/devices: syncing own device list");
+                        }
                         case "picture" ->
                                 LOGGER.log(System.Logger.Level.DEBUG,
                                         "Dirty bit account_sync/picture: profile picture refresh needed");
                         case "privacy" -> {
-                            whatsapp.store().setSyncedContacts(false);
+                            whatsapp.store().syncStore().setSyncedContacts(false);
                             LOGGER.log(System.Logger.Level.DEBUG,
                                     "Dirty bit account_sync/privacy: privacy settings refresh needed");
                         }
                         case "blocklist" -> {
-                            whatsapp.store().setSyncedContacts(false);
+                            whatsapp.store().syncStore().setSyncedContacts(false);
                             LOGGER.log(System.Logger.Level.DEBUG,
                                     "Dirty bit account_sync/blocklist: block list refresh needed");
                         }
@@ -333,7 +338,7 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
                         }
                     }
                 }
-                whatsapp.store().setSyncedStatus(false);
+                whatsapp.store().syncStore().setSyncedStatus(false);
             } else if (DIRTY_TYPE_SYNCD_APP_STATE.equals(type)) {
                 supportedTypes.add(type);
                 Collections.addAll(collectionsToSync, SyncPatchType.values());
@@ -360,6 +365,10 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
             wamService.commit(new MdAppStateDirtyBitsEventBuilder()
                     .dirtyBitsFalsePositive(!hasAppStateChanges)
                     .build());
+        }
+
+        if (syncOwnDevices) {
+            deviceService.syncMyDeviceList();
         }
 
         clearDirtyBits(allDirtyEntries);
@@ -631,7 +640,13 @@ public final class InfoBulletinStreamHandler implements SocketStream.Handler {
                 .map(entry -> entry.getAttributeAsString("id", null))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        whatsapp.store().setTosNoticeIds(notices);
+        whatsapp.store().settingsStore().setTosNotices(notices);
+        var snapshot = Set.copyOf(notices);
+        for (var listener : whatsapp.store().listeners()) {
+            if (listener instanceof TosNoticesChangedListener typed) {
+                Thread.startVirtualThread(() -> typed.onTosNoticesChanged(whatsapp, snapshot));
+            }
+        }
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received TOS bulletin notices={0}", notices);
     }

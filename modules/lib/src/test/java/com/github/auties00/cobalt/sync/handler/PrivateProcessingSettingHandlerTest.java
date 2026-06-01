@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Covers {@link PrivateProcessingSettingHandler}, which accepts only
  * {@link SyncdOperation#SET} with a non-empty
  * {@link PrivateProcessingSettingAction#privateProcessingStatus()} enum, persists it via
- * {@link WhatsAppStore#setPrivateProcessingStatus}, rejects a wrong-typed value or an
+ * {@link com.github.auties00.cobalt.store.SettingsStore#setPrivateProcessingStatus}, rejects a wrong-typed value or an
  * empty enum as {@link SyncActionState#MALFORMED}, reports
  * {@link SyncActionState#UNSUPPORTED} for {@link SyncdOperation#REMOVE}, and resolves
  * conflicts by timestamp. Mutations are hand-built as {@link DecryptedMutation.Trusted}.
@@ -42,7 +42,7 @@ class PrivateProcessingSettingHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private PrivateProcessingSettingHandler handler;
 
     @BeforeEach
@@ -90,27 +90,27 @@ class PrivateProcessingSettingHandlerTest {
         @Test
         @DisplayName("SET with ENABLED persists ENABLED on the store")
         void setEnabled() {
-            assertTrue(store.privateProcessingStatus().isEmpty(), "precondition: status is unset");
+            assertTrue(store.settingsStore().privateProcessingStatus().isEmpty(), "precondition: status is unset");
             var action = new PrivateProcessingSettingActionBuilder()
                     .privateProcessingStatus(PrivateProcessingStatus.ENABLED).build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(PrivateProcessingStatus.ENABLED, store.privateProcessingStatus().orElseThrow());
+            assertEquals(PrivateProcessingStatus.ENABLED, store.settingsStore().privateProcessingStatus().orElseThrow());
         }
 
         @Test
         @DisplayName("SET with DISABLED overwrites a prior ENABLED value")
         void setDisabledOverwrites() {
-            store.setPrivateProcessingStatus(PrivateProcessingStatus.ENABLED);
+            store.settingsStore().setPrivateProcessingStatus(PrivateProcessingStatus.ENABLED);
             var action = new PrivateProcessingSettingActionBuilder()
                     .privateProcessingStatus(PrivateProcessingStatus.DISABLED).build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(PrivateProcessingStatus.DISABLED, store.privateProcessingStatus().orElseThrow());
+            assertEquals(PrivateProcessingStatus.DISABLED, store.settingsStore().privateProcessingStatus().orElseThrow());
         }
     }
 
@@ -154,7 +154,7 @@ class PrivateProcessingSettingHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.privateProcessingStatus().isEmpty());
+            assertTrue(store.settingsStore().privateProcessingStatus().isEmpty());
         }
     }
 

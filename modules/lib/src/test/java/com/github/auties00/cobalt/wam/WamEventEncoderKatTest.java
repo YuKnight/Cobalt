@@ -62,7 +62,7 @@ class WamEventEncoderKatTest {
         var expectedLength = vector.getIntValue("byteLength");
 
         var buffer = new byte[MAX_BUFFER];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         var hasFields = fields != null && !fields.isEmpty();
         // The JS encoder writes weight verbatim; writeEventMarker negates internally,
         // so pass -capturedWeight to recover the captured bytes.

@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -27,7 +27,7 @@ import java.util.logging.Logger;
  * deleted on another device, the server replays the change here as a
  * {@link SyncdOperation#SET} (upsert) or {@link SyncdOperation#REMOVE}; the
  * result is read back via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findBusinessBroadcastList(String)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findBusinessBroadcastList(String)}.
  *
  * @implNote
  * This implementation stores the wire-shape protobuf action directly
@@ -104,7 +104,7 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() <= 1) {
@@ -131,7 +131,7 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
                     }
                 }
                 List<String> mirroredLabelIds = action.labelIds().isEmpty() ? null : new ArrayList<>(action.labelIds());
-                client.store().putBusinessBroadcastList(new BusinessBroadcastListBuilder()
+                client.store().businessStore().putBusinessBroadcastList(new BusinessBroadcastListBuilder()
                         .id(listId)
                         .deleted(action.deleted())
                         .participants(mirroredParticipants)
@@ -143,7 +143,7 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
             }
 
             if (mutation.operation() == SyncdOperation.REMOVE) {
-                client.store().removeBusinessBroadcastList(listId);
+                client.store().businessStore().removeBusinessBroadcastList(listId);
                 return MutationApplicationResult.success();
             }
 
@@ -157,12 +157,12 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
      * {@inheritDoc}
      *
      * <p>Iterates the batch, applying each mutation via
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} and
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} and
      * aggregating a malformed-mutation count for the warning log.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var malformedCount = 0;
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) {

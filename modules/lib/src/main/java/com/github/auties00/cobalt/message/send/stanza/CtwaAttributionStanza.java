@@ -170,7 +170,7 @@ public final class CtwaAttributionStanza {
             return null;
         }
 
-        var chat = store.findChatByJid(chatJid).orElse(null);
+        var chat = store.chatStore().findChatByJid(chatJid).orElse(null);
         if (!shouldLogFirstMessage(chat, entryPoint.partnerName())) {
             return null;
         }

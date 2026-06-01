@@ -285,7 +285,7 @@ public final class MetaStanza {
             return null;
         }
 
-        return store.findChatByJid(chatJid)
+        return store.chatStore().findChatByJid(chatJid)
                 .flatMap(Chat::lidOriginType)
                 .filter("ctwa"::equals)
                 .orElse(null);
@@ -351,7 +351,7 @@ public final class MetaStanza {
     @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
             adaptation = WhatsAppAdaptation.DIRECT)
     private boolean isHostedRecipient(Jid chatJid) {
-        return store.findVerifiedBusinessName(chatJid)
+        return store.contactStore().findVerifiedBusinessName(chatJid)
                 .map(vbn -> vbn.hostStorage().isPresent())
                 .orElse(false);
     }

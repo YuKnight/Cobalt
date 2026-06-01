@@ -115,7 +115,7 @@ class MessagePreparerTest {
     @DisplayName("prepareChat: store with no JID throws IllegalStateException (not logged in)")
     void prepareChatNotLoggedIn() {
         var store = MessageFixtures.temporaryStore(SELF_PN, null);
-        store.setJid(null);
+        store.accountStore().setJid(null);
         var preparer = new MessagePreparer(store);
         assertThrows(IllegalStateException.class,
                 () -> preparer.prepareChat(CHAT_PN, MessageContainer.of("hi")));

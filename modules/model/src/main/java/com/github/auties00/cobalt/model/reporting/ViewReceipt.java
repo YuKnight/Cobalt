@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Input model for {@code WhatsAppClient.publishViewReceipt} — publishes
+ * Input model for {@code LinkedWhatsAppClient.publishViewReceipt} — publishes
  * a view receipt for one or more items the local user has viewed.
  *
  * <p>{@link #receiptId} and {@link #to} are required.

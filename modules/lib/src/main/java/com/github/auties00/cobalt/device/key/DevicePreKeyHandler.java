@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.device.key;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -55,9 +55,9 @@ public final class DevicePreKeyHandler {
     private static final String ENCRYPT_XMLNS = "encrypt";
 
     /**
-     * The {@link WhatsAppClient} used for store access and IQ dispatch.
+     * The {@link LinkedWhatsAppClient} used for store access and IQ dispatch.
      */
-    private final WhatsAppClient client;
+    private final LinkedWhatsAppClient client;
 
     /**
      * The {@link SignalSessionCipher} used to materialise sessions from fetched bundles.
@@ -80,7 +80,7 @@ public final class DevicePreKeyHandler {
     @WhatsAppWebExport(moduleName = "WAWebManageE2ESessionsJob",
             exports = "ensureE2ESessions",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public DevicePreKeyHandler(WhatsAppClient client, SignalSessionCipher sessionCipher) {
+    public DevicePreKeyHandler(LinkedWhatsAppClient client, SignalSessionCipher sessionCipher) {
         this.client = Objects.requireNonNull(client, "client cannot be null");
         this.sessionCipher = Objects.requireNonNull(sessionCipher, "sessionCipher cannot be null");
     }
@@ -570,7 +570,7 @@ public final class DevicePreKeyHandler {
 
         for (var deviceJid : deviceJids) {
             var address = deviceJid.toSignalAddress();
-            if (store.findSessionByAddress(address).isEmpty()) {
+            if (store.signalStore().findSessionByAddress(address).isEmpty()) {
                 result.add(deviceJid);
             }
         }
@@ -647,7 +647,7 @@ public final class DevicePreKeyHandler {
         for (var userJid : userJids) {
             var primaryDeviceJid = userJid.toUserJid().withDevice(0);
             var address = primaryDeviceJid.toSignalAddress();
-            if (store.findIdentityByAddress(address).isEmpty()) {
+            if (store.signalStore().findIdentityByAddress(address).isEmpty()) {
                 usersNeedingKeys.add(userJid);
             }
         }
@@ -769,7 +769,7 @@ public final class DevicePreKeyHandler {
 
                 var address = deviceJid.toSignalAddress();
                 var identityKey = SignalIdentityPublicKey.ofDirect(identityKeyBytes);
-                store.saveIdentity(address, identityKey);
+                store.signalStore().saveIdentity(address, identityKey);
 
             } catch (Exception e) {
                 var jid = userNode.getAttribute("jid").map(Object::toString).orElse("unknown");
@@ -840,6 +840,6 @@ public final class DevicePreKeyHandler {
         var primaryDeviceJid = userJid.toUserJid().withDevice(0);
         var address = primaryDeviceJid.toSignalAddress();
         var identityKey = SignalIdentityPublicKey.ofDirect(accountSignatureKey);
-        store.saveIdentity(address, identityKey);
+        store.signalStore().saveIdentity(address, identityKey);
     }
 }

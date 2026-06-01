@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.stream.presence;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.ContactPresenceListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -8,7 +10,7 @@ import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 
 import java.time.Instant;
 import java.util.Set;
@@ -34,7 +36,7 @@ import java.util.Set;
  */
 @WhatsAppWebModule(moduleName = "WAWebHandlePresence")
 @WhatsAppWebModule(moduleName = "WAWebChangePresenceHandlerAction")
-public final class PresenceStreamHandler implements SocketStream.Handler {
+public final class PresenceStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * Reports stanzas that cannot be parsed or that carry malformed {@code last} timestamps at debug level.
      */
@@ -55,20 +57,20 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
     /**
      * Owns the store this handler mutates and the listeners that receive the resulting presence notifications.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
-     * Constructs a new {@link PresenceStreamHandler} bound to the given {@link WhatsAppClient}.
+     * Constructs a new {@link PresenceStreamHandler} bound to the given {@link LinkedWhatsAppClient}.
      *
-     * <p>The handler is constructed by the {@link SocketStream} wiring; embedders do not call this directly. The
+     * <p>The handler is constructed by the {@link NodeStreamService} wiring; embedders do not call this directly. The
      * supplied client must have an initialized
-     * {@link com.github.auties00.cobalt.store.AbstractWhatsAppStore store}.
+     * {@link com.github.auties00.cobalt.store.ProtobufWhatsAppStore store}.
      *
      * @param whatsapp the non-{@code null} client whose store is updated and whose listeners are notified
      */
     @WhatsAppWebExport(moduleName = "WAWebHandlePresence", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public PresenceStreamHandler(WhatsAppClient whatsapp) {
+    public PresenceStreamHandler(LinkedWhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
     }
 
@@ -108,7 +110,7 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        var meJid = whatsapp.store().jid().orElse(null);
+        var meJid = whatsapp.store().accountStore().jid().orElse(null);
         if (meJid != null && isSelfPresence(from, meJid)) {
             return;
         }
@@ -127,7 +129,7 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
         if (lastSeen != null) {
             contact.setLastSeen(lastSeen);
         }
-        whatsapp.store().addContact(contact);
+        whatsapp.store().contactStore().addContact(contact);
         notifyPresence(contact.toJid(), contact.toJid());
     }
 
@@ -196,7 +198,7 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
             return true;
         }
         if (fromUser.hasLidServer()) {
-            var phoneJid = whatsapp.store().findPhoneByLid(fromUser).orElse(null);
+            var phoneJid = whatsapp.store().contactStore().findPhoneByLid(fromUser).orElse(null);
             return phoneJid != null && phoneJid.user().equals(meUser.user());
         }
         return false;
@@ -224,16 +226,15 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
         }
 
         var canonical = jid.toUserJid().hasLidServer()
-                ? whatsapp.store().findPhoneByLid(jid.toUserJid()).orElse(jid.toUserJid())
+                ? whatsapp.store().contactStore().findPhoneByLid(jid.toUserJid()).orElse(jid.toUserJid())
                 : jid.toUserJid();
-        return whatsapp.store()
-                .findContactByJid(canonical)
-                .orElseGet(() -> whatsapp.store().addNewContact(canonical));
+        return whatsapp.store().contactStore().findContactByJid(canonical)
+                .orElseGet(() -> whatsapp.store().contactStore().addNewContact(canonical));
     }
 
     /**
      * Fans out a presence notification to every registered
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener}.
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener}.
      *
      * <p>The {@code conversation} and {@code participant} arguments are equal for {@code <presence>} stanzas (presence
      * is always per-contact, never per-group); they are kept distinct in the listener signature so the same callback
@@ -241,14 +242,16 @@ public final class PresenceStreamHandler implements SocketStream.Handler {
      *
      * @implNote
      * This implementation starts one virtual thread per listener so that a blocking listener cannot stall the
-     * {@link SocketStream} dispatch loop.
+     * {@link NodeStreamService} dispatch loop.
      *
      * @param conversation the JID of the conversation that experienced the presence change
      * @param participant  the JID of the participant whose presence changed
      */
     private void notifyPresence(Jid conversation, Jid participant) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onContactPresence(whatsapp, conversation, participant));
+            if (listener instanceof ContactPresenceListener typed) {
+                Thread.startVirtualThread(() -> typed.onContactPresence(whatsapp, conversation, participant));
+            }
         }
     }
 }

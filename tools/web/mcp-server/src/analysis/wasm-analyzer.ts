@@ -507,9 +507,28 @@ function toFreshUint8Array(binary: Buffer | Uint8Array): Uint8Array {
   return copy;
 }
 
+// All post-MVP WebAssembly features WABT must be told to accept when parsing.
+// WA's VoIP wasm is built with shared memory (threads) and passive data segments
+// (bulk_memory); without these flags readWasm aborts with errors such as
+// "memory may not be shared: threads not allowed". Enabling every feature keeps the
+// disassembler working across any module the snapshot may contain.
+const WABT_READ_OPTIONS = {
+  readDebugNames: true,
+  exceptions: true,
+  mutable_globals: true,
+  sat_float_to_int: true,
+  sign_extension: true,
+  simd: true,
+  threads: true,
+  multi_value: true,
+  tail_call: true,
+  bulk_memory: true,
+  reference_types: true,
+} as const;
+
 export async function disassembleWasm(binary: Buffer | Uint8Array): Promise<string> {
   const wabt = await getWabt();
-  const mod = wabt.readWasm(toFreshUint8Array(binary), { readDebugNames: true });
+  const mod = wabt.readWasm(toFreshUint8Array(binary), WABT_READ_OPTIONS);
   try {
     mod.generateNames();
     mod.applyNames();

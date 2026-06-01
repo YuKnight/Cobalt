@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Input model for {@code WhatsAppClient.createPoll}. Carries the chat
+ * Input model for {@code LinkedWhatsAppClient.createPoll}. Carries the chat
  * the poll is being posted into, the poll question, the list of
  * options, and how many of those options a voter may select.
  *

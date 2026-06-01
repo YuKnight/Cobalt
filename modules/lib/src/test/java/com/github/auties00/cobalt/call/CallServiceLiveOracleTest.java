@@ -1,12 +1,14 @@
 package com.github.auties00.cobalt.call;
+import com.github.auties00.cobalt.call.internal.TestLiveCallServiceFactory;
 
 import com.github.auties00.cobalt.call.CallEndReason;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.wam.TestWamService;
 import com.github.auties00.cobalt.wam.event.CallEvent;
 import com.github.auties00.cobalt.wam.type.CallResultType;
@@ -61,18 +63,24 @@ class CallServiceLiveOracleTest {
         Harness() {
             var store = MessageFixtures.temporaryStore(SELF_PN, SELF_LID);
             store.addListener(listener);
-            this.client = TestWhatsAppClient.create().withStore(store);
-            store.addListener(new WhatsAppClientListener() {
-                @Override public void onNodeSent(WhatsAppClient w, Node node) { sentNodes.add(node); }
+            this.client = TestWhatsAppClient.create()
+                    .withStore(store)
+                    .withSendNodeHandler(builder -> {
+                        var built = builder.build();
+                        sentNodes.add(built);
+                        return new NodeBuilder().description("ack").build();
+                    });
+            store.addListener(new LinkedWhatsAppClientListener() {
+                @Override public void onNodeSent(LinkedWhatsAppClient w, Node node) { sentNodes.add(node); }
             });
             this.wam = TestWamService.create(client);
-            this.service = new CallService(client, wam);
+            this.service = TestLiveCallServiceFactory.create(client, wam);
         }
     }
 
-    private static final class RecordingListener implements WhatsAppClientListener {
+    private static final class RecordingListener implements LinkedWhatsAppClientListener {
         final ConcurrentLinkedQueue<EndedEvent> ended = new ConcurrentLinkedQueue<>();
-        @Override public void onCallEnded(WhatsAppClient w, String callId, Jid fromJid, CallEndReason reason) {
+        @Override public void onCallEnded(LinkedWhatsAppClient w, String callId, Jid fromJid, CallEndReason reason) {
             ended.add(new EndedEvent(callId, fromJid, reason));
         }
     }
@@ -228,7 +236,7 @@ class CallServiceLiveOracleTest {
     }
 
     @Test
-    @DisplayName("WAM mapping: HANGUP → CONNECTED")
+    @DisplayName("WAM mapping: HANGUP â†’ CONNECTED")
     void wamHangupMapsToConnected() throws InterruptedException {
         var h = new Harness();
         var session = h.service.placeCall(PEER_LID, CallOptions.audio());
@@ -238,7 +246,7 @@ class CallServiceLiveOracleTest {
     }
 
     @Test
-    @DisplayName("WAM mapping: TIMEOUT → MISSED")
+    @DisplayName("WAM mapping: TIMEOUT â†’ MISSED")
     void wamTimeoutMapsToMissed() throws InterruptedException {
         var h = new Harness();
         var session = h.service.placeCall(PEER_LID, CallOptions.audio());
@@ -248,7 +256,7 @@ class CallServiceLiveOracleTest {
     }
 
     @Test
-    @DisplayName("WAM mapping: REJECT_DO_NOT_DISTURB → REJECTED_BY_USER")
+    @DisplayName("WAM mapping: REJECT_DO_NOT_DISTURB â†’ REJECTED_BY_USER")
     void wamDndMapsToRejected() throws InterruptedException {
         var h = new Harness();
         var offer = new IncomingCall("CID-DND", PEER_LID, PEER_LID,
@@ -261,7 +269,7 @@ class CallServiceLiveOracleTest {
     }
 
     @Test
-    @DisplayName("WAM mapping: REJECT_BLOCKED → REJECTED_BY_USER")
+    @DisplayName("WAM mapping: REJECT_BLOCKED â†’ REJECTED_BY_USER")
     void wamBlockedMapsToRejected() throws InterruptedException {
         var h = new Harness();
         var offer = new IncomingCall("CID-BLOCKED", PEER_LID, PEER_LID,
@@ -273,7 +281,7 @@ class CallServiceLiveOracleTest {
     }
 
     @Test
-    @DisplayName("WAM mapping: ACCEPTED_ELSEWHERE → CONNECTED (the call DID connect — just on another device)")
+    @DisplayName("WAM mapping: ACCEPTED_ELSEWHERE â†’ CONNECTED (the call DID connect â€” just on another device)")
     void wamAcceptedElsewhereMapsToConnected() throws InterruptedException {
         var h = new Harness();
         var session = h.service.placeCall(PEER_LID, CallOptions.audio());
@@ -283,7 +291,7 @@ class CallServiceLiveOracleTest {
     }
 
     @Test
-    @DisplayName("WAM mapping: unrecognised reason (e.g. \"\") → INVALID")
+    @DisplayName("WAM mapping: unrecognised reason (e.g. \"\") â†’ INVALID")
     void wamUnknownMapsToInvalid() throws InterruptedException {
         var h = new Harness();
         var session = h.service.placeCall(PEER_LID, CallOptions.audio());

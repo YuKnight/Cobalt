@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -37,7 +37,7 @@ class BotWelcomeRequestHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
     private static final Jid BOT_JID = Jid.of("12025550100@s.whatsapp.net");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -82,13 +82,13 @@ class BotWelcomeRequestHandlerTest {
         @Test
         @DisplayName("isSent=true writes a BotWelcomeRequestState keyed by the chat JID")
         void writesState() {
-            client.store().addNewChat(BOT_JID);
+            client.store().chatStore().addNewChat(BOT_JID);
 
             var result = new BotWelcomeRequestHandler().applyMutation(
                     client, botMutation(BOT_JID.toString(), Boolean.TRUE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var state = client.store().findBotWelcomeRequestState(BOT_JID).orElseThrow();
+            var state = client.store().businessStore().findBotWelcomeRequestState(BOT_JID).orElseThrow();
             assertEquals(BOT_JID, state.botJid());
             assertTrue(state.requested());
         }
@@ -96,13 +96,13 @@ class BotWelcomeRequestHandlerTest {
         @Test
         @DisplayName("isSent=false is also SUCCESS and writes requested=false")
         void writesFalse() {
-            client.store().addNewChat(BOT_JID);
+            client.store().chatStore().addNewChat(BOT_JID);
 
             var result = new BotWelcomeRequestHandler().applyMutation(
                     client, botMutation(BOT_JID.toString(), Boolean.FALSE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var state = client.store().findBotWelcomeRequestState(BOT_JID).orElseThrow();
+            var state = client.store().businessStore().findBotWelcomeRequestState(BOT_JID).orElseThrow();
             assertFalse(state.requested());
         }
     }
@@ -119,7 +119,7 @@ class BotWelcomeRequestHandlerTest {
             assertEquals(SyncActionState.ORPHAN, result.actionState());
             assertEquals(BOT_JID.toString(), result.modelId());
             assertEquals("Chat", result.modelType());
-            assertTrue(client.store().findBotWelcomeRequestState(BOT_JID).isEmpty(),
+            assertTrue(client.store().businessStore().findBotWelcomeRequestState(BOT_JID).isEmpty(),
                     "orphan must not create a state entry");
         }
     }
@@ -143,7 +143,7 @@ class BotWelcomeRequestHandlerTest {
         @Test
         @DisplayName("non-bot-welcome value yields MALFORMED (action value)")
         void wrongActionType() {
-            client.store().addNewChat(BOT_JID);
+            client.store().chatStore().addNewChat(BOT_JID);
 
             var wrongValue = new SyncActionValueBuilder()
                     .timestamp(Instant.now())
@@ -165,13 +165,13 @@ class BotWelcomeRequestHandlerTest {
         @Test
         @DisplayName("REMOVE returns UNSUPPORTED before any store write")
         void removeIsUnsupported() {
-            client.store().addNewChat(BOT_JID);
+            client.store().chatStore().addNewChat(BOT_JID);
 
             var result = new BotWelcomeRequestHandler().applyMutation(
                     client, botMutation(BOT_JID.toString(), Boolean.TRUE, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(client.store().findBotWelcomeRequestState(BOT_JID).isEmpty(),
+            assertTrue(client.store().businessStore().findBotWelcomeRequestState(BOT_JID).isEmpty(),
                     "REMOVE must not create a state entry");
         }
     }
@@ -213,7 +213,7 @@ class BotWelcomeRequestHandlerTest {
         @Test
         @DisplayName("default applyMutationBatch delegates to applyMutation per mutation")
         void perItem() {
-            client.store().addNewChat(BOT_JID);
+            client.store().chatStore().addNewChat(BOT_JID);
 
             var batch = List.of(
                     botMutation(BOT_JID.toString(), Boolean.TRUE, SyncdOperation.SET, Instant.now()),

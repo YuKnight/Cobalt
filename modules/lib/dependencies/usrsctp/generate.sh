@@ -70,6 +70,9 @@ rm -f "$OUT/${PKG//.//}/UsrSctp.java" "$OUT/${PKG//.//}/UsrSctp\$shared.java"
   --include-union sctp_sockstore \
   --include-struct sctp_rcvinfo \
   --include-struct sctp_sndinfo \
+  --include-struct sctp_prinfo \
+  --include-struct sctp_authinfo \
+  --include-struct sctp_sendv_spa \
   --include-struct sctp_event \
   --include-struct sctp_event_subscribe \
   --include-struct sctp_initmsg \
@@ -109,7 +112,12 @@ rm -f "$OUT/${PKG//.//}/UsrSctp.java" "$OUT/${PKG//.//}/UsrSctp\$shared.java"
   --include-constant SCTP_SENDV_NOINFO \
   --include-constant SCTP_SENDV_SNDINFO \
   --include-constant SCTP_SENDV_PRINFO \
+  --include-constant SCTP_SENDV_SPA \
   --include-constant SCTP_SEND_SNDINFO_VALID \
+  --include-constant SCTP_SEND_PRINFO_VALID \
+  --include-constant SCTP_PR_SCTP_NONE \
+  --include-constant SCTP_PR_SCTP_TTL \
+  --include-constant SCTP_PR_SCTP_RTX \
   --include-constant SCTP_ASSOC_CHANGE \
   --include-constant SCTP_PEER_ADDR_CHANGE \
   --include-constant SCTP_REMOTE_ERROR \

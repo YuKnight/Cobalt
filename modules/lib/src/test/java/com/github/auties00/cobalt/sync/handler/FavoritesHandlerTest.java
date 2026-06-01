@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Tests run against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * through {@link TestWhatsAppClient} so the
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#favoriteChats()}
+ * {@link com.github.auties00.cobalt.store.ChatStore#favoriteChats()}
  * read-back can be asserted directly without round-tripping through the
  * chat-table cache.
  */
@@ -46,7 +46,7 @@ class FavoritesHandlerTest {
     private static final Jid FAVORITE_A = Jid.of("12025550100@s.whatsapp.net");
     private static final Jid FAVORITE_B = Jid.of("12025550101@s.whatsapp.net");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -93,26 +93,26 @@ class FavoritesHandlerTest {
         @Test
         @DisplayName("a SET mutation with two entries populates the store list verbatim")
         void replacesFavorites() {
-            assertEquals(0, client.store().favoriteChats().size(), "store starts empty");
+            assertEquals(0, client.store().chatStore().favoriteChats().size(), "store starts empty");
 
             var result = new FavoritesHandler().applyMutation(
                     client, favoritesMutation(List.of(FAVORITE_A, FAVORITE_B), SyncdOperation.SET, Instant.ofEpochSecond(1700000000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(List.of(FAVORITE_A, FAVORITE_B), client.store().favoriteChats(),
+            assertEquals(List.of(FAVORITE_A, FAVORITE_B), client.store().chatStore().favoriteChats(),
                     "the store favorites must match the mutation entries in order");
         }
 
         @Test
         @DisplayName("an empty favorites list is still a valid SUCCESS - replaces with empty")
         void emptyFavoritesReplaces() {
-            client.store().setFavoriteChats(List.of(FAVORITE_A));
+            client.store().chatStore().setFavoriteChats(List.of(FAVORITE_A));
 
             var result = new FavoritesHandler().applyMutation(
                     client, favoritesMutation(List.of(), SyncdOperation.SET, Instant.ofEpochSecond(1700000000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(0, client.store().favoriteChats().size(),
+            assertEquals(0, client.store().chatStore().favoriteChats().size(),
                     "empty favorites list clears the store");
         }
     }
@@ -175,7 +175,7 @@ class FavoritesHandlerTest {
             assertEquals(2, results.size());
             assertTrue(results.stream().allMatch(r -> r.actionState() == SyncActionState.SUCCESS),
                     "both well-formed mutations are tagged success");
-            assertEquals(List.of(FAVORITE_B), client.store().favoriteChats(),
+            assertEquals(List.of(FAVORITE_B), client.store().chatStore().favoriteChats(),
                     "only the latest mutation's favorites land in the store");
         }
 
@@ -194,18 +194,18 @@ class FavoritesHandlerTest {
 
             assertEquals(SyncActionState.MALFORMED, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertEquals(List.of(FAVORITE_A), client.store().favoriteChats());
+            assertEquals(List.of(FAVORITE_A), client.store().chatStore().favoriteChats());
         }
 
         @Test
         @DisplayName("an empty batch leaves the store untouched and returns an empty list")
         void emptyBatch() {
-            client.store().setFavoriteChats(List.of(FAVORITE_A));
+            client.store().chatStore().setFavoriteChats(List.of(FAVORITE_A));
 
             var results = new FavoritesHandler().applyMutationBatch(client, List.of());
 
             assertEquals(0, results.size());
-            assertEquals(List.of(FAVORITE_A), client.store().favoriteChats(),
+            assertEquals(List.of(FAVORITE_A), client.store().chatStore().favoriteChats(),
                     "empty batch must be a no-op on the store");
         }
     }

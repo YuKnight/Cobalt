@@ -57,11 +57,11 @@
                 mvn -Pnatives -Dnatives.classifier=darwin-aarch64  package
                 mvn -Pnatives -Dnatives.classifier=windows-x86_64  package
 
-            The binaries are taken from the same
-            `dependencies/<lib>/bin/<classifier>/` tree the manifest
-            references — the assembly descriptor copies them into the
-            `META-INF/native/<classifier>/` resource path the loader
-            looks them up at.
+            The binary is taken from the same
+            `natives/bin/<classifier>/` tree the manifest references —
+            the assembly descriptor copies it into the
+            `modules/lib/natives/bin/<classifier>/` resource path the
+            loader looks it up at.
         -->
         <profile>
             <id>natives</id>
@@ -93,11 +93,10 @@
 
     <build>
         <!--
-            Layer the module's `dependencies/<lib>/bin/<classifier>/`
-            tree onto the test classpath so the loader's classpath
-            probe (which uses the manifest's repo-relative path
-            verbatim, e.g.
-            `modules/lib/dependencies/libopus/bin/linux-x86_64/libopus.so`)
+            Layer the module's `natives/bin/<classifier>/` tree onto the
+            test classpath so the loader's classpath probe (which uses
+            the manifest's repo-relative path verbatim, e.g.
+            `modules/lib/natives/bin/linux-x86_64/libcobalt-native.so`)
             hits the local binary during `mvn test` instead of trying
             to download from GitHub at a release tag that may not
             exist yet during development.
@@ -110,10 +109,10 @@
                 <directory>src/test/resources</directory>
             </testResource>
             <testResource>
-                <directory>${project.basedir}/dependencies</directory>
-                <targetPath>modules/lib/dependencies</targetPath>
+                <directory>${project.basedir}/natives</directory>
+                <targetPath>modules/lib/natives</targetPath>
                 <includes>
-                    <include>**/bin/**</include>
+                    <include>bin/**</include>
                 </includes>
             </testResource>
         </testResources>

@@ -1,4 +1,7 @@
 package com.github.auties00.cobalt.sync.integration;
+import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
+import com.github.auties00.cobalt.sync.LiveWebAppStateService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
@@ -11,7 +14,7 @@ import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import com.github.auties00.cobalt.sync.WebAppStateService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,18 +50,18 @@ class FullSyncCycleIntegrationTest {
     void setUp() {
         var props = TestABPropsService.builder().build();
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         client = TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(props);
-        var wam = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wam);
-        var snapshotRecovery = new SnapshotRecoveryService(client, props, wam);
-        service = new WebAppStateService(client, props, lidMigration, snapshotRecovery, wam, TestMediaConnectionService.create());
+        var wam = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wam);
+        var snapshotRecovery = new LiveSnapshotRecoveryService(client, props, wam);
+        service = new LiveWebAppStateService(client, props, lidMigration, snapshotRecovery, wam, TestMediaConnectionService.create());
     }
 
     @Nested
-    @DisplayName("synthetic smoke — orchestrator graph wires up without IO")
+    @DisplayName("synthetic smoke â€” orchestrator graph wires up without IO")
     class Smoke {
         @Test
         @DisplayName("WebAppStateService exposes the internally-built SyncKeyRotationService")
@@ -83,7 +86,7 @@ class FullSyncCycleIntegrationTest {
     }
 
     @Nested
-    @DisplayName("captured cycle — oracle parity once fixtures land")
+    @DisplayName("captured cycle â€” oracle parity once fixtures land")
     class CapturedCycle {
         @Test
         @DisplayName("post-cycle store state matches WAWebSyncdServerSync's captured projection")

@@ -99,7 +99,7 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
      * @throws IllegalStateException if no session is active
      */
     Jid requireSelfJid() {
-        return store.jid().orElseThrow(() ->
+        return store.accountStore().jid().orElseThrow(() ->
                 new IllegalStateException("Not logged in"));
     }
 
@@ -176,11 +176,11 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
             return false;
         }
         var senderUser = senderJid.toUserJid();
-        var selfPn = store.jid().orElse(null);
+        var selfPn = store.accountStore().jid().orElse(null);
         if (selfPn != null && senderUser.equals(selfPn.toUserJid())) {
             return true;
         }
-        var selfLid = store.lid().orElse(null);
+        var selfLid = store.accountStore().lid().orElse(null);
         return selfLid != null && senderUser.equals(selfLid.toUserJid());
     }
 }

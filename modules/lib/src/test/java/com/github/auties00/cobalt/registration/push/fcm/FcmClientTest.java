@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.registration.push.fcm;
 
+import com.github.auties00.cobalt.client.WhatsAppClientDevice;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
-import com.github.auties00.cobalt.client.WhatsAppDevice;
 import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
 import com.github.auties00.cobalt.Faker;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
@@ -36,7 +36,7 @@ class FcmClientTest {
     public void deliversPushCodeViaRegistration() throws Throwable {
         var maxAttempts = 5;
         var perAttemptTimeout = Duration.ofMinutes(2);
-        var device = WhatsAppDevice.ios(false);
+        var device = WhatsAppClientDevice.ios(false);
         Throwable lastFailure = null;
         for (var attempt = 1; attempt <= maxAttempts; attempt++) {
             var phoneNumber = Faker.randomItalianMobile();
@@ -45,7 +45,7 @@ class FcmClientTest {
 
                 var store = WhatsAppStoreFactory.temporary()
                         .create(WhatsAppClientType.MOBILE, phoneNumber);
-                store.setDevice(device);
+                store.accountStore().setDevice(device);
 
                 var verification = WhatsAppClientVerificationHandler.Mobile
                         .whatsapp(pushClient::getPushCode);
@@ -81,7 +81,7 @@ class FcmClientTest {
 
                 var failure = registrationFailure.get();
                 if (failure == null) {
-                    assertTrue(store.registered(),
+                    assertTrue(store.accountStore().registered(),
                             "store must report registered after a successful flow");
                     return;
                 }
@@ -137,9 +137,9 @@ class FcmClientTest {
     void rejectsNonAndroidDevice() {
         try (var client = FcmClient.newSession()) {
             assertThrows(IllegalArgumentException.class,
-                    () -> client.authenticate(WhatsAppDevice.ios(false)));
+                    () -> client.authenticate(WhatsAppClientDevice.ios(false)));
             assertThrows(IllegalArgumentException.class,
-                    () -> client.authenticate(WhatsAppDevice.web()));
+                    () -> client.authenticate(WhatsAppClientDevice.web()));
             assertFalse(client.isAuthenticated());
         }
     }
@@ -147,7 +147,7 @@ class FcmClientTest {
     @Test
     void authenticatesPersonalAndProducesPushToken() {
         try (var client = FcmClient.newSession()) {
-            client.authenticate(WhatsAppDevice.android(false));
+            client.authenticate(WhatsAppClientDevice.android(false));
             assertTrue(client.isAuthenticated());
             var token = client.getPushToken();
             assertNotNull(token);
@@ -159,7 +159,7 @@ class FcmClientTest {
     @Test
     void authenticatesBusinessAndProducesPushToken() {
         try (var client = FcmClient.newSession()) {
-            client.authenticate(WhatsAppDevice.android(true));
+            client.authenticate(WhatsAppClientDevice.android(true));
             assertTrue(client.isAuthenticated());
             assertFalse(client.getPushToken().isBlank());
         }
@@ -168,9 +168,9 @@ class FcmClientTest {
     @Test
     void rejectsDoubleAuthenticate() {
         try (var client = FcmClient.newSession()) {
-            client.authenticate(WhatsAppDevice.android(false));
+            client.authenticate(WhatsAppClientDevice.android(false));
             assertThrows(IllegalStateException.class,
-                    () -> client.authenticate(WhatsAppDevice.android(false)));
+                    () -> client.authenticate(WhatsAppClientDevice.android(false)));
         }
     }
 
@@ -179,7 +179,7 @@ class FcmClientTest {
         FcmSession saved;
         String firstToken;
         try (var client = FcmClient.newSession()) {
-            client.authenticate(WhatsAppDevice.android(false));
+            client.authenticate(WhatsAppClientDevice.android(false));
             firstToken = client.getPushToken();
             saved = client.getSession();
             assertNotEquals(0L, saved.androidId());

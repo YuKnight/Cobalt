@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Each test runs against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * via {@link TestWhatsAppClient}, so it starts from a clean single-device state and
- * the {@link com.github.auties00.cobalt.store.WhatsAppStore#detectedOutcomesEnabled()}
+ * the {@link com.github.auties00.cobalt.store.BusinessStore#detectedOutcomesEnabled()}
  * read-back can be asserted directly.
  */
 @DisplayName("DetectedOutcomesStatusHandler")
@@ -41,7 +41,7 @@ class DetectedOutcomesStatusHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -85,25 +85,25 @@ class DetectedOutcomesStatusHandlerTest {
         @Test
         @DisplayName("isEnabled=true sets the store flag to true")
         void enable() {
-            assertFalse(client.store().detectedOutcomesEnabled(), "default false");
+            assertFalse(client.store().businessStore().detectedOutcomesEnabled(), "default false");
 
             var result = new DetectedOutcomesStatusHandler().applyMutation(
                     client, detectedMutation(Boolean.TRUE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().detectedOutcomesEnabled());
+            assertTrue(client.store().businessStore().detectedOutcomesEnabled());
         }
 
         @Test
         @DisplayName("isEnabled=false flips the store flag to false")
         void disable() {
-            client.store().setDetectedOutcomesEnabled(true);
+            client.store().businessStore().setDetectedOutcomesEnabled(true);
 
             var result = new DetectedOutcomesStatusHandler().applyMutation(
                     client, detectedMutation(Boolean.FALSE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertFalse(client.store().detectedOutcomesEnabled());
+            assertFalse(client.store().businessStore().detectedOutcomesEnabled());
         }
     }
 
@@ -148,7 +148,7 @@ class DetectedOutcomesStatusHandlerTest {
                     client, detectedMutation(Boolean.TRUE, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertFalse(client.store().detectedOutcomesEnabled());
+            assertFalse(client.store().businessStore().detectedOutcomesEnabled());
         }
     }
 

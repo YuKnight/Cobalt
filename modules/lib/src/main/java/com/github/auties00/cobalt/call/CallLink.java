@@ -16,9 +16,9 @@ import java.util.Optional;
  * and whether joiners must pass through a host-admitted lobby. The same
  * value type is surfaced to listeners through the call-link lobby
  * callbacks on
- * {@link com.github.auties00.cobalt.client.WhatsAppClientListener}, such
+ * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener}, such
  * as
- * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onCallLinkAdmitted(com.github.auties00.cobalt.client.WhatsAppClient, CallLink)}.
+ * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onCallLinkAdmitted(com.github.auties00.cobalt.client.LinkedWhatsAppClient, CallLink)}.
  *
  * @param token         the opaque server-generated link token, used as
  *                      the lookup key by every link operation

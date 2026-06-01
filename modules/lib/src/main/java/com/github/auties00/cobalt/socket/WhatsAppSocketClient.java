@@ -73,7 +73,7 @@ import java.util.Objects;
  *
  * <p>Handshake shape (prologue, certificate verification and client
  * payload) is decided <em>orthogonally</em> from the transport, off
- * the {@code store.device().platform()} value: {@code IOS},
+ * the {@code store.accountStore().device().platform()} value: {@code IOS},
  * {@code IOS_BUSINESS}, {@code ANDROID} and {@code ANDROID_BUSINESS}
  * use the mobile-style handshake (flat {@code NoiseCertificate},
  * mobile prologue, mobile {@code ClientPayload}); {@code WEB},
@@ -225,7 +225,7 @@ public sealed abstract class WhatsAppSocketClient {
     public static WhatsAppSocketClient newCipheredSocketClient(WhatsAppStore store, WhatsAppSslContextFactory sslContextFactory) {
         Objects.requireNonNull(store, "store cannot be null");
         Objects.requireNonNull(sslContextFactory, "sslContextFactory cannot be null");
-        var platform = store.device().platform();
+        var platform = store.accountStore().device().platform();
         return switch (platform) {
             case WEB, WINDOWS -> new WebSocket(store, sslContextFactory);
             default -> new Tcp(store, sslContextFactory);
@@ -431,10 +431,10 @@ public sealed abstract class WhatsAppSocketClient {
      *         {@code NoiseCertificate}, mobile {@code ClientPayload})
      */
     private boolean isWebHandshakeShape() {
-        return switch (store.device().platform()) {
+        return switch (store.accountStore().device().platform()) {
             case WEB, WINDOWS, MACOS -> true;
             case IOS, IOS_BUSINESS, ANDROID, ANDROID_BUSINESS -> false;
-            default -> throw new IllegalStateException("Unexpected value: " + store.device().platform());
+            default -> throw new IllegalStateException("Unexpected value: " + store.accountStore().device().platform());
         };
     }
 
@@ -577,7 +577,7 @@ public sealed abstract class WhatsAppSocketClient {
      * <p>This returns a reconnection payload when the store already carries a
      * JID, otherwise a fresh pairing payload that includes registration
      * data. Either way the {@code webInfo} sub-platform is derived from
-     * {@code store.device().platform()} via {@link #webSubPlatform()}.
+     * {@code store.accountStore().device().platform()} via {@link #webSubPlatform()}.
      *
      * @return the client payload
      */
@@ -586,7 +586,7 @@ public sealed abstract class WhatsAppSocketClient {
         var webInfo = new ClientPayloadWebInfoBuilder()
                 .webSubPlatform(webSubPlatform())
                 .build();
-        var jid = store.jid();
+        var jid = store.accountStore().jid();
         if (jid.isPresent()) {
             return new ClientPayloadBuilder()
                     .connectType(ClientPayload.ConnectType.WIFI_UNKNOWN)
@@ -624,10 +624,10 @@ public sealed abstract class WhatsAppSocketClient {
      * @return the user agent value
      */
     private UserAgent webUserAgent() {
-        var appVersion = store.clientVersion();
+        var appVersion = store.accountStore().clientVersion();
         var mcc = "000";
         var mnc = "000";
-        var devicePlatform = store.device().platform();
+        var devicePlatform = store.accountStore().device().platform();
         if (devicePlatform == ClientPlatformType.WINDOWS
                 && appVersion.quaternary().isPresent()) {
             var buildStr = Integer.toString(appVersion.quaternary().getAsInt());
@@ -641,11 +641,11 @@ public sealed abstract class WhatsAppSocketClient {
                 .appVersion(appVersion)
                 .mcc(mcc)
                 .mnc(mnc)
-                .releaseChannel(store.releaseChannel())
+                .releaseChannel(store.accountStore().releaseChannel())
                 .localeLanguageIso6391("en")
                 .localeCountryIso31661Alpha2("US")
                 .deviceType(ClientPayload.ClientType.PHONE)
-                .deviceModelType(store.device().modelId())
+                .deviceModelType(store.accountStore().device().modelId())
                 .build();
     }
 
@@ -661,11 +661,11 @@ public sealed abstract class WhatsAppSocketClient {
      * @return the platform value advertised at handshake time
      */
     private ClientPlatformType webUserAgentPlatform() {
-        return switch (store.device().platform()) {
+        return switch (store.accountStore().device().platform()) {
             case WINDOWS, WEB -> ClientPlatformType.WEB;
             case MACOS -> ClientPlatformType.MACOS;
             default -> throw new IllegalStateException(
-                    "Unexpected web handshake platform: " + store.device().platform());
+                    "Unexpected web handshake platform: " + store.accountStore().device().platform());
         };
     }
 
@@ -676,12 +676,12 @@ public sealed abstract class WhatsAppSocketClient {
      * @return the sub-platform value advertised at handshake time
      */
     private ClientPayload.WebInfo.WebSubPlatform webSubPlatform() {
-        return switch (store.device().platform()) {
+        return switch (store.accountStore().device().platform()) {
             case WEB -> ClientPayload.WebInfo.WebSubPlatform.WEB_BROWSER;
             case WINDOWS -> ClientPayload.WebInfo.WebSubPlatform.WIN_HYBRID;
             case MACOS -> ClientPayload.WebInfo.WebSubPlatform.DARWIN;
             default -> throw new IllegalStateException(
-                    "Unexpected web handshake platform: " + store.device().platform());
+                    "Unexpected web handshake platform: " + store.accountStore().device().platform());
         };
     }
 
@@ -694,13 +694,13 @@ public sealed abstract class WhatsAppSocketClient {
      */
     private DevicePairingRegistrationData createRegisterData() {
         return new ClientPayloadDevicePairingRegistrationDataBuilder()
-                .buildHash(store.clientVersion().toHash())
-                .eRegid(DataUtils.intToBytes(store.registrationId(), 4))
+                .buildHash(store.accountStore().clientVersion().toHash())
+                .eRegid(DataUtils.intToBytes(store.signalStore().registrationId(), 4))
                 .eKeytype(DataUtils.intToBytes(SignalIdentityPublicKey.type(), 1))
-                .eIdent(store.identityKeyPair().publicKey().toEncodedPoint())
-                .eSkeyId(DataUtils.intToBytes(store.signedKeyPair().id(), 3))
-                .eSkeyVal(store.signedKeyPair().publicKey().toEncodedPoint())
-                .eSkeySig(store.signedKeyPair().signature())
+                .eIdent(store.signalStore().identityKeyPair().publicKey().toEncodedPoint())
+                .eSkeyId(DataUtils.intToBytes(store.signalStore().signedKeyPair().id(), 3))
+                .eSkeyVal(store.signalStore().signedKeyPair().publicKey().toEncodedPoint())
+                .eSkeySig(store.signalStore().signedKeyPair().signature())
                 .deviceProps(createCompanionProps())
                 .build();
     }
@@ -708,16 +708,10 @@ public sealed abstract class WhatsAppSocketClient {
     /**
      * Creates and encodes the companion device properties.
      *
-     * <p>These carry the history sync configuration flags that tell the
-     * server which categories of history data to deliver to this companion;
-     * the {@code platformType} is derived from the store's device platform
-     * so {@code WINDOWS} maps to {@code UWP}, {@code MACOS} to
-     * {@code IOS_CATALYST}, and so on.
-     *
      * @return the encoded companion device properties
      */
     private byte[] createCompanionProps() {
-        var historyLength = store.webHistoryPolicy()
+        var historyLength = store.syncStore().webHistoryPolicy()
                 .orElse(WhatsAppWebClientHistory.standard(true));
         var config = new DevicePropsHistorySyncConfigBuilder()
                 .inlineInitialPayloadInE2EeMsg(true)
@@ -728,25 +722,32 @@ public sealed abstract class WhatsAppSocketClient {
                 .supportBizHostedMsg(true)
                 .supportFbidBotChatHistory(true)
                 .supportMessageAssociation(true)
-                .supportCallLogHistory(store.device().platform() == ClientPlatformType.WINDOWS)
+                .supportCallLogHistory(store.accountStore().device().platform() == ClientPlatformType.WINDOWS)
                 .supportGroupHistory(true)
                 .storageQuotaMb(historyLength.size())
                 .fullSyncSizeMbLimit(historyLength.size())
                 .build();
-        var platformType = switch (store.device().platform()) {
+        var platformType = switch (store.accountStore().device().platform()) {
             case IOS, IOS_BUSINESS -> DevicePlatformType.IOS_PHONE;
             case ANDROID, ANDROID_BUSINESS -> DevicePlatformType.ANDROID_PHONE;
             case WINDOWS -> DevicePlatformType.UWP;
             case MACOS -> DevicePlatformType.IOS_CATALYST;
             case WEB -> DevicePlatformType.CHROME;
-            default -> throw new IllegalStateException("Unexpected value: " + store.device().platform());
+            default -> throw new IllegalStateException("Unexpected value: " + store.accountStore().device().platform());
+        };
+        var os = switch (store.accountStore().device().platform()) {
+            case IOS, IOS_BUSINESS -> "iOS";
+            case ANDROID, ANDROID_BUSINESS -> "Android";
+            case WINDOWS, WEB -> "Windows";
+            case MACOS -> "Mac OS";
+            default -> throw new IllegalStateException("Unexpected value: " + store.accountStore().device().platform());
         };
         var props = new DevicePropsBuilder()
-                .os(store.name())
+                .os(os)
                 .platformType(platformType)
                 .requireFullSync(historyLength.isExtended())
                 .historySyncConfig(config)
-                .version(store.clientVersion())
+                .version(store.accountStore().clientVersion())
                 .build();
         return DevicePropsSpec.encode(props);
     }
@@ -758,13 +759,13 @@ public sealed abstract class WhatsAppSocketClient {
      */
     private ClientPayload mobileClientPayload() {
         var agent = mobileUserAgent();
-        var phoneNumber = store
+        var phoneNumber = store.accountStore()
                 .phoneNumber()
                 .orElseThrow(() -> new InternalError("Phone number was not set"));
         return new ClientPayloadBuilder()
                 .username(phoneNumber)
                 .passive(false)
-                .pushName(store.registered() ? store.name() : null)
+                .pushName(store.accountStore().registered() ? store.accountStore().name().orElse(null) : null)
                 .userAgent(agent)
                 .shortConnect(true)
                 .connectType(ClientPayload.ConnectType.WIFI_UNKNOWN)
@@ -783,20 +784,20 @@ public sealed abstract class WhatsAppSocketClient {
      */
     private UserAgent mobileUserAgent() {
         return new ClientPayloadUserAgentBuilder()
-                .platform(store.device().platform())
-                .appVersion(store.clientVersion())
+                .platform(store.accountStore().device().platform())
+                .appVersion(store.accountStore().clientVersion())
                 .mcc("000")
                 .mnc("000")
-                .osVersion(store.device().osDeviceAppVersion().toString())
-                .manufacturer(store.device().manufacturer())
-                .device(store.device().model().replaceAll("_", " "))
-                .osBuildNumber(store.device().osBuildNumber())
-                .phoneId(store.fdid().toString().toUpperCase())
-                .releaseChannel(store.releaseChannel())
+                .osVersion(store.accountStore().device().osDeviceAppVersion().toString())
+                .manufacturer(store.accountStore().device().manufacturer())
+                .device(store.accountStore().device().model().replaceAll("_", " "))
+                .osBuildNumber(store.accountStore().device().osBuildNumber())
+                .phoneId(store.signalStore().fdid().toString().toUpperCase())
+                .releaseChannel(store.accountStore().releaseChannel())
                 .localeLanguageIso6391("en")
                 .localeCountryIso31661Alpha2("US")
                 .deviceType(ClientPayload.ClientType.PHONE)
-                .deviceModelType(store.device().modelId())
+                .deviceModelType(store.accountStore().device().modelId())
                 .build();
     }
 
@@ -861,9 +862,10 @@ public sealed abstract class WhatsAppSocketClient {
      * write keys.
      *
      * <p>This is idempotent: it is safe to call on an already-closed client
-     * or on one that never completed its handshake. The
-     * {@link WhatsAppSocketListener#onClose()} callback fires from the reader
-     * thread once the underlying transport surfaces the close.
+     * or on one that never completed its handshake. A close requested this
+     * way is silent: the reader thread exits without delivering
+     * {@link WhatsAppSocketListener#onClose()}, since that callback signals an
+     * unsolicited drop and must not fire against a caller-initiated teardown.
      *
      * @implNote
      * This implementation destroys the AES keys eagerly via
@@ -994,7 +996,7 @@ public sealed abstract class WhatsAppSocketClient {
 
             verifyCertificateChain(decryptedCertificate, decodedStaticText);
 
-            var noiseKeyPair = store.noiseKeyPair();
+            var noiseKeyPair = store.signalStore().noiseKeyPair();
             var encodedKey = handshake.cipher(noiseKeyPair.publicKey().toEncodedPoint(), true);
             var sharedPrivate = Curve25519.sharedKey(
                     noiseKeyPair.privateKey().toEncodedPoint(), ephemeral
@@ -1108,7 +1110,9 @@ public sealed abstract class WhatsAppSocketClient {
                 listener.onError(new WhatsAppStreamException.MalformedNode("Failed to process inbound datagram", e));
             }
         } finally {
-            listener.onClose();
+            if (!closed) {
+                listener.onClose();
+            }
         }
     }
 

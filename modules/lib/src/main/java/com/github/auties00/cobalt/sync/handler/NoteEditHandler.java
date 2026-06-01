@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -46,7 +46,7 @@ import java.util.logging.Logger;
 public final class NoteEditHandler implements WebAppStateActionHandler {
     /**
      * Logger used for diagnostic traces emitted by
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}.
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}.
      *
      * @implNote
      * This implementation logs at {@code WARNING} for missing
@@ -103,7 +103,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      * is malformed; an unresolvable chat is
      * {@link MutationApplicationResult#orphan(String, String)}; and the
      * resolved record is persisted via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#putNoteState(com.github.auties00.cobalt.model.business.NoteState)}
+     * {@link com.github.auties00.cobalt.store.BusinessStore#putNoteState(com.github.auties00.cobalt.model.business.NoteState)}
      * keyed by the id from {@link #resolveNoteId(Jid, Jid, String)}. Exceptions
      * surface as {@link MutationApplicationResult#failed()}.
      *
@@ -113,7 +113,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNoteSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
@@ -133,7 +133,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
             }
 
             if (action.deleted()) {
-                client.store().removeNoteState(noteId);
+                client.store().businessStore().removeNoteState(noteId);
                 return MutationApplicationResult.success();
             }
 
@@ -157,7 +157,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
                 LOGGER.warning("noteEditAction.unstructuredContent is empty");
             }
 
-            var chat = client.store().findChatByJid(validatedChatJid);
+            var chat = client.store().chatStore().findChatByJid(validatedChatJid);
             if (chat.isEmpty()) {
                 return MutationApplicationResult.orphan(validatedChatJid.toString(), "Chat");
             }
@@ -166,7 +166,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
 
             var resolvedNoteId = resolveNoteId(validatedChatJid, resolvedChatJid, noteId);
 
-            client.store().putNoteState(new NoteStateBuilder()
+            client.store().businessStore().putNoteState(new NoteStateBuilder()
                     .id(resolvedNoteId)
                     .type(type)
                     .chatJid(resolvedChatJid)

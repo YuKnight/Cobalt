@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.TestSignalSession;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.DisplayName;
@@ -40,8 +41,9 @@ class SenderKeyDistributionTest {
     void constructorNullArgs() {
         var senderStore = MessageFixtures.temporaryStore(SENDER_BARE, null);
         var encryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var deviceService = StubDeviceService.create();
 
         assertThrows(NullPointerException.class,
@@ -60,8 +62,9 @@ class SenderKeyDistributionTest {
         TestSignalSession.establishSession(senderStore, DEVICE_ONE, recipientStore);
 
         var encryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var distribution = new SenderKeyDistribution(encryption,
                 StubDeviceService.create(), senderStore);
 
@@ -88,8 +91,9 @@ class SenderKeyDistributionTest {
         TestSignalSession.establishSession(senderStore, DEVICE_TWO, recipientStoreTwo);
 
         var encryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var distribution = new SenderKeyDistribution(encryption,
                 StubDeviceService.create(), senderStore);
         var senderKeyBytes = encryption.getSenderKeyBytes(GROUP, SENDER_BARE);
@@ -114,8 +118,9 @@ class SenderKeyDistributionTest {
         TestSignalSession.establishSession(senderStore, DEVICE_ONE, recipientStore);
 
         var encryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var distribution = new SenderKeyDistribution(encryption,
                 StubDeviceService.create(), senderStore);
         var senderKeyBytes = encryption.getSenderKeyBytes(GROUP, SENDER_BARE);
@@ -130,8 +135,9 @@ class SenderKeyDistributionTest {
     void encryptNullArgs() {
         var senderStore = MessageFixtures.temporaryStore(SENDER_BARE, null);
         var encryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var distribution = new SenderKeyDistribution(encryption,
                 StubDeviceService.create(), senderStore);
         var senderKeyBytes = encryption.getSenderKeyBytes(GROUP, SENDER_BARE);
@@ -149,8 +155,9 @@ class SenderKeyDistributionTest {
     void encryptEmptyDeviceList() {
         var senderStore = MessageFixtures.temporaryStore(SENDER_BARE, null);
         var encryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var distribution = new SenderKeyDistribution(encryption,
                 StubDeviceService.create(), senderStore);
         var senderKeyBytes = encryption.getSenderKeyBytes(GROUP, SENDER_BARE);

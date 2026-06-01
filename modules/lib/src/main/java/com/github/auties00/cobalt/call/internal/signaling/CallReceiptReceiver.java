@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.call.internal.signaling;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 /**
  * Handles inbound VoIP call receipt stanzas by acknowledging them back to the server.
@@ -26,7 +26,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * preserved exactly.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleVoipCallReceipt")
-public final class CallReceiptReceiver implements SocketStream.Handler {
+public final class CallReceiptReceiver extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs parse errors for unrecognized or malformed call receipt stanzas.
@@ -36,7 +36,7 @@ public final class CallReceiptReceiver implements SocketStream.Handler {
     /**
      * Holds the WhatsApp client used to read the local user's device JID from the store.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Holds the {@link AckSender} used to emit the outbound {@code <ack class="receipt">} stanza, with
@@ -53,7 +53,7 @@ public final class CallReceiptReceiver implements SocketStream.Handler {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleVoipCallReceipt", exports = "handleCallReceipt",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public CallReceiptReceiver(WhatsAppClient whatsapp, AckSender ackSender) {
+    public CallReceiptReceiver(LinkedWhatsAppClient whatsapp, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.ackSender = ackSender;
     }
@@ -94,7 +94,7 @@ public final class CallReceiptReceiver implements SocketStream.Handler {
             return;
         }
 
-        var meDevicePn = whatsapp.store().jid().orElse(null);
+        var meDevicePn = whatsapp.store().accountStore().jid().orElse(null);
         if (meDevicePn == null) {
             return;
         }

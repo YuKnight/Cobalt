@@ -20,7 +20,7 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
  * debounce windows) as {@code public static final} fields on this enum
  * so consumers have a single import point.
  *
- * @see WhatsAppClient
+ * @see LinkedWhatsAppClient
  */
 @WhatsAppWebModule(moduleName = "WAWebOfflineResumeConst")
 @WhatsAppWebExport(

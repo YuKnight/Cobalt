@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.reportBug} — submits a
+ * Input model for {@code LinkedWhatsAppClient.reportBug} — submits a
  * bug-report payload to the WASmaxBugReporting pipeline.
  *
  * <p>{@link #from} is the only required field; every other field is

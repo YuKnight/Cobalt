@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -16,7 +16,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * <p>The sync dispatcher routes incoming {@code setting_relayAllCalls} mutations here whenever the
  * user toggles "Always relay calls" on another linked device (typical trigger: Privacy Settings,
  * Advanced, Protect IP Address in Calls). The handler writes the boolean preference onto
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setRelayAllCalls(boolean)} so Cobalt's VoIP
+ * {@link com.github.auties00.cobalt.store.SettingsStore#setRelayAllCalls(boolean)} so Cobalt's VoIP
  * layer routes subsequent calls through the WA relay instead of letting the peer learn the local IP
  * address.
  */
@@ -67,7 +67,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      * {@link PrivacySettingRelayAllCalls}; any other operation is
      * {@link MutationApplicationResult#unsupported()} and any other value is
      * {@link MutationApplicationResult#malformed()}. The boolean is written into
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setRelayAllCalls(boolean)}.
+     * {@link com.github.auties00.cobalt.store.SettingsStore#setRelayAllCalls(boolean)}.
      *
      * @implNote
      * This implementation replaces WA Web's {@code setRelayAllCallsToUserPrefs} backend shell hop
@@ -80,7 +80,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -89,7 +89,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setRelayAllCalls(action.isEnabled());
+        client.store().settingsStore().setRelayAllCalls(action.isEnabled());
         return MutationApplicationResult.success();
     }
 

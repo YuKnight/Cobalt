@@ -18,7 +18,7 @@ import java.util.Optional;
  * forced-update deadline. The push carries an optional Unix-epoch cutoff;
  * {@link com.github.auties00.cobalt.stream.control.InfoBulletinStreamHandler}
  * consumes the {@link #of(Node)} parser and exposes the deadline to embedders
- * over {@link com.github.auties00.cobalt.client.WhatsAppClientListener}. The
+ * over {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener}. The
  * hierarchy is receive-only and has a single {@link Inbound} permit.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleInfoBulletin")

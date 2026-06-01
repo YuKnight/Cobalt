@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -83,7 +83,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#unsupported()}, a missing label id or
      * target JID as malformed, and an unparseable target JID as malformed. The
      * target JID is resolved chat-table-first, then through
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#findPhoneByLid(Jid)}
+     * {@link com.github.auties00.cobalt.store.ContactStore#findPhoneByLid(Jid)}
      * when it carries the LID server. When {@link LabelAssociationAction#labeled()}
      * is set the resolved JID is added via {@link Label#addAssignment(Jid)};
      * otherwise it is removed via {@link Label#removeAssignment(Jid)}.
@@ -101,7 +101,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelJidSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
@@ -134,25 +134,24 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
             }
 
             var resolvedTargetJid = targetJid;
-            var resolvedChat = client.store().findChatByJid(targetJid);
+            var resolvedChat = client.store().chatStore().findChatByJid(targetJid);
             if (resolvedChat.isPresent()) {
                 resolvedTargetJid = resolvedChat.get().toJid();
             } else if (targetJid.hasLidServer()) {
-                var phoneJid = client.store().findPhoneByLid(targetJid);
+                var phoneJid = client.store().contactStore().findPhoneByLid(targetJid);
                 if (phoneJid.isPresent()) {
                     resolvedTargetJid = phoneJid.get();
                 }
             }
 
-            var label = client.store()
-                    .findLabel(labelId)
+            var label = client.store().settingsStore().findLabel(labelId)
                     .orElseGet(() -> {
                         var newLabel = new LabelBuilder()
                                 .id(labelId)
                                 .name("")
                                 .color(0)
                                 .build();
-                        client.store().addLabel(newLabel);
+                        client.store().settingsStore().addLabel(newLabel);
                         return newLabel;
                     });
 

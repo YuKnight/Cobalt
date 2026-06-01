@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.registration.push.apns;
 
+import com.github.auties00.cobalt.client.WhatsAppClientDevice;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
-import com.github.auties00.cobalt.client.WhatsAppDevice;
 import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
 import com.github.auties00.cobalt.Faker;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
@@ -32,7 +32,7 @@ class ApnsClientTest {
     public void deliversPushCodeViaRegistration() throws Throwable {
         var maxAttempts = 5;
         var perAttemptTimeout = Duration.ofMinutes(2);
-        var device = WhatsAppDevice.ios(false);
+        var device = WhatsAppClientDevice.ios(false);
         Throwable lastFailure = null;
         for (var attempt = 1; attempt <= maxAttempts; attempt++) {
             var phoneNumber = Faker.randomItalianMobile();
@@ -41,7 +41,7 @@ class ApnsClientTest {
 
                 var store = WhatsAppStoreFactory.temporary()
                         .create(WhatsAppClientType.MOBILE, phoneNumber);
-                store.setDevice(device);
+                store.accountStore().setDevice(device);
 
                 var verification = WhatsAppClientVerificationHandler.Mobile
                         .whatsapp(pushClient::getPushCode);
@@ -77,7 +77,7 @@ class ApnsClientTest {
 
                 var failure = registrationFailure.get();
                 if (failure == null) {
-                    assertTrue(store.registered(),
+                    assertTrue(store.accountStore().registered(),
                             "store must report registered after a successful flow");
                     return;
                 }
@@ -125,9 +125,9 @@ class ApnsClientTest {
     void rejectsNonIosDevice() {
         try (var client = ApnsClient.newSession()) {
             assertThrows(IllegalArgumentException.class,
-                    () -> client.authenticate(WhatsAppDevice.android(false)));
+                    () -> client.authenticate(WhatsAppClientDevice.android(false)));
             assertThrows(IllegalArgumentException.class,
-                    () -> client.authenticate(WhatsAppDevice.web()));
+                    () -> client.authenticate(WhatsAppClientDevice.web()));
             assertFalse(client.isAuthenticated());
         }
     }
@@ -135,7 +135,7 @@ class ApnsClientTest {
     @Test
     void authenticatesPersonalAndProducesPushToken() {
         try (var client = ApnsClient.newSession()) {
-            client.authenticate(WhatsAppDevice.ios(false));
+            client.authenticate(WhatsAppClientDevice.ios(false));
             assertTrue(client.isAuthenticated());
             var token = client.getPushToken();
             assertNotNull(token);
@@ -147,7 +147,7 @@ class ApnsClientTest {
     @Test
     void authenticatesBusinessAndProducesPushToken() {
         try (var client = ApnsClient.newSession()) {
-            client.authenticate(WhatsAppDevice.ios(true));
+            client.authenticate(WhatsAppClientDevice.ios(true));
             assertTrue(client.isAuthenticated());
             assertEquals(64, client.getPushToken().length());
         }
@@ -156,9 +156,9 @@ class ApnsClientTest {
     @Test
     void rejectsDoubleAuthenticate() {
         try (var client = ApnsClient.newSession()) {
-            client.authenticate(WhatsAppDevice.ios(false));
+            client.authenticate(WhatsAppClientDevice.ios(false));
             assertThrows(IllegalStateException.class,
-                    () -> client.authenticate(WhatsAppDevice.ios(false)));
+                    () -> client.authenticate(WhatsAppClientDevice.ios(false)));
         }
     }
 
@@ -166,7 +166,7 @@ class ApnsClientTest {
     void sessionRoundTripsThroughLoadSession() throws Exception {
         ApnsSession saved;
         try (var client = ApnsClient.newSession()) {
-            client.authenticate(WhatsAppDevice.ios(false));
+            client.authenticate(WhatsAppClientDevice.ios(false));
             assertEquals(64, client.getPushToken().length());
             saved = client.getSession();
             assertTrue(saved.privateKeyDer().length > 0);

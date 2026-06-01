@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.model.newsletter;
 
 /**
- * Optional filter for {@code WhatsAppClient.queryNewsletterResponses} —
+ * Optional filter for {@code LinkedWhatsAppClient.queryNewsletterResponses} —
  * narrows the response slice to a single contributor cohort. At most
  * one filter is applied per request; {@code null} on the call site
  * returns responses from every contributor.

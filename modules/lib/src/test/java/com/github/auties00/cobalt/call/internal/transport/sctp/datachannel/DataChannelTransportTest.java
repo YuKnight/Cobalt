@@ -189,6 +189,62 @@ public class DataChannelTransportTest {
         }
     }
 
+    @Test
+    public void partiallyReliableChannelMessagesRoundTrip() throws Exception {
+        // Exercises the SCTP_SENDV_SPA partial-reliability send path end-to-end through the
+        // loopback. The fact that the message arrives at all verifies the SPA container's
+        // sndinfo nesting (stream/PPID/ordered) and prinfo nesting (policy + value) are wired
+        // correctly; the partial-reliability semantics only matter on lossy links.
+        try (var pair = new LoopbackPair()) {
+            BlockingQueue<DataChannel.Message> serverInbox = new ArrayBlockingQueue<>(8);
+            var peerLatch = new CountDownLatch(1);
+            pair.server.setPeerOpenListener(channel -> {
+                channel.setMessageListener(serverInbox::offer);
+                peerLatch.countDown();
+            });
+            pair.connect();
+            var clientChannel = pair.client.open("pr-rtx",
+                    DataChannelOptions.partialReliableByRetransmit(3, true));
+            assertTrue(peerLatch.await(5, TimeUnit.SECONDS));
+            assertTrue(awaitState(clientChannel, DataChannelState.OPEN, 5_000));
+
+            clientChannel.send("partial-reliable hello");
+            clientChannel.send(new byte[]{(byte) 0xC0, (byte) 0xDE, 0x42});
+
+            var first = serverInbox.poll(5, TimeUnit.SECONDS);
+            var second = serverInbox.poll(5, TimeUnit.SECONDS);
+            assertTrue(first instanceof DataChannel.Message.Text,
+                    "first message should be Text, got " + (first == null ? "null" : first.getClass().getSimpleName()));
+            assertEquals("partial-reliable hello", ((DataChannel.Message.Text) first).value());
+            assertTrue(second instanceof DataChannel.Message.Binary,
+                    "second message should be Binary, got " + (second == null ? "null" : second.getClass().getSimpleName()));
+        }
+    }
+
+    @Test
+    public void lifetimeLimitedChannelMessageRoundTrips() throws Exception {
+        // SCTP_PR_SCTP_TTL variant of the partial-reliability send path.
+        try (var pair = new LoopbackPair()) {
+            BlockingQueue<DataChannel.Message> serverInbox = new ArrayBlockingQueue<>(4);
+            var peerLatch = new CountDownLatch(1);
+            pair.server.setPeerOpenListener(channel -> {
+                channel.setMessageListener(serverInbox::offer);
+                peerLatch.countDown();
+            });
+            pair.connect();
+            var clientChannel = pair.client.open("pr-ttl",
+                    DataChannelOptions.partialReliableByLifetime(2000, true));
+            assertTrue(peerLatch.await(5, TimeUnit.SECONDS));
+            assertTrue(awaitState(clientChannel, DataChannelState.OPEN, 5_000));
+
+            clientChannel.send("ttl hello");
+            var msg = serverInbox.poll(5, TimeUnit.SECONDS);
+            assertTrue(msg instanceof DataChannel.Message.Text,
+                    "expected Text, got " + (msg == null ? "null" : msg.getClass().getSimpleName()));
+            assertEquals("ttl hello", ((DataChannel.Message.Text) msg).value());
+        }
+    }
+
     private static boolean awaitState(DataChannel channel, DataChannelState target, long timeoutMs)
             throws InterruptedException {
         var deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);

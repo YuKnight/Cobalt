@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayloadBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -24,19 +24,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link LidMigrationService#state()} test seam so the production API need not leak the
  * {@link LidMigrationState} enum.
  */
-@DisplayName("LidMigrationService state machine")
+@DisplayName("LiveLidMigrationService state machine")
 class LidMigrationServiceStateMachineTest {
 
     private static final Jid SELF_PN = Jid.of("19254863482@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594056@lid");
 
-    private record Harness(TestWhatsAppClient client, TestABPropsService props, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, TestABPropsService props, LiveLidMigrationService service) {}
 
     private static Harness build(TestABPropsService props) {
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, props, service);
     }
 

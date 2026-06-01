@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.control;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -22,19 +23,19 @@ import java.util.concurrent.ConcurrentMap;
  * {@link #increment(SyncPatchType)} once per affected collection; when the offline-end bulletin arrives, the consumer
  * ({@link InfoBulletinStreamHandler}) calls {@link #report()}, which flushes the map into the WAM event with a
  * redundant count equal to the number of duplicate notifications observed for the same collection. It is wired up once
- * inside {@link com.github.auties00.cobalt.stream.SocketStream}.
+ * inside {@link com.github.auties00.cobalt.stream.NodeStreamService}.
  *
  * @implNote This implementation collapses WA Web's producer/consumer pair into a single shared service so the two
- * distinct {@code SocketStream.Handler} implementations can observe the same map without exposing private state on the
- * {@link WhatsAppClient}; the map is cleared atomically on flush.
+ * distinct {@code SocketStreamHandler} implementations can observe the same map without exposing private state on the
+ * {@link LinkedWhatsAppClient}; the map is cleared atomically on flush.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleReportServerSyncNotification")
 public final class OfflineNotificationsReporter {
     /**
-     * The {@link WhatsAppClient} retained for parity with sibling reporters; the actual WAM emission is routed through
+     * The {@link LinkedWhatsAppClient} retained for parity with sibling reporters; the actual WAM emission is routed through
      * {@link #wamService}.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * The {@link WamService} used to commit the {@code MdAppStateOfflineNotifications} event when {@link #report()}
@@ -56,14 +57,14 @@ public final class OfflineNotificationsReporter {
      * <p>The same instance is threaded through both the server-sync producer ({@link NotificationSyncStreamHandler})
      * and the offline-bulletin consumer ({@link InfoBulletinStreamHandler}).
      *
-     * @param whatsapp   the {@link WhatsAppClient}; must not be {@code null}
+     * @param whatsapp   the {@link LinkedWhatsAppClient}; must not be {@code null}
      * @param wamService the {@link WamService} used to commit the offline-notifications event; must not be
      *                   {@code null}
      * @throws NullPointerException if {@code whatsapp} or {@code wamService} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleReportServerSyncNotification",
             exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public OfflineNotificationsReporter(WhatsAppClient whatsapp, WamService wamService) {
+    public OfflineNotificationsReporter(LinkedWhatsAppClient whatsapp, WamService wamService) {
         this.whatsapp = Objects.requireNonNull(whatsapp, "whatsapp cannot be null");
         this.wamService = Objects.requireNonNull(wamService, "wamService cannot be null");
         this.offlineNotificationsCount = new ConcurrentHashMap<>();

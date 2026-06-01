@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Covers the {@link MaibaAIFeaturesControlHandler} for the SMB
  * {@code maiba_ai_features_control} feature-status mutation: metadata, the SET
  * happy path that persists the status via
- * {@link WhatsAppStore#setAiBusinessAgentStatus(MaibaAIFeatureStatus)}, the
+ * {@link com.github.auties00.cobalt.store.BusinessStore#setAiBusinessAgentStatus(MaibaAIFeatureStatus)}, the
  * malformed branch when {@link MaibaAIFeatureStatus} is empty, the REMOVE
  * rejection and timestamp-based conflict resolution. WA Web ships the protobuf
  * field but does not register a corresponding sync handler, so every behavioural
@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Tests run against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * through {@link TestWhatsAppClient} so the
- * {@link WhatsAppStore#aiBusinessAgentStatus()} read-back can be asserted
+ * {@link com.github.auties00.cobalt.store.BusinessStore#aiBusinessAgentStatus()} read-back can be asserted
  * directly.
  */
 @DisplayName("MaibaAIFeaturesControlHandler")
@@ -48,7 +48,7 @@ class MaibaAIFeaturesControlHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private MaibaAIFeaturesControlHandler handler;
 
     @BeforeEach
@@ -96,27 +96,27 @@ class MaibaAIFeaturesControlHandlerTest {
         @Test
         @DisplayName("SET with ENABLED persists ENABLED on the store")
         void setsEnabled() {
-            assertTrue(store.aiBusinessAgentStatus().isEmpty(), "precondition: status is unset");
+            assertTrue(store.businessStore().aiBusinessAgentStatus().isEmpty(), "precondition: status is unset");
             var action = new MaibaAIFeaturesControlActionBuilder()
                     .aiFeatureStatus(MaibaAIFeatureStatus.ENABLED).build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(MaibaAIFeatureStatus.ENABLED, store.aiBusinessAgentStatus().orElseThrow());
+            assertEquals(MaibaAIFeatureStatus.ENABLED, store.businessStore().aiBusinessAgentStatus().orElseThrow());
         }
 
         @Test
         @DisplayName("SET with DISABLED overwrites a prior ENABLED value")
         void setsDisabledOverwrites() {
-            store.setAiBusinessAgentStatus(MaibaAIFeatureStatus.ENABLED);
+            store.businessStore().setAiBusinessAgentStatus(MaibaAIFeatureStatus.ENABLED);
             var action = new MaibaAIFeaturesControlActionBuilder()
                     .aiFeatureStatus(MaibaAIFeatureStatus.DISABLED).build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(MaibaAIFeatureStatus.DISABLED, store.aiBusinessAgentStatus().orElseThrow());
+            assertEquals(MaibaAIFeatureStatus.DISABLED, store.businessStore().aiBusinessAgentStatus().orElseThrow());
         }
     }
 
@@ -135,7 +135,7 @@ class MaibaAIFeaturesControlHandlerTest {
                     "[\"maiba_ai_features_control\"]", value, SyncdOperation.SET, ts, handler.version());
 
             assertEquals(SyncActionState.MALFORMED, handler.applyMutation(client, mutation).actionState());
-            assertTrue(store.aiBusinessAgentStatus().isEmpty(),
+            assertTrue(store.businessStore().aiBusinessAgentStatus().isEmpty(),
                     "a malformed payload must not touch the store");
         }
 
@@ -162,7 +162,7 @@ class MaibaAIFeaturesControlHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.aiBusinessAgentStatus().isEmpty());
+            assertTrue(store.businessStore().aiBusinessAgentStatus().isEmpty());
         }
     }
 

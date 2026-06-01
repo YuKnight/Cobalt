@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.media.transcode.text.link.DeepLinkParser;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -77,7 +77,7 @@ public final class CatalogPreviewResolver {
      */
     @WhatsAppWebExport(moduleName = "WAWebBizLinkPreviewCatalogUtils", exports = "getProductOrCatalogLinkPreview",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public static boolean resolve(WhatsAppClient client, String ownerJid, String productId,
+    public static boolean resolve(LinkedWhatsAppClient client, String ownerJid, String productId,
                                   HttpClient httpClient, Duration timeout, ExtendedTextMessage message) {
         if (client == null || ownerJid == null || message == null) {
             return false;
@@ -131,7 +131,7 @@ public final class CatalogPreviewResolver {
      * @return the catalog entries, or the empty list when the query
      *         failed
      */
-    private static List<BusinessCatalogEntry> safeQueryCatalog(WhatsAppClient client, Jid wid) {
+    private static List<BusinessCatalogEntry> safeQueryCatalog(LinkedWhatsAppClient client, Jid wid) {
         try {
             return client.queryBusinessCatalog(wid);
         } catch (RuntimeException _) {
@@ -174,7 +174,7 @@ public final class CatalogPreviewResolver {
      * <p>The cached verified-business name has priority, followed by the
      * cached contact's chosen name or short name, and finally a fresh
      * usync round-trip via
-     * {@code WhatsAppClient.queryBusinessProfile(JidProvider)} which
+     * {@code LinkedWhatsAppClient.queryBusinessProfile(JidProvider)} which
      * surfaces the server-supplied {@link BusinessVerifiedName}. When
      * nothing resolves the JID's user portion is returned.
      *
@@ -190,14 +190,14 @@ public final class CatalogPreviewResolver {
      */
     @WhatsAppWebExport(moduleName = "WAWebGetOrQueryUsyncInfoContactAction", exports = "getOrQueryUsyncInfo",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static String ownerDisplayName(WhatsAppClient client, Jid wid) {
-        var contactName = client.store().findContactByJid(wid)
+    private static String ownerDisplayName(LinkedWhatsAppClient client, Jid wid) {
+        var contactName = client.store().contactStore().findContactByJid(wid)
                 .flatMap(contact -> contact.chosenName().or(contact::shortName))
                 .orElse(null);
         if (contactName != null && !contactName.isEmpty()) {
             return contactName;
         }
-        var verified = client.store().findVerifiedBusinessName(wid)
+        var verified = client.store().contactStore().findVerifiedBusinessName(wid)
                 .flatMap(BusinessVerifiedName::name)
                 .orElse(null);
         if (verified != null && !verified.isEmpty()) {
@@ -205,7 +205,7 @@ public final class CatalogPreviewResolver {
         }
         try {
             client.queryBusinessProfile(wid);
-            var refreshed = client.store().findVerifiedBusinessName(wid)
+            var refreshed = client.store().contactStore().findVerifiedBusinessName(wid)
                     .flatMap(BusinessVerifiedName::name)
                     .orElse(null);
             if (refreshed != null && !refreshed.isEmpty()) {
@@ -234,7 +234,7 @@ public final class CatalogPreviewResolver {
         var currency = product.currency().orElse(null);
         var price = product.price();
         if (description != null && currency != null && price > 0) {
-            return description + " · " + formatAmount(currency, price);
+            return description + " Â· " + formatAmount(currency, price);
         }
         if (description != null) {
             return description;

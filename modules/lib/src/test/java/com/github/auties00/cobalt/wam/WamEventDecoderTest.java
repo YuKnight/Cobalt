@@ -26,7 +26,7 @@ class WamEventDecoderTest {
     @DisplayName("truncated event marker: no fieldId byte → IndexOutOfBoundsException")
     void truncatedEventMarker() {
         var truncated = new byte[]{(byte) (WamTags.EVENT | WamTags.LAST | WamTags.VALUE_INT_0)};
-        var decoder = WamEventDecoder.of(truncated, 0, truncated.length);
+        var decoder = WamEventDecoder.fromBytes(truncated, 0, truncated.length);
         assertThrows(IndexOutOfBoundsException.class, decoder::readHeader);
     }
 
@@ -37,7 +37,7 @@ class WamEventDecoderTest {
                 (byte) (WamTags.FIELD | WamTags.WIDE_ID | WamTags.VALUE_INT_0),
                 0x01
         };
-        var decoder = WamEventDecoder.of(truncated, 0, truncated.length);
+        var decoder = WamEventDecoder.fromBytes(truncated, 0, truncated.length);
         assertThrows(IndexOutOfBoundsException.class, decoder::readHeader);
     }
 
@@ -49,7 +49,7 @@ class WamEventDecoderTest {
                 0x05,
                 0x01, 0x02
         };
-        var decoder = WamEventDecoder.of(truncated, 0, truncated.length);
+        var decoder = WamEventDecoder.fromBytes(truncated, 0, truncated.length);
         var header = decoder.readHeader();
         assertEquals(5, WamEventDecoder.fieldIdOf(header));
         assertThrows(IndexOutOfBoundsException.class, () -> decoder.readInt(header));
@@ -64,7 +64,7 @@ class WamEventDecoderTest {
                 0x10,
                 'a', 'b'
         };
-        var decoder = WamEventDecoder.of(truncated, 0, truncated.length);
+        var decoder = WamEventDecoder.fromBytes(truncated, 0, truncated.length);
         var header = decoder.readHeader();
         assertThrows(IndexOutOfBoundsException.class, () -> decoder.readString(header));
     }
@@ -73,9 +73,9 @@ class WamEventDecoderTest {
     @DisplayName("type-tag mismatch: readString on int header → IllegalStateException")
     void readStringOnIntHeader() {
         var buffer = new byte[16];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeIntField(5, 42L, false);
-        var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
         var header = decoder.readHeader();
         assertThrows(IllegalStateException.class, () -> decoder.readString(header));
     }
@@ -84,9 +84,9 @@ class WamEventDecoderTest {
     @DisplayName("type-tag mismatch: readInt on string header → IllegalStateException")
     void readIntOnStringHeader() {
         var buffer = new byte[32];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeStringField(5, "hi", false);
-        var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
         var header = decoder.readHeader();
         assertThrows(IllegalStateException.class, () -> decoder.readInt(header));
     }
@@ -95,9 +95,9 @@ class WamEventDecoderTest {
     @DisplayName("type-tag mismatch: readFloat on int header → IllegalStateException")
     void readFloatOnIntHeader() {
         var buffer = new byte[16];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeIntField(5, 200L, false);
-        var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
         var header = decoder.readHeader();
         assertThrows(IllegalStateException.class, () -> decoder.readFloat(header));
     }
@@ -109,7 +109,7 @@ class WamEventDecoderTest {
     @DisplayName("skip advances past every known value-type cleanly")
     void skipCoversAllTypes() {
         var buffer = new byte[512];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeNull(1, WamTags.GLOBAL);
         encoder.writeIntField(2, 0L, true);
         encoder.writeIntField(3, 1L, true);
@@ -121,7 +121,7 @@ class WamEventDecoderTest {
         encoder.writeStringField(9, "a".repeat(300), false);
         var size = encoder.written();
 
-        var decoder = WamEventDecoder.of(buffer, 0, size);
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, size);
         var skipped = 0;
         while (decoder.hasMore()) {
             var header = decoder.readHeader();
@@ -135,17 +135,17 @@ class WamEventDecoderTest {
     @DisplayName("writeNull is a no-op for FIELD / EVENT roles (matches WA Web's writeField/writeEvent null shortcut)")
     void writeNullNonGlobalIsNoop() {
         var buffer = new byte[16];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeNull(5, WamTags.FIELD);
         assertEquals(0, encoder.written(),
                 "writeNull(FIELD) must emit zero bytes, matching WAWebWamLibProtocol's behaviour");
 
-        encoder = WamEventEncoder.of(buffer);
+        encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeNull(5, WamTags.FIELD | WamTags.LAST);
         assertEquals(0, encoder.written(),
                 "writeNull(FIELD|LAST) must emit zero bytes");
 
-        encoder = WamEventEncoder.of(buffer);
+        encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeNull(5, WamTags.EVENT);
         assertEquals(0, encoder.written(),
                 "writeNull(EVENT) must emit zero bytes - WAWebWamLibProtocol.writeEvent skips null");
@@ -155,9 +155,9 @@ class WamEventDecoderTest {
     @DisplayName("unknown fieldId is propagated to caller, not rejected")
     void unknownFieldIdIsPropagated() {
         var buffer = new byte[16];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeIntField(99, 5L, false);
-        var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
         var header = decoder.readHeader();
         assertEquals(99, WamEventDecoder.fieldIdOf(header),
                 "decoder passes the fieldId through; caller decides whether to skip");

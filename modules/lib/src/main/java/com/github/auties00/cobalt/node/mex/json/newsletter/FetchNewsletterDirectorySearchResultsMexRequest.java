@@ -36,7 +36,7 @@ public final class FetchNewsletterDirectorySearchResultsMexRequest implements Me
      *
      * <p>Sent as the {@code query_id} attribute of the outgoing {@code <query>} child.
      */
-    public static final String QUERY_ID = "9699865846759651";
+    public static final String QUERY_ID = "26301059626252132";
 
     /**
      * Holds the GraphQL operation name reported by WhatsApp Web's MEX perf tracker for this query.

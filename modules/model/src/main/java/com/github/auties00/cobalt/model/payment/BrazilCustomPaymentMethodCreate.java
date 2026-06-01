@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.createBrazilCustomPaymentMethod} —
+ * Input model for {@code LinkedWhatsAppClient.createBrazilCustomPaymentMethod} —
  * registers a Brazil-specific custom payment method against the user's
  * account.
  *

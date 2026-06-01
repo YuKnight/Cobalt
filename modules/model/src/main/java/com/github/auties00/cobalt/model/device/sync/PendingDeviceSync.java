@@ -97,24 +97,52 @@ public final class PendingDeviceSync implements Serializable {
     final int retryCount;
 
     /**
+     * The {@code id} of the account-sync {@code <devices>} notification whose ack
+     * was deferred until this sync completes, or {@code null} when the sync
+     * carries no deferred ack.
+     *
+     * <p>Set only for entries queued by the account-sync devices handler during
+     * resume-from-restart, where the inline device list is not trusted and the
+     * notification must not be acknowledged before its follow-up device fetch has
+     * actually run. When the replayed sync succeeds the matching ack is shipped.
+     */
+    @ProtobufProperty(index = 5, type = ProtobufType.STRING)
+    final String notificationId;
+
+    /**
+     * The {@code from} of the deferred-ack notification (the account that owns the
+     * device list), or {@code null} when the sync carries no deferred ack.
+     *
+     * <p>Used as the {@code to} target of the deferred ack shipped once the sync
+     * completes; meaningful only when {@link #notificationId} is non-{@code null}.
+     */
+    @ProtobufProperty(index = 6, type = ProtobufType.STRING)
+    final Jid notificationFrom;
+
+    /**
      * Creates a new pending device-sync entry with the given fields.
      *
      * <p>This constructor is package-private and is intended to be used by
      * the protobuf framework and by the internal {@link #nextRetry()}
      * helper. External callers should use the {@link #of(Collection, String)}
      * factory method, which copies the user list defensively and stamps a
-     * fresh creation time.
+     * fresh creation time, or {@link #ofDeferredAck(Collection, String, String, Jid)}
+     * when the entry must also carry a deferred notification ack.
      *
-     * @param userJids   the user JIDs whose device lists need to be refreshed
-     * @param context    a short tag identifying the caller
-     * @param timestamp  the instant at which this entry was first recorded
-     * @param retryCount the number of retries already attempted
+     * @param userJids         the user JIDs whose device lists need to be refreshed
+     * @param context          a short tag identifying the caller
+     * @param timestamp        the instant at which this entry was first recorded
+     * @param retryCount       the number of retries already attempted
+     * @param notificationId   the deferred-ack notification id, or {@code null}
+     * @param notificationFrom the deferred-ack notification sender, or {@code null}
      */
-    PendingDeviceSync(List<Jid> userJids, String context, Instant timestamp, int retryCount) {
+    PendingDeviceSync(List<Jid> userJids, String context, Instant timestamp, int retryCount, String notificationId, Jid notificationFrom) {
         this.userJids = userJids;
         this.context = context;
         this.timestamp = timestamp;
         this.retryCount = retryCount;
+        this.notificationId = notificationId;
+        this.notificationFrom = notificationFrom;
     }
 
     /**
@@ -130,7 +158,27 @@ public final class PendingDeviceSync implements Serializable {
      * @return a new pending sync ready to be persisted
      */
     public static PendingDeviceSync of(Collection<Jid> userJids, String context) {
-        return new PendingDeviceSync(List.copyOf(userJids), context, Instant.now(), 0);
+        return new PendingDeviceSync(List.copyOf(userJids), context, Instant.now(), 0, null, null);
+    }
+
+    /**
+     * Creates a fresh pending sync entry that also carries a deferred notification
+     * ack to be shipped once the sync completes.
+     *
+     * <p>Used by the account-sync devices handler when it queues a self device
+     * sync during resume-from-restart: the originating notification's ack is held
+     * back (not sent immediately) and is shipped by the replay only after the
+     * device fetch succeeds, so a crash before completion leaves the notification
+     * unacknowledged and the server replays it.
+     *
+     * @param userJids         the user JIDs whose device lists need to be refreshed
+     * @param context          a short tag identifying the caller
+     * @param notificationId   the {@code id} of the notification whose ack is deferred
+     * @param notificationFrom the {@code from} of that notification, used as the ack target
+     * @return a new pending sync carrying the deferred ack
+     */
+    public static PendingDeviceSync ofDeferredAck(Collection<Jid> userJids, String context, String notificationId, Jid notificationFrom) {
+        return new PendingDeviceSync(List.copyOf(userJids), context, Instant.now(), 0, notificationId, notificationFrom);
     }
 
     /**
@@ -144,7 +192,7 @@ public final class PendingDeviceSync implements Serializable {
      * @return a new entry representing the next retry attempt
      */
     public PendingDeviceSync nextRetry() {
-        return new PendingDeviceSync(userJids, context, timestamp, retryCount + 1);
+        return new PendingDeviceSync(userJids, context, timestamp, retryCount + 1, notificationId, notificationFrom);
     }
 
     /**
@@ -214,11 +262,33 @@ public final class PendingDeviceSync implements Serializable {
     }
 
     /**
+     * Returns the {@code id} of the notification whose ack was deferred until this
+     * sync completes.
+     *
+     * @return the deferred-ack notification id, or {@code null} when the entry
+     *         carries no deferred ack
+     */
+    public String notificationId() {
+        return notificationId;
+    }
+
+    /**
+     * Returns the {@code from} of the deferred-ack notification, used as the ack
+     * target once the sync completes.
+     *
+     * @return the deferred-ack notification sender, or {@code null} when the entry
+     *         carries no deferred ack
+     */
+    public Jid notificationFrom() {
+        return notificationFrom;
+    }
+
+    /**
      * Compares this entry to another object for value equality.
      *
      * <p>Two entries are equal when they carry the same user JIDs, the
-     * same caller context, the same creation timestamp, and the same
-     * retry count.
+     * same caller context, the same creation timestamp, the same retry
+     * count, and the same deferred-ack notification id and sender.
      *
      * @param o the object to compare against
      * @return {@code true} if the two entries are value-equal
@@ -229,17 +299,19 @@ public final class PendingDeviceSync implements Serializable {
                             && retryCount == that.retryCount
                             && Objects.equals(userJids, that.userJids)
                             && Objects.equals(context, that.context)
-                            && Objects.equals(timestamp, that.timestamp);
+                            && Objects.equals(timestamp, that.timestamp)
+                            && Objects.equals(notificationId, that.notificationId)
+                            && Objects.equals(notificationFrom, that.notificationFrom);
     }
 
     /**
      * Returns a hash code consistent with {@link #equals(Object)}.
      *
-     * @return the hash code derived from all four fields
+     * @return the hash code derived from all fields
      */
     @Override
     public int hashCode() {
-        return Objects.hash(userJids, context, timestamp, retryCount);
+        return Objects.hash(userJids, context, timestamp, retryCount, notificationId, notificationFrom);
     }
 
     /**
@@ -257,7 +329,9 @@ public final class PendingDeviceSync implements Serializable {
                "userJids=" + userJids + ", " +
                "context=" + context + ", " +
                "timestamp=" + timestamp + ", " +
-               "retryCount=" + retryCount + ']';
+               "retryCount=" + retryCount + ", " +
+               "notificationId=" + notificationId + ", " +
+               "notificationFrom=" + notificationFrom + ']';
     }
 
 }

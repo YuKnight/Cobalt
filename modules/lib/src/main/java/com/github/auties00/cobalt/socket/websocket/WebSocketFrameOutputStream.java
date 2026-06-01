@@ -1,16 +1,8 @@
 package com.github.auties00.cobalt.socket.websocket;
 
-import jdk.incubator.vector.ByteVector;
-import jdk.incubator.vector.IntVector;
-import jdk.incubator.vector.VectorOperators;
-import jdk.incubator.vector.VectorSpecies;
-
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.nio.ByteOrder;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -41,64 +33,24 @@ import static com.github.auties00.cobalt.socket.websocket.WebSocketFrameConstant
  * </ul>
  *
  * <p>In both modes the mask is applied <strong>in place</strong> on the
- * caller's array using the JDK Vector API for bulk throughput with an
- * int-wise scalar fallback for short tails. The mutation contract is
- * intentional and load-bearing for zero-copy: the caller's buffer must
- * not be reused or read after the call returns.
+ * caller's array through the {@link WebSocketMasker} selected at load
+ * time, which prefers a SIMD implementation when the Vector API is
+ * available and falls back to a scalar one otherwise. The mutation
+ * contract is intentional and load-bearing for zero-copy: the caller's
+ * buffer must not be reused or read after the call returns.
  *
  * <p>All public state-mutating methods are serialized on {@code this}
  * so the input thread's auto-PONG (which goes through
  * {@link #writeControlFrame(byte, byte[], int)}) cannot race the writer
  * thread's streaming-mode frame.
- *
- * @implNote This implementation masks with a three-tier strategy: a
- * scalar alignment lead-in, a
- * {@link ByteVector#lanewise(VectorOperators.Binary, byte)} bulk loop,
- * an {@link VarHandle} int tail and a final byte tail. Below
- * {@link #VECTORIZE_THRESHOLD} the SIMD path is skipped so small frames
- * pay no vector-setup cost.
  */
 public final class WebSocketFrameOutputStream extends FilterOutputStream {
 
     /**
-     * Holds the preferred hardware vector species used for SIMD bulk
-     * masking.
+     * Holds the masker selected once at class-load time, shared by every
+     * instance to mask payloads in place.
      */
-    private static final VectorSpecies<Byte> BYTE_SPECIES = ByteVector.SPECIES_PREFERRED;
-
-    /**
-     * Holds the preferred hardware integer vector species used for
-     * building the mask broadcast.
-     */
-    private static final VectorSpecies<Integer> INT_SPECIES = IntVector.SPECIES_PREFERRED;
-
-    /**
-     * Holds the number of bytes processed per SIMD iteration.
-     */
-    private static final int VECTOR_LENGTH = BYTE_SPECIES.length();
-
-    /**
-     * Holds the minimum number of mask-aligned bytes required before
-     * the SIMD path is entered.
-     *
-     * <p>Below this threshold the int-wise and byte-wise paths handle
-     * the entire payload, avoiding vector-setup overhead on small
-     * frames.
-     *
-     * @implNote This implementation requires two full vectors' worth of
-     * bytes so the per-call cost of building the broadcast mask is
-     * amortised over at least two iterations.
-     */
-    private static final int VECTORIZE_THRESHOLD = VECTOR_LENGTH * 2;
-
-    /**
-     * Holds the {@link VarHandle} that reads and writes {@code int}
-     * values from a {@code byte[]} in big-endian order, matching the
-     * mask-byte layout produced by
-     * {@link WebSocketFrameConstants#maskByte(int, int)}.
-     */
-    private static final VarHandle INT_HANDLE =
-            MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.BIG_ENDIAN);
+    private static final WebSocketMasker MASKER = WebSocketMasker.INSTANCE;
 
     /**
      * Holds the maximum frame header size: two base bytes plus eight
@@ -259,7 +211,7 @@ public final class WebSocketFrameOutputStream extends FilterOutputStream {
                         + " bytes but only " + streamingRemaining + " remain");
             }
             if (len > 0) {
-                applyMaskToArray(src, off, len, streamingMaskKey, streamingMaskOffset);
+                MASKER.applyMask(src, off, len, streamingMaskKey, streamingMaskOffset);
                 out.write(src, off, len);
                 streamingMaskOffset += len;
                 streamingRemaining -= len;
@@ -365,7 +317,7 @@ public final class WebSocketFrameOutputStream extends FilterOutputStream {
         var maskKey = ThreadLocalRandom.current().nextInt();
         var headerLen = buildHeader(opcode, len, maskKey);
         if (len > 0) {
-            applyMaskToArray(src, off, len, maskKey, 0);
+            MASKER.applyMask(src, off, len, maskKey, 0);
         }
         out.write(header, 0, headerLen);
         if (len > 0) {
@@ -417,81 +369,5 @@ public final class WebSocketFrameOutputStream extends FilterOutputStream {
         header[pos + 2] = (byte) (maskKey >>> 8);
         header[pos + 3] = (byte) maskKey;
         return pos + 4;
-    }
-
-    /**
-     * Applies the WebSocket XOR mask to a region of a {@code byte[]} in
-     * place.
-     *
-     * <p>The work is split into a scalar lead-in that aligns the mask
-     * offset to a four-byte boundary, a SIMD bulk XOR via
-     * {@link ByteVector}, an int-wise tail via {@link VarHandle} and a
-     * final byte-wise sub-int tail.
-     *
-     * @param array      the byte array to mask in place
-     * @param offset     the index of the first byte to mask
-     * @param length     the number of bytes to mask
-     * @param maskKey    the four-byte masking key
-     * @param maskOffset the starting position in the four-byte mask
-     *                   cycle (always {@code 0} for the encoder since
-     *                   each frame uses a fresh key)
-     */
-    private static void applyMaskToArray(byte[] array, int offset, int length, int maskKey, int maskOffset) {
-        var i = 0;
-
-        var align = maskOffset & 3;
-        if (align != 0) {
-            var leading = Math.min(4 - align, length);
-            for (; i < leading; i++) {
-                array[offset + i] ^= maskByte(maskKey, maskOffset + i);
-            }
-        }
-
-        var remaining = length - i;
-
-        if (remaining >= VECTORIZE_THRESHOLD) {
-            var maskVec = buildAlignedMaskVector(maskKey);
-            var vectorBound = i + BYTE_SPECIES.loopBound(remaining);
-            for (; i < vectorBound; i += VECTOR_LENGTH) {
-                var data = ByteVector.fromArray(BYTE_SPECIES, array, offset + i);
-                data.lanewise(VectorOperators.XOR, maskVec)
-                        .intoArray(array, offset + i);
-            }
-        }
-
-        if (length - i >= 4) {
-            for (; i + 3 < length; i += 4) {
-                var idx = offset + i;
-                var val = (int) INT_HANDLE.get(array, idx);
-                INT_HANDLE.set(array, idx, val ^ maskKey);
-            }
-        }
-
-        for (; i < length; i++) {
-            array[offset + i] ^= maskByte(maskKey, maskOffset + i);
-        }
-    }
-
-    /**
-     * Builds a SIMD vector containing the four-byte mask pattern
-     * repeated to fill every lane.
-     *
-     * @implNote RFC 6455 masks use {@code maskKey[0]} as the
-     * highest-order byte (big-endian memory layout).
-     * {@link IntVector#reinterpretAsBytes()} always uses the platform's
-     * native byte order, so on little-endian hosts this implementation
-     * reverses the int before broadcasting so the reinterpreted bytes
-     * end up in the RFC 6455 order.
-     *
-     * @param maskKey the four-byte masking key
-     * @return a {@link ByteVector} filled with the repeating mask
-     *         pattern
-     */
-    private static ByteVector buildAlignedMaskVector(int maskKey) {
-        var nativeKey = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN
-                ? Integer.reverseBytes(maskKey)
-                : maskKey;
-        return IntVector.broadcast(INT_SPECIES, nativeKey)
-                .reinterpretAsBytes();
     }
 }

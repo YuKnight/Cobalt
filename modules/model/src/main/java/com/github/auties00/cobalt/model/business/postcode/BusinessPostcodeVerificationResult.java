@@ -84,4 +84,29 @@ public enum BusinessPostcodeVerificationResult {
         }
         return Optional.empty();
     }
+
+    /**
+     * Resolves a relay GraphQL {@code result_code} string to the matching
+     * outcome constant.
+     *
+     * <p>The relay variant of the verify-postcode operation encodes the
+     * outcome as {@code "RESULT_CODE_SUCCESS"} or
+     * {@code "RESULT_CODE_UNSERVICEABLE_LOCATION"}; the WhatsApp client maps
+     * any other value to {@link #INVALID_POSTCODE}.
+     *
+     * @param resultCode the relay {@code result_code} string, possibly
+     *                   {@code null}
+     * @return an {@code Optional} containing the matching constant, or empty
+     *         when {@code resultCode} is {@code null}
+     */
+    public static Optional<BusinessPostcodeVerificationResult> ofRelayResultCode(String resultCode) {
+        if (resultCode == null) {
+            return Optional.empty();
+        }
+        return switch (resultCode) {
+            case "RESULT_CODE_SUCCESS" -> Optional.of(SUCCESS);
+            case "RESULT_CODE_UNSERVICEABLE_LOCATION" -> Optional.of(UNSERVICEABLE_LOCATION);
+            default -> Optional.of(INVALID_POSTCODE);
+        };
+    }
 }

@@ -46,7 +46,7 @@ public final class FetchGroupInfoMexRequest implements MexOperation.Request.Json
      */
     @WhatsAppWebExport(moduleName = "WAWebMexFetchGroupInfoJobQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public static final String QUERY_ID = "26197094166585473";
+    public static final String QUERY_ID = "26570027442651356";
 
     /**
      * GraphQL operation name reported alongside this query when it is dispatched.

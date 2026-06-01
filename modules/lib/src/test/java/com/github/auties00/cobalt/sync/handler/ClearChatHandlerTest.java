@@ -107,7 +107,7 @@ class ClearChatHandlerTest {
         @Test
         @DisplayName("SET clears the chat's messages")
         void clearsAllMessages() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.addMessage(new ChatMessageInfoBuilder()
                     .key(new MessageKeyBuilder().id("m1").fromMe(false).parentJid(PEER).build())
                     .message(MessageContainer.of("hi"))
@@ -146,7 +146,7 @@ class ClearChatHandlerTest {
         @Test
         @DisplayName("a SyncActionValue carrying a pinAction instead of clearChatAction is MALFORMED")
         void wrongActionTypeIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var wrong = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .pinAction(new PinActionBuilder().pinned(true).build())
@@ -162,7 +162,7 @@ class ClearChatHandlerTest {
         @Test
         @DisplayName("a clearChatAction without a messageRange is MALFORMED")
         void missingMessageRangeIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var mutation = clearMutation(PEER, Instant.ofEpochSecond(1L), null, "0", "0");
             var result = new ClearChatHandler().applyMutation(client, mutation);
             assertEquals(SyncActionState.MALFORMED, result.actionState());
@@ -175,7 +175,7 @@ class ClearChatHandlerTest {
         @Test
         @DisplayName("an empty deleteMedia slot is MALFORMED")
         void emptyDeleteMediaIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .clearChatAction(new ClearChatActionBuilder().messageRange(rangeWithLast(1L)).build())
@@ -195,7 +195,7 @@ class ClearChatHandlerTest {
         @Test
         @DisplayName("REMOVE returns UNSUPPORTED")
         void removeReturnsUnsupported() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var mutation = new DecryptedMutation.Trusted(
                     JSON.toJSONString(List.of("clearChat", PEER.toString(), "0", "0")),
                     new SyncActionValueBuilder()

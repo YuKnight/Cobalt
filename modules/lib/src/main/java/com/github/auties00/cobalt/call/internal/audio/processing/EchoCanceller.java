@@ -45,7 +45,7 @@ import java.util.Objects;
  */
 public final class EchoCanceller implements AutoCloseable {
     static {
-        NativeLibLoader.load("speexdsp", Arena.global());
+        NativeLibLoader.load("cobalt-native", Arena.global());
     }
 
     /**

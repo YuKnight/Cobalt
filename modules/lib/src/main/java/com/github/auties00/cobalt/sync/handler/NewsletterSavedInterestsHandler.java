@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.NewsletterSavedInterestsAction;
@@ -78,7 +78,7 @@ public final class NewsletterSavedInterestsHandler implements WebAppStateActionH
      * update; an empty value is rejected as
      * {@link MutationApplicationResult#malformed()}. On success the resolved
      * token is written via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setNewsletterSavedInterests(String)}.
+     * {@link com.github.auties00.cobalt.store.SettingsStore#setNewsletterSavedInterests(String)}.
      *
      * @implNote
      * This implementation rejects a {@code REMOVE} operation because the
@@ -86,7 +86,7 @@ public final class NewsletterSavedInterestsHandler implements WebAppStateActionH
      * removal.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -96,7 +96,7 @@ public final class NewsletterSavedInterestsHandler implements WebAppStateActionH
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setNewsletterSavedInterests(action.newsletterSavedInterests().get());
+        client.store().settingsStore().setNewsletterSavedInterests(action.newsletterSavedInterests().get());
         return MutationApplicationResult.success();
     }
 }

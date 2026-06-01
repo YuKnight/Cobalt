@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -28,7 +28,7 @@ import java.time.Instant;
  *
  * @implNote
  * This implementation persists each template eagerly through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#putMarketingMessage(com.github.auties00.cobalt.model.business.MarketingMessage)}
+ * {@link com.github.auties00.cobalt.store.BusinessStore#putMarketingMessage(com.github.auties00.cobalt.model.business.MarketingMessage)}
  * keyed by the template id, collapsing WA Web's two-stage bulk-create-or-merge
  * plus collection-add flow into a single map write because Cobalt's storage is
  * a flat key/value map. The {@link MarketingMessageAction#isDeleted()} flag is
@@ -97,7 +97,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() <= 1) {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
@@ -119,7 +119,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        client.store().putMarketingMessage(new MarketingMessageBuilder()
+        client.store().businessStore().putMarketingMessage(new MarketingMessageBuilder()
                 .templateId(messageId)
                 .name(action.name().orElse(null))
                 .message(action.message().orElse(null))

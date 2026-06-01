@@ -29,7 +29,7 @@ import java.util.Objects;
  */
 public final class OpusDecoder implements AutoCloseable {
     static {
-        NativeLibLoader.load("opus", Arena.global());
+        NativeLibLoader.load("cobalt-native", Arena.global());
     }
 
     /**

@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Covers {@link NoteEditHandler}: a {@link SyncdOperation#SET} carrying type, {@code chatJid} and
- * content installs the note via {@link WhatsAppStore#putNoteState}, {@code deleted=true} on a SET
+ * content installs the note via {@link com.github.auties00.cobalt.store.BusinessStore#putNoteState}, {@code deleted=true} on a SET
  * drops the entry, an unknown chat JID surfaces as {@link SyncActionState#ORPHAN} with
  * {@code modelType="Chat"}, a wrong-typed value or missing {@link NoteEditAction#type()},
  * {@link NoteEditAction#chatJid()}, note id slot or note id surface as
@@ -74,7 +74,7 @@ class NoteEditHandlerTest {
     }
 
     @Nested
-    @DisplayName("metadata — wire identity")
+    @DisplayName("metadata Ã¢â‚¬â€ wire identity")
     class Metadata {
         @Test
         @DisplayName("actionName() returns the wire constant")
@@ -98,12 +98,12 @@ class NoteEditHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — SET upsert (create / edit)")
+    @DisplayName("applyMutation Ã¢â‚¬â€ SET upsert (create / edit)")
     class ApplySetUpsert {
         @Test
         @DisplayName("a SET with type + chatJid + content installs the note state")
         void installsNote() {
-            store.addNewChat(CHAT_JID);
+            store.chatStore().addNewChat(CHAT_JID);
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var action = new NoteEditActionBuilder()
                     .type(NoteType.UNSTRUCTURED)
@@ -117,7 +117,7 @@ class NoteEditHandlerTest {
                     buildMutation("note-1", action, SyncdOperation.SET, ts));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findNoteState("note-1").orElseThrow();
+            var stored = store.businessStore().findNoteState("note-1").orElseThrow();
             assertEquals("note-1", stored.id());
             assertEquals("remember to ask", stored.unstructuredContent().orElseThrow());
             assertEquals(NoteType.UNSTRUCTURED, stored.type().orElseThrow());
@@ -126,8 +126,8 @@ class NoteEditHandlerTest {
         @Test
         @DisplayName("deleted=true on a SET drops the note from the store")
         void deletedTrueRemovesNote() {
-            store.addNewChat(CHAT_JID);
-            store.putNoteState(new NoteStateBuilder()
+            store.chatStore().addNewChat(CHAT_JID);
+            store.businessStore().putNoteState(new NoteStateBuilder()
                     .id("note-rm")
                     .type(NoteType.UNSTRUCTURED)
                     .chatJid(CHAT_JID)
@@ -148,13 +148,13 @@ class NoteEditHandlerTest {
                     buildMutation("note-rm", action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findNoteState("note-rm").isEmpty(),
+            assertTrue(store.businessStore().findNoteState("note-rm").isEmpty(),
                     "deleted=true must drop the stored note");
         }
     }
 
     @Nested
-    @DisplayName("applyMutation — orphan when chat is unknown")
+    @DisplayName("applyMutation Ã¢â‚¬â€ orphan when chat is unknown")
     class OrphanChat {
         @Test
         @DisplayName("a SET targeting an unknown chat returns ORPHAN with the chat JID")
@@ -177,12 +177,12 @@ class NoteEditHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed value")
+    @DisplayName("applyMutation Ã¢â‚¬â€ malformed value")
     class MalformedValue {
         @Test
         @DisplayName("a SET whose value carries the wrong action returns MALFORMED")
         void wrongActionType() {
-            store.addNewChat(CHAT_JID);
+            store.chatStore().addNewChat(CHAT_JID);
             var ts = Instant.now();
             var value = new SyncActionValueBuilder()
                     .timestamp(ts)
@@ -197,7 +197,7 @@ class NoteEditHandlerTest {
         @Test
         @DisplayName("a non-deletion action missing the type field returns MALFORMED")
         void missingType() {
-            store.addNewChat(CHAT_JID);
+            store.chatStore().addNewChat(CHAT_JID);
             var action = new NoteEditActionBuilder()
                     .chatJid(CHAT_JID)
                     .createdAt(Instant.now())
@@ -229,7 +229,7 @@ class NoteEditHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed index")
+    @DisplayName("applyMutation Ã¢â‚¬â€ malformed index")
     class MalformedIndex {
         @Test
         @DisplayName("a missing note id slot returns MALFORMED")
@@ -263,7 +263,7 @@ class NoteEditHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — REMOVE")
+    @DisplayName("applyMutation Ã¢â‚¬â€ REMOVE")
     class ApplyRemove {
         @Test
         @DisplayName("REMOVE operation returns UNSUPPORTED")
@@ -282,10 +282,10 @@ class NoteEditHandlerTest {
     }
 
     @Nested
-    @DisplayName("resolveConflicts — default timestamp comparison")
+    @DisplayName("resolveConflicts Ã¢â‚¬â€ default timestamp comparison")
     class ResolveConflicts {
         @Test
-        @DisplayName("newer remote — APPLY_REMOTE_DROP_LOCAL")
+        @DisplayName("newer remote Ã¢â‚¬â€ APPLY_REMOTE_DROP_LOCAL")
         void newerRemoteApplies() {
             var local = mutationAt(Instant.ofEpochSecond(1_000));
             var remote = mutationAt(Instant.ofEpochSecond(2_000));
@@ -294,7 +294,7 @@ class NoteEditHandlerTest {
         }
 
         @Test
-        @DisplayName("older remote — SKIP_REMOTE")
+        @DisplayName("older remote Ã¢â‚¬â€ SKIP_REMOTE")
         void olderRemoteSkipped() {
             var local = mutationAt(Instant.ofEpochSecond(2_000));
             var remote = mutationAt(Instant.ofEpochSecond(1_000));

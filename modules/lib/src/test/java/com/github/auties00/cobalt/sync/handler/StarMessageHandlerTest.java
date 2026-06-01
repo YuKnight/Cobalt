@@ -64,7 +64,7 @@ class StarMessageHandlerTest {
 
     // Orphan-branch tests deliberately skip this seed so findMessageById misses.
     private void seedMessage() {
-        var chat = client.store().addNewChat(PEER);
+        var chat = client.store().chatStore().addNewChat(PEER);
         var key = new MessageKeyBuilder()
                 .id(MESSAGE_ID).fromMe(false).parentJid(PEER)
                 .build();
@@ -110,7 +110,7 @@ class StarMessageHandlerTest {
                     starMutation(true, PEER, MESSAGE_ID, "0", "0", Instant.ofEpochSecond(1L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var message = client.store().findMessageById(client.store().findChatByJid(PEER).orElseThrow(), MESSAGE_ID).orElseThrow();
+            var message = client.store().chatStore().findMessageById(client.store().chatStore().findChatByJid(PEER).orElseThrow(), MESSAGE_ID).orElseThrow();
             assertTrue(message.starred());
         }
 
@@ -118,14 +118,14 @@ class StarMessageHandlerTest {
         @DisplayName("starred=false unstars an already-starred message")
         void unstarsTheMessage() {
             seedMessage();
-            client.store().findMessageById(client.store().findChatByJid(PEER).orElseThrow(), MESSAGE_ID)
+            client.store().chatStore().findMessageById(client.store().chatStore().findChatByJid(PEER).orElseThrow(), MESSAGE_ID)
                     .orElseThrow().setStarred(true);
 
             var result = new StarMessageHandler().applyMutation(client,
                     starMutation(false, PEER, MESSAGE_ID, "0", "0", Instant.ofEpochSecond(2L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var message = client.store().findMessageById(client.store().findChatByJid(PEER).orElseThrow(), MESSAGE_ID).orElseThrow();
+            var message = client.store().chatStore().findMessageById(client.store().chatStore().findChatByJid(PEER).orElseThrow(), MESSAGE_ID).orElseThrow();
             assertFalse(message.starred());
         }
     }
@@ -137,7 +137,7 @@ class StarMessageHandlerTest {
         @DisplayName("SET against an unknown message returns ORPHAN with modelType=Msg")
         void orphanReturnsMsgModel() {
             // Chat exists but the message is missing.
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
 
             var result = new StarMessageHandler().applyMutation(client,
                     starMutation(true, PEER, "absent-id", "0", "0", Instant.ofEpochSecond(1L)));

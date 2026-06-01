@@ -38,6 +38,30 @@ public enum WaRelayAttributeType {
     XOR_RELAYED_ADDRESS(0x0016),
 
     /**
+     * Standard {@code XOR-MAPPED-ADDRESS} (RFC 5389 section 15.2), the client's reflexive
+     * transport address as seen by the relay, XOR'd with the magic cookie.
+     *
+     * <p>The relay sends this back in a successful Allocate response to confirm the source
+     * 5-tuple it observed.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebVoipSctpConnectionManager",
+            exports = "sendWAWebVoipDataToRelay", adaptation = WhatsAppAdaptation.DIRECT)
+    XOR_MAPPED_ADDRESS(0x0020),
+
+    /**
+     * WhatsApp-specific {@code WA-RELAYED-ADDRESS}, the relayed transport address allocated for
+     * this client by the relay, in the same {@link WaRelayXorAddress} 8-byte (IPv4) or 20-byte
+     * (IPv6) format as {@link #XOR_RELAYED_ADDRESS} but under a WA-specific comprehension-optional
+     * type code observed on production responses (0x4002).
+     *
+     * <p>WA uses this code in place of the standard {@link #XOR_RELAYED_ADDRESS} on Allocate
+     * Success responses.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebVoipSctpConnectionManager",
+            exports = "sendWAWebVoipDataToRelay", adaptation = WhatsAppAdaptation.ADAPTED)
+    WA_RELAYED_ADDRESS(0x4002),
+
+    /**
      * WhatsApp-specific {@code WA-RELAY-TOKEN}, a variable-length opaque per-relay authorisation blob.
      *
      * <p>The value is the Base64-decoded {@code RelayListUpdate.relay_tokens[i]} delivered by the

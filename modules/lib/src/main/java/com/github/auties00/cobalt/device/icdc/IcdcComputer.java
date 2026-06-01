@@ -115,7 +115,7 @@ public final class IcdcComputer {
             exports = "getICDCMeta",
             adaptation = WhatsAppAdaptation.DIRECT)
     public Optional<IcdcResult> compute(Jid userJid) {
-        return store.findDeviceList(userJid.toUserJid())
+        return store.contactStore().findDeviceList(userJid.toUserJid())
                 .filter(deviceList -> !deviceList.deleted())
                 .map(deviceList -> computeFromDeviceList(userJid, deviceList));
     }
@@ -154,7 +154,7 @@ public final class IcdcComputer {
         List<Integer> keyIndexes = null;
 
         if (hasCompanionDevices) {
-            var selfJid = store.jid().orElse(null);
+            var selfJid = store.accountStore().jid().orElse(null);
             var isSelf = selfJid != null && userJid.toUserJid().equals(selfJid.toUserJid());
 
             Integer selfKeyIndex = null;
@@ -172,7 +172,7 @@ public final class IcdcComputer {
             var includedKeyIndexes = new ArrayList<Integer>();
             for (var device : remoteDevices) {
                 var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
-                var identityKey = store.findIdentityByAddress(deviceJid.toSignalAddress()).orElse(null);
+                var identityKey = store.signalStore().findIdentityByAddress(deviceJid.toSignalAddress()).orElse(null);
                 if (identityKey != null) {
                     identityKeys.add(identityKey.toEncodedPoint());
                     includedKeyIndexes.add(device.keyIndex());
@@ -180,7 +180,7 @@ public final class IcdcComputer {
             }
 
             if (isSelf) {
-                identityKeys.add(store.identityKeyPair().publicKey().toEncodedPoint());
+                identityKeys.add(store.signalStore().identityKeyPair().publicKey().toEncodedPoint());
                 if (selfKeyIndex != null) {
                     includedKeyIndexes.add(selfKeyIndex);
                 }
@@ -198,7 +198,7 @@ public final class IcdcComputer {
         // For self, advAccountType is the proxy for getIsHostedMeAccount().
         ADVEncryptionType accountType = null;
         if (isBizHostedDevicesEnabled()) {
-            var selfJid = store.jid().orElse(null);
+            var selfJid = store.accountStore().jid().orElse(null);
             var isSelf = selfJid != null && userJid.toUserJid().equals(selfJid.toUserJid());
             if (isSelf && deviceList.advAccountType() == ADVEncryptionType.HOSTED) {
                 accountType = ADVEncryptionType.HOSTED;

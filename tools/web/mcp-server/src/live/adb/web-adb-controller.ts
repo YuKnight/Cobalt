@@ -25,6 +25,8 @@ import {
   LINKED_DEVICES_SCREEN_IDS,
   MAX_DIALOG_OK_BUTTON_IDS,
   MAX_LINKED_DEVICES_DIALOG_IDS,
+  MAX_ONBOARDING_DISMISSALS,
+  ONBOARDING_DISMISS_TEXT_PATTERNS,
   OVERFLOW_LINKED_DEVICES_INDEX,
   OVERFLOW_MENU_BUTTON_IDS,
   OVERFLOW_MENU_TITLE_IDS,
@@ -388,18 +390,33 @@ export class WebAdbController {
     blockedReason: "biometric_required" | "pin_required" | null;
   }> {
     const details: string[] = [];
-    const initialNodes = await this.dumpUiHierarchy(serial);
-    const initialSecurityPrompt = this.detectSecurityPrompt(initialNodes);
+    let currentNodes = await this.dumpUiHierarchy(serial);
+    const initialSecurityPrompt = this.detectSecurityPrompt(currentNodes);
     if (initialSecurityPrompt) {
       details.push(`Blocking security prompt detected: ${initialSecurityPrompt}.`);
       return { ready: false, details, blockedReason: initialSecurityPrompt };
     }
-    if (this.isLinkedDevicesScreen(initialNodes)) {
+    if (this.isLinkedDevicesScreen(currentNodes)) {
       details.push("Linked Devices screen detected.");
       return { ready: true, details, blockedReason: null };
     }
 
-    if (this.isOverflowMenuVisible(initialNodes)) {
+    currentNodes = await this.dismissOnboardingInterstitials(
+      serial,
+      details,
+      Math.min(8_000, timeoutMs)
+    );
+    const promptAfterDismiss = this.detectSecurityPrompt(currentNodes);
+    if (promptAfterDismiss) {
+      details.push(`Blocking security prompt detected: ${promptAfterDismiss}.`);
+      return { ready: false, details, blockedReason: promptAfterDismiss };
+    }
+    if (this.isLinkedDevicesScreen(currentNodes)) {
+      details.push("Linked Devices screen detected.");
+      return { ready: true, details, blockedReason: null };
+    }
+
+    if (this.isOverflowMenuVisible(currentNodes)) {
       details.push("Overflow menu already open.");
     } else {
       const menuOpened = await this.tapByResourceIds(
@@ -448,6 +465,49 @@ export class WebAdbController {
 
     details.push("Linked Devices screen not detected.");
     return { ready: false, details, blockedReason: null };
+  }
+
+  private async dismissOnboardingInterstitials(
+    serial: string,
+    details: string[],
+    timeoutMs: number
+  ): Promise<UiNode[]> {
+    const deadline = Date.now() + timeoutMs;
+    let nodes = await this.dumpUiHierarchy(serial);
+    let dismissed = 0;
+    while (dismissed < MAX_ONBOARDING_DISMISSALS && Date.now() <= deadline) {
+      if (
+        this.detectSecurityPrompt(nodes) != null ||
+        this.isLinkedDevicesScreen(nodes) ||
+        this.isOverflowMenuVisible(nodes)
+      ) {
+        break;
+      }
+      const target = this.findDismissableInterstitialNode(nodes);
+      if (!target) break;
+      const label = (target.text ?? "").trim();
+      if (!(await this.tapNode(serial, target))) break;
+      dismissed += 1;
+      details.push(`Dismissed onboarding interstitial via "${label}".`);
+      await sleep(750);
+      nodes = await this.dumpUiHierarchy(serial);
+    }
+    return nodes;
+  }
+
+  private findDismissableInterstitialNode(nodes: UiNode[]): UiNode | null {
+    let fallback: UiNode | null = null;
+    for (const node of nodes) {
+      const text = (node.text ?? "").trim();
+      if (!text) continue;
+      if (!ONBOARDING_DISMISS_TEXT_PATTERNS.some((pattern) => pattern.test(text))) {
+        continue;
+      }
+      if (parseBounds(node.bounds) == null) continue;
+      if (isInteractive(node)) return node;
+      if (fallback == null) fallback = node;
+    }
+    return fallback;
   }
 
   private async isMaxLinkedDevicesDialogVisible(serial: string): Promise<boolean> {

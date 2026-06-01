@@ -1562,6 +1562,17 @@ public final class FetchGroupInfoMexResponse implements MexOperation.Response.Js
         private final String closedByMembershipApprovalMode;
 
         /**
+         * The {@code appeal_status} scalar carrying the moderation-appeal state.
+         */
+        private final String appealStatus;
+
+        /**
+         * The {@code appeal_update_time} timestamp in seconds since epoch recording the last
+         * moderation-appeal state change.
+         */
+        private final Long appealUpdateTime;
+
+        /**
          * Parsed {@code limit_sharing} sub-object.
          */
         private final LimitSharing limitSharing;
@@ -1659,6 +1670,8 @@ public final class FetchGroupInfoMexResponse implements MexOperation.Response.Js
          *
          * @param allowNonAdminSubGroupCreation   the {@code allow_non_admin_sub_group_creation} scalar
          * @param closedByMembershipApprovalMode  the {@code closed_by_membership_approval_mode} scalar
+         * @param appealStatus                    the {@code appeal_status} scalar
+         * @param appealUpdateTime                the {@code appeal_update_time} timestamp in seconds since epoch
          * @param limitSharing                    the parsed {@code limit_sharing} sub-object
          * @param lidMigrationState               the parsed {@code lid_migration_state} sub-object
          * @param ephemeral                       the parsed {@code ephemeral} sub-object
@@ -1678,9 +1691,11 @@ public final class FetchGroupInfoMexResponse implements MexOperation.Response.Js
          * @param capi                            the {@code capi} scalar
          * @param support                         the {@code support} scalar
          */
-        private Properties(Boolean allowNonAdminSubGroupCreation, String closedByMembershipApprovalMode, LimitSharing limitSharing, LidMigrationState lidMigrationState, Ephemeral ephemeral, GrowthLocked2 growthLocked2, String memberAddMode, String parentGroupJid, String groupSafetyCheck, Boolean allowAdminReports, String announcement, String locked, String memberLinkMode, String memberShareGroupHistoryMode, Boolean membershipApprovalModeEnabled, String generalChat, Boolean autoAddDisabled, String hiddenGroup, String capi, String support) {
+        private Properties(Boolean allowNonAdminSubGroupCreation, String closedByMembershipApprovalMode, String appealStatus, Long appealUpdateTime, LimitSharing limitSharing, LidMigrationState lidMigrationState, Ephemeral ephemeral, GrowthLocked2 growthLocked2, String memberAddMode, String parentGroupJid, String groupSafetyCheck, Boolean allowAdminReports, String announcement, String locked, String memberLinkMode, String memberShareGroupHistoryMode, Boolean membershipApprovalModeEnabled, String generalChat, Boolean autoAddDisabled, String hiddenGroup, String capi, String support) {
             this.allowNonAdminSubGroupCreation = allowNonAdminSubGroupCreation;
             this.closedByMembershipApprovalMode = closedByMembershipApprovalMode;
+            this.appealStatus = appealStatus;
+            this.appealUpdateTime = appealUpdateTime;
             this.limitSharing = limitSharing;
             this.lidMigrationState = lidMigrationState;
             this.ephemeral = ephemeral;
@@ -1722,6 +1737,29 @@ public final class FetchGroupInfoMexResponse implements MexOperation.Response.Js
          */
         public Optional<String> closedByMembershipApprovalMode() {
             return Optional.ofNullable(closedByMembershipApprovalMode);
+        }
+
+        /**
+         * Returns the {@code appeal_status} scalar.
+         *
+         * <p>This carries the state of any moderation appeal raised against the group.
+         *
+         * @return an {@link Optional} containing the value, or empty if absent
+         */
+        public Optional<String> appealStatus() {
+            return Optional.ofNullable(appealStatus);
+        }
+
+        /**
+         * Returns the {@code appeal_update_time} timestamp.
+         *
+         * <p>The relay's seconds-since-epoch value, recording the last moderation-appeal state
+         * change, is adapted into a JDK {@link Instant}.
+         *
+         * @return an {@link Optional} containing the value as an {@link Instant}, or empty if absent
+         */
+        public Optional<Instant> appealUpdateTime() {
+            return Optional.ofNullable(appealUpdateTime).map(Instant::ofEpochSecond);
         }
 
         /**
@@ -2234,6 +2272,8 @@ public final class FetchGroupInfoMexResponse implements MexOperation.Response.Js
 
             var allowNonAdminSubGroupCreation = obj.getBoolean("allow_non_admin_sub_group_creation");
             var closedByMembershipApprovalMode = obj.getString("closed_by_membership_approval_mode");
+            var appealStatus = obj.getString("appeal_status");
+            var appealUpdateTime = obj.getLong("appeal_update_time");
             var limitSharing = LimitSharing.of(obj.getJSONObject("limit_sharing")).orElse(null);
             var lidMigrationState = LidMigrationState.of(obj.getJSONObject("lid_migration_state")).orElse(null);
             var ephemeral = Ephemeral.of(obj.getJSONObject("ephemeral")).orElse(null);
@@ -2252,7 +2292,7 @@ public final class FetchGroupInfoMexResponse implements MexOperation.Response.Js
             var hiddenGroup = obj.getString("hidden_group");
             var capi = obj.getString("capi");
             var support = obj.getString("support");
-            return Optional.of(new Properties(allowNonAdminSubGroupCreation, closedByMembershipApprovalMode, limitSharing, lidMigrationState, ephemeral, growthLocked2, memberAddMode, parentGroupJid, groupSafetyCheck, allowAdminReports, announcement, locked, memberLinkMode, memberShareGroupHistoryMode, membershipApprovalModeEnabled, generalChat, autoAddDisabled, hiddenGroup, capi, support));
+            return Optional.of(new Properties(allowNonAdminSubGroupCreation, closedByMembershipApprovalMode, appealStatus, appealUpdateTime, limitSharing, lidMigrationState, ephemeral, growthLocked2, memberAddMode, parentGroupJid, groupSafetyCheck, allowAdminReports, announcement, locked, memberLinkMode, memberShareGroupHistoryMode, membershipApprovalModeEnabled, generalChat, autoAddDisabled, hiddenGroup, capi, support));
         }
 
         /**

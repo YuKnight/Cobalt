@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.props;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.node.Node;
@@ -25,8 +25,8 @@ import java.util.OptionalInt;
  * others.
  *
  * <p>Concrete callers depend on this interface rather than on a concrete implementation;
- * {@link DefaultABPropsService} is the production wiring injected through the
- * {@link WhatsAppClient}, and the {@code props.test} package ships an alternative implementation
+ * {@link LiveABPropsService} is the production wiring injected through the
+ * {@link LinkedWhatsAppClient}, and the {@code props.test} package ships an alternative implementation
  * for deterministic tests.
  *
  * @implSpec
@@ -67,23 +67,6 @@ public interface ABPropsService {
      * @return {@code true} when at least one attempt succeeded
      */
     boolean sync(Long localRefreshId, boolean shouldSendHash);
-
-    /**
-     * Performs a single sync round trip without the retry loop.
-     *
-     * <p>This is the building block that {@link #sync(Long, boolean)} drives in its retry loop;
-     * callers with an external retry policy invoke it directly.
-     *
-     * @implSpec
-     * Implementations issue exactly one request and apply the response, performing no internal
-     * retry or backoff.
-     *
-     * @param localRefreshId the refresh-id override that selects the emergency push branch, or
-     *                       {@code null} for the regular branch
-     * @param shouldSendHash whether the persisted hash is included on the regular branch
-     * @return {@code true} when the response was processed successfully
-     */
-    boolean syncABProps(Long localRefreshId, boolean shouldSendHash);
 
     /**
      * Parses a sync response and applies it to the in-memory caches.
@@ -245,7 +228,7 @@ public interface ABPropsService {
      *
      * @implSpec
      * Implementations return empty rather than throwing on any failure variant, including a
-     * non-success relay response.
+     * non-success WhatsApp Web GraphQL response.
      *
      * @param groupJid  the target group JID
      * @param propsHash the cached group-props hash, or {@code null} for an unconditional fetch

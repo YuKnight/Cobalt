@@ -1,13 +1,14 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 
 /**
  * Routes inbound {@code <notification>} stanzas whose category covers WhatsApp Business to the matching per-type handler.
@@ -24,7 +25,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * {@link WhatsAppWebModule} annotation on the handler class.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
-public final class NotificationBusinessDispatcher implements SocketStream.Handler {
+public final class NotificationBusinessDispatcher extends SocketStreamHandler.Concurrent {
     /**
      * Handles {@code business}, {@code digital_commerce_subscription}, and {@code fb:update} notifications.
      */
@@ -43,8 +44,8 @@ public final class NotificationBusinessDispatcher implements SocketStream.Handle
     /**
      * Constructs the dispatcher and eagerly instantiates every sub-handler with the shared client and migration service.
      *
-     * <p>Called once during {@link SocketStream} setup. The {@code lidMigrationService} is consumed only by the
-     * {@code NotificationMexStreamHandler} when applying LID-change Meta Exchange events; the {@link WhatsAppClient}
+     * <p>Called once during {@link NodeStreamService} setup. The {@code lidMigrationService} is consumed only by the
+     * {@code NotificationMexStreamHandler} when applying LID-change Meta Exchange events; the {@link LinkedWhatsAppClient}
      * and {@link AckSender} are forwarded to every sub-handler for store and node access and for emitting the
      * per-notification outbound {@code <ack>} stanza.
      *
@@ -52,7 +53,7 @@ public final class NotificationBusinessDispatcher implements SocketStream.Handle
      * @param lidMigrationService the LID migration service forwarded to the Meta Exchange handler
      * @param ackSender           the ack sender forwarded to every sub-handler
      */
-    public NotificationBusinessDispatcher(WhatsAppClient whatsapp, LidMigrationService lidMigrationService, AckSender ackSender) {
+    public NotificationBusinessDispatcher(LinkedWhatsAppClient whatsapp, LidMigrationService lidMigrationService, AckSender ackSender) {
         this.businessHandler = new NotificationBusinessStreamHandler(whatsapp, ackSender);
         this.mexHandler = new NotificationMexStreamHandler(whatsapp, lidMigrationService, ackSender);
         this.paymentHandler = new NotificationPaymentStreamHandler(whatsapp, ackSender);
@@ -87,7 +88,7 @@ public final class NotificationBusinessDispatcher implements SocketStream.Handle
     }
 
     /**
-     * Propagates {@link SocketStream.Handler#reset()} to every sub-handler.
+     * Propagates {@link SocketStreamHandler#reset()} to every sub-handler.
      *
      * <p>Invoked by the parent notification pipeline when the stream reset signal fires.
      */

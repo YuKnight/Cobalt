@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.call.internal.video;
+import com.github.auties00.cobalt.call.internal.NoopCallService;
 
 import com.github.auties00.cobalt.call.frame.video.VideoFrame;
 import com.github.auties00.cobalt.call.CallEndReason;
@@ -45,7 +46,7 @@ public class VideoPipelineTest {
 
     @Test
     public void vp8EncodeAndDecodeRoundTrip() throws Exception {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-vid-1", PEER, PEER, SELF, true,
                 CallOptions.video());
         var outbound = new LinkedBlockingQueue<VideoPacket>();
@@ -73,7 +74,7 @@ public class VideoPipelineTest {
 
     @Test
     public void h264EncodeAndDecodeRoundTrip() throws Exception {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-vid-2", PEER, PEER, SELF, true,
                 CallOptions.video());
         var outbound = new LinkedBlockingQueue<VideoPacket>();
@@ -99,7 +100,7 @@ public class VideoPipelineTest {
 
     @Test
     public void requestKeyframeForcesIdrOnNextEncode() throws Exception {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-vid-3", PEER, PEER, SELF, true,
                 CallOptions.video());
         var outbound = new LinkedBlockingQueue<VideoPacket>();
@@ -131,7 +132,7 @@ public class VideoPipelineTest {
 
     @Test
     public void adjustBitrateAcceptsNewTarget() {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-vid-4", PEER, PEER, SELF, true,
                 CallOptions.video());
         try (var pipeline = new VideoPipeline(call, p -> {
@@ -145,7 +146,7 @@ public class VideoPipelineTest {
 
     @Test
     public void mismatchedCodecResolutionRejected() {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-vid-5", PEER, PEER, SELF, true,
                 CallOptions.video());
         var codec = VideoCodec.vp8(WIDTH, HEIGHT, BITRATE, FPS);
@@ -160,7 +161,7 @@ public class VideoPipelineTest {
 
     @Test
     public void closeIsIdempotent() {
-        var engine = new RecordingEngine();
+        var engine = new NoopCallService();
         var call = new ActiveCall(engine, "id-vid-6", PEER, PEER, SELF, true,
                 CallOptions.video());
         var pipeline = new VideoPipeline(call, p -> {
@@ -186,30 +187,4 @@ public class VideoPipelineTest {
         return frame;
     }
 
-    // Synthetic CallService recipient mirroring the one in ActiveCallTest.
-    private static final class RecordingEngine extends CallService {
-        RecordingEngine() {
-            super(null, null);
-        }
-
-        @Override
-        public void sendTerminate(Jid peer, Jid creator, String callId, CallEndReason reason) {
-        }
-
-        @Override
-        public void sendMute(Jid peer, Jid creator, String callId, boolean muted) {
-        }
-
-        @Override
-        public void sendVideoState(Jid peer, Jid creator, String callId, boolean enabled) {
-        }
-
-        @Override
-        public void unregister(String callId) {
-        }
-
-        @Override
-        public void notifyEnded(String callId, Jid fromJid, String reason) {
-        }
-    }
 }

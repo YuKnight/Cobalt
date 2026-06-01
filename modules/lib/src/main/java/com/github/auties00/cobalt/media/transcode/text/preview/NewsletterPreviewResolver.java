@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -35,7 +35,7 @@ public final class NewsletterPreviewResolver {
      * onto {@code message}.
      *
      * <p>Issues the server link-preview request via
-     * {@link WhatsAppClient#queryNewsletterLinkPreview(String)} and
+     * {@link LinkedWhatsAppClient#queryNewsletterLinkPreview(String)} and
      * writes every populated field of the response onto {@code message}
      * in place: {@code title}, {@code description}, {@code previewType},
      * {@code doNotPlayInline}, {@code jpegThumbnail} (the low-quality
@@ -60,7 +60,7 @@ public final class NewsletterPreviewResolver {
      */
     @WhatsAppWebExport(moduleName = "WAWebNewsletterFetchLinkPreviewAction", exports = "fetchPlaintextLinkPreviewAction",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public static boolean resolve(WhatsAppClient client, String url, ExtendedTextMessage message) {
+    public static boolean resolve(LinkedWhatsAppClient client, String url, ExtendedTextMessage message) {
         if (client == null || url == null || message == null) {
             return false;
         }
@@ -93,7 +93,7 @@ public final class NewsletterPreviewResolver {
      * transport-level error.
      *
      * <p>Returns {@code null} when the query fails so that
-     * {@link #resolve(WhatsAppClient, String, ExtendedTextMessage)}
+     * {@link #resolve(LinkedWhatsAppClient, String, ExtendedTextMessage)}
      * short-circuits and the link-preview pipeline falls back to the
      * minimal preview card.
      *
@@ -102,7 +102,7 @@ public final class NewsletterPreviewResolver {
      * @return the server response, or {@code null} when the query failed
      */
     private static NewsletterLinkPreview querySafely(
-            WhatsAppClient client, String url) {
+            LinkedWhatsAppClient client, String url) {
         try {
             return client.queryNewsletterLinkPreview(url).orElse(null);
         } catch (RuntimeException _) {

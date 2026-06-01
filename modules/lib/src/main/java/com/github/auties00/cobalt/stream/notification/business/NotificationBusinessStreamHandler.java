@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.BusinessPrivacySettingChangedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.business.BusinessCampaignStatusBuilder;
 import com.github.auties00.cobalt.model.business.BusinessFeatureFlagBuilder;
+import com.github.auties00.cobalt.model.business.BusinessDataSharingConsent;
 import com.github.auties00.cobalt.model.business.BusinessSubscriptionBuilder;
 import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -13,7 +16,6 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.biz.SmaxNonceNotificationResponse;
 import com.github.auties00.cobalt.node.smax.biz.SmaxSyncPrivacySettingResponse;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.time.Instant;
 
@@ -31,7 +33,7 @@ import java.time.Instant;
  * hold the contact record this device could not resolve.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleBusinessNotification")
-public final class NotificationBusinessStreamHandler implements SocketStream.Handler {
+public final class NotificationBusinessStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs warnings about malformed stanzas and debug messages about unsupported sub-types.
@@ -42,7 +44,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
     /**
      * Reads the store and issues business-profile queries.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Ships the post-processing {@code <ack class="notification">} stanzas for {@code business},
@@ -58,7 +60,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * @param whatsapp  the client used for store reads and business-profile queries
      * @param ackSender the ack sender used for the post-processing acks
      */
-    public NotificationBusinessStreamHandler(WhatsAppClient whatsapp, AckSender ackSender) {
+    public NotificationBusinessStreamHandler(LinkedWhatsAppClient whatsapp, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.ackSender = ackSender;
     }
@@ -273,14 +275,13 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
         if (jid != null) {
             var targetJid = jid.withoutData();
             if (isSelf(targetJid)) {
-                whatsapp.store()
-                        .setVerifiedName(null)
+                whatsapp.store().accountStore().setVerifiedName(null)
                         .setBusinessAddress(null)
                         .setBusinessDescription(null)
                         .setBusinessEmail(null)
                         .setBusinessWebsites(null)
-                        .setBusinessCategories(null)
-                        .setSyncedBusinessCertificate(false);
+                        .setBusinessCategories(null);
+                whatsapp.store().syncStore().setSyncedBusinessCertificate(false);
             }
             return false;
         }
@@ -298,9 +299,9 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * {@code <verified_name>} child targets a JID, and returns the side-list flag when the targeting is hash-based.
      *
      * <p>For self, the verified name is resolved through
-     * {@link WhatsAppClient#queryName(com.github.auties00.cobalt.model.jid.JidProvider)} and the
+     * {@link LinkedWhatsAppClient#queryName(com.github.auties00.cobalt.model.jid.JidProvider)} and the
      * {@code syncedBusinessCertificate} flag is set; for a peer, the change is reflected through
-     * {@link WhatsAppClient#queryBusinessProfile(com.github.auties00.cobalt.model.jid.JidProvider)}. The hash branch
+     * {@link LinkedWhatsAppClient#queryBusinessProfile(com.github.auties00.cobalt.model.jid.JidProvider)}. The hash branch
      * always returns {@code true} because Cobalt has no hash-keyed contact lookup.
      *
      * @param verifiedNameNode the {@code <verified_name>} child node
@@ -312,8 +313,8 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
             var targetJid = jid.withoutData();
             if (isSelf(targetJid)) {
                 whatsapp.queryName(targetJid)
-                        .ifPresent(whatsapp.store()::setVerifiedName);
-                whatsapp.store().setSyncedBusinessCertificate(true);
+                        .ifPresent(whatsapp.store().accountStore()::setVerifiedName);
+                whatsapp.store().syncStore().setSyncedBusinessCertificate(true);
             } else {
                 whatsapp.queryBusinessProfile(targetJid);
             }
@@ -351,7 +352,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                 var refreshed = whatsapp.queryBusinessProfile(targetJid).orElse(null);
                 if (refreshed != null && isSelf(targetJid)) {
                     applyOwnBusinessProfile(refreshed);
-                    whatsapp.store().setSyncedBusinessCertificate(true);
+                    whatsapp.store().syncStore().setSyncedBusinessCertificate(true);
                 }
             }
             return false;
@@ -370,7 +371,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * @implNote
      * This implementation does not refresh the catalog from the server. Cobalt has no in-memory catalog cache, so the
      * change is observable only on the next explicit
-     * {@link WhatsAppClient#queryBusinessCatalog(com.github.auties00.cobalt.model.jid.JidProvider)} call.
+     * {@link LinkedWhatsAppClient#queryBusinessCatalog(com.github.auties00.cobalt.model.jid.JidProvider)} call.
      *
      * @param catalogNode the {@code <product_catalog>} child node
      */
@@ -397,8 +398,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * @param profile the refreshed business profile
      */
     private void applyOwnBusinessProfile(BusinessProfile profile) {
-        whatsapp.store()
-                .setBusinessDescription(profile.description().orElse(null))
+        whatsapp.store().accountStore().setBusinessDescription(profile.description().orElse(null))
                 .setBusinessAddress(profile.address().orElse(null))
                 .setBusinessEmail(profile.email().orElse(null))
                 .setBusinessWebsites(profile.websites())
@@ -415,7 +415,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * @return {@code true} when {@code jid} matches the local account; {@code false} otherwise
      */
     private boolean isSelf(Jid jid) {
-        return whatsapp.store().jid()
+        return whatsapp.store().accountStore().jid()
                 .map(self -> self.isSameAccount(jid))
                 .orElse(false);
     }
@@ -438,7 +438,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                 var name = featureFlag.getAttributeAsString("name", null);
                 var enabled = featureFlag.getAttributeAsString("enabled", null);
                 if (name != null && enabled != null) {
-                    whatsapp.store().putBusinessFeatureFlag(new BusinessFeatureFlagBuilder()
+                    whatsapp.store().businessStore().putBusinessFeatureFlag(new BusinessFeatureFlagBuilder()
                             .name(name)
                             .enabled("true".equalsIgnoreCase(enabled))
                             .build());
@@ -452,7 +452,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                 if (id == null) {
                     return;
                 }
-                var existing = whatsapp.store().findBusinessSubscription(id).orElse(null);
+                var existing = whatsapp.store().businessStore().findBusinessSubscription(id).orElse(null);
                 var builder = new BusinessSubscriptionBuilder().id(id);
                 if (existing != null) {
                     existing.status().ifPresent(builder::status);
@@ -471,7 +471,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
                 if (creationTime != null) {
                     builder.createdAt(Instant.ofEpochSecond(creationTime));
                 }
-                whatsapp.store().putBusinessSubscription(builder.build());
+                whatsapp.store().businessStore().putBusinessSubscription(builder.build());
             });
         });
     }
@@ -481,7 +481,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
      * store.
      *
      * <p>The wire literal ({@code "false"}, {@code "notset"}, or {@code "true"}) is persisted directly via
-     * {@link com.github.auties00.cobalt.store.AbstractWhatsAppStore#setSmbDataSharingConsent(String)}.
+     * {@link com.github.auties00.cobalt.store.BusinessStore#setBusinessPrivacySetting(String)}.
      *
      * @implNote
      * This implementation routes through the typed {@link SmaxSyncPrivacySettingResponse} parser so that the SMAX
@@ -496,14 +496,21 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
         if (consent == null) {
             return;
         }
-        whatsapp.store().setSmbDataSharingConsent(consent);
+        whatsapp.store().businessStore().setBusinessPrivacySetting(consent);
+        BusinessDataSharingConsent.ofWire(consent).ifPresent(value -> {
+            for (var listener : whatsapp.store().listeners()) {
+                if (listener instanceof BusinessPrivacySettingChangedListener typed) {
+                    Thread.startVirtualThread(() -> typed.onBusinessPrivacySettingChanged(whatsapp, value));
+                }
+            }
+        });
     }
 
     /**
      * Stores the ad-account nonce parsed from a {@code <wa_ad_account_nonce>} child.
      *
      * <p>The nonce is a short-lived token consumed by the next ad-creation authentication call. It is written to the
-     * store via {@link com.github.auties00.cobalt.store.AbstractWhatsAppStore#setBusinessAccountNonce(String)}.
+     * store via {@link com.github.auties00.cobalt.store.BusinessStore#setBusinessAccountNonce(String)}.
      *
      * @implNote
      * This implementation routes through the typed {@link SmaxNonceNotificationResponse} parser before the store write.
@@ -513,7 +520,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
     private void handleAdAccountNonce(Node node) {
         SmaxNonceNotificationResponse.of(node)
                 .map(SmaxNonceNotificationResponse.Notification::nonce)
-                .ifPresent(whatsapp.store()::setBusinessAccountNonce);
+                .ifPresent(whatsapp.store().businessStore()::setBusinessAccountNonce);
     }
 
     /**
@@ -544,7 +551,7 @@ public final class NotificationBusinessStreamHandler implements SocketStream.Han
         }
 
         if (status != null) {
-            whatsapp.store().putBusinessCampaignStatus(new BusinessCampaignStatusBuilder()
+            whatsapp.store().businessStore().putBusinessCampaignStatus(new BusinessCampaignStatusBuilder()
                     .campaignId(adCreativeId)
                     .status(status)
                     .build());

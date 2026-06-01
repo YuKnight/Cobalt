@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -73,14 +73,14 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#unsupported()}, an absent action payload
      * and an empty {@link LabelReorderingAction#sortedLabelIds()} list as
      * malformed. Each id is matched against the store via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#findLabel(String)};
+     * {@link com.github.auties00.cobalt.store.SettingsStore#findLabel(String)};
      * present rows have their {@link Label#orderIndex()} set to the loop
      * position while absent ids are skipped. Labels present in the store but
      * absent from the action keep their existing {@link Label#orderIndex()}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelReorderingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -97,7 +97,7 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
         for (var position = 0; position < sortedLabelIds.size(); position++) {
             var labelId = sortedLabelIds.get(position);
             var labelIdString = String.valueOf(labelId);
-            var label = client.store().findLabel(labelIdString).orElse(null);
+            var label = client.store().settingsStore().findLabel(labelIdString).orElse(null);
             if (label != null) {
                 label.setOrderIndex(position);
             }

@@ -7,6 +7,7 @@ import com.github.auties00.cobalt.model.error.DisconnectReason;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -319,29 +320,80 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
                        adaptation = WhatsAppAdaptation.ADAPTED)
     public static final class MissingKey extends WhatsAppWebAppStateSyncException {
         /**
-         * The identifier of the missing key.
+         * The identifiers of every key referenced by the snapshot or patch that
+         * is absent from the local store, in first-seen order.
          */
-        private final byte[] keyId;
+        private final List<byte[]> keyIds;
 
         /**
-         * Constructs a new missing key exception.
+         * Constructs a new missing key exception for a single key.
+         *
+         * <p>Equivalent to a single-element {@link #MissingKey(List)}; retained
+         * for call sites such as recovery-snapshot ingest that fail on the first
+         * absent key rather than scanning a whole batch.
          *
          * @param keyId the identifier of the missing key
          * @throws NullPointerException if {@code keyId} is {@code null}
          */
         public MissingKey(byte[] keyId) {
-            super("Missing sync key with id " + HexFormat.of().formatHex(
-                    Objects.requireNonNull(keyId, "keyId cannot be null")));
-            this.keyId = keyId;
+            this(List.of(Objects.requireNonNull(keyId, "keyId cannot be null")));
         }
 
         /**
-         * Returns the identifier of the missing key.
+         * Constructs a new missing key exception for every absent key found in a
+         * snapshot or patch.
          *
-         * @return the key id, never {@code null}
+         * <p>The batch mirrors WhatsApp Web's snapshot and patch missing-key
+         * scans, which request every absent key in one round so the affected
+         * collection unblocks after a single key-share rather than one per round.
+         *
+         * @param keyIds the identifiers of the missing keys, in first-seen order
+         * @throws NullPointerException     if {@code keyIds} is {@code null}
+         * @throws IllegalArgumentException if {@code keyIds} is empty
+         */
+        public MissingKey(List<byte[]> keyIds) {
+            super("Missing sync key(s) with id " + HexFormat.of().formatHex(
+                    requireNonEmptyFirst(keyIds)));
+            this.keyIds = List.copyOf(keyIds);
+        }
+
+        /**
+         * Validates the supplied key-id batch and returns its first element for
+         * the detail message.
+         *
+         * @param keyIds the candidate batch
+         * @return the first key id
+         * @throws NullPointerException     if {@code keyIds} is {@code null}
+         * @throws IllegalArgumentException if {@code keyIds} is empty
+         */
+        private static byte[] requireNonEmptyFirst(List<byte[]> keyIds) {
+            Objects.requireNonNull(keyIds, "keyIds cannot be null");
+            if (keyIds.isEmpty()) {
+                throw new IllegalArgumentException("keyIds cannot be empty");
+            }
+            return keyIds.getFirst();
+        }
+
+        /**
+         * Returns the identifier of the first missing key.
+         *
+         * <p>A convenience for logging and for the single-key call sites; the
+         * full batch is available via {@link #keyIds()}.
+         *
+         * @return the first missing key id, never {@code null}
          */
         public byte[] keyId() {
-            return keyId;
+            return keyIds.getFirst();
+        }
+
+        /**
+         * Returns the identifiers of every missing key the snapshot or patch
+         * referenced.
+         *
+         * @return an unmodifiable list of the missing key ids, never empty
+         */
+        public List<byte[]> keyIds() {
+            return keyIds;
         }
 
         /**

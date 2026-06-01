@@ -65,7 +65,7 @@ class CallStanzaParityTest {
         assertNotNull(callCreator);
 
         // Build the Cobalt-side equivalent and compare child topology.
-        var built = CallStanza.preaccept(callCreator, callId);
+        var built = CallStanza.preaccept(callCreator, callId).build();
         var builtPreaccept = built.getChild("preaccept").orElseThrow();
         assertEquals(callId, builtPreaccept.getAttributeAsString("call-id").orElseThrow());
         assertEquals(callCreator, builtPreaccept.getAttributeAsJid("call-creator", null));
@@ -83,7 +83,7 @@ class CallStanzaParityTest {
         var callCreator = accept.getAttributeAsJid("call-creator", null);
         assertNotNull(callCreator);
 
-        var built = CallStanza.accept(callCreator, callId);
+        var built = CallStanza.accept(callCreator, callId).build();
         var builtAccept = built.getChild("accept").orElseThrow();
         assertEquals(callId, builtAccept.getAttributeAsString("call-id").orElseThrow());
         assertEquals(callCreator, builtAccept.getAttributeAsJid("call-creator", null));
@@ -101,7 +101,7 @@ class CallStanzaParityTest {
         var callCreator = reject.getAttributeAsJid("call-creator", null);
         assertNotNull(callCreator);
 
-        var built = CallStanza.reject(callCreator, callId);
+        var built = CallStanza.reject(callCreator, callId).build();
         var builtReject = built.getChild("reject").orElseThrow();
         assertEquals(callId, builtReject.getAttributeAsString("call-id").orElseThrow());
         assertEquals(callCreator, builtReject.getAttributeAsJid("call-creator", null));
@@ -124,7 +124,7 @@ class CallStanzaParityTest {
         assertNotNull(callCreator);
 
         var canonicalReason = CallEndReason.fromWireValue(reason);
-        var built = CallStanza.terminate(callCreator, callCreator, callId, canonicalReason);
+        var built = CallStanza.terminate(callCreator, callCreator, callId, canonicalReason).build();
         var builtTerminate = built.getChild("terminate").orElseThrow();
         assertEquals(callId, builtTerminate.getAttributeAsString("call-id").orElseThrow());
         assertEquals(canonicalReason.wireValue(), builtTerminate.getAttributeAsString("reason").orElseThrow());
@@ -145,7 +145,7 @@ class CallStanzaParityTest {
         // Build the Cobalt-side equivalent and compare the wire tag + state.
         var callId = muteNode.getAttributeAsString("call-id").orElseThrow();
         var creator = muteNode.getAttributeAsJid("call-creator", null);
-        var built = CallStanza.mute(creator, creator, callId, "1".equals(muteState));
+        var built = CallStanza.mute(creator, creator, callId, "1".equals(muteState)).build();
         var builtInner = built.getChild("mute_v2").orElseThrow();
         assertEquals(muteState, builtInner.getAttributeAsString("mute-state").orElseThrow());
     }

@@ -19,7 +19,7 @@ package com.github.auties00.cobalt.pairing;
  * {@code companionIdentityPublic || primaryIdentityPublic ||
  * advSecretMaterialSalt}; the {@code advSecret} is the HKDF-SHA256
  * output produced with {@code info="adv_secret"} and is persisted via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setAdvSecretKey}.
+ * {@link com.github.auties00.cobalt.store.SignalStore#setAdvSecretKey}.
  *
  * @param linkCodePairingWrappedKeyBundle the salt {@code ||} IV
  *                                        {@code ||} GCM ciphertext

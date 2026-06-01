@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -46,13 +46,13 @@ class LidMigrationServiceResolveThreadTest {
     private static final Jid STATUS_BROADCAST = Jid.of("status@broadcast");
     private static final Jid BOT = Jid.of("867051314767696@bot");
 
-    private record Harness(TestWhatsAppClient client, TestABPropsService props, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, TestABPropsService props, LiveLidMigrationService service) {}
 
     private static Harness build(TestABPropsService props) {
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, props, service);
     }
 
@@ -67,7 +67,7 @@ class LidMigrationServiceResolveThreadTest {
         // Populate primaryPnToLatestLidCache with PEER_PN -> PEER_LID.
         h.service.changeLid(PEER_PN, PEER_LID, null);
 
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
         chat.setLidOriginType("ctwa");
 
         var resolution = h.service.resolveThread(chat);
@@ -83,7 +83,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("LID chat, ctwa origin, primary latest cache empty -> ALREADY_LID, origin unchanged")
     void lidCtwaNoMatch() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
         chat.setLidOriginType("ctwa");
 
         var resolution = h.service.resolveThread(chat);
@@ -97,7 +97,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("LID chat, non-ctwa origin -> ALREADY_LID, origin unchanged")
     void lidNonCtwa() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
         chat.setLidOriginType("general");
 
         var resolution = h.service.resolveThread(chat);
@@ -110,7 +110,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("group server -> GROUP_OR_COMMUNITY")
     void groupKept() {
         var h = build();
-        var chat = h.client.store().addNewChat(GROUP);
+        var chat = h.client.store().chatStore().addNewChat(GROUP);
         var resolution = h.service.resolveThread(chat);
         assertEquals(LidMigrationResolution.KeepReason.GROUP_OR_COMMUNITY,
                 ((LidMigrationResolution.Keep) resolution).reason());
@@ -120,7 +120,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("newsletter server -> NEWSLETTER")
     void newsletterKept() {
         var h = build();
-        var chat = h.client.store().addNewChat(NEWSLETTER);
+        var chat = h.client.store().chatStore().addNewChat(NEWSLETTER);
         var resolution = h.service.resolveThread(chat);
         assertEquals(LidMigrationResolution.KeepReason.NEWSLETTER,
                 ((LidMigrationResolution.Keep) resolution).reason());
@@ -130,7 +130,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("regular broadcast -> BROADCAST")
     void broadcastKept() {
         var h = build();
-        var chat = h.client.store().addNewChat(BROADCAST);
+        var chat = h.client.store().chatStore().addNewChat(BROADCAST);
         var resolution = h.service.resolveThread(chat);
         assertEquals(LidMigrationResolution.KeepReason.BROADCAST,
                 ((LidMigrationResolution.Keep) resolution).reason());
@@ -140,7 +140,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("status broadcast account -> STATUS_BROADCAST")
     void statusBroadcastKept() {
         var h = build();
-        var chat = h.client.store().addNewChat(STATUS_BROADCAST);
+        var chat = h.client.store().chatStore().addNewChat(STATUS_BROADCAST);
         var resolution = h.service.resolveThread(chat);
         assertEquals(LidMigrationResolution.KeepReason.STATUS_BROADCAST,
                 ((LidMigrationResolution.Keep) resolution).reason());
@@ -150,7 +150,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("bot server -> BOT")
     void botKept() {
         var h = build();
-        var chat = h.client.store().addNewChat(BOT);
+        var chat = h.client.store().chatStore().addNewChat(BOT);
         var resolution = h.service.resolveThread(chat);
         assertEquals(LidMigrationResolution.KeepReason.BOT,
                 ((LidMigrationResolution.Keep) resolution).reason());
@@ -160,7 +160,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("PN chat with phoneNumberhDuplicateLidThread=true -> DUPLICATE_WILL_MERGE")
     void duplicateMergeKept() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setPhoneNumberDuplicateLidThread(true);
         var resolution = h.service.resolveThread(chat);
         assertEquals(LidMigrationResolution.KeepReason.DUPLICATE_WILL_MERGE,
@@ -173,7 +173,7 @@ class LidMigrationServiceResolveThreadTest {
         var h = build();
         h.service.changeLid(PEER_PN, PEER_LID, null);
         // Chat is created without setLid, so chat.lid() is empty: the localLid-null branch.
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
 
         var resolution = h.service.resolveThread(chat);
 
@@ -187,7 +187,7 @@ class LidMigrationServiceResolveThreadTest {
         var h = build();
         h.service.changeLid(PEER_PN, PEER_LID, null);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(PEER_LID); // Local matches primary.
 
         var resolution = h.service.resolveThread(chat);
@@ -204,7 +204,7 @@ class LidMigrationServiceResolveThreadTest {
         // Prime primary cache via changeLid.
         h.service.changeLid(PEER_PN, PEER_LID, null);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(OTHER_LID); // Local differs from primary.
         chat.setConversationTimestamp(Instant.now()); // Chat is "fresh" relative to no sync timestamp (EPOCH).
 
@@ -225,7 +225,7 @@ class LidMigrationServiceResolveThreadTest {
         var syncNow = Instant.now();
         h.service.observeChatDbMigrationTimestamp(syncNow);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(OTHER_LID); // Local differs from primary.
         chat.setConversationTimestamp(syncNow.minusSeconds(3600)); // Older than the effective sync.
 
@@ -244,7 +244,7 @@ class LidMigrationServiceResolveThreadTest {
         var chatDbTs = Instant.parse("2026-03-01T00:00:00Z");
         h.service.observeChatDbMigrationTimestamp(chatDbTs);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(OTHER_LID);
         // Chat ts equals chatDb ts -> "at or after" the sync timestamp -> throws.
         chat.setConversationTimestamp(chatDbTs);
@@ -274,7 +274,7 @@ class LidMigrationServiceResolveThreadTest {
 
         h.service.changeLid(PEER_PN, PEER_LID, null);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(OTHER_LID);
         chat.setConversationTimestamp(Instant.now().plusSeconds(60));
         // Chat ts is "fresh" relative to the receive ts -> triggers throw.
@@ -289,7 +289,7 @@ class LidMigrationServiceResolveThreadTest {
         // No observeChatDbMigrationTimestamp call; no processProtocolMessage call. Effective = EPOCH.
         h.service.changeLid(PEER_PN, PEER_LID, null);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(OTHER_LID);
         // Any real timestamp is after EPOCH -> throws.
         chat.setConversationTimestamp(Instant.parse("2026-01-01T00:00:00Z"));
@@ -306,7 +306,7 @@ class LidMigrationServiceResolveThreadTest {
         var h = build(props);
         h.service.changeLid(PEER_PN, PEER_LID, null);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(OTHER_LID);
         chat.setConversationTimestamp(Instant.now());
 
@@ -319,9 +319,9 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("PN chat, no primary, localLid present, no collision -> Migrate(localLid)")
     void migrateOnLocalNoCollision() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(PEER_LID);
 
         var resolution = h.service.resolveThread(chat);
@@ -334,9 +334,9 @@ class LidMigrationServiceResolveThreadTest {
     void splitThreadMismatchThrows() {
         var h = build();
         // Pre-existing LID-keyed chat with the same user (collision).
-        h.client.store().addNewChat(PEER_LID);
+        h.client.store().chatStore().addNewChat(PEER_LID);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(PEER_LID);
 
         assertThrows(WhatsAppLidMigrationException.SplitThreadMismatch.class,
@@ -349,7 +349,7 @@ class LidMigrationServiceResolveThreadTest {
         var h = build();
         h.service.registerOriginalLid(PEER_PN, PEER_LID);
 
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
 
         var resolution = h.service.resolveThread(chat);
         assertInstanceOf(LidMigrationResolution.Migrate.class, resolution);
@@ -361,7 +361,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("PN chat, no primary, no local, no cache, deletable (empty chat) -> Delete NO_LID_MAPPING")
     void deleteDeletable() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         // Empty chat -> deletable.
 
         var resolution = h.service.resolveThread(chat);
@@ -374,7 +374,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("PN chat, no primary, no local, no cache, non-deletable (locked) -> NoLidAvailable")
     void noLidAvailableThrows() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLocked(true);
 
         assertThrows(WhatsAppLidMigrationException.NoLidAvailable.class,
@@ -385,7 +385,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("PN chat with real message + no LID -> NoLidAvailable (data-bearing chat must not be deleted)")
     void noLidAvailableForDataBearingChat() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         var key = new MessageKeyBuilder()
                 .id("real")
                 .fromMe(false)
@@ -405,8 +405,8 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("2-arg resolveThread: empty existingLidThreads + localLid -> Migrate (no collision check fires)")
     void twoArgNoCollision() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
-        var chat = h.client.store().addNewChat(PEER_PN);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(PEER_LID);
 
         var resolution = h.service.resolveThread(chat, Set.of());
@@ -417,7 +417,7 @@ class LidMigrationServiceResolveThreadTest {
     @DisplayName("2-arg resolveThread: caller-supplied existingLidThreads triggers SplitThreadMismatch")
     void twoArgCollision() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
         chat.setLid(PEER_LID);
         var existingLidThreads = Set.of(PEER_LID.toUserJid());
 

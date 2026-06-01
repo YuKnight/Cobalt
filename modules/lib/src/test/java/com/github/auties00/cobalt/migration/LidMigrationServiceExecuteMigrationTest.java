@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingBuilder
 import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayloadBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -38,13 +38,13 @@ class LidMigrationServiceExecuteMigrationTest {
     private static final Jid OTHER_PN = Jid.of("12025550100@s.whatsapp.net");
     private static final Jid OTHER_LID = Jid.of("12025550100123@lid");
 
-    private record Harness(TestWhatsAppClient client, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, LiveLidMigrationService service) {}
 
     private static Harness build(TestABPropsService props) {
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, service);
     }
 
@@ -104,8 +104,8 @@ class LidMigrationServiceExecuteMigrationTest {
         var store = h.client.store();
 
         // Pre-existing PN chat + contact.
-        store.addNewContact(PEER_PN);
-        store.addNewChat(PEER_PN);
+        store.contactStore().addNewContact(PEER_PN);
+        store.chatStore().addNewChat(PEER_PN);
 
         h.service.initialize();
         h.service.enableMigration();
@@ -120,16 +120,16 @@ class LidMigrationServiceExecuteMigrationTest {
         assertEquals(LidMigrationState.COMPLETE, h.service.state());
 
         // Chat was rewritten: lid set, phoneNumberJid preserved.
-        var chat = store.findChatByJid(PEER_PN).orElseThrow();
+        var chat = store.chatStore().findChatByJid(PEER_PN).orElseThrow();
         assertEquals(PEER_LID, chat.lid().orElseThrow());
         assertEquals(PEER_PN, chat.phoneNumberJid().orElseThrow());
 
         // Contact mirrored.
-        var contact = store.findContactByJid(PEER_PN).orElseThrow();
+        var contact = store.contactStore().findContactByJid(PEER_PN).orElseThrow();
         assertEquals(PEER_LID, contact.lid().orElseThrow());
 
         // Bidirectional store mapping registered.
-        assertEquals(PEER_LID, store.findLidByPhone(PEER_PN).orElseThrow());
+        assertEquals(PEER_LID, store.contactStore().findLidByPhone(PEER_PN).orElseThrow());
     }
 
     @Test
@@ -139,7 +139,7 @@ class LidMigrationServiceExecuteMigrationTest {
         var store = h.client.store();
 
         // Empty chat, no mapping -> deletable.
-        store.addNewChat(PEER_PN);
+        store.chatStore().addNewChat(PEER_PN);
 
         h.service.initialize();
         h.service.enableMigration();
@@ -148,7 +148,7 @@ class LidMigrationServiceExecuteMigrationTest {
                 .build());
 
         assertEquals(LidMigrationState.COMPLETE, h.service.state());
-        assertFalse(store.findChatByJid(PEER_PN).isPresent(),
+        assertFalse(store.chatStore().findChatByJid(PEER_PN).isPresent(),
                 "chat with no LID and deletability bypass is removed");
     }
 
@@ -159,14 +159,14 @@ class LidMigrationServiceExecuteMigrationTest {
         var store = h.client.store();
 
         // 1. LID chat; Keep ALREADY_LID.
-        var lidChat = store.addNewChat(PEER_LID);
+        var lidChat = store.chatStore().addNewChat(PEER_LID);
         // 2. Group; Keep GROUP_OR_COMMUNITY.
-        var groupChat = store.addNewChat(Jid.of("120363012345678901@g.us"));
+        var groupChat = store.chatStore().addNewChat(Jid.of("120363012345678901@g.us"));
         // 3. PN chat with primary mapping; Migrate.
-        store.addNewContact(PEER_PN);
-        store.addNewChat(PEER_PN);
+        store.contactStore().addNewContact(PEER_PN);
+        store.chatStore().addNewChat(PEER_PN);
         // 4. Empty PN chat with no mapping anywhere; Delete.
-        var otherChat = store.addNewChat(OTHER_PN);
+        var otherChat = store.chatStore().addNewChat(OTHER_PN);
 
         h.service.initialize();
         h.service.enableMigration();
@@ -182,14 +182,14 @@ class LidMigrationServiceExecuteMigrationTest {
         assertTrue(h.client.failures().isEmpty(), "no per-resolution error surfaces to handleFailure");
 
         // LID chat untouched.
-        assertTrue(store.findChatByJid(PEER_LID).isPresent());
+        assertTrue(store.chatStore().findChatByJid(PEER_LID).isPresent());
         // Group untouched.
-        assertTrue(store.findChatByJid(groupChat.jid()).isPresent());
+        assertTrue(store.chatStore().findChatByJid(groupChat.jid()).isPresent());
         // PN chat was migrated.
-        var migrated = store.findChatByJid(PEER_PN).orElseThrow();
+        var migrated = store.chatStore().findChatByJid(PEER_PN).orElseThrow();
         assertEquals(PEER_LID, migrated.lid().orElseThrow());
         // OTHER_PN chat was deleted.
-        assertFalse(store.findChatByJid(OTHER_PN).isPresent());
+        assertFalse(store.chatStore().findChatByJid(OTHER_PN).isPresent());
     }
 
     @Test
@@ -210,7 +210,7 @@ class LidMigrationServiceExecuteMigrationTest {
 
         // findLidByPhone returns the most recently registered entry. learnMappingsInBulk runs after
         // COMPLETE and appends latestMappings after oldMappings, so the latest LID wins on the lookup.
-        assertEquals(PEER_LID_LATEST, h.client.store().findLidByPhone(PEER_PN).orElseThrow(),
+        assertEquals(PEER_LID_LATEST, h.client.store().contactStore().findLidByPhone(PEER_PN).orElseThrow(),
                 "with latest differing from assigned, the latest LID is the last registered entry");
     }
 
@@ -259,7 +259,7 @@ class LidMigrationServiceExecuteMigrationTest {
         var store = h.client.store();
 
         // Pre-register the mapping the primary will assign; so learnMappingsInBulk should skip it.
-        store.registerLidMapping(PEER_PN, PEER_LID);
+        store.contactStore().registerLidMapping(PEER_PN, PEER_LID);
 
         h.service.initialize();
         h.service.enableMigration();
@@ -272,7 +272,7 @@ class LidMigrationServiceExecuteMigrationTest {
                 .build());
 
         // Store mapping unchanged; assignment matched the existing entry.
-        assertEquals(PEER_LID, store.findLidByPhone(PEER_PN).orElseThrow());
+        assertEquals(PEER_LID, store.contactStore().findLidByPhone(PEER_PN).orElseThrow());
     }
 
     @Test
@@ -282,7 +282,7 @@ class LidMigrationServiceExecuteMigrationTest {
         var store = h.client.store();
         // Local has PEER_LID_LATEST; primary's latest = PEER_LID_LATEST (matches) and assigned = PEER_LID.
         // Old-bucket path: only assigned is registered, replacing the local.
-        store.registerLidMapping(PEER_PN, PEER_LID_LATEST);
+        store.contactStore().registerLidMapping(PEER_PN, PEER_LID_LATEST);
 
         h.service.initialize();
         h.service.enableMigration();
@@ -296,7 +296,7 @@ class LidMigrationServiceExecuteMigrationTest {
                 .build());
 
         // The assigned LID overwrites the local (which equalled the latest); old-bucket-only registration.
-        assertEquals(PEER_LID, store.findLidByPhone(PEER_PN).orElseThrow(),
+        assertEquals(PEER_LID, store.contactStore().findLidByPhone(PEER_PN).orElseThrow(),
                 "old-bucket registers only the assigned LID when local matches the latest");
     }
 
@@ -305,7 +305,7 @@ class LidMigrationServiceExecuteMigrationTest {
     void perResolutionErrorSwallowed() {
         var h = build(defaultProps());
         var store = h.client.store();
-        store.addNewContact(PEER_PN);
+        store.contactStore().addNewContact(PEER_PN);
 
         h.service.initialize();
         h.service.enableMigration();
@@ -325,7 +325,7 @@ class LidMigrationServiceExecuteMigrationTest {
         // chats to rewrite (store contained only a contact, no chats), so the sweep is trivially
         // complete and the per-resolution catch was not exercised; but no exception escaped.
         assertEquals(LidMigrationState.COMPLETE, h.service.state());
-        assertEquals(PEER_LID, store.findLidByPhone(PEER_PN).orElseThrow());
-        assertEquals(OTHER_LID, store.findLidByPhone(OTHER_PN).orElseThrow());
+        assertEquals(PEER_LID, store.contactStore().findLidByPhone(PEER_PN).orElseThrow());
+        assertEquals(OTHER_LID, store.contactStore().findLidByPhone(OTHER_PN).orElseThrow());
     }
 }

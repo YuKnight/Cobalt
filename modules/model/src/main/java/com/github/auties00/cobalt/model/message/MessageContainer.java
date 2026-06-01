@@ -1529,6 +1529,25 @@ public final class MessageContainer {
     }
 
     /**
+     * Returns the raw {@link DeviceSentMessage} envelope at this level, if
+     * present, without recursing into its wrapped inner container.
+     *
+     * <p>Companion accessor to the {@link FutureProofMessageType#DEVICE_SENT}
+     * value returned by {@link #futureProofContentType()}: the enum identifies
+     * the wrapper type and this accessor exposes the wrapper instance, so
+     * callers that need the envelope's {@link DeviceSentMessage#destinationJid()}
+     * or its raw inner container (for the receiver's outer-vs-inner
+     * {@link ChatMessageContextInfo} merge) can read them without going
+     * through {@link #content()}, which transparently unwraps the envelope
+     * and returns the inner payload.
+     *
+     * @return an {@code Optional} describing the {@link DeviceSentMessage}
+     */
+    public Optional<DeviceSentMessage> deviceSentMessage() {
+        return Optional.ofNullable(deviceSentMessage);
+    }
+
+    /**
      * Returns the fast ratchet key sender key distribution message, if present.
      *
      * <p>This is a side-channel field that coexists with the message

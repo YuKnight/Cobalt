@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
@@ -75,12 +75,12 @@ public final class SentinelMutationFactory {
      *         {@link Collections#emptyList()} if no sync key pairs exist
      */
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "getSentinelMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public List<SyncPendingMutation> getSentinelMutations(WhatsAppClient client) {
+    public List<SyncPendingMutation> getSentinelMutations(LinkedWhatsAppClient client) {
         LOGGER.fine("preparing mutations...");
 
         var timestamp = Instant.now();
         var collections = SyncPatchType.values();
-        var newestKey = SyncKeyUtils.findNewestKey(client.store().appStateKeys());
+        var newestKey = SyncKeyUtils.findNewestKey(client.store().syncStore().appStateKeys());
         if (newestKey == null) {
             LOGGER.warning("sentinel mutation sync: no key pairs");
             return Collections.emptyList();

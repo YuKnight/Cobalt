@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.contact.OutContactBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -48,7 +48,7 @@ class OutContactHandlerTest {
 
     private WhatsAppStore store;
     private TestABPropsService props;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private OutContactHandler handler;
 
     @BeforeEach
@@ -79,7 +79,7 @@ class OutContactHandlerTest {
     }
 
     @Nested
-    @DisplayName("metadata — wire identity")
+    @DisplayName("metadata â€” wire identity")
     class Metadata {
         @Test
         @DisplayName("actionName() returns the OutContactAction wire constant")
@@ -104,7 +104,7 @@ class OutContactHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — gating on out_contact_invites_enabled")
+    @DisplayName("applyMutation â€” gating on out_contact_invites_enabled")
     class Gating {
         @Test
         @DisplayName("when the AB-prop is not 1, every mutation returns UNSUPPORTED")
@@ -113,12 +113,12 @@ class OutContactHandlerTest {
             var result = handler.applyMutation(client,
                     setMutation(PEER, "Maria Garcia", null, Instant.now()));
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.findOutContact(PEER).isEmpty());
+            assertTrue(store.contactStore().findOutContact(PEER).isEmpty());
         }
     }
 
     @Nested
-    @DisplayName("applyMutation — happy SET")
+    @DisplayName("applyMutation â€” happy SET")
     class ApplySetHappy {
         @Test
         @DisplayName("SET adds the out-contact record with the supplied fullName/firstName")
@@ -127,7 +127,7 @@ class OutContactHandlerTest {
             var result = handler.applyMutation(client,
                     setMutation(PEER, "Maria Garcia", "Maria", ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var contact = store.findOutContact(PEER).orElseThrow();
+            var contact = store.contactStore().findOutContact(PEER).orElseThrow();
             assertEquals("Maria Garcia", contact.fullName().orElseThrow());
             assertEquals("Maria", contact.firstName().orElseThrow());
         }
@@ -137,7 +137,7 @@ class OutContactHandlerTest {
         void firstNameDerivedFromFullName() {
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             handler.applyMutation(client, setMutation(PEER, "Maria Garcia", null, ts));
-            var contact = store.findOutContact(PEER).orElseThrow();
+            var contact = store.contactStore().findOutContact(PEER).orElseThrow();
             assertEquals("Maria", contact.firstName().orElseThrow(),
                     "WA Web's p(e): t = e.trim().split(\" \")[0]");
         }
@@ -147,7 +147,7 @@ class OutContactHandlerTest {
         void emptyStringsCoalesce() {
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             handler.applyMutation(client, setMutation(PEER, "", "", ts));
-            var contact = store.findOutContact(PEER).orElseThrow();
+            var contact = store.contactStore().findOutContact(PEER).orElseThrow();
             assertTrue(contact.fullName().isEmpty());
             assertTrue(contact.firstName().isEmpty(),
                     "WA Web's m(e): e == null || e === \"\" -> null");
@@ -155,7 +155,7 @@ class OutContactHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — orphan dimension is n/a")
+    @DisplayName("applyMutation â€” orphan dimension is n/a")
     class OrphanDimension {
         @Test
         @DisplayName("out-contact is its own store; the record IS the entity, so no orphan path applies")
@@ -167,7 +167,7 @@ class OutContactHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed action value")
+    @DisplayName("applyMutation â€” malformed action value")
     class MalformedActionValue {
         @Test
         @DisplayName("a SET mutation carrying a different action returns MALFORMED")
@@ -193,7 +193,7 @@ class OutContactHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed action index")
+    @DisplayName("applyMutation â€” malformed action index")
     class MalformedActionIndex {
         @Test
         @DisplayName("a missing JID at indexParts[1] returns MALFORMED")
@@ -207,16 +207,16 @@ class OutContactHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — REMOVE drops the out-contact")
+    @DisplayName("applyMutation â€” REMOVE drops the out-contact")
     class RemoveOperation {
         @Test
         @DisplayName("REMOVE clears the record keyed by the supplied JID and returns SUCCESS")
         void removeDropsContact() {
-            store.addOutContact(new OutContactBuilder().jid(PEER).fullName("Maria").firstName("Maria").build());
+            store.contactStore().addOutContact(new OutContactBuilder().jid(PEER).fullName("Maria").firstName("Maria").build());
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var result = handler.applyMutation(client, removeMutation(PEER, ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findOutContact(PEER).isEmpty());
+            assertTrue(store.contactStore().findOutContact(PEER).isEmpty());
         }
 
         @Test
@@ -229,10 +229,10 @@ class OutContactHandlerTest {
     }
 
     @Nested
-    @DisplayName("resolveConflicts — inherits default timestamp comparison")
+    @DisplayName("resolveConflicts â€” inherits default timestamp comparison")
     class ResolveConflicts {
         @Test
-        @DisplayName("newer remote → APPLY_REMOTE_DROP_LOCAL")
+        @DisplayName("newer remote â†’ APPLY_REMOTE_DROP_LOCAL")
         void newerRemoteApplies() {
             var local = setMutation(PEER, "A", null, Instant.ofEpochSecond(1_000));
             var remote = setMutation(PEER, "B", null, Instant.ofEpochSecond(2_000));
@@ -241,7 +241,7 @@ class OutContactHandlerTest {
         }
 
         @Test
-        @DisplayName("older remote → SKIP_REMOTE")
+        @DisplayName("older remote â†’ SKIP_REMOTE")
         void olderRemoteSkipped() {
             var local = setMutation(PEER, "A", null, Instant.ofEpochSecond(2_000));
             var remote = setMutation(PEER, "B", null, Instant.ofEpochSecond(1_000));
@@ -251,7 +251,7 @@ class OutContactHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutationBatch — inherits default sequential apply")
+    @DisplayName("applyMutationBatch â€” inherits default sequential apply")
     class ApplyBatch {
         @Test
         @DisplayName("default batch path applies each mutation in order")
@@ -264,7 +264,7 @@ class OutContactHandlerTest {
             assertEquals(2, results.size());
             assertEquals(SyncActionState.SUCCESS, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertTrue(store.findOutContact(PEER).isEmpty(),
+            assertTrue(store.contactStore().findOutContact(PEER).isEmpty(),
                     "REMOVE in the batch tail must override the earlier SET");
         }
     }

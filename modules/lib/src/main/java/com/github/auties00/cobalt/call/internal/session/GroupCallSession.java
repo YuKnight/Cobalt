@@ -93,6 +93,20 @@ public final class GroupCallSession implements AutoCloseable {
     private final ConcurrentHashMap<Integer, Subscriber> subscribers = new ConcurrentHashMap<>();
 
     /**
+     * Participant JIDs that joined the call via {@code <group_update action="add">} but whose
+     * forward SSRC has not yet arrived through the SFU's
+     * {@link com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptions SenderSubscriptions}
+     * message.
+     *
+     * <p>Reconciled by {@link #resolvePendingParticipant(Jid, int, java.util.function.Consumer)}
+     * once the SSRC is learned. Entries are removed on
+     * {@link #removeParticipant(Jid)} so a participant who leaves before subscribing never gets
+     * promoted into the active subscriber map.
+     */
+    private final java.util.concurrent.ConcurrentHashMap<Jid, Boolean> pendingJoins =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
      * Whether {@link #start()} has been called, guarding against a second handshake.
      */
     private volatile boolean started;
@@ -166,12 +180,56 @@ public final class GroupCallSession implements AutoCloseable {
     public GroupCallSession(ActiveCall call, DatagramTransport transport,
                             SrtpRole role, DtlsCertificate localCert,
                             byte[] expectedPeerFingerprint, VoiceCallOptions options) {
+        this(call,
+                new DtlsSrtpDriver(
+                        Objects.requireNonNull(transport, "transport cannot be null"),
+                        Objects.requireNonNull(role, "role cannot be null"),
+                        Objects.requireNonNull(localCert, "localCert cannot be null"),
+                        Objects.requireNonNull(expectedPeerFingerprint, "expectedPeerFingerprint cannot be null")),
+                options);
+    }
+
+    /**
+     * Constructs a group-call session over an already-built {@link DtlsSrtpDriver}.
+     *
+     * <p>Used when the transport layer has already constructed the driver and run its connectivity
+     * check over the relay socket (the SFU leg), so the session shares the same byte transport and
+     * SRTP demultiplexer rather than building a second driver that would clobber the first's inbound
+     * listener.
+     *
+     * @param call    the active call whose media ports drive the session
+     * @param driver  the pre-built DTLS-SRTP driver wrapping the SFU transport
+     * @param options the per-call configuration
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public GroupCallSession(ActiveCall call, DtlsSrtpDriver driver, VoiceCallOptions options) {
         this.call = Objects.requireNonNull(call, "call cannot be null");
         this.options = Objects.requireNonNull(options, "options cannot be null");
-        Objects.requireNonNull(role, "role cannot be null");
-        Objects.requireNonNull(localCert, "localCert cannot be null");
-        Objects.requireNonNull(expectedPeerFingerprint, "expectedPeerFingerprint cannot be null");
-        this.dtls = new DtlsSrtpDriver(transport, role, localCert, expectedPeerFingerprint);
+        this.dtls = Objects.requireNonNull(driver, "driver cannot be null");
+    }
+
+    /**
+     * The 30-byte hop-by-hop key the relay issued in {@code <hbh_key>}, keying the SFU-leg SRTP; or
+     * {@code null} when media keys from a DTLS-SRTP export instead.
+     *
+     * <p>WhatsApp group calls route media through an SFU over the same hop-by-hop SRTP transport a 1:1
+     * call uses for its relay leg; per-participant end-to-end confidentiality is layered on top with
+     * SFrame. When set, the SFU-leg SRTP is keyed from this hop-by-hop key (no peer DTLS handshake),
+     * mirroring {@link VoiceCallSession#useHopByHopKey(byte[])}.
+     */
+    private volatile byte[] hopByHopKey;
+
+    /**
+     * Keys the SFU-leg SRTP from the relay's 30-byte hop-by-hop key instead of a DTLS-SRTP export.
+     *
+     * <p>Must be called before {@link #start()}.
+     *
+     * @param hbhKey the 30-byte hop-by-hop key, or {@code null} to keep DTLS-export keying
+     * @return this session, for chaining
+     */
+    public GroupCallSession useHopByHopKey(byte[] hbhKey) {
+        this.hopByHopKey = hbhKey == null ? null : hbhKey.clone();
+        return this;
     }
 
     /**
@@ -238,7 +296,9 @@ public final class GroupCallSession implements AutoCloseable {
      * budget bounds both the handshake wait and the wiring poll.
      */
     public void awaitConnected(long timeout, TimeUnit unit) throws IOException, InterruptedException {
-        dtls.awaitHandshake(timeout, unit);
+        if (hopByHopKey == null) {
+            dtls.awaitHandshake(timeout, unit);
+        }
         var deadline = System.nanoTime() + unit.toNanos(timeout);
         while (audio == null) {
             if (System.nanoTime() > deadline) {
@@ -283,6 +343,58 @@ public final class GroupCallSession implements AutoCloseable {
     }
 
     /**
+     * Records a participant join announced through {@code <group_update action="add">} whose
+     * forward SSRC is not yet known.
+     *
+     * <p>The actual {@link #addParticipant(GroupCallParticipant)} call can only happen once the SFU
+     * publishes the participant's send SSRC via the
+     * {@link com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptions SenderSubscriptions}
+     * AppData message; until then we record the join and reconcile later.
+     *
+     * @param jid the participant JID
+     * @throws NullPointerException if {@code jid} is {@code null}
+     */
+    public void notePendingJoin(Jid jid) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        pendingJoins.put(jid, Boolean.TRUE);
+    }
+
+    /**
+     * Resolves a previously-pending join now that the SFU has reported the participant's send SSRC.
+     *
+     * <p>If {@code jid} is in {@link #pendingJoins}, builds a {@link GroupCallParticipant} via the
+     * supplied factory and routes it through {@link #addParticipant(GroupCallParticipant)}; the
+     * pending entry is then removed. If the participant was never marked pending (e.g., joined
+     * before the call layer observed any {@code group_update}), the factory is invoked anyway so
+     * late-arriving subscriptions still wire.
+     *
+     * @param jid        the participant JID whose SSRC is now known
+     * @param audioSsrc  the SFU-assigned audio receive SSRC
+     * @param onResolved factory turning {@code (jid, audioSsrc)} into a {@link GroupCallParticipant};
+     *                   typically attaches the application's audio-frame listener
+     */
+    public void resolvePendingParticipant(Jid jid, int audioSsrc,
+                                          java.util.function.BiFunction<Jid, Integer, GroupCallParticipant> onResolved) {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        Objects.requireNonNull(onResolved, "onResolved cannot be null");
+        pendingJoins.remove(jid);
+        var participant = onResolved.apply(jid, audioSsrc);
+        if (participant != null) {
+            addParticipant(participant);
+        }
+    }
+
+    /**
+     * Returns whether a join for {@code jid} has been observed but not yet resolved with a SSRC.
+     *
+     * @param jid the participant JID
+     * @return {@code true} when pending
+     */
+    public boolean isPendingJoin(Jid jid) {
+        return pendingJoins.containsKey(jid);
+    }
+
+    /**
      * Removes the participant with the given JID, closing its decoder and stopping frame delivery.
      *
      * <p>The first subscriber whose participant matches {@code jid} is removed; if none matches, this
@@ -293,6 +405,7 @@ public final class GroupCallSession implements AutoCloseable {
      */
     public synchronized void removeParticipant(Jid jid) {
         Objects.requireNonNull(jid, "jid cannot be null");
+        pendingJoins.remove(jid);
         Integer toRemove = null;
         for (var entry : subscribers.entrySet()) {
             if (entry.getValue().participant.jid().equals(jid)) {
@@ -358,15 +471,22 @@ public final class GroupCallSession implements AutoCloseable {
      */
     private void completeAfterHandshake() {
         SrtpEndpoint srtp;
-        try {
-            srtp = dtls.awaitHandshake(30, TimeUnit.SECONDS);
-        } catch (Throwable _) {
-            close();
+        var hbh = this.hopByHopKey;
+        if (hbh != null) {
+            // SFU-leg media keys from the relay's <hbh_key>, not a peer DTLS handshake (the relay
+            // forwards SRTP; per-participant e2e is SFrame on top). Wire immediately.
+            srtp = SrtpEndpoint.fromHopByHopKey(hbh);
+        } else {
             try {
-                call.hangup();
-            } catch (Throwable suppressed) {
+                srtp = dtls.awaitHandshake(30, TimeUnit.SECONDS);
+            } catch (Throwable _) {
+                close();
+                try {
+                    call.hangup();
+                } catch (Throwable suppressed) {
+                }
+                return;
             }
-            return;
         }
         synchronized (this) {
             if (closed) {
@@ -498,5 +618,67 @@ public final class GroupCallSession implements AutoCloseable {
      */
     public SrtpEndpoint srtpEndpoint() {
         return dtls.srtpEndpoint();
+    }
+
+    /**
+     * Applies a freshly-published end-to-end rekey bundle to this group session's SRTP endpoint.
+     *
+     * <p>Walks {@link com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload#keys()} and
+     * routes each {@link com.github.auties00.cobalt.model.call.datachannel.RekeyKeyType#AUDIO AUDIO}
+     * or {@link com.github.auties00.cobalt.model.call.datachannel.RekeyKeyType#VIDEO VIDEO} entry to
+     * {@link com.github.auties00.cobalt.call.internal.rtp.srtp.SrtpEndpoint#rotateMasterKey(byte[])}
+     * on the shared endpoint owned by this session's DTLS driver. The rotation invalidates every
+     * per-participant inbound context, so the next inbound packet on each peer's SSRC rebuilds its
+     * context with the new master key.
+     *
+     * @param payload the rekey bundle
+     * @throws NullPointerException if {@code payload} is {@code null}
+     */
+    public void applyRekey(com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload payload) {
+        Objects.requireNonNull(payload, "payload cannot be null");
+        var srtp = dtls.srtpEndpoint();
+        if (srtp == null) {
+            return;
+        }
+        for (var entry : payload.keys()) {
+            switch (entry.type()) {
+                case AUDIO, VIDEO -> srtp.rotateMasterKey(entry.key());
+                case APPDATA -> { /* DataChannel rekey; outside the SRTP endpoint */ }
+            }
+        }
+    }
+
+    /**
+     * Encodes an
+     * {@link com.github.auties00.cobalt.model.call.datachannel.RxSubscriptions RxSubscriptions}
+     * proto describing which participants the local user wants to receive video from, and ships it
+     * over the supplied AppData {@link com.github.auties00.cobalt.call.internal.transport.sctp.datachannel.DataChannel
+     * DataChannel}.
+     *
+     * <p>The encoded payload is a length-prefixed
+     * {@link com.github.auties00.cobalt.model.call.datachannel.RxSubscriptionsSpec RxSubscriptionsSpec}-serialized
+     * message. Audio-only group calls still ship an empty bundle so the SFU knows the receiver is
+     * subscribed to nothing.
+     *
+     * @param channel the AppData DataChannel obtained from
+     *                {@link com.github.auties00.cobalt.call.internal.transport.ActiveCallTransport#dataChannel() ActiveCallTransport.dataChannel()}
+     * @param videoPids the participant PIDs we want any video from; pass an empty set for
+     *                  audio-only subscriptions
+     * @param videoQualities the per-PID quality entries; pass an empty list for audio-only
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    public void requestSubscriptions(
+            com.github.auties00.cobalt.call.internal.transport.sctp.datachannel.DataChannel channel,
+            java.util.Set<Integer> videoPids,
+            java.util.List<com.github.auties00.cobalt.model.call.datachannel.RxVidSubscriptionInfo> videoQualities) {
+        Objects.requireNonNull(channel, "channel cannot be null");
+        Objects.requireNonNull(videoPids, "videoPids cannot be null");
+        Objects.requireNonNull(videoQualities, "videoQualities cannot be null");
+        var subs = new com.github.auties00.cobalt.model.call.datachannel.RxSubscriptionsBuilder()
+                .vidRxPids(java.util.List.copyOf(videoPids))
+                .vidSubscriptions(java.util.List.copyOf(videoQualities))
+                .build();
+        var bytes = com.github.auties00.cobalt.model.call.datachannel.RxSubscriptionsSpec.encode(subs);
+        channel.send(bytes);
     }
 }

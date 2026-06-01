@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.TestSignalSession;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import com.github.auties00.libsignal.protocol.SignalPreKeyMessage;
@@ -80,7 +81,7 @@ class MessageEncryptionTest {
 
         // ofSerialized strips the 1-byte version prefix first; SignalPreKeyMessageSpec.decode would read it as protobuf and reject the wire type
         var preKey = SignalPreKeyMessage.ofSerialized(payload.ciphertext());
-        var recipientCipher = new SignalSessionCipher(recipient);
+        var recipientCipher = new SignalSessionCipher(recipient.signalStore());
         var recovered = recipientCipher.decrypt(SENDER_JID.toSignalAddress(), preKey);
 
         var padding = recovered.length - plaintext.length;
@@ -145,11 +146,13 @@ class MessageEncryptionTest {
     @DisplayName("constructor: null collaborators throw NullPointerException")
     void constructorNullArgs() {
         var store = MessageFixtures.temporaryStore(SENDER_JID, null);
-        var session = new SignalSessionCipher(store);
-        var group = new SignalGroupCipher(store);
-        assertThrows(NullPointerException.class, () -> new MessageEncryption(null, session, group));
-        assertThrows(NullPointerException.class, () -> new MessageEncryption(store, null, group));
-        assertThrows(NullPointerException.class, () -> new MessageEncryption(store, session, null));
+        var session = new SignalSessionCipher(store.signalStore());
+        var group = new SignalGroupCipher(store.signalStore());
+        var locks = new SignalCryptoLocks();
+        assertThrows(NullPointerException.class, () -> new MessageEncryption(null, session, group, locks));
+        assertThrows(NullPointerException.class, () -> new MessageEncryption(store, null, group, locks));
+        assertThrows(NullPointerException.class, () -> new MessageEncryption(store, session, null, locks));
+        assertThrows(NullPointerException.class, () -> new MessageEncryption(store, session, group, null));
     }
 
     @Test
@@ -166,7 +169,7 @@ class MessageEncryptionTest {
     }
 
     private static MessageEncryption encryption(WhatsAppStore store) {
-        return new MessageEncryption(store, new SignalSessionCipher(store), new SignalGroupCipher(store));
+        return new MessageEncryption(store, new SignalSessionCipher(store.signalStore()), new SignalGroupCipher(store.signalStore()), new SignalCryptoLocks());
     }
 
     private static String toHex(byte[] bytes) {

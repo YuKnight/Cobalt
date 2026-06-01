@@ -13,7 +13,8 @@ import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.DisplayName;
@@ -62,10 +63,11 @@ class PeerMessageSenderTest {
                             .attribute("t", 1700000000L)
                             .build();
                 });
-        var wamService = new DefaultWamService(client, client.abPropsService());
+        var wamService = new LiveWamService(client, client.abPropsService());
         var encryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var deviceService = StubDeviceService.create();
         var sender = new PeerMessageSender(client, encryption, deviceService, client.abPropsService(), wamService);
 
@@ -113,10 +115,11 @@ class PeerMessageSenderTest {
                         .description("ack")
                         .attribute("t", 1700000000L)
                         .build());
-        var wamService = new DefaultWamService(client, client.abPropsService());
+        var wamService = new LiveWamService(client, client.abPropsService());
         var encryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var deviceService = StubDeviceService.create()
                 .withEnsureSessions(devices -> {
                     ensureCalls.add(devices);
@@ -147,10 +150,11 @@ class PeerMessageSenderTest {
                     capturedStanza.set(node.build());
                     return new NodeBuilder().description("ack").attribute("t", 1700000000L).build();
                 });
-        var wamService = new DefaultWamService(client, client.abPropsService());
+        var wamService = new LiveWamService(client, client.abPropsService());
         var encryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var sender = new PeerMessageSender(client, encryption, StubDeviceService.create(), client.abPropsService(), wamService);
 
         sender.send(SELF_COMPANION, peerMessageInfo("3EB0TYPE01", SELF_COMPANION));

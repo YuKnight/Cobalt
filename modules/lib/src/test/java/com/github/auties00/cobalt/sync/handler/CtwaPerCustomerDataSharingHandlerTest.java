@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.business.ctwa.CtwaDataSharingPreferenceBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -44,7 +44,7 @@ class CtwaPerCustomerDataSharingHandlerTest {
     private static final String CUSTOMER_LID = "12025550100@lid";
     private static final Jid CUSTOMER_LID_JID = Jid.of(CUSTOMER_LID);
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -100,7 +100,7 @@ class CtwaPerCustomerDataSharingHandlerTest {
                     client, ctwaMutation(CUSTOMER_LID, Boolean.TRUE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var pref = client.store().findCtwaDataSharing(CUSTOMER_LID).orElseThrow();
+            var pref = client.store().businessStore().findCtwaDataSharing(CUSTOMER_LID).orElseThrow();
             assertEquals(CUSTOMER_LID, pref.accountLid());
             assertTrue(pref.enabled());
         }
@@ -112,7 +112,7 @@ class CtwaPerCustomerDataSharingHandlerTest {
                     client, ctwaMutation(CUSTOMER_LID, Boolean.FALSE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var pref = client.store().findCtwaDataSharing(CUSTOMER_LID).orElseThrow();
+            var pref = client.store().businessStore().findCtwaDataSharing(CUSTOMER_LID).orElseThrow();
             assertFalse(pref.enabled());
         }
     }
@@ -123,15 +123,15 @@ class CtwaPerCustomerDataSharingHandlerTest {
         @Test
         @DisplayName("REMOVE deletes the entry from the store")
         void removeDeletes() {
-            client.store().putCtwaDataSharing(
+            client.store().businessStore().putCtwaDataSharing(
                     new CtwaDataSharingPreferenceBuilder().accountLid(CUSTOMER_LID).enabled(true).build());
-            assertTrue(client.store().findCtwaDataSharing(CUSTOMER_LID).isPresent());
+            assertTrue(client.store().businessStore().findCtwaDataSharing(CUSTOMER_LID).isPresent());
 
             var result = new CtwaPerCustomerDataSharingHandler().applyMutation(
                     client, ctwaMutation(CUSTOMER_LID, null, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().findCtwaDataSharing(CUSTOMER_LID).isEmpty(),
+            assertTrue(client.store().businessStore().findCtwaDataSharing(CUSTOMER_LID).isEmpty(),
                     "REMOVE must drop the preference from the store");
         }
 

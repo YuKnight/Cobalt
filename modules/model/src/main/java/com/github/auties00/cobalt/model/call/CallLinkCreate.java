@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.createCallLink}. Carries the
+ * Input model for {@code LinkedWhatsAppClient.createCallLink}. Carries the
  * call medium, the JID of the device that creates the call, an
  * optional client-side call identifier, an optional creator username,
  * the waiting-room toggle, and an optional scheduled-start time.

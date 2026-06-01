@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.model.chat.group.GroupMetadataBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -32,14 +32,14 @@ class LidMigrationServiceMeUserForChatTest {
     private static final Jid PEER_LID = Jid.of("258252122116273@lid");
     private static final Jid GROUP = Jid.of("120363012345678901@g.us");
 
-    private record Harness(TestWhatsAppClient client, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, LiveLidMigrationService service) {}
 
     private static Harness build(Jid selfPn, Jid selfLid) {
         var props = TestABPropsService.builder().build();
         var store = MigrationFixtures.temporaryStore(selfPn, selfLid);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, service);
     }
 
@@ -51,7 +51,7 @@ class LidMigrationServiceMeUserForChatTest {
     @DisplayName("LID-server 1:1 chat -> me-LID for all translate types")
     void lidChatAllTypes() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
 
         assertEquals(SELF_LID_USER,
                 h.service.getMeUserLidOrJidForChat(chat, LidMigrationService.TranslateMsgKeyType.ADDON));
@@ -65,7 +65,7 @@ class LidMigrationServiceMeUserForChatTest {
     @DisplayName("1:1 PN chat (no metadata) -> me-PN for all translate types")
     void pnChatAllTypes() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_PN);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
 
         assertEquals(SELF_PN_USER,
                 h.service.getMeUserLidOrJidForChat(chat, LidMigrationService.TranslateMsgKeyType.ADDON));
@@ -79,8 +79,8 @@ class LidMigrationServiceMeUserForChatTest {
     @DisplayName("non-CAG group, isLidAddressingMode=true -> me-LID for all types")
     void groupLidModeAllTypes() {
         var h = build();
-        var chat = h.client.store().addNewChat(GROUP);
-        h.client.store().addChatMetadata(new GroupMetadataBuilder()
+        var chat = h.client.store().chatStore().addNewChat(GROUP);
+        h.client.store().chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(GROUP)
                 .subject("Test Group")
                 .isLidAddressingMode(true)
@@ -99,8 +99,8 @@ class LidMigrationServiceMeUserForChatTest {
     @DisplayName("non-CAG group, isLidAddressingMode=false -> me-PN for all types")
     void groupPnModeAllTypes() {
         var h = build();
-        var chat = h.client.store().addNewChat(GROUP);
-        h.client.store().addChatMetadata(new GroupMetadataBuilder()
+        var chat = h.client.store().chatStore().addNewChat(GROUP);
+        h.client.store().chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(GROUP)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
@@ -119,8 +119,8 @@ class LidMigrationServiceMeUserForChatTest {
     @DisplayName("CAG, isLidAddressingMode=true -> me-LID for all types")
     void cagLidModeAllTypes() {
         var h = build();
-        var chat = h.client.store().addNewChat(GROUP);
-        h.client.store().addChatMetadata(new GroupMetadataBuilder()
+        var chat = h.client.store().chatStore().addNewChat(GROUP);
+        h.client.store().chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(GROUP)
                 .subject("Test Group")
                 .isLidAddressingMode(true)
@@ -139,8 +139,8 @@ class LidMigrationServiceMeUserForChatTest {
     @DisplayName("CAG, isLidAddressingMode=false: ADDON -> me-LID (isCAG short-circuit)")
     void cagPnModeAddonUsesLid() {
         var h = build();
-        var chat = h.client.store().addNewChat(GROUP);
-        h.client.store().addChatMetadata(new GroupMetadataBuilder()
+        var chat = h.client.store().chatStore().addNewChat(GROUP);
+        h.client.store().chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(GROUP)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
@@ -156,8 +156,8 @@ class LidMigrationServiceMeUserForChatTest {
     @DisplayName("CAG, isLidAddressingMode=false: MESSAGE and EDIT_MESSAGE -> me-PN")
     void cagPnModeMessageAndEditUsePn() {
         var h = build();
-        var chat = h.client.store().addNewChat(GROUP);
-        h.client.store().addChatMetadata(new GroupMetadataBuilder()
+        var chat = h.client.store().chatStore().addNewChat(GROUP);
+        h.client.store().chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(GROUP)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
@@ -177,7 +177,7 @@ class LidMigrationServiceMeUserForChatTest {
     void missingSelfLidThrows() {
         // No self-LID configured.
         var h = build(SELF_PN, null);
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
 
         assertThrows(IllegalStateException.class,
                 () -> h.service.getMeUserLidOrJidForChat(chat, LidMigrationService.TranslateMsgKeyType.MESSAGE));
@@ -188,17 +188,17 @@ class LidMigrationServiceMeUserForChatTest {
     void missingSelfPnThrows() {
         // Self-PN set initially, then cleared so the PN-route fails.
         var h = build();
-        h.client.store().setJid(null);
+        h.client.store().accountStore().setJid(null);
 
-        var chat = h.client.store().addNewChat(GROUP);
-        h.client.store().addChatMetadata(new GroupMetadataBuilder()
+        var chat = h.client.store().chatStore().addNewChat(GROUP);
+        h.client.store().chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(GROUP)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
                 .defaultSubgroup(true) // CAG
                 .build());
 
-        // CAG + !isLidAddressingMode + MESSAGE -> me-PN path -> throws because store.jid() is null.
+        // CAG + !isLidAddressingMode + MESSAGE -> me-PN path -> throws because store.accountStore().jid() is null.
         assertThrows(IllegalStateException.class,
                 () -> h.service.getMeUserLidOrJidForChat(chat, LidMigrationService.TranslateMsgKeyType.MESSAGE));
     }

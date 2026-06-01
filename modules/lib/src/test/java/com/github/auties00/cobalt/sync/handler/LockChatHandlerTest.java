@@ -98,7 +98,7 @@ class LockChatHandlerTest {
         @Test
         @DisplayName("locked=true also unarchives and unpins the chat (mutual exclusion)")
         void lockingUnarchivesAndUnpins() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.setArchived(true);
             chat.setPinnedTimestamp(Instant.ofEpochSecond(123L));
 
@@ -114,7 +114,7 @@ class LockChatHandlerTest {
         @Test
         @DisplayName("locked=false only flips the lock flag (does not touch archive/pin)")
         void unlockingLeavesOthersAlone() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.setLocked(true);
             chat.setArchived(true);
             var pinTs = Instant.ofEpochSecond(123L);
@@ -152,7 +152,7 @@ class LockChatHandlerTest {
         @Test
         @DisplayName("a SyncActionValue carrying a pinAction instead of lockChatAction is MALFORMED")
         void wrongActionTypeIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var wrong = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .pinAction(new PinActionBuilder().pinned(true).build())
@@ -172,7 +172,7 @@ class LockChatHandlerTest {
         @Test
         @DisplayName("an empty chat JID at slot 1 is MALFORMED")
         void emptyChatJidIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .lockChatAction(new LockChatActionBuilder().locked(true).build())
@@ -192,7 +192,7 @@ class LockChatHandlerTest {
         @Test
         @DisplayName("REMOVE returns UNSUPPORTED")
         void removeReturnsUnsupported() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var mutation = new DecryptedMutation.Trusted(
                     JSON.toJSONString(List.of("lock", PEER.toString())),
                     new SyncActionValueBuilder()

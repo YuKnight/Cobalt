@@ -8,7 +8,7 @@ import it.auties.protobuf.model.ProtobufType;
 import java.util.Objects;
 
 /**
- * Input model for {@code WhatsAppClient.acceptGroupAdd} — the
+ * Input model for {@code LinkedWhatsAppClient.acceptGroupAdd} — the
  * parameters carried on an {@code <add_request>} acceptance.
  *
  * <p>All four fields are required — the relay rejects the acceptance

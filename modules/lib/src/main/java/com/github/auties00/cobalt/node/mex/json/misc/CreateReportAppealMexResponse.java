@@ -24,12 +24,9 @@ import java.util.Optional;
  *
  * <p>The envelope projects the updated channel-report record so callers can render an appeal entry
  * on a report management surface. Each top-level scalar is exposed as an {@link Optional}, the two
- * epoch-second timestamps as {@link Instant}, and the appeal-specific scalars through the nested
+ * epoch-second timestamps as {@link Instant}, the polymorphic reported-content payload through the
+ * nested {@link ReportedContentData} value, and the appeal-specific scalars through the nested
  * {@link Appeal} record.
- *
- * @implNote This implementation flattens the {@code reported_content_data} inline-fragment block
- * into three independent {@link Optional} scalars (server message id, server response id, notify
- * name) rather than preserving the fragment nesting.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexCreateReportAppealJob")
 public final class CreateReportAppealMexResponse implements MexOperation.Response.Json {
@@ -64,22 +61,10 @@ public final class CreateReportAppealMexResponse implements MexOperation.Respons
     private final String channelJid;
 
     /**
-     * Holds the {@code server_msg_id} scalar flattened from the {@code reported_content_data}
-     * inline-fragment block.
+     * Holds the parsed {@code reported_content_data} inline-fragment union projecting the content
+     * the appeal targets.
      */
-    private final String serverMsgId;
-
-    /**
-     * Holds the {@code server_response_id} scalar flattened from the {@code reported_content_data}
-     * inline-fragment block.
-     */
-    private final String responseServerMsgId;
-
-    /**
-     * Holds the {@code notify_name} scalar flattened from the {@code reported_content_data}
-     * inline-fragment block.
-     */
-    private final String notifyName;
+    private final ReportedContentData reportedContentData;
 
     /**
      * Holds the parsed {@code appeal} sub-object carrying the appeal-specific scalars.
@@ -98,21 +83,17 @@ public final class CreateReportAppealMexResponse implements MexOperation.Respons
      * @param lastUpdateTime       the {@code last_update_time} scalar (Unix epoch second), may be {@code null}
      * @param channelName          the {@code channel_name} scalar, may be {@code null}
      * @param channelJid           the {@code channel_jid} scalar, may be {@code null}
-     * @param serverMsgId          the {@code server_msg_id} scalar, may be {@code null}
-     * @param responseServerMsgId  the {@code server_response_id} scalar, may be {@code null}
-     * @param notifyName           the {@code notify_name} scalar, may be {@code null}
+     * @param reportedContentData  the parsed {@link ReportedContentData} union, may be {@code null}
      * @param appeal               the parsed {@link Appeal} sub-object, may be {@code null}
      */
-    private CreateReportAppealMexResponse(String reportId, String status, Long creationTime, Long lastUpdateTime, String channelName, String channelJid, String serverMsgId, String responseServerMsgId, String notifyName, Appeal appeal) {
+    private CreateReportAppealMexResponse(String reportId, String status, Long creationTime, Long lastUpdateTime, String channelName, String channelJid, ReportedContentData reportedContentData, Appeal appeal) {
         this.reportId = reportId;
         this.status = status;
         this.creationTime = creationTime;
         this.lastUpdateTime = lastUpdateTime;
         this.channelName = channelName;
         this.channelJid = channelJid;
-        this.serverMsgId = serverMsgId;
-        this.responseServerMsgId = responseServerMsgId;
-        this.notifyName = notifyName;
+        this.reportedContentData = reportedContentData;
         this.appeal = appeal;
     }
 
@@ -198,36 +179,14 @@ public final class CreateReportAppealMexResponse implements MexOperation.Respons
     }
 
     /**
-     * Returns the {@code server_msg_id} scalar flattened from the {@code reported_content_data}
-     * inline-fragment block.
+     * Returns the parsed {@code reported_content_data} inline-fragment union projecting the content
+     * the appeal targets.
      *
-     * @return an {@link Optional} containing the server message id, or {@link Optional#empty()} if
-     *         the relay omitted the scalar
+     * @return an {@link Optional} containing the parsed {@link ReportedContentData}, or
+     *         {@link Optional#empty()} if the relay omitted the sub-object
      */
-    public Optional<String> serverMsgId() {
-        return Optional.ofNullable(serverMsgId);
-    }
-
-    /**
-     * Returns the {@code server_response_id} scalar flattened from the
-     * {@code reported_content_data} inline-fragment block.
-     *
-     * @return an {@link Optional} containing the server response id, or {@link Optional#empty()} if
-     *         the relay omitted the scalar
-     */
-    public Optional<String> responseServerMsgId() {
-        return Optional.ofNullable(responseServerMsgId);
-    }
-
-    /**
-     * Returns the {@code notify_name} scalar flattened from the {@code reported_content_data}
-     * inline-fragment block.
-     *
-     * @return an {@link Optional} containing the reporter notify name, or {@link Optional#empty()}
-     *         if the relay omitted the scalar
-     */
-    public Optional<String> notifyName() {
-        return Optional.ofNullable(notifyName);
+    public Optional<ReportedContentData> reportedContentData() {
+        return Optional.ofNullable(reportedContentData);
     }
 
     /**
@@ -238,6 +197,257 @@ public final class CreateReportAppealMexResponse implements MexOperation.Respons
      */
     public Optional<Appeal> appeal() {
         return Optional.ofNullable(appeal);
+    }
+
+    /**
+     * Holds the parsed projection of the polymorphic {@code reported_content_data} sub-object nested
+     * under {@code xwa2_create_channel_report_appeal_v2}.
+     *
+     * <p>The relay returns one of three GraphQL inline-fragment shapes keyed by the
+     * {@code __typename} discriminator:
+     * <ul>
+     *   <li>{@code XWA2ChannelServerMsgData} carries {@code server_msg_id}.</li>
+     *   <li>{@code XWA2ChannelStatusData} carries {@code server_id}.</li>
+     *   <li>{@code XWA2ChannelQuestionResponseData} carries {@code server_response_id},
+     *       {@code notify_name} and a nested {@code question_data} fragment of type
+     *       {@code XWA2ChannelServerMsgData}.</li>
+     * </ul>
+     *
+     * @implNote This implementation parses every inline-fragment field leniently regardless of the
+     * active {@code __typename}; fields absent on the active fragment collapse to
+     * {@link Optional#empty()} rather than triggering a discriminator branch.
+     */
+    public static final class ReportedContentData {
+        /**
+         * Holds the GraphQL {@code __typename} discriminator selecting which inline-fragment fields
+         * are populated.
+         */
+        private final String typename;
+
+        /**
+         * Holds the {@code server_msg_id} populated on {@code XWA2ChannelServerMsgData} fragments.
+         */
+        private final String serverMsgId;
+
+        /**
+         * Holds the {@code server_id} populated on {@code XWA2ChannelStatusData} fragments.
+         */
+        private final String serverId;
+
+        /**
+         * Holds the {@code server_response_id} populated on
+         * {@code XWA2ChannelQuestionResponseData} fragments.
+         */
+        private final String serverResponseId;
+
+        /**
+         * Holds the {@code notify_name} populated on {@code XWA2ChannelQuestionResponseData}
+         * fragments.
+         */
+        private final String notifyName;
+
+        /**
+         * Holds the nested {@code question_data} fragment populated on
+         * {@code XWA2ChannelQuestionResponseData}.
+         */
+        private final QuestionData questionData;
+
+        /**
+         * Constructs a parsed {@code reported_content_data} value.
+         *
+         * <p>Only the fields matching the active {@code __typename} fragment are populated.
+         * Instances are produced only by the {@link #of(JSONObject)} parser.
+         *
+         * @param typename         the {@code __typename} discriminator, may be {@code null}
+         * @param serverMsgId      the {@code server_msg_id} value, may be {@code null}
+         * @param serverId         the {@code server_id} value, may be {@code null}
+         * @param serverResponseId the {@code server_response_id} value, may be {@code null}
+         * @param notifyName       the {@code notify_name} value, may be {@code null}
+         * @param questionData     the nested {@code question_data} fragment, may be {@code null}
+         */
+        private ReportedContentData(String typename, String serverMsgId, String serverId, String serverResponseId, String notifyName, QuestionData questionData) {
+            this.typename = typename;
+            this.serverMsgId = serverMsgId;
+            this.serverId = serverId;
+            this.serverResponseId = serverResponseId;
+            this.notifyName = notifyName;
+            this.questionData = questionData;
+        }
+
+        /**
+         * Returns the {@code __typename} discriminator.
+         *
+         * <p>Selects which inline-fragment getters carry data.
+         *
+         * @return an {@link Optional} containing the {@code __typename} value, or
+         *         {@link Optional#empty()} if the relay omitted the scalar
+         */
+        public Optional<String> typename() {
+            return Optional.ofNullable(typename);
+        }
+
+        /**
+         * Returns the message identifier of the reported channel message.
+         *
+         * <p>Populated only when {@link #typename()} resolves to {@code XWA2ChannelServerMsgData}.
+         *
+         * @return an {@link Optional} containing the {@code server_msg_id} value, or
+         *         {@link Optional#empty()} if not applicable to the active fragment
+         */
+        public Optional<String> serverMsgId() {
+            return Optional.ofNullable(serverMsgId);
+        }
+
+        /**
+         * Returns the status identifier of the reported channel status.
+         *
+         * <p>Populated only when {@link #typename()} resolves to {@code XWA2ChannelStatusData}.
+         *
+         * @return an {@link Optional} containing the {@code server_id} value, or
+         *         {@link Optional#empty()} if not applicable to the active fragment
+         */
+        public Optional<String> serverId() {
+            return Optional.ofNullable(serverId);
+        }
+
+        /**
+         * Returns the response identifier of the reported question response.
+         *
+         * <p>Populated only when {@link #typename()} resolves to
+         * {@code XWA2ChannelQuestionResponseData}.
+         *
+         * @return an {@link Optional} containing the {@code server_response_id} value, or
+         *         {@link Optional#empty()} if not applicable to the active fragment
+         */
+        public Optional<String> serverResponseId() {
+            return Optional.ofNullable(serverResponseId);
+        }
+
+        /**
+         * Returns the notify-name of the question respondent.
+         *
+         * <p>Populated only when {@link #typename()} resolves to
+         * {@code XWA2ChannelQuestionResponseData}.
+         *
+         * @return an {@link Optional} containing the {@code notify_name} value, or
+         *         {@link Optional#empty()} if not applicable to the active fragment
+         */
+        public Optional<String> notifyName() {
+            return Optional.ofNullable(notifyName);
+        }
+
+        /**
+         * Returns the nested question-message fragment carried by question-response reports.
+         *
+         * <p>Populated only when {@link #typename()} resolves to
+         * {@code XWA2ChannelQuestionResponseData}; identifies the underlying question whose response
+         * was reported.
+         *
+         * @return an {@link Optional} containing the parsed {@link QuestionData}, or
+         *         {@link Optional#empty()} if not applicable to the active fragment
+         */
+        public Optional<QuestionData> questionData() {
+            return Optional.ofNullable(questionData);
+        }
+
+        /**
+         * Parses a {@code reported_content_data} fragment from the given JSON object.
+         *
+         * <p>Used by the enclosing {@link CreateReportAppealMexResponse#of(byte[])} byte-level
+         * parser. Reads every inline-fragment field leniently so the fields absent on the active
+         * {@code __typename} fragment collapse to {@code null}. Yields {@link Optional#empty()} when
+         * {@code obj} is {@code null}.
+         *
+         * @param obj the JSON object carrying the reported-content union, may be {@code null}
+         * @return an {@link Optional} wrapping the parsed value, or {@link Optional#empty()} if
+         *         {@code obj} is {@code null}
+         */
+        static Optional<ReportedContentData> of(JSONObject obj) {
+            if (obj == null) {
+                return Optional.empty();
+            }
+
+            var typename = obj.getString("__typename");
+            var serverMsgId = obj.getString("server_msg_id");
+            var serverId = obj.getString("server_id");
+            var serverResponseId = obj.getString("server_response_id");
+            var notifyName = obj.getString("notify_name");
+            var questionData = QuestionData.of(obj.getJSONObject("question_data")).orElse(null);
+            return Optional.of(new ReportedContentData(typename, serverMsgId, serverId, serverResponseId, notifyName, questionData));
+        }
+
+        /**
+         * Holds the parsed {@code question_data} nested fragment carried by
+         * {@code XWA2ChannelQuestionResponseData} reports.
+         *
+         * <p>Identifies the underlying question message that produced the reported response. The
+         * relay projects this fragment as type {@code XWA2ChannelServerMsgData}.
+         */
+        public static final class QuestionData {
+            /**
+             * Holds the GraphQL {@code __typename} discriminator on the question fragment.
+             */
+            private final String typename;
+
+            /**
+             * Holds the {@code server_msg_id} of the underlying question message.
+             */
+            private final String serverMsgId;
+
+            /**
+             * Constructs a parsed {@code question_data} value.
+             *
+             * <p>Instances are produced only by the {@link #of(JSONObject)} parser.
+             *
+             * @param typename    the {@code __typename} discriminator, may be {@code null}
+             * @param serverMsgId the question message identifier, may be {@code null}
+             */
+            private QuestionData(String typename, String serverMsgId) {
+                this.typename = typename;
+                this.serverMsgId = serverMsgId;
+            }
+
+            /**
+             * Returns the {@code __typename} discriminator on the question fragment.
+             *
+             * @return an {@link Optional} containing the {@code __typename} value, or
+             *         {@link Optional#empty()} if the relay omitted the scalar
+             */
+            public Optional<String> typename() {
+                return Optional.ofNullable(typename);
+            }
+
+            /**
+             * Returns the message identifier of the underlying question message.
+             *
+             * @return an {@link Optional} containing the {@code server_msg_id} value, or
+             *         {@link Optional#empty()} if the relay omitted the scalar
+             */
+            public Optional<String> serverMsgId() {
+                return Optional.ofNullable(serverMsgId);
+            }
+
+            /**
+             * Parses a {@code question_data} fragment from the given JSON object.
+             *
+             * <p>Used by {@link ReportedContentData#of(JSONObject)} to hydrate the nested
+             * {@code question_data} entry. Yields {@link Optional#empty()} when {@code obj} is
+             * {@code null}.
+             *
+             * @param obj the JSON object carrying the question fragment, may be {@code null}
+             * @return an {@link Optional} wrapping the parsed value, or {@link Optional#empty()} if
+             *         {@code obj} is {@code null}
+             */
+            static Optional<QuestionData> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var typename = obj.getString("__typename");
+                var serverMsgId = obj.getString("server_msg_id");
+                return Optional.of(new QuestionData(typename, serverMsgId));
+            }
+        }
     }
 
     /**
@@ -400,7 +610,7 @@ public final class CreateReportAppealMexResponse implements MexOperation.Respons
      * extracted. Yields {@link Optional#empty()} when the envelope, the {@code data} branch, or the
      * {@code xwa2_create_channel_report_appeal_v2} child is absent.
      *
-     * @implNote This implementation collapses the three {@code reported_content_data} scalars to
+     * @implNote This implementation collapses the {@code reported_content_data} sub-object to
      * {@code null} when that inline-fragment block is absent rather than throwing, leaving the
      * choice of how to surface absence to the caller via {@link Optional}.
      *
@@ -430,12 +640,9 @@ public final class CreateReportAppealMexResponse implements MexOperation.Respons
         var lastUpdateTime = root.getLong("last_update_time");
         var channelName = root.getString("channel_name");
         var channelJid = root.getString("channel_jid");
-        var reportedContentData = root.getJSONObject("reported_content_data");
-        var serverMsgId = reportedContentData == null ? null : reportedContentData.getString("server_msg_id");
-        var responseServerMsgId = reportedContentData == null ? null : reportedContentData.getString("server_response_id");
-        var notifyName = reportedContentData == null ? null : reportedContentData.getString("notify_name");
+        var reportedContentData = ReportedContentData.of(root.getJSONObject("reported_content_data")).orElse(null);
         var appeal = Appeal.of(root.getJSONObject("appeal")).orElse(null);
 
-        return Optional.of(new CreateReportAppealMexResponse(reportId, status, creationTime, lastUpdateTime, channelName, channelJid, serverMsgId, responseServerMsgId, notifyName, appeal));
+        return Optional.of(new CreateReportAppealMexResponse(reportId, status, creationTime, lastUpdateTime, channelName, channelJid, reportedContentData, appeal));
     }
 }

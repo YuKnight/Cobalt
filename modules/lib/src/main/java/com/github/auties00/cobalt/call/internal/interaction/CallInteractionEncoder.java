@@ -2,24 +2,42 @@ package com.github.auties00.cobalt.call.internal.interaction;
 
 import com.github.auties00.cobalt.call.CallInteraction;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
+import com.github.auties00.cobalt.model.call.datachannel.AppDataMessage;
+import com.github.auties00.cobalt.model.call.datachannel.AppDataMessageBuilder;
+import com.github.auties00.cobalt.model.call.datachannel.AppDataMessageSpec;
+import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloads;
+import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloadsBuilder;
+import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloadsSpec;
+import com.github.auties00.cobalt.model.call.datachannel.ReactionInfo;
+import com.github.auties00.cobalt.model.call.datachannel.ReactionInfoBuilder;
+import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptor;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Objects;
 
 /**
- * Encodes a {@link CallInteraction} into the RTP/RTCP-shaped wire envelope written to the pre-negotiated DataChannel.
+ * Encodes a {@link CallInteraction} for transport on the call's pre-negotiated DataChannel.
  *
- * <p>Each interaction is serialized as a fixed 12-byte header concatenated with a per-interaction body. The header is
- * an RTP/RTCP-shaped tuple: a byte-0 version/padding/extension/CSRC bitfield, a byte-1 marker/payload-type bitfield, a
- * 16-bit sequence number, a 32-bit timestamp, and a 32-bit SSRC, all big-endian. The (byte0, byte1) tag pair is fixed
- * per interaction kind, while the sequence, timestamp, and SSRC are drawn from the per-call {@link InteractionStreamState}.
- * The returned bytes are plaintext: callers hand them to an SRTP encryptor before transmission.
+ * <p>For reactions (and any other AppData-stream interaction), the canonical wire shape is a
+ * protobuf-serialised {@link AppDataMessage} built via
+ * {@link #encodeReactionAsAppData(CallInteraction.Reaction, long)} (single-message) or
+ * {@link #encodeAppDataBatch(java.util.List)} (batched). The bytes are sent directly through
+ * the SCTP DataChannel (DTLS-encrypted by the transport); no extra SRTP wrap is needed.
  *
- * @implNote This implementation is empirical: WhatsApp Web's encrypted SRTP body cannot be recovered without keys, so the
- * plaintext body of each interaction is reconstructed from the most plausible plain shape inferred from live captures. A
- * reaction body is a {@link #REACTION_WRAPPER_LEN}-byte wrapper followed by the UTF-8 emoji bytes, matching the 2-byte
- * length delta observed between thumbs-up and heart captures. The wrapper bytes themselves are unknown and zero-filled
- * pending end-to-end validation against a real WhatsApp peer.
+ * <p>The {@link #encode(CallInteraction, InteractionStreamState)} path assembles a 12-byte
+ * RTP/RTCP-shaped header followed by a per-interaction body. It serves the data-plane
+ * interactions only: the key-frame request (an RTCP feedback packet) and the video-upgrade
+ * request. The raise-hand, lower-hand, and peer-mute interactions are NOT data-plane packets;
+ * they are server-relayed {@code <call>} signaling stanzas built by
+ * {@link com.github.auties00.cobalt.call.internal.signaling.CallStanza CallStanza}, so passing
+ * one of them to {@link #encode(CallInteraction, InteractionStreamState)} throws.
+ *
+ * @implNote The raise-hand and peer-mute wire shapes were recovered by live capture: raise-hand is
+ * a {@code <user_action action="raise_hand"><raise_hand raise-hand-state="0|1"/></user_action>}
+ * stanza and peer-mute is a {@code <mute_v2 request-state="1"/>} stanza, both server-relayed over
+ * the websocket rather than the media DataChannel. The key-frame and video-upgrade body layouts
+ * remain empirical pending their own capture.
  */
 @WhatsAppWebModule(moduleName = "WAWebVoipStackInterfaceWeb")
 public final class CallInteractionEncoder {
@@ -27,11 +45,6 @@ public final class CallInteractionEncoder {
      * Encodes the RTP byte-0 bitfield for version 2 with no padding, no extension, and a CSRC count of zero.
      */
     private static final int RTP_V2 = 0x80;
-
-    /**
-     * Encodes the RTP byte-0 bitfield for version 2 with no padding, no extension, and a CSRC count of one.
-     */
-    private static final int RTP_V2_CC1 = 0x81;
 
     /**
      * Encodes the RTP byte-1 bitfield for version 2 with the marker bit set and no padding, extension, or CSRC.
@@ -57,14 +70,6 @@ public final class CallInteractionEncoder {
      * Encodes the RTCP sender-report packet type, 200.
      */
     private static final int RTCP_SR = 0xc8;
-
-    /**
-     * Holds the fixed body length, in bytes, of a raise-hand or lower-hand packet.
-     *
-     * @implNote This implementation uses 110, which with the 12-byte header yields the 122-byte packet observed in live
-     * captures.
-     */
-    private static final int RAISE_HAND_BODY_LEN = 110;
 
     /**
      * Holds the fixed body length, in bytes, of a video-upgrade packet.
@@ -100,6 +105,71 @@ public final class CallInteractionEncoder {
     }
 
     /**
+     * Encodes a {@link CallInteraction.Reaction} as a single
+     * {@link AppDataMessage} carrying a {@link ReactionInfo}, ready to send on the call's
+     * AppData {@link com.github.auties00.cobalt.call.internal.transport.sctp.datachannel.DataChannel
+     * DataChannel} ({@link StreamDescriptor.StreamLayer#APP_DATA_STREAM0}).
+     *
+     * <p>This is the canonical wire shape for reactions verified against
+     * {@code WAWebVoipSendSignalingXmpp}'s plaintext extractor. It supersedes the empirical
+     * RTP-shaped {@link #encode(CallInteraction, InteractionStreamState)} path for the
+     * reaction case, which assembled a 12-byte RTP/RTCP-shaped header followed by a
+     * zero-filled wrapper before the emoji bytes; the wasm-side decoder expects a
+     * protobuf-serialised {@link AppDataMessage} instead, with no RTP framing.
+     *
+     * <p>The bytes are sent directly through the DataChannel (which itself rides DTLS-encrypted
+     * SCTP) without an extra SRTP wrap: the data plane is encrypted by the transport, not by
+     * SRTP.
+     *
+     * @apiNote The {@code transactionId} is a sender-side monotonic identifier. Callers typically
+     * source it from an {@link java.util.concurrent.atomic.AtomicLong} per call or from the
+     * call's {@link InteractionStreamState}; the receiver displays the reaction as a transient
+     * UI overlay and uses the id to deduplicate retransmissions.
+     *
+     * @param reaction      the reaction whose emoji is encoded; must not be {@code null}
+     * @param transactionId the sender-side transaction id for this reaction
+     * @return the protobuf-serialised bytes of the {@link AppDataMessage}, ready for the
+     *         DataChannel
+     * @throws NullPointerException if {@code reaction} is {@code null}
+     */
+    public static byte[] encodeReactionAsAppData(CallInteraction.Reaction reaction, long transactionId) {
+        Objects.requireNonNull(reaction, "reaction cannot be null");
+        var info = new ReactionInfoBuilder()
+                .transactionId(transactionId)
+                .reaction(reaction.emoji())
+                .build();
+        var message = new AppDataMessageBuilder()
+                .reactionInfo(info)
+                .build();
+        return AppDataMessageSpec.encode(message);
+    }
+
+    /**
+     * Wraps one or more {@link AppDataMessage} payloads in an {@link AppDataPayloads} batch
+     * envelope and serialises the batch for the AppData {@link com.github.auties00.cobalt.call.internal.transport.sctp.datachannel.DataChannel
+     * DataChannel}.
+     *
+     * <p>The runtime can coalesce multiple application-data messages into a single batched send
+     * so the receiver applies them atomically; a producer with a single message still wraps it
+     * in a one-entry {@link AppDataPayloads}.
+     *
+     * @param messages the batched payloads; must not be {@code null} or empty
+     * @return the protobuf-serialised bytes of the {@link AppDataPayloads} batch
+     * @throws NullPointerException     if {@code messages} is {@code null}
+     * @throws IllegalArgumentException if {@code messages} is empty
+     */
+    public static byte[] encodeAppDataBatch(List<AppDataMessage> messages) {
+        Objects.requireNonNull(messages, "messages cannot be null");
+        if (messages.isEmpty()) {
+            throw new IllegalArgumentException("messages cannot be empty");
+        }
+        var payloads = new AppDataPayloadsBuilder()
+                .messages(messages)
+                .build();
+        return AppDataPayloadsSpec.encode(payloads);
+    }
+
+    /**
      * Encodes one interaction into a plaintext packet comprising the 12-byte RTP/RTCP-shaped header and its body.
      *
      * <p>The interaction kind selects the header tag pair, the logical stream, and the body layout. The sequence,
@@ -116,11 +186,12 @@ public final class CallInteractionEncoder {
         Objects.requireNonNull(state, "state cannot be null");
         return switch (interaction) {
             case CallInteraction.Reaction r -> encodeReaction(r, state);
-            case CallInteraction.RaiseHand _ -> encodeHandToggle(true, state);
-            case CallInteraction.LowerHand _ -> encodeHandToggle(false, state);
-            case CallInteraction.PeerMuteRequest r -> encodeRequest(r.target(), state);
-            case CallInteraction.KeyFrameRequest _ -> encodeRequest("", state);
+            case CallInteraction.KeyFrameRequest _ -> encodeKeyFrameRequest(state);
             case CallInteraction.VideoUpgradeRequest _ -> encodeVideoUpgrade(state);
+            case CallInteraction.RaiseHand _, CallInteraction.LowerHand _,
+                 CallInteraction.PeerMuteRequest _ -> throw new IllegalArgumentException(
+                    "raise-hand, lower-hand, and peer-mute are sent as server-relayed <call> signaling "
+                            + "stanzas, not data-plane packets; route them through CallStanza instead");
         };
     }
 
@@ -144,41 +215,17 @@ public final class CallInteractionEncoder {
     }
 
     /**
-     * Encodes a raise-hand or lower-hand gesture into a hand-toggle packet.
+     * Encodes a key-frame request into a request packet.
      *
-     * <p>The packet carries the {@link #RTP_V2_CC1} byte-0 tag and the {@link #RTCP_SR} packet type and a fixed
-     * {@link #RAISE_HAND_BODY_LEN}-byte body whose byte 0 holds 1 for raised and 0 for lowered; the remaining bytes are
-     * zero. It is framed on the {@link InteractionStreamState.Stream#CONTROL} stream.
-     *
-     * @param raised {@code true} to encode a raise-hand gesture, {@code false} to encode a lower-hand gesture
-     * @param state  the per-call stream state
-     * @return the encoded packet
-     * @implNote This implementation zero-fills every body byte after byte 0; the true layout of the remaining bytes is
-     * unrecovered.
-     */
-    private static byte[] encodeHandToggle(boolean raised, InteractionStreamState state) {
-        var body = new byte[RAISE_HAND_BODY_LEN];
-        body[0] = (byte) (raised ? 1 : 0);
-        return frame(RTP_V2_CC1, RTCP_SR,
-                state, InteractionStreamState.Stream.CONTROL, body);
-    }
-
-    /**
-     * Encodes a peer-mute or key-frame request into a request packet.
-     *
-     * <p>The packet carries the {@link #RTP_V2_MARKER} byte-0 tag and the {@link #PT_REQUEST} payload type, a
-     * {@link #REQUEST_WRAPPER_LEN}-byte zero wrapper, and the UTF-8 bytes of {@code target}. A key-frame request passes
-     * an empty target, yielding a body of only the wrapper. The packet is framed on the
+     * <p>The packet carries the {@link #RTP_V2_MARKER} byte-0 tag and the {@link #PT_REQUEST} payload type and a
+     * {@link #REQUEST_WRAPPER_LEN}-byte zero wrapper body. It is framed on the
      * {@link InteractionStreamState.Stream#CONTROL} stream.
      *
-     * @param target the target peer WID in string form, or the empty string for a key-frame request
-     * @param state  the per-call stream state
+     * @param state the per-call stream state
      * @return the encoded packet
      */
-    private static byte[] encodeRequest(String target, InteractionStreamState state) {
-        var wid = target.getBytes(StandardCharsets.UTF_8);
-        var body = new byte[REQUEST_WRAPPER_LEN + wid.length];
-        System.arraycopy(wid, 0, body, REQUEST_WRAPPER_LEN, wid.length);
+    private static byte[] encodeKeyFrameRequest(InteractionStreamState state) {
+        var body = new byte[REQUEST_WRAPPER_LEN];
         return frame(RTP_V2_MARKER, PT_REQUEST,
                 state, InteractionStreamState.Stream.CONTROL, body);
     }

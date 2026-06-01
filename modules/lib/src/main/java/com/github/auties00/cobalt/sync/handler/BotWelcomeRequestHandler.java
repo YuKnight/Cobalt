@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -20,7 +20,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * been delivered once. When the welcome request lands on another device, the
  * server replays it here as a {@link BotWelcomeRequestAction}, and the result
  * is read back via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findBotWelcomeRequestState(Jid)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findBotWelcomeRequestState(Jid)}.
  *
  * @implNote
  * This implementation stores the requested flag in a typed quintet
@@ -83,7 +83,7 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() == SyncdOperation.REMOVE) {
             return MutationApplicationResult.unsupported();
         }
@@ -104,13 +104,13 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
             }
 
             var chatJid = Jid.of(chatJidString);
-            var chat = client.store().findChatByJid(chatJid);
+            var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
             var resolvedJid = chat.get().toJid();
-            client.store().putBotWelcomeRequestState(new BotWelcomeRequestStateBuilder().botJid(resolvedJid).requested(action.isSent()).build());
+            client.store().businessStore().putBotWelcomeRequestState(new BotWelcomeRequestStateBuilder().botJid(resolvedJid).requested(action.isSent()).build());
 
             return MutationApplicationResult.success();
         } catch (Exception e) {

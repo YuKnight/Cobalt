@@ -1,16 +1,17 @@
 package com.github.auties00.cobalt.stream.control;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 
 /**
  * Handles top-level {@code <error>} stanzas that report stanza-level protocol problems not scoped to a specific
  * request.
  *
- * <p>The handler is registered under the {@code "error"} tag inside {@link SocketStream} and runs whenever the server
+ * <p>The handler is registered under the {@code "error"} tag inside {@link NodeStreamService} and runs whenever the server
  * emits a bare {@code <error code="..."/>} stanza. The common payload is {@code code=479} ({@code smax-invalid}),
  * reported when the client's last outbound stanza failed schema-driven validation on the server. The stanza is
  * informational only: the handler logs it and leaves the session up, never dispatching to the configured error handler.
@@ -18,7 +19,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * {@code WARNING}.
  */
 @WhatsAppWebModule(moduleName = "WABackendHandleError")
-public final class ErrorStreamHandler implements SocketStream.Handler {
+public final class ErrorStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * The system logger used to record the diagnostic line for every inbound {@code <error>} stanza.
      */

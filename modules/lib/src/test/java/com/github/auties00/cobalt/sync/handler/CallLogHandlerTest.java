@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.call.CallLog;
 import com.github.auties00.cobalt.model.call.CallLogBuilder;
@@ -39,7 +39,7 @@ class CallLogHandlerTest {
     private static final Jid PEER = Jid.of("1234567890@s.whatsapp.net");
     private static final String CALL_ID = "CALL_ID_42";
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -101,7 +101,7 @@ class CallLogHandlerTest {
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var result = new CallLogHandler().applyMutation(client, setMutation(PEER, CALL_ID, false, log(CALL_ID), ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().findCallLog(CALL_ID).isPresent(),
+            assertTrue(client.store().chatStore().findCallLog(CALL_ID).isPresent(),
                     "WAWebCallLogSync.applyMutations writes the record via generateCallLogFromCallSyncRecord; Cobalt stores it directly");
         }
     }
@@ -173,11 +173,11 @@ class CallLogHandlerTest {
         @Test
         @DisplayName("REMOVE drops the call log entry and returns SUCCESS")
         void removeDropsEntry() {
-            client.store().addCallLog(log(CALL_ID));
+            client.store().chatStore().addCallLog(log(CALL_ID));
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var result = new CallLogHandler().applyMutation(client, removeMutation(PEER, CALL_ID, false, ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().findCallLog(CALL_ID).isEmpty(),
+            assertTrue(client.store().chatStore().findCallLog(CALL_ID).isEmpty(),
                     "Cobalt's REMOVE branch additionally clears the stored entry");
         }
 
@@ -227,8 +227,8 @@ class CallLogHandlerTest {
             for (var r : results) {
                 assertEquals(SyncActionState.SUCCESS, r.actionState());
             }
-            assertTrue(client.store().findCallLog("id-A").isPresent());
-            assertTrue(client.store().findCallLog("id-B").isPresent());
+            assertTrue(client.store().chatStore().findCallLog("id-A").isPresent());
+            assertTrue(client.store().chatStore().findCallLog("id-B").isPresent());
         }
     }
 

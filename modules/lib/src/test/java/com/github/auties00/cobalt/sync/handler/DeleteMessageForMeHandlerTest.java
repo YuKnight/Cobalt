@@ -68,7 +68,7 @@ class DeleteMessageForMeHandlerTest {
     }
 
     private void seedMessage(boolean fromMe) {
-        var chat = client.store().addNewChat(PEER);
+        var chat = client.store().chatStore().addNewChat(PEER);
         var key = new MessageKeyBuilder()
                 .id(MESSAGE_ID).fromMe(fromMe).parentJid(PEER)
                 .build();
@@ -109,13 +109,13 @@ class DeleteMessageForMeHandlerTest {
         @DisplayName("SET on an inbound (fromMe=false) message removes it from the chat")
         void removesInboundMessage() {
             seedMessage(false);
-            assertEquals(1, client.store().findChatByJid(PEER).orElseThrow().messageCount());
+            assertEquals(1, client.store().chatStore().findChatByJid(PEER).orElseThrow().messageCount());
 
             var result = new DeleteMessageForMeHandler().applyMutation(client,
                     dmfmMutation(PEER, MESSAGE_ID, "0", "0", Instant.ofEpochSecond(1L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(0, client.store().findChatByJid(PEER).orElseThrow().messageCount());
+            assertEquals(0, client.store().chatStore().findChatByJid(PEER).orElseThrow().messageCount());
         }
     }
 
@@ -136,7 +136,7 @@ class DeleteMessageForMeHandlerTest {
         @Test
         @DisplayName("SET against a known chat but missing message returns ORPHAN with modelType=Msg")
         void missingMessageIsOrphan() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
 
             var result = new DeleteMessageForMeHandler().applyMutation(client,
                     dmfmMutation(PEER, "absent-id", "0", "0", Instant.ofEpochSecond(1L)));
@@ -179,7 +179,7 @@ class DeleteMessageForMeHandlerTest {
         @Test
         @DisplayName("a 4-element index missing the participant slot is MALFORMED")
         void shortIndexIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .deleteMessageForMeAction(new DeleteMessageForMeActionBuilder().deleteMedia(false).build())
@@ -195,7 +195,7 @@ class DeleteMessageForMeHandlerTest {
         @Test
         @DisplayName("an empty messageId at slot 2 is MALFORMED")
         void emptyMessageIdIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .deleteMessageForMeAction(new DeleteMessageForMeActionBuilder().deleteMedia(false).build())
@@ -226,7 +226,7 @@ class DeleteMessageForMeHandlerTest {
 
             var result = new DeleteMessageForMeHandler().applyMutation(client, mutation);
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertEquals(1, client.store().findChatByJid(PEER).orElseThrow().messageCount(),
+            assertEquals(1, client.store().chatStore().findChatByJid(PEER).orElseThrow().messageCount(),
                     "REMOVE must not remove the message");
         }
     }

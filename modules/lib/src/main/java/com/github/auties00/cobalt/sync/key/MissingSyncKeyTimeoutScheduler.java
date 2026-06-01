@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.key;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -8,9 +8,11 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.sync.SyncdCoordinator;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -27,7 +29,7 @@ import java.util.concurrent.TimeUnit;
  * fires a fatal {@link WhatsAppWebAppStateSyncException.MissingKeyOnAllDevices} when every
  * asked device has answered without the key. The periodic six-hour re-broadcast job re-issues
  * the request for every tracked key so a request lost in transit can still be recovered. Both
- * fatal exceptions reach the client through {@link WhatsAppClient#handleFailure}.
+ * fatal exceptions reach the client through {@link LinkedWhatsAppClient#handleFailure}.
  *
  * <p>The scheduler is owned by {@link com.github.auties00.cobalt.sync.WebAppStateService} and
  * arms no timer until {@link #scheduleTimeoutCheck()} or {@link #startPeriodicReRequestJob()}
@@ -60,7 +62,7 @@ public final class MissingSyncKeyTimeoutScheduler {
      * Holds the injected client used to surface the fatal exceptions raised when a missing-key
      * deadline elapses.
      */
-    private final WhatsAppClient client;
+    private final LinkedWhatsAppClient client;
 
     /**
      * Holds the shared store consulted for the live missing-key tracker and for the resolved
@@ -79,6 +81,13 @@ public final class MissingSyncKeyTimeoutScheduler {
      * every tracked missing key.
      */
     private final MissingSyncKeyRequestService requestService;
+
+    /**
+     * Holds the shared syncd coordinator whose monitor makes the fatal-decision read of the
+     * missing-key tracker and the sync key store atomic against the apply path and the inbound
+     * key-share.
+     */
+    private final SyncdCoordinator coordinator;
 
     /**
      * Holds the single-threaded executor that owns every timer in this class.
@@ -119,12 +128,14 @@ public final class MissingSyncKeyTimeoutScheduler {
      * @param client the client used to surface fatal sync exceptions
      * @param abPropsService the AB prop source used to read the timeout configuration
      * @param requestService the request service driven by the periodic job
+     * @param coordinator the shared syncd coordinator serializing the fatal-decision read
      */
-    public MissingSyncKeyTimeoutScheduler(WhatsAppClient client, ABPropsService abPropsService, MissingSyncKeyRequestService requestService) {
+    public MissingSyncKeyTimeoutScheduler(LinkedWhatsAppClient client, ABPropsService abPropsService, MissingSyncKeyRequestService requestService, SyncdCoordinator coordinator) {
         this.client = client;
         this.store = client.store();
         this.abPropsService = abPropsService;
         this.requestService = requestService;
+        this.coordinator = coordinator;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             var thread = new Thread(r, "MissingSyncKeyTimeoutScheduler");
             thread.setDaemon(true);
@@ -140,7 +151,7 @@ public final class MissingSyncKeyTimeoutScheduler {
      * tracked key, clamped to zero when already past due. Any previously armed wait-for-key
      * timeout is cancelled first so successive calls converge on a single live timer. When the
      * tracker is empty the method is a no-op. It is invoked inline by
-     * {@link MissingSyncKeyRequestService#trackMissingKeys(java.util.Collection, java.util.Set)}
+     * {@link LiveMissingSyncKeyRequestService#trackMissingKeys(java.util.Collection, java.util.Set)}
      * whenever a key is added, and again from inside the periodic re-request job.
      *
      * @implNote This implementation clamps a negative remaining duration to zero so the
@@ -153,7 +164,7 @@ public final class MissingSyncKeyTimeoutScheduler {
         }
 
         var timeout = getTimeout();
-        var delay = store.missingSyncKeys()
+        var delay = store.syncStore().missingSyncKeys()
                 .stream()
                 .map(MissingDeviceSyncKey::timestamp)
                 .min(Instant::compareTo)
@@ -183,7 +194,7 @@ public final class MissingSyncKeyTimeoutScheduler {
      * {@link SyncKeyRotationService#handleKeyShare(int, java.util.List)} and no fatal is
      * raised. Keys that are still genuinely absent and older than the timeout cause a
      * {@link WhatsAppWebAppStateSyncException.TimeoutWhileWaitingForMissingKey} to be reported
-     * to {@link WhatsAppClient#handleFailure}. When nothing has actually expired the check
+     * to {@link LinkedWhatsAppClient#handleFailure}. When nothing has actually expired the check
      * rearms itself.
      *
      * @implNote This implementation reschedules itself after finding zero expired keys so a
@@ -191,29 +202,35 @@ public final class MissingSyncKeyTimeoutScheduler {
      * next deadline waiting for an external trigger.
      */
     private void checkForExpiredKeys() {
-        var currentMissingKeys = store.missingSyncKeys();
-        if (currentMissingKeys.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys remain, timeout check skipped");
-            return;
-        }
+        var expiredMissingSyncKeys = coordinator.runLocked(() -> {
+            var currentMissingKeys = store.syncStore().missingSyncKeys();
+            if (currentMissingKeys.isEmpty()) {
+                LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys remain, timeout check skipped");
+                return List.<MissingDeviceSyncKey>of();
+            }
 
-        var actuallyMissing = currentMissingKeys.stream()
-                .filter(key -> store.findWebAppStateKeyById(key.keyId()).isEmpty())
-                .toList();
-        if (actuallyMissing.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "All tracked missing keys have been received");
-            return;
-        }
+            var actuallyMissing = currentMissingKeys.stream()
+                    .filter(key -> store.syncStore().findWebAppStateKeyById(key.keyId()).isEmpty())
+                    .toList();
+            if (actuallyMissing.isEmpty()) {
+                LOGGER.log(System.Logger.Level.DEBUG, "All tracked missing keys have been received");
+                return List.<MissingDeviceSyncKey>of();
+            }
 
-        var timeout = getTimeout();
-        var now = Instant.now();
-        var expiredMissingSyncKeys = actuallyMissing
-                .stream()
-                .filter(key -> Duration.between(key.timestamp(), now).compareTo(timeout) > 0)
-                .toList();
+            var timeout = getTimeout();
+            var now = Instant.now();
+            var expired = actuallyMissing
+                    .stream()
+                    .filter(key -> Duration.between(key.timestamp(), now).compareTo(timeout) > 0)
+                    .toList();
+            if (expired.isEmpty()) {
+                LOGGER.log(System.Logger.Level.DEBUG, "No expired missing sync keys");
+                scheduleTimeoutCheck();
+            }
+            return expired;
+        });
+
         if (expiredMissingSyncKeys.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "No expired missing sync keys");
-            scheduleTimeoutCheck();
             return;
         }
 
@@ -232,26 +249,32 @@ public final class MissingSyncKeyTimeoutScheduler {
      * the key, which is a much faster unrecoverable signal than the multi-day timeout enforced
      * by {@link #checkForExpiredKeys()}. When no tracked key has yet exhausted its asked
      * devices the check rearms the wait-for-key timeout instead. The first such fully-exhausted
-     * key is reported to {@link WhatsAppClient#handleFailure}.
+     * key is reported to {@link LinkedWhatsAppClient#handleFailure}.
      *
      * @implNote This implementation is invoked from a five-second grace period
      * ({@link #scheduleAllDevicesRespondedCheck()}) so a late positive response can still race
      * in and resolve the key before the fatal is raised.
      */
     private void checkForAllDevicesRespondedWithoutKey() {
-        var currentMissingKeys = store.missingSyncKeys();
-        if (currentMissingKeys.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys remain, all-devices-responded check skipped");
-            return;
-        }
+        var missingOnAllDevices = coordinator.runLocked(() -> {
+            var currentMissingKeys = store.syncStore().missingSyncKeys();
+            if (currentMissingKeys.isEmpty()) {
+                LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys remain, all-devices-responded check skipped");
+                return List.<MissingDeviceSyncKey>of();
+            }
 
-        var missingOnAllDevices = currentMissingKeys.stream()
-                .filter(key -> store.findMissingSyncKey(key.keyId()).isPresent())
-                .filter(MissingDeviceSyncKey::isMissingOnAllDevices)
-                .toList();
+            var result = currentMissingKeys.stream()
+                    .filter(key -> store.syncStore().findMissingSyncKey(key.keyId()).isPresent())
+                    .filter(MissingDeviceSyncKey::isMissingOnAllDevices)
+                    .toList();
+            if (result.isEmpty()) {
+                LOGGER.log(System.Logger.Level.DEBUG, "No missing sync key has exhausted all device responses");
+                scheduleTimeoutCheck();
+            }
+            return result;
+        });
+
         if (missingOnAllDevices.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "No missing sync key has exhausted all device responses");
-            scheduleTimeoutCheck();
             return;
         }
 
@@ -300,7 +323,7 @@ public final class MissingSyncKeyTimeoutScheduler {
         }
 
         reRequestJob = scheduler.scheduleAtFixedRate(() -> {
-            var missingKeys = store.missingSyncKeys();
+            var missingKeys = store.syncStore().missingSyncKeys();
             var keyIds = missingKeys.stream()
                     .map(MissingDeviceSyncKey::keyId)
                     .toList();

@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.wam;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -50,7 +50,7 @@ class WamServiceGlobalsDirtyWriteTest {
                     capturedBuffers.add(extractBuffer(builder));
                     return successResponse();
                 });
-        var service = new InstrumentedWamService(client, props, new DefaultWamBeaconingService());
+        var service = new InstrumentedWamService(client, props, new LiveWamBeaconingService());
         service.markInitializedForTesting();
         service.setSamplingOverride(2862, 1);
 
@@ -121,7 +121,7 @@ class WamServiceGlobalsDirtyWriteTest {
         private final AtomicReference<Instant> now = new AtomicReference<>(Instant.ofEpochSecond(1_747_000_000L));
 
         InstrumentedWamService(
-                WhatsAppClient client,
+                LinkedWhatsAppClient client,
                 ABPropsService props,
                 WamBeaconingService beaconing) {
             super(client, props, beaconing);

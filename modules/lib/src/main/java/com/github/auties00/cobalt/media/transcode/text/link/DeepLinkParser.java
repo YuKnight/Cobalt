@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.text.link;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -40,7 +40,7 @@ public final class DeepLinkParser {
     /**
      * Caches parsed payment-link regex maps keyed by the raw AB-prop value.
      *
-     * <p>Backs {@link #paymentLink(WhatsAppClient, ABPropsService, String)} so a single
+     * <p>Backs {@link #paymentLink(LinkedWhatsAppClient, ABPropsService, String)} so a single
      * AB-prop refresh costs one parse, not one parse per outgoing message.
      *
      * @implNote
@@ -207,14 +207,14 @@ public final class DeepLinkParser {
      * Recognises the deep-link shape of {@code url}.
      *
      * <p>Tries the group-invite, catalog, and product shapes in order, then falls back to
-     * {@link #paymentLink(WhatsAppClient, ABPropsService, String)}. Returns
+     * {@link #paymentLink(LinkedWhatsAppClient, ABPropsService, String)}. Returns
      * {@link DeepLink.NotApplicable#INSTANCE} for a {@code null} {@code url} and for any
      * URL none of the four supported shapes matches, allowing the link-preview pipeline to
      * short-circuit the og-tag scrape on the recognised branches and run the regular fetch
      * otherwise.
      *
      * @implNote
-     * This implementation falls back to {@link #paymentLink(WhatsAppClient, ABPropsService, String)}
+     * This implementation falls back to {@link #paymentLink(LinkedWhatsAppClient, ABPropsService, String)}
      * last so the recognised payment-service-provider set tracks the
      * {@link ABProp#SMB_PAYMENT_LINKS_URL_REGEX_LIST} AB-prop rather than being hard-coded.
      *
@@ -226,7 +226,7 @@ public final class DeepLinkParser {
      */
     @WhatsAppWebExport(moduleName = "WAWebApiParse", exports = "parseAPICmd",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public static DeepLink parse(WhatsAppClient client, ABPropsService abPropsService, String url) {
+    public static DeepLink parse(LinkedWhatsAppClient client, ABPropsService abPropsService, String url) {
         if (url == null) {
             return DeepLink.NotApplicable.INSTANCE;
         }
@@ -276,7 +276,7 @@ public final class DeepLinkParser {
      * AB-prop is unset or empty, or when no configured regex matches. The
      * {@link DeepLink.PaymentLink#shouldDetectInComposer()} flag on the returned variant is
      * {@code true} only on SMB clients (Android-Business or iOS-Business), as decided by
-     * {@link #isSmb(WhatsAppClient)}.
+     * {@link #isSmb(LinkedWhatsAppClient)}.
      *
      * @param client         the WhatsApp client used to determine SMB status from the
      *                       local device platform
@@ -287,7 +287,7 @@ public final class DeepLinkParser {
      */
     @WhatsAppWebExport(moduleName = "WAWebPaymentLinkUrlMetaData", exports = "getPaymentLinkUrlMetaData",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private static DeepLink.PaymentLink paymentLink(WhatsAppClient client, ABPropsService abPropsService, String url) {
+    private static DeepLink.PaymentLink paymentLink(LinkedWhatsAppClient client, ABPropsService abPropsService, String url) {
         if (client == null || abPropsService == null || url == null) {
             return null;
         }
@@ -311,7 +311,7 @@ public final class DeepLinkParser {
     /**
      * Parses the AB-prop JSON value into a regex-to-payment-service-provider-label map.
      *
-     * <p>Invoked from {@link #paymentLink(WhatsAppClient, ABPropsService, String)} via
+     * <p>Invoked from {@link #paymentLink(LinkedWhatsAppClient, ABPropsService, String)} via
      * {@link Map#computeIfAbsent(Object, java.util.function.Function)} so the parse happens
      * at most once per distinct AB-prop value. Returns an empty map for a {@code null},
      * empty, or malformed top-level JSON object.
@@ -362,8 +362,8 @@ public final class DeepLinkParser {
      */
     @WhatsAppWebExport(moduleName = "WAWebMobilePlatforms", exports = "isSMB",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static boolean isSmb(WhatsAppClient client) {
-        var device = client.store().device();
+    private static boolean isSmb(LinkedWhatsAppClient client) {
+        var device = client.store().accountStore().device();
         if (device == null) {
             return false;
         }

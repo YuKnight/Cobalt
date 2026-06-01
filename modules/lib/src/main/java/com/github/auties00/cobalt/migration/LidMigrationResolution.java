@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
  * takes for a single chat thread.
  *
  * <p>An instance is produced by the per-chat resolution step in
- * {@link LidMigrationService#resolveThread(com.github.auties00.cobalt.model.chat.Chat, java.util.Set)}
+ * {@link LiveLidMigrationService#resolveThread(com.github.auties00.cobalt.model.chat.Chat, java.util.Set)}
  * and consumed by the executor that applies the decision to the local store.
  * The three permitted variants are mutually exclusive: {@link Migrate} re-keys
  * the chat to LID, {@link Keep} leaves it untouched (because it already uses

@@ -37,7 +37,7 @@ if [[ "$JEXTRACT" != *.bat ]] && [ ! -x "$JEXTRACT" ] && [ -x "${JEXTRACT}.bat" 
 fi
 
 OUT="$ROOT/modules/lib/src/main/java"
-PKG="com.github.auties00.cobalt.media.bindings.ffmpeg"
+PKG="com.github.auties00.cobalt.media.ffmpeg"
 PKG_DIR="$OUT/${PKG//.//}"
 mkdir -p "$PKG_DIR"
 

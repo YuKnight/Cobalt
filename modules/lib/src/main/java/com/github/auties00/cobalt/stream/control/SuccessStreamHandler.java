@@ -1,11 +1,19 @@
 package com.github.auties00.cobalt.stream.control;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.ChatsListener;
+import com.github.auties00.cobalt.client.listener.ContactsListener;
+import com.github.auties00.cobalt.client.listener.LoggedInListener;
+import com.github.auties00.cobalt.client.listener.NameChangedListener;
+import com.github.auties00.cobalt.client.listener.NewslettersListener;
+import com.github.auties00.cobalt.client.listener.StatusListener;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.exception.WhatsAppFacebookGraphQlException;
 import com.github.auties00.cobalt.exception.WhatsAppServerRuntimeException;
 import com.github.auties00.cobalt.media.MediaConnectionService;
+import com.github.auties00.cobalt.model.device.pairing.LinkedPrimaryPlatform;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -18,7 +26,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.iq.media.IqQueryMediaConnsRequest;
 import com.github.auties00.cobalt.node.iq.media.IqQueryMediaConnsResponse;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.util.SchedulerUtils;
 import com.github.auties00.cobalt.wam.WamService;
@@ -36,12 +44,12 @@ import java.util.function.Supplier;
  * Handles the {@code <success>} stanza pushed by the WhatsApp server immediately after a successful authentication
  * handshake and drives the full client bootstrap that follows.
  *
- * <p>The handler is registered under the {@code "success"} tag inside {@link SocketStream}. One {@code <success>}
+ * <p>The handler is registered under the {@code "success"} tag inside {@link NodeStreamService}. One {@code <success>}
  * stanza per session drives a one-shot bootstrap: update the {@code me} identity (LID, display name, phone number) from
  * the parsed attributes, sync A/B props, enable or disable LID migration, start the WAM service, schedule the ADV
  * device check, resume web app-state syncing, send the {@code <iq xmlns="passive"><active/></iq>} stanza that
  * transitions the server out of passive mode, run the launch-time compliance probes and notify
- * {@link WhatsAppClientListener#onLoggedIn(WhatsAppClient)}. A one-shot {@link AtomicBoolean} guard ensures the
+ * {@link LoggedInListener#onLoggedIn(LinkedWhatsAppClient)}. A one-shot {@link AtomicBoolean} guard ensures the
  * bootstrap runs at most once per connection; {@link #reset()} clears it on socket teardown so the next reconnect
  * repeats the bootstrap.
  *
@@ -51,11 +59,11 @@ import java.util.function.Supplier;
  * derivation) are skipped because Cobalt is headless and persists the store without at-rest encryption.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleSuccess")
-public final class SuccessStreamHandler implements SocketStream.Handler {
+public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * The {@link WhatsAppClient} used for store access, listener notification and outbound IQ sending.
+     * The {@link LinkedWhatsAppClient} used for store access, listener notification and outbound IQ sending.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * The {@link ABPropsService} used to sync A/B testing properties from the server during bootstrap.
@@ -113,7 +121,7 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
     /**
      * Constructs a new success stream handler bound to the given services.
      *
-     * @param whatsapp                         the {@link WhatsAppClient}; must not be {@code null}
+     * @param whatsapp                         the {@link LinkedWhatsAppClient}; must not be {@code null}
      * @param abPropsService                   the {@link ABPropsService}; must not be {@code null}
      * @param deviceService                    the {@link DeviceService}; must not be {@code null}
      * @param lidMigrationService              the {@link LidMigrationService}; must not be {@code null}
@@ -124,7 +132,7 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      * @throws NullPointerException if any service is {@code null}
      */
     public SuccessStreamHandler(
-            WhatsAppClient whatsapp,
+            LinkedWhatsAppClient whatsapp,
             ABPropsService abPropsService,
             DeviceService deviceService,
             LidMigrationService lidMigrationService,
@@ -179,16 +187,16 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      * Drives the one-shot post-handshake bootstrap sequence: parses the {@code <success>} attributes, updates the
      * {@code me} identity, syncs A/B props, primes LID migration, starts the WAM, device and inactive-group services,
      * resumes app-state syncing, transitions the socket out of passive mode, fans out
-     * {@link WhatsAppClientListener#onLoggedIn(WhatsAppClient)} and persists the store.
+     * {@link LoggedInListener#onLoggedIn(LinkedWhatsAppClient)} and persists the store.
      *
      * <p>Reachable only via {@link #handle(Node)} the first time a {@code <success>} stanza is observed on the current
      * connection.
      *
      * @implNote This implementation runs the clock-skew normalisation, AB-prop sync, WAM initialisation, device-service
      * kick-off, inactive-group migration, web-app-state resume, initial pre-key upload via
-     * {@link #uploadInitialPreKeysIfNeeded()}, passive-mode iq, {@link WhatsAppClient#editPresence(ContactStatus)}
+     * {@link #uploadInitialPreKeysIfNeeded()}, passive-mode iq, {@link LinkedWhatsAppClient#editPresence(ContactStatus)}
      * broadcast, compliance probes, collection listener replay, newsletter and business-profile bootstraps in the exact
-     * order required by WA Web's await chain. The pre-key upload runs before {@link WhatsAppClient#enableActiveMode()}
+     * order required by WA Web's await chain. The pre-key upload runs before {@link LinkedWhatsAppClient#enableActiveMode()}
      * so the primary device can establish the Signal session it needs to encrypt history-sync messages as soon as the
      * companion goes active. The {@link ContactStatus#AVAILABLE} presence broadcast that follows tells the relay the
      * companion is online so the server flushes the queued primary-to-companion {@code <message>} envelopes (history-
@@ -204,8 +212,13 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
     private void bootstrap(Node node) {
         var store = whatsapp.store();
 
-        store.setOnline(true);
-        store.setRegistered(true);
+        var replayChats = store.syncStore().syncedChats();
+        var replayContacts = store.syncStore().syncedContacts();
+        var replayNewsletters = store.syncStore().syncedNewsletters();
+        var replayStatus = store.syncStore().syncedStatus();
+
+        store.accountStore().setOnline(true);
+        store.accountStore().setRegistered(true);
 
         var serverTimestampSeconds = node.getAttributeAsLong("t", 0L);
         if (serverTimestampSeconds > 0) {
@@ -217,18 +230,20 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
                         .clockSkewHourly(clockSkewHourly)
                         .build());
             }
-            store.setClockSkewSeconds(skewSeconds);
+            store.syncStore().setClockSkewSeconds(skewSeconds);
         }
 
-        node.getAttributeAsJid("lid").ifPresent(store::setLid);
+        node.getAttributeAsJid("lid").ifPresent(store.accountStore()::setLid);
 
         var displayName = node.getAttributeAsString("display_name", null);
         if (displayName != null && !displayName.isBlank()) {
-            var oldName = store.name();
-            store.setName(displayName);
+            var oldName = store.accountStore().name().orElse(null);
+            store.accountStore().setName(displayName);
             if (!Objects.equals(oldName, displayName)) {
                 for (var listener : store.listeners()) {
-                    Thread.startVirtualThread(() -> listener.onNameChanged(whatsapp, oldName, displayName));
+                    if (listener instanceof NameChangedListener typed) {
+                        Thread.startVirtualThread(() -> typed.onNameChanged(whatsapp, oldName, displayName));
+                    }
                 }
             }
         }
@@ -253,9 +268,9 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
 
         var groupAbpropsRefreshId = node.getAttributeAsLong("group_abprops", 0L);
         if (groupAbpropsRefreshId != 0L && serverTimestampSeconds > 0
-                && groupAbpropsRefreshId != store.groupAbPropsRefreshId()) {
-            store.setGroupAbPropsEmergencyPushTimestamp(Instant.ofEpochSecond(serverTimestampSeconds));
-            store.setGroupAbPropsRefreshId(groupAbpropsRefreshId);
+                && groupAbpropsRefreshId != store.syncStore().groupAbPropsRefreshId()) {
+            store.syncStore().setGroupAbPropsEmergencyPushTimestamp(Instant.ofEpochSecond(serverTimestampSeconds));
+            store.syncStore().setGroupAbPropsRefreshId(groupAbpropsRefreshId);
         }
 
         webAppStateService.resumeAfterRestart();
@@ -273,17 +288,38 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
 
         runComplianceProbe("new-chat capping info", whatsapp::queryNewChatMessageCappingInfo);
 
+        syncPrivacySettings();
+
         syncPrivacyDisallowedListsMex();
 
         for (var listener : store.listeners()) {
-            Thread.startVirtualThread(() -> listener.onLoggedIn(whatsapp));
+            if (listener instanceof LoggedInListener typed) {
+                Thread.startVirtualThread(() -> typed.onLoggedIn(whatsapp));
+            }
         }
 
-        replayCachedCollectionListeners();
+        replayCachedCollectionListeners(replayChats, replayContacts, replayNewsletters, replayStatus);
 
         bootstrapNewsletterBackend();
 
         bootstrapBusinessCertificate();
+
+        if (store.accountStore().clientType() == WhatsAppClientType.WEB) {
+            Thread.startVirtualThread(whatsapp::refreshWhatsAppWebGraphQlSession);
+            if (store.accountStore().primaryPlatform().filter(LinkedPrimaryPlatform::isBusiness).isPresent()
+                    && store.webSessionStore().facebookGraphQlSession().isEmpty()) {
+                Thread.startVirtualThread(() -> {
+                    try {
+                        whatsapp.refreshFacebookGraphQlSession();
+                    } catch (WhatsAppFacebookGraphQlException.SessionUnseeded _) {
+
+                    } catch (WhatsAppFacebookGraphQlException exception) {
+                        LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
+                                "Facebook GraphQL credentials auto-refresh failed", exception);
+                    }
+                });
+            }
+        }
 
         try {
             store.save();
@@ -292,48 +328,68 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
     }
 
     /**
-     * Replays the cached chats, contacts, newsletters and status collections to every registered listener when the
-     * corresponding sync gate is already true.
+     * Replays the cached chats, contacts, newsletters and status collections to every registered listener for each
+     * collection that was already synced when the connection was established.
      *
      * <p>Surfaces each dataset exactly once per login through
-     * {@link WhatsAppClientListener#onChats(WhatsAppClient, java.util.Collection)},
-     * {@link WhatsAppClientListener#onContacts(WhatsAppClient, java.util.Collection)},
-     * {@link WhatsAppClientListener#onNewsletters(WhatsAppClient, java.util.Collection)} and
-     * {@link WhatsAppClientListener#onStatus(WhatsAppClient, java.util.Collection)}: every fresh listener sees the
-     * dataset whether the data was just synced or read back from a persisted store on reconnect, and the callback fires
-     * even when the cached collection is empty so embedders can rely on a one-shot post-login signal.
+     * {@link ChatsListener#onChats(LinkedWhatsAppClient, java.util.Collection)},
+     * {@link ContactsListener#onContacts(LinkedWhatsAppClient, java.util.Collection)},
+     * {@link NewslettersListener#onNewsletters(LinkedWhatsAppClient, java.util.Collection)} and
+     * {@link StatusListener#onStatus(LinkedWhatsAppClient, java.util.Collection)}. This path covers the reconnect
+     * case, where the data was synced in a prior session and read back from the persisted store: the history-sync
+     * pipeline will not re-deliver it, so a fresh listener would otherwise never see it. A collection that was still
+     * unsynced at connection time is deliberately skipped here, because
+     * {@link com.github.auties00.cobalt.sync.WebHistorySyncService} fires its callback once the first chunk lands;
+     * replaying it as well would double-fire the listener. The callback fires even when the cached collection is empty
+     * so embedders can rely on a one-shot post-login signal.
      *
-     * @implNote This implementation fans each callback out on a fresh virtual thread so a slow listener cannot stall
-     * the bootstrap. WA Web has no equivalent because its UI components subscribe directly to the reactive collections.
+     * @param replayChats       whether the chats collection was already synced at connection time
+     * @param replayContacts    whether the contacts collection was already synced at connection time
+     * @param replayNewsletters whether the newsletters collection was already synced at connection time
+     * @param replayStatus      whether the status collection was already synced at connection time
+     * @implNote This implementation gates on the connection-time snapshot rather than the live sync gates so that a
+     * fresh login, whose gates flip mid-bootstrap while this thread blocks on compliance and privacy round-trips, does
+     * not replay a collection that {@link com.github.auties00.cobalt.sync.WebHistorySyncService} has already delivered.
+     * Each callback fans out on a fresh virtual thread so a slow listener cannot stall the bootstrap. WA Web has no
+     * equivalent because its UI components subscribe directly to the reactive collections.
      */
-    private void replayCachedCollectionListeners() {
+    private void replayCachedCollectionListeners(boolean replayChats, boolean replayContacts,
+                                                 boolean replayNewsletters, boolean replayStatus) {
         var store = whatsapp.store();
         var listeners = store.listeners();
         if (listeners.isEmpty()) {
             return;
         }
-        if (store.syncedChats()) {
-            var chats = store.chats();
+        if (replayChats) {
+            var chats = store.chatStore().chats();
             for (var listener : listeners) {
-                Thread.startVirtualThread(() -> listener.onChats(whatsapp, chats));
+                if (listener instanceof ChatsListener typed) {
+                    Thread.startVirtualThread(() -> typed.onChats(whatsapp, chats));
+                }
             }
         }
-        if (store.syncedContacts()) {
-            var contacts = store.contacts();
+        if (replayContacts) {
+            var contacts = store.contactStore().contacts();
             for (var listener : listeners) {
-                Thread.startVirtualThread(() -> listener.onContacts(whatsapp, contacts));
+                if (listener instanceof ContactsListener typed) {
+                    Thread.startVirtualThread(() -> typed.onContacts(whatsapp, contacts));
+                }
             }
         }
-        if (store.syncedNewsletters()) {
-            var newsletters = store.newsletters();
+        if (replayNewsletters) {
+            var newsletters = store.chatStore().newsletters();
             for (var listener : listeners) {
-                Thread.startVirtualThread(() -> listener.onNewsletters(whatsapp, newsletters));
+                if (listener instanceof NewslettersListener typed) {
+                    Thread.startVirtualThread(() -> typed.onNewsletters(whatsapp, newsletters));
+                }
             }
         }
-        if (store.syncedStatus()) {
-            var status = store.status();
+        if (replayStatus) {
+            var status = store.chatStore().status();
             for (var listener : listeners) {
-                Thread.startVirtualThread(() -> listener.onStatus(whatsapp, status));
+                if (listener instanceof StatusListener typed) {
+                    Thread.startVirtualThread(() -> typed.onStatus(whatsapp, status));
+                }
             }
         }
     }
@@ -343,8 +399,8 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      *
      * <p>Gated on three conditions: this is a web client (newsletters are a web-only companion feature), the configured
      * {@link com.github.auties00.cobalt.client.WhatsAppWebClientHistory} policy includes newsletters, and the
-     * newsletter sync gate is still false. The {@link WhatsAppClient#refreshNewsletters()} call sets the gate and fans
-     * out {@link WhatsAppClientListener#onNewsletters(WhatsAppClient, java.util.Collection)} internally.
+     * newsletter sync gate is still false. The {@link LinkedWhatsAppClient#refreshNewsletters()} call sets the gate and fans
+     * out {@link NewslettersListener#onNewsletters(LinkedWhatsAppClient, java.util.Collection)} internally.
      *
      * @implNote This implementation runs the fetch on a fresh virtual thread because the round trip can be slow on
      * first install; failures are logged through {@link #LOGGER_COMPLIANCE} and swallowed so the rest of the bootstrap
@@ -354,10 +410,10 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void bootstrapNewsletterBackend() {
         var store = whatsapp.store();
-        if (store.clientType() != WhatsAppClientType.WEB || store.syncedNewsletters()) {
+        if (store.accountStore().clientType() != WhatsAppClientType.WEB || store.syncStore().syncedNewsletters()) {
             return;
         }
-        var policy = store.webHistoryPolicy().orElse(null);
+        var policy = store.syncStore().webHistoryPolicy().orElse(null);
         if (policy == null || !policy.hasNewsletters()) {
             return;
         }
@@ -388,10 +444,10 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      */
     private void bootstrapBusinessCertificate() {
         var store = whatsapp.store();
-        if (store.syncedBusinessCertificate()) {
+        if (store.syncStore().syncedBusinessCertificate()) {
             return;
         }
-        var self = store.jid().orElse(null);
+        var self = store.accountStore().jid().orElse(null);
         if (self == null) {
             return;
         }
@@ -404,7 +460,7 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
                         "Initial business certificate fetch failed: {0}",
                         exception.getMessage());
             } finally {
-                store.setSyncedBusinessCertificate(true);
+                store.syncStore().setSyncedBusinessCertificate(true);
             }
         });
     }
@@ -420,8 +476,7 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      * @param profile the freshly-fetched {@link BusinessProfile}
      */
     private void applyOwnBusinessProfile(BusinessProfile profile) {
-        whatsapp.store()
-                .setBusinessDescription(profile.description().orElse(null))
+        whatsapp.store().accountStore().setBusinessDescription(profile.description().orElse(null))
                 .setBusinessAddress(profile.address().orElse(null))
                 .setBusinessEmail(profile.email().orElse(null))
                 .setBusinessWebsites(profile.websites())
@@ -445,7 +500,7 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
     /**
      * The delay before retrying a failed media-connection refresh.
      *
-     * <p>Used when the {@code media_conn} query throws so a transient relay error does not permanently halt the renewal
+     * <p>Used when the {@code media_conn} query throws so a transient WhatsApp Web GraphQL error does not permanently halt the renewal
      * loop.
      */
     private static final Duration MEDIA_CONNECTION_RETRY_DELAY = Duration.ofMinutes(1);
@@ -484,13 +539,13 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      *
      * <p>On a fresh pair the companion has not yet uploaded any one-time pre-keys to the server, so the primary device
      * cannot fetch a pre-key bundle to establish the Signal session it needs to encrypt the history-sync
-     * {@code <message>} envelopes. The upload runs before {@link WhatsAppClient#enableActiveMode()} so the primary can
+     * {@code <message>} envelopes. The upload runs before {@link LinkedWhatsAppClient#enableActiveMode()} so the primary can
      * encrypt and push history-sync notifications as soon as the companion goes active. Subsequent reconnects observe
      * an already-populated pre-key store and skip the upload.
      *
      * @implNote WA Web runs the equivalent upload as a passive task registered before the passive-mode iq; Cobalt has
      * no passive-task pipeline, so the upload is inlined here. Failures are logged through {@link #LOGGER_COMPLIANCE}
-     * and swallowed so a transient relay error does not abort the rest of the post-success bootstrap; the next
+     * and swallowed so a transient WhatsApp Web GraphQL error does not abort the rest of the post-success bootstrap; the next
      * pre-key-low {@code <notification type="encrypt">} push retries the upload.
      */
     @WhatsAppWebExport(moduleName = "WAWebRegisterPassiveTasks",
@@ -498,7 +553,7 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebUploadPrekeysForRegTask", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void uploadInitialPreKeysIfNeeded() {
-        if (whatsapp.store().hasPreKeys()) {
+        if (whatsapp.store().signalStore().hasPreKeys()) {
             return;
         }
         try {
@@ -524,7 +579,7 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
      * thread; the cadence follows {@link MediaConnectionService#needsRefresh()}'s
      * {@code min(ttl, floor(0.8 * authTtl))} formula, clamped to {@link #MEDIA_CONNECTION_MIN_REFRESH_DELAY} so a
      * malformed response cannot produce a zero or negative delay. On failure the next tick fires after
-     * {@link #MEDIA_CONNECTION_RETRY_DELAY} so a transient relay error does not permanently halt the loop.
+     * {@link #MEDIA_CONNECTION_RETRY_DELAY} so a transient WhatsApp Web GraphQL error does not permanently halt the loop.
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryMediaConnsJob",
             exports = "queryMediaConn", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -579,19 +634,32 @@ public final class SuccessStreamHandler implements SocketStream.Handler {
     }
 
     /**
-     * Reconciles the four privacy disallowed-list categories with the server through the MEX/GraphQL transport.
+     * Fetches the account privacy settings during the post-success bootstrap so that
+     * {@link com.github.auties00.cobalt.store.SettingsStore#privacySettings()} is populated before the
+     * {@code onLoggedIn} listeners fire.
      *
-     * <p>Fans out one query per privacy category (about, group-add, last-seen, profile-picture) so the server records
-     * the same compliance ping the official client emits at app launch. The reply is logged and discarded.
+     * <p>Issues the {@code <iq xmlns="privacy" type="get">} query through
+     * {@link LinkedWhatsAppClient#refreshPrivacySettings()}, which stores each returned category.
      *
-     * @implNote This implementation has no per-category digest store slot yet, so the local cache digest is sent as the
-     * empty string on every probe; the server therefore always returns the full roster, but the round trip itself is
-     * sufficient for compliance.
+     * @implNote This implementation swallows a failure through {@link #LOGGER_COMPLIANCE} so a transient WhatsApp Web GraphQL error
+     * does not abort the rest of the bootstrap; the settings can still be re-queried on demand.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncPrivacyDisallowedLists",
             exports = "syncPrivacyDisallowedLists", adaptation = WhatsAppAdaptation.ADAPTED)
+    @WhatsAppWebExport(moduleName = "WAWebQueryPrivacySettingsJob", exports = "getPrivacySettings",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    private void syncPrivacySettings() {
+        try {
+            whatsapp.refreshPrivacySettings();
+        } catch (Throwable throwable) {
+            LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
+                    "Cannot fetch privacy settings: {0}",
+                    throwable.getMessage());
+        }
+    }
+
     private void syncPrivacyDisallowedListsMex() {
-        var meLid = whatsapp.store().lid().orElse(null);
+        var meLid = whatsapp.store().accountStore().lid().orElse(null);
         if (meLid == null) {
             return;
         }

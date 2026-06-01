@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifies {@link UGCBotHandler}: applying an incoming {@code ugc_bot}
  * mutation and asserting the {@link UGCBotAction#definition()} bytes
- * persisted on {@link WhatsAppStore#setUserCreatedBotDefinition(byte[])}.
+ * persisted on {@link com.github.auties00.cobalt.store.BusinessStore#setUserCreatedBotDefinition(byte[])}.
  * Each test instantiates a fresh handler against a fresh store, so the
  * user-created bot definition starts unset.
  */
@@ -40,7 +40,7 @@ class UGCBotHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private UGCBotHandler handler;
 
     @BeforeEach
@@ -90,14 +90,14 @@ class UGCBotHandlerTest {
         @Test
         @DisplayName("SET with a non-empty definition is persisted as-is on the store")
         void setsDefinition() {
-            assertTrue(store.userCreatedBotDefinition().isEmpty(), "precondition: definition is unset");
+            assertTrue(store.businessStore().userCreatedBotDefinition().isEmpty(), "precondition: definition is unset");
             var blob = new byte[]{0x01, 0x02, 0x03};
             var action = new UGCBotActionBuilder().definition(blob).build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertArrayEquals(blob, store.userCreatedBotDefinition().orElseThrow());
+            assertArrayEquals(blob, store.businessStore().userCreatedBotDefinition().orElseThrow());
         }
     }
 
@@ -140,7 +140,7 @@ class UGCBotHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.userCreatedBotDefinition().isEmpty());
+            assertTrue(store.businessStore().userCreatedBotDefinition().isEmpty());
         }
     }
 

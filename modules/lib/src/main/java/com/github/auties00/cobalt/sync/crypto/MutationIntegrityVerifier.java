@@ -86,7 +86,7 @@ public final class MutationIntegrityVerifier {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdAntiTampering", exports = "computeLtHashAndValidateSnapshot", adaptation = WhatsAppAdaptation.ADAPTED)
     public byte[] verifySnapshotMac(SyncPatchType collectionName, long version, SyncdSnapshot snapshot, byte[] expectedHash) {
-        if (!store.checkPatchMacs()) {
+        if (!store.syncStore().checkPatchMacs()) {
             return null;
         }
 
@@ -104,7 +104,7 @@ public final class MutationIntegrityVerifier {
             );
         }
 
-        var keyData = store.findWebAppStateKeyById(keyId.get())
+        var keyData = store.syncStore().findWebAppStateKeyById(keyId.get())
                 .orElseThrow(() -> new WhatsAppWebAppStateSyncException.MissingKey(keyId.get()))
                 .keyData()
                 .flatMap(AppStateSyncKeyData::keyData)
@@ -154,7 +154,7 @@ public final class MutationIntegrityVerifier {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdAntiTampering", exports = "computeLtHashAndValidatePatch", adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean verifyPatchIntegrity(SyncPatchType collectionName, SyncdPatch patch, byte[] computedLtHash, SequencedCollection<byte[]> patchValueMacs) {
-        if (!store.checkPatchMacs()) {
+        if (!store.syncStore().checkPatchMacs()) {
             return true;
         }
 
@@ -167,7 +167,7 @@ public final class MutationIntegrityVerifier {
             );
         }
 
-        var keyData = store.findWebAppStateKeyById(keyId.get())
+        var keyData = store.syncStore().findWebAppStateKeyById(keyId.get())
                 .orElseThrow(() -> new WhatsAppWebAppStateSyncException.MissingKey(keyId.get()))
                 .keyData()
                 .flatMap(AppStateSyncKeyData::keyData)
@@ -191,7 +191,7 @@ public final class MutationIntegrityVerifier {
                 }
             }
 
-            var alreadyInMacMismatch = store.findWebAppState(collectionName).macMismatch();
+            var alreadyInMacMismatch = store.syncStore().findWebAppState(collectionName).macMismatch();
             if (alreadyInMacMismatch) {
                 return true;
             }

@@ -129,6 +129,11 @@ public record AudioPipelineOptions(
      * @implNote This implementation hard-codes the AGC target to {@code 8000} and the noise-suppression
      * target to {@code -20} dB, the levels captured from WhatsApp's wasm {@code AudioDriverConfig}; the
      * complexity is fixed at {@code 5} as the wasm engine's voice setting.
+     *
+     * <p>The codec choice itself matches WA Web's live offers, which advertise
+     * {@code <audio enc="opus" rate="8000"/>} and {@code <audio enc="opus" rate="16000"/>};
+     * the callee's preaccept selects {@code rate="16000"} for every observed web-linked call.
+     * MLow does not appear on the web-linked path on the captured revisions.
      */
     public static AudioPipelineOptions defaults() {
         var frameSize = DEFAULT_SAMPLE_RATE * DEFAULT_FRAME_DURATION_MS / 1000;

@@ -49,7 +49,7 @@ import java.util.Objects;
  */
 public final class VP8Encoder implements AutoCloseable {
     static {
-        NativeLibLoader.load("vpx", Arena.global());
+        NativeLibLoader.load("cobalt-native", Arena.global());
     }
 
     /**

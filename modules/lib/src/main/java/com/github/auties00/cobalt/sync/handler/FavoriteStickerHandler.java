@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -23,7 +23,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * }
  * The apply path is gated by the primary device advertising the
  * {@value #FAVORITE_STICKER_FEATURE} feature in
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#primaryFeatures()};
+ * {@link com.github.auties00.cobalt.store.SyncStore#primaryFeatures()};
  * when it does not, the mutation is reported as
  * {@link MutationApplicationResult#orphan(String, String)}.
  */
@@ -79,9 +79,9 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#orphan(String, String)}. When
      * {@link StickerAction#isFavorite()} is set the sticker is timestamped and
      * added via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#addFavouriteSticker(String, com.github.auties00.cobalt.model.preference.Sticker)};
+     * {@link com.github.auties00.cobalt.store.SettingsStore#addFavouriteSticker(String, com.github.auties00.cobalt.model.preference.Sticker)};
      * otherwise it is removed via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#removeFavouriteSticker(String)}.
+     * {@link com.github.auties00.cobalt.store.SettingsStore#removeFavouriteSticker(String)}.
      *
      * @implNote
      * This implementation classifies a missing index slot as
@@ -92,12 +92,12 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
      * protobuf field to {@code false}, a {@code null} flag is treated as a
      * removal rather than a malformed value. An add fast-paths an entry that is
      * already present through
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#findFavouriteSticker(String)},
+     * {@link com.github.auties00.cobalt.store.SettingsStore#findFavouriteSticker(String)},
      * and a removal is unconditional because the store call is idempotent.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersFavoriteSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -115,19 +115,19 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
             if (!(mutation.value().action().orElse(null) instanceof StickerAction action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
-            if (!client.store().primaryFeatures().contains(FAVORITE_STICKER_FEATURE)) {
+            if (!client.store().syncStore().primaryFeatures().contains(FAVORITE_STICKER_FEATURE)) {
                 return MutationApplicationResult.orphan(stickerHash, "FavoriteSticker");
             }
 
             if (action.isFavorite()) {
-                if (client.store().findFavouriteSticker(stickerHash).isPresent()) {
+                if (client.store().settingsStore().findFavouriteSticker(stickerHash).isPresent()) {
                     return MutationApplicationResult.success();
                 }
                 var sticker = action.toSticker();
                 sticker.setTimestamp(mutation.timestamp().getEpochSecond());
-                client.store().addFavouriteSticker(stickerHash, sticker);
+                client.store().settingsStore().addFavouriteSticker(stickerHash, sticker);
             } else {
-                client.store().removeFavouriteSticker(stickerHash);
+                client.store().settingsStore().removeFavouriteSticker(stickerHash);
             }
 
             return MutationApplicationResult.success();

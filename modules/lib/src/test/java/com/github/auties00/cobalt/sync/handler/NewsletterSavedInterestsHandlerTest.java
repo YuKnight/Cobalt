@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Covers {@link NewsletterSavedInterestsHandler} for the protobuf-only
  * {@code "newsletter_saved_interests"} action: the handler accepts only {@link SyncdOperation#SET}
  * with a non-empty interests token, persists it via
- * {@link WhatsAppStore#setNewsletterSavedInterests}, and rejects a wrong-typed value or an empty
+ * {@link com.github.auties00.cobalt.store.SettingsStore#setNewsletterSavedInterests}, and rejects a wrong-typed value or an empty
  * token as {@link SyncActionState#MALFORMED}.
  *
  * <p>No public outgoing-mutation factory exists for this action, so each test drives the handler
@@ -43,7 +43,7 @@ class NewsletterSavedInterestsHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private NewsletterSavedInterestsHandler handler;
 
     @BeforeEach
@@ -91,27 +91,27 @@ class NewsletterSavedInterestsHandlerTest {
         @Test
         @DisplayName("SET with a non-empty interests token persists the value on the store")
         void setsInterests() {
-            assertTrue(store.newsletterSavedInterests().isEmpty(), "precondition: interests are unset");
+            assertTrue(store.settingsStore().newsletterSavedInterests().isEmpty(), "precondition: interests are unset");
             var action = new NewsletterSavedInterestsActionBuilder()
                     .newsletterSavedInterests("topics:tech,sports").build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals("topics:tech,sports", store.newsletterSavedInterests().orElseThrow());
+            assertEquals("topics:tech,sports", store.settingsStore().newsletterSavedInterests().orElseThrow());
         }
 
         @Test
         @DisplayName("SET overwrites any prior interests token")
         void setsOverwrites() {
-            store.setNewsletterSavedInterests("old");
+            store.settingsStore().setNewsletterSavedInterests("old");
             var action = new NewsletterSavedInterestsActionBuilder()
                     .newsletterSavedInterests("new").build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals("new", store.newsletterSavedInterests().orElseThrow());
+            assertEquals("new", store.settingsStore().newsletterSavedInterests().orElseThrow());
         }
     }
 
@@ -155,7 +155,7 @@ class NewsletterSavedInterestsHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.newsletterSavedInterests().isEmpty());
+            assertTrue(store.settingsStore().newsletterSavedInterests().isEmpty());
         }
     }
 

@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers {@link RecentEmojiWeightsHandler}, which accepts only
  * {@link SyncdOperation#SET}, persists the full {@link RecentEmojiWeight} snapshot via
- * {@link WhatsAppStore#setRecentEmojiWeights} (an empty list is still
+ * {@link com.github.auties00.cobalt.store.SettingsStore#setRecentEmojiWeights} (an empty list is still
  * {@link SyncActionState#SUCCESS}), rejects a wrong-typed value as
  * {@link SyncActionState#MALFORMED}, reports {@link SyncActionState#UNSUPPORTED} for
  * {@link SyncdOperation#REMOVE}, and resolves conflicts by timestamp.
@@ -42,7 +42,7 @@ class RecentEmojiWeightsHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private RecentEmojiWeightsHandler handler;
 
     @BeforeEach
@@ -95,7 +95,7 @@ class RecentEmojiWeightsHandlerTest {
         @Test
         @DisplayName("SET with a non-empty weights list replaces the store snapshot")
         void setsWeights() {
-            assertTrue(store.recentEmojiWeights().isEmpty(), "precondition: weights are unset");
+            assertTrue(store.settingsStore().recentEmojiWeights().isEmpty(), "precondition: weights are unset");
             var action = new RecentEmojiWeightsActionBuilder()
                     .weights(List.of(weight("smile", 0.9f), weight("heart", 0.5f)))
                     .build();
@@ -103,7 +103,7 @@ class RecentEmojiWeightsHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.recentEmojiWeights();
+            var stored = store.settingsStore().recentEmojiWeights();
             assertEquals(2, stored.size());
             assertEquals("smile", stored.get(0).emoji().orElseThrow());
         }
@@ -116,7 +116,7 @@ class RecentEmojiWeightsHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.recentEmojiWeights().isEmpty());
+            assertTrue(store.settingsStore().recentEmojiWeights().isEmpty());
         }
     }
 
@@ -150,7 +150,7 @@ class RecentEmojiWeightsHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.recentEmojiWeights().isEmpty());
+            assertTrue(store.settingsStore().recentEmojiWeights().isEmpty());
         }
     }
 

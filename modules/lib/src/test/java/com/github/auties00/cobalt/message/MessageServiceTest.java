@@ -1,4 +1,6 @@
 package com.github.auties00.cobalt.message;
+import com.github.auties00.cobalt.media.transcode.LiveMediaTranscoderService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.StubDeviceService;
@@ -7,7 +9,7 @@ import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.Assertions;
@@ -38,22 +40,25 @@ class MessageServiceTest {
         var client = TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(TestABPropsService.builder().build());
-        var session = new SignalSessionCipher(store);
-        var group = new SignalGroupCipher(store);
+        var session = new SignalSessionCipher(store.signalStore());
+        var group = new SignalGroupCipher(store.signalStore());
+        var cryptoLocks = new com.github.auties00.cobalt.message.crypto.SignalCryptoLocks();
+        var encryption = new com.github.auties00.cobalt.message.send.crypto.MessageEncryption(store, session, group, cryptoLocks);
+        var decryption = new com.github.auties00.cobalt.message.receive.crypto.MessageDecryption(store, session, group, cryptoLocks);
         var device = StubDeviceService.create();
         var props = client.abPropsService();
-        var wam = new DefaultWamService(client, props);
-        var migration = new LidMigrationService(client, props, wam);
-        var transcoder = new MediaTranscoderService(client, props, TestMediaConnectionService.create());
+        var wam = new LiveWamService(client, props);
+        var migration = new LiveLidMigrationService(client, props, wam);
+        var transcoder = new LiveMediaTranscoderService(client, props, TestMediaConnectionService.create());
 
-        assertThrows(NullPointerException.class, () -> new MessageService(null, session, group, device, migration, props, wam, transcoder));
-        assertThrows(NullPointerException.class, () -> new MessageService(client, null, group, device, migration, props, wam, transcoder));
-        assertThrows(NullPointerException.class, () -> new MessageService(client, session, null, device, migration, props, wam, transcoder));
-        assertThrows(NullPointerException.class, () -> new MessageService(client, session, group, null, migration, props, wam, transcoder));
-        assertThrows(NullPointerException.class, () -> new MessageService(client, session, group, device, null, props, wam, transcoder));
-        assertThrows(NullPointerException.class, () -> new MessageService(client, session, group, device, migration, null, wam, transcoder));
-        assertThrows(NullPointerException.class, () -> new MessageService(client, session, group, device, migration, props, null, transcoder));
-        assertThrows(NullPointerException.class, () -> new MessageService(client, session, group, device, migration, props, wam, null));
+        assertThrows(NullPointerException.class, () -> new LiveMessageService(null, encryption, decryption, device, migration, props, wam, transcoder));
+        assertThrows(NullPointerException.class, () -> new LiveMessageService(client, null, decryption, device, migration, props, wam, transcoder));
+        assertThrows(NullPointerException.class, () -> new LiveMessageService(client, encryption, null, device, migration, props, wam, transcoder));
+        assertThrows(NullPointerException.class, () -> new LiveMessageService(client, encryption, decryption, null, migration, props, wam, transcoder));
+        assertThrows(NullPointerException.class, () -> new LiveMessageService(client, encryption, decryption, device, null, props, wam, transcoder));
+        assertThrows(NullPointerException.class, () -> new LiveMessageService(client, encryption, decryption, device, migration, null, wam, transcoder));
+        assertThrows(NullPointerException.class, () -> new LiveMessageService(client, encryption, decryption, device, migration, props, null, transcoder));
+        assertThrows(NullPointerException.class, () -> new LiveMessageService(client, encryption, decryption, device, migration, props, wam, null));
     }
 
     @Test
@@ -63,15 +68,18 @@ class MessageServiceTest {
         var client = TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(TestABPropsService.builder().build());
-        var session = new SignalSessionCipher(store);
-        var group = new SignalGroupCipher(store);
+        var session = new SignalSessionCipher(store.signalStore());
+        var group = new SignalGroupCipher(store.signalStore());
+        var cryptoLocks = new com.github.auties00.cobalt.message.crypto.SignalCryptoLocks();
+        var encryption = new com.github.auties00.cobalt.message.send.crypto.MessageEncryption(store, session, group, cryptoLocks);
+        var decryption = new com.github.auties00.cobalt.message.receive.crypto.MessageDecryption(store, session, group, cryptoLocks);
         var device = StubDeviceService.create();
         var props = client.abPropsService();
-        var wam = new DefaultWamService(client, props);
-        var migration = new LidMigrationService(client, props, wam);
-        var transcoder = new MediaTranscoderService(client, props, TestMediaConnectionService.create());
+        var wam = new LiveWamService(client, props);
+        var migration = new LiveLidMigrationService(client, props, wam);
+        var transcoder = new LiveMediaTranscoderService(client, props, TestMediaConnectionService.create());
 
-        var service = new MessageService(client, session, group, device, migration, props, wam, transcoder);
+        var service = new LiveMessageService(client, encryption, decryption, device, migration, props, wam, transcoder);
         assertNotNull(service,
                 "with all valid collaborators MessageService must be constructed without throwing");
     }
@@ -83,14 +91,17 @@ class MessageServiceTest {
         var client = TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(TestABPropsService.builder().build());
-        var session = new SignalSessionCipher(store);
-        var group = new SignalGroupCipher(store);
+        var session = new SignalSessionCipher(store.signalStore());
+        var group = new SignalGroupCipher(store.signalStore());
+        var cryptoLocks = new com.github.auties00.cobalt.message.crypto.SignalCryptoLocks();
+        var encryption = new com.github.auties00.cobalt.message.send.crypto.MessageEncryption(store, session, group, cryptoLocks);
+        var decryption = new com.github.auties00.cobalt.message.receive.crypto.MessageDecryption(store, session, group, cryptoLocks);
         var device = StubDeviceService.create();
         var props = client.abPropsService();
-        var wam = new DefaultWamService(client, props);
-        var migration = new LidMigrationService(client, props, wam);
-        var transcoder = new MediaTranscoderService(client, props, TestMediaConnectionService.create());
-        var service = new MessageService(client, session, group, device, migration, props, wam, transcoder);
+        var wam = new LiveWamService(client, props);
+        var migration = new LiveLidMigrationService(client, props, wam);
+        var transcoder = new LiveMediaTranscoderService(client, props, TestMediaConnectionService.create());
+        var service = new LiveMessageService(client, encryption, decryption, device, migration, props, wam, transcoder);
 
         Assertions.assertDoesNotThrow(service::clearPendingMessages);
         Assertions.assertDoesNotThrow(service::clearPendingMessages);

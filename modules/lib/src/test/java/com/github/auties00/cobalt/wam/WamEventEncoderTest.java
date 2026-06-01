@@ -97,9 +97,9 @@ class WamEventEncoderTest {
         void boolRoundTrip() {
             for (var v : new boolean[]{true, false}) {
                 var buffer = new byte[16];
-                var encoder = WamEventEncoder.of(buffer);
+                var encoder = WamEventEncoder.toBytes(buffer);
                 encoder.writeBoolField(5, v, false);
-                var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+                var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
                 var header = decoder.readHeader();
                 assertEquals(5, WamEventDecoder.fieldIdOf(header));
                 var decoded = decoder.readInt(header) != 0L;
@@ -114,11 +114,11 @@ class WamEventEncoderTest {
         @DisplayName("null GLOBAL entry: writeNull → tag with VALUE_NULL bits, no payload")
         void nullRoundTrip() {
             var buffer = new byte[16];
-            var encoder = WamEventEncoder.of(buffer);
+            var encoder = WamEventEncoder.toBytes(buffer);
             encoder.writeNull(5, WamTags.GLOBAL);
             assertEquals(2, encoder.written(),
                     "null GLOBAL entry encodes to exactly 2 bytes: tag + fieldId");
-            var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+            var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
             var header = decoder.readHeader();
             assertEquals(5, WamEventDecoder.fieldIdOf(header));
             assertEquals(0x00, WamEventDecoder.valueTypeOf(header) & 0xF0,
@@ -129,9 +129,9 @@ class WamEventEncoderTest {
         @DisplayName("event marker: writeEventMarker → decoded eventId + negated weight")
         void eventMarkerRoundTrip() {
             var buffer = new byte[16];
-            var encoder = WamEventEncoder.of(buffer);
+            var encoder = WamEventEncoder.toBytes(buffer);
             encoder.writeEventMarker(2862, 1, false);
-            var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+            var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
             var header = decoder.readHeader();
             assertEquals(2862, WamEventDecoder.fieldIdOf(header));
             assertEquals(-1L, decoder.readInt(header),
@@ -227,7 +227,7 @@ class WamEventEncoderTest {
         void exactSizeSucceeds() {
             var size = WamEventSizes.intFieldSize(7, 70_000L);
             var buffer = new byte[size];
-            var encoder = WamEventEncoder.of(buffer);
+            var encoder = WamEventEncoder.toBytes(buffer);
             encoder.writeIntField(7, 70_000L, false);
             assertEquals(size, encoder.written());
         }
@@ -236,7 +236,7 @@ class WamEventEncoderTest {
         @DisplayName("encoding beyond the buffer throws IndexOutOfBoundsException")
         void overflowThrows() {
             var buffer = new byte[3];
-            var encoder = WamEventEncoder.of(buffer);
+            var encoder = WamEventEncoder.toBytes(buffer);
             assertThrows(IndexOutOfBoundsException.class,
                     () -> encoder.writeIntField(7, 70_000L, false));
         }
@@ -244,10 +244,10 @@ class WamEventEncoderTest {
 
     private static void assertIntRoundTrip(int fieldId, long value, boolean hasFollowing) {
         var buffer = new byte[BUFFER];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeIntField(fieldId, value, hasFollowing);
         var written = encoder.written();
-        var decoder = WamEventDecoder.of(buffer, 0, written);
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, written);
         var header = decoder.readHeader();
         assertEquals(fieldId, WamEventDecoder.fieldIdOf(header));
         assertEquals(value, decoder.readInt(header));
@@ -256,9 +256,9 @@ class WamEventEncoderTest {
     private static void assertStringRoundTrip(int fieldId, String value, boolean hasFollowing) {
         var size = WamEventSizes.stringFieldSize(fieldId, value);
         var buffer = new byte[size];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeStringField(fieldId, value, hasFollowing);
-        var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
         var header = decoder.readHeader();
         assertEquals(fieldId, WamEventDecoder.fieldIdOf(header));
         assertEquals(value, decoder.readString(header));
@@ -267,9 +267,9 @@ class WamEventEncoderTest {
     private static void assertFloatRoundTrip(int fieldId, double value) {
         var size = WamEventSizes.floatFieldSize(fieldId);
         var buffer = new byte[size];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeFloatField(fieldId, value, false);
-        var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
         var header = decoder.readHeader();
         assertEquals(fieldId, WamEventDecoder.fieldIdOf(header));
         var actual = decoder.readFloat(header);
@@ -279,11 +279,11 @@ class WamEventEncoderTest {
 
     private static void assertSinkParity(Consumer<WamEventEncoder> op) {
         var arrayBuffer = new byte[BUFFER];
-        var arrayEncoder = WamEventEncoder.of(arrayBuffer);
+        var arrayEncoder = WamEventEncoder.toBytes(arrayBuffer);
         op.accept(arrayEncoder);
 
         var stream = new ByteArrayOutputStream();
-        var streamEncoder = WamEventEncoder.of(stream);
+        var streamEncoder = WamEventEncoder.toStream(stream);
         op.accept(streamEncoder);
 
         assertEquals(arrayEncoder.written(), streamEncoder.written(),
@@ -296,7 +296,7 @@ class WamEventEncoderTest {
 
     private static void assertSizeParity(int expectedSize, Consumer<WamEventEncoder> op) {
         var buffer = new byte[expectedSize];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         op.accept(encoder);
         assertEquals(expectedSize, encoder.written(),
                 "WamEventSizes.xxxSize must equal actual bytes written");

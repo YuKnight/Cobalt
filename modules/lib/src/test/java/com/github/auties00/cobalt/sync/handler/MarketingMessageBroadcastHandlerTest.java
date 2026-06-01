@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * conflict resolution.
  *
  * <p>The handler runs against an in-memory {@link DeviceFixtures#temporaryStore} via
- * {@link TestWhatsAppClient} so the {@link WhatsAppStore#findMarketingMessage(String)} read-back
+ * {@link TestWhatsAppClient} so the {@link com.github.auties00.cobalt.store.BusinessStore#findMarketingMessage(String)} read-back
  * can be asserted directly. Premium templates are pre-seeded through {@link MarketingMessageBuilder}
  * so the orphan branch can be verified independently.
  */
@@ -77,7 +77,7 @@ class MarketingMessageBroadcastHandlerTest {
     }
 
     private void seedTemplate(String templateId) {
-        store.putMarketingMessage(new MarketingMessageBuilder()
+        store.businessStore().putMarketingMessage(new MarketingMessageBuilder()
                 .templateId(templateId)
                 .name("Spring")
                 .message("body")
@@ -125,7 +125,7 @@ class MarketingMessageBroadcastHandlerTest {
             assertEquals(SyncActionState.SUCCESS, result.actionState());
             // The handler keys the broadcast record by the sent message id; the premium template
             // id is stored as the record's status field per Cobalt's adapted side-map.
-            assertTrue(store.findMarketingMessageBroadcast("msg-1").isPresent());
+            assertTrue(store.businessStore().findMarketingMessageBroadcast("msg-1").isPresent());
         }
     }
 

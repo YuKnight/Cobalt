@@ -1,116 +1,33 @@
 package com.github.auties00.cobalt.message;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
-import com.github.auties00.cobalt.message.receive.MessageReceivingService;
-import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
-import com.github.auties00.cobalt.message.send.MessageSendingService;
 import com.github.auties00.cobalt.ack.AckResult;
-import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
-import com.github.auties00.cobalt.migration.LidMigrationService;
+import com.github.auties00.cobalt.ack.CallAck;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.message.receive.MessageReceivingService;
+import com.github.auties00.cobalt.message.send.MessageSendingService;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.wam.WamService;
-import com.github.auties00.libsignal.SignalSessionCipher;
-import com.github.auties00.libsignal.groups.SignalGroupCipher;
-
-import java.util.Objects;
 
 /**
- * Fans message traffic between the outbound send pipeline and the inbound
- * receive pipeline behind a single facade.
+ * Facade that fans message traffic between the outbound send pipeline and the inbound receive
+ * pipeline.
  *
- * <p>Code that wants to send or react to messages talks to this class instead
- * of touching the {@link MessageSendingService} and
- * {@link MessageReceivingService} pair directly. The two sub-services are
- * assembled from the supplied collaborators in the constructor and share the
- * {@link WhatsAppClient#store() client store}, so the send and receive sides
- * observe a single source of truth for sessions, devices, and pending-message
- * caches.
+ * <p>Code that wants to send or react to messages talks to this service instead of touching the
+ * {@link MessageSendingService} and {@link MessageReceivingService} pair directly. The two
+ * pipelines share the {@link LinkedWhatsAppClient#store() client store}, so the send and receive
+ * sides observe a single source of truth for sessions, devices, and pending-message caches.
  *
- * @implNote This implementation collapses WA Web's two separate entry points,
- * {@code WAWebSendMsgJob.encryptAndSendMsg} for outbound fanout and
- * {@code WAWebCommsHandleMessagingStanza.handleMessagingStanza} for inbound
- * dispatch, into one facade that owns no state of its own.
+ * @implSpec
+ * Implementations must forward every outbound call to a {@link MessageSendingService} and every
+ * inbound call to a {@link MessageReceivingService} backed by the same store, and must own no
+ * additional message state of their own.
  */
-public final class MessageService {
-    /**
-     * Holds the outbound pipeline owning device fetch, fanout, encryption, and
-     * stanza emission.
-     */
-    private final MessageSendingService sendingService;
-
-    /**
-     * Holds the inbound pipeline owning stanza parsing, Signal decryption, and
-     * {@link MessageInfo} construction.
-     */
-    private final MessageReceivingService receivingService;
-
-    /**
-     * Wires the send and receive pipelines from the supplied collaborators.
-     *
-     * <p>The two pipelines share the {@link WhatsAppClient#store() client store}
-     * and the {@link SignalSessionCipher}/{@link SignalGroupCipher} pair so
-     * encrypted state stays consistent across both directions of traffic. The
-     * ciphers passed in must be backed by the same store as
-     * {@link WhatsAppClient#store()}; otherwise the send and receive sides see
-     * different Signal session records.
-     *
-     * @param client              the {@link WhatsAppClient} used to send
-     *                            stanzas and to register inbound stanza
-     *                            handlers
-     * @param sessionCipher       the {@link SignalSessionCipher} used for
-     *                            one-to-one encryption and decryption
-     * @param groupCipher         the {@link SignalGroupCipher} used for
-     *                            sender-key fanout in group threads
-     * @param deviceService       the {@link DeviceService} consulted to
-     *                            resolve per-user device lists before each
-     *                            fanout
-     * @param lidMigrationService the {@link LidMigrationService} that gates
-     *                            the PN-to-LID stanza rewrite in the
-     *                            user-chat send path
-     * @param abPropsService      the {@link ABPropsService} consulted to
-     *                            gate optional protocol behaviour
-     * @param wamService             the {@link WamService} forwarded to
-     *                               the sending pipeline for end-to-end
-     *                               telemetry events
-     * @param mediaTranscoderService the {@link MediaTranscoderService}
-     *                               threaded into the sending pipeline
-     *                               for link-preview decoration
-     * @throws NullPointerException if any argument is {@code null}
-     */
-    public MessageService(
-            WhatsAppClient client,
-            SignalSessionCipher sessionCipher,
-            SignalGroupCipher groupCipher,
-            DeviceService deviceService,
-            LidMigrationService lidMigrationService,
-            ABPropsService abPropsService,
-            WamService wamService,
-            MediaTranscoderService mediaTranscoderService
-    ) {
-        Objects.requireNonNull(client, "client");
-        Objects.requireNonNull(sessionCipher, "sessionCipher");
-        Objects.requireNonNull(groupCipher, "groupCipher");
-        Objects.requireNonNull(deviceService, "deviceService");
-        Objects.requireNonNull(lidMigrationService, "lidMigrationService");
-        Objects.requireNonNull(abPropsService, "abPropsService");
-        Objects.requireNonNull(wamService, "wamService");
-        Objects.requireNonNull(mediaTranscoderService, "mediaTranscoderService");
-
-        var store = client.store();
-        var encryption = new MessageEncryption(store, sessionCipher, groupCipher);
-        var decryption = new MessageDecryption(store, sessionCipher, groupCipher);
-        this.sendingService = new MessageSendingService(client, encryption, deviceService, lidMigrationService, abPropsService, wamService, mediaTranscoderService);
-        this.receivingService = new MessageReceivingService(store, decryption);
-    }
-
+public interface MessageService {
     /**
      * Sends a fresh outbound message to the given chat.
      *
@@ -119,6 +36,9 @@ public final class MessageService {
      * acknowledgment. This overload is for plain user-facing sends where the
      * caller does not need to pre-build a {@link MessageInfo}.
      *
+     * @implSpec
+     * Implementations must delegate to {@link MessageSendingService#send(Jid, MessageContainer)}.
+     *
      * @param chatJid   the recipient chat JID
      * @param container the message payload
      * @return the server acknowledgment outcome
@@ -126,9 +46,7 @@ public final class MessageService {
      *                              {@code null}
      * @see MessageSendingService#send(Jid, MessageContainer)
      */
-    public AckResult send(Jid chatJid, MessageContainer container) {
-        return sendingService.send(chatJid, container);
-    }
+    AckResult send(Jid chatJid, MessageContainer container);
 
     /**
      * Sends a pre-populated {@link MessageInfo} the caller has already keyed,
@@ -139,15 +57,16 @@ public final class MessageService {
      * service does not mutate the supplied {@link MessageInfo}; the same
      * instance can safely be passed again on a retry.
      *
+     * @implSpec
+     * Implementations must delegate to {@link MessageSendingService#send(MessageInfo)}.
+     *
      * @param messageInfo the prepared outbound message, either a
      *                    {@link ChatMessageInfo} or a {@link NewsletterMessageInfo}
      * @return the server acknowledgment outcome
      * @throws NullPointerException if {@code messageInfo} is {@code null}
      * @see MessageSendingService#send(MessageInfo)
      */
-    public AckResult send(MessageInfo messageInfo) {
-        return sendingService.send(messageInfo);
-    }
+    AckResult send(MessageInfo messageInfo);
 
     /**
      * Sends a peer protocol message to one of the current account's own linked
@@ -158,6 +77,10 @@ public final class MessageService {
      * linked devices of the same account. The {@code targetDevice} argument is
      * normally the account's primary device JID.
      *
+     * @implSpec
+     * Implementations must delegate to
+     * {@link MessageSendingService#sendPeer(Jid, ChatMessageInfo)}.
+     *
      * @param targetDevice the target device JID
      * @param messageInfo  the peer protocol message
      * @return the server acknowledgment outcome
@@ -165,9 +88,7 @@ public final class MessageService {
      *                              {@code messageInfo} is {@code null}
      * @see MessageSendingService#sendPeer(Jid, ChatMessageInfo)
      */
-    public AckResult sendPeer(Jid targetDevice, ChatMessageInfo messageInfo) {
-        return sendingService.sendPeer(targetDevice, messageInfo);
-    }
+    AckResult sendPeer(Jid targetDevice, ChatMessageInfo messageInfo);
 
     /**
      * Processes a single inbound {@code <message>} stanza and returns the typed
@@ -179,17 +100,83 @@ public final class MessageService {
      * server failed to deliver produce a {@code null} return so the caller can
      * distinguish them from genuine payloads.
      *
+     * @implSpec
+     * Implementations must delegate to {@link MessageReceivingService#process(Node)}.
+     *
      * @param node the raw inbound {@code <message>} node
      * @return the processed {@link MessageInfo}, or {@code null} for
      *         unavailable fanout placeholders
      * @throws NullPointerException if {@code node} is {@code null}
-     * @throws com.github.auties00.cobalt.exception.WhatsAppMessageException.Receive
+     * @throws WhatsAppMessageException.Receive
      *         if decryption or validation fails for an encrypted payload
      * @see MessageReceivingService#process(Node)
      */
-    public MessageInfo process(Node node) {
-        return receivingService.process(node);
-    }
+    MessageInfo process(Node node);
+
+    /**
+     * Builds and sends an outbound {@code <call><offer>} stanza to the peer's devices.
+     *
+     * <p>Owns the addressing-mode resolution (LID where the local user has migrated, PN
+     * otherwise), the per-device list sync, the {@code ensureSessions} prekey fetch, the
+     * per-device Signal envelope of the call-key plaintext, and the ADV-signed device-identity
+     * attachment. Returns the parsed {@link CallAck} so the call layer can read the
+     * {@link CallAck#relay() relay block} and drive the media plane on success, or surface the
+     * {@link AckResult#error() error code} on rejection.
+     *
+     * @implSpec
+     * Implementations must resolve both self and peer to the call's canonical addressing mode
+     * before building the wire stanza; the WhatsApp server rejects mixed-addressing offers with
+     * {@code error="439"}.
+     *
+     * @param peer    the peer user JID (PN or LID; will be resolved to the canonical mode)
+     * @param callId  the call identifier
+     * @param callKey the per-call shared key bytes to encrypt to every peer device
+     * @param video   whether the call offers video
+     * @return the parsed call ACK
+     * @throws NullPointerException  if {@code peer}, {@code callId}, or {@code callKey} is
+     *                               {@code null}
+     * @throws IllegalStateException if the client is not logged in, or if no trusted-contact token
+     *                               is available for the peer
+     */
+    CallAck sendCall(Jid peer, String callId, byte[] callKey, boolean video);
+
+    /**
+     * Sends a group-call offer to the group-call JID and returns the parsed ACK.
+     *
+     * <p>A group call offer differs from a 1:1 offer: it targets {@code <group-user>@call} (the WA
+     * call domain) rather than a device JID, carries the group's {@code g.us} JID as the
+     * {@code group-jid} attribute and a {@code <group_info>} child listing the participants, and
+     * encrypts the call key to every device of every participant in the {@code <destination>} fanout.
+     * The server fans the offer out to the group's members.
+     *
+     * @param group        the group JID (a {@code g.us} JID)
+     * @param participants the participant user JIDs to invite
+     * @param callId       the call identifier
+     * @param callKey      the per-call shared key bytes to encrypt to every participant device
+     * @param video        whether the call offers video
+     * @return the parsed call ACK
+     * @throws NullPointerException  if any argument is {@code null}
+     * @throws IllegalStateException if the client is not logged in
+     */
+    CallAck sendGroupCall(Jid group, java.util.Collection<Jid> participants, String callId,
+                          byte[] callKey, boolean video);
+
+    /**
+     * Decrypts a Signal-encrypted call payload into its plaintext bytes.
+     *
+     * <p>Used by the call layer's {@code <enc_rekey>} runtime to recover the
+     * {@link com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload E2eRekeyPayload}
+     * the peer published. The {@code encType} attribute is the wire-level Signal envelope
+     * variant ({@code msg} or {@code pkmsg}) carried on the inbound {@code <enc>} child.
+     *
+     * @param senderJid  the device JID that authored the envelope
+     * @param encType    the Signal envelope variant
+     * @param ciphertext the Signal-encrypted bytes
+     * @return the plaintext bytes
+     * @throws NullPointerException             if any argument is {@code null}
+     * @throws WhatsAppMessageException.Receive if decryption or validation fails
+     */
+    byte[] processCall(Jid senderJid, MessageEncryptionType encType, byte[] ciphertext);
 
     /**
      * Clears the pending-message deduplication cache held by the receiving
@@ -199,9 +186,10 @@ public final class MessageService {
      * new session are not mistakenly treated as duplicates of pre-reconnect
      * traffic.
      *
+     * @implSpec
+     * Implementations must delegate to {@link MessageReceivingService#clearPendingMessages()}.
+     *
      * @see MessageReceivingService#clearPendingMessages()
      */
-    public void clearPendingMessages() {
-        receivingService.clearPendingMessages();
-    }
+    void clearPendingMessages();
 }

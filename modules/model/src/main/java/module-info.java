@@ -15,9 +15,11 @@ module com.github.auties00.cobalt.model {
     exports com.github.auties00.cobalt.model.bot.response;
     exports com.github.auties00.cobalt.model.bot.session;
     exports com.github.auties00.cobalt.model.business;
+    exports com.github.auties00.cobalt.model.business.ai;
     exports com.github.auties00.cobalt.model.business.catalog;
     exports com.github.auties00.cobalt.model.business.profile;
     exports com.github.auties00.cobalt.model.call;
+    exports com.github.auties00.cobalt.model.call.datachannel;
     exports com.github.auties00.cobalt.model.chat;
     exports com.github.auties00.cobalt.model.chat.community;
     exports com.github.auties00.cobalt.model.chat.group;
@@ -84,8 +86,19 @@ module com.github.auties00.cobalt.model {
     exports com.github.auties00.cobalt.model.business.cart;
     exports com.github.auties00.cobalt.model.business.order;
     exports com.github.auties00.cobalt.model.business.ctwa;
+    exports com.github.auties00.cobalt.model.business.webgraphql;
     exports com.github.auties00.cobalt.model.business.compliance;
     exports com.github.auties00.cobalt.model.business.postcode;
     exports com.github.auties00.cobalt.model.business.linking;
     exports com.github.auties00.cobalt.model.business.marketing;
+    exports com.github.auties00.cobalt.model.business.ads;
+    exports com.github.auties00.cobalt.model.business.subscription;
+    exports com.github.auties00.cobalt.model.business.flow;
+    exports com.github.auties00.cobalt.model.business.waa;
+    exports com.github.auties00.cobalt.model.business.support;
+    exports com.github.auties00.cobalt.model.business.crossposting;
+    exports com.github.auties00.cobalt.model.business.auth;
+    exports com.github.auties00.cobalt.model.business.aichannel;
+    exports com.github.auties00.cobalt.model.business.acs;
+    exports com.github.auties00.cobalt.model.business.promotion;
 }

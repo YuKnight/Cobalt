@@ -757,7 +757,7 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
      *
      * <p>The {@link #errorCode()} and {@link #errorText()} pair is surfaced to the caller as a block-failure log
      * line; the optional {@link #errorAddressingMode()} hint helps the caller diagnose migration-state issues by
-     * indicating which wire the relay expected. It is selected for relay error codes below {@code 500}.
+     * indicating which wire the relay expected. It is selected for WhatsApp Web GraphQL error codes below {@code 500}.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateBlockListResponseInvalidRequest")
     final class ClientError implements SmaxUpdateBlockListResponse {
@@ -905,7 +905,7 @@ public sealed interface SmaxUpdateBlockListResponse extends SmaxOperation.Respon
      * The transient server-error reply variant, returned when the relay reports a recoverable failure.
      *
      * <p>The {@link #errorCode()} and {@link #errorText()} pair is surfaced to the caller; WA Web does not retry
-     * inline, leaving recovery to the caller. It is selected for relay error codes of {@code 500} or above.
+     * inline, leaving recovery to the caller. It is selected for WhatsApp Web GraphQL error codes of {@code 500} or above.
      */
     @WhatsAppWebModule(moduleName = "WASmaxInBlocklistsUpdateBlockListResponseServerError")
     final class ServerError implements SmaxUpdateBlockListResponse {

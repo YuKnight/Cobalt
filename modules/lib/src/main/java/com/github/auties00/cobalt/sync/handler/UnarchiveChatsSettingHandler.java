@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -28,7 +28,7 @@ import java.util.List;
  * the handler re-archives previously-archived chats per their stored
  * {@link ArchiveChatAction} entries. The boolean preference itself is persisted
  * on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setUnarchiveChats(boolean)}.
+ * {@link com.github.auties00.cobalt.store.SettingsStore#setUnarchiveChats(boolean)}.
  */
 @WhatsAppWebModule(moduleName = "WAWebArchiveSettingSync")
 public final class UnarchiveChatsSettingHandler implements WebAppStateActionHandler {
@@ -78,12 +78,12 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      * is acknowledged as {@link MutationApplicationResult#skipped()} so the
      * dispatcher can still correlate the result list with the input by position;
      * the trailing mutation runs through
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}. An empty
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}. An empty
      * batch returns an empty list.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.isEmpty()) {
             return List.of();
         }
@@ -104,8 +104,8 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      * to a {@link UnarchiveChatsSetting} is reported as malformed; otherwise the
      * boolean preference (a missing nullable Boolean coalescing to {@code false})
      * is persisted via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setUnarchiveChats(boolean)}
-     * and {@link #updateSideEffectOnChats(WhatsAppClient, boolean)} runs. Any
+     * {@link com.github.auties00.cobalt.store.SettingsStore#setUnarchiveChats(boolean)}
+     * and {@link #updateSideEffectOnChats(LinkedWhatsAppClient, boolean)} runs. Any
      * thrown exception maps to {@link MutationApplicationResult#failed()}.
      *
      * @implNote
@@ -116,7 +116,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -127,7 +127,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
             }
 
             var unarchiveChats = setting.unarchiveChats();
-            client.store().setUnarchiveChats(unarchiveChats);
+            client.store().settingsStore().setUnarchiveChats(unarchiveChats);
             updateSideEffectOnChats(client, unarchiveChats);
             return MutationApplicationResult.success();
         } catch (Exception e) {
@@ -142,14 +142,14 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      * <p>Runs after the new setting value has been persisted; the choice between
      * unarchiving newly-active chats and re-archiving previously archived chats is
      * determined solely by the setting value, delegating to
-     * {@link #applyUnarchiveSideEffect(WhatsAppClient)} or
-     * {@link #applyArchiveSideEffect(WhatsAppClient)}.
+     * {@link #applyUnarchiveSideEffect(LinkedWhatsAppClient)} or
+     * {@link #applyArchiveSideEffect(LinkedWhatsAppClient)}.
      *
-     * @param client         the {@link WhatsAppClient} whose store is being updated
+     * @param client         the {@link LinkedWhatsAppClient} whose store is being updated
      * @param unarchiveChats the new setting value
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
-    private void updateSideEffectOnChats(WhatsAppClient client, boolean unarchiveChats) {
+    private void updateSideEffectOnChats(LinkedWhatsAppClient client, boolean unarchiveChats) {
         if (unarchiveChats) {
             applyUnarchiveSideEffect(client);
         } else {
@@ -174,14 +174,14 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      * archived chat with a successful archive entry, matching the user-facing intent
      * of the setting change.
      *
-     * @param client the {@link WhatsAppClient} whose store is being updated
+     * @param client the {@link LinkedWhatsAppClient} whose store is being updated
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void applyUnarchiveSideEffect(WhatsAppClient client) {
+    private void applyUnarchiveSideEffect(LinkedWhatsAppClient client) {
         // TODO: replicate WA Web's MessageRangeUtils.compareMessageRanges gating once Cobalt
         //       maintains active-message-range tracking; today Cobalt may unarchive chats
         //       that WA Web would have left archived.
-        var archiveEntries = client.store().getSyncActionEntries(SyncPatchType.REGULAR_LOW);
+        var archiveEntries = client.store().syncStore().getSyncActionEntries(SyncPatchType.REGULAR_LOW);
         for (var entry : archiveEntries) {
             if (entry.actionState() != SyncActionState.SUCCESS
                     && entry.actionState() != SyncActionState.ORPHAN) {
@@ -216,7 +216,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
                 continue;
             }
 
-            var chat = client.store().findChatByJid(chatJid);
+            var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
                 continue;
             }
@@ -243,11 +243,11 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
      * table; the practical effect is identical because the dispatcher applies
      * pending mutations to the store before invoking this handler.
      *
-     * @param client the {@link WhatsAppClient} whose store is being updated
+     * @param client the {@link LinkedWhatsAppClient} whose store is being updated
      */
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void applyArchiveSideEffect(WhatsAppClient client) {
-        var archiveEntries = client.store().getSyncActionEntries(SyncPatchType.REGULAR_LOW);
+    private void applyArchiveSideEffect(LinkedWhatsAppClient client) {
+        var archiveEntries = client.store().syncStore().getSyncActionEntries(SyncPatchType.REGULAR_LOW);
         for (var entry : archiveEntries) {
             if (entry.actionState() != SyncActionState.SUCCESS) {
                 continue;
@@ -277,7 +277,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
                 continue;
             }
 
-            var chat = client.store().findChatByJid(chatJid);
+            var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
                 continue;
             }

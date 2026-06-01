@@ -122,16 +122,23 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
             private final String role;
 
             /**
+             * Holds the admin profile projection echoed for admin and owner followers.
+             */
+            private final AdminProfile adminProfile;
+
+            /**
              * Constructs an edge wrapper from the parsed sub-fields.
              *
-             * @param node       the follower profile sub-object
-             * @param followTime the follow epoch-second
-             * @param role       the follower role label
+             * @param node         the follower profile sub-object
+             * @param followTime   the follow epoch-second
+             * @param role         the follower role label
+             * @param adminProfile the admin profile projection
              */
-            private Edges(Node node, Long followTime, String role) {
+            private Edges(Node node, Long followTime, String role, AdminProfile adminProfile) {
                 this.node = node;
                 this.followTime = followTime;
                 this.role = role;
+                this.adminProfile = adminProfile;
             }
 
             /**
@@ -159,6 +166,18 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
              */
             public Optional<String> role() {
                 return Optional.ofNullable(role);
+            }
+
+            /**
+             * Returns the admin profile projection.
+             *
+             * <p>WhatsApp Web populates this only for followers whose {@link #role()} is an admin or
+             * owner; subscriber edges omit the sub-object.
+             *
+             * @return the parsed {@link AdminProfile}, or empty when the relay omitted the field
+             */
+            public Optional<AdminProfile> adminProfile() {
+                return Optional.ofNullable(adminProfile);
             }
 
             /**
@@ -342,6 +361,184 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
             }
 
             /**
+             * Wraps the {@code admin_profile} sub-object echoed for admin and owner followers.
+             *
+             * <p>Carries the admin's Jid string {@code id}, display {@code name}, and a
+             * {@link Picture} reference used to render the admin profile chip.
+             */
+            public static final class AdminProfile {
+                /**
+                 * Holds the admin Jid string.
+                 */
+                private final String id;
+
+                /**
+                 * Holds the admin display name.
+                 */
+                private final String name;
+
+                /**
+                 * Holds the admin picture reference projection.
+                 */
+                private final Picture picture;
+
+                /**
+                 * Constructs an admin-profile wrapper from the parsed sub-fields.
+                 *
+                 * @param id      the admin Jid string
+                 * @param name    the admin display name
+                 * @param picture the admin picture reference projection
+                 */
+                private AdminProfile(String id, String name, Picture picture) {
+                    this.id = id;
+                    this.name = name;
+                    this.picture = picture;
+                }
+
+                /**
+                 * Returns the admin Jid string.
+                 *
+                 * @return the admin id, or empty when the relay omitted the field
+                 */
+                public Optional<String> id() {
+                    return Optional.ofNullable(id);
+                }
+
+                /**
+                 * Returns the admin display name.
+                 *
+                 * @return the display name, or empty when the relay omitted the field
+                 */
+                public Optional<String> name() {
+                    return Optional.ofNullable(name);
+                }
+
+                /**
+                 * Returns the admin picture reference projection.
+                 *
+                 * @return the parsed {@link Picture}, or empty when the relay omitted the field
+                 */
+                public Optional<Picture> picture() {
+                    return Optional.ofNullable(picture);
+                }
+
+                /**
+                 * Wraps the {@code picture} reference sub-object.
+                 *
+                 * <p>Carries the file id and the relay direct-path used to fetch the picture bytes.
+                 */
+                public static final class Picture {
+                    /**
+                     * Holds the file identifier.
+                     */
+                    private final String id;
+
+                    /**
+                     * Holds the relay direct-path for the picture bytes.
+                     */
+                    private final String directPath;
+
+                    /**
+                     * Constructs a picture wrapper from the parsed sub-fields.
+                     *
+                     * @param id         the file identifier
+                     * @param directPath the relay direct-path
+                     */
+                    private Picture(String id, String directPath) {
+                        this.id = id;
+                        this.directPath = directPath;
+                    }
+
+                    /**
+                     * Returns the file identifier.
+                     *
+                     * @return the file id, or empty when the relay omitted the field
+                     */
+                    public Optional<String> id() {
+                        return Optional.ofNullable(id);
+                    }
+
+                    /**
+                     * Returns the relay direct-path.
+                     *
+                     * @return the direct path, or empty when the relay omitted the field
+                     */
+                    public Optional<String> directPath() {
+                        return Optional.ofNullable(directPath);
+                    }
+
+                    /**
+                     * Parses a {@link Picture} from the given JSON object.
+                     *
+                     * @param obj the JSON object to parse
+                     * @return the parsed entry, or empty when {@code obj} is {@code null}
+                     */
+                    static Optional<Picture> of(JSONObject obj) {
+                        if (obj == null) {
+                            return Optional.empty();
+                        }
+
+                        var id = obj.getString("id");
+                        var directPath = obj.getString("direct_path");
+                        return Optional.of(new Picture(id, directPath));
+                    }
+
+                    /**
+                     * Parses a list of {@link Picture} entries from the given JSON array.
+                     *
+                     * @param arr the JSON array to parse
+                     * @return the parsed list, empty when {@code arr} is {@code null}
+                     */
+                    static List<Picture> ofArray(JSONArray arr) {
+                        if (arr == null) {
+                            return List.of();
+                        }
+
+                        var result = new ArrayList<Picture>(arr.size());
+                        for (var i = 0; i < arr.size(); i++) {
+                            of(arr.getJSONObject(i)).ifPresent(result::add);
+                        }
+                        return result;
+                    }
+                }
+
+                /**
+                 * Parses an {@link AdminProfile} from the given JSON object.
+                 *
+                 * @param obj the JSON object to parse
+                 * @return the parsed entry, or empty when {@code obj} is {@code null}
+                 */
+                static Optional<AdminProfile> of(JSONObject obj) {
+                    if (obj == null) {
+                        return Optional.empty();
+                    }
+
+                    var id = obj.getString("id");
+                    var name = obj.getString("name");
+                    var picture = Picture.of(obj.getJSONObject("picture")).orElse(null);
+                    return Optional.of(new AdminProfile(id, name, picture));
+                }
+
+                /**
+                 * Parses a list of {@link AdminProfile} entries from the given JSON array.
+                 *
+                 * @param arr the JSON array to parse
+                 * @return the parsed list, empty when {@code arr} is {@code null}
+                 */
+                static List<AdminProfile> ofArray(JSONArray arr) {
+                    if (arr == null) {
+                        return List.of();
+                    }
+
+                    var result = new ArrayList<AdminProfile>(arr.size());
+                    for (var i = 0; i < arr.size(); i++) {
+                        of(arr.getJSONObject(i)).ifPresent(result::add);
+                    }
+                    return result;
+                }
+            }
+
+            /**
              * Parses an {@link Edges} from the given JSON object.
              *
              * @param obj the JSON object to parse
@@ -355,7 +552,8 @@ public final class FetchNewsletterFollowersMexResponse implements MexOperation.R
                 var node = Node.of(obj.getJSONObject("node")).orElse(null);
                 var followTime = obj.getLong("follow_time");
                 var role = obj.getString("role");
-                return Optional.of(new Edges(node, followTime, role));
+                var adminProfile = AdminProfile.of(obj.getJSONObject("admin_profile")).orElse(null);
+                return Optional.of(new Edges(node, followTime, role, adminProfile));
             }
 
             /**

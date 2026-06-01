@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.editContact}. Describes a
+ * Input model for {@code LinkedWhatsAppClient.editContact}. Describes a
  * single contact-card edit that is replicated across the user's linked
  * devices. The target {@link #contact} JID is required; every other
  * field is optional and only takes effect when carried with a value.
@@ -18,7 +18,7 @@ import java.util.Optional;
  * or modified on one device, the same payload is replayed against the
  * primary device's native addressbook so the contact stays consistent
  * across surfaces. Removing a contact does not use this model and goes
- * through {@code WhatsAppClient.deleteContact} instead.
+ * through {@code LinkedWhatsAppClient.deleteContact} instead.
  *
  * <p>{@link #syncToAddressbook} is declared as a nullable
  * {@link Boolean} so that a present {@code false} is distinguishable

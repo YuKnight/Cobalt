@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.NameChangedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -22,9 +23,9 @@ import com.github.auties00.cobalt.wam.WamService;
  * user's outgoing presences and to message envelopes shown to peers. Each
  * {@link SyncdOperation#SET} mutation broadcasts a fresh
  * {@code <presence name="..."/>} stanza, persists the new name to
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setName(String)},
+ * {@link com.github.auties00.cobalt.store.AccountStore#setName(String)},
  * mirrors it onto the self-contact's {@code chosenName}, and fires
- * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onNameChanged(WhatsAppClient, String, String)}
+ * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onNameChanged(LinkedWhatsAppClient, String, String)}
  * on every registered listener via virtual threads. The mutation index is the
  * singleton {@snippet :
  *     ["setting_pushName"]
@@ -99,12 +100,12 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      * defaulting to the empty string and triggering a
      * {@link BootstrapAppStateDataStageCode#PUSHNAME_INVALID} WAM stage
      * emission; a {@code <presence name="..."/>} stanza is dispatched via
-     * {@link WhatsAppClient#sendNodeWithNoResponse(com.github.auties00.cobalt.node.Node)}
+     * {@link LinkedWhatsAppClient#sendNodeWithNoResponse(com.github.auties00.cobalt.node.Node)}
      * with no {@code type} attribute; the new name is persisted via
      * {@code WhatsAppStore.setName}; the self-contact's
      * {@link com.github.auties00.cobalt.model.contact.Contact#setChosenName(String)}
      * is updated when present;
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onNameChanged(WhatsAppClient, String, String)}
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onNameChanged(LinkedWhatsAppClient, String, String)}
      * is dispatched on every registered listener via a fresh virtual thread
      * per listener; and a
      * {@link BootstrapAppStateDataStageCode#PUSHNAME_APPLIED} WAM stage is
@@ -116,7 +117,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -139,16 +140,17 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
                 .attribute("name", name)
                 .build());
 
-        var oldName = client.store().name();
-        client.store().setName(name);
+        var oldName = client.store().accountStore().name().orElse(null);
+        client.store().accountStore().setName(name);
 
-        client.store()
-                .jid()
-                .flatMap(self -> client.store().findContactByJid(self.withoutData()))
+        client.store().accountStore().jid()
+                .flatMap(self -> client.store().contactStore().findContactByJid(self.withoutData()))
                 .ifPresent(contact -> contact.setChosenName(name));
 
         for (var listener : client.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onNameChanged(client, oldName, name));
+            if (listener instanceof NameChangedListener typed) {
+                Thread.startVirtualThread(() -> typed.onNameChanged(client, oldName, name));
+            }
         }
 
         logCriticalBootstrapStageIfNecessary(client, BootstrapAppStateDataStageCode.PUSHNAME_APPLIED);
@@ -171,13 +173,13 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      * critical-block collection has completed its initial sync: once
      * bootstrapped, no further stage events are emitted.
      *
-     * @param client the {@link WhatsAppClient} whose store is queried for
+     * @param client the {@link LinkedWhatsAppClient} whose store is queried for
      *               bootstrap state
      * @param stage  the bootstrap stage reached
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdCriticalBootstrapProcessingApi", exports = "logCriticalBootstrapStageIfNecessary", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void logCriticalBootstrapStageIfNecessary(WhatsAppClient client, BootstrapAppStateDataStageCode stage) {
-        if (client.store().findWebAppState(SyncPatchType.CRITICAL_BLOCK).bootstrapped()) {
+    private void logCriticalBootstrapStageIfNecessary(LinkedWhatsAppClient client, BootstrapAppStateDataStageCode stage) {
+        if (client.store().syncStore().findWebAppState(SyncPatchType.CRITICAL_BLOCK).bootstrapped()) {
             return;
         }
         this.wamService.commit(new MdBootstrapAppStateCriticalDataProcessingEventBuilder()

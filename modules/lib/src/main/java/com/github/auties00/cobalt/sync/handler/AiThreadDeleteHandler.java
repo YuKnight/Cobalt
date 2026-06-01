@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -21,7 +21,7 @@ import java.util.logging.Logger;
  * one such thread is deleted on another device, the server replays the delete
  * here, and the matching entry is removed; the surviving thread titles are
  * read back through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findAiThreadTitle(String)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findAiThreadTitle(String)}.
  *
  * @implNote
  * This implementation collapses WA Web's {@code ThreadsMetadata} IDB
@@ -105,7 +105,7 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
      * <p>Validates the JSON index {@code ["ai_thread_delete", chatJid, threadId]},
      * confirms the chat JID is a bot, gates on AI-thread support, and removes
      * the entry keyed by {@code "<chatJid>|<threadId>"} via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#removeAiThreadTitle(String)}.
+     * {@link com.github.auties00.cobalt.store.BusinessStore#removeAiThreadTitle(String)}.
      * Returns {@link SyncActionState#UNSUPPORTED} for non-{@link SyncdOperation#SET}
      * operations or when AI-thread support is off, {@link SyncActionState#ORPHAN}
      * when no matching thread is in the store, and {@link SyncActionState#FAILED}
@@ -121,7 +121,7 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
@@ -144,7 +144,7 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
-            var aiThreadSupported = client.store().primaryDeviceCapabilities()
+            var aiThreadSupported = client.store().contactStore().primaryDeviceCapabilities()
                     .flatMap(DeviceCapabilities::aiThread)
                     .flatMap(DeviceCapabilities.AiThread::supportLevel)
                     .filter(level -> level != DeviceCapabilities.AiThread.SupportLevel.NONE)
@@ -154,11 +154,11 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
             }
 
             var key = chatJidString + "|" + threadId;
-            if (client.store().findAiThreadTitle(key).isEmpty()) {
+            if (client.store().businessStore().findAiThreadTitle(key).isEmpty()) {
                 return MutationApplicationResult.orphan(key, "Thread");
             }
 
-            client.store().removeAiThreadTitle(key);
+            client.store().businessStore().removeAiThreadTitle(key);
             return MutationApplicationResult.success();
         } catch (Exception e) {
             LOGGER.warning("AI thread delete mutation failed: " + e.getMessage());

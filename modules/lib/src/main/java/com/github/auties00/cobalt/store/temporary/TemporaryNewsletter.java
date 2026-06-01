@@ -11,10 +11,10 @@ import java.util.stream.Stream;
 
 /**
  * The in-memory {@link Newsletter} subtype used as the value type of
- * {@link TemporaryStore#newsletters}.
+ * {@link com.github.auties00.cobalt.store.temporary.TemporaryChatStore#newsletters}.
  *
  * @apiNote
- * Cobalt embedders never construct this directly; {@link TemporaryStore#addNewNewsletter(Jid)}
+ * Cobalt embedders never construct this directly; {@link com.github.auties00.cobalt.store.temporary.TemporaryChatStore#addNewNewsletter(Jid)}
  * returns one as a {@link Newsletter}. Mirrors {@link TemporaryChat} but the underlying map is
  * keyed by the {@link NewsletterMessageInfo} message-key id rather than the numeric server id,
  * because the abstract API hands messages around as id strings.
@@ -35,7 +35,7 @@ final class TemporaryNewsletter extends Newsletter {
      * field defaulted.
      *
      * @apiNote
-     * Package-private; called by {@link TemporaryStore#addNewNewsletter(Jid)}. The defaulted
+     * Package-private; called by {@link com.github.auties00.cobalt.store.temporary.TemporaryChatStore#addNewNewsletter(Jid)}. The defaulted
      * metadata scalars are populated on demand as the receiver path observes the corresponding
      * stanzas.
      *

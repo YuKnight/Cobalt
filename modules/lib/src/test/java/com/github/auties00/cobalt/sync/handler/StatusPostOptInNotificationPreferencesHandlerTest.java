@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifies {@link StatusPostOptInNotificationPreferencesHandler}: applying
  * an incoming opt-in mutation and asserting the boolean flag side-effect on
- * {@link WhatsAppStore#setStatusPostOptInNotificationPreferencesEnabled(Boolean)}.
+ * {@link com.github.auties00.cobalt.store.SettingsStore#setStatusPostOptInNotificationPreferencesEnabled(Boolean)}.
  * The handler is a private-constructor singleton accessed via
  * {@link StatusPostOptInNotificationPreferencesHandler#INSTANCE}, so each
  * test rebuilds the store and client so flag state does not leak.
@@ -41,7 +41,7 @@ class StatusPostOptInNotificationPreferencesHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private StatusPostOptInNotificationPreferencesHandler handler;
 
     @BeforeEach
@@ -91,7 +91,7 @@ class StatusPostOptInNotificationPreferencesHandlerTest {
         @Test
         @DisplayName("SET with enabled=true persists true on the store")
         void setsEnabled() {
-            assertTrue(store.statusPostOptInNotificationPreferencesEnabled().isEmpty(),
+            assertTrue(store.settingsStore().statusPostOptInNotificationPreferencesEnabled().isEmpty(),
                     "precondition: flag is unset");
             var action = new StatusPostOptInNotificationPreferencesActionBuilder()
                     .enabled(true).build();
@@ -99,7 +99,7 @@ class StatusPostOptInNotificationPreferencesHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.statusPostOptInNotificationPreferencesEnabled().orElseThrow());
+            assertTrue(store.settingsStore().statusPostOptInNotificationPreferencesEnabled().orElseThrow());
         }
 
         @Test
@@ -111,7 +111,7 @@ class StatusPostOptInNotificationPreferencesHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertFalse(store.statusPostOptInNotificationPreferencesEnabled().orElseThrow());
+            assertFalse(store.settingsStore().statusPostOptInNotificationPreferencesEnabled().orElseThrow());
         }
     }
 
@@ -146,7 +146,7 @@ class StatusPostOptInNotificationPreferencesHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.statusPostOptInNotificationPreferencesEnabled().isEmpty());
+            assertTrue(store.settingsStore().statusPostOptInNotificationPreferencesEnabled().isEmpty());
         }
     }
 

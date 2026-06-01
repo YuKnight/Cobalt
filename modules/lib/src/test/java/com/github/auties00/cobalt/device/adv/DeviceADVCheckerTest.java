@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.device.adv;
+import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
+import com.github.auties00.cobalt.sync.LiveWebAppStateService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
-import com.github.auties00.cobalt.device.DefaultDeviceService;
+import com.github.auties00.cobalt.device.LiveDeviceService;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.device.info.DeviceInfo;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
@@ -12,7 +15,7 @@ import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Exercises {@link DeviceADVChecker}'s staleness analysis core directly through its package-private
  * {@code analyzeDeviceLists}, which takes the current instant as an explicit parameter so each case
  * is deterministic without driving the production scheduler's {@link Instant#now()} clock. Every case
- * builds a fresh harness wiring the checker through a real {@link DefaultDeviceService} over a
+ * builds a fresh harness wiring the checker through a real {@link LiveDeviceService} over a
  * temporary store, then feeds synthetic device-list states with fixed timestamps and asserts the
  * scheduler-facing contract: fresh records survive, stale records are flagged for expiration and
  * queued for sync, own-device-list expiration sets {@code selfExpired}, and primary-only and deleted
@@ -49,12 +52,12 @@ class DeviceADVCheckerTest {
         var props = TestABPropsService.builder().build();
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wamService);
-        var snapshotRecovery = new SnapshotRecoveryService(client, props, wamService);
-        var webAppState = new WebAppStateService(client, props, lidMigration, snapshotRecovery, wamService, TestMediaConnectionService.create());
-        var sessionCipher = new SignalSessionCipher(store);
-        var deviceService = new DefaultDeviceService(client, webAppState, props, sessionCipher, wamService);
+        var wamService = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wamService);
+        var snapshotRecovery = new LiveSnapshotRecoveryService(client, props, wamService);
+        var webAppState = new LiveWebAppStateService(client, props, lidMigration, snapshotRecovery, wamService, TestMediaConnectionService.create());
+        var sessionCipher = new SignalSessionCipher(store.signalStore());
+        var deviceService = new LiveDeviceService(client, webAppState, props, sessionCipher, wamService);
         var checker = new DeviceADVChecker(client, deviceService, props, wamService);
         return new Harness(client, props, checker);
     }

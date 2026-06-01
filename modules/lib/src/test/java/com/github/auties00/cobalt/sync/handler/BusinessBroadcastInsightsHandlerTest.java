@@ -103,7 +103,7 @@ class BusinessBroadcastInsightsHandlerTest {
                     buildMutation("camp-1", sampleAction(), SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findBusinessBroadcastInsight("camp-1").orElseThrow();
+            var stored = store.businessStore().findBusinessBroadcastInsight("camp-1").orElseThrow();
             assertEquals(100, stored.recipientCount().orElseThrow());
             assertEquals(95, stored.deliveredCount().orElseThrow());
         }
@@ -165,7 +165,7 @@ class BusinessBroadcastInsightsHandlerTest {
         @Test
         @DisplayName("REMOVE drops the insights record and returns SUCCESS")
         void removeDropsInsights() {
-            store.putBusinessBroadcastInsight(new BusinessBroadcastInsightBuilder()
+            store.businessStore().putBusinessBroadcastInsight(new BusinessBroadcastInsightBuilder()
                     .id("camp-rm")
                     .recipientCount(1)
                     .build());
@@ -174,7 +174,7 @@ class BusinessBroadcastInsightsHandlerTest {
                     buildMutation("camp-rm", null, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findBusinessBroadcastInsight("camp-rm").isEmpty());
+            assertTrue(store.businessStore().findBusinessBroadcastInsight("camp-rm").isEmpty());
         }
     }
 
@@ -212,7 +212,7 @@ class BusinessBroadcastInsightsHandlerTest {
         void preservesResults() {
             var ts = Instant.now();
             var goodSet = buildMutation("camp-batch-1", sampleAction(), SyncdOperation.SET, ts);
-            store.putBusinessBroadcastInsight(new BusinessBroadcastInsightBuilder().id("camp-batch-rm").build());
+            store.businessStore().putBusinessBroadcastInsight(new BusinessBroadcastInsightBuilder().id("camp-batch-rm").build());
             var goodRemove = buildMutation("camp-batch-rm", null, SyncdOperation.REMOVE, ts);
             var malformedIndex = buildMutation("", sampleAction(), SyncdOperation.SET, ts);
 

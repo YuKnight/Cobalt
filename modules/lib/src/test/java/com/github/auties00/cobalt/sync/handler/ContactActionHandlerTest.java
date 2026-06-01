@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -52,7 +52,7 @@ class ContactActionHandlerTest {
 
     private WhatsAppStore store;
     private TestABPropsService props;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private ContactActionHandler handler;
     private ContactActionMutationFactory factory;
 
@@ -112,7 +112,7 @@ class ContactActionHandlerTest {
         @Test
         @DisplayName("creates the contact when it does not exist and writes name fields")
         void createsAndWritesNames() {
-            assertTrue(store.findContactByJid(CONTACT_PN).isEmpty(), "precondition: no contact");
+            assertTrue(store.contactStore().findContactByJid(CONTACT_PN).isEmpty(), "precondition: no contact");
 
             var action = new ContactActionBuilder()
                     .fullName("Maria Garcia")
@@ -122,7 +122,7 @@ class ContactActionHandlerTest {
             var result = handler.applyMutation(client, build(CONTACT_PN, action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var contact = store.findContactByJid(CONTACT_PN).orElseThrow();
+            var contact = store.contactStore().findContactByJid(CONTACT_PN).orElseThrow();
             assertEquals("Maria Garcia", contact.fullName().orElseThrow());
             assertEquals("Maria", contact.shortName().orElseThrow());
         }
@@ -134,7 +134,7 @@ class ContactActionHandlerTest {
 
             handler.applyMutation(client, build(CONTACT_PN, action, SyncdOperation.SET, Instant.now()));
 
-            var contact = store.findContactByJid(CONTACT_PN).orElseThrow();
+            var contact = store.contactStore().findContactByJid(CONTACT_PN).orElseThrow();
             assertEquals("Maria", contact.shortName().orElseThrow(),
                     "WAWebContactShortName.getShortName takes the first whitespace-separated token");
         }
@@ -149,9 +149,9 @@ class ContactActionHandlerTest {
 
             handler.applyMutation(client, build(CONTACT_PN, action, SyncdOperation.SET, Instant.now()));
 
-            var contact = store.findContactByJid(CONTACT_PN).orElseThrow();
+            var contact = store.contactStore().findContactByJid(CONTACT_PN).orElseThrow();
             assertEquals(CONTACT_LID, contact.lid().orElseThrow());
-            assertEquals(CONTACT_PN, store.findPhoneByLid(CONTACT_LID).orElseThrow(),
+            assertEquals(CONTACT_PN, store.contactStore().findPhoneByLid(CONTACT_LID).orElseThrow(),
                     "createLidPnMappings: a regular PN-form contact with a LID must register the bidirectional mapping");
         }
 
@@ -163,7 +163,7 @@ class ContactActionHandlerTest {
 
             handler.applyMutation(client, build(CONTACT_PN, action, SyncdOperation.SET, Instant.now()));
 
-            var contact = store.findContactByJid(CONTACT_PN).orElseThrow();
+            var contact = store.contactStore().findContactByJid(CONTACT_PN).orElseThrow();
             assertEquals("maria", contact.username().orElseThrow(),
                     "WA Web's setUsernamesJob strips the leading '@' before writing");
         }
@@ -176,7 +176,7 @@ class ContactActionHandlerTest {
 
             handler.applyMutation(client, build(CONTACT_PN, action, SyncdOperation.SET, Instant.now()));
 
-            var contact = store.findContactByJid(CONTACT_PN).orElseThrow();
+            var contact = store.contactStore().findContactByJid(CONTACT_PN).orElseThrow();
             assertTrue(contact.username().isEmpty(),
                     "the username branch is gated on the AB-prop being true");
         }
@@ -271,7 +271,7 @@ class ContactActionHandlerTest {
         @Test
         @DisplayName("REMOVE on a regular PN contact clears name and username fields")
         void removeClearsFields() {
-            var contact = store.addNewContact(CONTACT_PN);
+            var contact = store.contactStore().addNewContact(CONTACT_PN);
             contact.setFullName("Maria");
             contact.setShortName("Maria");
             contact.setUsername("maria");
@@ -296,7 +296,7 @@ class ContactActionHandlerTest {
         void removeRetainsAddressBookForUsernameContact() {
             props.set(ABProp.USERNAME_CONTACT_SYNCD_SUPPORT_ENABLE, true);
 
-            var contact = store.addNewContact(CONTACT_PN);
+            var contact = store.contactStore().addNewContact(CONTACT_PN);
             contact.setFullName("Maria");
             contact.setShortName("Maria");
             contact.setUsername("maria");

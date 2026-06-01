@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.call.internal.session;
+import com.github.auties00.cobalt.call.internal.NoopCallService;
 
 import com.github.auties00.cobalt.call.ActiveCall;
 import com.github.auties00.cobalt.call.CallOptions;
@@ -39,9 +40,9 @@ public class GroupCallSessionTest {
         var serverCert = DtlsCertificate.generate();
         var transports = LoopbackPair.pair();
 
-        var clientCall = new ActiveCall(new RecordingEngine(), "id-grp-1",
+        var clientCall = new ActiveCall(new NoopCallService(), "id-grp-1",
                 PEER, PEER, SELF, true, CallOptions.audio());
-        var serverCall = new ActiveCall(new RecordingEngine(), "id-grp-2",
+        var serverCall = new ActiveCall(new NoopCallService(), "id-grp-2",
                 SELF, PEER, PEER, false, CallOptions.audio());
 
         var clientOpts = new VoiceCallOptions(0xAAA1, 0xBBB1, 111,
@@ -82,7 +83,7 @@ public class GroupCallSessionTest {
         var serverCert = DtlsCertificate.generate();
         var transports = LoopbackPair.pair();
 
-        var serverCall = new ActiveCall(new RecordingEngine(), "id-grp-rs",
+        var serverCall = new ActiveCall(new NoopCallService(), "id-grp-rs",
                 SELF, PEER, PEER, false, CallOptions.audio());
 
         var clientOpts = new VoiceCallOptions(0xAAA2, 0xBBB2, 111,
@@ -91,7 +92,7 @@ public class GroupCallSessionTest {
                 AudioPipelineOptions.defaults().withoutAec().withoutPreprocessor());
 
         try (var clientSession = new GroupCallSession(
-                new ActiveCall(new RecordingEngine(), "id-grp-rs-client",
+                new ActiveCall(new NoopCallService(), "id-grp-rs-client",
                         PEER, PEER, SELF, true, CallOptions.audio()),
                 transports[0], SrtpRole.CLIENT, clientCert, serverCert.sha256Fingerprint(), clientOpts);
              var serverSession = new GroupCallSession(serverCall, transports[1],
@@ -190,10 +191,4 @@ public class GroupCallSessionTest {
         }
     }
 
-    // Synthetic CallService-shaped stand-in for the call engine.
-    private static final class RecordingEngine extends CallService {
-        RecordingEngine() {
-            super(null, null);
-        }
-    }
 }

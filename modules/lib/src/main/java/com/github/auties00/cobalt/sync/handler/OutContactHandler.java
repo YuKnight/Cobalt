@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -135,7 +135,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebOutContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var gateValue = abPropsService.getInt(ABProp.OUT_CONTACT_INVITES_ENABLED);
         if (gateValue != OUT_CONTACT_INVITES_ENABLED_VALUE) {
             return MutationApplicationResult.unsupported();
@@ -178,14 +178,14 @@ public final class OutContactHandler implements WebAppStateActionHandler {
                         .fullName(fullName)
                         .firstName(firstName)
                         .build();
-                client.store().addOutContact(outContact);
+                client.store().contactStore().addOutContact(outContact);
 
                 LOGGER.fine(() -> "OutContactSync: set " + userJidString);
 
                 yield MutationApplicationResult.success();
             }
             case REMOVE -> {
-                client.store().removeOutContact(userJid);
+                client.store().contactStore().removeOutContact(userJid);
 
                 LOGGER.fine(() -> "OutContactSync: remove " + userJidString);
 

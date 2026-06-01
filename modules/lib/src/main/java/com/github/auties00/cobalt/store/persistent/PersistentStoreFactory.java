@@ -1,16 +1,25 @@
 package com.github.auties00.cobalt.store.persistent;
 
+import com.github.auties00.cobalt.client.WhatsAppClientDevice;
+import com.github.auties00.cobalt.store.ProtobufAccountStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufContactStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufSettingsStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufSignalStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufSyncStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufWebSessionStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 import com.github.auties00.cobalt.client.WhatsAppClientSixPartsKeys;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
-import com.github.auties00.cobalt.client.WhatsAppDevice;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.util.StorePathUtils;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,7 +40,7 @@ import java.util.UUID;
  * chat or newsletter that holds bodies in LMDB but is missing from the snapshot. This bridges the
  * post-commit window where an LMDB write landed but the next metadata save never ran (process
  * killed in between). Recovered entries surface through the normal
- * {@link WhatsAppStore#chats()} and {@link WhatsAppStore#newsletters()} collections so callers
+ * {@link com.github.auties00.cobalt.store.ChatStore#chats()} and {@link com.github.auties00.cobalt.store.ChatStore#newsletters()} collections so callers
  * see a consistent shape regardless of whether the previous shutdown was clean or crashy.
  */
 public final class PersistentStoreFactory implements WhatsAppStoreFactory {
@@ -54,6 +63,16 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * it when free space accumulates, so the on-disk size tracks the data rather than this cap.
      */
     private static final long DEFAULT_MAP_SIZE = 8L * 1024 * 1024 * 1024;
+
+    /**
+     * The name of the pointer file, written inside each client type's home directory, that records
+     * the most recently opened session identifier for auto-resume.
+     *
+     * @implNote
+     * The leading dot keeps the file visually out of the way; because it is a regular file rather
+     * than a session directory it never collides with a UUID- or phone-number-named session.
+     */
+    private static final String LATEST_SESSION_FILE = ".latest";
 
     /**
      * The root directory under which per-session folders are created.
@@ -143,18 +162,19 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation asks {@link StorePathUtils#getLatestSessionDirectory(WhatsAppClientType, Path)}
-     * for the most recently modified session folder and forwards its name to
-     * {@link #loadSession(WhatsAppClientType, String)}.
+     * This implementation resolves the {@link #readLatestSession(WhatsAppClientType) latest-session
+     * pointer} in a single read and loads that session directly; there is no directory scan. When
+     * the pointer is absent, or names a session whose {@code store.proto} no longer exists, the
+     * result is {@link Optional#empty()}.
      */
     @Override
     public Optional<WhatsAppStore> loadLatest(WhatsAppClientType clientType) throws IOException {
         Objects.requireNonNull(clientType, "clientType cannot be null");
-        var latest = StorePathUtils.getLatestSessionDirectory(clientType, directory);
-        if (latest.isEmpty()) {
+        var pointer = readLatestSession(clientType);
+        if (pointer.isEmpty()) {
             return Optional.empty();
         }
-        return loadSession(clientType, latest.get().getFileName().toString());
+        return loadSession(clientType, pointer.get());
     }
 
     /**
@@ -180,6 +200,7 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
         var messageStore = PersistentMessageStore.open(envPath, mapSize);
         store.attachMessageStore(messageStore);
         recoverOrphans(store, messageStore);
+        writeLatestSession(clientType, sessionId);
         return Optional.of(store);
     }
 
@@ -194,21 +215,22 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * @implNote
      * This implementation walks {@link PersistentMessageStore#distinctChatJids()} and
      * {@link PersistentMessageStore#distinctNewsletterJids()} once and reuses
-     * {@link PersistentStore#addNewChat} and {@link PersistentStore#addNewNewsletter} to build the
+     * {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#addNewChat} and {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#addNewNewsletter} to build the
      * stubs so the inserted entries receive the same attachment handling as fresh ones.
      *
      * @param store        the freshly attached store
      * @param messageStore the just-opened LMDB facade
      */
     private static void recoverOrphans(PersistentStore store, PersistentMessageStore messageStore) {
+        var chatStore = store.chatStore();
         for (var chatJid : messageStore.distinctChatJids()) {
-            if (!store.chats.containsKey(chatJid)) {
-                store.addNewChat(chatJid);
+            if (!chatStore.chats.containsKey(chatJid)) {
+                chatStore.addNewChat(chatJid);
             }
         }
         for (var newsletterJid : messageStore.distinctNewsletterJids()) {
-            if (!store.newsletters.containsKey(newsletterJid)) {
-                store.addNewNewsletter(newsletterJid);
+            if (!chatStore.newsletters.containsKey(newsletterJid)) {
+                chatStore.addNewNewsletter(newsletterJid);
             }
         }
     }
@@ -226,13 +248,19 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         var resolvedUuid = Objects.requireNonNullElseGet(uuid, UUID::randomUUID);
         var sessionId = resolvedUuid.toString();
-        var sessionDirectory = StorePathUtils.getSessionDirectory(clientType, directory, sessionId);
-        var store = new PersistentStoreBuilder()
-                .uuid(resolvedUuid)
-                .clientType(clientType)
-                .device(defaultDevice(clientType))
-                .directory(sessionDirectory)
-                .build();
+        var store = new PersistentStore(
+                new ProtobufSignalStoreBuilder().build(),
+                new ProtobufAccountStoreBuilder()
+                        .uuid(resolvedUuid)
+                        .clientType(clientType)
+                        .device(defaultDevice(clientType))
+                        .build(),
+                new ProtobufContactStoreBuilder().build(),
+                new ProtobufSyncStoreBuilder().build(),
+                new ProtobufSettingsStoreBuilder().build(),
+                directory, null, null, null,
+                new ProtobufWebSessionStoreBuilder().build(),
+                new PersistentChatStoreBuilder().build());
         attachFreshLmdb(store, clientType, sessionId);
         return store;
     }
@@ -248,14 +276,20 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
     public WhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) throws IOException {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         var sessionId = String.valueOf(phoneNumber);
-        var sessionDirectory = StorePathUtils.getSessionDirectory(clientType, directory, sessionId);
-        var store = new PersistentStoreBuilder()
-                .uuid(UUID.randomUUID())
-                .phoneNumber(phoneNumber)
-                .clientType(clientType)
-                .device(defaultDevice(clientType))
-                .directory(sessionDirectory)
-                .build();
+        var store = new PersistentStore(
+                new ProtobufSignalStoreBuilder().build(),
+                new ProtobufAccountStoreBuilder()
+                        .uuid(UUID.randomUUID())
+                        .phoneNumber(phoneNumber)
+                        .clientType(clientType)
+                        .device(defaultDevice(clientType))
+                        .build(),
+                new ProtobufContactStoreBuilder().build(),
+                new ProtobufSyncStoreBuilder().build(),
+                new ProtobufSettingsStoreBuilder().build(),
+                directory, null, null, null,
+                new ProtobufWebSessionStoreBuilder().build(),
+                new PersistentChatStoreBuilder().build());
         attachFreshLmdb(store, clientType, sessionId);
         return store;
     }
@@ -275,38 +309,115 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
         Objects.requireNonNull(sixPartsKeys, "sixPartsKeys cannot be null");
         var phoneNumber = sixPartsKeys.phoneNumber();
         var sessionId = String.valueOf(phoneNumber);
-        var sessionDirectory = StorePathUtils.getSessionDirectory(clientType, directory, sessionId);
-        var store = new PersistentStoreBuilder()
-                .directory(sessionDirectory)
-                .uuid(UUID.randomUUID())
-                .phoneNumber(phoneNumber)
-                .noiseKeyPair(sixPartsKeys.noiseKeyPair())
-                .identityKeyPair(sixPartsKeys.identityKeyPair())
-                .identityId(sixPartsKeys.identityId())
-                .clientType(clientType)
-                .device(WhatsAppDevice.web())
-                .registered(true)
-                .jid(Jid.of(phoneNumber))
-                .build();
+        var store = new PersistentStore(
+                new ProtobufSignalStoreBuilder()
+                        .noiseKeyPair(sixPartsKeys.noiseKeyPair())
+                        .identityKeyPair(sixPartsKeys.identityKeyPair())
+                        .identityId(sixPartsKeys.identityId())
+                        .build(),
+                new ProtobufAccountStoreBuilder()
+                        .uuid(UUID.randomUUID())
+                        .phoneNumber(phoneNumber)
+                        .clientType(clientType)
+                        .device(WhatsAppClientDevice.web())
+                        .registered(true)
+                        .jid(Jid.of(phoneNumber))
+                        .build(),
+                new ProtobufContactStoreBuilder().build(),
+                new ProtobufSyncStoreBuilder().build(),
+                new ProtobufSettingsStoreBuilder().build(),
+                directory, null, null, null,
+                new ProtobufWebSessionStoreBuilder().build(),
+                new PersistentChatStoreBuilder().build());
         attachFreshLmdb(store, clientType, sessionId);
         return store;
     }
 
     /**
-     * Opens a fresh LMDB env for {@code sessionId} and wires it into {@code store}.
+     * Opens a fresh LMDB env for {@code sessionId}, wires it into {@code store}, and records the
+     * session as the most recently opened one.
      *
      * @apiNote
      * Internal helper shared by every {@code create(...)} overload after the metadata builder
      * produces an otherwise empty store.
      *
+     * @implNote
+     * This implementation writes the
+     * {@link #writeLatestSession(WhatsAppClientType, String) latest-session pointer} once the env is
+     * open so a subsequent {@link #loadLatest(WhatsAppClientType)} resumes the session just created
+     * without scanning the home directory.
+     *
      * @param store      the freshly built store
      * @param clientType the client type
      * @param sessionId  the session UUID string or phone-number string
-     * @throws IOException if the env directory cannot be created
+     * @throws IOException if the env directory cannot be created or the pointer cannot be written
      */
     private void attachFreshLmdb(PersistentStore store, WhatsAppClientType clientType, String sessionId) throws IOException {
         var envPath = PersistentStore.messagesEnvPath(clientType, directory, sessionId);
         store.attachMessageStore(PersistentMessageStore.open(envPath, mapSize));
+        writeLatestSession(clientType, sessionId);
+    }
+
+    /**
+     * Records {@code sessionId} as the most recently opened session for {@code clientType}, so
+     * {@link #readLatestSession(WhatsAppClientType)} can resolve it without scanning every session
+     * directory.
+     *
+     * @apiNote
+     * Invoked whenever a session becomes the active one: on creation and on a successful load. The
+     * pointer captures the session the embedder actually opened, a more faithful notion of "latest"
+     * than a filesystem modification time that a backup, antivirus scan, or unrelated write could
+     * perturb.
+     *
+     * @implNote
+     * This implementation writes the identifier to a sibling {@code .tmp} file and then issues an
+     * {@link StandardCopyOption#ATOMIC_MOVE atomic move}, falling back to a
+     * {@link StandardCopyOption#REPLACE_EXISTING replacing move} on file systems that cannot move
+     * atomically, so a crash mid-write never leaves a truncated pointer.
+     *
+     * @param clientType the client type that owns the home directory
+     * @param sessionId  the session identifier to record
+     * @throws IOException if the pointer file cannot be written or moved
+     */
+    private void writeLatestSession(WhatsAppClientType clientType, String sessionId) throws IOException {
+        var home = ProtobufWhatsAppStore.getHomeDirectory(clientType, directory);
+        var pointer = home.resolve(LATEST_SESSION_FILE);
+        var temp = home.resolve(LATEST_SESSION_FILE + ".tmp");
+        Files.writeString(temp, sessionId);
+        try {
+            Files.move(temp, pointer, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException _) {
+            Files.move(temp, pointer, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    /**
+     * Returns the most recently opened session identifier for {@code clientType}, as recorded by
+     * {@link #writeLatestSession(WhatsAppClientType, String)}, or an empty {@link Optional} when no
+     * pointer has been written yet.
+     *
+     * <p>The identifier is not validated against the filesystem: the pointed session may since have
+     * been deleted. {@link #loadLatest(WhatsAppClientType)} treats a dangling pointer the same as a
+     * missing one.
+     *
+     * @implNote
+     * This implementation reads the pointer optimistically and treats a {@link NoSuchFileException}
+     * as an absent pointer rather than pre-checking existence, avoiding the redundant stat of a
+     * check-then-read.
+     *
+     * @param clientType the client type that owns the home directory
+     * @return the recorded session identifier, or empty when the pointer is absent or blank
+     * @throws IOException if the pointer file exists but cannot be read
+     */
+    private Optional<String> readLatestSession(WhatsAppClientType clientType) throws IOException {
+        var pointer = ProtobufWhatsAppStore.getHomeDirectory(clientType, directory)
+                .resolve(LATEST_SESSION_FILE);
+        try {
+            var sessionId = Files.readString(pointer).strip();
+            return sessionId.isEmpty() ? Optional.empty() : Optional.of(sessionId);
+        } catch (NoSuchFileException _) {
+            return Optional.empty();
+        }
     }
 
     /**
@@ -314,16 +425,16 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * client type.
      *
      * @apiNote
-     * Internal helper that picks a desktop-shaped {@link WhatsAppDevice} for web sessions and an
+     * Internal helper that picks a desktop-shaped {@link WhatsAppClientDevice} for web sessions and an
      * iOS-shaped descriptor for mobile sessions.
      *
      * @param clientType the client type
-     * @return a fresh {@link WhatsAppDevice} suitable for the type
+     * @return a fresh {@link WhatsAppClientDevice} suitable for the type
      */
-    private static WhatsAppDevice defaultDevice(WhatsAppClientType clientType) {
+    private static WhatsAppClientDevice defaultDevice(WhatsAppClientType clientType) {
         return switch (clientType) {
-            case WEB -> WhatsAppDevice.desktop();
-            case MOBILE -> WhatsAppDevice.ios(false);
+            case WEB -> WhatsAppClientDevice.desktop();
+            case MOBILE -> WhatsAppClientDevice.ios(false);
         };
     }
 }

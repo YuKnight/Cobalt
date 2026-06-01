@@ -7,7 +7,8 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.sync.SyncdCoordinator;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,11 +49,12 @@ class MissingSyncKeyTimeoutSchedulerTest {
         props.set(ABProp.SYNCD_WAIT_FOR_KEY_TIMEOUT_DAYS, 30);
 
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         client = TestWhatsAppClient.create().withStore(store);
-        var wam = new DefaultWamService(client, props);
-        requestService = new MissingSyncKeyRequestService(client, wam);
-        scheduler = new MissingSyncKeyTimeoutScheduler(client, props, requestService);
+        var wam = new LiveWamService(client, props);
+        var coordinator = new SyncdCoordinator();
+        requestService = new LiveMissingSyncKeyRequestService(client, wam, coordinator);
+        scheduler = new MissingSyncKeyTimeoutScheduler(client, props, requestService, coordinator);
         requestService.setTimeoutScheduler(scheduler);
     }
 
@@ -74,7 +76,7 @@ class MissingSyncKeyTimeoutSchedulerTest {
         @Test
         @DisplayName("with a tracked missing key schedules the timeout check")
         void tracksFuture() {
-            store.addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
+            store.syncStore().addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
                     .keyId(new byte[]{1, 2, 3, 4, 5, 6})
                     .timestamp(Instant.now())
                     .askedDevices(Set.of(0))
@@ -86,7 +88,7 @@ class MissingSyncKeyTimeoutSchedulerTest {
         @Test
         @DisplayName("rescheduling is safe (replaces the previous future)")
         void reschedulingReplaces() {
-            store.addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
+            store.syncStore().addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
                     .keyId(new byte[]{1, 2, 3, 4, 5, 6})
                     .timestamp(Instant.now())
                     .build());
@@ -108,7 +110,7 @@ class MissingSyncKeyTimeoutSchedulerTest {
         @Test
         @DisplayName("cancel after scheduling clears the pending check")
         void cancelAfterSchedule() {
-            store.addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
+            store.syncStore().addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
                     .keyId(new byte[]{1, 2, 3, 4, 5, 6})
                     .timestamp(Instant.now())
                     .build());
@@ -171,7 +173,7 @@ class MissingSyncKeyTimeoutSchedulerTest {
         @Test
         @DisplayName("shutdown after scheduling does not throw")
         void shutdownAfterScheduling() {
-            store.addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
+            store.syncStore().addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
                     .keyId(new byte[]{1, 2, 3, 4, 5, 6})
                     .timestamp(Instant.now())
                     .build());

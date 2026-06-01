@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers {@link PrimaryFeatureHandler}: a {@link SyncdOperation#SET} carrying a non-empty
  * or empty flags list persists the flags via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setPrimaryFeatures(List)}; a
+ * {@link com.github.auties00.cobalt.store.SyncStore#setPrimaryFeatures(List)}; a
  * wrong-typed value surfaces as {@link SyncActionState#MALFORMED};
  * {@link SyncdOperation#REMOVE} surfaces as {@link SyncActionState#UNSUPPORTED};
  * {@link PrimaryFeatureHandler#applyMutationBatch} writes only the latest-by-timestamp
@@ -39,7 +39,7 @@ class PrimaryFeatureHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -86,7 +86,7 @@ class PrimaryFeatureHandlerTest {
                     client, primaryFeatureMutation(List.of("feature_a", "feature_b"), SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(List.of("feature_a", "feature_b"), client.store().primaryFeatures());
+            assertEquals(List.of("feature_a", "feature_b"), client.store().syncStore().primaryFeatures());
         }
 
         @Test
@@ -96,7 +96,7 @@ class PrimaryFeatureHandlerTest {
                     client, primaryFeatureMutation(List.of(), SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(0, client.store().primaryFeatures().size());
+            assertEquals(0, client.store().syncStore().primaryFeatures().size());
         }
     }
 
@@ -137,13 +137,13 @@ class PrimaryFeatureHandlerTest {
         @Test
         @DisplayName("REMOVE returns UNSUPPORTED before any store write")
         void removeIsUnsupported() {
-            client.store().setPrimaryFeatures(List.of("seed"));
+            client.store().syncStore().setPrimaryFeatures(List.of("seed"));
 
             var result = new PrimaryFeatureHandler().applyMutation(
                     client, primaryFeatureMutation(List.of("ignored"), SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertEquals(List.of("seed"), client.store().primaryFeatures(),
+            assertEquals(List.of("seed"), client.store().syncStore().primaryFeatures(),
                     "REMOVE must not overwrite the store");
         }
     }
@@ -161,7 +161,7 @@ class PrimaryFeatureHandlerTest {
 
             assertEquals(2, results.size());
             assertTrue(results.stream().allMatch(r -> r.actionState() == SyncActionState.SUCCESS));
-            assertEquals(List.of("v2"), client.store().primaryFeatures(),
+            assertEquals(List.of("v2"), client.store().syncStore().primaryFeatures(),
                     "only the latest mutation's flags persist");
         }
 
@@ -180,18 +180,18 @@ class PrimaryFeatureHandlerTest {
 
             assertEquals(SyncActionState.MALFORMED, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS,   results.get(1).actionState());
-            assertEquals(List.of("v"), client.store().primaryFeatures());
+            assertEquals(List.of("v"), client.store().syncStore().primaryFeatures());
         }
 
         @Test
         @DisplayName("an empty batch is a no-op")
         void emptyBatch() {
-            client.store().setPrimaryFeatures(List.of("seed"));
+            client.store().syncStore().setPrimaryFeatures(List.of("seed"));
 
             var results = new PrimaryFeatureHandler().applyMutationBatch(client, List.of());
 
             assertEquals(0, results.size());
-            assertEquals(List.of("seed"), client.store().primaryFeatures());
+            assertEquals(List.of("seed"), client.store().syncStore().primaryFeatures());
         }
     }
 

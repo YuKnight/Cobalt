@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -30,9 +30,9 @@ import java.util.List;
  *
  * @implNote
  * This implementation overrides
- * {@link #applyMutationBatch(WhatsAppClient, List)} to mirror WA Web's batch
+ * {@link #applyMutationBatch(LinkedWhatsAppClient, List)} to mirror WA Web's batch
  * loop shape, but the per-mutation arm delegates to
- * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} because
+ * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} because
  * there is no batch-level state to track. WA Web's {@code WARN} batch counters
  * and the missing-version / unknown-sub-index trace messages are dropped.
  */
@@ -104,14 +104,14 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      *
      * @implNote
      * This implementation delegates to
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} for
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} for
      * every entry; there is no batch-level deduplication or latest-wins
      * tracking. WA Web's per-batch {@code WARN} counters for the unsupported
      * and malformed-value paths are dropped.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) {
             results.add(applyMutation(client, mutation));
@@ -136,7 +136,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPrimaryVersionSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }

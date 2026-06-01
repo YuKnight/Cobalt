@@ -3,9 +3,9 @@ package com.github.auties00.cobalt.registration;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
-import com.github.auties00.cobalt.client.WhatsAppDevicePushClient;
+import com.github.auties00.cobalt.client.WhatsAppClientDevicePushClient;
 import com.github.auties00.cobalt.client.info.WhatsAppMobileClientInfo;
-import com.github.auties00.cobalt.client.WhatsAppDeviceAttestor;
+import com.github.auties00.cobalt.client.WhatsAppClientDeviceAttestor;
 import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
 import com.github.auties00.cobalt.model.business.*;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
@@ -59,8 +59,8 @@ import java.util.*;
  * Base64-URL encoded and wrapped in an {@code ENC=...} form field.
  *
  * <p>An instance is obtained through {@link #newRegistration(WhatsAppStore,
- * WhatsAppClientVerificationHandler.Mobile, WhatsAppDeviceAttestor,
- * WhatsAppDevicePushClient)}, which selects
+ * WhatsAppClientVerificationHandler.Mobile, WhatsAppClientDeviceAttestor,
+ * WhatsAppClientDevicePushClient)}, which selects
  * {@link AndroidClientRegistration} or {@link IosClientRegistration}
  * based on the configured platform; {@link #register} then runs the
  * whole ceremony once. The class lets Cobalt take the role of a native
@@ -127,8 +127,8 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *
      * <p>Mutated in place when registration succeeds: the
      * {@code registered} flag and the local JID are written via
-     * {@link WhatsAppStore#setRegistered} and
-     * {@link WhatsAppStore#setJid}.
+     * {@link com.github.auties00.cobalt.store.AccountStore#setRegistered} and
+     * {@link com.github.auties00.cobalt.store.AccountStore#setJid}.
      */
     protected final WhatsAppStore store;
 
@@ -223,7 +223,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * <p>Invoked only from the concrete subclasses, which are
      * themselves created by {@link #newRegistration(WhatsAppStore,
      * WhatsAppClientVerificationHandler.Mobile,
-     * WhatsAppDeviceAttestor, WhatsAppDevicePushClient)}. Both
+     * WhatsAppClientDeviceAttestor, WhatsAppClientDevicePushClient)}. Both
      * arguments are validated as non-{@code null} and the shared
      * {@link #httpClient} is built with redirect following enabled.
      *
@@ -250,13 +250,13 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *
      * <p>Dispatches to either {@link AndroidClientRegistration} or
      * {@link IosClientRegistration} based on
-     * {@link WhatsAppStore#device}'s
+     * {@link com.github.auties00.cobalt.store.AccountStore#device}'s
      * {@link ClientPlatformType platform}. A {@code null} attestor
      * falls back to the platform's
-     * {@link WhatsAppDeviceAttestor.Android#NONE} or
-     * {@link WhatsAppDeviceAttestor.Ios#NONE} low-trust default, and a
+     * {@link WhatsAppClientDeviceAttestor.Android#NONE} or
+     * {@link WhatsAppClientDeviceAttestor.Ios#NONE} low-trust default, and a
      * {@code null} push client falls back to
-     * {@link WhatsAppDevicePushClient#noop()}. A non-{@code null}
+     * {@link WhatsAppClientDevicePushClient#noop()}. A non-{@code null}
      * attestor whose platform does not match the device platform is
      * rejected.
      *
@@ -275,7 +275,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *                     {@code NONE} attestor
      * @param pushClient   the device push client, or {@code null} to
      *                     fall back to
-     *                     {@link WhatsAppDevicePushClient#noop()}
+     *                     {@link WhatsAppClientDevicePushClient#noop()}
      * @return a concrete {@code MobileClientRegistration}
      * @throws IllegalArgumentException if the store's device platform
      *                                  is not a supported mobile
@@ -286,15 +286,15 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
     public static MobileClientRegistration newRegistration(
             WhatsAppStore store,
             WhatsAppClientVerificationHandler.Mobile verification,
-            WhatsAppDeviceAttestor attestor,
-            WhatsAppDevicePushClient pushClient) {
-        var platform = store.device().platform();
+            WhatsAppClientDeviceAttestor attestor,
+            WhatsAppClientDevicePushClient pushClient) {
+        var platform = store.accountStore().device().platform();
         return switch (platform) {
             case ANDROID, ANDROID_BUSINESS -> {
                 var androidAttestor = switch (attestor) {
                     case null -> null;
-                    case WhatsAppDeviceAttestor.Android a -> a;
-                    case WhatsAppDeviceAttestor.Ios ignored -> throw new IllegalArgumentException(
+                    case WhatsAppClientDeviceAttestor.Android a -> a;
+                    case WhatsAppClientDeviceAttestor.Ios ignored -> throw new IllegalArgumentException(
                             "Android device requires an Android attestor, got: " + attestor.getClass().getName());
                 };
                 yield new AndroidClientRegistration(store, verification, androidAttestor, pushClient);
@@ -302,8 +302,8 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             case IOS, IOS_BUSINESS -> {
                 var iosAttestor = switch (attestor) {
                     case null -> null;
-                    case WhatsAppDeviceAttestor.Ios i -> i;
-                    case WhatsAppDeviceAttestor.Android ignored -> throw new IllegalArgumentException(
+                    case WhatsAppClientDeviceAttestor.Ios i -> i;
+                    case WhatsAppClientDeviceAttestor.Android ignored -> throw new IllegalArgumentException(
                             "iOS device requires an iOS attestor, got: " + attestor.getClass().getName());
                 };
                 yield new IosClientRegistration(store, verification, iosAttestor, pushClient);
@@ -345,7 +345,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * matching the respective native apps.
      *
      * @implSpec
-     * Overriders must read {@link WhatsAppStore#fdid} and return a
+     * Overriders must read {@link com.github.auties00.cobalt.store.SignalStore#fdid} and return a
      * non-{@code null} UUID string in the per-platform casing.
      *
      * @return the formatted device family identifier
@@ -359,9 +359,9 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * <p>Android returns the Play Integrity sextuple ({@code gpia},
      * {@code _gg}, {@code _gi}, {@code _gp}, {@code _ge},
      * {@code _ga}) produced by the configured
-     * {@link WhatsAppDeviceAttestor.Android} plus the FCM
+     * {@link WhatsAppClientDeviceAttestor.Android} plus the FCM
      * {@code push_token} produced by the configured
-     * {@link WhatsAppDevicePushClient}. iOS returns just the APNS
+     * {@link WhatsAppClientDevicePushClient}. iOS returns just the APNS
      * {@code push_token}, because its App Attest payloads ride outside
      * the encrypted body (in the {@code H=} suffix and the
      * {@code Authorization} header) rather than inside it. The funnel
@@ -395,7 +395,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *
      * @implSpec
      * Overriders must POST {@code body} verbatim, set the
-     * {@code User-Agent} matching {@link WhatsAppStore#device}'s
+     * {@code User-Agent} matching {@link com.github.auties00.cobalt.store.AccountStore#device}'s
      * user-agent string, and attach {@code authorizationHeader} as the
      * {@code Authorization} header when it is non-{@code null}. Other
      * headers are platform-specific.
@@ -971,12 +971,12 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *                                       registration succeeds
      */
     private void saveRegistrationStatus(boolean registered) throws IOException {
-        store.setRegistered(registered);
+        store.accountStore().setRegistered(registered);
         if (registered) {
-            var phoneNumber = store.phoneNumber()
+            var phoneNumber = store.accountStore().phoneNumber()
                     .orElseThrow(() -> new WhatsAppRegistrationException("Phone number wasn't set"));
             var jid = Jid.of(phoneNumber);
-            store.setJid(jid);
+            store.accountStore().setJid(jid);
         }
         store.save();
     }
@@ -1119,20 +1119,20 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
         var registrationParams = toFormParams(
                 "cc", String.valueOf(phoneNumber.getCountryCode()),
                 "in", String.valueOf(phoneNumber.getNationalNumber()),
-                "rc", String.valueOf(store.releaseChannel().index()),
+                "rc", String.valueOf(store.accountStore().releaseChannel().index()),
                 "lg", "en",
                 "lc", "US",
-                "authkey", Base64.getUrlEncoder().encodeToString(store.noiseKeyPair().publicKey().toEncodedPoint()),
+                "authkey", Base64.getUrlEncoder().encodeToString(store.signalStore().noiseKeyPair().publicKey().toEncodedPoint()),
                 "vname", certificate,
-                "e_regid", Base64.getUrlEncoder().encodeToString(DataUtils.intToBytes(store.registrationId(), 4)),
+                "e_regid", Base64.getUrlEncoder().encodeToString(DataUtils.intToBytes(store.signalStore().registrationId(), 4)),
                 "e_keytype", SIGNAL_PUBLIC_KEY_TYPE,
-                "e_ident", Base64.getUrlEncoder().encodeToString(store.identityKeyPair().publicKey().toEncodedPoint()),
-                "e_skey_id", Base64.getUrlEncoder().encodeToString(DataUtils.intToBytes(store.signedKeyPair().id(), 3)),
-                "e_skey_val", Base64.getUrlEncoder().encodeToString(store.signedKeyPair().publicKey().toEncodedPoint()),
-                "e_skey_sig", Base64.getUrlEncoder().encodeToString(store.signedKeyPair().signature()),
+                "e_ident", Base64.getUrlEncoder().encodeToString(store.signalStore().identityKeyPair().publicKey().toEncodedPoint()),
+                "e_skey_id", Base64.getUrlEncoder().encodeToString(DataUtils.intToBytes(store.signalStore().signedKeyPair().id(), 3)),
+                "e_skey_val", Base64.getUrlEncoder().encodeToString(store.signalStore().signedKeyPair().publicKey().toEncodedPoint()),
+                "e_skey_sig", Base64.getUrlEncoder().encodeToString(store.signalStore().signedKeyPair().signature()),
                 "fdid", fdid,
-                "expid", Base64.getUrlEncoder().encodeToString(store.deviceId()),
-                "id", toUrlHex(store.identityId()),
+                "expid", Base64.getUrlEncoder().encodeToString(store.signalStore().deviceId()),
+                "id", toUrlHex(store.signalStore().identityId()),
                 "access_session_id", accessSessionId,
                 "token", useToken ? token : null
         );
@@ -1190,7 +1190,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             return null;
         }
 
-        var info = WhatsAppMobileClientInfo.of(store.device().platform());
+        var info = WhatsAppMobileClientInfo.of(store.accountStore().device().platform());
         return info.computeRegistrationToken(phoneNumber.getNationalNumber());
     }
 
@@ -1213,7 +1213,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *         consumer platforms
      */
     protected String generateBusinessCertificate() {
-        var platform = store.device().platform();
+        var platform = store.accountStore().device().platform();
         if(platform != ClientPlatformType.ANDROID_BUSINESS && platform != ClientPlatformType.IOS_BUSINESS) {
             return null;
         }
@@ -1227,7 +1227,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
 
         var certificate = new BusinessVerifiedNameCertificateBuilder()
                 .details(encodedDetails)
-                .signature(Curve25519.sign(store.identityKeyPair().privateKey().toEncodedPoint(), encodedDetails))
+                .signature(Curve25519.sign(store.signalStore().identityKeyPair().privateKey().toEncodedPoint(), encodedDetails))
                 .build();
         return Base64.getUrlEncoder().encodeToString(BusinessVerifiedNameCertificateSpec.encode(certificate));
     }
@@ -1253,7 +1253,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *                                       parsed
      */
     protected static PhoneNumber getPhoneNumber(WhatsAppStore store) {
-        var phoneNumber = store.phoneNumber()
+        var phoneNumber = store.accountStore().phoneNumber()
                 .orElseThrow(() -> new WhatsAppRegistrationException("Phone number wasn't set"));
         try {
             return PhoneNumberUtil.getInstance()
@@ -1346,9 +1346,9 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             var body = toFormParams(
                     "lg", "en",
                     "lc", "US",
-                    "expid", Base64.getUrlEncoder().encodeToString(store.deviceId()),
+                    "expid", Base64.getUrlEncoder().encodeToString(store.signalStore().deviceId()),
                     "fdid", fdid,
-                    "id", toUrlHex(store.identityId()),
+                    "id", toUrlHex(store.signalStore().identityId()),
                     "current_screen", "enter_number",
                     "previous_screen", "",
                     "action_taken", actionTaken,
@@ -1394,9 +1394,9 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
                     "in", String.valueOf(phoneNumber.getNationalNumber()),
                     "lg", "en",
                     "lc", "US",
-                    "expid", Base64.getUrlEncoder().encodeToString(store.deviceId()),
+                    "expid", Base64.getUrlEncoder().encodeToString(store.signalStore().deviceId()),
                     "fdid", fdid,
-                    "id", toUrlHex(store.identityId()),
+                    "id", toUrlHex(store.signalStore().identityId()),
                     "current_screen", currentScreen,
                     "previous_screen", Objects.requireNonNullElse(previousFunnelScreen, ""),
                     "action_taken", actionTaken,

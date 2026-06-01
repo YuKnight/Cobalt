@@ -74,11 +74,6 @@ public final class TestABPropsService implements ABPropsService {
     }
 
     @Override
-    public boolean syncABProps(Long localRefreshId, boolean shouldSendHash) {
-        return true;
-    }
-
-    @Override
     public boolean process(Node response) {
         return true;
     }

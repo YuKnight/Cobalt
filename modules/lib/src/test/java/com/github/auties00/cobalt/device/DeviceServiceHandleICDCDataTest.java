@@ -1,4 +1,7 @@
 package com.github.auties00.cobalt.device;
+import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
+import com.github.auties00.cobalt.sync.LiveWebAppStateService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.migration.LidMigrationService;
@@ -10,7 +13,7 @@ import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,12 +51,12 @@ class DeviceServiceHandleICDCDataTest {
         var props = TestABPropsService.builder().build();
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wamService);
-        var snapshotRecovery = new SnapshotRecoveryService(client, props, wamService);
-        var webAppState = new WebAppStateService(client, props, lidMigration, snapshotRecovery, wamService, TestMediaConnectionService.create());
-        var sessionCipher = new SignalSessionCipher(store);
-        var deviceService = new DefaultDeviceService(client, webAppState, props, sessionCipher, wamService);
+        var wamService = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wamService);
+        var snapshotRecovery = new LiveSnapshotRecoveryService(client, props, wamService);
+        var webAppState = new LiveWebAppStateService(client, props, lidMigration, snapshotRecovery, wamService, TestMediaConnectionService.create());
+        var sessionCipher = new SignalSessionCipher(store.signalStore());
+        var deviceService = new LiveDeviceService(client, webAppState, props, sessionCipher, wamService);
         return new Harness(client, deviceService);
     }
 
@@ -76,7 +79,7 @@ class DeviceServiceHandleICDCDataTest {
 
         h.deviceService.handleICDCData(PEER_DEVICE_1, null, metadata);
 
-        assertTrue(h.client.store().findDeviceList(PEER).isEmpty(),
+        assertTrue(h.client.store().contactStore().findDeviceList(PEER).isEmpty(),
                 "no cached list before, none after");
     }
 
@@ -94,7 +97,7 @@ class DeviceServiceHandleICDCDataTest {
                 .currentIndex(0)
                 .validIndexes(new LinkedHashSet<>())
                 .build();
-        h.client.store().addDeviceList(cached);
+        h.client.store().contactStore().addDeviceList(cached);
 
         var metadata = new DeviceListMetadataBuilder()
                 .senderTimestamp(newerTimestamp)
@@ -103,7 +106,7 @@ class DeviceServiceHandleICDCDataTest {
 
         h.deviceService.handleICDCData(PEER_DEVICE_1, null, metadata);
 
-        var updated = h.client.store().findDeviceList(PEER).orElseThrow();
+        var updated = h.client.store().contactStore().findDeviceList(PEER).orElseThrow();
         assertEquals(newerTimestamp, updated.expectedTimestamp(),
                 "newer sender timestamp lands as the new expectedTimestamp on the cached list");
         assertEquals(cachedTimestamp, updated.timestamp(),
@@ -124,7 +127,7 @@ class DeviceServiceHandleICDCDataTest {
                 .currentIndex(0)
                 .validIndexes(new LinkedHashSet<>())
                 .build();
-        h.client.store().addDeviceList(cached);
+        h.client.store().contactStore().addDeviceList(cached);
 
         var metadata = new DeviceListMetadataBuilder()
                 .senderTimestamp(senderTimestamp)
@@ -132,7 +135,7 @@ class DeviceServiceHandleICDCDataTest {
 
         h.deviceService.handleICDCData(PEER, null, metadata);
 
-        var updated = h.client.store().findDeviceList(PEER).orElseThrow();
+        var updated = h.client.store().contactStore().findDeviceList(PEER).orElseThrow();
         assertEquals(senderTimestamp.plusSeconds(1), updated.timestamp(),
                 "minimal-sync path bumps the timestamp to senderTimestamp+1s");
         assertEquals(1, updated.devices().size(),

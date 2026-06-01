@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Covers {@link MusicUserIdHandler} for the protobuf-only {@code "music_user_id"} action: the
  * handler accepts only {@link SyncdOperation#SET} with at least one of
  * {@link MusicUserIdAction#musicUserId()} or {@link MusicUserIdAction#musicUserIdMap()} populated,
- * persists the action via {@link WhatsAppStore#setMusicUserIdState}, and rejects a wrong-typed
+ * persists the action via {@link com.github.auties00.cobalt.store.BusinessStore#setMusicUserIdState}, and rejects a wrong-typed
  * value or an empty payload as {@link SyncActionState#MALFORMED}.
  *
  * <p>No public outgoing-mutation factory exists for this action, so each test drives the handler
@@ -44,7 +44,7 @@ class MusicUserIdHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private MusicUserIdHandler handler;
 
     @BeforeEach
@@ -97,7 +97,7 @@ class MusicUserIdHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.musicUserIdState().orElseThrow();
+            var stored = store.businessStore().musicUserIdState().orElseThrow();
             assertEquals("spotify-user-123", stored.musicUserId().orElseThrow());
         }
 
@@ -111,7 +111,7 @@ class MusicUserIdHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.musicUserIdState().orElseThrow();
+            var stored = store.businessStore().musicUserIdState().orElseThrow();
             assertEquals(2, stored.musicUserIdMap().size());
             assertEquals("abc", stored.musicUserIdMap().get("spotify"));
         }
@@ -142,7 +142,7 @@ class MusicUserIdHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.MALFORMED, result.actionState());
-            assertTrue(store.musicUserIdState().isEmpty());
+            assertTrue(store.businessStore().musicUserIdState().isEmpty());
         }
     }
 
@@ -157,7 +157,7 @@ class MusicUserIdHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.musicUserIdState().isEmpty());
+            assertTrue(store.businessStore().musicUserIdState().isEmpty());
         }
     }
 

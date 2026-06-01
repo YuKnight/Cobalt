@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayloadBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * mapping. Each case runs against an isolated store so registered mappings cannot bleed across
  * cases.
  */
-@DisplayName("LidMigrationService JID conversion helpers")
+@DisplayName("LiveLidMigrationService JID conversion helpers")
 class LidMigrationServiceJidConversionTest {
 
     private static final Jid SELF_PN = Jid.of("19254863482@s.whatsapp.net");
@@ -43,14 +43,14 @@ class LidMigrationServiceJidConversionTest {
     private static final Jid BOT = Jid.of("867051314767696@bot");
     private static final Jid HOSTED = Jid.of("18005550199@hosted");
 
-    private record Harness(TestWhatsAppClient client, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, LiveLidMigrationService service) {}
 
     private static Harness build() {
         var props = TestABPropsService.builder().build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, service);
     }
 
@@ -78,7 +78,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("toPn looks up the LID through the store")
     void toPnLidMapped() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         assertEquals(PEER_PN, h.service.toPn(PEER_LID));
     }
 
@@ -106,7 +106,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("toLid strips device suffix before looking up")
     void toLidStripsDevice() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         assertEquals(PEER_LID, h.service.toLid(PEER_DEVICE));
     }
 
@@ -130,7 +130,7 @@ class LidMigrationServiceJidConversionTest {
     void toUserLidOrThrow() {
         var h = build();
         assertThrows(IllegalStateException.class, () -> h.service.toUserLidOrThrow(PEER_PN));
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         assertEquals(PEER_LID, h.service.toUserLidOrThrow(PEER_PN));
     }
 
@@ -139,7 +139,7 @@ class LidMigrationServiceJidConversionTest {
     void toPnOrThrow() {
         var h = build();
         assertThrows(IllegalStateException.class, () -> h.service.toPnOrThrow(PEER_LID));
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         assertEquals(PEER_PN, h.service.toPnOrThrow(PEER_LID));
     }
 
@@ -154,7 +154,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("lookupLid falls back to store when primary cache is empty")
     void lookupLidStoreFallback() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         assertEquals(PEER_LID, h.service.lookupLid(PEER_PN).orElseThrow());
     }
 
@@ -166,32 +166,32 @@ class LidMigrationServiceJidConversionTest {
         // overwrite the store's entry afterwards to prove the cache wins).
         h.service.changeLid(PEER_PN, PEER_LID, null);
         var differentLid = Jid.of("12345678901234@lid");
-        h.client.store().registerLidMapping(PEER_PN, differentLid);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, differentLid);
 
         assertEquals(PEER_LID, h.service.lookupLid(PEER_PN).orElseThrow(),
                 "primary cache (PEER_LID) wins over store (differentLid)");
     }
 
     @Test
-    @DisplayName("getAlternateUserWid (via toCommonAddressingMode): me LID -> me PN via store.jid()/store.lid() fast path")
+    @DisplayName("getAlternateUserWid (via toCommonAddressingMode): me LID -> me PN via store.accountStore().jid()/store.accountStore().lid() fast path")
     void getAlternateUserWidMeFastPathLidToPn() {
         var h = build();
-        // No registered mapping for self; only store.jid() and store.lid() are set.
+        // No registered mapping for self; only store.accountStore().jid() and store.accountStore().lid() are set.
         // Pair (selfLid, peerPn) is "mixed addressing" so toCommonAddressingMode converts.
         var result = h.service.toCommonAddressingMode(SELF_LID, PEER_PN);
         // selfLid's alternate (via me fast path) is the self PN at user level.
         assertEquals(SELF_PN.toUserJid(), result[0],
-                "me LID -> me PN through the fast path that consults store.jid()");
+                "me LID -> me PN through the fast path that consults store.accountStore().jid()");
         assertEquals(PEER_PN, result[1]);
     }
 
     @Test
-    @DisplayName("getAlternateUserWid (via toCommonAddressingMode): me PN -> me LID via store.lid() fast path")
+    @DisplayName("getAlternateUserWid (via toCommonAddressingMode): me PN -> me LID via store.accountStore().lid() fast path")
     void getAlternateUserWidMeFastPathPnToLid() {
         var h = build();
         var result = h.service.toCommonAddressingMode(SELF_PN, PEER_LID);
         assertEquals(SELF_LID.toUserJid(), result[0],
-                "me PN -> me LID through the fast path that consults store.lid()");
+                "me PN -> me LID through the fast path that consults store.accountStore().lid()");
         assertEquals(PEER_LID, result[1]);
     }
 
@@ -204,11 +204,11 @@ class LidMigrationServiceJidConversionTest {
                 .build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
 
         // Register a mapping so lookupLid finds something.
-        store.registerLidMapping(PEER_PN, PEER_LID);
+        store.contactStore().registerLidMapping(PEER_PN, PEER_LID);
 
         service.initialize();
         service.enableMigration();
@@ -284,7 +284,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("shouldUseLidAddressing is false for a 1:1 PN recipient when migration has not advanced")
     void shouldUseLidAddressingNotMigrated() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         assertFalse(h.service.shouldUseLidAddressing(PEER_PN),
                 "state machine is NOT_STARTED; LID addressing is gated on COMPLETE/IN_PROGRESS");
     }
@@ -293,7 +293,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("toAddressingModeFactory(true) returns toLid as a function reference")
     void toAddressingModeFactoryTrue() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var fn = h.service.toAddressingModeFactory(true);
         assertEquals(PEER_LID, fn.apply(PEER_PN));
     }
@@ -302,7 +302,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("toAddressingModeFactory(false) returns toPn as a function reference")
     void toAddressingModeFactoryFalse() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var fn = h.service.toAddressingModeFactory(false);
         assertEquals(PEER_PN, fn.apply(PEER_LID));
     }
@@ -320,7 +320,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("toCommonAddressingMode converts the first side when its alternate is known")
     void toCommonAddressingModeConvertsFirst() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var other = Jid.of("999999999999999@lid");
         // first=PN (mapping known), second=LID (no mapping); first is converted to LID.
         var result = h.service.toCommonAddressingMode(PEER_PN, other);
@@ -332,7 +332,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("toCommonAddressingMode converts the second side when only its alternate is known")
     void toCommonAddressingModeConvertsSecond() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var unknownPn = Jid.of("12025550100@s.whatsapp.net");
         // first=unknownPn (no LID), second=PEER_LID (PN known); second is converted to PN.
         var result = h.service.toCommonAddressingMode(unknownPn, PEER_LID);
@@ -359,7 +359,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("getPnAndLidToUpdate returns [LID, PN] when the LID has a mapping")
     void getPnAndLidToUpdateFromLid() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var pair = h.service.getPnAndLidToUpdate(PEER_LID);
         assertEquals(2, pair.size());
         assertEquals(PEER_LID, pair.get(0));
@@ -370,7 +370,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("getPnAndLidToUpdate returns [PN, LID] when the PN has a mapping")
     void getPnAndLidToUpdateFromPn() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var pair = h.service.getPnAndLidToUpdate(PEER_PN);
         assertEquals(2, pair.size());
         assertEquals(PEER_PN, pair.get(0));
@@ -396,7 +396,7 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("chatIsLid is true for a chat on the LID server")
     void chatIsLidLidServer() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
         assertTrue(h.service.chatIsLid(chat));
     }
 
@@ -404,13 +404,13 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("chatIsLid is true for a group whose metadata reports isLidAddressingMode=true")
     void chatIsLidGroupOnLidMode() {
         var h = build();
-        var chat = h.client.store().addNewChat(GROUP);
+        var chat = h.client.store().chatStore().addNewChat(GROUP);
         var metadata = new GroupMetadataBuilder()
                 .jid(GROUP)
                 .subject("Test Group")
                 .isLidAddressingMode(true)
                 .build();
-        h.client.store().addChatMetadata(metadata);
+        h.client.store().chatStore().addChatMetadata(metadata);
         assertTrue(h.service.chatIsLid(chat));
     }
 
@@ -418,13 +418,13 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("chatIsLid is false for a group whose metadata reports isLidAddressingMode=false")
     void chatIsLidGroupNotOnLidMode() {
         var h = build();
-        var chat = h.client.store().addNewChat(GROUP);
+        var chat = h.client.store().chatStore().addNewChat(GROUP);
         var metadata = new GroupMetadataBuilder()
                 .jid(GROUP)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
                 .build();
-        h.client.store().addChatMetadata(metadata);
+        h.client.store().chatStore().addChatMetadata(metadata);
         assertFalse(h.service.chatIsLid(chat));
     }
 
@@ -432,8 +432,8 @@ class LidMigrationServiceJidConversionTest {
     @DisplayName("chatIsLid is false for a 1:1 PN chat regardless of mapping")
     void chatIsLidPnChat() {
         var h = build();
-        var chat = h.client.store().addNewChat(PEER_PN);
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_PN);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         // The chat JID is PN; chatIsLid only flips for LID-server chats or LID-addressing groups.
         assertFalse(h.service.chatIsLid(chat));
     }

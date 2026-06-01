@@ -37,7 +37,7 @@ import java.util.Optional;
  * {@link Chat#getPresence(JidProvider)} for that purpose. By default the
  * WhatsApp server does not push presence updates for every contact; to
  * receive real-time updates for a specific contact call
- * {@code WhatsAppClient#subscribeToPresence(JidProvider)}.
+ * {@code LinkedWhatsAppClient#subscribeToPresence(JidProvider)}.
  *
  * <p>This class is a local model only. Modifying its fields does not send any
  * request to the WhatsApp servers; it simply reflects the locally cached

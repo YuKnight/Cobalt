@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.control;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppConnectionException;
 import com.github.auties00.cobalt.exception.WhatsAppException;
 import com.github.auties00.cobalt.exception.WhatsAppServerRuntimeException;
@@ -9,18 +10,18 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 
 /**
  * Handles {@code <failure>} stanzas that report session-fatal error conditions during or after the post-handshake
  * exchange.
  *
- * <p>The handler is registered under the {@code "failure"} tag inside {@link SocketStream}. Failure stanzas are the WA
+ * <p>The handler is registered under the {@code "failure"} tag inside {@link NodeStreamService}. Failure stanzas are the WA
  * wire signal that the session cannot continue: the server pushes a numeric {@code reason} and the handler maps it to
  * the recovery exception that matches it. Logout-style reasons surface as {@link WhatsAppSessionException.LoggedOut},
  * the temporary-ban reason as {@link WhatsAppSessionException.Banned}, version mismatches as
  * {@link WhatsAppConnectionException}, and anything unrecognised as {@link WhatsAppServerRuntimeException}. The chosen
- * exception is handed to {@link WhatsAppClient#handleFailure(WhatsAppException)} so the configured error handler picks
+ * exception is handed to {@link LinkedWhatsAppClient#handleFailure(WhatsAppException)} so the configured error handler picks
  * the next action (logout, ban, reconnect, disconnect, discard).
  *
  * @implNote This implementation does not replicate WA Web's inline UI/storage recovery (logout banners, in-app updater
@@ -30,7 +31,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleFailure")
 @WhatsAppWebModule(moduleName = "WAWebFailureErrorCodes")
-public final class FailureStreamHandler implements SocketStream.Handler {
+public final class FailureStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * The system logger used to record every received failure stanza and any reason codes that do not trigger an
@@ -94,16 +95,16 @@ public final class FailureStreamHandler implements SocketStream.Handler {
     private static final int REASON_SERVICE_UNAVAILABLE = 503;
 
     /**
-     * The {@link WhatsAppClient} used to dispatch the parsed failure exception through the pluggable error handler.
+     * The {@link LinkedWhatsAppClient} used to dispatch the parsed failure exception through the pluggable error handler.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Constructs a new failure stream handler bound to the given client.
      *
-     * @param whatsapp the {@link WhatsAppClient} on which the parsed failure exception is dispatched
+     * @param whatsapp the {@link LinkedWhatsAppClient} on which the parsed failure exception is dispatched
      */
-    public FailureStreamHandler(WhatsAppClient whatsapp) {
+    public FailureStreamHandler(LinkedWhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
     }
 

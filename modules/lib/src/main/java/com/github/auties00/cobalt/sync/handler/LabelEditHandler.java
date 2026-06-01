@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -77,7 +77,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#unsupported()} and a missing label id or
      * action payload as malformed. A {@link LabelEditAction#deleted()} action
      * removes the label via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#removeLabel(String)};
+     * {@link com.github.auties00.cobalt.store.SettingsStore#removeLabel(String)};
      * otherwise the row is upserted, merging into an existing {@link Label} in
      * place when one is found or building a new one via {@link LabelBuilder}.
      *
@@ -93,7 +93,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebLabelSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -112,7 +112,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
         }
 
         if (action.deleted()) {
-            client.store().removeLabel(labelId);
+            client.store().settingsStore().removeLabel(labelId);
             return MutationApplicationResult.success();
         }
 
@@ -126,7 +126,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.success();
         }
 
-        var existing = client.store().findLabel(labelId).orElse(null);
+        var existing = client.store().settingsStore().findLabel(labelId).orElse(null);
         if (existing != null) {
             existing.setName(name);
             existing.setColor(color);
@@ -154,7 +154,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
                     .isActive(action.isActive() ? Boolean.TRUE : null)
                     .isImmutable(action.isImmutable() ? Boolean.TRUE : null)
                     .build();
-            client.store().addLabel(label);
+            client.store().settingsStore().addLabel(label);
         }
 
         return MutationApplicationResult.success();

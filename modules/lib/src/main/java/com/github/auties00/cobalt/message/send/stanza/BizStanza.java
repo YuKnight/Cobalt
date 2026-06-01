@@ -67,7 +67,7 @@ public final class BizStanza {
      * when none of the three conditions apply.
      *
      * @implNote This implementation reads the privacy-mode triplet from the {@link BusinessVerifiedName} contact record
-     * via {@link WhatsAppStore#findVerifiedBusinessName(Jid)}.
+     * via {@link com.github.auties00.cobalt.store.ContactStore#findVerifiedBusinessName(Jid)}.
      *
      * @param chatJid                 the recipient chat {@link Jid}
      * @param nativeFlowName          the native-flow name from the message protobuf, or {@code null}
@@ -78,7 +78,7 @@ public final class BizStanza {
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.DIRECT)
     public Node build(Jid chatJid, String nativeFlowName, boolean isNativeFlowInteractive) {
-        var verifiedName = store.findVerifiedBusinessName(chatJid)
+        var verifiedName = store.contactStore().findVerifiedBusinessName(chatJid)
                 .orElse(null);
         if (verifiedName != null && verifiedName.hasPrivacyMode()) {
             var hostStorage = verifiedName.hostStorage()

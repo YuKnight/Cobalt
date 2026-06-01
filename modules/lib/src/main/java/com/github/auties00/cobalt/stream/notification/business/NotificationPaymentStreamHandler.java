@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.MessageStatusListener;
+import com.github.auties00.cobalt.client.listener.NewMessageListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo.StubType;
@@ -19,7 +22,6 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.message.PaymentMessageStatus;
 import com.github.auties00.cobalt.stream.message.PaymentMessageTransactionType;
-import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.util.RandomIdUtils;
 
 import java.time.Instant;
@@ -38,7 +40,7 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebPaymentNotificationHandler")
 @WhatsAppWebModule(moduleName = "WAWebPaymentNotificationParser")
-final class NotificationPaymentStreamHandler implements SocketStream.Handler {
+final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * Logs warnings about malformed stanzas and unsupported services such as Novi payments.
      */
@@ -47,7 +49,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
     /**
      * Reads the store, looks up messages, and writes orphan-payment records.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Ships the post-processing {@code <ack class="notification" type="pay"/>} stanza.
@@ -62,7 +64,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * @param whatsapp  the client used for store reads, message lookups, and orphan-payment writes
      * @param ackSender the ack sender used for the post-processing ack
      */
-    NotificationPaymentStreamHandler(WhatsAppClient whatsapp, AckSender ackSender) {
+    NotificationPaymentStreamHandler(LinkedWhatsAppClient whatsapp, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.ackSender = ackSender;
     }
@@ -100,7 +102,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
 
     /**
      * Materialises an account-setup invite as a local stub message in the inviter's chat and fires
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onNewMessage(WhatsAppClient, MessageInfo)} for
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onNewMessage(LinkedWhatsAppClient, MessageInfo)} for
      * listeners.
      *
      * <p>Only invites whose {@code type} is {@code account-set-up} produce a stub; other invite types are logged and
@@ -151,16 +153,17 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
                 .message(MessageContainer.empty())
                 .build();
 
-        var chat = whatsapp.store()
-                .findChatByJid(from)
-                .orElseGet(() -> whatsapp.store().addNewChat(from));
+        var chat = whatsapp.store().chatStore().findChatByJid(from)
+                .orElseGet(() -> whatsapp.store().chatStore().addNewChat(from));
         chat.setLastMsgTimestamp(timestamp);
         chat.setConversationTimestamp(timestamp);
         chat.setUnreadCount(chat.unreadCount().orElse(0) + 1);
         chat.addMessage(info);
 
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onNewMessage(whatsapp, info));
+            if (listener instanceof NewMessageListener typed) {
+                Thread.startVirtualThread(() -> typed.onNewMessage(whatsapp, info));
+            }
         }
     }
 
@@ -192,7 +195,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        var self = whatsapp.store().jid().orElse(null);
+        var self = whatsapp.store().accountStore().jid().orElse(null);
         var fromMe = self != null && Objects.equals(self.toUserJid(), sender.toUserJid());
         var group = transaction.getAttributeAsJid("group").orElse(null);
         var remote = group != null ? group : fromMe ? receiver : sender;
@@ -200,7 +203,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
 
         var message = findPaymentMessage(remote, participant, messageId, fromMe);
         if (!(message instanceof ChatMessageInfo chatMessageInfo)) {
-            whatsapp.store().addOrphanPaymentNotification(new OrphanPaymentNotificationBuilder()
+            whatsapp.store().businessStore().addOrphanPaymentNotification(new OrphanPaymentNotificationBuilder()
                     .messageId(messageId)
                     .receiverJid(receiver)
                     .currency(transaction.getAttributeAsString("currency", null))
@@ -218,7 +221,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
     /**
      * Writes transaction fields onto the resolved chat message, propagates the status onto the originating payment
      * request when one exists, and fires
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onMessageStatus(WhatsAppClient, MessageInfo)} for
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onMessageStatus(LinkedWhatsAppClient, MessageInfo)} for
      * listeners.
      *
      * <p>When this transaction fulfils a payment request, the originating request message is located by key and then by
@@ -250,9 +253,9 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
             if (requestIdOpt.isEmpty() || requestRemoteOpt.isEmpty()) {
                 return;
             }
-            var requestMessage = whatsapp.store().findMessageByKey(requestKey).orElse(null);
+            var requestMessage = whatsapp.store().chatStore().findMessageByKey(requestKey).orElse(null);
             if (requestMessage == null) {
-                requestMessage = whatsapp.store().findMessageById(requestRemoteOpt.get(), requestIdOpt.get()).orElse(null);
+                requestMessage = whatsapp.store().chatStore().findMessageById(requestRemoteOpt.get(), requestIdOpt.get()).orElse(null);
             }
             if (!(requestMessage instanceof ChatMessageInfo requestChat)) {
                 return;
@@ -263,15 +266,19 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
                     paymentInfo.txnStatus().orElse(PaymentInfo.TxnStatus.UNKNOWN)));
             requestChat.setPaymentInfo(requestPaymentInfo);
             for (var listener : whatsapp.store().listeners()) {
-                Thread.startVirtualThread(() -> listener.onMessageStatus(whatsapp, requestChat));
+                if (listener instanceof MessageStatusListener typed) {
+                    Thread.startVirtualThread(() -> typed.onMessageStatus(whatsapp, requestChat));
+                }
             }
         });
 
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onMessageStatus(whatsapp, chatMessageInfo));
+            if (listener instanceof MessageStatusListener typed) {
+                Thread.startVirtualThread(() -> typed.onMessageStatus(whatsapp, chatMessageInfo));
+            }
         }
 
-        chatMessageInfo.key().id().ifPresent(whatsapp.store()::removeOrphanPaymentNotification);
+        chatMessageInfo.key().id().ifPresent(whatsapp.store().businessStore()::removeOrphanPaymentNotification);
     }
 
     /**
@@ -304,8 +311,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
      * @return the matching {@link MessageInfo}, or {@code null} when not found
      */
     private MessageInfo findPaymentMessage(Jid remote, Jid participant, String messageId, boolean fromMe) {
-        var direct = whatsapp.store()
-                .findMessageByKey(new MessageKeyBuilder()
+        var direct = whatsapp.store().chatStore().findMessageByKey(new MessageKeyBuilder()
                         .id(messageId)
                         .parentJid(remote)
                         .fromMe(fromMe)
@@ -316,7 +322,7 @@ final class NotificationPaymentStreamHandler implements SocketStream.Handler {
             return direct;
         }
 
-        return whatsapp.store().findMessageById(remote, messageId)
+        return whatsapp.store().chatStore().findMessageById(remote, messageId)
                 .map(MessageInfo.class::cast)
                 .orElse(null);
     }

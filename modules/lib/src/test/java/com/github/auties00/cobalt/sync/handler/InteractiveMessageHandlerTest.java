@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Tests run against a fresh in-memory {@link DeviceFixtures#temporaryStore}
  * through {@link TestWhatsAppClient} so the per-AGM and composite-index state
  * recorded by the handler can be read back through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#interactiveMessageStates()}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#interactiveMessageStates()}.
  */
 @DisplayName("InteractiveMessageHandler")
 class InteractiveMessageHandlerTest {
@@ -73,7 +73,7 @@ class InteractiveMessageHandlerTest {
     }
 
     private void seedMessage() {
-        var chat = client.store().addNewChat(PEER);
+        var chat = client.store().chatStore().addNewChat(PEER);
         var key = new MessageKeyBuilder()
                 .id(MESSAGE_ID).fromMe(false).parentJid(PEER)
                 .build();
@@ -120,7 +120,7 @@ class InteractiveMessageHandlerTest {
                             PEER, MESSAGE_ID, "0", "0", SUB_ID, Instant.ofEpochSecond(1L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var states = client.store().interactiveMessageStates();
+            var states = client.store().businessStore().interactiveMessageStates();
             assertFalse(states.isEmpty(), "interactive message state must be recorded");
             assertTrue(states.stream().anyMatch(s -> s.messageId().startsWith("messageId|")),
                     "the messageId-keyed state must be present");
@@ -132,14 +132,14 @@ class InteractiveMessageHandlerTest {
         @DisplayName("agmId-only path: when message is missing but agmId is present, the agmId state is recorded and the result is SUCCESS")
         void agmIdRecordedWhenMessageMissing() {
             // Chat exists; message does not. AgmId present.
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
 
             var result = new InteractiveMessageHandler().applyMutation(client,
                     interactiveMutation(InteractiveMessageActionMode.DISABLE_CTA, "agm-42",
                             PEER, "absent-id", "0", "0", SUB_ID, Instant.ofEpochSecond(1L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().interactiveMessageStates().stream()
+            assertTrue(client.store().businessStore().interactiveMessageStates().stream()
                             .anyMatch(s -> s.messageId().equals("agmId|agm-42")),
                     "agmId state must be recorded even when the message is absent");
         }
@@ -163,7 +163,7 @@ class InteractiveMessageHandlerTest {
         @Test
         @DisplayName("SET against a known chat but missing message + no agmId returns ORPHAN")
         void missingMessageWithoutAgmIdIsOrphan() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
 
             var result = new InteractiveMessageHandler().applyMutation(client,
                     interactiveMutation(InteractiveMessageActionMode.DISABLE_CTA, null,
@@ -247,7 +247,7 @@ class InteractiveMessageHandlerTest {
 
             var result = new InteractiveMessageHandler().applyMutation(client, mutation);
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(client.store().interactiveMessageStates().isEmpty(),
+            assertTrue(client.store().businessStore().interactiveMessageStates().isEmpty(),
                     "REMOVE must not record any state");
         }
     }

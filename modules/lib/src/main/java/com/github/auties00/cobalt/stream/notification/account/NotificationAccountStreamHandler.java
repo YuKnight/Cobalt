@@ -1,27 +1,34 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.AboutChangedListener;
+import com.github.auties00.cobalt.client.listener.ContactBlockedListener;
+import com.github.auties00.cobalt.client.listener.ProfilePictureChangedListener;
+import com.github.auties00.cobalt.client.listener.TosNoticesChangedListener;
+import com.github.auties00.cobalt.client.listener.ContactTextStatusListener;
+import com.github.auties00.cobalt.client.listener.WhatsAppListener;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.contact.ContactTextStatusBuilder;
-import com.github.auties00.cobalt.model.device.info.DeviceInfo;
-import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
+import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.node.usync.UsyncContext;
+import com.github.auties00.cobalt.store.WhatsAppStore;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -43,7 +50,7 @@ import java.util.function.Consumer;
  * dispatching to the per-type branch.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleAccountSyncNotification")
-final class NotificationAccountStreamHandler implements SocketStream.Handler {
+final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs warnings about unhandled notifications and debug messages about ignored child elements.
@@ -66,7 +73,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * Holds the client used for store reads, queries (about, picture, blocklist), node sends, and
      * listener notifications.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Holds the device service used by the {@code devices} child path to apply the inline device list
@@ -87,7 +94,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param deviceService the non-{@code null} device service used for device-list mutations
      * @param ackSender     the non-{@code null} ack sender used for the protocol-level {@code <ack>} response
      */
-    NotificationAccountStreamHandler(WhatsAppClient whatsapp, DeviceService deviceService, AckSender ackSender) {
+    NotificationAccountStreamHandler(LinkedWhatsAppClient whatsapp, DeviceService deviceService, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.deviceService = Objects.requireNonNull(deviceService, "deviceService cannot be null");
         this.ackSender = Objects.requireNonNull(ackSender, "ackSender cannot be null");
@@ -95,16 +102,18 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
 
     /**
      * Validates the stanza shape, dispatches to {@link #handleNotification(Node)}, logs any thrown
-     * exception, and always sends the protocol-level ACK.
+     * exception, and sends the protocol-level ACK unless the branch deferred it.
      *
      * <p>Stanzas whose description is not {@code notification} or whose {@code type} is not
-     * {@code account_sync} are dropped without ACK; valid stanzas are always ACKed even when handling
-     * throws.</p>
+     * {@code account_sync} are dropped without ACK. A valid stanza is ACKed even when handling throws,
+     * except when {@link #handleNotification(Node)} reports that the ACK was deferred (the
+     * {@code devices} branch during resume-from-restart, where the ACK rides on the queued device sync
+     * and is shipped once that sync completes).</p>
      *
      * @implNote This implementation swallows {@link Throwable} from the mutation branch and logs it,
      * whereas WA Web rejects the underlying job promise so the orchestrator can NACK the stanza. Cobalt
-     * ACKs unconditionally because the WA Web ack node is constructed at the top of the wrapper before
-     * dispatching to the per-type branch.
+     * ACKs in the {@code finally} block because the WA Web ack node is constructed at the top of the
+     * wrapper before dispatching to the per-type branch; the one exception is the deferred-ack path.
      *
      * @param node the incoming {@code <notification>} stanza
      */
@@ -114,14 +123,17 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
             return;
         }
 
+        var deferAck = false;
         try {
-            handleNotification(node);
+            deferAck = handleNotification(node);
         } catch (Throwable throwable) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Cannot handle account_sync notification " + node.getAttributeAsString("id", "<missing>"),
                     throwable);
         } finally {
-            sendNotificationAck(node);
+            if (!deferAck) {
+                sendNotificationAck(node);
+            }
         }
     }
 
@@ -134,54 +146,55 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * {@code DEBUG} and otherwise ignored.</p>
      *
      * @param node the {@code <notification>} stanza
+     * @return {@code true} when the matched branch deferred the protocol ack (the {@code devices}
+     *         branch when it queues a device sync during resume-from-restart), {@code false} otherwise
      */
-    private void handleNotification(Node node) {
+    private boolean handleNotification(Node node) {
         for (var child : node.children()) {
             switch (child.description()) {
                 case "status" -> {
                     refreshOwnAbout();
-                    return;
+                    return false;
                 }
                 case "text_status" -> {
                     handleTextStatusNotification(node, child);
-                    return;
+                    return false;
                 }
                 case "privacy" -> {
                     whatsapp.pullWebAppState(SyncPatchType.REGULAR_LOW, SyncPatchType.REGULAR);
-                    return;
+                    return false;
                 }
                 case "devices" -> {
-                    refreshOwnDevices(node);
-                    return;
+                    return refreshOwnDevices(node);
                 }
                 case "blocklist" -> {
                     applyBlocklistUsernames(child);
                     whatsapp.refreshBlockList();
-                    return;
+                    return false;
                 }
                 case "picture" -> {
                     refreshOwnPicture();
-                    return;
+                    return false;
                 }
                 case "disappearing_mode" -> {
                     handleDisappearingModeNotification(node, child);
-                    return;
+                    return false;
                 }
                 case "tos" -> {
                     handleTosNotification(child);
-                    return;
+                    return false;
                 }
                 case "notice" -> {
                     handleNoticeNotification(child);
-                    return;
+                    return false;
                 }
                 case "user" -> {
                     handleUserNotification(child);
-                    return;
+                    return false;
                 }
                 case "biz_opt_out_list" -> {
                     handleBizOptOutListNotification(child);
-                    return;
+                    return false;
                 }
                 default -> {
                 }
@@ -191,6 +204,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Ignoring unrecognized account_sync notification {0}",
                 node.getAttributeAsString("id", "<missing>"));
+        return false;
     }
 
     /**
@@ -199,19 +213,19 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      *
      * <p>Triggered by a {@code <status/>} child, meaning the user changed their about on another device.
      * Queries the current about for the local account, compares it against the stored value, and on a
-     * change writes the new value to the store and fires {@link WhatsAppClientListener#onAboutChanged}.</p>
+     * change writes the new value to the store and fires {@link AboutChangedListener#onAboutChanged}.</p>
      *
      * @implNote This implementation compares the stored about against the queried value before writing,
      * avoiding a redundant listener fire when the server pushes a value Cobalt already has; WA Web fires
      * the frontend event unconditionally when the queried status is non-empty.
      */
     void refreshOwnAbout() {
-        var self = whatsapp.store().jid().orElse(null);
+        var self = whatsapp.store().accountStore().jid().orElse(null);
         if (self == null) {
             return;
         }
 
-        var oldAbout = whatsapp.store().selfTextStatus().flatMap(ContactTextStatus::text).orElse("");
+        var oldAbout = whatsapp.store().accountStore().selfTextStatus().flatMap(ContactTextStatus::text).orElse("");
         var newAbout = whatsapp.queryAbout(self).orElse("");
         if (Objects.equals(oldAbout, newAbout)) {
             return;
@@ -220,8 +234,8 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
         var newStatus = new ContactTextStatusBuilder()
                 .text(newAbout)
                 .build();
-        whatsapp.store().setSelfTextStatus(newStatus);
-        fireListeners(listener -> listener.onAboutChanged(whatsapp, oldAbout, newAbout));
+        whatsapp.store().accountStore().setSelfTextStatus(newStatus);
+        fireListeners(AboutChangedListener.class, listener -> listener.onAboutChanged(whatsapp, oldAbout, newAbout));
     }
 
     /**
@@ -232,7 +246,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * user via {@link #updateOwnTextStatus(Node)}; otherwise it applies to the user named in the
      * stanza's {@code from} attribute (falling back to the local account), reading the inline
      * {@code text}, {@code emoji}, {@code ephemeral_duration_sec}, and {@code last_update_time} fields.
-     * Either path drives {@link WhatsAppClientListener#onContactTextStatus} for the changed contact.</p>
+     * Either path drives {@link ContactTextStatusListener#onContactTextStatus} for the changed contact.</p>
      *
      * @implNote This implementation collapses the WA Web {@code action === "modify"} path (which
      * re-queries the text status from the server) into the same stanza-driven update used for the
@@ -247,7 +261,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
             updateOwnTextStatus(textStatusNode);
         } else {
             var from = getUserJid(node, "from");
-            var self = from != null ? from : whatsapp.store().jid().map(Jid::toUserJid).orElse(null);
+            var self = from != null ? from : whatsapp.store().accountStore().jid().map(Jid::toUserJid).orElse(null);
             if (self == null) {
                 return;
             }
@@ -283,7 +297,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * @param textStatusNode the {@code <text_status>} child node
      */
     private void updateOwnTextStatus(Node textStatusNode) {
-        var self = whatsapp.store().jid().orElse(null);
+        var self = whatsapp.store().accountStore().jid().orElse(null);
         if (self == null) {
             return;
         }
@@ -305,54 +319,100 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
     }
 
     /**
-     * Replaces the authenticated user's cached device list with the inline list carried by the
+     * Reconciles the authenticated user's cached device lists with the inline list carried by the
      * notification's {@code <devices>} child.
      *
-     * <p>Reads each {@code <device jid=... key-index=.../>} child into a {@link DeviceInfo}, captures the
-     * server-computed {@code dhash}, and writes the resulting {@code DeviceList} to the store so future
-     * device-list IQs can short-circuit when the hash matches. This drives Signal-session establishment
-     * for new companion devices and cleanup for removed ones.</p>
+     * <p>Reproduces WA Web's {@code WAWebHandleAccountSyncNotification} {@code DEVICES} case. While the
+     * resume-from-restart sequence is still running ({@link WhatsAppStore#isResumeFromRestartComplete()}
+     * is {@code false}) the inline payload is not trusted: the sender is stashed as a
+     * {@link PendingDeviceSync} carrying this notification's deferred ack, so the authoritative device
+     * list is fetched by a USync replay once the socket reaches steady state and the ack is shipped only
+     * after that replay succeeds, mirroring WA Web's {@code OfflinePendingDeviceCache.addOfflinePendingDevice}.
+     * A payload with no {@code <device>} children triggers a full self USync via
+     * {@link DeviceService#syncMyDeviceList()}, matching WA Web's {@code getDevices("notification")}.
+     * Otherwise a self sender is fanned out to both the phone-number and LID identities (WA Web's
+     * {@code y()} helper) and each record is rebuilt through
+     * {@link DeviceService#refreshOwnDeviceList(Jid, Node)}, which validates the embedded
+     * {@code <key-index-list>} so the record carries the authoritative ADV fingerprint. This drives
+     * Signal-session establishment for new companion devices and cleanup for removed ones.</p>
      *
-     * @implNote This implementation reads the inline device children rather than firing a fresh USync
-     * device query, because the server does not respond to a USync issued immediately after an inline
-     * {@code devices} notification (it treats the inline payload as authoritative). An earlier Cobalt
-     * version called {@link DeviceService#getDeviceLists} here and blocked for 60 seconds on the silent
-     * response before timing out.
+     * @implNote This implementation collapses WA Web's secondary
+     * {@code isResumeOnSocketDisconnectInProgress()} branch into the single
+     * {@link WhatsAppStore#isResumeFromRestartComplete()} gate, because Cobalt has no browser-tab
+     * concept and therefore no distinct open-tab resume state. It also drops WA Web's
+     * {@code cleanupCampaignsWithInvalidDevices} follow-up, as Cobalt has no business-broadcast campaign
+     * store. The deferred ack rides on the persisted {@link PendingDeviceSync} rather than WA Web's
+     * separate {@code pendingAcks} debounce buffer, so it survives a restart and is shipped by
+     * {@link DeviceService#retryPendingSyncs()} once the device fetch completes; a crash before then
+     * leaves the notification unacknowledged so the server replays it.
      *
      * @param node the {@code <notification>} stanza carrying the {@code devices} child and {@code from} attribute
+     * @return {@code true} when the ack was deferred (queued during resume), {@code false} when the ack
+     *         should be sent immediately by {@link #handle(Node)}
      */
-    private void refreshOwnDevices(Node node) {
-        var self = whatsapp.store().jid()
-                .map(Jid::toUserJid)
-                .orElseGet(() -> getUserJid(node, "from"));
-        if (self == null) {
-            return;
+    private boolean refreshOwnDevices(Node node) {
+        var rawFrom = node.getAttributeAsJid("from").orElse(null);
+        if (rawFrom == null) {
+            return false;
+        }
+        var from = rawFrom.toUserJid();
+
+        var store = whatsapp.store();
+        if (!store.isResumeFromRestartComplete()) {
+            var notificationId = node.getAttributeAsString("id", null);
+            if (notificationId == null) {
+                store.syncStore().addPendingDeviceSync(PendingDeviceSync.of(List.of(from), UsyncContext.NOTIFICATION.wireValue()));
+                return false;
+            }
+            store.syncStore().addPendingDeviceSync(PendingDeviceSync.ofDeferredAck(
+                    List.of(from), UsyncContext.NOTIFICATION.wireValue(), notificationId, rawFrom));
+            return true;
         }
 
         var devicesChild = node.getChild("devices").orElse(null);
-        if (devicesChild == null) {
-            return;
+        if (devicesChild == null || devicesChild.getChildren("device").isEmpty()) {
+            deviceService.syncMyDeviceList();
+            return false;
         }
 
-        var parsed = new ArrayList<DeviceInfo>();
-        for (var deviceNode : devicesChild.getChildren("device")) {
-            var deviceJid = deviceNode.getAttributeAsJid("jid").orElse(null);
-            if (deviceJid == null) {
-                continue;
-            }
-            var keyIndex = deviceNode.getAttributeAsInt("key-index", 0);
-            parsed.add(DeviceInfo.ofE2EE(deviceJid.device(), keyIndex));
+        for (var wid : resolveSelfWids(from)) {
+            deviceService.refreshOwnDeviceList(wid, devicesChild);
         }
+        return false;
+    }
 
-        var dhash = devicesChild.getAttributeAsString("dhash", null);
-        var list = new DeviceListBuilder()
-                .userJid(self)
-                .devices(List.copyOf(parsed))
-                .timestamp(Instant.now())
-                .rawId(dhash)
-                .deleted(false)
-                .build();
-        whatsapp.store().addDeviceList(list);
+    /**
+     * Fans a self account JID out to both the phone-number and LID self identities.
+     *
+     * <p>When {@code from} is one of this account's own identities, returns the phone-number user JID
+     * and the LID user JID (whichever are present) so the caller rebuilds a device-list record under
+     * each, matching the dual record WA Web keeps for {@code createDeviceListPK(PN)} and
+     * {@code createDeviceListPK(LID)}. When {@code from} is not a self identity the single resolved JID
+     * is returned unchanged, and a self account with neither identity resolvable falls back to
+     * {@code from} alone.</p>
+     *
+     * @implNote This implementation mirrors WA Web's {@code y()} helper, which expands a me-account
+     * wid into the {@code [PN, LID]} pair and otherwise logs a {@code wid-is-not-self} error and
+     * processes the lone wid; Cobalt keeps the expansion but omits the diagnostic log.
+     *
+     * @param from the notification sender resolved to a user JID
+     * @return the self identities to rebuild, or the single input JID when it is not a self account
+     */
+    private List<Jid> resolveSelfWids(Jid from) {
+        var store = whatsapp.store();
+        var phoneJid = store.accountStore().jid().map(Jid::toUserJid).orElse(null);
+        var lidJid = store.accountStore().lid().map(Jid::toUserJid).orElse(null);
+        if (!from.equals(phoneJid) && !from.equals(lidJid)) {
+            return List.of(from);
+        }
+        var wids = new ArrayList<Jid>(2);
+        if (phoneJid != null) {
+            wids.add(phoneJid);
+        }
+        if (lidJid != null) {
+            wids.add(lidJid);
+        }
+        return wids.isEmpty() ? List.of(from) : wids;
     }
 
     /**
@@ -381,17 +441,16 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
             if (userJid == null) {
                 continue;
             }
-            var contact = whatsapp.store()
-                    .findContactByJid(userJid)
-                    .orElseGet(() -> whatsapp.store().addNewContact(userJid));
+            var contact = whatsapp.store().contactStore().findContactByJid(userJid)
+                    .orElseGet(() -> whatsapp.store().contactStore().addNewContact(userJid));
             contact.setUsername(username);
-            whatsapp.store().addContact(contact);
+            whatsapp.store().contactStore().addContact(contact);
         }
     }
 
     /**
      * Refreshes the authenticated user's profile-picture URI by querying the server and firing
-     * {@link WhatsAppClientListener#onProfilePictureChanged} when the URI changed.
+     * {@link ProfilePictureChangedListener#onProfilePictureChanged} when the URI changed.
      *
      * <p>Triggered when the user updates their profile picture on another paired device. Compares the
      * queried URI against the stored URI and writes plus fires the listener only on a change.</p>
@@ -400,19 +459,19 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      * Web always dispatches the frontend event.
      */
     private void refreshOwnPicture() {
-        var self = whatsapp.store().jid().orElse(null);
+        var self = whatsapp.store().accountStore().jid().orElse(null);
         if (self == null) {
             return;
         }
 
-        var oldPicture = whatsapp.store().profilePicture().orElse(null);
+        var oldPicture = whatsapp.store().accountStore().profilePicture().orElse(null);
         var newPicture = whatsapp.queryPicture(self).orElse(null);
         if (Objects.equals(oldPicture, newPicture)) {
             return;
         }
 
-        whatsapp.store().setProfilePicture(newPicture);
-        fireListeners(listener -> listener.onProfilePictureChanged(whatsapp, self));
+        whatsapp.store().accountStore().setProfilePicture(newPicture);
+        fireListeners(ProfilePictureChangedListener.class, listener -> listener.onProfilePictureChanged(whatsapp, self));
     }
 
     /**
@@ -454,7 +513,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
         }
 
         if (duration != null) {
-            whatsapp.store().setNewChatsEphemeralTimer(ChatEphemeralTimer.of(duration));
+            whatsapp.store().settingsStore().setNewChatsEphemeralTimer(ChatEphemeralTimer.of(duration));
         }
     }
 
@@ -478,9 +537,11 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
             }
         }
         if (!notices.isEmpty()) {
-            var currentNotices = new HashSet<>(whatsapp.store().tosNoticeIds());
+            var currentNotices = new HashSet<>(whatsapp.store().settingsStore().tosNotices());
             currentNotices.addAll(notices);
-            whatsapp.store().setTosNoticeIds(currentNotices);
+            whatsapp.store().settingsStore().setTosNotices(currentNotices);
+            var snapshot = Set.copyOf(currentNotices);
+            fireListeners(TosNoticesChangedListener.class, listener -> listener.onTosNoticesChanged(whatsapp, snapshot));
         }
     }
 
@@ -511,9 +572,11 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
         var accepted = PDFN_ACCEPTED_STAGE.equals(noticeStage);
 
         if (accepted) {
-            var currentNotices = new HashSet<>(whatsapp.store().tosNoticeIds());
+            var currentNotices = new HashSet<>(whatsapp.store().settingsStore().tosNotices());
             currentNotices.add(noticeId);
-            whatsapp.store().setTosNoticeIds(currentNotices);
+            whatsapp.store().settingsStore().setTosNotices(currentNotices);
+            var snapshot = Set.copyOf(currentNotices);
+            fireListeners(TosNoticesChangedListener.class, listener -> listener.onTosNoticesChanged(whatsapp, snapshot));
         }
     }
 
@@ -530,14 +593,14 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
      */
     private void handleUserNotification(Node userNode) {
         var isAiAvailable = "AI available".equals(userNode.getAttributeAsString("state", null));
-        whatsapp.store().setAiAvailable(isAiAvailable);
+        whatsapp.store().businessStore().setAiAvailable(isAiAvailable);
     }
 
     /**
      * Reconciles the local business-opt-out blocklist against the {@code <biz_opt_out_list>} child.
      *
      * <p>Applies each {@code <item action=... biz_jid=.../>} entry to the matching contact's blocked
-     * flag and updates the stored hash on success, firing {@link WhatsAppClientListener#onContactBlocked}
+     * flag and updates the stored hash on success, firing {@link ContactBlockedListener#onContactBlocked}
      * for any contact whose flag changed. The reconciliation is skipped entirely when {@code prev_dhash}
      * does not match the stored hash.</p>
      *
@@ -551,7 +614,7 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
     private void handleBizOptOutListNotification(Node optOutListNode) {
         var dhash = optOutListNode.getAttributeAsString("dhash", null);
         var prevDhash = optOutListNode.getAttributeAsString("prev_dhash", null);
-        var storedHash = whatsapp.store().businessOptOutListHash().orElse(null);
+        var storedHash = whatsapp.store().businessStore().businessOptOutListHash().orElse(null);
 
         if (!Objects.equals(storedHash, prevDhash)) {
             // TODO: trigger a full opt-out list refresh when prev_dhash mismatches; today Cobalt waits for the next app-state sync to converge.
@@ -567,16 +630,15 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
                 }
                 var isBlocked = "block".equals(action);
                 var userJid = bizJid.toUserJid();
-                var contact = whatsapp.store()
-                        .findContactByJid(userJid)
-                        .orElseGet(() -> whatsapp.store().addNewContact(userJid));
+                var contact = whatsapp.store().contactStore().findContactByJid(userJid)
+                        .orElseGet(() -> whatsapp.store().contactStore().addNewContact(userJid));
                 if (contact.blocked() != isBlocked) {
                     contact.setBlocked(isBlocked);
-                    whatsapp.store().addContact(contact);
-                    fireListeners(listener -> listener.onContactBlocked(whatsapp, userJid));
+                    whatsapp.store().contactStore().addContact(contact);
+                    fireListeners(ContactBlockedListener.class, listener -> listener.onContactBlocked(whatsapp, userJid));
                 }
             }
-            whatsapp.store().setBusinessOptOutListHash(dhash);
+            whatsapp.store().businessStore().setBusinessOptOutListHash(dhash);
         }
     }
 
@@ -596,16 +658,22 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
     }
 
     /**
-     * Fans the given callback out to every registered listener on its own virtual thread.
+     * Fans the given callback out to every registered listener of the given
+     * type on its own virtual thread.
      *
      * <p>Each listener runs on a fresh virtual thread so a slow listener cannot block the notification
      * stream.</p>
      *
-     * @param consumer the callback to invoke against each listener
+     * @param type     the per-event listener interface to dispatch against
+     * @param consumer the callback to invoke against each matching listener
+     * @param <L>      the per-event listener interface
      */
-    private void fireListeners(Consumer<WhatsAppClientListener> consumer) {
+    private <L extends WhatsAppListener> void fireListeners(Class<L> type, Consumer<L> consumer) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> consumer.accept(listener));
+            if (type.isInstance(listener)) {
+                var typed = type.cast(listener);
+                Thread.startVirtualThread(() -> consumer.accept(typed));
+            }
         }
     }
 
@@ -632,29 +700,26 @@ final class NotificationAccountStreamHandler implements SocketStream.Handler {
             Instant lastUpdateTime
     ) {
         var canonicalJid = contactJid.toUserJid();
-        var current = whatsapp.store()
-                .findContactTextStatus(canonicalJid)
+        var current = whatsapp.store().contactStore().findContactTextStatus(canonicalJid)
                 .orElseGet(() -> new ContactTextStatusBuilder().build());
         current.setText(text);
         current.setEmoji(emoji);
         current.setEphemeralDurationSeconds(ephemeralDurationSeconds);
         current.setLastUpdateTime(lastUpdateTime);
-        whatsapp.store().addContactTextStatus(canonicalJid, current);
+        whatsapp.store().contactStore().addContactTextStatus(canonicalJid, current);
         notifyContactTextStatusChanged(canonicalJid, current);
         return current;
     }
 
     /**
-     * Fires {@link WhatsAppClientListener#onContactTextStatus} on every registered listener, each on its
+     * Fires {@link ContactTextStatusListener#onContactTextStatus} on every registered listener, each on its
      * own virtual thread.
      *
      * @param contactJid the JID whose text status changed
      * @param status     the updated text-status record
      */
     private void notifyContactTextStatusChanged(Jid contactJid, ContactTextStatus status) {
-        for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onContactTextStatus(whatsapp, contactJid, status));
-        }
+        fireListeners(ContactTextStatusListener.class, listener -> listener.onContactTextStatus(whatsapp, contactJid, status));
     }
 
     /**

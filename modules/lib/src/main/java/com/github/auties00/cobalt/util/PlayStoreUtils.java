@@ -5,7 +5,6 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.exception.ProtobufDeserializationException;
 import it.auties.protobuf.model.ProtobufType;
-import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -574,7 +573,7 @@ public final class PlayStoreUtils {
      */
     private static ResponseWrapper decodeWrapper(InputStream raw, String endpoint, String packageName) throws IOException {
         try (raw) {
-            return PlayStoreUtilsResponseWrapperSpec.decode(ProtobufInputStream.fromStream(raw));
+            return PlayStoreUtilsResponseWrapperSpec.decode(new BufferedProtobufInputStream(raw));
         } catch (ProtobufDeserializationException e) {
             throw new IOException("Failed to decode " + endpoint + " response for '" + packageName + "'", e);
         }

@@ -8,11 +8,12 @@
  *
  * <p>The exported capability surface is organised as follows:
  * <ul>
- *   <li>Connection and control through {@link com.github.auties00.cobalt.client.WhatsAppClient}, the
+ *   <li>Connection and control through {@link com.github.auties00.cobalt.client.LinkedWhatsAppClient}, the
  *       single facade for pairing, connecting, sending and receiving traffic, and driving every other
  *       feature.</li>
- *   <li>Event delivery through {@link com.github.auties00.cobalt.client.WhatsAppClientListener}, the
- *       callback interface for incoming messages, presence, calls, and other asynchronous notifications.</li>
+ *   <li>Event delivery through {@link com.github.auties00.cobalt.client.listener.WhatsAppListener} and its
+ *       aggregator {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener}, the
+ *       callback interfaces for incoming messages, presence, calls, and other asynchronous notifications.</li>
  *   <li>Session and entity persistence through {@link com.github.auties00.cobalt.store.WhatsAppStore},
  *       which holds chats, contacts, messages, and the Signal protocol material for a session.</li>
  *   <li>The {@code call} packages, which expose voice and video calling together with audio and video
@@ -91,6 +92,7 @@ module com.github.auties00.cobalt {
 
     // Client API
     exports com.github.auties00.cobalt.client;
+    exports com.github.auties00.cobalt.client.listener;
 
     // Exceptions
     exports com.github.auties00.cobalt.exception;
@@ -104,12 +106,16 @@ module com.github.auties00.cobalt {
     exports com.github.auties00.cobalt.node.smax;
     exports com.github.auties00.cobalt.node.usync;
 
+    // GraphQL HTTP transports (not stanza-based, so kept outside the node package)
+    exports com.github.auties00.cobalt.graphql.web;
+    exports com.github.auties00.cobalt.graphql.facebook;
+
     // Store
     // Exported for obvious reasons
     exports com.github.auties00.cobalt.store;
 
     // Metrics
-    // Export the codegen event specs + types so that users can send their own WAM events through WhatsAppClient
+    // Export the codegen event specs + types so that users can send their own WAM events through LinkedWhatsAppClient
     // Don't export the WAM internals
     exports com.github.auties00.cobalt.wam.event;
     exports com.github.auties00.cobalt.wam.type;

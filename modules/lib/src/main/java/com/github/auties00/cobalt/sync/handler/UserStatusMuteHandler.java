@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -79,7 +79,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#unsupported()}. The second index slot must parse as a valid
      * {@link Jid} and the decoded value must be a {@link UserStatusMuteAction}, otherwise the
      * mutation is reported as malformed. Group JIDs route through
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#applyGroupMetadataEdit(Jid, com.github.auties00.cobalt.model.chat.group.GroupMetadataEdit)};
+     * {@link com.github.auties00.cobalt.store.ChatStore#applyGroupMetadataEdit(Jid, com.github.auties00.cobalt.model.chat.group.GroupMetadataEdit)};
      * user JIDs route through {@link com.github.auties00.cobalt.model.contact.Contact#setStatusMuted(boolean)}
      * on the resolved contact. An unknown group or contact surfaces as
      * {@link MutationApplicationResult#orphan(String, String)} with the model type
@@ -96,7 +96,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebUserStatusMuteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -126,13 +126,13 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
                     .group(wid)
                     .statusMuted(action.muted())
                     .build();
-            var updated = client.store().applyGroupMetadataEdit(wid, edit);
+            var updated = client.store().chatStore().applyGroupMetadataEdit(wid, edit);
             return updated.isPresent()
                     ? MutationApplicationResult.success()
                     : MutationApplicationResult.orphan(widString, "UserStatusMute");
         }
 
-        var contact = client.store().findContactByJid(wid);
+        var contact = client.store().contactStore().findContactByJid(wid);
         if (contact.isEmpty()) {
             return MutationApplicationResult.orphan(widString, "UserStatusMute");
         }

@@ -21,7 +21,9 @@ import java.util.Optional;
  *
  * <p>This query backs the live-validation indicator on the username picker. The candidate name is
  * sent as the {@code input} variable; the relay validates length, charset, and reservation status
- * server-side. The reply is consumed through {@link UsernameAvailabilityMexResponse}.
+ * server-side. The optional {@code source} variable records which surface triggered the check and
+ * the optional {@code session_id} variable correlates a sequence of checks within one editing
+ * session. The reply is consumed through {@link UsernameAvailabilityMexResponse}.
  *
  * @see UsernameAvailabilityMexResponse
  */
@@ -34,7 +36,7 @@ public final class UsernameAvailabilityMexRequest implements MexOperation.Reques
      */
     @WhatsAppWebExport(moduleName = "WAWebMexUsernameAvailabilityQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public static final String QUERY_ID = "9615795045169045";
+    public static final String QUERY_ID = "26122779627399568";
 
     /**
      * The GraphQL operation name reported alongside this request.
@@ -49,15 +51,48 @@ public final class UsernameAvailabilityMexRequest implements MexOperation.Reques
     private final String input;
 
     /**
-     * Constructs a username-availability check request.
+     * The {@code source} GraphQL variable recording the surface that triggered the check, or
+     * {@code null} to omit it.
+     */
+    private final String source;
+
+    /**
+     * The {@code session_id} GraphQL variable correlating a sequence of checks within one editing
+     * session, or {@code null} to omit it.
+     */
+    private final String sessionId;
+
+    /**
+     * Constructs a username-availability check request carrying only the candidate name.
      *
      * <p>The candidate name is forwarded verbatim as the {@code input} variable; the relay validates
-     * length, charset, and reservation status server-side.
+     * length, charset, and reservation status server-side. The {@code source} and {@code session_id}
+     * variables are omitted from the wire payload.
      *
      * @param input the candidate username, or {@code null} to omit the variable
      */
     public UsernameAvailabilityMexRequest(String input) {
+        this(input, null, null);
+    }
+
+    /**
+     * Constructs a username-availability check request carrying the candidate name along with the
+     * triggering surface and editing-session correlation id.
+     *
+     * <p>The candidate name is forwarded verbatim as the {@code input} variable; the relay validates
+     * length, charset, and reservation status server-side. The {@code source} variable records which
+     * surface triggered the check and the {@code session_id} variable correlates a sequence of checks
+     * within one editing session. Each variable whose value is {@code null} is omitted from the wire
+     * payload.
+     *
+     * @param input     the candidate username, or {@code null} to omit the variable
+     * @param source    the triggering surface, or {@code null} to omit the variable
+     * @param sessionId the editing-session correlation id, or {@code null} to omit the variable
+     */
+    public UsernameAvailabilityMexRequest(String input, String source, String sessionId) {
         this.input = input;
+        this.source = source;
+        this.sessionId = sessionId;
     }
 
     /**
@@ -79,8 +114,9 @@ public final class UsernameAvailabilityMexRequest implements MexOperation.Reques
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"variables": {"input": <input>}}}, or
-     * {@code {"variables": {}}} when {@link #input} is {@code null}, then defers envelope
+     * @implNote This implementation emits {@code {"variables": {"input": <input>, "source":
+     * <source>, "session_id": <sessionId>}}}, writing each variable only when its value is non-null
+     * and emitting {@code {"variables": {}}} when all three are {@code null}, then defers envelope
      * construction to {@link MexOperation.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexUsernameAvailability", exports = "mexCheckUsernameAvailabilityQueryJob",
@@ -96,6 +132,18 @@ public final class UsernameAvailabilityMexRequest implements MexOperation.Reques
                 writer.writeName("input");
                 writer.writeColon();
                 writer.writeString(input);
+            }
+
+            if (source != null) {
+                writer.writeName("source");
+                writer.writeColon();
+                writer.writeString(source);
+            }
+
+            if (sessionId != null) {
+                writer.writeName("session_id");
+                writer.writeColon();
+                writer.writeString(sessionId);
             }
             writer.endObject();
             writer.endObject();

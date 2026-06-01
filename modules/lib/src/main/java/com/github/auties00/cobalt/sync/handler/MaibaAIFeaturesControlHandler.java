@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
@@ -17,7 +17,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * {@link MaibaAIFeaturesControlAction.MaibaAIFeatureStatus#ENABLED_HAS_LEARNING}
  * or {@link MaibaAIFeaturesControlAction.MaibaAIFeatureStatus#DISABLED}) which
  * is persisted via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setAiBusinessAgentStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus)}
+ * {@link com.github.auties00.cobalt.store.BusinessStore#setAiBusinessAgentStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus)}
  * so SMB-AI features can read the current opt-in state without re-decoding the
  * protobuf.
  *
@@ -75,7 +75,7 @@ public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHan
      * {@link MaibaAIFeaturesControlAction#aiFeatureStatus()} is reported as
      * {@link MutationApplicationResult#malformed()}; otherwise the status is
      * persisted via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setAiBusinessAgentStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus)}.
+     * {@link com.github.auties00.cobalt.store.BusinessStore#setAiBusinessAgentStatus(MaibaAIFeaturesControlAction.MaibaAIFeatureStatus)}.
      *
      * @implNote
      * This implementation treats an empty status as malformed so the
@@ -84,7 +84,7 @@ public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHan
      * {@link SyncdOperation#REMOVE} semantic.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -94,7 +94,7 @@ public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHan
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setAiBusinessAgentStatus(action.aiFeatureStatus().get());
+        client.store().businessStore().setAiBusinessAgentStatus(action.aiFeatureStatus().get());
         return MutationApplicationResult.success();
     }
 

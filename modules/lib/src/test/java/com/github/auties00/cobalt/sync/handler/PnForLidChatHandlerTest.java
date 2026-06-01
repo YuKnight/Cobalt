@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -48,7 +48,7 @@ class PnForLidChatHandlerTest {
 
     private WhatsAppStore store;
     private TestABPropsService props;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private PnForLidChatHandler handler;
 
     @BeforeEach
@@ -70,7 +70,7 @@ class PnForLidChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("metadata — wire identity")
+    @DisplayName("metadata â€” wire identity")
     class Metadata {
         @Test
         @DisplayName("actionName() returns the PnForLidChatAction wire constant")
@@ -94,7 +94,7 @@ class PnForLidChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("AB-prop gating — pnh_pn_for_lid_chat_sync")
+    @DisplayName("AB-prop gating â€” pnh_pn_for_lid_chat_sync")
     class AbPropGating {
         @Test
         @DisplayName("when the prop is off, the mutation returns UNSUPPORTED")
@@ -109,7 +109,7 @@ class PnForLidChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — happy SET")
+    @DisplayName("applyMutation â€” happy SET")
     class ApplySetHappy {
         @Test
         @DisplayName("registers the bidirectional phoneJid <-> lidJid mapping on the store")
@@ -119,16 +119,16 @@ class PnForLidChatHandlerTest {
             var result = handler.applyMutation(client, build(CONTACT_LID, action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(CONTACT_PN, store.findPhoneByLid(CONTACT_LID).orElseThrow(),
+            assertEquals(CONTACT_PN, store.contactStore().findPhoneByLid(CONTACT_LID).orElseThrow(),
                     "WAWebPnForLidChatSync.applyMutations must persist the LID -> PN mapping");
         }
     }
 
     @Nested
-    @DisplayName("applyMutation — orphan dimension is n/a")
+    @DisplayName("applyMutation â€” orphan dimension is n/a")
     class OrphanDimension {
         @Test
-        @DisplayName("the handler writes to the LID-mapping table directly — no orphan path")
+        @DisplayName("the handler writes to the LID-mapping table directly â€” no orphan path")
         void noOrphanPath() {
             var action = new PnForLidChatActionBuilder().pnJid(CONTACT_PN).build();
             var result = handler.applyMutation(client, build(CONTACT_LID, action, SyncdOperation.SET, Instant.now()));
@@ -140,7 +140,7 @@ class PnForLidChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed value")
+    @DisplayName("applyMutation â€” malformed value")
     class MalformedValue {
         @Test
         @DisplayName("a value carrying the wrong action returns MALFORMED")
@@ -168,7 +168,7 @@ class PnForLidChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed index")
+    @DisplayName("applyMutation â€” malformed index")
     class MalformedIndex {
         @Test
         @DisplayName("an empty lidJid slot returns MALFORMED")
@@ -209,7 +209,7 @@ class PnForLidChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — REMOVE")
+    @DisplayName("applyMutation â€” REMOVE")
     class ApplyRemove {
         @Test
         @DisplayName("REMOVE operation returns UNSUPPORTED")
@@ -223,10 +223,10 @@ class PnForLidChatHandlerTest {
     }
 
     @Nested
-    @DisplayName("resolveConflicts — default timestamp comparison")
+    @DisplayName("resolveConflicts â€” default timestamp comparison")
     class ResolveConflicts {
         @Test
-        @DisplayName("newer remote → APPLY_REMOTE_DROP_LOCAL")
+        @DisplayName("newer remote â†’ APPLY_REMOTE_DROP_LOCAL")
         void newerRemoteApplies() {
             var local = build(CONTACT_LID, action(CONTACT_PN), SyncdOperation.SET, Instant.ofEpochSecond(1_000));
             var remote = build(CONTACT_LID, action(CONTACT_PN), SyncdOperation.SET, Instant.ofEpochSecond(2_000));
@@ -235,7 +235,7 @@ class PnForLidChatHandlerTest {
         }
 
         @Test
-        @DisplayName("equal timestamps → APPLY_REMOTE_DROP_LOCAL (remote wins on tie)")
+        @DisplayName("equal timestamps â†’ APPLY_REMOTE_DROP_LOCAL (remote wins on tie)")
         void equalTiesGoToRemote() {
             var ts = Instant.ofEpochSecond(1_500);
             assertEquals(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL,
@@ -245,7 +245,7 @@ class PnForLidChatHandlerTest {
         }
 
         @Test
-        @DisplayName("older remote → SKIP_REMOTE")
+        @DisplayName("older remote â†’ SKIP_REMOTE")
         void olderRemoteSkipped() {
             var local = build(CONTACT_LID, action(CONTACT_PN), SyncdOperation.SET, Instant.ofEpochSecond(2_000));
             var remote = build(CONTACT_LID, action(CONTACT_PN), SyncdOperation.SET, Instant.ofEpochSecond(1_000));

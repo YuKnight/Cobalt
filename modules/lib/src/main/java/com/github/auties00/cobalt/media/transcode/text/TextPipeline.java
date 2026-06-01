@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.media.transcode.text;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.media.transcode.text.link.DeepLinkParser;
@@ -41,7 +41,7 @@ import java.util.Set;
  * thumbnail, and (when applicable) payment-link metadata.
  *
  * <p>On every outgoing message the pipeline walks a fixed sequence. It first
- * consults the user's privacy gate ({@code store.disableLinkPreviews()}) and
+ * consults the user's privacy gate ({@code store.settingsStore().disableLinkPreviews()}) and
  * scans the body for the first detected URL via
  * {@link Linkify#findLink(String, boolean)}. It drops the URL when
  * {@link #isSuspicious(Jid, Linkify.Match)} flags an IDN homograph attempt or
@@ -84,10 +84,10 @@ public final class TextPipeline {
     private static final String LID_COUNTRY_CODE_SENTINEL = "ZZ";
 
     /**
-     * Holds the owning {@link WhatsAppClient} used for store access, media
+     * Holds the owning {@link LinkedWhatsAppClient} used for store access, media
      * uploads, and newsletter and catalog MEX round-trips.
      */
-    private final WhatsAppClient client;
+    private final LinkedWhatsAppClient client;
 
     /**
      * Holds the {@link ABPropsService} consulted to gate the rich fetch
@@ -130,7 +130,7 @@ public final class TextPipeline {
      *                               upload the HQ thumbnail
      * @throws NullPointerException if any argument is {@code null}
      */
-    public TextPipeline(WhatsAppClient client, ABPropsService abPropsService,
+    public TextPipeline(LinkedWhatsAppClient client, ABPropsService abPropsService,
                         MediaConnectionService mediaConnectionService) {
         this.client = Objects.requireNonNull(client, "client cannot be null");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService cannot be null");
@@ -188,7 +188,7 @@ public final class TextPipeline {
         if (message == null) {
             return;
         }
-        if (client.store().disableLinkPreviews()) {
+        if (client.store().settingsStore().disableLinkPreviews()) {
             return;
         }
         var text = message.text().orElse(null);
@@ -274,7 +274,7 @@ public final class TextPipeline {
         }
         var host = match.domain().toLowerCase();
         var recipientCC = countryCodeFor(chatJid);
-        var selfCC = countryCodeFor(client.store().jid().orElse(null));
+        var selfCC = countryCodeFor(client.store().accountStore().jid().orElse(null));
         return Idn.isSuspicious(host, recipientCC, selfCC, List.of());
     }
 

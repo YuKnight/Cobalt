@@ -1,94 +1,29 @@
 package com.github.auties00.cobalt.message.receive;
 
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
-import com.github.auties00.cobalt.message.dedup.MessageDedup;
-import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
-import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.store.WhatsAppStore;
-
-import java.util.Objects;
 
 /**
- * Single entry point for every inbound {@code <message>} stanza, routing each one to
- * the receiver matching the stanza's address class.
+ * Single entry point for every inbound {@code <message>} stanza, turning each one into the
+ * typed {@link MessageInfo} that matches the stanza's address class.
  *
- * <p>The router picks {@link NewsletterMessageReceiver} when the {@code from} JID lives
- * on the {@code @newsletter} server (Channels) and {@link ChatMessageReceiver} for
- * every other address class (1:1, group, broadcast, status, peer). The
- * {@link com.github.auties00.cobalt.client.WhatsAppClient} drives this service from the
- * socket layer; direct use is reserved for unit tests and for custom dispatchers.
+ * <p>Channels posts (a {@code from} JID on the {@code @newsletter} server) become a
+ * {@link NewsletterMessageInfo} read straight from the {@code <plaintext>} child; every other
+ * address class (1:1, group, broadcast, status, peer) goes through the Signal-protocol
+ * decryption pipeline and becomes a {@link ChatMessageInfo}. The
+ * {@link LinkedWhatsAppClient} drives this service from the socket layer; direct use is reserved
+ * for unit tests and custom dispatchers.
  *
- * @implNote
- * This implementation mirrors WhatsApp Web's
- * {@code WAWebCommsHandleMessagingStanza.handleMessagingStanza} dispatch but inlines
- * the dedup cache that WA Web gates behind the {@code web_pending_message_cache_enabled}
- * AB prop via {@code WAWebMessageDedupUtils.isPengingMessageCacheEnabled}; Cobalt
- * always dedups so duplicate fanout deliveries are dropped without the AB-prop
- * branch.
+ * @implSpec
+ * Implementations must be thread-safe and must deduplicate the same in-flight delivery so a
+ * server fanout that duplicates a message during an offline-to-online transition is processed
+ * once.
  */
-@WhatsAppWebModule(moduleName = "WAWebCommsHandleMessagingStanza")
-@WhatsAppWebModule(moduleName = "WAWebHandleMsg")
-public final class MessageReceivingService {
-    /**
-     * Logger used for the dedup-skip diagnostic.
-     */
-    private static final System.Logger LOGGER = System.getLogger(MessageReceivingService.class.getName());
-
-    /**
-     * Receiver invoked for every non-newsletter inbound stanza.
-     *
-     * <p>Holds the full Signal-protocol decryption pipeline.
-     */
-    private final ChatMessageReceiver chatReceiver;
-
-    /**
-     * Receiver invoked for every {@code @newsletter}-server inbound stanza.
-     *
-     * <p>Reads the {@code <plaintext>} child directly; no Signal decryption is involved.
-     */
-    private final NewsletterMessageReceiver newsletterReceiver;
-
-    /**
-     * In-flight dedup cache keyed by {@code fromJid:id}.
-     *
-     * <p>Guards against the same E2E message being processed twice when the server
-     * fanout duplicates a delivery during an offline-to-online transition; entries are
-     * short-lived and removed in the {@code finally} block of {@link #process(Node)}.
-     */
-    private final MessageDedup dedup;
-
-    /**
-     * Constructs the receiving service and assembles the internal receiver graph.
-     *
-     * <p>The same {@link WhatsAppStore} used by the rest of the client must be passed so
-     * the receivers see consistent self-JID and Signal-session state.
-     *
-     * @implNote
-     * This implementation injects both receivers through the constructor and exposes no
-     * service-locator accessor for them; both are package-private and owned solely by
-     * this service.
-     *
-     * @param store      the central session store, shared with the rest of the client
-     * @param decryption the Signal-protocol decryption service (PKMSG/MSG/SKMSG) plus
-     *                   the MSMSG bot-message scheme used by {@link ChatMessageReceiver}
-     */
-    @WhatsAppWebExport(moduleName = "WAWebCommsHandleMessagingStanza", exports = "handleMessagingStanza",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public MessageReceivingService(
-            WhatsAppStore store,
-            MessageDecryption decryption
-    ) {
-        this.chatReceiver = new ChatMessageReceiver(store, decryption);
-        this.newsletterReceiver = new NewsletterMessageReceiver(store);
-        this.dedup = new MessageDedup();
-    }
-
+public interface MessageReceivingService {
     /**
      * Routes and processes an incoming {@code <message>} stanza into the appropriate
      * {@link MessageInfo} subtype.
@@ -98,13 +33,10 @@ public final class MessageReceivingService {
      * unavailable fanout placeholders that should be silently acknowledged and for
      * duplicate deliveries already in flight; callers must treat both as no-ops.
      *
-     * @implNote
-     * This implementation builds the dedup key as {@code fromJid + ":" + id} and
-     * releases it in a {@code finally} so a follow-up message from the same peer is
-     * not falsely flagged when the first finishes; WhatsApp Web's
-     * {@code WAWebHandleMsg} delegates the same bookkeeping to
-     * {@code WAWebMessageDedupUtils.addPendingMessage}, which is also released after
-     * the message is fully processed.
+     * @implSpec
+     * Implementations must dispatch newsletter-server stanzas to the plaintext path and every
+     * other address class to the decryption path, and must return {@code null} for both
+     * unavailable fanout placeholders and duplicate in-flight deliveries.
      *
      * @param node the raw incoming {@code <message>} node; must be non-{@code null}
      * @return the processed message info, or {@code null} when the stanza is dropped
@@ -112,43 +44,17 @@ public final class MessageReceivingService {
      * @throws WhatsAppMessageException.Receive if decryption or validation fails for
      *                                          an E2E message
      */
-    @WhatsAppWebExport(moduleName = "WAWebCommsHandleMessagingStanza", exports = "handleMessagingStanza",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    @WhatsAppWebExport(moduleName = "WAWebHandleMsg", exports = "default",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public MessageInfo process(Node node) {
-        Objects.requireNonNull(node, "node");
-
-        var fromJid = node.getRequiredAttributeAsJid("from");
-        if (fromJid.hasNewsletterServer()) {
-            return newsletterReceiver.receive(node, fromJid);
-        }
-
-        var id = node.getRequiredAttributeAsString("id");
-        var dedupKey = fromJid + ":" + id;
-        if (dedup.isPending(dedupKey)) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Duplicate message {0}, skipping", id);
-            return null;
-        }
-        dedup.add(dedupKey);
-
-        try {
-            return chatReceiver.receive(node, fromJid);
-        } finally {
-            dedup.remove(dedupKey);
-        }
-    }
+    MessageInfo process(Node node);
 
     /**
      * Clears the pending-message dedup cache.
      *
      * <p>Called when the offline-delivery phase ends so messages re-delivered in a new
      * session are not mistakenly flagged as duplicates.
+     *
+     * @implSpec
+     * Implementations must drop every tracked in-flight key so a subsequent delivery of any
+     * previously-seen message id is processed rather than skipped.
      */
-    @WhatsAppWebExport(moduleName = "WAWebMessageDedupUtils", exports = "maybeClearPendingMessages",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public void clearPendingMessages() {
-        dedup.clear();
-    }
+    void clearPendingMessages();
 }

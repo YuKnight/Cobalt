@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncActionState;
@@ -37,7 +37,7 @@ class AndroidUnsupportedActionsHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -81,38 +81,38 @@ class AndroidUnsupportedActionsHandlerTest {
         @Test
         @DisplayName("allowed=true sets primaryAllowsAllMutations to true")
         void enables() {
-            assertFalse(client.store().primaryAllowsAllMutations(), "default is false");
+            assertFalse(client.store().syncStore().primaryAllowsAllMutations(), "default is false");
 
             var result = new AndroidUnsupportedActionsHandler().applyMutation(
                     client, androidMutation(Boolean.TRUE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().primaryAllowsAllMutations());
+            assertTrue(client.store().syncStore().primaryAllowsAllMutations());
         }
 
         @Test
         @DisplayName("allowed=false does NOT clear the flag (one-way set)")
         void doesNotClear() {
-            client.store().setPrimaryAllowsAllMutations(true);
+            client.store().syncStore().setPrimaryAllowsAllMutations(true);
 
             var result = new AndroidUnsupportedActionsHandler().applyMutation(
                     client, androidMutation(Boolean.FALSE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().primaryAllowsAllMutations(),
+            assertTrue(client.store().syncStore().primaryAllowsAllMutations(),
                     "the handler intentionally never resets the flag to false");
         }
 
         @Test
         @DisplayName("re-applying allowed=true on a set flag is a SUCCESS no-op")
         void idempotent() {
-            client.store().setPrimaryAllowsAllMutations(true);
+            client.store().syncStore().setPrimaryAllowsAllMutations(true);
 
             var result = new AndroidUnsupportedActionsHandler().applyMutation(
                     client, androidMutation(Boolean.TRUE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().primaryAllowsAllMutations());
+            assertTrue(client.store().syncStore().primaryAllowsAllMutations());
         }
     }
 
@@ -132,7 +132,7 @@ class AndroidUnsupportedActionsHandlerTest {
             var result = new AndroidUnsupportedActionsHandler().applyMutation(client, mutation);
 
             assertEquals(SyncActionState.MALFORMED, result.actionState());
-            assertFalse(client.store().primaryAllowsAllMutations(),
+            assertFalse(client.store().syncStore().primaryAllowsAllMutations(),
                     "malformed mutation must not touch the store");
         }
     }
@@ -159,7 +159,7 @@ class AndroidUnsupportedActionsHandlerTest {
                     client, androidMutation(Boolean.TRUE, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertFalse(client.store().primaryAllowsAllMutations());
+            assertFalse(client.store().syncStore().primaryAllowsAllMutations());
         }
     }
 

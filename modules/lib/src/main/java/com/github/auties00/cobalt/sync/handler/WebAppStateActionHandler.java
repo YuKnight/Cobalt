@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -69,7 +69,7 @@ public interface WebAppStateActionHandler {
      * Returns the mutation format version this handler accepts.
      *
      * <p>The dispatcher consults this value before invoking
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}; mutations whose on-wire
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}; mutations whose on-wire
      * version is greater than the handler's declared version are skipped so that an older client
      * cannot mis-interpret a newer payload shape.
      *
@@ -85,7 +85,7 @@ public interface WebAppStateActionHandler {
      * Applies a single decoded mutation and reports the outcome.
      *
      * <p>This is the per-mutation entry point used by the default batch loop in
-     * {@link #applyMutationBatch(WhatsAppClient, List)}; handlers that need batch-level
+     * {@link #applyMutationBatch(LinkedWhatsAppClient, List)}; handlers that need batch-level
      * deduplication or single-mutation semantics override the batch entry point instead and may
      * delegate here.
      *
@@ -99,11 +99,11 @@ public interface WebAppStateActionHandler {
      * {@link com.github.auties00.cobalt.client.WhatsAppClientErrorHandler} rather than being mapped
      * to a sentinel {@link MutationApplicationResult} as WA Web does.
      *
-     * @param client   the {@link WhatsAppClient} whose store the mutation should be applied to
+     * @param client   the {@link LinkedWhatsAppClient} whose store the mutation should be applied to
      * @param mutation the decoded, trusted mutation to apply
      * @return the detailed application outcome
      */
-    MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation);
+    MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation);
 
     /**
      * Applies a batch of decoded mutations and returns one result per input.
@@ -124,15 +124,15 @@ public interface WebAppStateActionHandler {
      *
      * @implNote
      * This implementation walks the input list sequentially on the calling virtual thread,
-     * delegating each mutation to {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}.
+     * delegating each mutation to {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}.
      * WA Web's {@code Promise.all} parallelism collapses to sequential blocking calls because
      * Cobalt's sync pipeline already runs on a virtual thread per patch.
      *
-     * @param client    the {@link WhatsAppClient} whose store the mutations should be applied to
+     * @param client    the {@link LinkedWhatsAppClient} whose store the mutations should be applied to
      * @param mutations the decoded, trusted mutations to apply
      * @return the per-mutation outcomes, in the same order as {@code mutations}
      */
-    default List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    default List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) {
             results.add(applyMutation(client, mutation));

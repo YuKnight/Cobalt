@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link LabelEditMutationFactory} builder.
  *
  * <p>Tests run against a fresh in-memory {@link DeviceFixtures#temporaryStore}
- * through {@link TestWhatsAppClient} so the {@link WhatsAppStore#findLabel(String)}
+ * through {@link TestWhatsAppClient} so the {@link com.github.auties00.cobalt.store.SettingsStore#findLabel(String)}
  * read-back can be asserted directly. The merge path mutates the existing
  * {@link com.github.auties00.cobalt.model.preference.Label} in place so chat-jid
  * assignments from {@link LabelAssociationHandler} are preserved across edits.
@@ -107,7 +107,7 @@ class LabelEditHandlerTest {
             var result = handler.applyMutation(client, buildSet("42", action, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var label = store.findLabel("42").orElseThrow();
+            var label = store.settingsStore().findLabel("42").orElseThrow();
             assertEquals("Customers", label.name());
             assertEquals(5, label.color());
             assertEquals(0, label.predefinedId().orElseThrow());
@@ -125,7 +125,7 @@ class LabelEditHandlerTest {
                     .color(1)
                     .build();
             existing.addAssignment(Jid.of("11110000@s.whatsapp.net"));
-            store.addLabel(existing);
+            store.settingsStore().addLabel(existing);
 
             var action = new LabelEditActionBuilder()
                     .name("Renamed")
@@ -134,7 +134,7 @@ class LabelEditHandlerTest {
             var result = handler.applyMutation(client, buildSet("42", action, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var merged = store.findLabel("42").orElseThrow();
+            var merged = store.settingsStore().findLabel("42").orElseThrow();
             assertEquals("Renamed", merged.name());
             assertEquals(7, merged.color());
             assertEquals(1, merged.assignments().size(),
@@ -144,8 +144,8 @@ class LabelEditHandlerTest {
         @Test
         @DisplayName("deleted=true removes the label from the store")
         void deletedRemoves() {
-            store.addLabel(new LabelBuilder().id("42").name("X").color(0).build());
-            assertTrue(store.findLabel("42").isPresent());
+            store.settingsStore().addLabel(new LabelBuilder().id("42").name("X").color(0).build());
+            assertTrue(store.settingsStore().findLabel("42").isPresent());
 
             var action = new LabelEditActionBuilder()
                     .deleted(true)
@@ -153,7 +153,7 @@ class LabelEditHandlerTest {
             var result = handler.applyMutation(client, buildSet("42", action, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findLabel("42").isEmpty(), "the label must be removed on deleted=true");
+            assertTrue(store.settingsStore().findLabel("42").isEmpty(), "the label must be removed on deleted=true");
         }
 
         @Test
@@ -179,7 +179,7 @@ class LabelEditHandlerTest {
             var result = handler.applyMutation(client, buildSet("99", action, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findLabel("99").isEmpty(),
+            assertTrue(store.settingsStore().findLabel("99").isEmpty(),
                     "SERVER_ASSIGNED labels are filtered out of the main label collection by WA Web");
         }
     }

@@ -110,7 +110,7 @@ class BusinessBroadcastCampaignHandlerTest {
                     buildMutation("camp-1", sampleAction(), SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findBusinessBroadcastCampaign("camp-1").orElseThrow();
+            var stored = store.businessStore().findBusinessBroadcastCampaign("camp-1").orElseThrow();
             assertEquals("camp-1", stored.id());
             assertEquals(Status.SCHEDULED, stored.status().orElseThrow());
             assertEquals(Jid.of(BROADCAST_JID), stored.broadcastJid().orElseThrow());
@@ -216,7 +216,7 @@ class BusinessBroadcastCampaignHandlerTest {
                     buildMutation("camp-rm", null, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findBusinessBroadcastCampaign("camp-rm").isEmpty());
+            assertTrue(store.businessStore().findBusinessBroadcastCampaign("camp-rm").isEmpty());
         }
     }
 

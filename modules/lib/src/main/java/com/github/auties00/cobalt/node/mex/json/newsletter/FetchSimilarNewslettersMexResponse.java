@@ -92,6 +92,12 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
         private final ThreadMetadata threadMetadata;
 
         /**
+         * Holds the optional status-metadata projection echoed under {@code status_metadata},
+         * present only when the request set {@code fetch_status_metadata}.
+         */
+        private final StatusMetadata statusMetadata;
+
+        /**
          * Holds the lifecycle state marker echoed under {@code state}.
          */
         private final State state;
@@ -101,11 +107,13 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
          *
          * @param id             the newsletter Jid string
          * @param threadMetadata the slim display-metadata block
+         * @param statusMetadata the optional status-metadata projection
          * @param state          the lifecycle state marker
          */
-        private Result(String id, ThreadMetadata threadMetadata, State state) {
+        private Result(String id, ThreadMetadata threadMetadata, StatusMetadata statusMetadata, State state) {
             this.id = id;
             this.threadMetadata = threadMetadata;
+            this.statusMetadata = statusMetadata;
             this.state = state;
         }
 
@@ -125,6 +133,16 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
          */
         public Optional<ThreadMetadata> threadMetadata() {
             return Optional.ofNullable(threadMetadata);
+        }
+
+        /**
+         * Returns the optional status-metadata projection.
+         *
+         * @return the parsed {@link StatusMetadata}, or empty when omitted (for example when the
+         *         request did not set {@code fetch_status_metadata})
+         */
+        public Optional<StatusMetadata> statusMetadata() {
+            return Optional.ofNullable(statusMetadata);
         }
 
         /**
@@ -508,6 +526,75 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
         }
 
         /**
+         * Wraps the optional {@code status_metadata} block on a similar-newsletter entry.
+         *
+         * <p>Gated server-side by the {@code fetch_status_metadata} GraphQL variable; carries the
+         * server-assigned id of the newsletter's most recent status update. Absent when the request
+         * did not opt in.
+         *
+         * @implNote This implementation models only {@code last_status_server_id} because the
+         * similar-newsletters selection set omits the {@code last_status_sent_time} field the
+         * directory-list and search selection sets carry.
+         */
+        public static final class StatusMetadata {
+            /**
+             * Holds the server-assigned id of the last status update.
+             */
+            private final String lastStatusServerId;
+
+            /**
+             * Constructs a parsed {@code status_metadata} value.
+             *
+             * @param lastStatusServerId the server-assigned id of the last status update
+             */
+            private StatusMetadata(String lastStatusServerId) {
+                this.lastStatusServerId = lastStatusServerId;
+            }
+
+            /**
+             * Returns the server-assigned id of the last status update.
+             *
+             * @return the {@code last_status_server_id} value, or empty when omitted
+             */
+            public Optional<String> lastStatusServerId() {
+                return Optional.ofNullable(lastStatusServerId);
+            }
+
+            /**
+             * Parses a {@code status_metadata} fragment from the given JSON object.
+             *
+             * @param obj the JSON object to parse
+             * @return the parsed value, or empty when {@code obj} is {@code null}
+             */
+            static Optional<StatusMetadata> of(JSONObject obj) {
+                if (obj == null) {
+                    return Optional.empty();
+                }
+
+                var lastStatusServerId = obj.getString("last_status_server_id");
+                return Optional.of(new StatusMetadata(lastStatusServerId));
+            }
+
+            /**
+             * Parses every {@code status_metadata} fragment in the given JSON array.
+             *
+             * @param arr the JSON array to parse
+             * @return the list of parsed values, empty when {@code arr} is {@code null}
+             */
+            static List<StatusMetadata> ofArray(JSONArray arr) {
+                if (arr == null) {
+                    return List.of();
+                }
+
+                var result = new ArrayList<StatusMetadata>(arr.size());
+                for (var i = 0; i < arr.size(); i++) {
+                    of(arr.getJSONObject(i)).ifPresent(result::add);
+                }
+                return result;
+            }
+        }
+
+        /**
          * Parses a single {@code result} entry from the given JSON object.
          *
          * @param obj the JSON object to parse
@@ -520,8 +607,9 @@ public final class FetchSimilarNewslettersMexResponse implements MexOperation.Re
 
             var id = obj.getString("id");
             var threadMetadata = ThreadMetadata.of(obj.getJSONObject("thread_metadata")).orElse(null);
+            var statusMetadata = StatusMetadata.of(obj.getJSONObject("status_metadata")).orElse(null);
             var state = State.of(obj.getJSONObject("state")).orElse(null);
-            return Optional.of(new Result(id, threadMetadata, state));
+            return Optional.of(new Result(id, threadMetadata, statusMetadata, state));
         }
 
         /**

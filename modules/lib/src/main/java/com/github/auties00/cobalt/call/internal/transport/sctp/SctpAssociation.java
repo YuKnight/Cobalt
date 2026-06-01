@@ -3,7 +3,9 @@ package com.github.auties00.cobalt.call.internal.transport.sctp;
 import com.github.auties00.cobalt.call.internal.transport.sctp.bindings.UsrSctp;
 import com.github.auties00.cobalt.call.internal.transport.sctp.bindings.sctp_event;
 import com.github.auties00.cobalt.call.internal.transport.sctp.bindings.sctp_initmsg;
+import com.github.auties00.cobalt.call.internal.transport.sctp.bindings.sctp_prinfo;
 import com.github.auties00.cobalt.call.internal.transport.sctp.bindings.sctp_rcvinfo;
+import com.github.auties00.cobalt.call.internal.transport.sctp.bindings.sctp_sendv_spa;
 import com.github.auties00.cobalt.call.internal.transport.sctp.bindings.sctp_sndinfo;
 import com.github.auties00.cobalt.call.internal.transport.sctp.bindings.sockaddr_conn;
 import com.github.auties00.cobalt.call.internal.transport.sctp.bindings.usrsctp_socket$receive_cb;
@@ -144,6 +146,14 @@ public final class SctpAssociation implements AutoCloseable {
      * Holds the reusable scratch segment for the {@code sctp_sndinfo} struct passed to {@code usrsctp_sendv}.
      */
     private final MemorySegment sndInfoScratch;
+
+    /**
+     * Scratch buffer for {@code sctp_sendv_spa} used by
+     * {@link #sendWithPolicy(int, int, byte[], boolean, short, int)}. Reused across calls;
+     * lazily-allocated on the first partial-reliability send so fully-reliable sends do not pay
+     * the allocation cost.
+     */
+    private volatile MemorySegment spaScratch;
 
     /**
      * Holds the reusable scratch segment for the local-side {@code sockaddr_conn} struct passed to
@@ -435,6 +445,84 @@ public final class SctpAssociation implements AutoCloseable {
             }
             if (sent != payload.length) {
                 throw new WhatsAppCallException.Sctp("usrsctp_sendv short write: " + sent + " of " + payload.length);
+            }
+        }
+    }
+
+    /**
+     * Sends a message under a partial-reliability policy.
+     *
+     * <p>Routes through {@code usrsctp_sendv} with a {@link sctp_sendv_spa} container whose
+     * {@code sendv_flags} carry both {@link UsrSctp#SCTP_SEND_SNDINFO_VALID() SCTP_SEND_SNDINFO_VALID}
+     * and {@link UsrSctp#SCTP_SEND_PRINFO_VALID() SCTP_SEND_PRINFO_VALID}, so the message is delivered
+     * on the chosen stream with the requested PR policy applied by usrsctp's outbound scheduler.
+     *
+     * @param streamId the SCTP stream index (0 .. 1023)
+     * @param ppid     the SCTP PPID
+     * @param payload  the message bytes
+     * @param ordered  {@code true} for ordered delivery, {@code false} for unordered
+     * @param prPolicy one of {@link UsrSctp#SCTP_PR_SCTP_NONE()},
+     *                 {@link UsrSctp#SCTP_PR_SCTP_TTL()}, or
+     *                 {@link UsrSctp#SCTP_PR_SCTP_RTX()}
+     * @param prValue  the policy operand: max retransmissions for {@code SCTP_PR_SCTP_RTX},
+     *                 lifetime milliseconds for {@code SCTP_PR_SCTP_TTL}; ignored for
+     *                 {@code SCTP_PR_SCTP_NONE}
+     * @throws NullPointerException       if {@code payload} is {@code null}
+     * @throws WhatsAppCallException.Sctp if {@code usrsctp_sendv} fails or sends fewer bytes than requested
+     */
+    public void sendWithPolicy(int streamId, int ppid, byte[] payload, boolean ordered,
+                               short prPolicy, int prValue) {
+        Objects.requireNonNull(payload, "payload cannot be null");
+        requireOpen();
+        var spa = spaScratch;
+        if (spa == null) {
+            synchronized (this) {
+                spa = spaScratch;
+                if (spa == null) {
+                    spa = sctp_sendv_spa.allocate(arena);
+                    spaScratch = spa;
+                }
+            }
+        }
+        sctp_sendv_spa.sendv_flags(spa,
+                UsrSctp.SCTP_SEND_SNDINFO_VALID() | UsrSctp.SCTP_SEND_PRINFO_VALID());
+        var sndInfo = sctp_sendv_spa.sendv_sndinfo(spa);
+        sctp_sndinfo.snd_sid(sndInfo, (short) streamId);
+        sctp_sndinfo.snd_flags(sndInfo, ordered ? (short) 0 : SCTP_UNORDERED);
+        sctp_sndinfo.snd_ppid(sndInfo, htonl(ppid));
+        sctp_sndinfo.snd_context(sndInfo, 0);
+        sctp_sndinfo.snd_assoc_id(sndInfo, 0);
+        var prInfo = sctp_sendv_spa.sendv_prinfo(spa);
+        sctp_prinfo.pr_policy(prInfo, prPolicy);
+        sctp_prinfo.pr_value(prInfo, prValue);
+        try (var scratch = Arena.ofConfined()) {
+            MemorySegment data;
+            if (payload.length == 0) {
+                data = MemorySegment.NULL;
+            } else {
+                data = scratch.allocate(payload.length);
+                MemorySegment.copy(payload, 0, data, ValueLayout.JAVA_BYTE, 0, payload.length);
+            }
+            long sent;
+            try {
+                sent = UsrSctp.usrsctp_sendv(
+                        socket,
+                        data,
+                        payload.length,
+                        MemorySegment.NULL,
+                        0,
+                        spa,
+                        (int) sctp_sendv_spa.layout().byteSize(),
+                        UsrSctp.SCTP_SENDV_SPA(),
+                        0);
+            } catch (Throwable t) {
+                throw new WhatsAppCallException.Sctp("usrsctp_sendv (SPA) failed", t);
+            }
+            if (sent < 0) {
+                throw new WhatsAppCallException.Sctp("usrsctp_sendv (SPA) returned " + sent);
+            }
+            if (sent != payload.length) {
+                throw new WhatsAppCallException.Sctp("usrsctp_sendv (SPA) short write: " + sent + " of " + payload.length);
             }
         }
     }

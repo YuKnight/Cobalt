@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -89,7 +89,7 @@ public final class MuteChatMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "generateMuteMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation generateMuteMutation(
-            WhatsAppClient client,
+            LinkedWhatsAppClient client,
             Jid chatJid,
             long muteEndSeconds,
             Long mentionAllSeconds

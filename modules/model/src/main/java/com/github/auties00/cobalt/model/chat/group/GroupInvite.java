@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 /**
- * Input model for {@code WhatsAppClient.queryGroupInfoByInvite} — a v4
+ * Input model for {@code LinkedWhatsAppClient.queryGroupInfoByInvite} — a v4
  * in-band invite payload addressed by the
  * {@link com.github.auties00.cobalt.model.message.group.GroupInviteMessage GroupInviteMessage}.
  *

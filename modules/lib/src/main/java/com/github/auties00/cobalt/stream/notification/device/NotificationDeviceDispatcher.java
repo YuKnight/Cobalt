@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -9,7 +10,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.stream.control.OfflineNotificationsReporter;
 import com.github.auties00.cobalt.wam.WamService;
 
@@ -31,7 +32,7 @@ import com.github.auties00.cobalt.wam.WamService;
  * functions.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
-public final class NotificationDeviceDispatcher implements SocketStream.Handler {
+public final class NotificationDeviceDispatcher extends SocketStreamHandler.Concurrent {
     /**
      * Handles {@code type="devices"} notifications carrying device add, remove, or update actions
      * for a user's device list.
@@ -61,11 +62,11 @@ public final class NotificationDeviceDispatcher implements SocketStream.Handler 
      * Constructs the dispatcher and eagerly instantiates every sub-handler with the shared
      * dependencies.
      *
-     * <p>Called once during {@link SocketStream} setup. Each constructor parameter is forwarded to
+     * <p>Called once during {@link NodeStreamService} setup. Each constructor parameter is forwarded to
      * the sub-handlers that consume it; dependencies not needed by a given sub-handler are not
      * passed to it.
      *
-     * @param whatsapp                     the {@link WhatsAppClient} forwarded to every sub-handler for store and node access
+     * @param whatsapp                     the {@link LinkedWhatsAppClient} forwarded to every sub-handler for store and node access
      * @param deviceLinkingService         the {@link CompanionPairingService} consumed by the linking handler for the pairing-code handshake
      * @param abPropsService               the {@link ABPropsService} consumed by the server-crypto handler for {@code server/abprops} resync
      * @param deviceService                the {@link DeviceService} consumed by the device-list handler for {@code add}/{@code remove}/{@code update} dispatch
@@ -74,7 +75,7 @@ public final class NotificationDeviceDispatcher implements SocketStream.Handler 
      * @param ackSender                    the {@link AckSender} forwarded to every sub-handler for emitting the per-notification outbound {@code <ack>} stanza
      */
     public NotificationDeviceDispatcher(
-            WhatsAppClient whatsapp,
+            LinkedWhatsAppClient whatsapp,
             CompanionPairingService deviceLinkingService,
             ABPropsService abPropsService,
             DeviceService deviceService,

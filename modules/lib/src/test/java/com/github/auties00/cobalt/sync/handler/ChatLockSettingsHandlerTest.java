@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.setting.ChatLockSettings;
@@ -38,7 +38,7 @@ class ChatLockSettingsHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -108,7 +108,7 @@ class ChatLockSettingsHandlerTest {
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var result = new ChatLockSettingsHandler().applyMutation(client, mutation(true, null, SyncdOperation.SET, ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = client.store().chatLockSettings().orElseThrow();
+            var stored = client.store().settingsStore().chatLockSettings().orElseThrow();
             assertTrue(stored.hideLockedChats());
             assertTrue(stored.secretCode().isEmpty());
         }
@@ -119,7 +119,7 @@ class ChatLockSettingsHandlerTest {
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var result = new ChatLockSettingsHandler().applyMutation(client, mutation(true, validSecretCode(), SyncdOperation.SET, ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = client.store().chatLockSettings().orElseThrow();
+            var stored = client.store().settingsStore().chatLockSettings().orElseThrow();
             assertTrue(stored.hideLockedChats());
             assertTrue(stored.secretCode().isPresent());
         }
@@ -271,7 +271,7 @@ class ChatLockSettingsHandlerTest {
         @DisplayName("an empty batch produces an empty result list and does not touch the store")
         void emptyBatch() {
             assertTrue(new ChatLockSettingsHandler().applyMutationBatch(client, List.of()).isEmpty());
-            assertTrue(client.store().chatLockSettings().isEmpty());
+            assertTrue(client.store().settingsStore().chatLockSettings().isEmpty());
         }
 
         @Test
@@ -295,7 +295,7 @@ class ChatLockSettingsHandlerTest {
             assertEquals(1, results.size());
             assertEquals(SyncActionState.MALFORMED, results.get(0).actionState());
             // sanitised value still landed: hide=true, secret=null
-            var stored = client.store().chatLockSettings().orElseThrow();
+            var stored = client.store().settingsStore().chatLockSettings().orElseThrow();
             assertTrue(stored.hideLockedChats());
             assertTrue(stored.secretCode().isEmpty(),
                     "WAWebChatLockSettingsSync clears the secret on a malformed-secret mutation but still persists hideLockedChats");
@@ -310,7 +310,7 @@ class ChatLockSettingsHandlerTest {
             ));
             assertEquals(1, results.size());
             assertEquals(SyncActionState.UNSUPPORTED, results.get(0).actionState());
-            assertTrue(client.store().chatLockSettings().isEmpty(),
+            assertTrue(client.store().settingsStore().chatLockSettings().isEmpty(),
                     "no UNSUPPORTED mutation contributes to the pending save target");
         }
 
@@ -326,7 +326,7 @@ class ChatLockSettingsHandlerTest {
             for (var r : results) {
                 assertEquals(SyncActionState.SUCCESS, r.actionState());
             }
-            assertTrue(client.store().chatLockSettings().orElseThrow().hideLockedChats(),
+            assertTrue(client.store().settingsStore().chatLockSettings().orElseThrow().hideLockedChats(),
                     "the last SET's value lands in the store");
         }
 
@@ -342,7 +342,7 @@ class ChatLockSettingsHandlerTest {
             var results = new ChatLockSettingsHandler().applyMutationBatch(client, List.of(bad));
             assertEquals(1, results.size());
             assertEquals(SyncActionState.MALFORMED, results.get(0).actionState());
-            assertFalse(client.store().chatLockSettings().isPresent(),
+            assertFalse(client.store().settingsStore().chatLockSettings().isPresent(),
                     "WAWebChatLockSettingsSync skips the save when no chatLockSettings was ever parsed");
         }
     }

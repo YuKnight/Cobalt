@@ -1,4 +1,4 @@
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
@@ -11,7 +11,7 @@ import com.github.auties00.cobalt.util.SchedulerUtils;
  */
 void main() throws IOException {
     var phoneNumber = 393495089819L;
-    WhatsAppClient.builder()
+    LinkedWhatsAppClient.builder()
             .webClient(WhatsAppStoreFactory.temporary())
             .createConnection()
             .unregistered(phoneNumber, code -> System.out.println("COBALT_PAIRING_CODE=" + code))

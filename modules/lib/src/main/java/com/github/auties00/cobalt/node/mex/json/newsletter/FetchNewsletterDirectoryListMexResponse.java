@@ -312,6 +312,12 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             private final String verification;
 
             /**
+             * Holds the optional status-metadata projection, present only when the request set
+             * {@code fetch_status_metadata}.
+             */
+            private final StatusMetadata statusMetadata;
+
+            /**
              * Constructs a thread-metadata wrapper from the parsed sub-fields.
              *
              * <p>Reserved for the static parser.
@@ -324,8 +330,9 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
              * @param description      the localised description projection
              * @param picture          the picture reference projection
              * @param verification     the verification tier label
+             * @param statusMetadata   the optional status-metadata projection
              */
-            private ThreadMetadata(Long creationTime, String invite, String handle, Long subscribersCount, Name name, Description description, Picture picture, String verification) {
+            private ThreadMetadata(Long creationTime, String invite, String handle, Long subscribersCount, Name name, Description description, Picture picture, String verification, StatusMetadata statusMetadata) {
                 this.creationTime = creationTime;
                 this.invite = invite;
                 this.handle = handle;
@@ -334,6 +341,7 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 this.description = description;
                 this.picture = picture;
                 this.verification = verification;
+                this.statusMetadata = statusMetadata;
             }
 
             /**
@@ -406,6 +414,16 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
              */
             public Optional<String> verification() {
                 return Optional.ofNullable(verification);
+            }
+
+            /**
+             * Returns the optional status-metadata projection.
+             *
+             * @return the parsed {@link StatusMetadata}, or empty when the relay omitted the field
+             *         (for example when the request did not set {@code fetch_status_metadata})
+             */
+            public Optional<StatusMetadata> statusMetadata() {
+                return Optional.ofNullable(statusMetadata);
             }
 
             /**
@@ -718,6 +736,93 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
             }
 
             /**
+             * Wraps the optional {@code status_metadata} sub-object.
+             *
+             * <p>Gated server-side by the {@code fetch_status_metadata} GraphQL variable; carries the
+             * server-assigned id of the newsletter's most recent status update and the epoch-second it
+             * was sent. Absent when the request did not opt in.
+             */
+            public static final class StatusMetadata {
+                /**
+                 * Holds the server-assigned id of the last status update.
+                 */
+                private final String lastStatusServerId;
+
+                /**
+                 * Holds the epoch-second the last status update was sent.
+                 */
+                private final Long lastStatusSentTime;
+
+                /**
+                 * Constructs a status-metadata wrapper from the parsed sub-fields.
+                 *
+                 * <p>Reserved for the static parser.
+                 *
+                 * @param lastStatusServerId the server-assigned id of the last status update
+                 * @param lastStatusSentTime the epoch-second the last status update was sent
+                 */
+                private StatusMetadata(String lastStatusServerId, Long lastStatusSentTime) {
+                    this.lastStatusServerId = lastStatusServerId;
+                    this.lastStatusSentTime = lastStatusSentTime;
+                }
+
+                /**
+                 * Returns the server-assigned id of the last status update.
+                 *
+                 * @return the last-status server id, or empty when the relay omitted the field
+                 */
+                public Optional<String> lastStatusServerId() {
+                    return Optional.ofNullable(lastStatusServerId);
+                }
+
+                /**
+                 * Returns the instant the last status update was sent.
+                 *
+                 * @return the last-status sent instant, or empty when the relay omitted the field
+                 */
+                public Optional<Instant> lastStatusSentTime() {
+                    return Optional.ofNullable(lastStatusSentTime).map(Instant::ofEpochSecond);
+                }
+
+                /**
+                 * Parses a {@link StatusMetadata} from the given JSON object.
+                 *
+                 * <p>Used by {@link ThreadMetadata#of(JSONObject)} to hydrate the nested
+                 * {@code status_metadata} entry.
+                 *
+                 * @param obj the JSON object to parse
+                 * @return the parsed {@link StatusMetadata}, or empty when {@code obj} is {@code null}
+                 */
+                static Optional<StatusMetadata> of(JSONObject obj) {
+                    if (obj == null) {
+                        return Optional.empty();
+                    }
+
+                    var lastStatusServerId = obj.getString("last_status_server_id");
+                    var lastStatusSentTime = obj.getLong("last_status_sent_time");
+                    return Optional.of(new StatusMetadata(lastStatusServerId, lastStatusSentTime));
+                }
+
+                /**
+                 * Parses a list of {@link StatusMetadata} entries from the given JSON array.
+                 *
+                 * @param arr the JSON array to parse
+                 * @return the parsed list, empty when {@code arr} is {@code null}
+                 */
+                static List<StatusMetadata> ofArray(JSONArray arr) {
+                    if (arr == null) {
+                        return List.of();
+                    }
+
+                    var result = new ArrayList<StatusMetadata>(arr.size());
+                    for (var i = 0; i < arr.size(); i++) {
+                        of(arr.getJSONObject(i)).ifPresent(result::add);
+                    }
+                    return result;
+                }
+            }
+
+            /**
              * Parses a {@link ThreadMetadata} from the given JSON object.
              *
              * <p>Used by {@link Result#of(JSONObject)} to hydrate the nested {@code thread_metadata}
@@ -739,7 +844,8 @@ public final class FetchNewsletterDirectoryListMexResponse implements MexOperati
                 var description = Description.of(obj.getJSONObject("description")).orElse(null);
                 var picture = Picture.of(obj.getJSONObject("picture")).orElse(null);
                 var verification = obj.getString("verification");
-                return Optional.of(new ThreadMetadata(creationTime, invite, handle, subscribersCount, name, description, picture, verification));
+                var statusMetadata = StatusMetadata.of(obj.getJSONObject("status_metadata")).orElse(null);
+                return Optional.of(new ThreadMetadata(creationTime, invite, handle, subscribersCount, name, description, picture, verification, statusMetadata));
             }
 
             /**

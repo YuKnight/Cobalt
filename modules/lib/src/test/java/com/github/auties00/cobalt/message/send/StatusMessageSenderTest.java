@@ -2,7 +2,6 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.StubDeviceService;
-import com.github.auties00.cobalt.device.fanout.DeviceGroupFanoutResult;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution;
@@ -10,21 +9,28 @@ import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.ReportingStanza;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
+import com.github.auties00.cobalt.model.contact.ContactBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
+import com.github.auties00.cobalt.model.privacy.StatusPrivacyMode;
+import com.github.auties00.cobalt.model.privacy.StatusPrivacySettingBuilder;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,13 +58,13 @@ class StatusMessageSenderTest {
         var senderStore = MessageFixtures.temporaryStore(SELF_PN, SELF_LID);
         // Pre-mark the audience device as already having the sender key so the
         // steady-state branch is taken.
-        senderStore.markSenderKeyDistributed(STATUS, AUDIENCE_DEVICE);
+        senderStore.signalStore().markSenderKeyDistributed(STATUS, AUDIENCE_DEVICE);
 
         var captured = new AtomicReference<Node>();
         var client = clientWithCapture(senderStore, captured);
         var sender = statusMessageSender(client, senderStore,
-                StubDeviceService.create().withGroupFanout(
-                        (g, s) -> new DeviceGroupFanoutResult(Set.of(AUDIENCE_DEVICE), "")));
+                StubDeviceService.create().withStatusFanout(
+                        audience -> Set.of(AUDIENCE_DEVICE)));
 
         sender.send(STATUS, statusMessage("3EB0STAT001", MessageContainer.of("status body")));
 
@@ -89,13 +95,13 @@ class StatusMessageSenderTest {
     @DisplayName("text status: <meta> child is emitted when present (status_setting omitted when no privacy entry seeded)")
     void metaShapeWhenNoPrivacy() {
         var senderStore = MessageFixtures.temporaryStore(SELF_PN, SELF_LID);
-        senderStore.markSenderKeyDistributed(STATUS, AUDIENCE_DEVICE);
+        senderStore.signalStore().markSenderKeyDistributed(STATUS, AUDIENCE_DEVICE);
 
         var captured = new AtomicReference<Node>();
         var client = clientWithCapture(senderStore, captured);
         var sender = statusMessageSender(client, senderStore,
-                StubDeviceService.create().withGroupFanout(
-                        (g, s) -> new DeviceGroupFanoutResult(Set.of(AUDIENCE_DEVICE), "")));
+                StubDeviceService.create().withStatusFanout(
+                        audience -> Set.of(AUDIENCE_DEVICE)));
 
         sender.send(STATUS, statusMessage("3EB0STAT002", MessageContainer.of("status with no privacy entry")));
 
@@ -105,6 +111,55 @@ class StatusMessageSenderTest {
             assertTrue(meta.getAttribute("status_setting").isEmpty(),
                     "no privacy entry means no status_setting attribute on <meta>");
         }
+    }
+
+    @Test
+    @DisplayName("audience derives from status privacy: WHITELIST -> allowlist; CONTACTS_EXCEPT -> contacts minus blocklist")
+    void audienceFromStatusPrivacy() {
+        var a = Jid.of("111111111111@s.whatsapp.net");
+        var b = Jid.of("222222222222@s.whatsapp.net");
+        var c = Jid.of("333333333333@s.whatsapp.net");
+
+        var whitelistAudience = captureStatusAudience(store -> {
+            store.contactStore().addContact(new ContactBuilder().jid(a).build());
+            store.contactStore().addContact(new ContactBuilder().jid(b).build());
+            store.contactStore().addContact(new ContactBuilder().jid(c).build());
+            store.settingsStore().setStatusPrivacy(new StatusPrivacySettingBuilder()
+                    .mode(StatusPrivacyMode.WHITELIST).jids(List.of(a)).build());
+        });
+        assertEquals(Set.of(a), Set.copyOf(whitelistAudience),
+                "WHITELIST audience must be exactly the allowlist, ignoring contacts");
+
+        var exceptAudience = captureStatusAudience(store -> {
+            store.contactStore().addContact(new ContactBuilder().jid(a).build());
+            store.contactStore().addContact(new ContactBuilder().jid(b).build());
+            store.contactStore().addContact(new ContactBuilder().jid(c).build());
+            store.settingsStore().setStatusPrivacy(new StatusPrivacySettingBuilder()
+                    .mode(StatusPrivacyMode.CONTACTS_EXCEPT).jids(List.of(b)).build());
+        });
+        assertEquals(Set.of(a, c), Set.copyOf(exceptAudience),
+                "CONTACTS_EXCEPT audience must be all contacts minus the blocklist");
+    }
+
+    // Runs a status send after the given store seeding and returns the audience the sender handed
+    // to getStatusFanout. AUDIENCE_DEVICE is pre-marked so the send takes the steady-state branch
+    // and never reaches the per-device sender-key crypto.
+    private static Collection<Jid> captureStatusAudience(Consumer<WhatsAppStore> seed) {
+        var senderStore = MessageFixtures.temporaryStore(SELF_PN, SELF_LID);
+        senderStore.signalStore().markSenderKeyDistributed(STATUS, AUDIENCE_DEVICE);
+        seed.accept(senderStore);
+
+        var captured = new AtomicReference<Node>();
+        var client = clientWithCapture(senderStore, captured);
+        var audienceRef = new AtomicReference<Collection<Jid>>();
+        var sender = statusMessageSender(client, senderStore,
+                StubDeviceService.create().withStatusFanout(audience -> {
+                    audienceRef.set(audience);
+                    return Set.of(AUDIENCE_DEVICE);
+                }));
+
+        sender.send(STATUS, statusMessage("3EB0STATAUD", MessageContainer.of("audience probe")));
+        return audienceRef.get();
     }
 
     // The returned ack carries only the t attribute, which AckParser reads as
@@ -125,9 +180,10 @@ class StatusMessageSenderTest {
     private static StatusMessageSender statusMessageSender(TestWhatsAppClient client, WhatsAppStore store, StubDeviceService deviceService) {
         var ab = client.abPropsService();
         var encryption = new MessageEncryption(store,
-                new SignalSessionCipher(store),
-                new SignalGroupCipher(store));
-        var wamService = new DefaultWamService(client, ab);
+                new SignalSessionCipher(store.signalStore()),
+                new SignalGroupCipher(store.signalStore()),
+                new SignalCryptoLocks());
+        var wamService = new LiveWamService(client, ab);
         var skDistribution = new SenderKeyDistribution(encryption, deviceService, store);
         var meta = new MetaStanza(store);
         var reporting = new ReportingStanza(ab);

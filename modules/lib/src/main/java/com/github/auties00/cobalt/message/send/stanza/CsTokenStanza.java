@@ -116,7 +116,7 @@ public final class CsTokenStanza {
             return null;
         }
 
-        var chat = store.findChatByJid(chatJid).orElse(null);
+        var chat = store.chatStore().findChatByJid(chatJid).orElse(null);
         var recipientLid = chat != null ? chat.accountLid().orElse(null) : null;
         if (recipientLid == null) {
             LOGGER.log(System.Logger.Level.WARNING, "[nct-cstoken] recipientLid is null");

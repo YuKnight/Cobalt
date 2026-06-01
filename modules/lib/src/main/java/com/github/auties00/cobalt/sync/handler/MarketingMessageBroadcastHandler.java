@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -28,7 +28,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote
  * This implementation persists each association eagerly through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#putMarketingMessageBroadcast(com.github.auties00.cobalt.model.business.MarketingMessageBroadcast)}
+ * {@link com.github.auties00.cobalt.store.BusinessStore#putMarketingMessageBroadcast(com.github.auties00.cobalt.model.business.MarketingMessageBroadcast)}
  * keyed by the sent message id, with the premium template id stored as the
  * record's status field. WA Web batches the pairs and mutates the
  * {@code sentMessageIds} set on each premium template once at the end of the
@@ -84,7 +84,7 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
      * referenced premium template is unknown locally the mutation is reported
      * as {@link MutationApplicationResult#orphan()}; otherwise the
      * association is persisted via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#putMarketingMessageBroadcast(com.github.auties00.cobalt.model.business.MarketingMessageBroadcast)}.
+     * {@link com.github.auties00.cobalt.store.BusinessStore#putMarketingMessageBroadcast(com.github.auties00.cobalt.model.business.MarketingMessageBroadcast)}.
      *
      * @implNote
      * This implementation classifies a missing index slot as
@@ -96,7 +96,7 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPremiumMessageBroadcastSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() <= 2) {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
@@ -112,11 +112,11 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
             return MutationApplicationResult.unsupported();
         }
 
-        if (client.store().findMarketingMessage(premiumMessageId).isEmpty()) {
+        if (client.store().businessStore().findMarketingMessage(premiumMessageId).isEmpty()) {
             return MutationApplicationResult.orphan();
         }
 
-        client.store().putMarketingMessageBroadcast(new MarketingMessageBroadcastBuilder()
+        client.store().businessStore().putMarketingMessageBroadcast(new MarketingMessageBroadcastBuilder()
                 .templateId(messageId)
                 .status(premiumMessageId)
                 .build());

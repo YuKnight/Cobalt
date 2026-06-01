@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.message.send.crypto;
 
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.message.receive.crypto.SenderKeyNameFactory;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -10,8 +11,10 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
+import com.github.auties00.libsignal.groups.SignalSenderKeyName;
 import com.github.auties00.libsignal.protocol.SignalSenderKeyDistributionMessage;
 
 import java.util.Objects;
@@ -64,6 +67,13 @@ public final class MessageEncryption {
     private final SignalGroupCipher groupCipher;
 
     /**
+     * Holds the shared lock registry that serialises the non-atomic Signal session and sender-key ratchets so that
+     * concurrent encryptions and the inbound {@link MessageDecryption} decryptions of the same device session or
+     * sender-key chain cannot interleave.
+     */
+    private final SignalCryptoLocks cryptoLocks;
+
+    /**
      * Holds the minimum number of random padding bytes appended to a plaintext before encryption.
      */
     private static final int MIN_PADDING = 1;
@@ -83,6 +93,8 @@ public final class MessageEncryption {
      * @param sessionCipher the cipher used for {@link #encryptForDevice(Jid, byte[])}
      * @param groupCipher   the cipher used for {@link #encryptForGroup(Jid, Jid, byte[])} and
      *                      {@link #createSenderKeyDistributionMessage(Jid, Jid)}
+     * @param cryptoLocks   the lock registry shared with {@link MessageDecryption} that serialises concurrent
+     *                      session and sender-key ratchets
      * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = {"encryptMsgProtobuf", "encryptMsgSenderKey"},
@@ -90,11 +102,13 @@ public final class MessageEncryption {
     public MessageEncryption(
             WhatsAppStore store,
             SignalSessionCipher sessionCipher,
-            SignalGroupCipher groupCipher
+            SignalGroupCipher groupCipher,
+            SignalCryptoLocks cryptoLocks
     ) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.sessionCipher = Objects.requireNonNull(sessionCipher, "sessionCipher cannot be null");
         this.groupCipher = Objects.requireNonNull(groupCipher, "groupCipher cannot be null");
+        this.cryptoLocks = Objects.requireNonNull(cryptoLocks, "cryptoLocks cannot be null");
     }
 
     /**
@@ -106,9 +120,13 @@ public final class MessageEncryption {
      * {@link WhatsAppMessageException.Send.Unknown} aborts the per-device branch for that recipient; the caller decides
      * whether the recipient is critical (a primary device, in which case the whole send fails) or skippable (a companion).
      *
-     * @implNote This implementation removes the failing Signal session via {@link WhatsAppStore#removeSession} on
-     * encryption error so a later retry on the same address triggers a fresh PreKey exchange rather than re-using the
-     * stale session record.
+     * @implNote This implementation serialises the encrypt cycle for one recipient device through
+     * {@link SignalCryptoLocks#withSession}, keyed by the recipient {@link SignalProtocolAddress} and shared with the
+     * inbound {@link MessageDecryption}, because the Signal session ratchet is a non-atomic load-ratchet-store cycle;
+     * WhatsApp Web never races it since its JavaScript runs single-threaded, whereas Cobalt encrypts and decrypts on
+     * virtual threads. On encryption error it removes the failing Signal session via {@link com.github.auties00.cobalt.store.SignalStore#removeSession}
+     * so a later retry on the same address triggers a fresh PreKey exchange rather than re-using the stale session
+     * record.
      *
      * @param recipientJid the recipient device {@link Jid}
      * @param plaintext    the protobuf-encoded plaintext bytes
@@ -129,39 +147,41 @@ public final class MessageEncryption {
         var paddedPlaintext = addPadding(plaintext);
         var address = recipientJid.toSignalAddress();
 
-        try {
-            var ciphertextMessage = sessionCipher.encrypt(address, paddedPlaintext);
-            var encryptionType = MessageEncryptionType.fromSignalCiphertext(ciphertextMessage);
-
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Encrypted message for {0}, type={1}",
-                    recipientJid, encryptionType);
-
-            return new MessageEncryptedPayload(
-                    encryptionType,
-                    ciphertextMessage.toSerialized(),
-                    recipientJid
-            );
-        } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "encryptMsgProtobuf: encryption fail for {0}: {1}",
-                    recipientJid, e.getMessage());
-
+        return cryptoLocks.withSession(address, () -> {
             try {
-                store.removeSession(address);
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Removed stale session for {0} after encryption failure",
-                        recipientJid);
-            } catch (Exception cleanupError) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Failed to cleanup session for {0}: {1}",
-                        recipientJid, cleanupError.getMessage());
-            }
+                var ciphertextMessage = sessionCipher.encrypt(address, paddedPlaintext);
+                var encryptionType = MessageEncryptionType.fromSignalCiphertext(ciphertextMessage);
 
-            throw new WhatsAppMessageException.Send.Unknown(
-                    "Failed to encrypt message for device: " + recipientJid, e
-            );
-        }
+                LOGGER.log(System.Logger.Level.DEBUG,
+                        "Encrypted message for {0}, type={1}",
+                        recipientJid, encryptionType);
+
+                return new MessageEncryptedPayload(
+                        encryptionType,
+                        ciphertextMessage.toSerialized(),
+                        recipientJid
+                );
+            } catch (Exception e) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "encryptMsgProtobuf: encryption fail for {0}: {1}",
+                        recipientJid, e.getMessage());
+
+                try {
+                    store.signalStore().removeSession(address);
+                    LOGGER.log(System.Logger.Level.DEBUG,
+                            "Removed stale session for {0} after encryption failure",
+                            recipientJid);
+                } catch (Exception cleanupError) {
+                    LOGGER.log(System.Logger.Level.DEBUG,
+                            "Failed to cleanup session for {0}: {1}",
+                            recipientJid, cleanupError.getMessage());
+                }
+
+                throw new WhatsAppMessageException.Send.Unknown(
+                        "Failed to encrypt message for device: " + recipientJid, e
+                );
+            }
+        });
     }
 
     /**
@@ -172,8 +192,12 @@ public final class MessageEncryption {
      * first through {@link com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution#encrypt(Jid, byte[], java.util.Collection)}.
      * The returned payload always has a {@code null} {@link MessageEncryptedPayload#recipientJid()}.
      *
-     * @implNote This implementation lazily bootstraps the sender-key state via {@link SignalGroupCipher#create} when the
-     * store does not already hold one for this sender.
+     * @implNote This implementation serialises the encrypt cycle for one sender-key chain through
+     * {@link SignalCryptoLocks#withSenderKey}, keyed by the {@link SignalSenderKeyName} and shared with
+     * {@link #createSenderKeyDistributionMessage(Jid, Jid)}, {@link #rotateSenderKey(Jid, Jid)}, and the inbound
+     * {@link MessageDecryption}, so the check-then-create bootstrap and the chain ratchet cannot interleave across
+     * virtual threads; WhatsApp Web never races them since its JavaScript runs single-threaded. It lazily bootstraps the
+     * sender-key state via {@link SignalGroupCipher#create} when the store does not already hold one for this sender.
      *
      * @param groupJid  the group {@link Jid}
      * @param senderJid the sender device {@link Jid}, PN or LID depending on the group's addressing mode
@@ -198,30 +222,32 @@ public final class MessageEncryption {
         var paddedPlaintext = addPadding(plaintext);
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
 
-        if (store.findSenderKeyByName(senderKeyName).isEmpty()) {
-            groupCipher.create(senderKeyName);
-        }
+        return cryptoLocks.withSenderKey(senderKeyName, () -> {
+            if (store.signalStore().findSenderKeyByName(senderKeyName).isEmpty()) {
+                groupCipher.create(senderKeyName);
+            }
 
-        try {
-            var ciphertextMessage = groupCipher.encrypt(senderKeyName, paddedPlaintext);
+            try {
+                var ciphertextMessage = groupCipher.encrypt(senderKeyName, paddedPlaintext);
 
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Encrypted group message for {0}, sender={1}",
-                    groupJid, senderJid);
+                LOGGER.log(System.Logger.Level.DEBUG,
+                        "Encrypted group message for {0}, sender={1}",
+                        groupJid, senderJid);
 
-            return new MessageEncryptedPayload(
-                    MessageEncryptionType.SKMSG,
-                    ciphertextMessage.toSerialized(),
-                    null
-            );
-        } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "encryptMsgSenderKey: encryption fail for {0}: {1}",
-                    groupJid, e.getMessage());
-            throw new WhatsAppMessageException.Send.Unknown(
-                    "Failed to encrypt group message for group: " + groupJid, e
-            );
-        }
+                return new MessageEncryptedPayload(
+                        MessageEncryptionType.SKMSG,
+                        ciphertextMessage.toSerialized(),
+                        null
+                );
+            } catch (Exception e) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "encryptMsgSenderKey: encryption fail for {0}: {1}",
+                        groupJid, e.getMessage());
+                throw new WhatsAppMessageException.Send.Unknown(
+                        "Failed to encrypt group message for group: " + groupJid, e
+                );
+            }
+        });
     }
 
     /**
@@ -264,6 +290,10 @@ public final class MessageEncryption {
      * The distribution message must be delivered, via per-device PKMSG or MSG encryption, to every group member that does
      * not yet hold the sender's key before they can decrypt any SKMSG produced by {@link #encryptForGroup(Jid, Jid, byte[])}.
      *
+     * @implNote This implementation acquires the {@link SignalSenderKeyName} lock via
+     * {@link SignalCryptoLocks#withSenderKey}, shared with {@link #encryptForGroup(Jid, Jid, byte[])}, so a concurrent
+     * send cannot lazily create or ratchet the chain between this caller's create and its read of the distribution.
+     *
      * @param groupJid  the group {@link Jid}
      * @param senderJid the sender device {@link Jid}
      * @return the sender-key distribution message
@@ -278,7 +308,7 @@ public final class MessageEncryption {
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
 
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
-        return groupCipher.create(senderKeyName);
+        return cryptoLocks.withSenderKey(senderKeyName, () -> groupCipher.create(senderKeyName));
     }
 
     /**
@@ -306,6 +336,10 @@ public final class MessageEncryption {
      * so the next {@link #encryptForGroup(Jid, Jid, byte[])} call lazily creates a fresh distribution and re-fans it out
      * via {@link com.github.auties00.cobalt.message.send.senderkey.SenderKeyDistribution#encrypt(Jid, byte[], java.util.Collection)}.
      *
+     * @implNote This implementation acquires the {@link SignalSenderKeyName} lock via
+     * {@link SignalCryptoLocks#withSenderKey} so the removal cannot interleave with an in-flight
+     * {@link #encryptForGroup(Jid, Jid, byte[])} on the same chain.
+     *
      * @param groupJid  the group {@link Jid}
      * @param senderJid the sender device {@link Jid}
      * @throws NullPointerException if any argument is {@code null}
@@ -317,11 +351,13 @@ public final class MessageEncryption {
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
 
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
-        store.removeSenderKeys(senderKeyName);
+        cryptoLocks.withSenderKey(senderKeyName, () -> {
+            store.signalStore().removeSenderKeys(senderKeyName);
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Rotated sender key for group {0}, sender {1}",
-                groupJid, senderJid);
+            LOGGER.log(System.Logger.Level.DEBUG,
+                    "Rotated sender key for group {0}, sender {1}",
+                    groupJid, senderJid);
+        });
     }
 
     /**
@@ -339,7 +375,7 @@ public final class MessageEncryption {
     public boolean hasSessionWith(Jid deviceJid) {
         Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
         var address = deviceJid.toSignalAddress();
-        return store.findSessionByAddress(address).isPresent();
+        return store.signalStore().findSessionByAddress(address).isPresent();
     }
 
     /**
@@ -358,7 +394,7 @@ public final class MessageEncryption {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
         var senderKeyName = SenderKeyNameFactory.create(groupJid, senderJid);
-        return store.findSenderKeyByName(senderKeyName).isPresent();
+        return store.signalStore().findSenderKeyByName(senderKeyName).isPresent();
     }
 
 }

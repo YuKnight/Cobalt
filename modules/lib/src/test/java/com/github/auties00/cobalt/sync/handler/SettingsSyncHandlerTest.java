@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.props.ABProp;
@@ -50,13 +50,13 @@ class SettingsSyncHandlerTest {
 
     private WhatsAppStore store;
     private TestABPropsService props;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private SettingsSyncHandler handler;
 
     @BeforeEach
     void setUp() {
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setPrimaryFeatures(List.of("settings_sync_enabled"));
+        store.syncStore().setPrimaryFeatures(List.of("settings_sync_enabled"));
         props = TestABPropsService.builder()
                 .with(ABProp.SETTINGS_SYNC_ENABLED, true)
                 .build();
@@ -107,7 +107,7 @@ class SettingsSyncHandlerTest {
         @Test
         @DisplayName("when the primary feature is absent, every mutation returns UNSUPPORTED")
         void primaryFeatureMissingReturnsUnsupported() {
-            store.setPrimaryFeatures(List.of()); // close the gate
+            store.syncStore().setPrimaryFeatures(List.of()); // close the gate
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var result = handler.applyMutation(client,
                     languageMutation(PLATFORM_WEB_INDEX, "app", "en_US", ts));
@@ -135,7 +135,7 @@ class SettingsSyncHandlerTest {
             var result = handler.applyMutation(client,
                     languageMutation(PLATFORM_WEB_INDEX, "app", "pt_BR", ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals("pt_BR", store.locale().orElseThrow(),
+            assertEquals("pt_BR", store.accountStore().locale().orElseThrow(),
                     "WAWebSettingsSyncHelpers.applySettingUpdate(LANGUAGE,...) -> store.setLocale");
         }
 
@@ -150,7 +150,7 @@ class SettingsSyncHandlerTest {
                     value, SyncdOperation.SET, ts, 1);
             var result = handler.applyMutation(client, mutation);
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.disableLinkPreviews());
+            assertTrue(store.settingsStore().disableLinkPreviews());
         }
 
         @Test
@@ -288,7 +288,7 @@ class SettingsSyncHandlerTest {
             var result = handler.applyMutation(client,
                     languageMutation(PLATFORM_MAC_INDEX, "app", "fr_FR", ts));
             assertEquals(SyncActionState.SKIPPED, result.actionState());
-            assertTrue(store.locale().isEmpty(), "no platform-MAC mutation should reach the store on a non-Windows client");
+            assertTrue(store.accountStore().locale().isEmpty(), "no platform-MAC mutation should reach the store on a non-Windows client");
         }
     }
 
@@ -302,7 +302,7 @@ class SettingsSyncHandlerTest {
             var result = handler.applyMutation(client,
                     languageMutation(PLATFORM_WEB_INDEX, "1234@s.whatsapp.net", "fr_FR", ts));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.locale().isEmpty(),
+            assertTrue(store.accountStore().locale().isEmpty(),
                     "Cobalt does not maintain a per-chat settings store; non-app scope is intentionally a no-op");
         }
     }
@@ -371,7 +371,7 @@ class SettingsSyncHandlerTest {
             assertEquals(SyncActionState.SKIPPED, results.get(0).actionState(),
                     "earlier mutation with the same index must be dropped by the dedup map");
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertEquals("fr", store.locale().orElseThrow());
+            assertEquals("fr", store.accountStore().locale().orElseThrow());
         }
 
         @Test

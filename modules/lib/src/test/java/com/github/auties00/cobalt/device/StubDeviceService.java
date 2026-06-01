@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.device;
 
-import com.github.auties00.cobalt.device.fanout.DeviceGroupFanoutResult;
 import com.github.auties00.cobalt.device.icdc.HostedIcdcResult;
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
 import com.github.auties00.cobalt.model.device.DeviceListMetadata;
@@ -20,21 +19,26 @@ import java.util.function.Function;
 
 /**
  * Test-only {@link DeviceService} double used by tests in adjacent packages that need a
- * {@link DeviceService} dependency without the full {@link DefaultDeviceService} collaborator graph.
+ * {@link DeviceService} dependency without the full {@link LiveDeviceService} collaborator graph.
  *
  * <p>Defaults are deliberately loud: every method raises an {@link UnsupportedOperationException}
  * carrying its own name (so the test report points at the missing stub) except
- * {@link #ensureSessions(Collection)} and {@link #computeIcdc(Jid)}, which return a harmless default
- * because several sender tests use them as no-op participants. Each {@code withXxx} setter installs
+ * {@link #ensureSessions(Collection)}, {@link #computeIcdc(Jid)},
+ * {@link #computeGroupPhash(Collection, Jid, boolean, boolean)}, and
+ * {@link #syncAndGetDeviceList(Collection)}, which return a harmless default because several
+ * sender and call-engine tests use them as no-op participants. Each {@code withXxx} setter installs
  * the handler for exactly one method and returns the stub so calls can be chained.
  */
 public final class StubDeviceService implements DeviceService {
 
     private Function<Jid, Collection<Jid>> userFanout;
-    private BiFunction<Jid, Jid, DeviceGroupFanoutResult> groupFanout;
-    private Function<Collection<Jid>, DeviceGroupFanoutResult> broadcastFanout;
+    private Function<Jid, Set<Jid>> groupFanout;
+    private BiFunction<Collection<Jid>, Jid, String> groupPhash;
+    private Function<Collection<Jid>, Set<Jid>> broadcastFanout;
+    private Function<Collection<Jid>, Set<Jid>> statusFanout;
     private Function<Collection<Jid>, Integer> ensureSessions;
     private Function<Jid, Optional<IcdcResult>> computeIcdc;
+    private Function<Collection<Jid>, List<DeviceList>> syncAndGetDeviceList;
 
     /**
      * Returns a new stub with every method throwing by default.
@@ -58,26 +62,51 @@ public final class StubDeviceService implements DeviceService {
     }
 
     /**
-     * Installs the handler used by {@link #getGroupFanout(Jid, Jid)}.
+     * Installs the handler used by {@link #getGroupFanout(Jid)}.
      *
-     * @param handler the handler, keyed on group JID and sender device JID
+     * @param handler the handler, keyed on group JID
      * @return this stub for chaining
      */
-    public StubDeviceService withGroupFanout(BiFunction<Jid, Jid, DeviceGroupFanoutResult> handler) {
+    public StubDeviceService withGroupFanout(Function<Jid, Set<Jid>> handler) {
         this.groupFanout = handler;
         return this;
     }
 
     /**
-     * Installs the handler used by {@link #getBroadcastFanout(Jid, Jid, Collection)}; the handler
-     * receives only the recipient user JIDs, and the broadcast JID and sender device JID are
-     * discarded.
+     * Installs the handler used by
+     * {@link #computeGroupPhash(Collection, Jid, boolean, boolean)}; the handler receives the
+     * recipient devices and sender device JID, and the bot gates are discarded. When no handler is
+     * installed the stub returns the canonical {@code "2:hash"}.
+     *
+     * @param handler the handler, keyed on recipient devices and sender device JID
+     * @return this stub for chaining
+     */
+    public StubDeviceService withGroupPhash(BiFunction<Collection<Jid>, Jid, String> handler) {
+        this.groupPhash = handler;
+        return this;
+    }
+
+    /**
+     * Installs the handler used by {@link #getBroadcastFanout(Jid, Collection)}; the handler
+     * receives only the recipient user JIDs, and the broadcast JID is discarded.
      *
      * @param handler the handler, keyed on recipient user JIDs
      * @return this stub for chaining
      */
-    public StubDeviceService withBroadcastFanout(Function<Collection<Jid>, DeviceGroupFanoutResult> handler) {
+    public StubDeviceService withBroadcastFanout(Function<Collection<Jid>, Set<Jid>> handler) {
         this.broadcastFanout = handler;
+        return this;
+    }
+
+    /**
+     * Installs the handler used by {@link #getStatusFanout(Collection)}; the handler receives the
+     * resolved status audience user JIDs.
+     *
+     * @param handler the handler, keyed on the audience user JIDs
+     * @return this stub for chaining
+     */
+    public StubDeviceService withStatusFanout(Function<Collection<Jid>, Set<Jid>> handler) {
+        this.statusFanout = handler;
         return this;
     }
 
@@ -103,6 +132,19 @@ public final class StubDeviceService implements DeviceService {
      */
     public StubDeviceService withComputeIcdc(Function<Jid, Optional<IcdcResult>> handler) {
         this.computeIcdc = handler;
+        return this;
+    }
+
+    /**
+     * Installs the handler used by {@link #syncAndGetDeviceList(Collection)}; when no handler is
+     * installed the stub returns an empty list (treated as "no companion devices for any of the
+     * queried users", which is the common shape call-engine tests exercise).
+     *
+     * @param handler the handler, keyed on the requested user JIDs
+     * @return this stub for chaining
+     */
+    public StubDeviceService withSyncAndGetDeviceList(Function<Collection<Jid>, List<DeviceList>> handler) {
+        this.syncAndGetDeviceList = handler;
         return this;
     }
 
@@ -150,19 +192,32 @@ public final class StubDeviceService implements DeviceService {
     }
 
     @Override
-    public DeviceGroupFanoutResult getGroupFanout(Jid groupJid, Jid senderDeviceJid) {
+    public Set<Jid> getGroupFanout(Jid groupJid) {
         if (groupFanout == null) {
             throw unsupported("getGroupFanout: install via withGroupFanout(...)");
         }
-        return groupFanout.apply(groupJid, senderDeviceJid);
+        return groupFanout.apply(groupJid);
     }
 
     @Override
-    public DeviceGroupFanoutResult getBroadcastFanout(Jid broadcastJid, Jid senderDeviceJid, Collection<Jid> recipientUserJids) {
+    public String computeGroupPhash(Collection<Jid> recipientDevices, Jid senderDeviceJid, boolean openBotGroup, boolean teeBotGroup) {
+        return groupPhash == null ? "2:hash" : groupPhash.apply(recipientDevices, senderDeviceJid);
+    }
+
+    @Override
+    public Set<Jid> getBroadcastFanout(Jid broadcastJid, Collection<Jid> recipientUserJids) {
         if (broadcastFanout == null) {
             throw unsupported("getBroadcastFanout: install via withBroadcastFanout(...)");
         }
         return broadcastFanout.apply(recipientUserJids);
+    }
+
+    @Override
+    public Set<Jid> getStatusFanout(Collection<Jid> audienceUserJids) {
+        if (statusFanout == null) {
+            throw unsupported("getStatusFanout: install via withStatusFanout(...)");
+        }
+        return statusFanout.apply(audienceUserJids);
     }
 
     @Override
@@ -187,13 +242,21 @@ public final class StubDeviceService implements DeviceService {
     }
 
     @Override
+    public void refreshOwnDeviceList(Jid wid, Node devicesNode) {
+        throw unsupported("refreshOwnDeviceList");
+    }
+
+    @Override
     public void syncMyDeviceList() {
         throw unsupported("syncMyDeviceList");
     }
 
     @Override
     public List<DeviceList> syncAndGetDeviceList(Collection<Jid> userJids) {
-        throw unsupported("syncAndGetDeviceList");
+        if (syncAndGetDeviceList == null) {
+            return List.of();
+        }
+        return syncAndGetDeviceList.apply(userJids);
     }
 
     @Override

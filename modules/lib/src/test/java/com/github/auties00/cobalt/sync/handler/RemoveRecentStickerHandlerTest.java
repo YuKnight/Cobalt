@@ -48,7 +48,7 @@ class RemoveRecentStickerHandlerTest {
     private TestWhatsAppClient client;
 
     // The recent_sticker primary feature is intentionally not pre-enabled; tests that need
-    // the post-gate body call store.setPrimaryFeatures(...) themselves.
+    // the post-gate body call store.syncStore().setPrimaryFeatures(...) themselves.
     @BeforeEach
     void setUp() {
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
@@ -69,7 +69,7 @@ class RemoveRecentStickerHandlerTest {
 
     private void seedRecentSticker(long epochSecond) {
         var sticker = new StickerBuilder().timestamp(epochSecond).build();
-        store.addRecentSticker(STICKER_HASH, sticker);
+        store.settingsStore().addRecentSticker(STICKER_HASH, sticker);
     }
 
     @Nested
@@ -119,7 +119,7 @@ class RemoveRecentStickerHandlerTest {
         @Test
         @DisplayName("REMOVE operation is UNSUPPORTED even when the feature is enabled")
         void removeUnsupported() {
-            store.setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var value = new SyncActionValueBuilder()
                     .timestamp(ts)
@@ -138,7 +138,7 @@ class RemoveRecentStickerHandlerTest {
         @Test
         @DisplayName("missing sticker hash (single-element index) is MALFORMED")
         void singleElementIndex() {
-            store.setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
             var action = new RemoveRecentStickerActionBuilder().build();
             var result = new RemoveRecentStickerHandler().applyMutation(client,
                     setMutation(action, "[\"removeRecentSticker\"]"));
@@ -152,7 +152,7 @@ class RemoveRecentStickerHandlerTest {
         @Test
         @DisplayName("no local recent sticker reports ORPHAN (no model id/type)")
         void orphanWhenMissingLocally() {
-            store.setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
             var action = new RemoveRecentStickerActionBuilder().build();
             var result = new RemoveRecentStickerHandler().applyMutation(client,
                     setMutation(action, "[\"removeRecentSticker\",\"" + STICKER_HASH + "\"]"));
@@ -167,20 +167,20 @@ class RemoveRecentStickerHandlerTest {
         @Test
         @DisplayName("missing lastStickerSentTs removes the local entry and reports SUCCESS")
         void removesWhenLastSentMissing() {
-            store.setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
             seedRecentSticker(1_600_000_000L);
             var action = new RemoveRecentStickerActionBuilder().build(); // no lastStickerSentTs
             var result = new RemoveRecentStickerHandler().applyMutation(client,
                     setMutation(action, "[\"removeRecentSticker\",\"" + STICKER_HASH + "\"]"));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findRecentSticker(STICKER_HASH).isEmpty(),
+            assertTrue(store.settingsStore().findRecentSticker(STICKER_HASH).isEmpty(),
                     "missing lastStickerSentTs must trigger removal");
         }
 
         @Test
         @DisplayName("local timestamp <= lastStickerSentTs removes the local entry")
         void removesWhenLocalNotNewer() {
-            store.setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
             seedRecentSticker(1_600_000_000L); // local
             var action = new RemoveRecentStickerActionBuilder()
                     .lastStickerSentTs(Instant.ofEpochSecond(1_700_000_000L)) // newer
@@ -188,13 +188,13 @@ class RemoveRecentStickerHandlerTest {
             var result = new RemoveRecentStickerHandler().applyMutation(client,
                     setMutation(action, "[\"removeRecentSticker\",\"" + STICKER_HASH + "\"]"));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findRecentSticker(STICKER_HASH).isEmpty());
+            assertTrue(store.settingsStore().findRecentSticker(STICKER_HASH).isEmpty());
         }
 
         @Test
         @DisplayName("local timestamp > lastStickerSentTs keeps the local entry but still reports SUCCESS")
         void keepsWhenLocalNewer() {
-            store.setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
             seedRecentSticker(1_800_000_000L); // local newer
             var action = new RemoveRecentStickerActionBuilder()
                     .lastStickerSentTs(Instant.ofEpochSecond(1_700_000_000L)) // older
@@ -203,7 +203,7 @@ class RemoveRecentStickerHandlerTest {
                     setMutation(action, "[\"removeRecentSticker\",\"" + STICKER_HASH + "\"]"));
             assertEquals(SyncActionState.SUCCESS, result.actionState(),
                     "WA Web returns SUCCESS even when the removal is skipped");
-            assertTrue(store.findRecentSticker(STICKER_HASH).isPresent(),
+            assertTrue(store.settingsStore().findRecentSticker(STICKER_HASH).isPresent(),
                     "local entry newer than lastStickerSentTs must survive");
         }
     }
@@ -214,7 +214,7 @@ class RemoveRecentStickerHandlerTest {
         @Test
         @DisplayName("missing action sub-message still reaches orphan check; with no entry yields ORPHAN")
         void missingActionWithoutEntry() {
-            store.setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
             var ts = Instant.ofEpochSecond(1_700_000_000L);
             var value = new SyncActionValueBuilder().timestamp(ts).build(); // no removeRecentStickerAction
             var index = "[\"removeRecentSticker\",\"" + STICKER_HASH + "\"]";
@@ -255,7 +255,7 @@ class RemoveRecentStickerHandlerTest {
         @Test
         @DisplayName("the handler does not override applyMutationBatch - default per-item dispatch is used")
         void defaultDispatchPreserved() {
-            store.setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
+            store.syncStore().setPrimaryFeatures(List.of(RECENT_STICKER_FEATURE));
             seedRecentSticker(1_600_000_000L);
             var action = new RemoveRecentStickerActionBuilder().build();
             var batch = List.of(

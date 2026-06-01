@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers {@link PrivacySettingChannelsPersonalisedRecommendationHandler}, which accepts
  * only {@link SyncdOperation#SET}, persists the resolved {@code isUserOptedOut} boolean
- * via {@link WhatsAppStore#setChannelsPersonalisedRecommendationOptOut}, rejects a
+ * via {@link com.github.auties00.cobalt.store.SettingsStore#setChannelsPersonalisedRecommendationOptOut}, rejects a
  * wrong-typed value as {@link SyncActionState#MALFORMED}, reports
  * {@link SyncActionState#UNSUPPORTED} for {@link SyncdOperation#REMOVE}, and resolves
  * conflicts by timestamp. The handler is driven through its package-private singleton
@@ -42,7 +42,7 @@ class PrivacySettingChannelsPersonalisedRecommendationHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private PrivacySettingChannelsPersonalisedRecommendationHandler handler;
 
     @BeforeEach
@@ -91,7 +91,7 @@ class PrivacySettingChannelsPersonalisedRecommendationHandlerTest {
         @Test
         @DisplayName("SET with isUserOptedOut=true persists true on the store")
         void setsOptedOut() {
-            assertTrue(store.channelsPersonalisedRecommendationOptOut().isEmpty(),
+            assertTrue(store.settingsStore().channelsPersonalisedRecommendationOptOut().isEmpty(),
                     "precondition: opt-out flag is unset");
             var action = new PrivacySettingChannelsPersonalisedRecommendationActionBuilder()
                     .isUserOptedOut(true).build();
@@ -99,7 +99,7 @@ class PrivacySettingChannelsPersonalisedRecommendationHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.channelsPersonalisedRecommendationOptOut().orElseThrow());
+            assertTrue(store.settingsStore().channelsPersonalisedRecommendationOptOut().orElseThrow());
         }
 
         @Test
@@ -111,7 +111,7 @@ class PrivacySettingChannelsPersonalisedRecommendationHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertFalse(store.channelsPersonalisedRecommendationOptOut().orElseThrow());
+            assertFalse(store.settingsStore().channelsPersonalisedRecommendationOptOut().orElseThrow());
         }
     }
 
@@ -146,7 +146,7 @@ class PrivacySettingChannelsPersonalisedRecommendationHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.channelsPersonalisedRecommendationOptOut().isEmpty());
+            assertTrue(store.settingsStore().channelsPersonalisedRecommendationOptOut().isEmpty());
         }
     }
 

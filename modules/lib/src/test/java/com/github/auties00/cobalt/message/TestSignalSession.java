@@ -32,12 +32,12 @@ public final class TestSignalSession {
      * @return the existing or newly added prekey
      */
     public static SignalPreKeyPair seedOneTimePreKey(WhatsAppStore store) {
-        var existing = store.preKeys();
+        var existing = store.signalStore().preKeys();
         if (!existing.isEmpty()) {
             return existing.iterator().next();
         }
         var preKey = SignalPreKeyPair.random(1);
-        store.addPreKey(preKey);
+        store.signalStore().addPreKey(preKey);
         return preKey;
     }
 
@@ -54,17 +54,17 @@ public final class TestSignalSession {
      */
     public static void establishSession(WhatsAppStore senderStore, Jid recipientJid, WhatsAppStore recipientStore) {
         var preKey = seedOneTimePreKey(recipientStore);
-        var signedKey = recipientStore.signedKeyPair();
+        var signedKey = recipientStore.signalStore().signedKeyPair();
         var bundle = new SignalPreKeyBundleBuilder()
-                .registrationId(recipientStore.registrationId())
+                .registrationId(recipientStore.signalStore().registrationId())
                 .deviceId(recipientJid.device())
                 .preKeyId(preKey.id())
                 .preKeyPublic(preKey.publicKey())
                 .signedPreKeyId(signedKey.id())
                 .signedPreKeyPublic(signedKey.publicKey())
                 .signedPreKeySignature(signedKey.signature())
-                .identityKey(recipientStore.identityKeyPair().publicKey())
+                .identityKey(recipientStore.signalStore().identityKeyPair().publicKey())
                 .build();
-        new SignalSessionCipher(senderStore).process(recipientJid.toSignalAddress(), bundle);
+        new SignalSessionCipher(senderStore.signalStore()).process(recipientJid.toSignalAddress(), bundle);
     }
 }

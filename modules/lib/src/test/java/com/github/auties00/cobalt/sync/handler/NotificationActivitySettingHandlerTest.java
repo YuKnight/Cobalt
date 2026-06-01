@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Covers {@link NotificationActivitySettingHandler} for the protobuf-only
  * {@code "notificationActivitySetting"} action: the handler accepts only {@link SyncdOperation#SET}
  * with a non-empty {@link NotificationActivitySettingAction#notificationActivitySetting()} enum,
- * persists it via {@link WhatsAppStore#setNotificationActivitySetting}, and rejects a wrong-typed
+ * persists it via {@link com.github.auties00.cobalt.store.SettingsStore#setNotificationActivitySetting}, and rejects a wrong-typed
  * value or an empty enum as {@link SyncActionState#MALFORMED}.
  *
  * <p>No public outgoing-mutation factory exists for this action, so each test drives the handler
@@ -44,7 +44,7 @@ class NotificationActivitySettingHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private NotificationActivitySettingHandler handler;
 
     @BeforeEach
@@ -92,7 +92,7 @@ class NotificationActivitySettingHandlerTest {
         @Test
         @DisplayName("SET with ALL_MESSAGES persists ALL_MESSAGES on the store")
         void setAllMessages() {
-            assertTrue(store.notificationActivitySetting().isEmpty(), "precondition: setting is unset");
+            assertTrue(store.settingsStore().notificationActivitySetting().isEmpty(), "precondition: setting is unset");
             var action = new NotificationActivitySettingActionBuilder()
                     .notificationActivitySetting(NotificationActivitySetting.ALL_MESSAGES).build();
 
@@ -100,13 +100,13 @@ class NotificationActivitySettingHandlerTest {
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
             assertEquals(NotificationActivitySetting.ALL_MESSAGES,
-                    store.notificationActivitySetting().orElseThrow());
+                    store.settingsStore().notificationActivitySetting().orElseThrow());
         }
 
         @Test
         @DisplayName("SET with HIGHLIGHTS overwrites the prior preference")
         void setHighlightsOverwrites() {
-            store.setNotificationActivitySetting(NotificationActivitySetting.ALL_MESSAGES);
+            store.settingsStore().setNotificationActivitySetting(NotificationActivitySetting.ALL_MESSAGES);
             var action = new NotificationActivitySettingActionBuilder()
                     .notificationActivitySetting(NotificationActivitySetting.HIGHLIGHTS).build();
 
@@ -114,7 +114,7 @@ class NotificationActivitySettingHandlerTest {
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
             assertEquals(NotificationActivitySetting.HIGHLIGHTS,
-                    store.notificationActivitySetting().orElseThrow());
+                    store.settingsStore().notificationActivitySetting().orElseThrow());
         }
     }
 
@@ -158,7 +158,7 @@ class NotificationActivitySettingHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.notificationActivitySetting().isEmpty());
+            assertTrue(store.settingsStore().notificationActivitySetting().isEmpty());
         }
     }
 

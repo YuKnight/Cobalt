@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 /**
  * Combined behavioural and known-answer tests for the WAM beaconing roll
- * backing {@link DefaultWamBeaconingService}, exercising the 1% activation roll,
+ * backing {@link LiveWamBeaconingService}, exercising the 1% activation roll,
  * the UTC day boundary, and the per-buffer-key counter semantics demanded
  * by {@code WAWebWamBeaconing.maybeGetEventSequenceNumber}.
  *
@@ -214,7 +214,7 @@ class WamBeaconingTest {
      * consumed, activation set if it is {@code <= 0.01}, and the counter
      * reset to {@code 0}; subsequent same-day calls return the next
      * sequence number (when active) or empty (when inactive), mirroring
-     * {@link DefaultWamBeaconingService}'s per-buffer-key state machine.
+     * {@link LiveWamBeaconingService}'s per-buffer-key state machine.
      */
     private static final class DeterministicWamBeaconingService implements WamBeaconingService {
         private final ConcurrentMap<String, KeyState> states = new ConcurrentHashMap<>();
@@ -281,7 +281,7 @@ class WamBeaconingTest {
     @Test
     @DisplayName("DefaultWamBeaconing is the production impl exposed to WamService")
     void defaultImplProvidesWamBeaconing() {
-        WamBeaconingService beaconing = new DefaultWamBeaconingService();
+        WamBeaconingService beaconing = new LiveWamBeaconingService();
         var first = beaconing.nextSequenceNumber("regular");
         var second = beaconing.nextSequenceNumber("regular");
         if (first.isPresent()) {
@@ -299,7 +299,7 @@ class WamBeaconingTest {
     @Test
     @DisplayName("DefaultWamBeaconing keeps per-key state isolated")
     void defaultImplKeepsKeysIsolated() {
-        var beaconing = new DefaultWamBeaconingService();
+        var beaconing = new LiveWamBeaconingService();
         var regular = beaconing.nextSequenceNumber("regular");
         var realtime = beaconing.nextSequenceNumber("realtime");
         if (regular.isPresent() && realtime.isPresent()) {

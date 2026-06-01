@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingChannelsPersonalisedRecommendationAction;
@@ -100,7 +100,7 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
      * nullable boolean rule.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -109,7 +109,7 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setChannelsPersonalisedRecommendationOptOut(action.isUserOptedOut());
+        client.store().settingsStore().setChannelsPersonalisedRecommendationOptOut(action.isUserOptedOut());
         return MutationApplicationResult.success();
     }
 }

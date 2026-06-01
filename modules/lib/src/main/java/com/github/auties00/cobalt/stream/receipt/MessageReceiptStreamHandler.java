@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.stream.receipt;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.MessageStatusListener;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -18,7 +20,7 @@ import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdRetryFromUnknownDeviceEventBuilder;
 import com.github.auties00.cobalt.wam.event.ReceiptStanzaReceiveEventBuilder;
@@ -40,7 +42,7 @@ import java.util.Objects;
  * and retry acknowledgements, then mirrors them into the local store.
  *
  * <p>This handler drives the per-message read/delivery status fanned out via
- * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onMessageStatus}
+ * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onMessageStatus}
  * and, for retry receipts, transparently re-encrypts and re-ships the
  * original outbound message. {@link ReceiptStreamHandler} forwards every
  * non-call receipt here regardless of whether it is a retry or a regular
@@ -80,7 +82,7 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebHandleMessageRetryRequest")
 @WhatsAppWebModule(moduleName = "WAWebHandleRetryRequest")
 @WhatsAppWebModule(moduleName = "WAWebRetryRequestParser")
-public final class MessageReceiptStreamHandler implements SocketStream.Handler {
+public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * The {@link System.Logger} used to report parse failures, refused
      * retries and unknown-device WAM emissions.
@@ -100,11 +102,11 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
     private static final int MAX_RETRY = 5;
 
     /**
-     * The {@link WhatsAppClient} that owns the store this handler mutates
+     * The {@link LinkedWhatsAppClient} that owns the store this handler mutates
      * and that ships outgoing {@code <ack>} stanzas via
-     * {@link WhatsAppClient#sendNodeWithNoResponse(Node)}.
+     * {@link LinkedWhatsAppClient#sendNodeWithNoResponse(Node)}.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * The {@link MessageService} used to re-send a message in response to
@@ -140,7 +142,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      * @param ackSender      the non-{@code null} ack sender used for the
      *                       outbound {@code <ack class="receipt">} stanza
      */
-    public MessageReceiptStreamHandler(WhatsAppClient whatsapp, MessageService messageService, WamService wamService, AckSender ackSender) {
+    public MessageReceiptStreamHandler(LinkedWhatsAppClient whatsapp, MessageService messageService, WamService wamService, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.messageService = messageService;
         this.wamService = wamService;
@@ -348,7 +350,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         }
 
         if (receipt.from().hasBroadcastServer() && receipt.participant() != null) {
-            var self = whatsapp.store().jid().orElse(null);
+            var self = whatsapp.store().accountStore().jid().orElse(null);
             if (self != null && sameUser(self, receipt.participant())) {
                 return;
             }
@@ -618,8 +620,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             exports = "getTargetChat",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private MessageInfo findRetryMessage(Jid provider, Jid participant, String id) {
-        var direct = whatsapp.store()
-                .findMessageById(provider, id)
+        var direct = whatsapp.store().chatStore().findMessageById(provider, id)
                 .map(MessageInfo.class::cast)
                 .orElse(null);
         if (direct != null) {
@@ -630,8 +631,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return null;
         }
 
-        return whatsapp.store()
-                .findMessageById(participant.toUserJid(), id)
+        return whatsapp.store().chatStore().findMessageById(participant.toUserJid(), id)
                 .map(MessageInfo.class::cast)
                 .orElse(null);
     }
@@ -670,7 +670,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
 
         var sender = participant != null ? participant.toUserJid() : from != null ? from.toUserJid() : null;
         return sender != null
-                && whatsapp.store().jid().map(self -> Objects.equals(self.toUserJid(), sender)).orElse(false);
+                && whatsapp.store().accountStore().jid().map(self -> Objects.equals(self.toUserJid(), sender)).orElse(false);
     }
 
     /**
@@ -776,7 +776,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
                 }
             }
 
-            var sessionCipher = new SignalSessionCipher(whatsapp.store());
+            var sessionCipher = new SignalSessionCipher(whatsapp.store().signalStore());
             sessionCipher.process(remoteDevice.toSignalAddress(), builder.build());
             whatsapp.store().save();
         } catch (Throwable _) {
@@ -849,7 +849,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
         if (deviceId == DeviceConstants.PRIMARY_DEVICE_ID) {
             return true;
         }
-        var deviceList = whatsapp.store().findDeviceList(requester.toUserJid()).orElse(null);
+        var deviceList = whatsapp.store().contactStore().findDeviceList(requester.toUserJid()).orElse(null);
         if (deviceList == null || deviceList.deleted()) {
             return false;
         }
@@ -911,8 +911,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
      *         message is not in the store
      */
     private MessageInfo findMessage(Jid provider, Jid participant, String id) {
-        var direct = whatsapp.store()
-                .findMessageById(provider, id)
+        var direct = whatsapp.store().chatStore().findMessageById(provider, id)
                 .map(MessageInfo.class::cast)
                 .orElse(null);
         if (direct != null) {
@@ -923,8 +922,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
             return null;
         }
 
-        return whatsapp.store()
-                .findMessageById(participant.toUserJid(), id)
+        return whatsapp.store().chatStore().findMessageById(participant.toUserJid(), id)
                 .map(MessageInfo.class::cast)
                 .orElse(null);
     }
@@ -932,7 +930,7 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
     /**
      * Folds one per-participant receipt event into the existing
      * {@link MessageInfo}, then fans out
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onMessageStatus}.
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onMessageStatus}.
      *
      * <p>Both {@link ChatMessageInfo} and {@link NewsletterMessageInfo} are
      * mutated in place because the store hands out the same instance across
@@ -1646,18 +1644,20 @@ public final class MessageReceiptStreamHandler implements SocketStream.Handler {
 
     /**
      * Fans out an {@code onMessageStatus} notification to every registered
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener}.
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener}.
      *
      * @implNote
      * This implementation starts one virtual thread per listener so that
-     * a blocking listener cannot stall the {@link SocketStream} dispatch
+     * a blocking listener cannot stall the {@link NodeStreamService} dispatch
      * loop.
      *
      * @param info the message whose status has changed
      */
     private void notifyMessageStatus(MessageInfo info) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onMessageStatus(whatsapp, info));
+            if (listener instanceof MessageStatusListener typed) {
+                Thread.startVirtualThread(() -> typed.onMessageStatus(whatsapp, info));
+            }
         }
     }
 

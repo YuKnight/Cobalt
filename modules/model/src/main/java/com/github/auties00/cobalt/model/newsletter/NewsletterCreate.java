@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.createNewsletter}. Carries the
+ * Input model for {@code LinkedWhatsAppClient.createNewsletter}. Carries the
  * display name, optional description, and optional profile picture for
  * the new newsletter.
  *

@@ -11,16 +11,27 @@ import java.util.Objects;
 /**
  * Decodes a server {@code <ack>} {@link Node} into a structured {@link AckResult}.
  *
- * <p>This utility class exposes a single static {@link #parse(Node)} entry point that flattens the
- * attributes the send pipeline cares about into an {@link AckResult}. It is invoked by every send
- * path in {@link com.github.auties00.cobalt.message.send.MessageSendingService} after the wire
- * stanza has been dispatched and the synchronous response received, and it may be called directly by
- * embedders that need to interpret a raw ack node.
+ * <p>This utility class exposes a single static {@link #parse(Node)} entry point that flattens
+ * the common envelope attributes ({@code id}, {@code t}, {@code class}, {@code type},
+ * {@code from}, {@code participant}, {@code recipient}, {@code error}) and dispatches on the
+ * {@code class} attribute to populate the matching {@link AckResult} subtype:
+ *
+ * <ul>
+ *   <li>{@code message} → {@link MessageAck} (carries {@code sync}, {@code phash},
+ *       {@code refresh_lid}, {@code addressing_mode}, {@code count})</li>
+ *   <li>{@code receipt} → {@link ReceiptAck}</li>
+ *   <li>{@code notification} → {@link NotificationAck}</li>
+ *   <li>{@code call} → {@link CallAck} (carries the {@code <relay>} child on offer ACKs)</li>
+ * </ul>
+ *
+ * <p>An unrecognised {@code class} attribute is parsed as {@link MessageAck} since the
+ * message-fanout slots are the safest superset on the wire.
  *
  * @see AckResult
  * @see NackReason
  */
 @WhatsAppWebModule(moduleName = "WAWebSendMsgCommonApi")
+@WhatsAppWebModule(moduleName = "WAAckParser")
 public final class AckParser {
     /**
      * Prevents instantiation of this utility class.
@@ -32,20 +43,20 @@ public final class AckParser {
     }
 
     /**
-     * Parses the given {@code <ack>} node into an {@link AckResult}.
+     * Parses the given {@code <ack>} node into the matching {@link AckResult} subtype.
      *
-     * <p>Pulls the {@code t}, {@code sync}, {@code phash}, {@code refresh_lid},
-     * {@code addressing_mode}, {@code count}, and {@code error} attributes off the supplied node and
-     * returns a flattened result. The {@code t} attribute is interpreted as epoch seconds and
-     * converted to an {@link Instant}, and {@code refresh_lid} defaults to {@code false} when absent.
-     * The input must already be the {@code <ack>} element, not its enclosing {@code <iq>}.
+     * <p>The input must already be the {@code <ack>} element, not its enclosing {@code <iq>}.
+     * The {@code t} attribute is interpreted as epoch seconds and converted to an
+     * {@link Instant}, {@code refresh_lid} defaults to {@code false} when absent, and the
+     * dispatch on {@code class} populates the message-fanout slots only for
+     * {@link MessageAck}, the {@code <relay>} child only for {@link CallAck}.
      *
      * @param ack the {@code <ack>} node returned by the server
-     * @return the parsed {@link AckResult}
+     * @return the parsed {@link AckResult} subtype
      * @throws NullPointerException     if {@code ack} is {@code null}
      * @throws IllegalArgumentException if the node tag is not {@code "ack"}
      */
-    @WhatsAppWebExport(moduleName = "WAWebSendMsgCommonApi", exports = "sendMsgAckSyncParser",
+    @WhatsAppWebExport(moduleName = "WAAckParser", exports = "AckParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     public static AckResult parse(Node ack) {
         Objects.requireNonNull(ack, "ack");
@@ -54,25 +65,37 @@ public final class AckParser {
                     "Expected <ack> node, got <" + ack.description() + ">");
         }
 
+        var id = ack.getAttributeAsString("id", null);
         var timestampSeconds = ack.getAttributeAsLong("t", null);
         var timestamp = timestampSeconds != null
                 ? Instant.ofEpochSecond(timestampSeconds)
                 : null;
-        var sync = ack.getAttributeAsString("sync", null);
-        var phash = ack.getAttributeAsString("phash", null);
-        var refreshLid = ack.getAttributeAsBool("refresh_lid", false);
-        var addressingMode = ack.getAttributeAsString("addressing_mode", null);
-        var count = ack.getAttributeAsInt("count", null);
+        var ackClassToken = ack.getAttributeAsString("class", null);
+        var ackClass = AckClass.fromWireToken(ackClassToken);
+        var type = ack.getAttributeAsString("type", null);
+        var from = ack.getAttributeAsJid("from", null);
+        var participant = ack.getAttributeAsJid("participant", null);
+        var recipient = ack.getAttributeAsJid("recipient", null);
         var error = ack.getAttributeAsInt("error", null);
 
-        return new AckResult(
-                timestamp,
-                sync,
-                phash,
-                refreshLid,
-                addressingMode,
-                count,
-                error
-        );
+        return switch (ackClass) {
+            case RECEIPT -> new ReceiptAck(id, timestamp, type, from, participant, recipient,
+                    error);
+            case NOTIFICATION -> new NotificationAck(id, timestamp, type, from, participant,
+                    recipient, error);
+            case CALL -> {
+                var relay = ack.getChild("relay").flatMap(CallRelay::parse).orElse(null);
+                yield new CallAck(id, timestamp, type, from, participant, recipient, error, relay);
+            }
+            case null, default -> {
+                var sync = ack.getAttributeAsString("sync", null);
+                var phash = ack.getAttributeAsString("phash", null);
+                var refreshLid = ack.getAttributeAsBool("refresh_lid", false);
+                var addressingMode = ack.getAttributeAsString("addressing_mode", null);
+                var count = ack.getAttributeAsInt("count", null);
+                yield new MessageAck(id, timestamp, type, from, participant, recipient, error,
+                        sync, phash, refreshLid, addressingMode, count);
+            }
+        };
     }
 }

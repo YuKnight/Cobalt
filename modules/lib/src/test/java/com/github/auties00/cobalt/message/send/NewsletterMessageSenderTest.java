@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -50,7 +50,7 @@ class NewsletterMessageSenderTest {
                             .attribute("server_id", "42")
                             .build();
                 });
-        var sender = new NewsletterMessageSender(client, props, new DefaultWamService(client, props));
+        var sender = new NewsletterMessageSender(client, props, new LiveWamService(client, props));
 
         var info = new NewsletterMessageInfoBuilder()
                 .key(new MessageKeyBuilder()

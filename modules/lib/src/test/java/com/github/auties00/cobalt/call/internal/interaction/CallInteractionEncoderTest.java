@@ -1,10 +1,14 @@
 package com.github.auties00.cobalt.call.internal.interaction;
 
 import com.github.auties00.cobalt.call.CallInteraction;
+import com.github.auties00.cobalt.model.call.datachannel.AppDataMessage;
+import com.github.auties00.cobalt.model.call.datachannel.AppDataMessageSpec;
+import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloadsSpec;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -17,6 +21,41 @@ import static org.junit.jupiter.api.Assertions.*;
  * captures of the corresponding WhatsApp Web in-call interactions.
  */
 public class CallInteractionEncoderTest {
+    @Test
+    public void reactionAsAppDataRoundTrips() {
+        // The new canonical wire shape: AppDataMessage{ reactionInfo{ transaction_id, reaction } }
+        // serialised as a single protobuf message ready for the AppData DataChannel.
+        var bytes = CallInteractionEncoder.encodeReactionAsAppData(
+                new CallInteraction.Reaction("👍"), 42L);
+        var decoded = AppDataMessageSpec.decode(bytes);
+        assertNotNull(decoded);
+        var info = decoded.reactionInfo().orElseThrow();
+        assertEquals(42L, info.transactionId().orElseThrow());
+        assertEquals("👍", info.reaction().orElseThrow());
+        assertTrue(decoded.transcriptionInfo().isEmpty(),
+                "single-reaction message must not carry a transcription payload");
+    }
+
+    @Test
+    public void appDataBatchRoundTrips() {
+        var thumb = AppDataMessageSpec.decode(
+                CallInteractionEncoder.encodeReactionAsAppData(new CallInteraction.Reaction("👍"), 1L));
+        var heart = AppDataMessageSpec.decode(
+                CallInteractionEncoder.encodeReactionAsAppData(new CallInteraction.Reaction("❤"), 2L));
+        var batch = CallInteractionEncoder.encodeAppDataBatch(List.of(thumb, heart));
+        var decoded = AppDataPayloadsSpec.decode(batch);
+        var messages = decoded.messages();
+        assertEquals(2, messages.size());
+        assertEquals("👍", messages.get(0).reactionInfo().orElseThrow().reaction().orElseThrow());
+        assertEquals(2L, messages.get(1).reactionInfo().orElseThrow().transactionId().orElseThrow());
+    }
+
+    @Test
+    public void encodeAppDataBatchRejectsEmptyList() {
+        assertThrows(IllegalArgumentException.class,
+                () -> CallInteractionEncoder.encodeAppDataBatch(List.of()));
+    }
+
     @Test
     public void reactionEnvelope() {
         var state = new InteractionStreamState();

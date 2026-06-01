@@ -75,8 +75,13 @@ public final class AudioFileSource implements AudioSource, AutoCloseable {
     /**
      * Holds the libswresample context pointer that converts the decoded format to 16 kHz mono signed
      * 16-bit PCM.
+     *
+     * <p>Set lazily on the first decoded {@link AVFrame} rather than in the constructor: many codecs
+     * (MP3 included) leave {@code codecCtx->ch_layout} and {@code codecCtx->sample_fmt} unset until
+     * the first frame is produced, and seeding the resampler from those zeroed values yields a
+     * context that fails {@code swr_convert} with {@code EINVAL} on every subsequent call.
      */
-    private final MemorySegment swrCtx;
+    private MemorySegment swrCtx;
 
     /**
      * Holds the reusable {@code AVPacket} pointer driven by the demuxer read loop.
@@ -161,7 +166,6 @@ public final class AudioFileSource implements AudioSource, AutoCloseable {
             FFmpegError.check("avcodec_open2",
                     Ffmpeg.avcodec_open2(codecCtx, codec, MemorySegment.NULL));
 
-            this.swrCtx = buildResampler(arena, codecCtx);
             this.packet = FFmpegError.requireNonNull("av_packet_alloc", Ffmpeg.av_packet_alloc());
             this.frame = FFmpegError.requireNonNull("av_frame_alloc", Ffmpeg.av_frame_alloc());
         } catch (RuntimeException e) {
@@ -270,6 +274,9 @@ public final class AudioFileSource implements AudioSource, AutoCloseable {
         if (inSamples <= 0) {
             return;
         }
+        if (swrCtx == null) {
+            swrCtx = buildResampler(arena, frame);
+        }
         var outCapacity = (int) (((long) inSamples * OUT_SAMPLE_RATE
                                   / Math.max(1, AVFrame.sample_rate(frame))) + 256);
         try (var local = Arena.ofConfined()) {
@@ -293,6 +300,9 @@ public final class AudioFileSource implements AudioSource, AutoCloseable {
      * @throws IllegalStateException if the flush conversion fails
      */
     private void flushResampler() {
+        if (swrCtx == null) {
+            return;
+        }
         try (var local = Arena.ofConfined()) {
             var outCapacity = OUT_FRAME_SAMPLES * 4;
             var outBuf = local.allocate((long) outCapacity * Short.BYTES);
@@ -435,13 +445,13 @@ public final class AudioFileSource implements AudioSource, AutoCloseable {
      * @return the initialized {@code SwrContext} pointer
      * @throws IllegalStateException if the resampler cannot be allocated or initialized
      */
-    private static MemorySegment buildResampler(Arena arena, MemorySegment codecCtx) {
+    private static MemorySegment buildResampler(Arena arena, MemorySegment frame) {
         var swrPtr = arena.allocate(ValueLayout.ADDRESS);
         var monoLayout = arena.allocate(AVChannelLayout.layout());
         Ffmpeg.av_channel_layout_default(monoLayout, 1);
-        var srcChLayout = AVCodecContext.ch_layout(codecCtx);
-        var srcFmt = AVCodecContext.sample_fmt(codecCtx);
-        var srcRate = AVCodecContext.sample_rate(codecCtx);
+        var srcChLayout = AVFrame.ch_layout(frame);
+        var srcFmt = AVFrame.format(frame);
+        var srcRate = AVFrame.sample_rate(frame);
 
         FFmpegError.check("swr_alloc_set_opts2",
                 Ffmpeg.swr_alloc_set_opts2(swrPtr,

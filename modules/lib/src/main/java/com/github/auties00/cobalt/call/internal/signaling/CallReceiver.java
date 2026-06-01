@@ -1,23 +1,34 @@
 package com.github.auties00.cobalt.call.internal.signaling;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.call.ActiveCall;
+import com.github.auties00.cobalt.call.CallInteraction;
 import com.github.auties00.cobalt.call.internal.CallService;
 import com.github.auties00.cobalt.call.IncomingCall;
-import com.github.auties00.cobalt.call.internal.transport.OfferTransportSpec;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.ack.CallRelay;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.CallEndedListener;
+import com.github.auties00.cobalt.client.listener.CallInteractionListener;
+import com.github.auties00.cobalt.client.listener.CallListener;
+import com.github.auties00.cobalt.client.listener.CallMuteChangedListener;
+import com.github.auties00.cobalt.client.listener.CallOfferNoticeListener;
+import com.github.auties00.cobalt.client.listener.CallParticipantsChangedListener;
+import com.github.auties00.cobalt.client.listener.CallPeerStateChangedListener;
+import com.github.auties00.cobalt.client.listener.CallPreacceptListener;
+import com.github.auties00.cobalt.client.listener.CallVideoStateChangedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import com.github.auties00.cobalt.call.CallEndReason;
 
 /**
@@ -36,7 +47,7 @@ import com.github.auties00.cobalt.call.CallEndReason;
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleVoipCall")
 @WhatsAppWebModule(moduleName = "WAWebVoipLidUtils")
-public final class CallReceiver implements SocketStream.Handler {
+public final class CallReceiver extends SocketStreamHandler.Concurrent {
     /**
      * Logs parse errors and signaling traces for malformed or ignored stanzas.
      */
@@ -45,7 +56,7 @@ public final class CallReceiver implements SocketStream.Handler {
     /**
      * Holds the WhatsApp client used to send stanzas and access the store.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Holds the call engine that dispatches peer-side accept, reject, and terminate transitions to the
@@ -69,7 +80,7 @@ public final class CallReceiver implements SocketStream.Handler {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleVoipCall", exports = "handleCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public CallReceiver(WhatsAppClient whatsapp, CallService engine, AckSender ackSender) {
+    public CallReceiver(LinkedWhatsAppClient whatsapp, CallService engine, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.engine = engine;
         this.ackSender = ackSender;
@@ -108,7 +119,7 @@ public final class CallReceiver implements SocketStream.Handler {
      * also when the payload lacks a {@code call-id} or {@code call-creator} attribute. When the stanza
      * carries a {@code sender_lid} attribute, the mapping between the sender LID and the {@code from}
      * phone number is persisted via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#registerLidMapping(Jid, Jid)}. The payload
+     * {@link com.github.auties00.cobalt.store.ContactStore#registerLidMapping(Jid, Jid)}. The payload
      * attributes and the optional {@code group_info} participants are persisted through
      * {@link #persistAttributesAndLidMappingsForCall(Jid, Jid, String, Node, boolean)}: the caller push
      * name is written to the contact, the caller LID-to-phone mapping is registered when applicable,
@@ -137,14 +148,6 @@ public final class CallReceiver implements SocketStream.Handler {
      *       offer notice.</li>
      *   <li>any media-plane or unrecognized tag: send an acknowledgement.</li>
      * </ul>
-     *
-     * @implNote This implementation acknowledges and otherwise drops the pure media-plane signals
-     * ({@code transport}, {@code relaylatency}, {@code relayelection}, {@code video_state_ack},
-     * {@code accept_ack}, {@code accept_receipt}, {@code offer_receipt}, {@code offer_ack},
-     * {@code offer_nack}, {@code interruption}, {@code notify}, {@code flow_control},
-     * {@code web_client}, {@code group_info}) because Cobalt implements no WebRTC media plane and can
-     * observe them only at the parse layer. The {@code enc_rekey} retry-receipt branch is likewise
-     * omitted because there is no media runtime to request a rekey retry.
      *
      * @param node the inbound call stanza node
      */
@@ -182,12 +185,16 @@ public final class CallReceiver implements SocketStream.Handler {
             case "offer" -> handleOffer(node, payload, from, callId, callCreator, groupJid, offline);
             case "accept" -> {
                 sendCallReceipt(node, from, callId, callCreator, "accept");
+                var candidates = parsePeerCandidates(payload);
+                if (!candidates.isEmpty()) {
+                    engine.onPeerCandidates(callId, candidates);
+                }
                 engine.onPeerAccept(callId);
             }
             case "reject" -> {
                 sendCallReceipt(node, from, callId, callCreator, "reject");
                 engine.onPeerReject(callId, "reject");
-                whatsapp.store().removeCall(callId);
+                whatsapp.store().chatStore().removeCall(callId);
                 notifyEnded(callId, from, "reject");
             }
             case "preaccept" -> {
@@ -196,21 +203,43 @@ public final class CallReceiver implements SocketStream.Handler {
             }
             case "enc_rekey" -> {
                 sendCallReceipt(node, from, callId, callCreator, "enc_rekey");
+                handleEncRekey(callId, payload, from);
             }
             case "terminate" -> {
                 var reason = payload.getAttributeAsString("reason", null);
                 engine.onPeerTerminate(callId, reason);
-                whatsapp.store().removeCall(callId);
+                whatsapp.store().chatStore().removeCall(callId);
                 sendCallAck(node, payload.description());
                 notifyEnded(callId, from, reason);
             }
             case "mute_v2" -> {
-                // Wire shape verified against captured fixtures: the attribute is `mute-state` with
-                // values "1" (muted) and "0" (unmuted); the legacy `mute` tag with
-                // state="muted"|"unmuted" is no longer emitted by current WA Web snapshots.
+                // Wire shape verified against captured fixtures: a self mute announcement carries
+                // `mute-state` ("1" muted, "0" unmuted); a peer-mute request from another participant
+                // carries `request-state` instead (the voip engine accepts either on the mute_v2
+                // element). The request surfaces as a PeerMuteRequest interaction, the announcement as
+                // a mute-changed event.
                 sendCallAck(node, payload.description());
-                var muteState = payload.getAttributeAsString("mute-state", null);
-                notifyMute(callId, from, "1".equals(muteState));
+                var requestState = payload.getAttributeAsString("request-state", null);
+                if (requestState != null) {
+                    notifyInteraction(callId, from,
+                            new CallInteraction.PeerMuteRequest(from.toString(), Optional.empty()));
+                } else {
+                    var muteState = payload.getAttributeAsString("mute-state", null);
+                    notifyMute(callId, from, "1".equals(muteState));
+                }
+            }
+            case "user_action" -> {
+                // Captured live: a server-relayed group-call user action. The `action` attribute names
+                // the action; a raise_hand action wraps a <raise_hand raise-hand-state="0|1"/> child.
+                sendCallAck(node, payload.description());
+                var action = payload.getAttributeAsString("action", null);
+                if ("raise_hand".equals(action)) {
+                    var raised = payload.getChild("raise_hand")
+                            .map(child -> "1".equals(child.getAttributeAsString("raise-hand-state", null)))
+                            .orElse(false);
+                    notifyInteraction(callId, from,
+                            raised ? new CallInteraction.RaiseHand() : new CallInteraction.LowerHand());
+                }
             }
             case "video_state" -> {
                 sendCallAck(node, payload.description());
@@ -224,6 +253,12 @@ public final class CallReceiver implements SocketStream.Handler {
             }
             case "group_update" -> {
                 sendCallAck(node, payload.description());
+                // A relay-less group offer (native desktop caller) gets its <relay> block here, in
+                // the group_update that confirms the join, rather than inline in the offer. Feed it to
+                // the engine so the callee allocates the relay and starts hop-by-hop SRTP.
+                payload.getChild("relay")
+                        .flatMap(CallRelay::parse)
+                        .ifPresent(relay -> engine.onGroupRelay(callId, relay));
                 var action = payload.getAttributeAsString("action", null);
                 var participants = payload.getChild("group_info")
                         .map(info -> info.children().stream()
@@ -232,7 +267,18 @@ public final class CallReceiver implements SocketStream.Handler {
                                 .toList())
                         .orElse(List.of());
                 if (!participants.isEmpty()) {
-                    notifyParticipantsChanged(callId, groupJid, participants, "add".equals(action));
+                    var isAdd = "add".equals(action);
+                    notifyParticipantsChanged(callId, groupJid, participants, isAdd);
+                    var call = engine.find(callId);
+                    if (call != null && call.isGroup()) {
+                        call.groupSession().ifPresent(session -> {
+                            if (isAdd) {
+                                participants.forEach(session::notePendingJoin);
+                            } else {
+                                participants.forEach(session::removeParticipant);
+                            }
+                        });
+                    }
                 }
             }
             case "offer_notice" -> {
@@ -242,12 +288,167 @@ public final class CallReceiver implements SocketStream.Handler {
                     notifyOfferNotice(missed);
                 }
             }
-            case "transport", "relaylatency", "relayelection", "video_state_ack", "accept_ack",
+            case "transport" -> {
+                // The <transport> stanza carries a peer-to-peer ICE candidate-gathering round: its
+                // <te priority="N">IPv4PORT</te> children are the peer's transport addresses for a new
+                // candidate round (transport-message-type, p2p-cand-round). Feed them to the call's ICE
+                // agent so connectivity checks run against the freshest candidate set, then ACK.
+                sendCallAck(node, payload.description());
+                var candidates = parsePeerCandidates(payload);
+                if (!candidates.isEmpty()) {
+                    engine.onPeerCandidates(callId, candidates);
+                }
+                // A group call's <transport transport-message-type="4"><net.../></transport> is not a
+                // P2P candidate round (no <te> children); the captured real callee ECHOES it back to
+                // <callId>@call as part of the SFU media-path negotiation. Mirror that so the SFU sees
+                // the participant's transport engage.
+                var transportCall = engine.find(callId);
+                if (candidates.isEmpty() && transportCall != null && transportCall.isGroup()) {
+                    var callTarget = Jid.of(callId + "@call");
+                    Thread.ofVirtual().name("transport-echo-" + callId).start(() -> {
+                        try {
+                            whatsapp.sendNode(new NodeBuilder()
+                                    .description("call")
+                                    .attribute("to", callTarget)
+                                    .content(payload));
+                        } catch (RuntimeException ignored) {
+                            // best-effort handshake echo
+                        }
+                    });
+                }
+            }
+            case "relaylatency" -> {
+                sendCallAck(node, payload.description());
+                handleRelayLatency(callId, payload);
+            }
+            case "relayelection", "video_state_ack", "accept_ack",
                  "accept_receipt", "offer_receipt", "offer_ack", "offer_nack", "interruption",
                  "notify", "flow_control", "web_client", "group_info" ->
                     sendCallAck(node, payload.description());
             default -> sendCallAck(node, payload.description());
         }
+    }
+
+    /**
+     * Forwards the inbound {@code <enc_rekey>} stanza's Signal-encrypted payload to the engine.
+     *
+     * <p>Extracts the single {@code <enc>} child carrying the rekey envelope (sender LID and the
+     * Signal {@code type}/ciphertext) and dispatches to
+     * {@link CallService#onEncRekey(String, Jid, com.github.auties00.cobalt.message.MessageEncryptionType, byte[])}.
+     * The engine owns the decryption and the {@link com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload}
+     * parse. Malformed payloads (missing {@code <enc>}, missing {@code type}, missing content) are
+     * dropped without dispatching.
+     *
+     * @param callId  the call identifier
+     * @param payload the {@code <enc_rekey>} payload node
+     * @param from    the sender JID from the outer call stanza
+     */
+    private void handleEncRekey(String callId, Node payload, Jid from) {
+        var enc = payload.getChild("enc").orElse(null);
+        if (enc == null) {
+            return;
+        }
+        var typeAttr = enc.getAttributeAsString("type", null);
+        if (typeAttr == null) {
+            return;
+        }
+        com.github.auties00.cobalt.message.MessageEncryptionType encType;
+        try {
+            encType = com.github.auties00.cobalt.message.MessageEncryptionType.fromProtocolValue(typeAttr);
+        } catch (IllegalArgumentException _) {
+            return;
+        }
+        var ciphertext = enc.toContentBytes().orElse(null);
+        if (ciphertext == null) {
+            return;
+        }
+        engine.onEncRekey(callId, from, encType, ciphertext);
+    }
+
+    /**
+     * Records one round of relay-latency probe samples on the call's transport.
+     *
+     * <p>Each {@code <te>} child of {@code <relaylatency>} carries the WhatsApp Web GraphQL endpoint identifier
+     * ({@code relay_name}) and the measured round-trip time ({@code latency}). The samples are
+     * folded into the call's {@link com.github.auties00.cobalt.call.internal.transport.ActiveCallTransport#recordRelayLatency(String, long)}
+     * so a future relay re-election can prefer the lower-RTT candidate.
+     *
+     * @param callId  the call identifier
+     * @param payload the {@code <relaylatency>} payload node
+     */
+    /**
+     * Parses the peer's ICE candidates from a {@code <accept>} or {@code <transport>} payload.
+     *
+     * <p>Each {@code <te priority="N">} child carries six content bytes: four big-endian IPv4 address
+     * octets followed by a two-byte big-endian port. Children whose content is not exactly six bytes
+     * (for example IPv6 or relay {@code <te>} variants) are skipped. The result is ordered by
+     * descending priority so the agent forms the highest-priority pair first.
+     *
+     * @param payload the {@code <accept>} or {@code <transport>} payload node
+     * @return the peer's transport addresses, highest priority first, never {@code null}
+     */
+    private static java.util.List<java.net.InetSocketAddress> parsePeerCandidates(Node payload) {
+        record Candidate(int priority, java.net.InetSocketAddress address) {}
+        var parsed = new java.util.ArrayList<Candidate>();
+        for (var te : payload.streamChildren("te").toList()) {
+            var content = te.toContentBytes().orElse(null);
+            if (content == null || content.length != 6) {
+                continue;
+            }
+            var priority = te.getAttributeAsInt("priority", 0);
+            var addressBytes = new byte[]{content[0], content[1], content[2], content[3]};
+            var port = ((content[4] & 0xFF) << 8) | (content[5] & 0xFF);
+            try {
+                var address = new java.net.InetSocketAddress(
+                        java.net.InetAddress.getByAddress(addressBytes), port);
+                parsed.add(new Candidate(priority, address));
+            } catch (java.net.UnknownHostException _) {
+            }
+        }
+        parsed.sort(java.util.Comparator.comparingInt(Candidate::priority).reversed());
+        return parsed.stream().map(Candidate::address).toList();
+    }
+
+    private void handleRelayLatency(String callId, Node payload) {
+        var call = engine.find(callId);
+        if (call == null) {
+            return;
+        }
+        var transport = call.transport();
+        for (var te : payload.streamChildren("te").toList()) {
+            var relayName = te.getAttributeAsString("relay_name", null);
+            var latency = te.getAttributeAsLong("latency", (Long) null);
+            if (relayName != null && latency != null) {
+                transport.recordRelayLatency(relayName, latency);
+            }
+            // The <te> content is the relay transport address (4-byte IPv4 + 2-byte big-endian port);
+            // these relaylatency-advertised endpoints are the ones a successful client allocates to.
+            var content = te.toContentBytes().orElse(null);
+            if (content != null && content.length == 6) {
+                try {
+                    var addr = java.net.InetAddress.getByAddress(
+                            new byte[]{content[0], content[1], content[2], content[3]});
+                    var port = ((content[4] & 0xFF) << 8) | (content[5] & 0xFF);
+                    transport.recordRelayEndpoint(new java.net.InetSocketAddress(addr, port));
+                } catch (java.net.UnknownHostException _) {
+                }
+            }
+        }
+        // Echo the relay-latency probe back, one <call to=callId@call> per received <relaylatency>,
+        // as the real client does: this is the leg of the join handshake that reports the measured
+        // relays so the server finalises the relay path. Sent on a virtual thread via sendNode so the
+        // dispatch thread is not blocked and the <call> envelope receives a correlation id.
+        var callTarget = Jid.of(callId + "@call");
+        Thread.ofVirtual().name("relaylatency-echo-" + callId).start(() -> {
+            try {
+                whatsapp.sendNode(new NodeBuilder()
+                        .description("call")
+                        .attribute("to", callTarget)
+                        .content(payload));
+            } catch (RuntimeException ignored) {
+                // best-effort; a closed socket or unmatched ack must not break latency recording
+            }
+        });
     }
 
     /**
@@ -271,7 +472,7 @@ public final class CallReceiver implements SocketStream.Handler {
     private void handleOffer(Node node, Node payload, Jid from, String callId, Jid callCreator, Jid groupJid, boolean offline) {
         sendCallReceipt(node, from, callId, callCreator, "offer");
 
-        var self = whatsapp.store().jid().orElse(null);
+        var self = whatsapp.store().accountStore().jid().orElse(null);
         var outgoing = self != null && callCreator.toUserJid().equals(self.toUserJid());
         if (outgoing) {
             return;
@@ -281,8 +482,8 @@ public final class CallReceiver implements SocketStream.Handler {
         if (call == null) {
             return;
         }
-        whatsapp.store().addCall(call);
-        whatsapp.sendNodeWithNoResponse(CallStanza.ringing(callCreator, callId));
+        whatsapp.store().chatStore().addCall(call);
+        whatsapp.sendNodeWithNoResponse(CallStanza.ringing(callCreator, callId).build());
         notifyCall(call);
     }
 
@@ -291,8 +492,8 @@ public final class CallReceiver implements SocketStream.Handler {
      *
      * <p>Resolves the chat JID from {@code groupJid} for group calls or from the canonical user JID of
      * the creator otherwise, returning {@code null} when no chat JID can be resolved. The offer
-     * payload's relay transport metadata is parsed through
-     * {@link OfferTransportSpec#parse(Node)} so the transport that takes over on accept receives the
+     * payload's WhatsApp Web GraphQL transport metadata is parsed through
+     * {@link CallRelay#parseOffer(Node)} so the transport that takes over on accept receives the
      * relay tokens it needs; a missing or unparseable transport spec yields a call with no transport
      * spec rather than a failure.
      *
@@ -310,8 +511,8 @@ public final class CallReceiver implements SocketStream.Handler {
         if (chatJid == null) {
             return null;
         }
-        var transportSpec = OfferTransportSpec
-                .parse(payload)
+        var transportSpec = CallRelay
+                .parseOffer(payload)
                 .orElse(null);
         return new IncomingCall(
                 callId,
@@ -381,7 +582,7 @@ public final class CallReceiver implements SocketStream.Handler {
      * <p>When {@code pushName} is non-{@code null} and non-blank, the contact's chosen name is updated
      * through {@link #updatePushname(Jid, String)}. When {@code jid} resolves to a LID user and
      * {@code phoneNumber} is non-{@code null}, the LID-to-phone-number mapping is registered in the
-     * store via {@link com.github.auties00.cobalt.store.WhatsAppStore#registerLidMapping(Jid, Jid)}. A
+     * store via {@link com.github.auties00.cobalt.store.ContactStore#registerLidMapping(Jid, Jid)}. A
      * {@code null} {@code jid} is a no-op.
      *
      * @implNote This implementation omits the WhatsApp Web username and country-code flow and the
@@ -410,7 +611,7 @@ public final class CallReceiver implements SocketStream.Handler {
         if (!userJid.hasLidServer() || phoneNumber == null) {
             return;
         }
-        whatsapp.store().registerLidMapping(phoneNumber.toUserJid(), userJid);
+        whatsapp.store().contactStore().registerLidMapping(phoneNumber.toUserJid(), userJid);
     }
 
     /**
@@ -425,10 +626,10 @@ public final class CallReceiver implements SocketStream.Handler {
     @WhatsAppWebExport(moduleName = "WAWebHandlePushnameUpdate", exports = "updatePushname",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void updatePushname(Jid contactJid, String pushName) {
-        var contact = whatsapp.store().findContactByJid(contactJid)
-                .orElseGet(() -> whatsapp.store().addNewContact(contactJid.toUserJid()));
+        var contact = whatsapp.store().contactStore().findContactByJid(contactJid)
+                .orElseGet(() -> whatsapp.store().contactStore().addNewContact(contactJid.toUserJid()));
         contact.setChosenName(pushName);
-        whatsapp.store().addContact(contact);
+        whatsapp.store().contactStore().addContact(contact);
     }
 
     /**
@@ -500,13 +701,13 @@ public final class CallReceiver implements SocketStream.Handler {
      *         local JID is unavailable
      */
     private Jid resolveReceiptFrom(Jid remote) {
-        var self = whatsapp.store().jid().orElse(null);
+        var self = whatsapp.store().accountStore().jid().orElse(null);
         if (self == null) {
             return null;
         }
 
         if (remote.hasLidServer()) {
-            return whatsapp.store().lid().orElse(self.toUserJid());
+            return whatsapp.store().accountStore().lid().orElse(self.toUserJid());
         }
 
         return self.toUserJid();
@@ -532,7 +733,7 @@ public final class CallReceiver implements SocketStream.Handler {
             return userJid;
         }
 
-        return whatsapp.store().findPhoneByLid(userJid).orElse(userJid);
+        return whatsapp.store().contactStore().findPhoneByLid(userJid).orElse(userJid);
     }
 
     /**
@@ -545,7 +746,9 @@ public final class CallReceiver implements SocketStream.Handler {
      */
     private void notifyCall(IncomingCall call) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onCall(whatsapp, call));
+            if (listener instanceof CallListener typed) {
+                Thread.startVirtualThread(() -> typed.onCall(whatsapp, call));
+            }
         }
     }
 
@@ -563,7 +766,9 @@ public final class CallReceiver implements SocketStream.Handler {
     private void notifyEnded(String callId, Jid fromJid, String wireReason) {
         var parsed = CallEndReason.fromWireValue(wireReason);
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onCallEnded(whatsapp, callId, fromJid, parsed));
+            if (listener instanceof CallEndedListener typed) {
+                Thread.startVirtualThread(() -> typed.onCallEnded(whatsapp, callId, fromJid, parsed));
+            }
         }
     }
 
@@ -577,7 +782,9 @@ public final class CallReceiver implements SocketStream.Handler {
      */
     private void notifyPreaccept(String callId, Jid fromJid) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onCallPreaccept(whatsapp, callId, fromJid));
+            if (listener instanceof CallPreacceptListener typed) {
+                Thread.startVirtualThread(() -> typed.onCallPreaccept(whatsapp, callId, fromJid));
+            }
         }
     }
 
@@ -592,7 +799,27 @@ public final class CallReceiver implements SocketStream.Handler {
      */
     private void notifyMute(String callId, Jid fromJid, boolean muted) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onCallMuteChanged(whatsapp, callId, fromJid, muted));
+            if (listener instanceof CallMuteChangedListener typed) {
+                Thread.startVirtualThread(() -> typed.onCallMuteChanged(whatsapp, callId, fromJid, muted));
+            }
+        }
+    }
+
+    /**
+     * Notifies every registered listener of an inbound in-call interaction.
+     *
+     * <p>Surfaces a raise-hand, lower-hand, or peer-mute request another participant sent, parsed from
+     * its server-relayed signaling stanza. Each listener is invoked on its own virtual thread.
+     *
+     * @param callId      the call identifier
+     * @param fromJid     the participant that performed the interaction
+     * @param interaction the parsed interaction
+     */
+    private void notifyInteraction(String callId, Jid fromJid, CallInteraction interaction) {
+        for (var listener : whatsapp.store().listeners()) {
+            if (listener instanceof CallInteractionListener typed) {
+                Thread.startVirtualThread(() -> typed.onCallInteraction(whatsapp, callId, fromJid, interaction));
+            }
         }
     }
 
@@ -607,7 +834,9 @@ public final class CallReceiver implements SocketStream.Handler {
      */
     private void notifyVideoState(String callId, Jid fromJid, boolean enabled) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onCallVideoStateChanged(whatsapp, callId, fromJid, enabled));
+            if (listener instanceof CallVideoStateChangedListener typed) {
+                Thread.startVirtualThread(() -> typed.onCallVideoStateChanged(whatsapp, callId, fromJid, enabled));
+            }
         }
     }
 
@@ -625,7 +854,9 @@ public final class CallReceiver implements SocketStream.Handler {
     private void notifyPeerState(String callId, Jid fromJid, String wireState) {
         var parsed = CallPeerState.fromWireValue(wireState);
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onCallPeerStateChanged(whatsapp, callId, fromJid, parsed));
+            if (listener instanceof CallPeerStateChangedListener typed) {
+                Thread.startVirtualThread(() -> typed.onCallPeerStateChanged(whatsapp, callId, fromJid, parsed));
+            }
         }
     }
 
@@ -642,7 +873,9 @@ public final class CallReceiver implements SocketStream.Handler {
      */
     private void notifyParticipantsChanged(String callId, Jid groupJid, List<Jid> participants, boolean added) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onCallParticipantsChanged(whatsapp, callId, groupJid, participants, added));
+            if (listener instanceof CallParticipantsChangedListener typed) {
+                Thread.startVirtualThread(() -> typed.onCallParticipantsChanged(whatsapp, callId, groupJid, participants, added));
+            }
         }
     }
 
@@ -655,7 +888,9 @@ public final class CallReceiver implements SocketStream.Handler {
      */
     private void notifyOfferNotice(IncomingCall call) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onCallOfferNotice(whatsapp, call));
+            if (listener instanceof CallOfferNoticeListener typed) {
+                Thread.startVirtualThread(() -> typed.onCallOfferNotice(whatsapp, call));
+            }
         }
     }
 }

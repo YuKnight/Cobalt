@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.WamoUserIdentifierAction;
@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * <p>The sync dispatcher would route incoming {@code generated_wui} mutations here if the server
  * ever emits one. The identifier is an opaque token used to tag the local user inside WA's
  * paid-newsletter subscription pipeline; the handler stores it on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setNewsletterSubscriptionUserIdentifier(String)}
+ * {@link com.github.auties00.cobalt.store.SettingsStore#setNewsletterSubscriptionUserIdentifier(String)}
  * so subsequent newsletter subscription operations can include it.
  *
  * @implNote
@@ -70,7 +70,7 @@ public final class WamoUserIdentifierHandler implements WebAppStateActionHandler
      * <p>Non-{@link SyncdOperation#SET} operations are {@link MutationApplicationResult#unsupported()}.
      * A missing or blank {@link WamoUserIdentifierAction#identifier()} is
      * {@link MutationApplicationResult#malformed()}, and the resolved string is written to
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setNewsletterSubscriptionUserIdentifier(String)}.
+     * {@link com.github.auties00.cobalt.store.SettingsStore#setNewsletterSubscriptionUserIdentifier(String)}.
      *
      * @implNote
      * This implementation follows the canonical SET-only single-string shape used by sibling
@@ -78,7 +78,7 @@ public final class WamoUserIdentifierHandler implements WebAppStateActionHandler
      * filter is Cobalt-defensive: an empty WAMO identifier carries no meaningful update.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -89,7 +89,7 @@ public final class WamoUserIdentifierHandler implements WebAppStateActionHandler
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setNewsletterSubscriptionUserIdentifier(action.identifier().get());
+        client.store().settingsStore().setNewsletterSubscriptionUserIdentifier(action.identifier().get());
         return MutationApplicationResult.success();
     }
 }

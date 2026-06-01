@@ -71,7 +71,7 @@ public final class UdpDatagramTransport implements DatagramTransport {
      * remote addresses are captured for {@link #localAddress()} and {@link #remoteAddress()}. The
      * receive thread is a daemon virtual thread named after the local port.
      *
-     * @param remoteAddress the relay endpoint to connect to
+     * @param remoteAddress the WhatsApp Web GraphQL endpoint to connect to
      * @throws WhatsAppCallException.Ice if the channel cannot be opened, bound, or connected
      * @throws NullPointerException      if {@code remoteAddress} is {@code null}
      */

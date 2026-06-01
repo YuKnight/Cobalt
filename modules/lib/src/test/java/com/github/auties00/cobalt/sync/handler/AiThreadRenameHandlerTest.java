@@ -54,7 +54,7 @@ class AiThreadRenameHandlerTest {
     private void primaryAiThreadSupport(DeviceCapabilities.AiThread.SupportLevel level) {
         var aiThread = new DeviceCapabilitiesAiThreadBuilder().supportLevel(level).build();
         var caps = new DeviceCapabilitiesBuilder().aiThread(aiThread).build();
-        store.setPrimaryDeviceCapabilities(caps);
+        store.contactStore().setPrimaryDeviceCapabilities(caps);
     }
 
     private static DecryptedMutation.Trusted setMutation(AiThreadRenameAction action, String index) {
@@ -212,14 +212,14 @@ class AiThreadRenameHandlerTest {
         @DisplayName("existing thread title is renamed and SUCCESS is reported")
         void renamesExistingTitle() {
             primaryAiThreadSupport(DeviceCapabilities.AiThread.SupportLevel.FULL);
-            store.putAiThreadTitle(new AiThreadTitleBuilder()
+            store.businessStore().putAiThreadTitle(new AiThreadTitleBuilder()
                     .threadId(STORE_KEY).title("Old Title").build());
 
             var action = new AiThreadRenameActionBuilder().newTitle("New Title").build();
             var result = new AiThreadRenameHandler().applyMutation(client, setMutation(action, INDEX));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var updated = store.findAiThreadTitle(STORE_KEY).orElseThrow();
+            var updated = store.businessStore().findAiThreadTitle(STORE_KEY).orElseThrow();
             assertEquals("New Title", updated.title().orElseThrow(),
                     "the stored title must reflect the rename");
         }
@@ -250,7 +250,7 @@ class AiThreadRenameHandlerTest {
         @DisplayName("the handler does not override applyMutationBatch")
         void defaultDispatchPreserved() {
             primaryAiThreadSupport(DeviceCapabilities.AiThread.SupportLevel.FULL);
-            store.putAiThreadTitle(new AiThreadTitleBuilder()
+            store.businessStore().putAiThreadTitle(new AiThreadTitleBuilder()
                     .threadId(STORE_KEY).title("Old").build());
             var action = new AiThreadRenameActionBuilder().newTitle("New").build();
             var results = new AiThreadRenameHandler().applyMutationBatch(client,

@@ -59,7 +59,7 @@ class PaymentTosHandlerTest {
     }
 
     private void smbPlatform() {
-        store.device().setPlatform(ClientPlatformType.IOS_BUSINESS);
+        store.accountStore().device().setPlatform(ClientPlatformType.IOS_BUSINESS);
     }
 
     private void enablePix() {
@@ -83,7 +83,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("metadata — wire constants")
+    @DisplayName("metadata â€” wire constants")
     class Metadata {
         @Test
         @DisplayName("actionName() is payment_tos")
@@ -107,7 +107,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — platform gating")
+    @DisplayName("applyMutation â€” platform gating")
     class PlatformGating {
         @Test
         @DisplayName("default WEB platform short-circuits to UNSUPPORTED")
@@ -119,7 +119,7 @@ class PaymentTosHandlerTest {
         @Test
         @DisplayName("IOS_BUSINESS platform is accepted")
         void iosBusinessAccepted() {
-            store.device().setPlatform(ClientPlatformType.IOS_BUSINESS);
+            store.accountStore().device().setPlatform(ClientPlatformType.IOS_BUSINESS);
             enablePix();
             assertEquals(SyncActionState.SUCCESS,
                     handler.applyMutation(testClient, setMutation(validAction())).actionState());
@@ -128,7 +128,7 @@ class PaymentTosHandlerTest {
         @Test
         @DisplayName("ANDROID_BUSINESS platform is accepted")
         void androidBusinessAccepted() {
-            store.device().setPlatform(ClientPlatformType.ANDROID_BUSINESS);
+            store.accountStore().device().setPlatform(ClientPlatformType.ANDROID_BUSINESS);
             enablePix();
             assertEquals(SyncActionState.SUCCESS,
                     handler.applyMutation(testClient, setMutation(validAction())).actionState());
@@ -136,7 +136,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — AB-prop gate")
+    @DisplayName("applyMutation â€” AB-prop gate")
     class AbPropGating {
         @Test
         @DisplayName("disabled payments_br_pix_on_web AB prop returns UNSUPPORTED")
@@ -149,7 +149,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — non-SET operation")
+    @DisplayName("applyMutation â€” non-SET operation")
     class RemoveBranch {
         @Test
         @DisplayName("REMOVE operation past the gates is UNSUPPORTED")
@@ -166,7 +166,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed value")
+    @DisplayName("applyMutation â€” malformed value")
     class MalformedValue {
         @Test
         @DisplayName("missing paymentTosAction sub-message is MALFORMED")
@@ -179,7 +179,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — happy SET path")
+    @DisplayName("applyMutation â€” happy SET path")
     class HappySet {
         @Test
         @DisplayName("SET persists the action to the store and reports SUCCESS")
@@ -190,7 +190,7 @@ class PaymentTosHandlerTest {
             var result = handler.applyMutation(testClient, setMutation(action));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var persisted = store.paymentTos().orElseThrow(
+            var persisted = store.businessStore().paymentTos().orElseThrow(
                     () -> new AssertionError("paymentTos must be persisted"));
             assertEquals(PaymentTosAction.PaymentNotice.BR_PAY_PRIVACY_POLICY, persisted.paymentNotice());
             assertEquals(true, persisted.accepted());
@@ -198,7 +198,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed index (n/a)")
+    @DisplayName("applyMutation â€” malformed index (n/a)")
     class MalformedIndex {
         @Test
         @DisplayName("the handler does not parse indexParts beyond position 0, so index malformations are not exercised")
@@ -216,7 +216,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("resolveConflicts — default timestamp tiebreaker")
+    @DisplayName("resolveConflicts â€” default timestamp tiebreaker")
     class ResolveConflicts {
         @Test
         @DisplayName("remote with later timestamp wins (APPLY_REMOTE_DROP_LOCAL)")
@@ -233,7 +233,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutationBatch — default per-item dispatch (n/a override)")
+    @DisplayName("applyMutationBatch â€” default per-item dispatch (n/a override)")
     class BatchDispatch {
         @Test
         @DisplayName("the handler does not override applyMutationBatch")
@@ -248,7 +248,7 @@ class PaymentTosHandlerTest {
     }
 
     @Nested
-    @DisplayName("getPaymentTosSetMutation — pending mutation builder")
+    @DisplayName("getPaymentTosSetMutation â€” pending mutation builder")
     class Builder {
         @Test
         @DisplayName("builder emits a SET pending mutation at [\"payment_tos\"]")

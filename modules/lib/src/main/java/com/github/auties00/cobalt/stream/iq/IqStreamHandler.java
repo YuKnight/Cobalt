@@ -1,8 +1,12 @@
 package com.github.auties00.cobalt.stream.iq;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.graphql.web.auth.CanonicalNonceDecryptor;
+import com.github.auties00.cobalt.graphql.web.auth.WhatsAppWebGraphQlBootstrapClient;
+import com.github.auties00.cobalt.model.business.webgraphql.WhatsAppWebGraphQlSessionBuilder;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -12,10 +16,12 @@ import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentityB
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentitySpec;
 import com.github.auties00.cobalt.model.device.pairing.ClientPairingProps;
 import com.github.auties00.cobalt.model.device.pairing.ClientPairingPropsSpec;
+import com.github.auties00.cobalt.model.device.pairing.LinkedPrimaryPlatform;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.node.smax.mdcompanion.SmaxMdSetRegEncryptionMetadata;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.wam.WamService;
@@ -44,13 +50,13 @@ import java.util.concurrent.TimeUnit;
  * multi-device companion-pairing flow and the keep-alive pings.
  *
  * <p>The handler is registered under the {@code "iq"} tag inside
- * {@link SocketStream} and routes each inbound stanza by its {@code xmlns}
+ * {@link NodeStreamService} and routes each inbound stanza by its {@code xmlns}
  * attribute. Two namespaces are supported: {@code urn:xmpp:ping}, which is
  * answered with an empty {@code <iq type="result">}, and {@code md}, the
  * companion-pairing exchange that lands the QR ref rotation and the follow-up
  * pair-success exchange. Response IQs for outbound requests are not routed
  * here; they flow through the per-call request/response correlator on
- * {@link WhatsAppClient}.
+ * {@link LinkedWhatsAppClient}.
  *
  * @implNote
  * This implementation collapses the {@code WAWebHandlePairDevice} and
@@ -66,7 +72,7 @@ import java.util.concurrent.TimeUnit;
 @WhatsAppWebModule(moduleName = "WAWebHandleStanzaCommon")
 @WhatsAppWebModule(moduleName = "WAWebHandlePairDevice")
 @WhatsAppWebModule(moduleName = "WAWebHandlePairSuccess")
-public final class IqStreamHandler implements SocketStream.Handler {
+public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs diagnostic output during pairing-flow IQ processing.
@@ -102,7 +108,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
     /**
      * The client used for store access and outbound stanza dispatch.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * The verification handler that receives QR-payload strings during the QR
@@ -166,7 +172,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
     /**
      * Constructs an IQ stream handler bound to the given services.
      *
-     * <p>The dispatcher in {@link SocketStream} instantiates the handler once
+     * <p>The dispatcher in {@link NodeStreamService} instantiates the handler once
      * per client; embedders never call this constructor directly. The rotation
      * executor is created here as a single-thread daemon scheduler so that an
      * in-flight QR rotation never keeps the JVM alive.
@@ -189,7 +195,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
      * @throws NullPointerException if any service is {@code null}
      */
     public IqStreamHandler(
-            WhatsAppClient whatsapp,
+            LinkedWhatsAppClient whatsapp,
             WhatsAppClientVerificationHandler.Web webVerificationHandler,
             DeviceService deviceService,
             SnapshotRecoveryService snapshotRecoveryService,
@@ -303,7 +309,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        whatsapp.store().setAdvSecretKey(DataUtils.randomByteArray(32));
+        whatsapp.store().signalStore().setAdvSecretKey(DataUtils.randomByteArray(32));
         sendPairDeviceAck(iqNode);
 
         if (deviceLinkingService.isEnabled()) {
@@ -428,7 +434,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
         synchronized (rotationLock) {
             cancelRotationLocked();
 
-            if (whatsapp.store().registered()) {
+            if (whatsapp.store().accountStore().registered()) {
                 return;
             }
 
@@ -497,22 +503,22 @@ public final class IqStreamHandler implements SocketStream.Handler {
      */
     private String buildQrPayload(String ref) {
         var store = whatsapp.store();
-        var advSecret = store.advSecretKey().orElseGet(() -> {
+        var advSecret = store.signalStore().advSecretKey().orElseGet(() -> {
             var generated = DataUtils.randomByteArray(32);
-            store.setAdvSecretKey(generated);
+            store.signalStore().setAdvSecretKey(generated);
             return generated;
         });
 
         var encoder = Base64.getEncoder();
-        var noise = encoder.encodeToString(store.noiseKeyPair().publicKey().toEncodedPoint());
-        var identity = encoder.encodeToString(store.identityKeyPair().publicKey().toEncodedPoint());
+        var noise = encoder.encodeToString(store.signalStore().noiseKeyPair().publicKey().toEncodedPoint());
+        var identity = encoder.encodeToString(store.signalStore().identityKeyPair().publicKey().toEncodedPoint());
         var secret = encoder.encodeToString(advSecret);
         return String.join(",",
                 ref,
                 noise,
                 identity,
                 secret,
-                whatsapp.store().device().clientType().name().toLowerCase());
+                whatsapp.store().accountStore().device().clientType().name().toLowerCase());
     }
 
     /**
@@ -533,7 +539,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
      *
      * @implNote
      * This implementation folds the upstream module-level re-entry flag and the
-     * separate registered guard into a single {@code store.registered()} call,
+     * separate registered guard into a single {@code store.accountStore().registered()} call,
      * because the dispatcher already runs each stanza on its own virtual thread
      * and the registered flag is flipped at the end of a successful pair. The
      * funnel telemetry emissions
@@ -547,7 +553,7 @@ public final class IqStreamHandler implements SocketStream.Handler {
      *               {@code <pair-success/>} child
      */
     private void handlePairSuccess(Node iqNode) {
-        if (whatsapp.store().registered()) {
+        if (whatsapp.store().accountStore().registered()) {
             LOGGER.log(System.Logger.Level.DEBUG, "Ignoring pair-success iq: store already registered");
             return;
         }
@@ -567,15 +573,19 @@ public final class IqStreamHandler implements SocketStream.Handler {
         var store = whatsapp.store();
 
         resolvePairedJid(pairSuccess, false).ifPresent(jid -> {
-            store.setJid(jid);
-            if (store.phoneNumber().isEmpty()) {
+            store.accountStore().setJid(jid);
+            if (store.accountStore().phoneNumber().isEmpty()) {
                 try {
-                    store.setPhoneNumber(Long.parseLong(jid.user()));
+                    store.accountStore().setPhoneNumber(Long.parseLong(jid.user()));
                 } catch (NumberFormatException _) {
                 }
             }
         });
-        resolvePairedJid(pairSuccess, true).ifPresent(store::setLid);
+        resolvePairedJid(pairSuccess, true).ifPresent(store.accountStore()::setLid);
+        pairSuccess.getChild("platform")
+                .flatMap(platform -> platform.getAttributeAsString("name"))
+                .flatMap(LinkedPrimaryPlatform::ofWireValue)
+                .ifPresent(store.accountStore()::setPrimaryPlatform);
 
         var validatedIdentity = deviceService.extractAndValidateLocalSignedDeviceIdentity(pairSuccess)
                 .orElse(null);
@@ -587,14 +597,14 @@ public final class IqStreamHandler implements SocketStream.Handler {
 
         var mdSessionId = computeMdLinkSessionId(
                 validatedIdentity.accountSignatureKey().orElse(null),
-                store.identityKeyPair().publicKey().toEncodedPoint()
+                store.signalStore().identityKeyPair().publicKey().toEncodedPoint()
         );
         emitMdLinkDeviceCompanionStage(MdLinkDeviceCompanionStage.PAIR_SUCCESS_RECEIVED, null, mdSessionId, regStartSeconds);
 
         try {
-            store.jid().ifPresent(localJid -> deviceService.persistLocalDeviceIdentityFromPairSuccess(
+            store.accountStore().jid().ifPresent(localJid -> deviceService.persistLocalDeviceIdentityFromPairSuccess(
                     localJid, validatedIdentity.accountSignatureKey().orElse(null)));
-            store.setSignedDeviceIdentity(validatedIdentity);
+            store.signalStore().setSignedDeviceIdentity(validatedIdentity);
             sendPairSuccessResponse(iqNode, validatedIdentity);
 
             emitMdLinkDeviceCompanionStage(MdLinkDeviceCompanionStage.PAIR_DEVICE_SIGN_SENT, null, mdSessionId, regStartSeconds);
@@ -611,12 +621,85 @@ public final class IqStreamHandler implements SocketStream.Handler {
                         }
                     });
             store.setPairingTimestamp(Instant.ofEpochSecond(regStartSeconds));
-            store.setRegistered(true);
-            store.setOnline(true);
+            store.accountStore().setRegistered(true);
+            store.accountStore().setOnline(true);
             safeSave("pair-success");
+            acquireWhatsAppWebGraphQlSession(pairSuccess);
         } catch (RuntimeException exception) {
             emitMdLinkDeviceCompanionStage(null, -1, mdSessionId, regStartSeconds);
             throw exception;
+        }
+    }
+
+    /**
+     * Performs the best-effort canonical-registration step that bootstraps the
+     * {@code http_relay} transport's credentials at pair-success.
+     *
+     * <p>This mirrors the trailing {@code handleCanonicalRegistration} call WA
+     * Web makes at the end of {@code handlePairSuccess}: it reads the optional
+     * {@code <encryption-metadata/>} child of {@code <pair-success/>}, decrypts
+     * the canonical nonce blob with
+     * {@link CanonicalNonceDecryptor#decrypt(byte[], byte[], SmaxMdSetRegEncryptionMetadata)}
+     * (HKDF-SHA256 over the ADV secret key salted by the Noise static public
+     * key, then AES-256-GCM), stitches in the local device id taken from the
+     * paired JID, fetches the {@code lsd} token and exchanges the credentials at
+     * {@code /auth/token/}, and on success populates the WhatsApp Web GraphQL session via
+     * {@link LinkedWhatsAppClient#establishWhatsAppWebGraphQlSession(String, String)} so the
+     * relay GraphQL transport stops throwing "WhatsApp Web GraphQL session not established".
+     *
+     * <p>The whole step is guarded: any missing input, decryption failure, HTTP
+     * failure, or unsuccessful exchange is logged at {@code DEBUG} and swallowed
+     * so a credential-acquisition problem never aborts an otherwise successful
+     * pairing, matching WA Web's own try/catch around the canonical step.
+     *
+     * @implNote This implementation instantiates a fresh
+     * {@link WhatsAppWebGraphQlBootstrapClient} per pairing so the bootstrap {@code GET} and
+     * the {@code /auth/token/} POST share one cookie jar; the HttpOnly session
+     * cookie is replayed opaquely rather than read by name.
+     *
+     * @param pairSuccess the {@code <pair-success/>} stanza whose optional
+     *                    {@code <encryption-metadata/>} child carries the
+     *                    canonical nonce blob
+     */
+    private void acquireWhatsAppWebGraphQlSession(Node pairSuccess) {
+        try {
+            var store = whatsapp.store();
+            var metadata = pairSuccess.getChild("encryption-metadata")
+                    .flatMap(SmaxMdSetRegEncryptionMetadata::of)
+                    .orElse(null);
+            if (metadata == null) {
+                return;
+            }
+
+            var noiseStaticPublicKey = store.signalStore().noiseKeyPair().publicKey().toEncodedPoint();
+            var credentials = CanonicalNonceDecryptor.decrypt(
+                            store.signalStore().advSecretKey().orElse(null), noiseStaticPublicKey, metadata)
+                    .orElse(null);
+            if (credentials == null) {
+                LOGGER.log(System.Logger.Level.DEBUG, "Canonical nonce blob absent or undecryptable; skipping WhatsApp Web GraphQL bootstrap");
+                return;
+            }
+
+            var deviceId = store.accountStore().jid()
+                    .map(Jid::device)
+                    .orElse(0);
+
+            var bootstrap = new WhatsAppWebGraphQlBootstrapClient();
+            var lsd = bootstrap.fetchLsd();
+            if (bootstrap.exchange(credentials.withDeviceId(deviceId), lsd)) {
+                store.webSessionStore().setWhatsAppWebGraphQlSession(new WhatsAppWebGraphQlSessionBuilder()
+                        .sessionCookie(bootstrap.cookieHeader())
+                        .lsdToken(lsd)
+                        .canonicalAccessToken(credentials.accessToken())
+                        .fbid(credentials.fbid())
+                        .build());
+                store.save();
+                LOGGER.log(System.Logger.Level.DEBUG, "Established http_relay session at pair-success");
+            } else {
+                LOGGER.log(System.Logger.Level.DEBUG, "Canonical /auth/token/ exchange did not succeed; WhatsApp Web GraphQL session not established");
+            }
+        } catch (Throwable throwable) {
+            LOGGER.log(System.Logger.Level.DEBUG, "WhatsApp Web GraphQL credential acquisition failed: {0}", throwable.getMessage());
         }
     }
 

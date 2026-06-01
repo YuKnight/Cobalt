@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -20,7 +20,7 @@ import java.util.logging.Logger;
  * handler reads the {@link AndroidUnsupportedActions#allowed()} flag from each
  * {@code android_unsupported_actions} mutation and, when it is {@code true},
  * latches the
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#primaryAllowsAllMutations()}
+ * {@link com.github.auties00.cobalt.store.SyncStore#primaryAllowsAllMutations()}
  * flag so the rest of Cobalt's sync engine knows it is safe to author action
  * types the primary may not yet understand.
  *
@@ -72,7 +72,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      *
      * <p>Reads the {@link AndroidUnsupportedActions#allowed()} flag from the
      * mutation value and, when it is {@code true}, calls
-     * {@link #updatePrimaryAllowsAllMutationsFlag(WhatsAppClient)}. Non-{@link SyncdOperation#SET}
+     * {@link #updatePrimaryAllowsAllMutationsFlag(LinkedWhatsAppClient)}. Non-{@link SyncdOperation#SET}
      * operations are reported as {@link MutationApplicationResult#unsupported()};
      * a missing or mistyped action payload is reported as malformed via
      * {@link SyncdIndexUtils#malformedActionValue(String)}; any thrown exception
@@ -80,7 +80,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
@@ -103,7 +103,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
     /**
      * Latches the {@code primaryAllowsAllMutations} store flag if it is not already set.
      *
-     * <p>Invoked from {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)}
+     * <p>Invoked from {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}
      * when the incoming mutation's {@code allowed} flag is {@code true}.
      *
      * @implNote
@@ -113,13 +113,13 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
      * {@code getPrimaryAllowsAllMutations() || setPrimaryAllowsAllMutations()}
      * guard.
      *
-     * @param client the {@link WhatsAppClient} whose store hosts the flag
+     * @param client the {@link LinkedWhatsAppClient} whose store hosts the flag
      */
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
-    private void updatePrimaryAllowsAllMutationsFlag(WhatsAppClient client) {
-        if (!client.store().primaryAllowsAllMutations()) {
+    private void updatePrimaryAllowsAllMutationsFlag(LinkedWhatsAppClient client) {
+        if (!client.store().syncStore().primaryAllowsAllMutations()) {
             LOGGER.info("[syncd] primary allows all mutations flag set: allow_unsupported_mutation");
-            client.store().setPrimaryAllowsAllMutations(true);
+            client.store().syncStore().setPrimaryAllowsAllMutations(true);
         }
     }
 }

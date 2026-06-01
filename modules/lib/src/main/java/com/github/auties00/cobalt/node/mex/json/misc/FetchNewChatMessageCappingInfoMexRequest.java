@@ -19,12 +19,12 @@ import java.util.Optional;
  *
  * <p>This query is issued when the individual new-chat messaging capping feature is enabled. The
  * parsed snapshot drives the messaging-capping UI and exposes the {@code capping_status},
- * {@code ote_status} and {@code mv_status} flags. The {@link #input} variable is forwarded as an
- * opaque caller-supplied JSON string; passing {@code null} omits it from the wire payload.
+ * {@code ote_status} and {@code mv_status} flags. The {@link #input} value names the capping
+ * thread type and is wrapped on the wire as the GraphQL object {@code {"type": <input>}}; passing
+ * {@code null} omits the variable from the payload.
  *
- * @implNote This implementation leaves the {@code input} shape to the caller (WhatsApp Web
- * hard-codes {@code {"type":"INDIVIDUAL_NEW_CHAT_THREAD"}}) because the surrounding capping
- * telemetry instrumentation is not mirrored.
+ * @implNote This implementation wraps {@link #input} in a {@code {"type": ...}} object, mirroring
+ * WhatsApp Web which hard-codes {@code {"type":"INDIVIDUAL_NEW_CHAT_THREAD"}}.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewChatMessageCappingInfoJob")
 public final class FetchNewChatMessageCappingInfoMexRequest implements MexOperation.Request.Json {
@@ -48,23 +48,23 @@ public final class FetchNewChatMessageCappingInfoMexRequest implements MexOperat
     public static final String OPERATION_NAME = "mexFetchNewChatMessageCapping";
 
     /**
-     * Holds the serialised JSON payload bound to the {@code input} GraphQL variable.
+     * Holds the capping thread type bound to the {@code input.type} GraphQL variable.
      *
-     * <p>WhatsApp Web sends
+     * <p>The value names the capping policy to query; WhatsApp Web uses
      * {@snippet :
-     * String input = "{\"type\":\"INDIVIDUAL_NEW_CHAT_THREAD\"}";
+     * String input = "INDIVIDUAL_NEW_CHAT_THREAD";
      * }
-     * but the wire schema allows any caller-defined shape.
+     * and {@link #toNode()} wraps it as the GraphQL object {@code {"type": <input>}}.
      */
     private final String input;
 
     /**
-     * Constructs a new request with the serialised {@code input} GraphQL variable.
+     * Constructs a new request for the given capping thread type.
      *
-     * <p>The caller produces the JSON payload; passing {@code null} omits the variable from the
-     * wire envelope.
+     * <p>Passing {@code null} omits the {@code input} variable from the wire envelope.
      *
-     * @param input the serialised {@code input} JSON payload, may be {@code null} to omit
+     * @param input the capping thread type (for example {@code "INDIVIDUAL_NEW_CHAT_THREAD"}),
+     *              may be {@code null} to omit
      */
     public FetchNewChatMessageCappingInfoMexRequest(String input) {
         this.input = input;
@@ -90,8 +90,8 @@ public final class FetchNewChatMessageCappingInfoMexRequest implements MexOperat
      * {@inheritDoc}
      *
      * @implNote This implementation streams the GraphQL variables through fastjson2's
-     * {@link JSONWriter}, emits the {@code input} string only when the constructor argument is
-     * non-{@code null}, then wraps the payload via
+     * {@link JSONWriter}, emitting {@code input} as the object {@code {"type": <input>}} only when
+     * the constructor argument is non-{@code null}, then wraps the payload via
      * {@link MexOperation.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexFetchNewChatMessageCappingInfoJobQuery.graphql", exports = "params.id",
@@ -106,7 +106,11 @@ public final class FetchNewChatMessageCappingInfoMexRequest implements MexOperat
             if (input != null) {
                 writer.writeName("input");
                 writer.writeColon();
+                writer.startObject();
+                writer.writeName("type");
+                writer.writeColon();
                 writer.writeString(input);
+                writer.endObject();
             }
             writer.endObject();
             writer.endObject();

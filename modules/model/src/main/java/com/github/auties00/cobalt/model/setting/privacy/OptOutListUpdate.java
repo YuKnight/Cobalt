@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * Input model for {@code WhatsAppClient.updateOptOutList} — applies a
+ * Input model for {@code LinkedWhatsAppClient.updateOptOutList} — applies a
  * single mutation to the user's opt-out registry.
  *
  * <p>{@link #itemJid}, {@link #itemCategory} and {@link #itemAction}

@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -39,7 +39,7 @@ class UnarchiveChatsSettingHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -89,25 +89,25 @@ class UnarchiveChatsSettingHandlerTest {
         @Test
         @DisplayName("SET true updates the store flag and returns SUCCESS")
         void setsTrue() {
-            assertFalse(client.store().unarchiveChats(), "precondition: setting starts false");
+            assertFalse(client.store().settingsStore().unarchiveChats(), "precondition: setting starts false");
             var ts = Instant.ofEpochSecond(1_700_000_000L);
 
             var result = new UnarchiveChatsSettingHandler().applyMutation(client, unarchiveMutation(true, SyncdOperation.SET, ts));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().unarchiveChats());
+            assertTrue(client.store().settingsStore().unarchiveChats());
         }
 
         @Test
         @DisplayName("SET false updates the store flag to false")
         void setsFalse() {
-            client.store().setUnarchiveChats(true);
+            client.store().settingsStore().setUnarchiveChats(true);
             var ts = Instant.ofEpochSecond(1_700_000_000L);
 
             var result = new UnarchiveChatsSettingHandler().applyMutation(client, unarchiveMutation(false, SyncdOperation.SET, ts));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertFalse(client.store().unarchiveChats());
+            assertFalse(client.store().settingsStore().unarchiveChats());
         }
     }
 
@@ -213,7 +213,7 @@ class UnarchiveChatsSettingHandlerTest {
             assertEquals(SyncActionState.SKIPPED, results.get(0).actionState(),
                     "WAWebArchiveSettingSync only applies the last mutation in the batch");
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertFalse(client.store().unarchiveChats(),
+            assertFalse(client.store().settingsStore().unarchiveChats(),
                     "only the last mutation's value (false) is written to the store");
         }
 
@@ -225,7 +225,7 @@ class UnarchiveChatsSettingHandlerTest {
             ));
             assertEquals(1, results.size());
             assertEquals(SyncActionState.SUCCESS, results.get(0).actionState());
-            assertTrue(client.store().unarchiveChats());
+            assertTrue(client.store().settingsStore().unarchiveChats());
         }
     }
 

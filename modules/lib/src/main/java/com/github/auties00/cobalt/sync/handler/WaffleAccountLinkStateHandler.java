@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -103,11 +103,11 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      * is empty are malformed, and the remaining {@code SET} mutations contribute to the running
      * latest-timestamp tracker. After the per-mutation pass the latest mutation's link state and
      * timestamp are persisted via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState)}
+     * {@link com.github.auties00.cobalt.store.AccountStore#setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState)}
      * and
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setLinkedMetaAccountStateTimestamp(java.time.Instant)},
+     * {@link com.github.auties00.cobalt.store.AccountStore#setLinkedMetaAccountStateTimestamp(java.time.Instant)},
      * and an {@link WaffleAccountLinkStateAction.AccountLinkState#ACTIVE} state triggers
-     * {@link #requestNonceFromPrimary(WhatsAppClient)}.
+     * {@link #requestNonceFromPrimary(LinkedWhatsAppClient)}.
      *
      * @implNote
      * This implementation drops WA Web's per-mutation warning counters and "already Active" no-op
@@ -115,7 +115,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var accountLinkingEnabled = abPropsService.getBool(ABProp.WEB_WAFFLE);
         DecryptedMutation.Trusted latest = null;
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
@@ -144,8 +144,8 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
         if (latest != null) {
             var action = (WaffleAccountLinkStateAction) latest.value().action().orElseThrow();
             var linkState = action.linkState().orElseThrow();
-            client.store().setLinkedMetaAccountState(linkState);
-            client.store().setLinkedMetaAccountStateTimestamp(latest.timestamp());
+            client.store().accountStore().setLinkedMetaAccountState(linkState);
+            client.store().accountStore().setLinkedMetaAccountStateTimestamp(latest.timestamp());
             if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
                 requestNonceFromPrimary(client);
             }
@@ -159,12 +159,12 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      *
      * <p>This is the single-mutation adapter and applies the same gate-and-validate-and-persist
      * sequence as the batch entry point on a list of size one. The
-     * {@link #requestNonceFromPrimary(WhatsAppClient)} side-effect runs inline when the resolved
+     * {@link #requestNonceFromPrimary(LinkedWhatsAppClient)} side-effect runs inline when the resolved
      * state is {@link WaffleAccountLinkStateAction.AccountLinkState#ACTIVE}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!abPropsService.getBool(ABProp.WEB_WAFFLE)) {
             return MutationApplicationResult.unsupported();
         }
@@ -179,8 +179,8 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
         }
 
         var linkState = action.linkState().orElseThrow();
-        client.store().setLinkedMetaAccountState(linkState);
-        client.store().setLinkedMetaAccountStateTimestamp(mutation.timestamp());
+        client.store().accountStore().setLinkedMetaAccountState(linkState);
+        client.store().accountStore().setLinkedMetaAccountStateTimestamp(mutation.timestamp());
         if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
             requestNonceFromPrimary(client);
         }
@@ -204,12 +204,12 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
      * Web's nonce-fetch API delegation chain. The in-flight promise memoization performed by WA Web
      * is dropped because Cobalt's sync pipeline already serializes mutations on a virtual thread.
      *
-     * @param client the {@link WhatsAppClient} used to dispatch the peer message
+     * @param client the {@link LinkedWhatsAppClient} used to dispatch the peer message
      */
     @WhatsAppWebExport(moduleName = "WAWebAccountLinkingNonceFetchAPI", exports = "requestNonceFromPrimary", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSendNonMessageDataRequest", exports = "sendPeerDataOperationRequest", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void requestNonceFromPrimary(WhatsAppClient client) {
-        var me = client.store().jid().orElse(null);
+    private void requestNonceFromPrimary(LinkedWhatsAppClient client) {
+        var me = client.store().accountStore().jid().orElse(null);
         if (me == null) {
             return;
         }

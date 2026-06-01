@@ -487,6 +487,40 @@ public final class DeviceList {
     }
 
     /**
+     * Returns a copy of this device list owned by {@code userJid}, or this same instance when it
+     * already carries that JID.
+     *
+     * <p>Only the owner JID changes; the device entries, timestamps, deletion markers, account
+     * type, and signed-key-index metadata are preserved verbatim. Each device JID is minted by
+     * combining {@link #userJid()} with a device id (see {@link #deviceJids()}), and device ids are
+     * independent of the addressing mode, so re-keying to a different addressing of the same account
+     * (for example the LID counterpart of a phone-number JID) renders the same devices under that
+     * addressing.
+     *
+     * @param userJid the new owner JID
+     * @return a copy owned by {@code userJid}, or this instance when {@code userJid} already owns it
+     */
+    public DeviceList withUserJid(Jid userJid) {
+        if (Objects.equals(this.userJid, userJid)) {
+            return this;
+        }
+        return new DeviceList(
+                userJid,
+                devices,
+                timestamp,
+                rawId,
+                deleted,
+                deletedChangedToHost,
+                advAccountType,
+                expectedTimestamp,
+                expectedTimestampLastDeviceJobTimestamp,
+                expectedTimestampUpdateTimestamp,
+                currentIndex,
+                validIndexes
+        );
+    }
+
+    /**
      * Compares this device list to another object for structural equality.
      *
      * <p>Two device lists are equal when all of their fields match

@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.stream.newsletter;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.NewMessageListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
@@ -11,7 +13,6 @@ import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.time.Instant;
 
@@ -33,7 +34,7 @@ import java.time.Instant;
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleNewsletterStatus")
 @WhatsAppWebModule(moduleName = "WAWebNewsletterStatusUtils")
-public final class NewsletterStatusStreamHandler implements SocketStream.Handler {
+public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * Logs debug-level diagnostics while parsing newsletter status stanzas.
      *
@@ -44,20 +45,20 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
     private static final System.Logger LOGGER = System.getLogger(NewsletterStatusStreamHandler.class.getName());
 
     /**
-     * Holds the owning {@link WhatsAppClient} used to access the store and broadcast new-message
+     * Holds the owning {@link LinkedWhatsAppClient} used to access the store and broadcast new-message
      * events to registered listeners.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
-     * Constructs a handler bound to the given {@link WhatsAppClient}.
+     * Constructs a handler bound to the given {@link LinkedWhatsAppClient}.
      *
      * <p>Invoked by the socket-stream wiring at client construction; application code does not
      * instantiate handlers directly.
      *
-     * @param whatsapp the owning {@link WhatsAppClient} instance
+     * @param whatsapp the owning {@link LinkedWhatsAppClient} instance
      */
-    public NewsletterStatusStreamHandler(WhatsAppClient whatsapp) {
+    public NewsletterStatusStreamHandler(LinkedWhatsAppClient whatsapp) {
         this.whatsapp = whatsapp;
     }
 
@@ -194,9 +195,8 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
      * @param info          the decoded {@link NewsletterMessageInfo} to persist
      */
     private void storeMessage(Jid newsletterJid, NewsletterMessageInfo info) {
-        var newsletter = whatsapp.store()
-                .findNewsletterByJid(newsletterJid)
-                .orElseGet(() -> whatsapp.store().addNewNewsletter(newsletterJid));
+        var newsletter = whatsapp.store().chatStore().findNewsletterByJid(newsletterJid)
+                .orElseGet(() -> whatsapp.store().chatStore().addNewNewsletter(newsletterJid));
         newsletter.setTimestamp(info.timestamp().orElse(null));
         if (!info.key().fromMe()) {
             newsletter.setUnreadMessagesCount(newsletter.unreadMessagesCount() + 1);
@@ -206,7 +206,7 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
 
     /**
      * Broadcasts an
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onNewMessage(WhatsAppClient, MessageInfo)}
+     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onNewMessage(LinkedWhatsAppClient, MessageInfo)}
      * callback to every listener registered on the store, surfacing inbound channel posts on the
      * public listener surface.
      *
@@ -218,7 +218,9 @@ public final class NewsletterStatusStreamHandler implements SocketStream.Handler
      */
     private void notifyNewMessage(MessageInfo info) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onNewMessage(whatsapp, info));
+            if (listener instanceof NewMessageListener typed) {
+                Thread.startVirtualThread(() -> typed.onNewMessage(whatsapp, info));
+            }
         }
     }
 }

@@ -23,7 +23,7 @@ import java.util.Objects;
  * </ul>
  *
  * <p>Roles can be changed through the participant management methods in
- * {@code WhatsAppClient}. The {@link #data()} method returns the
+ * {@code LinkedWhatsAppClient}. The {@link #data()} method returns the
  * protocol-level string identifier used in XMPP stanzas.
  *
  * @see GroupParticipant

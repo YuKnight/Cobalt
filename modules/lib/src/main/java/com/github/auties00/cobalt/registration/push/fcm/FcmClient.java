@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.registration.push.fcm;
 
-import com.github.auties00.cobalt.client.WhatsAppDevice;
+import com.github.auties00.cobalt.client.WhatsAppClientDevice;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
-import com.github.auties00.cobalt.client.WhatsAppDevicePushClient;
+import com.github.auties00.cobalt.client.WhatsAppClientDevicePushClient;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * {@link WhatsAppDevicePushClient} that receives WhatsApp's silent verification push over Firebase Cloud Messaging
+ * {@link WhatsAppClientDevicePushClient} that receives WhatsApp's silent verification push over Firebase Cloud Messaging
  * while pretending to be the {@code com.whatsapp} (or {@code com.whatsapp.w4b}) Android app.
  *
  * <p>Owns three single-responsibility collaborators and orchestrates the lifecycle around them:
@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *   }
  * }
  */
-public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable {
+public final class FcmClient implements WhatsAppClientDevicePushClient, AutoCloseable {
     /**
      * Cached unmodifiable set of supported platforms.
      *
@@ -59,7 +59,7 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
      * <p>The state machine transitions as follows:
      * <ul>
      *   <li>{@link #UNAUTHENTICATED} moves to {@link #AUTHENTICATING} when
-     *       {@link FcmClient#authenticate(WhatsAppDevice)} is invoked.</li>
+     *       {@link FcmClient#authenticate(WhatsAppClientDevice)} is invoked.</li>
      *   <li>{@link #AUTHENTICATING} moves to {@link #AUTHENTICATED} on success or back to {@link #UNAUTHENTICATED} on
      *       failure.</li>
      *   <li>Any state moves to {@link #CLOSED} when {@link FcmClient#close()} is invoked.</li>
@@ -69,12 +69,12 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
         /**
          * No session bound.
          *
-         * <p>Only {@link FcmClient#authenticate(WhatsAppDevice)} and {@link FcmClient#close()} are valid in this
+         * <p>Only {@link FcmClient#authenticate(WhatsAppClientDevice)} and {@link FcmClient#close()} are valid in this
          * state; every read-only accessor throws {@link IllegalStateException}.
          */
         UNAUTHENTICATED,
         /**
-         * {@link FcmClient#authenticate(WhatsAppDevice)} is currently running.
+         * {@link FcmClient#authenticate(WhatsAppClientDevice)} is currently running.
          *
          * <p>Concurrent callers see this state and throw rather than racing on the registration pipeline.
          */
@@ -114,12 +114,12 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
      *
      * @implNote
      * This implementation transitions the state via {@link AtomicReference#compareAndSet(Object, Object)} so
-     * concurrent {@link #authenticate(WhatsAppDevice)} callers see a consistent view and only one wins the race.
+     * concurrent {@link #authenticate(WhatsAppClientDevice)} callers see a consistent view and only one wins the race.
      */
     private final AtomicReference<State> state;
 
     /**
-     * Session bound during {@link #authenticate(WhatsAppDevice)} or {@link #loadSession(FcmSession, URI)}.
+     * Session bound during {@link #authenticate(WhatsAppClientDevice)} or {@link #loadSession(FcmSession, URI)}.
      *
      * <p>{@code null} until authentication succeeds. Reset to {@code null} on auth failure so a retry sees a clean
      * slate.
@@ -149,7 +149,7 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
     /**
      * Creates a fresh, unauthenticated client that dials Google directly.
      *
-     * <p>The caller must call {@link #authenticate(WhatsAppDevice)} before any of the read-only accessors become
+     * <p>The caller must call {@link #authenticate(WhatsAppClientDevice)} before any of the read-only accessors become
      * usable.
      *
      * @return a new unauthenticated client
@@ -175,7 +175,7 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
      * Restores a client from a previously captured {@link FcmSession} and starts the background MCS listener.
      *
      * <p>Re-runs the FIS step if the cached auth token has expired. The returned client is already in
-     * {@link State#AUTHENTICATED}, so {@link #authenticate(WhatsAppDevice)} would throw.
+     * {@link State#AUTHENTICATED}, so {@link #authenticate(WhatsAppClientDevice)} would throw.
      *
      * @param session the session previously obtained from {@link #getSession()}
      * @return a restored, listening client
@@ -243,7 +243,7 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
      * @throws UncheckedIOException     wrapping any HTTP or protocol failure
      */
     @Override
-    public void authenticate(WhatsAppDevice device) {
+    public void authenticate(WhatsAppClientDevice device) {
         Objects.requireNonNull(device, "device");
         var platform = device.platform();
         var config = switch (platform) {
@@ -271,7 +271,7 @@ public final class FcmClient implements WhatsAppDevicePushClient, AutoCloseable 
     }
 
     /**
-     * Wipes the partial state left by a failed {@link #authenticate(WhatsAppDevice)} attempt and reverts the lifecycle
+     * Wipes the partial state left by a failed {@link #authenticate(WhatsAppClientDevice)} attempt and reverts the lifecycle
      * back to {@link State#UNAUTHENTICATED}.
      *
      * <p>Lets the caller retry authentication after a transient HTTP failure without leaking a half-built

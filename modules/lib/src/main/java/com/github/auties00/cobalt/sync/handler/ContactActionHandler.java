@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
  * renames, or deletes an address-book contact on another device, the server
  * replays the change here as a {@link ContactAction}, and the result becomes
  * observable through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findContactByJid(com.github.auties00.cobalt.model.jid.JidProvider)}.
+ * {@link com.github.auties00.cobalt.store.ContactStore#findContactByJid(com.github.auties00.cobalt.model.jid.JidProvider)}.
  *
  * @implNote
  * This implementation drops several WA Web batch-level side effects
@@ -41,7 +41,7 @@ import java.util.regex.Pattern;
  * implemented per-mutation against the local
  * {@link com.github.auties00.cobalt.model.contact.Contact#isAddedByUsername()}
  * flag instead. LID-PN learning is performed inline via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#registerLidMapping(Jid, Jid)}
+ * {@link com.github.auties00.cobalt.store.ContactStore#registerLidMapping(Jid, Jid)}
  * rather than batched and committed via WA Web's
  * {@code createLidPnMappings(flushImmediately:true, learningSource:"other")}.
  */
@@ -139,7 +139,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() <= 1) {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
@@ -163,9 +163,8 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                     return MutationApplicationResult.skipped();
                 }
 
-                var contact = client.store()
-                        .findContactByJid(contactJid)
-                        .orElseGet(() -> client.store().addNewContact(contactJid));
+                var contact = client.store().contactStore().findContactByJid(contactJid)
+                        .orElseGet(() -> client.store().contactStore().addNewContact(contactJid));
                 var fullName = action.fullName().orElse("");
                 contact.setFullName(fullName);
                 var shortName = action.firstName()
@@ -182,7 +181,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                 action.lidJid().ifPresent(lid -> {
                     contact.setLid(lid);
                     if (contactJid.hasUserServer()) {
-                        client.store().registerLidMapping(contactJid, lid);
+                        client.store().contactStore().registerLidMapping(contactJid, lid);
                     }
                 });
 
@@ -195,7 +194,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
                     return MutationApplicationResult.skipped();
                 }
 
-                var contact = client.store().findContactByJid(contactJid);
+                var contact = client.store().contactStore().findContactByJid(contactJid);
                 if (contact.isPresent()) {
                     if (usernameEnabled && contact.get().isAddedByUsername()) {
                         return MutationApplicationResult.success();
@@ -216,26 +215,26 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      * Re-processes any orphan {@code user_status_mute} mutations whose target contact JID is the one just upserted.
      *
      * <p>Invoked from the SET branch of
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} once the
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} once the
      * contact upsert lands. Successfully reapplied orphans are deleted from the
      * orphan store; failures are left in place for a future retry.
      *
      * @implNote
      * This implementation walks
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#findOrphanMutationsByModel(SyncPatchType, String)}
+     * {@link com.github.auties00.cobalt.store.SyncStore#findOrphanMutationsByModel(SyncPatchType, String)}
      * and dispatches each entry through {@link UserStatusMuteHandler}.
      * Any thrown exception is caught and reported via
      * {@link Logger#warning(String)}, replacing WA Web's
      * {@code WALogger.ERROR(...).sendLogs(...)} pair (Cobalt has no
      * server-side log-uploading channel here).
      *
-     * @param client the {@link WhatsAppClient} whose store hosts the orphan entries
+     * @param client the {@link LinkedWhatsAppClient} whose store hosts the orphan entries
      * @param contactJidString the contact JID string used to look up the orphan entries
      */
     @WhatsAppWebExport(moduleName = "WAWebContactSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void retryOrphanStatusMutes(WhatsAppClient client, String contactJidString) {
+    private void retryOrphanStatusMutes(LinkedWhatsAppClient client, String contactJidString) {
         try {
-            var entries = client.store().findOrphanMutationsByModel(UserStatusMuteAction.COLLECTION_NAME, contactJidString);
+            var entries = client.store().syncStore().findOrphanMutationsByModel(UserStatusMuteAction.COLLECTION_NAME, contactJidString);
             if (entries.isEmpty()) {
                 return;
             }
@@ -256,7 +255,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
             }
 
             if (!applied.isEmpty()) {
-                client.store().removeOrphanMutations(UserStatusMuteAction.COLLECTION_NAME, applied);
+                client.store().syncStore().removeOrphanMutations(UserStatusMuteAction.COLLECTION_NAME, applied);
             }
         } catch (Exception e) {
             LOGGER.warning("[syncd] contact: orphan status mutes check failed: " + e.getMessage());

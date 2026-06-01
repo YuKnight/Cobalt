@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -44,7 +44,7 @@ class ShareOwnPnHandlerTest {
 
     private WhatsAppStore store;
     private TestABPropsService props;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private ShareOwnPnHandler handler;
 
     @BeforeEach
@@ -106,12 +106,12 @@ class ShareOwnPnHandlerTest {
         @Test
         @DisplayName("upserts the LID contact with phoneNumberShared=true when none exists")
         void upsertsContact() {
-            assertTrue(store.findContactByJid(CONTACT_LID).isEmpty(), "precondition: no contact");
+            assertTrue(store.contactStore().findContactByJid(CONTACT_LID).isEmpty(), "precondition: no contact");
 
             var result = handler.applyMutation(client, build(CONTACT_LID, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var contact = store.findContactByJid(CONTACT_LID).orElseThrow();
+            var contact = store.contactStore().findContactByJid(CONTACT_LID).orElseThrow();
             assertTrue(contact.isPhoneNumberShared(),
                     "WAWebShareOwnPnSync.applyMutations sets shareOwnPn=true via bulkCreateOrMerge");
         }
@@ -119,7 +119,7 @@ class ShareOwnPnHandlerTest {
         @Test
         @DisplayName("sets phoneNumberShared=true on an existing contact without clobbering other fields")
         void mergesIntoExisting() {
-            var contact = store.addNewContact(CONTACT_LID);
+            var contact = store.contactStore().addNewContact(CONTACT_LID);
             contact.setFullName("Maria");
             assertFalse(contact.isPhoneNumberShared(), "precondition: shareOwnPn unset");
 

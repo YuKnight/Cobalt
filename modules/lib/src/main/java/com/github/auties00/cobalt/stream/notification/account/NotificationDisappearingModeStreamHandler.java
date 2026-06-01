@@ -1,12 +1,12 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.time.Instant;
 
@@ -24,7 +24,7 @@ import java.time.Instant;
  * stanza from clobbering a fresher value.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleDisappearingModeNotification")
-final class NotificationDisappearingModeStreamHandler implements SocketStream.Handler {
+final class NotificationDisappearingModeStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * Logs diagnostics for this handler.
      */
@@ -33,7 +33,7 @@ final class NotificationDisappearingModeStreamHandler implements SocketStream.Ha
     /**
      * Holds the client used for store reads and chat mutations.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Holds the ack sender used to ship the post-processing
@@ -47,7 +47,7 @@ final class NotificationDisappearingModeStreamHandler implements SocketStream.Ha
      * @param whatsapp  the non-{@code null} client
      * @param ackSender the non-{@code null} ack sender
      */
-    NotificationDisappearingModeStreamHandler(WhatsAppClient whatsapp, AckSender ackSender) {
+    NotificationDisappearingModeStreamHandler(LinkedWhatsAppClient whatsapp, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.ackSender = ackSender;
     }
@@ -98,8 +98,7 @@ final class NotificationDisappearingModeStreamHandler implements SocketStream.Ha
         var rawTimestamp = disappearingMode.getAttributeAsLong("t", (Long) null);
         var settingTimestamp = rawTimestamp != null ? Instant.ofEpochSecond(rawTimestamp) : null;
 
-        var chat = whatsapp.store()
-                .findChatByJid(from)
+        var chat = whatsapp.store().chatStore().findChatByJid(from)
                 .orElse(null);
         if (chat == null) {
             return;

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
@@ -82,7 +82,7 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      * {@link NotificationActivitySettingAction#notificationActivitySetting()}
      * is rejected as {@link MutationApplicationResult#malformed()}; on success
      * the resolved enum is written via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setNotificationActivitySetting(NotificationActivitySettingAction.NotificationActivitySetting)}.
+     * {@link com.github.auties00.cobalt.store.SettingsStore#setNotificationActivitySetting(NotificationActivitySettingAction.NotificationActivitySetting)}.
      *
      * @implNote
      * This implementation lets exceptions propagate so the configured
@@ -91,7 +91,7 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      * try/catch returning a failed sentinel.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -101,7 +101,7 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setNotificationActivitySetting(action.notificationActivitySetting().get());
+        client.store().settingsStore().setNotificationActivitySetting(action.notificationActivitySetting().get());
 
         return MutationApplicationResult.success();
     }

@@ -1,11 +1,12 @@
 package com.github.auties00.cobalt.message.send;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
+import com.github.auties00.cobalt.ack.MessageAck;
 import com.github.auties00.cobalt.ack.NackReason;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
@@ -50,10 +51,6 @@ import com.github.auties00.cobalt.wam.type.TypeOfGroupEnum;
 
 import java.security.GeneralSecurityException;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -114,22 +111,13 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
     private final ReportingStanza reportingStanza;
 
     /**
-     * Serialises sender-key encryption per group.
-     *
-     * <p>Concurrent sends to the same group are serialised because the Signal
-     * sender-key counter must increase monotonically per group per sender; sends
-     * to different groups proceed in parallel.
-     */
-    private final ConcurrentMap<String, ReentrantLock> locks;
-
-    /**
      * Constructs a {@link GroupMessageSender} bound to the supplied
      * dependencies.
      *
      * <p>Constructed once by {@link MessageSendingService}; embedders should not
      * instantiate directly.
      *
-     * @param client                the {@link WhatsAppClient} used to dispatch
+     * @param client                the {@link LinkedWhatsAppClient} used to dispatch
      *                              stanzas
      * @param encryption            the {@link MessageEncryption} service
      * @param deviceService         the {@link DeviceService}
@@ -146,7 +134,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebSendGroupMsgJob", exports = "encryptAndSendGroupMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
     GroupMessageSender(
-            WhatsAppClient client,
+            LinkedWhatsAppClient client,
             MessageEncryption encryption,
             DeviceService deviceService,
             ABPropsService abPropsService,
@@ -165,36 +153,6 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         this.bizStanza = Objects.requireNonNull(bizStanza, "bizStanza");
         this.metaStanza = Objects.requireNonNull(metaStanza, "metaStanza");
         this.reportingStanza = Objects.requireNonNull(reportingStanza, "reportingStanza");
-        this.locks = new ConcurrentHashMap<>();
-    }
-
-    /**
-     * Runs the given {@link Callable} while holding the {@link ReentrantLock}
-     * associated with {@code key}.
-     *
-     * <p>Serialises concurrent send and key-distribution operations on the same
-     * group, mirroring WA Web's per-conversation {@code sendMsgQueueMap.enqueue}
-     * queue.
-     *
-     * @param <T>  the {@code task} result type
-     * @param key  the lock key, typically the group JID string
-     * @param task the {@link Callable} to execute under the lock
-     * @return the value returned by {@code task}
-     * @throws NullPointerException if any argument is {@code null}
-     * @throws Exception            propagated from {@code task}
-     */
-    @WhatsAppWebExport(moduleName = "WAWebSendMsgQueueMap", exports = "sendMsgQueueMap",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    private  <T> T enqueue(String key, Callable<T> task) throws Exception {
-        Objects.requireNonNull(key, "key");
-        Objects.requireNonNull(task, "task");
-        var lock = locks.computeIfAbsent(key, _ -> new ReentrantLock());
-        lock.lock();
-        try {
-            return task.call();
-        } finally {
-            lock.unlock();
-        }
     }
 
     /**
@@ -211,212 +169,211 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebSendGroupSkmsgJob", exports = "encryptAndSendSenderKeyMsg",
             adaptation = WhatsAppAdaptation.DIRECT)
     @Override
-    AckResult send(Jid groupJid, ChatMessageInfo messageInfo) {
-        waitForOfflineDelivery();
-        try {
-            return enqueue(groupJid.toString(), () -> {
-                var rawContainer = messageInfo.message();
+    AckResult doSend(Jid groupJid, ChatMessageInfo messageInfo) {
+        var rawContainer = messageInfo.message();
 
-                var chatMetadata = store.findChatMetadata(groupJid).orElse(null);
-                var isCag = chatMetadata instanceof GroupMetadata gm
-                        && gm.isDefaultSubgroup();
-                var isCagAddon = isCag && isCagAddonMessage(rawContainer);
-                var isLidAddressingMode = (chatMetadata != null && chatMetadata.isLidAddressingMode())
-                        || isCagAddon;
-                var addressingMode = isLidAddressingMode ? "lid" : "pn";
+        // getGroupFanout refreshes the group metadata; the addressing mode must be read
+        // from the store afterwards so it reflects the server's current addressing_mode.
+        var allDevices = deviceService.getGroupFanout(groupJid);
 
-                var senderJid = isLidAddressingMode ? selfLidOrPn() : requireSelfJid();
+        var chatMetadata = store.chatStore().findChatMetadata(groupJid).orElse(null);
+        var isCag = chatMetadata instanceof GroupMetadata gm
+                && gm.isDefaultSubgroup();
+        var isCagAddon = isCag && isCagAddonMessage(rawContainer);
+        var isLidAddressingMode = (chatMetadata != null && chatMetadata.isLidAddressingMode())
+                || isCagAddon;
+        var addressingMode = isLidAddressingMode ? "lid" : "pn";
 
-                var fanout = deviceService.getGroupFanout(groupJid, senderJid);
-                var allDevices = fanout.devices();
-                var phash = fanout.phash();
+        var senderJid = isLidAddressingMode ? selfLidOrPn() : requireSelfJid();
 
-                var skDistribDevices = new ArrayList<Jid>();
-                var skExistingDevices = new ArrayList<Jid>();
-                for (var device : allDevices) {
-                    if (store.hasSenderKeyDistributed(groupJid, device)) {
-                        skExistingDevices.add(device);
-                    } else {
-                        skDistribDevices.add(device);
-                    }
-                }
-
-                if (isLidAddressingMode) {
-                    skDistribDevices.removeIf(d -> !d.hasLidServer());
-                    skExistingDevices.removeIf(d -> !d.hasLidServer());
-                } else {
-                    skDistribDevices.removeIf(Jid::hasLidServer);
-                    skExistingDevices.removeIf(Jid::hasLidServer);
-                }
-
-                var isCapiGroup = chatMetadata instanceof GroupMetadata gm2
-                        && gm2.hasCapi();
-                var container = isCapiGroup
-                        ? applyCapiFlag(rawContainer)
-                        : rawContainer;
-
-                var rotateKey = store.clearKeyRotation(groupJid);
-                if (rotateKey) {
-                    encryption.rotateSenderKey(groupJid, senderJid);
-                    skDistribDevices.addAll(skExistingDevices);
-                    skExistingDevices.clear();
-                }
-
-                var participantUserJids = Stream.concat(skDistribDevices.stream(), skExistingDevices.stream())
-                        .map(Jid::toUserJid)
-                        .distinct()
-                        .toList();
-                var contentBindings = generateContentBindings(messageInfo, participantUserJids);
-
-                var allSkDevices = Stream.concat(skDistribDevices.stream(), skExistingDevices.stream())
-                        .toList();
-                store.createOrMergeReceiptRecords(messageInfo.key().id().orElseThrow(), allSkDevices);
-
-                var senderKeyBytes = encryption.getSenderKeyBytes(groupJid, senderJid);
-                List<MessageEncryptedPayload> skDistPayloads;
-                if (skDistribDevices.isEmpty()) {
-                    skDistPayloads = List.of();
-                } else {
-                    var depletedPrekeyCount = deviceService.ensureSessions(skDistribDevices);
-                    emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.GROUP, allSkDevices.size());
-                    skDistPayloads = senderKeyDistribution.encrypt(groupJid, senderKeyBytes, skDistribDevices);
-                }
-
-                var isBotFeedback = container.content() instanceof ProtocolMessage pm
-                        && pm.type().orElse(null) == ProtocolMessage.Type.BOT_FEEDBACK_MESSAGE;
-
-                byte[] skmsgCiphertext;
-                if (isBotFeedback) {
-                    skmsgCiphertext = null;
-                } else {
-                    var plaintext = MessageContainerSpec.encode(container);
-                    try {
-                        skmsgCiphertext = encryption.encryptForGroup(groupJid, senderJid, plaintext)
-                                .ciphertext();
-                        emitE2eMessageSendSenderKeyEvent(
-                                groupJid, container,
-                                E2eDestination.GROUP,
-                                isLidAddressingMode, true);
-                    } catch (RuntimeException skmsgError) {
-                        emitE2eMessageSendSenderKeyEvent(
-                                groupJid, container,
-                                E2eDestination.GROUP,
-                                isLidAddressingMode, false);
-                        throw skmsgError;
-                    }
-                }
-
-                var decryptFail = resolveDecryptFail(container);
-                Node participantsNode;
-                if (!isBotFeedback && !skDistPayloads.isEmpty()) {
-                    participantsNode = ParticipantsStanza.buildSenderKeyDistribution(
-                            skDistPayloads, contentBindings, decryptFail);
-                } else if (contentBindings != null) {
-                    participantsNode = ParticipantsStanza.buildContentBindingOnly(
-                            skExistingDevices, contentBindings);
-                } else {
-                    participantsNode = null;
-                }
-
-                var isOpenBotGroup = chatMetadata != null && chatMetadata.isOpenBotGroup()
-                        && abPropsService.getBool(ABProp.WEB_AI_GROUP_OPEN_SUPPORT)
-                        && abPropsService.getBool(ABProp.AI_GROUP_PARTICIPATION_ENABLED);
-                Node openBotNode = null;
-                if (isOpenBotGroup) {
-                    deviceService.ensureSessions(List.of(Jid.metaAiBotAccount()));
-                    store.createOrMergeReceiptRecords(
-                            messageInfo.key().id().orElseThrow(), List.of(Jid.metaAiBotAccount()));
-                    openBotNode = botStanza.buildForGroup(messageInfo, true);
-                }
-
-                var needsIdentity = ParticipantsStanza.requiresIdentityNode(skDistPayloads);
-                if (!needsIdentity && openBotNode != null) {
-                    needsIdentity = openBotNode.streamChild("to")
-                            .flatMap(to -> to.streamChild("enc"))
-                            .anyMatch(enc -> "pkmsg".equals(enc.getAttributeAsString("type", null)));
-                }
-                var identityNode = needsIdentity ? buildIdentityNode() : null;
-
-                var mediaType = resolveMediaType(container);
-                var botNode = openBotNode != null
-                        ? openBotNode
-                        : botStanza.build(messageInfo, groupJid);
-                var stanzaPhash = isBotFeedback ? null : phash;
-                var stanza = GroupSkmsgFanoutStanza.build(
-                        messageInfo.key().id().orElseThrow(),
-                        groupJid,
-                        resolveStanzaType(container),
-                        stanzaPhash,
-                        skmsgCiphertext,
-                        mediaType,
-                        decryptFail,
-                        resolveEditAttribute(container),
-                        addressingMode,
-                        participantsNode,
-                        identityNode,
-                        metaStanza.buildChat(groupJid, container, null),
-                        bizStanza.buildGroup(container),
-                        botNode,
-                        reportingStanza.build(messageInfo, requireSelfJid(), groupJid),
-                        SenderContentBindingStanza.build(senderJid, contentBindings)
-                );
-
-                store.updateIdentityRange(allSkDevices);
-
-                flushStore();
-                var ackNode = client.sendNode(stanza);
-                var ack = AckParser.parse(ackNode);
-
-                if (!ack.isSuccess()) {
-                    var errorCode = ack.error().orElse(-1);
-                    if (errorCode == NackReason.STALE_GROUP_ADDRESSING_MODE.code()) {
-                        LOGGER.log(System.Logger.Level.WARNING,
-                                "encryptAndSendSenderKeyMsg: ack with error code 421 for {0}, refreshing metadata",
-                                groupJid);
-                        migrateAddressingMode(groupJid, !isLidAddressingMode);
-                        throw new WhatsAppMessageException.Send.Unknown(
-                                "Stale group addressing mode for " + groupJid, null);
-                    }
-                    throw new WhatsAppMessageException.Send.Unknown(
-                            "Invalid ack from server for group " + groupJid
-                            + ", error: " + errorCode, null);
-                }
-
-                for (var device : skDistribDevices) {
-                    store.markSenderKeyDistributed(groupJid, device);
-                }
-
-                var serverPhash = ack.phash().orElse(null);
-                if (serverPhash != null && !serverPhash.equals(phash)) {
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "encryptAndSendSenderKeyMsg: phash mismatch for {0}, server: {1}",
-                            messageInfo.key().id(), serverPhash);
-                    var serverAddressingMode = ack.addressingMode().orElse(null);
-                    resendAsGroupDirect(groupJid, messageInfo, allSkDevices,
-                            addressingMode, serverAddressingMode, chatMetadata, senderJid);
-                }
-
-                ack.addressingMode().ifPresent(serverMode -> {
-                    if (!serverMode.equals(addressingMode)) {
-                        LOGGER.log(System.Logger.Level.INFO,
-                                "Addressing mode mismatch for {0}: local={1}, server={2}, migrating",
-                                groupJid, addressingMode, serverMode);
-                        wamService.commit(new AddressingModeMismatchEventBuilder()
-                                .localAddressingMode(wamAddressingMode(addressingMode))
-                                .serverAddressingMode(wamAddressingMode(serverMode))
-                                .mismatchOrigin(MismatchOriginType.ACK_OUTGOING_MESSAGE)
-                                .build());
-                        migrateAddressingMode(groupJid, "lid".equals(serverMode));
-                    }
-                });
-
-                return ack;
-            });
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to send group message to " + groupJid, e);
+        var skDistribDevices = new ArrayList<Jid>();
+        var skExistingDevices = new ArrayList<Jid>();
+        for (var device : allDevices) {
+            if (store.signalStore().hasSenderKeyDistributed(groupJid, device)) {
+                skExistingDevices.add(device);
+            } else {
+                skDistribDevices.add(device);
+            }
         }
+
+        if (isLidAddressingMode) {
+            skDistribDevices.removeIf(d -> !d.hasLidServer());
+            skExistingDevices.removeIf(d -> !d.hasLidServer());
+        } else {
+            skDistribDevices.removeIf(Jid::hasLidServer);
+            skExistingDevices.removeIf(Jid::hasLidServer);
+        }
+
+        var phashOpenBotGate = chatMetadata != null && chatMetadata.isOpenBotGroup();
+        var phashTeeBotGate = chatMetadata instanceof GroupMetadata gmTee && gmTee.isTeeBotGroup();
+        var phash = deviceService.computeGroupPhash(
+                Stream.concat(skExistingDevices.stream(), skDistribDevices.stream()).toList(),
+                senderJid, phashOpenBotGate, phashTeeBotGate);
+
+        var isCapiGroup = chatMetadata instanceof GroupMetadata gm2
+                && gm2.hasCapi();
+        var container = isCapiGroup
+                ? applyCapiFlag(rawContainer)
+                : rawContainer;
+
+        var rotateKey = store.signalStore().clearKeyRotation(groupJid);
+        if (rotateKey) {
+            encryption.rotateSenderKey(groupJid, senderJid);
+            skDistribDevices.addAll(skExistingDevices);
+            skExistingDevices.clear();
+        }
+
+        var participantUserJids = Stream.concat(skDistribDevices.stream(), skExistingDevices.stream())
+                .map(Jid::toUserJid)
+                .distinct()
+                .toList();
+        var contentBindings = generateContentBindings(messageInfo, participantUserJids);
+
+        var allSkDevices = Stream.concat(skDistribDevices.stream(), skExistingDevices.stream())
+                .toList();
+        store.createOrMergeReceiptRecords(messageInfo.key().id().orElseThrow(), allSkDevices);
+
+        var senderKeyBytes = encryption.getSenderKeyBytes(groupJid, senderJid);
+        List<MessageEncryptedPayload> skDistPayloads;
+        if (skDistribDevices.isEmpty()) {
+            skDistPayloads = List.of();
+        } else {
+            var depletedPrekeyCount = deviceService.ensureSessions(skDistribDevices);
+            emitPrekeysDepletionEvents(depletedPrekeyCount, MessageType.GROUP, allSkDevices.size());
+            skDistPayloads = senderKeyDistribution.encrypt(groupJid, senderKeyBytes, skDistribDevices);
+        }
+
+        var isBotFeedback = container.content() instanceof ProtocolMessage pm
+                && pm.type().orElse(null) == ProtocolMessage.Type.BOT_FEEDBACK_MESSAGE;
+
+        byte[] skmsgCiphertext;
+        if (isBotFeedback) {
+            skmsgCiphertext = null;
+        } else {
+            var plaintext = MessageContainerSpec.encode(container);
+            try {
+                skmsgCiphertext = encryption.encryptForGroup(groupJid, senderJid, plaintext)
+                        .ciphertext();
+                emitE2eMessageSendSenderKeyEvent(
+                        groupJid, container,
+                        E2eDestination.GROUP,
+                        isLidAddressingMode, true);
+            } catch (RuntimeException skmsgError) {
+                emitE2eMessageSendSenderKeyEvent(
+                        groupJid, container,
+                        E2eDestination.GROUP,
+                        isLidAddressingMode, false);
+                throw skmsgError;
+            }
+        }
+
+        var decryptFail = resolveDecryptFail(container);
+        Node participantsNode;
+        if (!isBotFeedback && !skDistPayloads.isEmpty()) {
+            participantsNode = ParticipantsStanza.buildSenderKeyDistribution(
+                    skDistPayloads, contentBindings, decryptFail);
+        } else if (contentBindings != null) {
+            participantsNode = ParticipantsStanza.buildContentBindingOnly(
+                    skExistingDevices, contentBindings);
+        } else {
+            participantsNode = null;
+        }
+
+        var isOpenBotGroup = chatMetadata != null && chatMetadata.isOpenBotGroup()
+                && abPropsService.getBool(ABProp.WEB_AI_GROUP_OPEN_SUPPORT)
+                && abPropsService.getBool(ABProp.AI_GROUP_PARTICIPATION_ENABLED);
+        Node openBotNode = null;
+        if (isOpenBotGroup) {
+            deviceService.ensureSessions(List.of(Jid.metaAiBotAccount()));
+            store.createOrMergeReceiptRecords(
+                    messageInfo.key().id().orElseThrow(), List.of(Jid.metaAiBotAccount()));
+            openBotNode = botStanza.buildForGroup(messageInfo, true);
+        }
+
+        var needsIdentity = ParticipantsStanza.requiresIdentityNode(skDistPayloads);
+        if (!needsIdentity && openBotNode != null) {
+            needsIdentity = openBotNode.streamChild("to")
+                    .flatMap(to -> to.streamChild("enc"))
+                    .anyMatch(enc -> "pkmsg".equals(enc.getAttributeAsString("type", null)));
+        }
+        var identityNode = needsIdentity ? buildIdentityNode() : null;
+
+        var mediaType = resolveMediaType(container);
+        var botNode = openBotNode != null
+                ? openBotNode
+                : botStanza.build(messageInfo, groupJid);
+        var stanzaPhash = isBotFeedback ? null : phash;
+        var stanza = GroupSkmsgFanoutStanza.build(
+                messageInfo.key().id().orElseThrow(),
+                groupJid,
+                resolveStanzaType(container),
+                stanzaPhash,
+                skmsgCiphertext,
+                mediaType,
+                decryptFail,
+                resolveEditAttribute(container),
+                addressingMode,
+                participantsNode,
+                identityNode,
+                metaStanza.buildChat(groupJid, container, null),
+                bizStanza.buildGroup(container),
+                botNode,
+                reportingStanza.build(messageInfo, requireSelfJid(), groupJid),
+                SenderContentBindingStanza.build(senderJid, contentBindings)
+        );
+
+        store.signalStore().updateIdentityRange(allSkDevices);
+
+        flushStore();
+        var ackNode = client.sendNode(stanza);
+        var ack = AckParser.parse(ackNode);
+
+        if (!ack.isSuccess()) {
+            var errorCode = ack.error().orElse(-1);
+            if (errorCode == NackReason.STALE_GROUP_ADDRESSING_MODE.code()) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "encryptAndSendSenderKeyMsg: ack with error code 421 for {0}, refreshing metadata",
+                        groupJid);
+                migrateAddressingMode(groupJid, !isLidAddressingMode);
+                throw new WhatsAppMessageException.Send.Unknown(
+                        "Stale group addressing mode for " + groupJid, null);
+            }
+            throw new WhatsAppMessageException.Send.Unknown(
+                    "Invalid ack from server for group " + groupJid
+                    + ", error: " + errorCode, null);
+        }
+
+        for (var device : skDistribDevices) {
+            store.signalStore().markSenderKeyDistributed(groupJid, device);
+        }
+
+        if (ack instanceof MessageAck messageAck) {
+            var serverPhash = messageAck.phash().orElse(null);
+            if (serverPhash != null && !serverPhash.equals(phash)) {
+                LOGGER.log(System.Logger.Level.DEBUG,
+                        "encryptAndSendSenderKeyMsg: phash mismatch for {0}, server: {1}",
+                        messageInfo.key().id(), serverPhash);
+                var serverAddressingMode = messageAck.addressingMode().orElse(null);
+                resendAsGroupDirect(groupJid, messageInfo, allSkDevices,
+                        addressingMode, serverAddressingMode, chatMetadata, senderJid);
+            }
+
+            messageAck.addressingMode().ifPresent(serverMode -> {
+                if (!serverMode.equals(addressingMode)) {
+                    LOGGER.log(System.Logger.Level.INFO,
+                            "Addressing mode mismatch for {0}: local={1}, server={2}, migrating",
+                            groupJid, addressingMode, serverMode);
+                    wamService.commit(new AddressingModeMismatchEventBuilder()
+                            .localAddressingMode(wamAddressingMode(addressingMode))
+                            .serverAddressingMode(wamAddressingMode(serverMode))
+                            .mismatchOrigin(MismatchOriginType.ACK_OUTGOING_MESSAGE)
+                            .build());
+                    migrateAddressingMode(groupJid, "lid".equals(serverMode));
+                }
+            });
+        }
+
+        return ack;
     }
 
     /**
@@ -442,13 +399,12 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
         try {
             enqueue(groupJid.toString(), () -> {
-                var fanout = deviceService.getGroupFanout(groupJid, requireSelfJid());
-                var allDevices = fanout.devices();
+                var allDevices = deviceService.getGroupFanout(groupJid);
 
                 var skDistribDevices = new ArrayList<Jid>();
                 var skExistingDevices = new ArrayList<Jid>();
                 for (var device : allDevices) {
-                    if (store.hasSenderKeyDistributed(groupJid, device)) {
+                    if (store.signalStore().hasSenderKeyDistributed(groupJid, device)) {
                         skExistingDevices.add(device);
                     } else {
                         skDistribDevices.add(device);
@@ -469,7 +425,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 var allLid = skDistribDevices.stream().allMatch(Jid::hasLidServer);
                 var senderJid = allLid ? selfLidOrPn() : requireSelfJid();
 
-                var rotateKey = store.clearKeyRotation(groupJid);
+                var rotateKey = store.signalStore().clearKeyRotation(groupJid);
                 if (rotateKey) {
                     encryption.rotateSenderKey(groupJid, senderJid);
                 }
@@ -479,7 +435,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 var skDistPayloads = senderKeyDistribution.encrypt(
                         groupJid, senderKeyBytes, skDistribDevices);
 
-                var phash = fanout.phash();
+                var phash = deviceService.computeGroupPhash(allSkDevices, requireSelfJid(), false, false);
 
                 Node participantsNode = null;
                 if (!skDistPayloads.isEmpty()) {
@@ -519,7 +475,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 }
 
                 for (var device : skDistribDevices) {
-                    store.markSenderKeyDistributed(groupJid, device);
+                    store.signalStore().markSenderKeyDistributed(groupJid, device);
                 }
 
                 return ack;
@@ -677,15 +633,15 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 .serverAddressingMode(wamAddressingMode(serverAddressingMode))
                 .build());
 
-        var refreshedFanout = deviceService.getGroupFanout(groupJid, requireSelfJid());
+        var refreshedDevices = deviceService.getGroupFanout(groupJid);
 
-        var refreshedMetadata = store.findChatMetadata(groupJid).orElse(null);
+        var refreshedMetadata = store.chatStore().findChatMetadata(groupJid).orElse(null);
         emitMdGroupParticipantMissAck(messageInfo, originalDevices, refreshedMetadata);
 
         var originalJids = originalDevices.stream()
                 .map(Jid::toString)
                 .collect(Collectors.toUnmodifiableSet());
-        var deltaDevices = refreshedFanout.devices().stream()
+        var deltaDevices = refreshedDevices.stream()
                 .filter(device -> !originalJids.contains(device.toString()))
                 .toList();
 
@@ -906,7 +862,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebDBGroupParticipant", exports = "migrateParticipantInfoAddressingMode",
             adaptation = WhatsAppAdaptation.DIRECT)
     private void migrateAddressingMode(Jid groupJid, boolean toLid) {
-        var metadata = store.findChatMetadata(groupJid).orElse(null);
+        var metadata = store.chatStore().findChatMetadata(groupJid).orElse(null);
         if (metadata == null) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Cannot migrate addressing mode for {0}: no metadata", groupJid);
@@ -933,7 +889,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         metadata.addAllParticipants(migratedParticipants);
         metadata.setLidAddressingMode(toLid);
 
-        store.clearSenderKeyDistribution(groupJid);
+        store.signalStore().clearSenderKeyDistribution(groupJid);
 
         LOGGER.log(System.Logger.Level.INFO,
                 "Migrated addressing mode for {0} to {1} ({2} participants)",
@@ -956,9 +912,9 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
             adaptation = WhatsAppAdaptation.DIRECT)
     private Jid convertJid(Jid jid, boolean toLid) {
         if (toLid) {
-            return jid.hasLidServer() ? jid : store.findLidByPhone(jid).orElse(null);
+            return jid.hasLidServer() ? jid : store.contactStore().findLidByPhone(jid).orElse(null);
         } else {
-            return jid.hasUserServer() ? jid : store.findPhoneByLid(jid).orElse(null);
+            return jid.hasUserServer() ? jid : store.contactStore().findPhoneByLid(jid).orElse(null);
         }
     }
 

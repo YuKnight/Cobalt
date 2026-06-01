@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.ack.NackReason;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.ContactTextStatusListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.chat.Chat;
@@ -18,7 +21,6 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterMetadataBuilder;
 import com.github.auties00.cobalt.model.newsletter.NewsletterViewerRole;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -30,10 +32,13 @@ import java.util.Set;
  *
  * <p>Dispatched by {@link NotificationBusinessDispatcher}. The {@code <update op_name="..."/>} child carries a JSON
  * payload, and the {@code op_name} attribute selects the per-operation handler: newsletter mutations, text-status
- * updates, group property updates, community-owner updates, username changes, and LID changes. Any operation whose
- * payload carries a fatal extension error is logged and skipped without an ack; any operation with no registered
- * handler raises {@link MissingMexNotificationHandlerException}, which the dispatch branch turns into a NACK by
- * omitting the ack so the server retries. The ack is sent only on a successful dispatch.
+ * updates, group property updates, community-owner updates, username changes, and LID changes. Every notification is
+ * acknowledged at the transport layer: a successful dispatch sends a positive {@code <ack type="mex"/>}, while a fatal
+ * extension error, a {@code null} {@code data} member, a known-but-unsupported operation, or any handler failure sends
+ * an {@code <ack type="mex" error="487"/>} ({@link NackReason#PARSING_ERROR}); an operation with no registered handler
+ * raises {@link MissingMexNotificationHandlerException} and sends an {@code <ack type="mex" error="488"/>}
+ * ({@link NackReason#UNRECOGNIZED_STANZA}). The transport ack is mandatory: a notification left unacknowledged makes the
+ * server eventually close the stream with a {@code <stream:error>} that names the outstanding id.
  *
  * @implNote
  * This implementation collapses WhatsApp Web's per-operation Meta Exchange handlers into one Cobalt handler that walks
@@ -41,7 +46,7 @@ import java.util.Set;
  * and a typed parser would add no validation beyond a key check.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMexNotification")
-final class NotificationMexStreamHandler implements SocketStream.Handler {
+final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * Logs warnings about parse failures and debug messages about UI-only operations that Cobalt explicitly drops.
      */
@@ -62,7 +67,7 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
     /**
      * Reads the store, runs server queries (newsletter metadata, push name, about), and sends acks.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Migrates a contact's phone-number-to-LID mapping atomically across the store on a LID-change event.
@@ -83,7 +88,7 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * @param lidMigrationService the LID migration service used by {@link #handleLidChange(JSONObject)}
      * @param ackSender           the ack sender used for the success ack
      */
-    NotificationMexStreamHandler(WhatsAppClient whatsapp, LidMigrationService lidMigrationService, AckSender ackSender) {
+    NotificationMexStreamHandler(LinkedWhatsAppClient whatsapp, LidMigrationService lidMigrationService, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.lidMigrationService = lidMigrationService;
         this.ackSender = ackSender;
@@ -110,9 +115,11 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * Parses the {@code <update>} child's JSON payload, validates it for fatal extension errors, and dispatches to the
      * per-operation handler.
      *
-     * <p>The ack is sent only on success. A parser error, an unknown op, or any other failure NACKs by omitting the
-     * ack. An unknown op among {@link #KNOWN_UNSUPPORTED_OPS} is warned about; any other unknown op is logged at error
-     * level.
+     * <p>A successful dispatch sends a positive ack. An operation among {@link #KNOWN_UNSUPPORTED_OPS} is warned about
+     * and nacked with {@link NackReason#PARSING_ERROR}; an operation with no registered handler at all is logged at
+     * error level and nacked with {@link NackReason#UNRECOGNIZED_STANZA}; any other failure is warned about and nacked
+     * with {@link NackReason#PARSING_ERROR}. The transport ack is always sent so the server never closes the stream on
+     * an outstanding notification.
      *
      * @param node the {@code <notification>} stanza
      */
@@ -133,25 +140,29 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             if (KNOWN_UNSUPPORTED_OPS.contains(e.operationName())) {
                 LOGGER.log(System.Logger.Level.WARNING,
                         "[mex] handleMexNotification: {0} unsupported, nack", e.operationName());
+                sendNotificationNack(stanzaId, stanzaFrom, NackReason.PARSING_ERROR);
             } else {
                 LOGGER.log(System.Logger.Level.ERROR,
                         "[mex] handleMexNotification: {0} unknown op, nack", e.operationName());
+                sendNotificationNack(stanzaId, stanzaFrom, NackReason.UNRECOGNIZED_STANZA);
             }
         } catch (Throwable throwable) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Cannot handle mex notification {0}: {1}",
                     stanzaId != null ? stanzaId : "<missing>",
                     throwable.getMessage());
+            sendNotificationNack(stanzaId, stanzaFrom, NackReason.PARSING_ERROR);
         }
     }
 
     /**
      * Routes the operation to its handler, validates the payload, and sends the ack on success.
      *
-     * <p>The payload is rejected when it carries a fatal extension error or a {@code null} {@code data} member. The
-     * recognised op names map to newsletter, text-status, group, community-owner, and username/LID handlers; UI-only
-     * ops (brigading, limit sharing, reachout timelock, integrity challenge, message capping) are debug-logged because
-     * Cobalt has no equivalent UI surface; any other op name raises {@link MissingMexNotificationHandlerException}.
+     * <p>The payload is rejected with a {@link NackReason#PARSING_ERROR} ack when it carries a fatal extension error or
+     * a {@code null} {@code data} member. The recognised op names map to newsletter, text-status, group,
+     * community-owner, and username/LID handlers; UI-only ops (brigading, limit sharing, reachout timelock, integrity
+     * challenge, message capping) are debug-logged because Cobalt has no equivalent UI surface; any other op name raises
+     * {@link MissingMexNotificationHandlerException}.
      *
      * @param operationName the Meta Exchange op name from the {@code op_name} attribute
      * @param stanzaId      the stanza id used in the ack
@@ -164,6 +175,7 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
         if (hasFatalExtensionError(errors)) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "[mex] Fatal extension error in mex notification for operation {0}", operationName);
+            sendNotificationNack(stanzaId, stanzaFrom, NackReason.PARSING_ERROR);
             return;
         }
 
@@ -171,6 +183,7 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
         if (data == null) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "[mex] null data in parsed json for operation {0}", operationName);
+            sendNotificationNack(stanzaId, stanzaFrom, NackReason.PARSING_ERROR);
             return;
         }
 
@@ -491,14 +504,14 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        var phoneJid = whatsapp.store().findPhoneByLid(oldLid.toUserJid()).orElse(null);
+        var phoneJid = whatsapp.store().contactStore().findPhoneByLid(oldLid.toUserJid()).orElse(null);
         if (phoneJid == null) {
-            phoneJid = whatsapp.store().findContactByJid(oldLid)
+            phoneJid = whatsapp.store().contactStore().findContactByJid(oldLid)
                     .map(Contact::jid)
                     .orElse(null);
         }
         if (phoneJid == null) {
-            phoneJid = whatsapp.store().findChatByJid(oldLid)
+            phoneJid = whatsapp.store().chatStore().findChatByJid(oldLid)
                     .flatMap(Chat::phoneNumberJid)
                     .orElse(null);
         }
@@ -508,9 +521,9 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        whatsapp.store().findContactByJid(oldLid)
+        whatsapp.store().contactStore().findContactByJid(oldLid)
                 .ifPresent(contact -> contact.setLid(newLid.toUserJid()));
-        whatsapp.store().findChatByJid(oldLid)
+        whatsapp.store().chatStore().findChatByJid(oldLid)
                 .ifPresent(chat -> chat.setLid(newLid.toUserJid()));
     }
 
@@ -571,9 +584,8 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             }
 
             var userJid = jid.toUserJid();
-            var contact = whatsapp.store()
-                    .findContactByJid(userJid)
-                    .orElseGet(() -> whatsapp.store().addNewContact(userJid));
+            var contact = whatsapp.store().contactStore().findContactByJid(userJid)
+                    .orElseGet(() -> whatsapp.store().contactStore().addNewContact(userJid));
             try {
                 whatsapp.queryName(userJid).ifPresent(contact::setChosenName);
             } catch (Throwable throwable) {
@@ -593,17 +605,16 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * @param username the new username, or {@code null} to clear
      */
     private void updateUsername(Jid lidJid, String username) {
-        var phoneJid = whatsapp.store().findPhoneByLid(lidJid).orElse(null);
-        var contact = whatsapp.store()
-                .findContactByJid(lidJid)
-                .or(() -> phoneJid != null ? whatsapp.store().findContactByJid(phoneJid) : Optional.empty())
-                .orElseGet(() -> whatsapp.store().addNewContact(phoneJid != null ? phoneJid : lidJid));
+        var phoneJid = whatsapp.store().contactStore().findPhoneByLid(lidJid).orElse(null);
+        var contact = whatsapp.store().contactStore().findContactByJid(lidJid)
+                .or(() -> phoneJid != null ? whatsapp.store().contactStore().findContactByJid(phoneJid) : Optional.empty())
+                .orElseGet(() -> whatsapp.store().contactStore().addNewContact(phoneJid != null ? phoneJid : lidJid));
         contact.setLid(lidJid);
         contact.setUsername(username);
-        whatsapp.store().addContact(contact);
+        whatsapp.store().contactStore().addContact(contact);
 
-        whatsapp.store().findChatByJid(lidJid)
-                .or(() -> phoneJid != null ? whatsapp.store().findChatByJid(phoneJid) : Optional.empty())
+        whatsapp.store().chatStore().findChatByJid(lidJid)
+                .or(() -> phoneJid != null ? whatsapp.store().chatStore().findChatByJid(phoneJid) : Optional.empty())
                 .ifPresent(chat -> {
                     chat.setLid(lidJid);
                     chat.setUsername(username);
@@ -727,20 +738,19 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
             Instant lastUpdateTime
     ) {
         var canonicalJid = contactJid.toUserJid();
-        var current = whatsapp.store()
-                .findContactTextStatus(canonicalJid)
+        var current = whatsapp.store().contactStore().findContactTextStatus(canonicalJid)
                 .orElseGet(() -> new ContactTextStatusBuilder().build());
         current.setText(text);
         current.setEmoji(emoji);
         current.setEphemeralDurationSeconds(ephemeralDurationSeconds);
         current.setLastUpdateTime(lastUpdateTime);
-        whatsapp.store().addContactTextStatus(canonicalJid, current);
+        whatsapp.store().contactStore().addContactTextStatus(canonicalJid, current);
         notifyContactTextStatusChanged(canonicalJid, current);
         return current;
     }
 
     /**
-     * Fires {@link com.github.auties00.cobalt.client.WhatsAppClientListener#onContactTextStatus(WhatsAppClient, Jid, ContactTextStatus)}
+     * Fires {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onContactTextStatus(LinkedWhatsAppClient, Jid, ContactTextStatus)}
      * on every registered listener on its own virtual thread.
      *
      * @param contactJid the JID whose text status changed
@@ -748,7 +758,9 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      */
     private void notifyContactTextStatusChanged(Jid contactJid, ContactTextStatus status) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onContactTextStatus(whatsapp, contactJid, status));
+            if (listener instanceof ContactTextStatusListener typed) {
+                Thread.startVirtualThread(() -> typed.onContactTextStatus(whatsapp, contactJid, status));
+            }
         }
     }
 
@@ -759,9 +771,8 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * @return the matching {@link Newsletter}
      */
     private Newsletter ensureNewsletter(Jid newsletterJid) {
-        return whatsapp.store()
-                .findNewsletterByJid(newsletterJid)
-                .orElseGet(() -> whatsapp.store().addNewNewsletter(newsletterJid));
+        return whatsapp.store().chatStore().findNewsletterByJid(newsletterJid)
+                .orElseGet(() -> whatsapp.store().chatStore().addNewNewsletter(newsletterJid));
     }
 
     /**
@@ -818,14 +829,14 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
      * @param newsletterJid the newsletter JID to remove
      */
     private void removeNewsletter(Jid newsletterJid) {
-        whatsapp.store().removeNewsletter(newsletterJid);
+        whatsapp.store().chatStore().removeNewsletter(newsletterJid);
     }
 
     /**
-     * Sends the {@code <ack class="notification" type="mex"/>} stanza.
+     * Sends the positive {@code <ack class="notification" type="mex"/>} stanza.
      *
-     * <p>Fire-and-forget. Invoked only on successful dispatch; parse failures and unsupported operations omit the ack
-     * so the server retries. The ack is suppressed when either the stanza id or the {@code from} JID is missing.
+     * <p>Fire-and-forget. Invoked only on successful dispatch. The ack is suppressed when either the stanza id or the
+     * {@code from} JID is missing.
      *
      * @param stanzaId   the stanza id
      * @param stanzaFrom the {@code from} JID
@@ -843,9 +854,35 @@ final class NotificationMexStreamHandler implements SocketStream.Handler {
     }
 
     /**
+     * Sends an {@code <ack class="notification" type="mex" error="N"/>} nack stanza.
+     *
+     * <p>Fire-and-forget. Invoked on every dispatch failure (fatal extension error, {@code null} data, unsupported or
+     * unknown operation, or a handler exception). The nack is suppressed when either the stanza id or the {@code from}
+     * JID is missing. The transport ack is required regardless of outcome: leaving a notification unacknowledged makes
+     * the server close the stream with a {@code <stream:error>} that names the outstanding id.
+     *
+     * @param stanzaId   the stanza id
+     * @param stanzaFrom the {@code from} JID
+     * @param reason     the {@link NackReason} stamped into the {@code error} attribute
+     */
+    private void sendNotificationNack(String stanzaId, Jid stanzaFrom, NackReason reason) {
+        if (stanzaId == null || stanzaFrom == null) {
+            return;
+        }
+        var synthetic = new NodeBuilder()
+                .description("notification")
+                .attribute("id", stanzaId)
+                .attribute("from", stanzaFrom)
+                .build();
+        ackSender.ack(AckClass.NOTIFICATION, synthetic).type("mex").error(reason).send();
+    }
+
+    /**
      * Signals that {@link #dispatch(String, String, Jid, JSONObject)} encountered an op name no Cobalt handler knows.
      *
-     * <p>Caught inside {@link #handleNotification(Node)} and turned into a NACK (no ack sent) so the server retries.
+     * <p>Caught inside {@link #handleNotification(Node)} and turned into an {@code <ack error=...>} nack: a
+     * known-but-unsupported op nacks with {@link NackReason#PARSING_ERROR}, any other unknown op with
+     * {@link NackReason#UNRECOGNIZED_STANZA}.
      */
     private static final class MissingMexNotificationHandlerException extends RuntimeException {
         /**

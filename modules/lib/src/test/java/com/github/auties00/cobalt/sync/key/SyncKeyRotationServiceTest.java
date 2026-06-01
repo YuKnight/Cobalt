@@ -1,4 +1,7 @@
 package com.github.auties00.cobalt.sync.key;
+import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
+import com.github.auties00.cobalt.sync.LiveWebAppStateService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
@@ -14,7 +17,7 @@ import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -56,12 +59,12 @@ class SyncKeyRotationServiceTest {
     private static Harness build() {
         var props = TestABPropsService.builder().build();
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wam = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wam);
-        var snapshotRecovery = new SnapshotRecoveryService(client, props, wam);
-        var webAppState = new WebAppStateService(client, props, lidMigration, snapshotRecovery, wam, TestMediaConnectionService.create());
+        var wam = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wam);
+        var snapshotRecovery = new LiveSnapshotRecoveryService(client, props, wam);
+        var webAppState = new LiveWebAppStateService(client, props, lidMigration, snapshotRecovery, wam, TestMediaConnectionService.create());
         return new Harness(client, store, webAppState.syncKeyRotationService());
     }
 
@@ -85,13 +88,13 @@ class SyncKeyRotationServiceTest {
         @DisplayName("a key not present in the store is added on receipt")
         void storesNewKey() {
             var h = build();
-            assertTrue(h.store.appStateKeys().isEmpty(), "precondition: empty key store");
+            assertTrue(h.store.syncStore().appStateKeys().isEmpty(), "precondition: empty key store");
 
             var keyId = SyncKeyUtils.buildKeyId(1, 1);
             var keyData = filled(32, 0x77);
             h.rotation.handleKeyShare(0, List.of(syncKey(keyId, keyData)));
 
-            var stored = h.store.findWebAppStateKeyById(keyId).orElseThrow(
+            var stored = h.store.syncStore().findWebAppStateKeyById(keyId).orElseThrow(
                     () -> new AssertionError("expected key to have been stored"));
             assertArrayEquals(keyId,
                     stored.keyId().orElseThrow().keyId().orElseThrow());
@@ -105,11 +108,11 @@ class SyncKeyRotationServiceTest {
             var h = build();
             var keyId = SyncKeyUtils.buildKeyId(1, 1);
             var keyData = filled(32, 0x77);
-            h.store.addWebAppStateKeys(List.of(syncKey(keyId, keyData)));
-            assertEquals(1, h.store.appStateKeys().size());
+            h.store.syncStore().addWebAppStateKeys(List.of(syncKey(keyId, keyData)));
+            assertEquals(1, h.store.syncStore().appStateKeys().size());
 
             h.rotation.handleKeyShare(0, List.of(syncKey(keyId, keyData)));
-            assertEquals(1, h.store.appStateKeys().size(),
+            assertEquals(1, h.store.syncStore().appStateKeys().size(),
                     "dedup keeps the existing entry");
         }
 
@@ -122,7 +125,7 @@ class SyncKeyRotationServiceTest {
                     .keyId(new AppStateSyncKeyIdBuilder().keyId(keyId).build())
                     .build();
             h.rotation.handleKeyShare(0, List.of(keyWithoutData));
-            assertTrue(h.store.appStateKeys().isEmpty(),
+            assertTrue(h.store.syncStore().appStateKeys().isEmpty(),
                     "negative response must not be stored as if it were a positive one");
         }
 
@@ -133,19 +136,19 @@ class SyncKeyRotationServiceTest {
             var keyId = SyncKeyUtils.buildKeyId(2, 5);
             var keyData = filled(32, 0x55);
 
-            h.store.addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
+            h.store.syncStore().addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
                     .keyId(keyId)
                     .timestamp(Instant.now())
                     .askedDevices(Set.of(0))
                     .build());
-            assertTrue(h.store.findMissingSyncKey(keyId).isPresent(),
+            assertTrue(h.store.syncStore().findMissingSyncKey(keyId).isPresent(),
                     "precondition: key tracked as missing");
 
             h.rotation.handleKeyShare(0, List.of(syncKey(keyId, keyData)));
 
-            assertFalse(h.store.findMissingSyncKey(keyId).isPresent(),
+            assertFalse(h.store.syncStore().findMissingSyncKey(keyId).isPresent(),
                     "missing-key tracker must be cleared once the key arrives");
-            assertTrue(h.store.findWebAppStateKeyById(keyId).isPresent(),
+            assertTrue(h.store.syncStore().findWebAppStateKeyById(keyId).isPresent(),
                     "key must be in the active store after the share");
         }
 
@@ -157,7 +160,7 @@ class SyncKeyRotationServiceTest {
             var keyB = syncKey(SyncKeyUtils.buildKeyId(2, 1), filled(32, 0x22));
             var keyC = syncKey(SyncKeyUtils.buildKeyId(3, 1), filled(32, 0x33));
             h.rotation.handleKeyShare(0, List.of(keyA, keyB, keyC));
-            assertEquals(3, h.store.appStateKeys().size());
+            assertEquals(3, h.store.syncStore().appStateKeys().size());
         }
 
         @Test
@@ -168,7 +171,7 @@ class SyncKeyRotationServiceTest {
                     .keyData(new AppStateSyncKeyDataBuilder().keyData(filled(32, 0x00)).build())
                     .build();
             h.rotation.handleKeyShare(0, List.of(malformed));
-            assertTrue(h.store.appStateKeys().isEmpty(),
+            assertTrue(h.store.syncStore().appStateKeys().isEmpty(),
                     "share with absent key id must be a no-op, not throw");
         }
     }
@@ -187,7 +190,7 @@ class SyncKeyRotationServiceTest {
         @DisplayName("single key is returned regardless of epoch")
         void singleKey() {
             var h = build();
-            h.store.addWebAppStateKeys(List.of(
+            h.store.syncStore().addWebAppStateKeys(List.of(
                     syncKey(SyncKeyUtils.buildKeyId(1, 7), filled(32, 0x42))));
             var newest = h.rotation.getNewestKeyPair();
             assertNotNull(newest);
@@ -198,7 +201,7 @@ class SyncKeyRotationServiceTest {
         @DisplayName("highest-epoch key wins across multiple")
         void highestEpochWins() {
             var h = build();
-            h.store.addWebAppStateKeys(List.of(
+            h.store.syncStore().addWebAppStateKeys(List.of(
                     syncKey(SyncKeyUtils.buildKeyId(1, 1), filled(32, 0x11)),
                     syncKey(SyncKeyUtils.buildKeyId(1, 5), filled(32, 0x55)),
                     syncKey(SyncKeyUtils.buildKeyId(1, 3), filled(32, 0x33))));
@@ -221,7 +224,7 @@ class SyncKeyRotationServiceTest {
         @DisplayName("returns the existing newest key when rotation is suppressed")
         void rotationSuppressedReturnsExisting() {
             var h = build();
-            h.store.addWebAppStateKeys(List.of(
+            h.store.syncStore().addWebAppStateKeys(List.of(
                     syncKey(SyncKeyUtils.buildKeyId(1, 7), filled(32, 0x42))));
             var active = h.rotation.getActiveKey(false);
             assertNotNull(active);
@@ -243,10 +246,10 @@ class SyncKeyRotationServiceTest {
         @DisplayName("ensureActiveKey(false) is a no-op when a usable key already exists")
         void noopWhenKeyExists() {
             var h = build();
-            h.store.addWebAppStateKeys(List.of(
+            h.store.syncStore().addWebAppStateKeys(List.of(
                     syncKey(SyncKeyUtils.buildKeyId(1, 1), filled(32, 0x33))));
             h.rotation.ensureActiveKey(false);
-            assertEquals(1, h.store.appStateKeys().size(),
+            assertEquals(1, h.store.syncStore().appStateKeys().size(),
                     "no rotation requested -> no new key generated");
         }
     }

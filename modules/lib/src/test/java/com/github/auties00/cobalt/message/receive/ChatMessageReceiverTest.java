@@ -10,6 +10,7 @@ import com.github.auties00.cobalt.model.message.MessageContainerSpec;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.DisplayName;
@@ -45,8 +46,9 @@ class ChatMessageReceiverTest {
 
         var senderContainer = MessageContainer.of("hello from sender");
         var senderEncryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var payload = senderEncryption.encryptForDevice(
                 RECIPIENT_PRIMARY,
                 MessageContainerSpec.encode(senderContainer));
@@ -66,8 +68,9 @@ class ChatMessageReceiverTest {
                 .build();
 
         var recipientDecryption = new MessageDecryption(recipientStore,
-                new SignalSessionCipher(recipientStore),
-                new SignalGroupCipher(recipientStore));
+                new SignalSessionCipher(recipientStore.signalStore()),
+                new SignalGroupCipher(recipientStore.signalStore()),
+                new SignalCryptoLocks());
         var receiver = new ChatMessageReceiver(recipientStore, recipientDecryption);
 
         var info = receiver.receive(inbound, SENDER_PRIMARY);
@@ -92,11 +95,13 @@ class ChatMessageReceiverTest {
         var recipientStore = MessageFixtures.temporaryStore(RECIPIENT_BARE, null);
         TestSignalSession.establishSession(senderStore, RECIPIENT_PRIMARY, recipientStore);
         var senderEncryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var recipientDecryption = new MessageDecryption(recipientStore,
-                new SignalSessionCipher(recipientStore),
-                new SignalGroupCipher(recipientStore));
+                new SignalSessionCipher(recipientStore.signalStore()),
+                new SignalGroupCipher(recipientStore.signalStore()),
+                new SignalCryptoLocks());
         var receiver = new ChatMessageReceiver(recipientStore, recipientDecryption);
 
         var firstPayload = senderEncryption.encryptForDevice(

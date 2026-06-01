@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -22,7 +22,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * {@link ChatAssignmentOpenedStatusAction} here, and the result becomes
  * observable via the {@code opened} flag on
  * {@link com.github.auties00.cobalt.model.chat.ChatAssignment} as surfaced by
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findChatAssignment(Jid)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findChatAssignment(Jid)}.
  *
  * @implNote
  * This implementation reuses the same
@@ -91,7 +91,7 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentOpenedStatusSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() <= 2) {
@@ -108,7 +108,7 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
             }
 
             var chatJid = Jid.of(chatJidString);
-            var chat = client.store().findChatByJid(chatJid);
+            var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
@@ -118,13 +118,13 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
             }
 
             var resolvedChatJid = chat.get().toJid();
-            var existing = client.store().findChatAssignment(resolvedChatJid).orElse(null);
+            var existing = client.store().businessStore().findChatAssignment(resolvedChatJid).orElse(null);
             if (existing == null || !agentId.equals(existing.agentId().orElse(null))) {
                 return MutationApplicationResult.orphan(resolvedChatJid + "_" + agentId, "ChatAssignment");
             }
 
             var chatOpened = action.chatOpened();
-            client.store().putChatAssignment(new ChatAssignmentBuilder()
+            client.store().businessStore().putChatAssignment(new ChatAssignmentBuilder()
                     .chatJid(resolvedChatJid)
                     .agentId(existing.agentId().orElse(null))
                     .opened(chatOpened)

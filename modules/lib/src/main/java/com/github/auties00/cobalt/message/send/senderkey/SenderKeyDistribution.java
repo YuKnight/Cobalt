@@ -55,7 +55,7 @@ public final class SenderKeyDistribution {
      * Constructs a sender-key distribution service bound to the given dependencies.
      *
      * <p>The three collaborators must share the same {@link WhatsAppStore} so that the post-send
-     * {@link WhatsAppStore#updateIdentityRange(Collection)} call and the per-recipient
+     * {@link com.github.auties00.cobalt.store.SignalStore#updateIdentityRange(Collection)} call and the per-recipient
      * {@link DeviceService#computeIcdc(Jid)} lookups observe consistent state.
      *
      * @param encryption    the {@link MessageEncryption} service for per-device encryption
@@ -113,7 +113,7 @@ public final class SenderKeyDistribution {
      * from the result; a primary-device failure propagates as
      * {@link WhatsAppMessageException.Send.Unknown} so the orchestrator can abort the whole send.
      * After encryption the supplied device set is passed to
-     * {@link WhatsAppStore#updateIdentityRange(Collection)} so the next fanout sees the
+     * {@link com.github.auties00.cobalt.store.SignalStore#updateIdentityRange(Collection)} so the next fanout sees the
      * freshly-keyed recipients in the identity range.
      *
      * @param groupJid       the group {@link Jid}
@@ -166,7 +166,7 @@ public final class SenderKeyDistribution {
             }
         }
 
-        store.updateIdentityRange(devices);
+        store.signalStore().updateIdentityRange(devices);
 
         return Collections.unmodifiableList(results);
     }
@@ -207,7 +207,7 @@ public final class SenderKeyDistribution {
             return null;
         }
 
-        var selfJid = store.jid().orElse(null);
+        var selfJid = store.accountStore().jid().orElse(null);
         IcdcResult senderIcdc = null;
         if (selfJid != null) {
             senderIcdc = deviceService.computeIcdc(selfJid).orElse(null);
@@ -264,7 +264,7 @@ public final class SenderKeyDistribution {
             Jid groupJid,
             String phash
     ) {
-        var selfJid = store.jid().orElse(null);
+        var selfJid = store.accountStore().jid().orElse(null);
 
         IcdcResult senderIcdc = null;
         if (selfJid != null) {

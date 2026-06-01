@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * Covers {@link PaymentInfoHandler}: the SMB platform gate, the
  * {@link ABProp#ORDER_DETAILS_PAYMENT_INSTRUCTIONS_SYNC_ENABLED} AB-prop gate, the
  * {@link SyncdOperation#SET} path that persists the CPI string via
- * {@link WhatsAppStore#setPaymentInstructionCpi(String)}, the malformed-value
+ * {@link com.github.auties00.cobalt.store.BusinessStore#setPaymentInstructionCpi(String)}, the malformed-value
  * classification when {@link PaymentInfoAction#cpi()} is missing, and the
  * {@link SyncActionState#UNSUPPORTED} classification for non-{@code SET} operations and
  * gate failures. Each test builds its own mutation and opts into the platform and AB prop
@@ -57,7 +57,7 @@ class PaymentInfoHandlerTest {
     }
 
     private void smbPlatform() {
-        store.device().setPlatform(ClientPlatformType.IOS_BUSINESS);
+        store.accountStore().device().setPlatform(ClientPlatformType.IOS_BUSINESS);
     }
 
     private void enableSync() {
@@ -74,7 +74,7 @@ class PaymentInfoHandlerTest {
     }
 
     @Nested
-    @DisplayName("metadata — wire constants")
+    @DisplayName("metadata Ã¢â‚¬â€ wire constants")
     class Metadata {
         @Test
         @DisplayName("actionName() is payment_info")
@@ -98,7 +98,7 @@ class PaymentInfoHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — platform gating")
+    @DisplayName("applyMutation Ã¢â‚¬â€ platform gating")
     class PlatformGating {
         @Test
         @DisplayName("default WEB platform short-circuits to UNSUPPORTED")
@@ -111,7 +111,7 @@ class PaymentInfoHandlerTest {
         @Test
         @DisplayName("ANDROID_BUSINESS platform is accepted")
         void androidBusinessAccepted() {
-            store.device().setPlatform(ClientPlatformType.ANDROID_BUSINESS);
+            store.accountStore().device().setPlatform(ClientPlatformType.ANDROID_BUSINESS);
             enableSync();
             var action = new PaymentInfoActionBuilder().cpi("cpi-1234").build();
             assertEquals(SyncActionState.SUCCESS,
@@ -121,7 +121,7 @@ class PaymentInfoHandlerTest {
         @Test
         @DisplayName("IOS_BUSINESS platform is accepted")
         void iosBusinessAccepted() {
-            store.device().setPlatform(ClientPlatformType.IOS_BUSINESS);
+            store.accountStore().device().setPlatform(ClientPlatformType.IOS_BUSINESS);
             enableSync();
             var action = new PaymentInfoActionBuilder().cpi("cpi-1234").build();
             assertEquals(SyncActionState.SUCCESS,
@@ -130,7 +130,7 @@ class PaymentInfoHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — AB-prop gate")
+    @DisplayName("applyMutation Ã¢â‚¬â€ AB-prop gate")
     class AbPropGating {
         @Test
         @DisplayName("disabled order_details_payment_instructions_sync_enabled AB prop returns UNSUPPORTED")
@@ -144,7 +144,7 @@ class PaymentInfoHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — non-SET operation")
+    @DisplayName("applyMutation Ã¢â‚¬â€ non-SET operation")
     class RemoveBranch {
         @Test
         @DisplayName("REMOVE operation past the platform/AB-prop gates is UNSUPPORTED")
@@ -162,7 +162,7 @@ class PaymentInfoHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed value")
+    @DisplayName("applyMutation Ã¢â‚¬â€ malformed value")
     class MalformedValue {
         @Test
         @DisplayName("missing paymentInfoAction sub-message is MALFORMED")
@@ -185,7 +185,7 @@ class PaymentInfoHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — happy SET path")
+    @DisplayName("applyMutation Ã¢â‚¬â€ happy SET path")
     class HappySet {
         @Test
         @DisplayName("SET persists the cpi to the store and reports SUCCESS")
@@ -196,13 +196,13 @@ class PaymentInfoHandlerTest {
             var result = handler.applyMutation(testClient, setMutation(action));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals("cpi-1234", store.paymentInstructionCpi().orElseThrow(
+            assertEquals("cpi-1234", store.businessStore().paymentInstructionCpi().orElseThrow(
                     () -> new AssertionError("cpi must be persisted")));
         }
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed index (n/a)")
+    @DisplayName("applyMutation Ã¢â‚¬â€ malformed index (n/a)")
     class MalformedIndex {
         @Test
         @DisplayName("the handler does not parse indexParts beyond position 0, so index malformations are not exercised")
@@ -223,7 +223,7 @@ class PaymentInfoHandlerTest {
     }
 
     @Nested
-    @DisplayName("resolveConflicts — default timestamp tiebreaker")
+    @DisplayName("resolveConflicts Ã¢â‚¬â€ default timestamp tiebreaker")
     class ResolveConflicts {
         @Test
         @DisplayName("remote with later timestamp wins (APPLY_REMOTE_DROP_LOCAL)")
@@ -241,7 +241,7 @@ class PaymentInfoHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutationBatch — default per-item dispatch (n/a override)")
+    @DisplayName("applyMutationBatch Ã¢â‚¬â€ default per-item dispatch (n/a override)")
     class BatchDispatch {
         @Test
         @DisplayName("the handler does not override applyMutationBatch")

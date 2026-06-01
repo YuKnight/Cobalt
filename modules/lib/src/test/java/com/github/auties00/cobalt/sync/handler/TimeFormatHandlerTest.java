@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Verifies {@link TimeFormatHandler} and the outgoing
  * {@link TimeFormatMutationFactory}: applying an incoming time-format
  * mutation and asserting the boolean preference written into
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setTwentyFourHourFormat(boolean)}.
+ * {@link com.github.auties00.cobalt.store.SettingsStore#setTwentyFourHourFormat(boolean)}.
  * Each test recreates the store so the {@code twentyFourHourFormat} field
  * starts at its default value.
  */
@@ -42,7 +42,7 @@ class TimeFormatHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -86,26 +86,26 @@ class TimeFormatHandlerTest {
         @Test
         @DisplayName("isTwentyFourHourFormatEnabled=true sets the store flag to true")
         void enables24Hour() {
-            assertFalse(client.store().twentyFourHourFormat(), "default is 12h");
+            assertFalse(client.store().settingsStore().twentyFourHourFormat(), "default is 12h");
 
             var result = new TimeFormatHandler().applyMutation(
                     client, timeFormatMutation(Boolean.TRUE, SyncdOperation.SET, Instant.ofEpochSecond(1700000000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().twentyFourHourFormat(),
+            assertTrue(client.store().settingsStore().twentyFourHourFormat(),
                     "store must reflect 24h time format");
         }
 
         @Test
         @DisplayName("isTwentyFourHourFormatEnabled=false sets the store flag to false")
         void disables24Hour() {
-            client.store().setTwentyFourHourFormat(true);
+            client.store().settingsStore().setTwentyFourHourFormat(true);
 
             var result = new TimeFormatHandler().applyMutation(
                     client, timeFormatMutation(Boolean.FALSE, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertFalse(client.store().twentyFourHourFormat());
+            assertFalse(client.store().settingsStore().twentyFourHourFormat());
         }
     }
 
@@ -125,7 +125,7 @@ class TimeFormatHandlerTest {
             var result = new TimeFormatHandler().applyMutation(client, mutation);
 
             assertEquals(SyncActionState.MALFORMED, result.actionState());
-            assertFalse(client.store().twentyFourHourFormat(),
+            assertFalse(client.store().settingsStore().twentyFourHourFormat(),
                     "malformed mutation must not touch the store");
         }
     }
@@ -168,7 +168,7 @@ class TimeFormatHandlerTest {
                     client, timeFormatMutation(Boolean.TRUE, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertFalse(client.store().twentyFourHourFormat(),
+            assertFalse(client.store().settingsStore().twentyFourHourFormat(),
                     "REMOVE must not flip the store");
         }
     }

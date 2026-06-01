@@ -124,11 +124,11 @@ class WamGeneratedImplKatTest {
         var weight = scenario.getIntValue("weight");
         var bytes = HexFormat.of().parseHex(expectedHex);
 
-        var decoder = WamEventDecoder.of(bytes, 0, bytes.length);
+        var decoder = WamEventDecoder.fromBytes(bytes, 0, bytes.length);
         var decoded = WamEventRegistry.decode(decoder);
 
         var reencodeBuffer = new byte[MAX_BUFFER];
-        var encoder = WamEventEncoder.of(reencodeBuffer);
+        var encoder = WamEventEncoder.toBytes(reencodeBuffer);
         // The JS-emitted bytes carry the negated weight on the wire.
         // WamEventRegistry.decode consumes that payload but discards
         // the value; the re-encode must use the same captured weight
@@ -154,7 +154,7 @@ class WamGeneratedImplKatTest {
         var fields = scenario.getJSONArray("fields");
 
         var buffer = new byte[MAX_BUFFER];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
 
         if ("<synthetic>".equals(cobaltClass)) {
             encodeSyntheticDirectly(encoder, scenario.getIntValue("eventId"), weight, fields);

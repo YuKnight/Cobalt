@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.sync;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
@@ -8,7 +9,7 @@ import com.github.auties00.cobalt.model.message.system.history.HistorySyncNotifi
 import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * chunk-to-store projection are out of scope ({@code WebHistorySyncServiceLiveOracleTest} covers
  * decode parity against the captured oracle). The service is wired against a temporary store from
  * {@link DeviceFixtures#temporaryStore(Jid, Jid)} and a {@link TestWhatsAppClient} with real
- * {@link DefaultWamService} and {@link LidMigrationService} collaborators; the
+ * {@link LiveWamService} and {@link LidMigrationService} collaborators; the
  * {@code SELF_PN_DEVICE_1} JID is set on the store so the WAM commit path can derive a stable
  * session id even though no test asserts the emission directly.
  */
@@ -50,37 +51,37 @@ class WebHistorySyncServiceTest {
     void setUp() {
         props = TestABPropsService.builder().build();
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         client = TestWhatsAppClient.create().withStore(store);
-        var wam = new DefaultWamService(client, props);
-        lidMigration = new LidMigrationService(client, props, wam);
-        service = new WebHistorySyncService(client, lidMigration, wam, TestMediaConnectionService.create());
+        var wam = new LiveWamService(client, props);
+        lidMigration = new LiveLidMigrationService(client, props, wam);
+        service = new LiveWebHistorySyncService(client, lidMigration, wam, TestMediaConnectionService.create());
     }
 
     @Nested
     @DisplayName("constructor -- rejects null collaborators")
     class ConstructorContract {
         @Test
-        @DisplayName("null WhatsAppClient is NPE")
+        @DisplayName("null LinkedWhatsAppClient is NPE")
         void nullClient() {
-            var wam = new DefaultWamService(client, props);
+            var wam = new LiveWamService(client, props);
             assertThrows(NullPointerException.class,
-                    () -> new WebHistorySyncService(null, lidMigration, wam, TestMediaConnectionService.create()));
+                    () -> new LiveWebHistorySyncService(null, lidMigration, wam, TestMediaConnectionService.create()));
         }
 
         @Test
         @DisplayName("null LidMigrationService is NPE")
         void nullLidMigration() {
-            var wam = new DefaultWamService(client, props);
+            var wam = new LiveWamService(client, props);
             assertThrows(NullPointerException.class,
-                    () -> new WebHistorySyncService(client, null, wam, TestMediaConnectionService.create()));
+                    () -> new LiveWebHistorySyncService(client, null, wam, TestMediaConnectionService.create()));
         }
 
         @Test
         @DisplayName("null WamService is NPE")
         void nullWam() {
             assertThrows(NullPointerException.class,
-                    () -> new WebHistorySyncService(client, lidMigration, null, TestMediaConnectionService.create()));
+                    () -> new LiveWebHistorySyncService(client, lidMigration, null, TestMediaConnectionService.create()));
         }
     }
 

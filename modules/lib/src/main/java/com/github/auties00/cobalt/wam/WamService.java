@@ -1,66 +1,31 @@
 package com.github.auties00.cobalt.wam;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.message.MessageContainer;
-import com.github.auties00.cobalt.model.message.commerce.OrderMessage;
-import com.github.auties00.cobalt.model.message.commerce.ProductMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactMessage;
-import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage;
-import com.github.auties00.cobalt.model.message.event.EncEventResponseMessage;
-import com.github.auties00.cobalt.model.message.event.EventMessage;
-import com.github.auties00.cobalt.model.message.event.EventResponseMessage;
-import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
-import com.github.auties00.cobalt.model.message.list.ListMessage;
-import com.github.auties00.cobalt.model.message.list.ListResponseMessage;
-import com.github.auties00.cobalt.model.message.location.LiveLocationMessage;
-import com.github.auties00.cobalt.model.message.location.LocationMessage;
-import com.github.auties00.cobalt.model.message.media.AlbumMessage;
-import com.github.auties00.cobalt.model.message.media.AudioMessage;
-import com.github.auties00.cobalt.model.message.media.DocumentMessage;
-import com.github.auties00.cobalt.model.message.media.ImageMessage;
-import com.github.auties00.cobalt.model.message.media.StickerMessage;
-import com.github.auties00.cobalt.model.message.media.StickerPackMessage;
-import com.github.auties00.cobalt.model.message.media.VideoMessage;
-import com.github.auties00.cobalt.model.message.poll.PollCreationMessage;
-import com.github.auties00.cobalt.model.message.poll.PollUpdateMessage;
-import com.github.auties00.cobalt.model.message.security.EncReactionMessage;
-import com.github.auties00.cobalt.model.message.system.PinInChatMessage;
-import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
-import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.props.ABProp;
-import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
+import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.wam.binary.WamEventDecoder;
 import com.github.auties00.cobalt.wam.binary.WamEventEncoder;
 import com.github.auties00.cobalt.wam.binary.WamGlobalEncoder;
 import com.github.auties00.cobalt.wam.event.PsIdUpdateEventBuilder;
+import com.github.auties00.cobalt.wam.event.WamClientErrorsEventBuilder;
 import com.github.auties00.cobalt.wam.event.WamEventRegistry;
+import com.github.auties00.cobalt.wam.model.WamChannel;
+import com.github.auties00.cobalt.wam.model.WamEventSpec;
+import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsId;
 import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsTokenIssuer;
 import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsUploader;
-import com.github.auties00.cobalt.wam.event.SendDocumentEventBuilder;
-import com.github.auties00.cobalt.wam.event.WamClientErrorsEventBuilder;
-import com.github.auties00.cobalt.wam.model.WamEventSpec;
-import com.github.auties00.cobalt.wam.model.WamChannel;
-import com.github.auties00.cobalt.wam.privatestats.WamPrivateStatsId;
-import com.github.auties00.cobalt.wam.type.AgentEngagementEnumType;
-import com.github.auties00.cobalt.wam.type.BotType;
-import com.github.auties00.cobalt.wam.type.DocumentType;
-import com.github.auties00.cobalt.wam.type.E2eDeviceType;
-import com.github.auties00.cobalt.wam.type.InvisibleMessageCategoryType;
-import com.github.auties00.cobalt.wam.type.MediaType;
-import com.github.auties00.cobalt.wam.type.MessageType;
-import com.github.auties00.cobalt.wam.type.PsIdAction;
+import com.github.auties00.cobalt.wam.type.*;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteOrder;
 import java.time.Instant;
 import java.util.*;
@@ -111,10 +76,9 @@ import java.util.logging.Logger;
  * points are the sampling-override methods
  * ({@link #setSamplingOverride(int, int)},
  * {@link #removeSamplingOverride(int)}, {@link #replaceSamplingOverrides(Map)})
- * for overriding WA Web sampling weights at runtime, and the classification
- * helpers in the lower half of the class
- * ({@link #getWamMediaType(MessageContainer)} and friends) used by other
- * Cobalt modules building WAM events.
+ * for overriding WA Web sampling weights at runtime. The stateless WAM
+ * message-classification helpers that other Cobalt modules use to tag
+ * their events now live in {@link WamMsgUtils}.
  *
  * @implNote
  * This implementation flushes unconditionally on every scheduler tick.
@@ -134,7 +98,6 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebWamCodegenWamEvent")
 @WhatsAppWebModule(moduleName = "WAWebL10NCountryCodes")
 @WhatsAppWebModule(moduleName = "WAWebBrowserApi")
-@WhatsAppWebModule(moduleName = "WAWebWamMsgUtils")
 @WhatsAppWebModule(moduleName = "WAWebProcessRawMediaLogging")
 @WhatsAppWebExport(moduleName = "WAWebWam", exports = "Wam", adaptation = WhatsAppAdaptation.ADAPTED)
 public abstract class WamService {
@@ -337,7 +300,7 @@ public abstract class WamService {
      * IQ stanzas and to read connectivity state for
      * {@link #waitIfDisconnected()}.
      */
-    private final WhatsAppClient client;
+    private final LinkedWhatsAppClient client;
 
     /**
      * Holds the AB-props service queried at {@link #initialize()} for
@@ -483,7 +446,7 @@ public abstract class WamService {
      * (id {@code 13}).
      *
      * <p>It is sourced from
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#name()} at
+     * {@link com.github.auties00.cobalt.store.AccountStore#name()} at
      * {@link #initialize()}; mirrors WA Web's
      * {@code WAWebBrowserInfo().os}.
      */
@@ -667,7 +630,7 @@ public abstract class WamService {
      *                       {@code null}
      * @throws NullPointerException if any argument is {@code null}
      */
-    protected WamService(WhatsAppClient client, ABPropsService abPropsService, WamBeaconingService beaconing) {
+    protected WamService(LinkedWhatsAppClient client, ABPropsService abPropsService, WamBeaconingService beaconing) {
         this.client = Objects.requireNonNull(client, "client cannot be null");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService cannot be null");
         this.pending = new ConcurrentHashMap<>();
@@ -693,7 +656,7 @@ public abstract class WamService {
      *
      * @implSpec
      * Subclasses must return a non-null {@link Instant};
-     * {@link DefaultWamService} returns {@link Instant#now()} and tests
+     * {@link LiveWamService} returns {@link Instant#now()} and tests
      * return a controlled clock value driven by their stub
      * {@link #sleep(long)} so the connectivity-wait deadline check
      * terminates deterministically.
@@ -713,7 +676,7 @@ public abstract class WamService {
      *
      * @implSpec
      * Subclasses must block the calling virtual thread for the
-     * requested duration; {@link DefaultWamService} delegates to
+     * requested duration; {@link LiveWamService} delegates to
      * {@link Thread#sleep(long)} and tests record the request without
      * sleeping while advancing their virtual clock.
      *
@@ -735,7 +698,7 @@ public abstract class WamService {
      * {@code initialDelaySeconds} have elapsed and then every
      * {@code periodSeconds} thereafter until
      * {@link #cancelAllScheduled()} is called.
-     * {@link DefaultWamService} uses a virtual-thread-backed
+     * {@link LiveWamService} uses a virtual-thread-backed
      * {@link ScheduledExecutorService}; tests
      * record the schedule and drive ticks deterministically.
      *
@@ -916,10 +879,10 @@ public abstract class WamService {
     @WhatsAppWebExport(moduleName = "WAWebWam", exports = "commitOnSet", adaptation = WhatsAppAdaptation.ADAPTED)
     public void initialize() {
         var store = client.store();
-        var version = store.clientVersion();
+        var version = store.accountStore().clientVersion();
         this.appVersion = version != null ? version.toString() : null;
-        this.platform = store.clientType() == WhatsAppClientType.WEB ? 8L : 2L;
-        this.deviceName = store.name();
+        this.platform = store.accountStore().clientType() == WhatsAppClientType.WEB ? 8L : 2L;
+        this.deviceName = store.accountStore().name().orElse(null);
         this.memClass = (int) (Runtime.getRuntime().maxMemory() / (1024 * 1024));
         this.numCpu = Runtime.getRuntime().availableProcessors();
         this.browser = "Chrome";
@@ -931,7 +894,7 @@ public abstract class WamService {
                 ? null
                 : abPropsService.abKey().orElse("");
         this.webcRevision = version != null ? version.tertiary().orElse(0) : 0;
-        this.companionAppVersion = store.companionVersion()
+        this.companionAppVersion = store.accountStore().companionVersion()
                 .map(Object::toString)
                 .orElse(null);
         this.psCountryCode = derivePsCountryCode();
@@ -986,7 +949,7 @@ public abstract class WamService {
             exports = "getCountryShortcodeByPhone",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private String derivePsCountryCode() {
-        var phoneNumber = client.store().phoneNumber();
+        var phoneNumber = client.store().accountStore().phoneNumber();
         if (phoneNumber.isEmpty()) {
             return null;
         }
@@ -1439,7 +1402,7 @@ public abstract class WamService {
         }
 
         var buffer = new byte[size];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         writeHeader(encoder, channel);
         encoder.writeRaw(globalsBytes, 0, globalsBytes.length);
 
@@ -1537,7 +1500,7 @@ public abstract class WamService {
         }
 
         var bytes = new byte[size];
-        var encoder = WamEventEncoder.of(bytes);
+        var encoder = WamEventEncoder.toBytes(bytes);
         for (var entry : dirty) {
             WamGlobalEncoder.writeDynamicGlobal(entry.getKey(), entry.getValue(), encoder);
         }
@@ -1858,14 +1821,13 @@ public abstract class WamService {
             return null;
         }
         var saveKey = generateSaveKey();
-        try (var out = client.store().openWamPendingBufferWriter(saveKey)) {
-            var encoder = WamEventEncoder.of(out);
+        try (var encoder = WamEventEncoder.toBufferedStream(client.store().openWamPendingBufferWriter(saveKey))) {
             for (var i = from; i < to; i++) {
                 var pe = events.get(i);
                 WamGlobalEncoder.writeCommitTime(pe.commitTimeSeconds(), encoder);
                 pe.event().encode(encoder, weights[i]);
             }
-        } catch (IOException error) {
+        } catch (IOException | UncheckedIOException error) {
             LOGGER.warning("Failed to persist WAM buffer " + saveKey + ": " + error.getMessage());
             return null;
         }
@@ -1923,8 +1885,7 @@ public abstract class WamService {
                 if (stream.isEmpty()) {
                     continue;
                 }
-                try (var in = stream.get()) {
-                    var decoder = WamEventDecoder.of(in);
+                try (var decoder = WamEventDecoder.fromBufferedStream(stream.get())) {
                     while (decoder.hasMore()) {
                         var header = decoder.readHeader();
                         if (WamEventDecoder.fieldIdOf(header) != COMMIT_TIME_FIELD_ID) {
@@ -1984,7 +1945,7 @@ public abstract class WamService {
      *
      * @implNote
      * This implementation polls
-     * {@link WhatsAppClient#isConnected()} every
+     * {@link LinkedWhatsAppClient#isConnected()} every
      * {@code 1000} milliseconds via the abstract {@link #sleep(long)}
      * hook; the deadline is computed from {@link #now()} so the
      * testable subclass can drive the loop deterministically by
@@ -2273,621 +2234,5 @@ public abstract class WamService {
         //       drops anything the final flush cannot ship, losing events
         //       across restarts.
         initialized = false;
-    }
-
-    /**
-     * Returns the WAM {@link MediaType} classification for the
-     * payload carried by the given {@link ChatMessageInfo}.
-     *
-     * <p>This resolves the wrapped {@link MessageContainer} and forwards to
-     * {@link #getWamMediaType(MessageContainer)}; the WAM send and receive
-     * metric loggers use it to tag every event with the payload shape so
-     * the WA backend can bucket telemetry per media kind.
-     * {@link MediaType#NONE} is returned for {@code null} and for
-     * unclassified types.
-     *
-     * @param info the chat message info whose payload is being
-     *             classified; may be {@code null}
-     * @return the WAM media-type classification for the resolved
-     *         payload
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMediaType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public MediaType getWamMediaType(ChatMessageInfo info) {
-        return info == null ? MediaType.NONE : getWamMediaType(info.message());
-    }
-
-    /**
-     * Returns the WAM {@link MediaType} classification for the
-     * resolved content of the given {@link MessageContainer}.
-     *
-     * <p>This mirrors WA Web's {@code getWamMediaType} switch on
-     * {@code e.type}: every branch of the upstream string switch maps to
-     * an {@code instanceof} arm here, with the GIF and PTT
-     * sub-classifications driven off the per-message
-     * {@link VideoMessage#gifPlayback()} and {@link AudioMessage#ptt()}
-     * booleans rather than secondary type strings.
-     *
-     * @implNote
-     * This implementation does not surface the
-     * {@code BUTTON_MESSAGE} or {@code BUTTON_RESPONSE_MESSAGE} arms
-     * (legacy reply-button surfaces), the {@code PUSH_TO_VIDEO}
-     * variant of {@code ptv}, the {@code FUTURE} catch-all for
-     * unrecognised type strings, the catalog-link sub-classifications
-     * of plain {@code chat} payloads, or the
-     * {@code POLL_RESULT_SNAPSHOT} / {@code KEEP} / {@code UNKEEP} /
-     * {@code EPHEMERAL_SYNC_RESPONSE} ancillary entries; these are
-     * never produced by Cobalt's send and receive surfaces.
-     *
-     * @param container the container whose resolved content is being
-     *                  classified; {@code null} yields
-     *                  {@link MediaType#NONE}
-     * @return the WAM media-type classification, defaulting to
-     *         {@link MediaType#NONE} for unrecognised or unclassified
-     *         types
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMediaType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public MediaType getWamMediaType(MessageContainer container) {
-        if (container == null) {
-            return MediaType.NONE;
-        }
-        var content = container.content();
-        return switch (content) {
-            case ImageMessage ignored -> MediaType.PHOTO;
-            case VideoMessage video -> video.gifPlayback() ? MediaType.GIF : MediaType.VIDEO;
-            case AudioMessage audio -> audio.ptt() ? MediaType.PTT : MediaType.AUDIO;
-            case DocumentMessage ignored -> MediaType.DOCUMENT;
-            case StickerMessage ignored -> MediaType.STICKER;
-            case StickerPackMessage ignored -> MediaType.STICKER_PACK;
-            case ReactionMessage ignored -> MediaType.REACTION;
-            case EncReactionMessage ignored -> MediaType.REACTION;
-            case PollCreationMessage ignored -> MediaType.POLL_CREATE;
-            case PollUpdateMessage ignored -> MediaType.POLL_VOTE;
-            case ContactMessage ignored -> MediaType.CONTACT;
-            case ContactsArrayMessage ignored -> MediaType.CONTACT_ARRAY;
-            case LocationMessage ignored -> MediaType.LOCATION;
-            case LiveLocationMessage ignored -> MediaType.LIVE_LOCATION;
-            case ProductMessage ignored -> MediaType.PRODUCT_IMAGE;
-            case ListMessage ignored -> MediaType.LIST;
-            case ListResponseMessage ignored -> MediaType.LIST_REPLY;
-            case OrderMessage ignored -> MediaType.ORDER;
-            case EventResponseMessage ignored -> MediaType.EVENT_RESPOND;
-            case EncEventResponseMessage ignored -> MediaType.EVENT_RESPOND;
-            case EventMessage ignored -> MediaType.EVENT_CREATE;
-            case AlbumMessage ignored -> MediaType.MEDIA_ALBUM;
-            case PinInChatMessage ignored -> MediaType.PIN_IN_CHAT;
-            case ExtendedTextMessage ignored -> MediaType.TEXT;
-            case null, default -> MediaType.NONE;
-        };
-    }
-
-    /**
-     * Returns the WAM {@link MessageType} classification derived
-     * from the chat JID carried by the given
-     * {@link ChatMessageInfo}.
-     *
-     * <p>This mirrors WA Web's {@code WAWebWamMsgUtils.getWamMessageType}:
-     * it resolves the parent JID from {@code info.key()} and delegates to
-     * {@link #getWamMessageType(Jid)}. {@link MessageType#STATUS} is
-     * disambiguated before {@link MessageType#BROADCAST} because status
-     * messages live on the broadcast server but must not be reported as
-     * generic broadcasts.
-     *
-     * @param info the chat message info whose destination is being
-     *             classified; {@code null} yields
-     *             {@link MessageType#INDIVIDUAL}
-     * @return the WAM message-type classification, defaulting to
-     *         {@link MessageType#INDIVIDUAL}
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMessageType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public MessageType getWamMessageType(ChatMessageInfo info) {
-        if (info == null) {
-            return MessageType.INDIVIDUAL;
-        }
-        var parent = info.key().parentJid().orElse(null);
-        if (parent == null) {
-            return MessageType.INDIVIDUAL;
-        }
-        return getWamMessageType(parent);
-    }
-
-    /**
-     * Returns the WAM {@link MessageType} classification derived
-     * from the server component of the given chat JID.
-     *
-     * <p>This is the JID-level fan-out of
-     * {@link #getWamMessageType(ChatMessageInfo)}, exposed separately
-     * because Cobalt's send pipeline reaches the classification before the
-     * {@link ChatMessageInfo} wrapper has been constructed. It mirrors WA
-     * Web's {@code getWamMessageType} server cascade:
-     * {@code isStatusBroadcast} first, then {@code isGroup}, then
-     * {@code isBroadcast}, then {@code isNewsletter}, falling through to
-     * {@link MessageType#INDIVIDUAL} for user, LID, hosted, and bot
-     * servers.
-     *
-     * @param chatJid the chat JID whose server is being classified;
-     *                {@code null} yields {@link MessageType#INDIVIDUAL}
-     * @return the WAM message-type classification, defaulting to
-     *         {@link MessageType#INDIVIDUAL}
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamMessageType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public MessageType getWamMessageType(Jid chatJid) {
-        if (chatJid == null) {
-            return MessageType.INDIVIDUAL;
-        }
-        if (chatJid.isStatusBroadcastAccount()) {
-            return MessageType.STATUS;
-        }
-        if (chatJid.hasGroupOrCommunityServer()) {
-            return MessageType.GROUP;
-        }
-        if (chatJid.hasBroadcastServer()) {
-            return MessageType.BROADCAST;
-        }
-        if (chatJid.hasNewsletterServer()) {
-            return MessageType.CHANNEL;
-        }
-        return MessageType.INDIVIDUAL;
-    }
-
-    /**
-     * Returns the WAM {@link MessageType} classification derived
-     * from the stanza-level
-     * {@link com.github.auties00.cobalt.message.receive.stanza.MessageType}
-     * produced during parsing.
-     *
-     * <p>This mirrors WA Web's
-     * {@code WAWebWamMsgUtils.getMessageTypeFromMsgInfoType}: the upstream
-     * switch is on the {@code msgInfo.type} string ({@code chat},
-     * {@code group}, {@code peer_broadcast}, {@code other_broadcast},
-     * {@code direct_peer_status}, {@code other_status}). Cobalt classifies
-     * the incoming stanza once during parsing into the enum form, so this
-     * helper performs the equivalent collapse onto the WAM message-type
-     * enum directly without re-stringifying.
-     *
-     * @param stanzaType the parser-level message type;
-     *                   {@code null} yields {@link MessageType#INDIVIDUAL}
-     * @return the WAM message-type classification, defaulting to
-     *         {@link MessageType#INDIVIDUAL}
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getMessageTypeFromMsgInfoType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public MessageType getWamMessageTypeFromStanzaType(
-            com.github.auties00.cobalt.message.receive.stanza.MessageType stanzaType
-    ) {
-        if (stanzaType == null) {
-            return MessageType.INDIVIDUAL;
-        }
-        return switch (stanzaType) {
-            case CHAT, PEER_CHAT -> MessageType.INDIVIDUAL;
-            case GROUP -> MessageType.GROUP;
-            case PEER_BROADCAST, OTHER_BROADCAST -> MessageType.BROADCAST;
-            case DIRECT_PEER_STATUS, OTHER_STATUS -> MessageType.STATUS;
-        };
-    }
-
-    /**
-     * Returns the WAM {@link E2eDeviceType} classification of the
-     * sender JID relative to the bound account.
-     *
-     * <p>This mirrors WA Web's {@code WAWebWamMsgUtils.getWamE2eSenderType}:
-     * a two-axis classification (self-vs-other on the user component of
-     * the JID, primary-vs-companion on the device component, hosted-vs-not
-     * on the server component). The {@code instanceof Wid} guard at the top
-     * of the WA Web function maps here to a server-family check
-     * ({@link Jid#hasUserServer()}, {@link Jid#hasLidServer()},
-     * {@link Jid#hasHostedServer()}, {@link Jid#hasHostedLidServer()});
-     * foreign-server JIDs return {@code null} so callers omit the property
-     * from the WAM event.
-     *
-     * @param senderJid the sender's full device JID;
-     *                  {@code null} yields {@code null}
-     * @param selfJid   the logged-in account's primary JID;
-     *                  {@code null} when the account is not yet bound
-     * @return the WAM classification, or {@code null} when the
-     *         sender is not a user / LID / hosted-LID JID
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamE2eSenderType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public E2eDeviceType getWamE2eSenderType(Jid senderJid, Jid selfJid) {
-        if (senderJid == null) {
-            return null;
-        }
-        if (!senderJid.hasUserServer() && !senderJid.hasLidServer()
-                && !senderJid.hasHostedServer() && !senderJid.hasHostedLidServer()) {
-            return null;
-        }
-        var isMe = selfJid != null
-                && selfJid.toUserJid().equals(senderJid.toUserJid());
-        var isCompanion = senderJid.hasDevice();
-        var isHosted = senderJid.hasHostedServer() || senderJid.hasHostedLidServer();
-        if (isMe) {
-            if (isCompanion) {
-                return isHosted ? E2eDeviceType.MY_HOSTED_COMPANION : E2eDeviceType.MY_COMPANION;
-            }
-            return E2eDeviceType.MY_PRIMARY;
-        }
-        if (isCompanion) {
-            return isHosted ? E2eDeviceType.OTHER_HOSTED_COMPANION : E2eDeviceType.OTHER_COMPANION;
-        }
-        return E2eDeviceType.OTHER_PRIMARY;
-    }
-
-    /**
-     * Returns the WAM {@link MediaType} classification for an
-     * interactive message based on its body variant.
-     *
-     * <p>This mirrors WA Web's
-     * {@code WAWebWamMsgUtils.getInteractiveWamType} switch on the
-     * {@code interactiveType} discriminator: shop storefront maps to
-     * {@link MediaType#SHOP_STOREFRONT}, carousels map to
-     * {@link MediaType#INTERACTIVE_CAROUSEL}, native flows delegate to
-     * {@link #getInteractiveNativeFlowWamType(InteractiveMessage.NativeFlowMessage)}
-     * which further separates {@code CTA_FLOW} ({@link MediaType#NONE})
-     * from any other native flow ({@link MediaType#INTERACTIVE_NFM}).
-     *
-     * @implNote
-     * This implementation maps the Cobalt-only
-     * {@link InteractiveMessage.CollectionMessage} variant to
-     * {@link MediaType#NONE} because WA Web's switch does not declare
-     * a {@code COLLECTION} branch; the variant exists in the Cobalt
-     * protobuf model but produces no WAM classification.
-     *
-     * @param interactive the interactive message whose body variant
-     *                    is being classified; {@code null} yields
-     *                    {@link MediaType#NONE}
-     * @return the WAM media-type classification, or
-     *         {@link MediaType#NONE} when no variant is set
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getInteractiveWamType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public MediaType getInteractiveWamType(InteractiveMessage interactive) {
-        if (interactive == null) {
-            return MediaType.NONE;
-        }
-        var content = interactive.content().orElse(null);
-        if (content == null) {
-            return MediaType.NONE;
-        }
-        return switch (content) {
-            case InteractiveMessage.ShopMessage ignored -> MediaType.SHOP_STOREFRONT;
-            case InteractiveMessage.CarouselMessage ignored -> MediaType.INTERACTIVE_CAROUSEL;
-            case InteractiveMessage.NativeFlowMessage native_ -> getInteractiveNativeFlowWamType(native_);
-            case InteractiveMessage.CollectionMessage ignored -> MediaType.NONE;
-        };
-    }
-
-    /**
-     * Disambiguates the WAM {@link MediaType} for a native-flow
-     * interactive message based on the resolved native-flow name.
-     *
-     * <p>This mirrors WA Web's inner native-flow disambiguator: the
-     * {@code CTA_FLOW} (galaxy) variant is filtered out of interactive WAM
-     * reporting and maps to {@link MediaType#NONE}; any other native-flow
-     * name maps to {@link MediaType#INTERACTIVE_NFM}. The WA Web string
-     * constant for {@code CTA_FLOW} is {@code "galaxy_message"}.
-     *
-     * @param nativeFlow the native-flow message whose name drives the
-     *                   classification; must not be {@code null}
-     * @return {@link MediaType#NONE} for the {@code CTA_FLOW}
-     *         (galaxy) variant, {@link MediaType#INTERACTIVE_NFM}
-     *         otherwise
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getInteractiveWamType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    private static MediaType getInteractiveNativeFlowWamType(InteractiveMessage.NativeFlowMessage nativeFlow) {
-        for (var button : nativeFlow.buttons()) {
-            var name = button.name().orElse(null);
-            if ("galaxy_message".equals(name)) {
-                return MediaType.NONE;
-            }
-        }
-        return MediaType.INTERACTIVE_NFM;
-    }
-
-    /**
-     * Returns the WAM {@link AgentEngagementEnumType} classification
-     * for a message exchanged with a bot.
-     *
-     * <p>This mirrors WA Web's
-     * {@code WAWebWamMsgUtils.getWamAgentEngagementType}: a chat JID that
-     * is itself a bot maps to {@link AgentEngagementEnumType#DIRECT_CHAT};
-     * a bot-invoked message in a non-bot chat maps to
-     * {@link AgentEngagementEnumType#INVOKED}; everything else returns
-     * {@code null} so callers omit the property from the emitted WAM event
-     * entirely (a present-but-null property would shift the server-side
-     * bucketing).
-     *
-     * @param chatJid      the chat JID that hosts the message;
-     *                     {@code null} yields {@code null}
-     * @param isBotInvoked {@code true} when the message originates
-     *                     from a bot query or a Meta-bot response
-     *                     (the disjunction of WA Web's
-     *                     {@code getIsBotQuery} and
-     *                     {@code getIsMetaBotResponse})
-     * @return the WAM agent-engagement classification, or
-     *         {@code null} when the message is unrelated to a bot
-     *         conversation
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamAgentEngagementType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public AgentEngagementEnumType getWamAgentEngagementType(Jid chatJid, boolean isBotInvoked) {
-        if (chatJid == null) {
-            return null;
-        }
-        if (chatJid.isBot()) {
-            return AgentEngagementEnumType.DIRECT_CHAT;
-        }
-        if (isBotInvoked) {
-            return AgentEngagementEnumType.INVOKED;
-        }
-        return null;
-    }
-
-    /**
-     * Returns the WAM {@link BotType} classification of a bot
-     * interaction.
-     *
-     * <p>This mirrors WA Web's {@code WAWebWamMsgUtils.getWamBotType}: a
-     * Meta-bot JID maps to {@link BotType#METABOT}; a first-party business
-     * bot (via {@code BizBotType.BIZ_1P} or
-     * {@code BizBotAutomatedType.PARTIAL_1P}) maps to
-     * {@link BotType#BOT_1P_BIZ}; a third-party business bot (via
-     * {@code BizBotType.BIZ_3P} or {@code BizBotAutomatedType.FULL_3P}) maps
-     * to {@link BotType#BOT_3P_BIZ}; the catch-all is
-     * {@link BotType#UNKNOWN}.
-     *
-     * @implNote
-     * This implementation collapses the two upstream sources (the
-     * static {@code BizBotType} attribute and the runtime
-     * {@code BizBotAutomatedType} flag) into the boolean parameters
-     * so callers compute the disjunction at the call site; this lets
-     * Cobalt expose the classifier without depending on WA Web's
-     * {@code WAWebBotTypes} module.
-     *
-     * @param botJid     the JID involved in the bot interaction;
-     *                   may be {@code null}
-     * @param is1pBizBot {@code true} when WA Web would classify the
-     *                   interaction as {@code BizBotType.BIZ_1P} or
-     *                   {@code BizBotAutomatedType.PARTIAL_1P}
-     * @param is3pBizBot {@code true} when WA Web would classify the
-     *                   interaction as {@code BizBotType.BIZ_3P} or
-     *                   {@code BizBotAutomatedType.FULL_3P}
-     * @return the matching WAM bot type, defaulting to
-     *         {@link BotType#UNKNOWN}
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamBotType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public BotType getWamBotType(Jid botJid, boolean is1pBizBot, boolean is3pBizBot) {
-        if (botJid != null && botJid.isBot()) {
-            return BotType.METABOT;
-        }
-        if (is1pBizBot) {
-            return BotType.BOT_1P_BIZ;
-        }
-        if (is3pBizBot) {
-            return BotType.BOT_3P_BIZ;
-        }
-        return BotType.UNKNOWN;
-    }
-
-    /**
-     * Returns the WAM {@link InvisibleMessageCategoryType}
-     * classification for the supplied stanza-level message-category
-     * attribute.
-     *
-     * <p>This mirrors WA Web's
-     * {@code WAWebWamMsgUtils.getWamInvisibleMessageCatgoryType} (the typo
-     * in the upstream export name is preserved on the annotation to track
-     * the actual export). The only recognised category is {@code "peer"}
-     * ({@code MSG_CATEGORY.peer}); any other value or {@code null} returns
-     * {@code null} so callers omit the property from the emitted WAM event.
-     *
-     * @param category the {@code category} attribute carried on the
-     *                 incoming stanza; may be {@code null}
-     * @return {@link InvisibleMessageCategoryType#PEER} for
-     *         {@code "peer"}, otherwise {@code null}
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "getWamInvisibleMessageCatgoryType",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public InvisibleMessageCategoryType getWamInvisibleMessageCategoryType(String category) {
-        if (category == null || category.isEmpty()) {
-            return null;
-        }
-        if ("peer".equals(category)) {
-            return InvisibleMessageCategoryType.PEER;
-        }
-        return null;
-    }
-
-    /**
-     * Returns whether any of the JIDs participating in the message
-     * exchange are LID-addressed.
-     *
-     * <p>This mirrors WA Web's {@code WAWebWamMsgUtils.msgIsLid} chat-type
-     * cascade:
-     * <ul>
-     *   <li>group chats: the supplied {@code participantIsLid} flag;</li>
-     *   <li>status updates: whether the {@code key.participant} JID is
-     *       LID-addressed (missing JIDs evaluate to {@code false});</li>
-     *   <li>everything else: whether the {@code from} or {@code to}
-     *       JID is LID-addressed.</li>
-     * </ul>
-     * The message-receive and message-send WAM emitters use it to tag every
-     * event with whether the exchange touched the LID-addressing namespace,
-     * which the backend uses to bucket LID-migration metrics.
-     *
-     * @param fromJid           the sender JID; may be {@code null}
-     * @param toJid             the recipient JID; may be {@code null}
-     * @param keyParticipantJid the {@code key.participant} JID
-     *                          consulted for status updates; may be
-     *                          {@code null}
-     * @param chatType          the WAM message-type classification of
-     *                          the chat, used to dispatch between the
-     *                          three cascade arms; must not be
-     *                          {@code null}
-     * @param participantIsLid  {@code true} when the
-     *                          {@code participant} attribute on a
-     *                          group stanza is LID-addressed
-     * @return {@code true} when the relevant JID for the chat type is
-     *         LID-addressed
-     */
-    @WhatsAppWebExport(moduleName = "WAWebWamMsgUtils", exports = "msgIsLid",
-            adaptation = WhatsAppAdaptation.ADAPTED)
-    public boolean msgIsLid(
-            Jid fromJid,
-            Jid toJid,
-            Jid keyParticipantJid,
-            MessageType chatType,
-            boolean participantIsLid
-    ) {
-        if (chatType == MessageType.GROUP) {
-            return participantIsLid;
-        }
-        if (chatType == MessageType.STATUS) {
-            return keyParticipantJid != null && keyParticipantJid.hasLidServer();
-        }
-        var fromIsLid = fromJid != null && fromJid.hasLidServer();
-        var toIsLid = toJid != null && toJid.hasLidServer();
-        return fromIsLid || toIsLid;
-    }
-
-    /**
-     * Holds the fixed mapping from lower-case file extensions (without the
-     * leading dot) to the corresponding WAM {@link DocumentType} bucket
-     * consumed by {@link #logSendDocumentEvent(String, long)}.
-     *
-     * <p>It is populated verbatim from WA Web's
-     * {@code WAWebProcessRawMediaLogging} extension-to-type table so the
-     * emitted {@code documentType} and {@code documentExt} fields match the
-     * upstream wire shape exactly. Extensions not in the table fall back to
-     * {@link DocumentType#OTHER} with an empty {@code documentExt}.
-     *
-     * @implNote
-     * The WA Web table classifies {@code wmv} as
-     * {@link DocumentType#AUDIO} despite {@code wmv} being a video
-     * container; the entry is kept verbatim because the WAM backend
-     * expects this exact bucketing.
-     */
-    @WhatsAppWebExport(moduleName = "WAWebProcessRawMediaLogging", exports = "default",
-            adaptation = WhatsAppAdaptation.DIRECT)
-    private static final Map<String, DocumentType> DOCUMENT_EXT_TO_TYPE = Map.<String, DocumentType>ofEntries(
-            Map.entry("ai", DocumentType.IMAGE),
-            Map.entry("ico", DocumentType.IMAGE),
-            Map.entry("jpeg", DocumentType.IMAGE),
-            Map.entry("jpg", DocumentType.IMAGE),
-            Map.entry("png", DocumentType.IMAGE),
-            Map.entry("ps", DocumentType.IMAGE),
-            Map.entry("psd", DocumentType.IMAGE),
-            Map.entry("svg", DocumentType.IMAGE),
-            Map.entry("tif", DocumentType.IMAGE),
-            Map.entry("tiff", DocumentType.IMAGE),
-            Map.entry("3g2", DocumentType.VIDEO),
-            Map.entry("3gp", DocumentType.VIDEO),
-            Map.entry("avi", DocumentType.VIDEO),
-            Map.entry("flv", DocumentType.VIDEO),
-            Map.entry("h264", DocumentType.VIDEO),
-            Map.entry("m4v", DocumentType.VIDEO),
-            Map.entry("mkv", DocumentType.VIDEO),
-            Map.entry("mov", DocumentType.VIDEO),
-            Map.entry("mp4", DocumentType.VIDEO),
-            Map.entry("mpg", DocumentType.VIDEO),
-            Map.entry("mpeg", DocumentType.VIDEO),
-            Map.entry("rm", DocumentType.VIDEO),
-            Map.entry("vob", DocumentType.VIDEO),
-            Map.entry("wmv", DocumentType.AUDIO),
-            Map.entry("aif", DocumentType.AUDIO),
-            Map.entry("cda", DocumentType.AUDIO),
-            Map.entry("mpa", DocumentType.AUDIO),
-            Map.entry("opus", DocumentType.AUDIO),
-            Map.entry("ogg", DocumentType.AUDIO),
-            Map.entry("wlp", DocumentType.AUDIO),
-            Map.entry("amr", DocumentType.AUDIO),
-            Map.entry("mp3", DocumentType.AUDIO),
-            Map.entry("m4a", DocumentType.AUDIO),
-            Map.entry("aac", DocumentType.AUDIO),
-            Map.entry("wav", DocumentType.AUDIO),
-            Map.entry("wma", DocumentType.AUDIO),
-            Map.entry("pdf", DocumentType.DOCUMENT),
-            Map.entry("doc", DocumentType.DOCUMENT),
-            Map.entry("docx", DocumentType.DOCUMENT),
-            Map.entry("ppt", DocumentType.DOCUMENT),
-            Map.entry("pptx", DocumentType.DOCUMENT),
-            Map.entry("xls", DocumentType.DOCUMENT),
-            Map.entry("xlsx", DocumentType.DOCUMENT),
-            Map.entry("txt", DocumentType.DOCUMENT),
-            Map.entry("rtf", DocumentType.DOCUMENT),
-            Map.entry("tex", DocumentType.DOCUMENT),
-            Map.entry("csv", DocumentType.DOCUMENT),
-            Map.entry("wpd", DocumentType.DOCUMENT),
-            Map.entry("7z", DocumentType.COMPRESSED_FILE),
-            Map.entry("arj", DocumentType.COMPRESSED_FILE),
-            Map.entry("deb", DocumentType.COMPRESSED_FILE),
-            Map.entry("pkg", DocumentType.COMPRESSED_FILE),
-            Map.entry("rar", DocumentType.COMPRESSED_FILE),
-            Map.entry("rpm", DocumentType.COMPRESSED_FILE),
-            Map.entry("gz", DocumentType.COMPRESSED_FILE),
-            Map.entry("z", DocumentType.COMPRESSED_FILE),
-            Map.entry("zip", DocumentType.COMPRESSED_FILE),
-            Map.entry("apk", DocumentType.EXECUTABLE),
-            Map.entry("bat", DocumentType.EXECUTABLE),
-            Map.entry("bin", DocumentType.EXECUTABLE),
-            Map.entry("cgi", DocumentType.EXECUTABLE),
-            Map.entry("pl", DocumentType.EXECUTABLE),
-            Map.entry("com", DocumentType.EXECUTABLE),
-            Map.entry("exe", DocumentType.EXECUTABLE),
-            Map.entry("gadget", DocumentType.EXECUTABLE),
-            Map.entry("jar", DocumentType.EXECUTABLE),
-            Map.entry("msi", DocumentType.EXECUTABLE),
-            Map.entry("py", DocumentType.EXECUTABLE),
-            Map.entry("wsf", DocumentType.EXECUTABLE)
-    );
-
-    /**
-     * Commits the {@code SendDocumentEvent} for an outgoing document
-     * send.
-     *
-     * <p>The document-send pipeline calls this before the upload begins; it
-     * mirrors WA Web's
-     * {@code WAWebProcessRawMediaLogging.logSendDocumentEvent}. The
-     * filename is split on {@code .} and the last segment, lowercased, is
-     * looked up in {@link #DOCUMENT_EXT_TO_TYPE} to resolve the
-     * {@link DocumentType}; an absent or unknown extension yields an empty
-     * {@code documentExt} property and falls back to
-     * {@link DocumentType#OTHER}.
-     *
-     * @implNote
-     * This implementation leaves the {@code documentPageSize} WAM
-     * property unset because WA Web's emission site declares it on the
-     * event spec but never populates it; the field is reserved for
-     * future use.
-     *
-     * @param filename the user-visible document filename;
-     *                 {@code null} resolves the extension as the empty
-     *                 string (mirroring WA Web's
-     *                 {@code e?.split(".").pop() ?? ""} fallback)
-     * @param size     the raw decrypted document size in bytes
-     */
-    @WhatsAppWebExport(moduleName = "WAWebProcessRawMediaLogging", exports = "logSendDocumentEvent",
-            adaptation = WhatsAppAdaptation.DIRECT)
-    public void logSendDocumentEvent(String filename, long size) {
-        String extension;
-        if (filename == null || filename.isEmpty()) {
-            extension = "";
-        } else {
-            var dotIndex = filename.lastIndexOf('.');
-            var tail = dotIndex < 0 ? filename : filename.substring(dotIndex + 1);
-            extension = tail.toLowerCase(Locale.ROOT);
-        }
-        var normalizedExt = DOCUMENT_EXT_TO_TYPE.containsKey(extension) ? extension : "";
-        var documentType = DOCUMENT_EXT_TO_TYPE.getOrDefault(normalizedExt, DocumentType.OTHER);
-        commit(new SendDocumentEventBuilder()
-                .documentSize((double) size)
-                .documentType(documentType)
-                .documentExt(normalizedExt)
-                .build());
     }
 }

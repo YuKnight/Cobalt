@@ -185,6 +185,15 @@ public class UsrSctp extends UsrSctp$shared {
     public static int SCTP_SENDV_PRINFO() {
         return SCTP_SENDV_PRINFO;
     }
+    private static final int SCTP_SENDV_SPA = (int)4L;
+    /**
+     * {@snippet lang=c :
+     * #define SCTP_SENDV_SPA 4
+     * }
+     */
+    public static int SCTP_SENDV_SPA() {
+        return SCTP_SENDV_SPA;
+    }
     private static final int SCTP_SEND_SNDINFO_VALID = (int)1L;
     /**
      * {@snippet lang=c :
@@ -193,6 +202,15 @@ public class UsrSctp extends UsrSctp$shared {
      */
     public static int SCTP_SEND_SNDINFO_VALID() {
         return SCTP_SEND_SNDINFO_VALID;
+    }
+    private static final int SCTP_SEND_PRINFO_VALID = (int)2L;
+    /**
+     * {@snippet lang=c :
+     * #define SCTP_SEND_PRINFO_VALID 2
+     * }
+     */
+    public static int SCTP_SEND_PRINFO_VALID() {
+        return SCTP_SEND_PRINFO_VALID;
     }
     private static final int SCTP_ASSOC_CHANGE = (int)1L;
     /**
@@ -256,6 +274,33 @@ public class UsrSctp extends UsrSctp$shared {
      */
     public static int SCTP_EOR() {
         return SCTP_EOR;
+    }
+    private static final int SCTP_PR_SCTP_NONE = (int)0L;
+    /**
+     * {@snippet lang=c :
+     * #define SCTP_PR_SCTP_NONE 0
+     * }
+     */
+    public static int SCTP_PR_SCTP_NONE() {
+        return SCTP_PR_SCTP_NONE;
+    }
+    private static final int SCTP_PR_SCTP_TTL = (int)1L;
+    /**
+     * {@snippet lang=c :
+     * #define SCTP_PR_SCTP_TTL 1
+     * }
+     */
+    public static int SCTP_PR_SCTP_TTL() {
+        return SCTP_PR_SCTP_TTL;
+    }
+    private static final int SCTP_PR_SCTP_RTX = (int)3L;
+    /**
+     * {@snippet lang=c :
+     * #define SCTP_PR_SCTP_RTX 3
+     * }
+     */
+    public static int SCTP_PR_SCTP_RTX() {
+        return SCTP_PR_SCTP_RTX;
     }
     private static final int SCTP_RTOINFO = (int)1L;
     /**

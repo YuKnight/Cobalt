@@ -55,16 +55,37 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexRequest implement
     private final String input;
 
     /**
-     * Constructs a request with the given pre-serialised {@code input} payload.
+     * Holds whether to populate the {@code status_metadata} fragment in the response.
+     */
+    private final boolean fetchStatusMetadata;
+
+    /**
+     * Constructs a request with the given pre-serialised {@code input} payload without requesting
+     * the optional {@code status_metadata} fragment.
      *
-     * <p>The {@code input} string is forwarded verbatim under the {@code variables.input} key;
-     * callers are responsible for matching the schema (categories list, country code, per-category
-     * limit).
+     * <p>Equivalent to {@link #FetchNewsletterDirectoryCategoriesPreviewMexRequest(String, boolean)}
+     * with {@code fetchStatusMetadata} set to {@code false}.
      *
      * @param input the pre-serialised input payload, or {@code null} to omit
      */
     public FetchNewsletterDirectoryCategoriesPreviewMexRequest(String input) {
+        this(input, false);
+    }
+
+    /**
+     * Constructs a request with the given pre-serialised {@code input} payload.
+     *
+     * <p>The {@code input} string is forwarded verbatim under the {@code variables.input} key;
+     * callers are responsible for matching the schema (categories list, country code, per-category
+     * limit). The {@code fetchStatusMetadata} flag mirrors whether the newsletter status receiver is
+     * enabled.
+     *
+     * @param input               the pre-serialised input payload, or {@code null} to omit
+     * @param fetchStatusMetadata whether to request the optional {@code status_metadata} fragment
+     */
+    public FetchNewsletterDirectoryCategoriesPreviewMexRequest(String input, boolean fetchStatusMetadata) {
         this.input = input;
+        this.fetchStatusMetadata = fetchStatusMetadata;
     }
 
     /**
@@ -90,9 +111,10 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexRequest implement
     /**
      * {@inheritDoc}
      *
-     * <p>Produces the {@code {variables: {input: "<payload>"}}} envelope; the {@code input} entry is
-     * omitted when {@link #input} is {@code null} so the GraphQL schema never receives an explicit
-     * {@code null} variable.
+     * <p>Produces the {@code {variables: {input: "<payload>", fetch_status_metadata}}} envelope; the
+     * {@code input} entry is omitted when {@link #input} is {@code null} so the GraphQL schema never
+     * receives an explicit {@code null} variable, while {@code fetch_status_metadata} is always
+     * emitted.
      *
      * @implNote This implementation writes the GraphQL variables directly through a
      * {@link JSONWriter} and wraps any {@link IOException} from the in-memory writer in an
@@ -115,6 +137,9 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexRequest implement
                 writer.writeColon();
                 writer.writeString(input);
             }
+            writer.writeName("fetch_status_metadata");
+            writer.writeColon();
+            writer.writeBool(fetchStatusMetadata);
             writer.endObject();
             writer.endObject();
 

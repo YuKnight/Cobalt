@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.wam;
 
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -70,11 +70,11 @@ class WamServiceTest {
     @DisplayName("constructor")
     class ConstructorTests {
         @Test
-        @DisplayName("DefaultWamService(client, abPropsService) builds without throwing")
+        @DisplayName("LiveWamService(client, abPropsService) builds without throwing")
         void defaultBuilds() {
             var props = TestABPropsService.builder().build();
             var client = TestWhatsAppClient.create();
-            var service = assertDoesNotThrow(() -> new DefaultWamService(client, props));
+            var service = assertDoesNotThrow(() -> new LiveWamService(client, props));
             assertNotNull(service);
         }
 
@@ -442,9 +442,9 @@ class WamServiceTest {
     // spec on the event id alone.
     private static void assertChannelMatches(String eventName, int eventId, String liveChannel) {
         var buffer = new byte[8];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
         encoder.writeEventMarker(eventId, 0, false);
-        var decoder = WamEventDecoder.of(buffer, 0, encoder.written());
+        var decoder = WamEventDecoder.fromBytes(buffer, 0, encoder.written());
         var spec = WamEventRegistry.decode(decoder);
         var expected = WamChannel.valueOf(liveChannel.toUpperCase(Locale.ROOT));
         assertSame(expected, spec.channel(),
@@ -467,7 +467,7 @@ class WamServiceTest {
     private static TestableWamService newService() {
         var props = TestABPropsService.builder().build();
         var client = TestWhatsAppClient.create().withAbPropsService(props);
-        return new TestableWamService(client, props, new DefaultWamBeaconingService());
+        return new TestableWamService(client, props, new LiveWamBeaconingService());
     }
 
     /**
@@ -486,7 +486,7 @@ class WamServiceTest {
 
         final Queue<ScheduledCall> scheduledRunnables = new ConcurrentLinkedQueue<>();
 
-        TestableWamService(WhatsAppClient client, ABPropsService props, WamBeaconingService beaconing) {
+        TestableWamService(LinkedWhatsAppClient client, ABPropsService props, WamBeaconingService beaconing) {
             super(client, props, beaconing);
         }
 
@@ -1110,7 +1110,7 @@ class WamServiceTest {
                     }
                     throw new IllegalStateException("realistic harness ran out of canned responses for sendNode");
                 });
-        var service = new TestableWamService(client, props, new DefaultWamBeaconingService());
+        var service = new TestableWamService(client, props, new LiveWamBeaconingService());
         harnessRef[0] = new RealisticHarness(client, service, responses, calls);
         return harnessRef[0];
     }

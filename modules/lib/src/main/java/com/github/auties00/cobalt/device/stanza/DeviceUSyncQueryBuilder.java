@@ -97,8 +97,9 @@ public final class DeviceUSyncQueryBuilder {
      * <p>The {@code userJids} set is sliced into batches of up to {@value MAX_USERS_PER_QUERY} entries
      * (see {@link #MAX_USERS_PER_QUERY}), and one IQ {@link NodeBuilder} is returned per batch for the
      * caller to send in turn. The {@code context} value is written verbatim onto the {@code <usync>}
-     * element; typical values are {@code "message"}, {@code "interactive"}, and
-     * {@code "inactive_group_migration"}. When {@code includeUsernameProtocol} is {@code true} the
+     * element and must be a valid USync context wire literal ({@code "interactive"}, {@code "message"},
+     * {@code "voip"}, {@code "background"}, or {@code "notification"}); the relay does not recognise
+     * caller-internal sync labels. When {@code includeUsernameProtocol} is {@code true} the
      * {@code <query>} element also carries the {@code <username/>} probe. At least one batch is always
      * returned, even for an empty {@code userJids} set, in which case the IQ carries an empty
      * {@code <list/>}.

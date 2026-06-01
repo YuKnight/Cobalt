@@ -1,9 +1,16 @@
 package com.github.auties00.cobalt.stream.message;
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
+import com.github.auties00.cobalt.sync.LiveWebHistorySyncService;
 
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.ack.NackReason;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.MessageReplyListener;
+import com.github.auties00.cobalt.client.listener.MessageStatusListener;
+import com.github.auties00.cobalt.client.listener.NewMessageListener;
+import com.github.auties00.cobalt.client.listener.NewStatusListener;
+import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
@@ -37,11 +44,11 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecovery;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.sync.WebHistorySyncService;
 import com.github.auties00.cobalt.sync.key.SyncKeyRotationService;
+import com.github.auties00.cobalt.wam.WamMsgUtils;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.IncomingMessageDropEventBuilder;
 import com.github.auties00.cobalt.wam.event.MdBadDeviceSentMessageEventBuilder;
@@ -74,7 +81,6 @@ import com.github.auties00.cobalt.wam.type.TypeOfGroupEnum;
 import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.chat.ChatDisappearingMode;
-import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.ByteArrayInputStream;
 import java.time.Instant;
@@ -124,7 +130,7 @@ import java.util.zip.GZIPInputStream;
 @WhatsAppWebModule(moduleName = "WAWebHandleMsg")
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleMessagingStanza")
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleWorkerCompatibleStanza")
-public final class MessageStreamHandler implements SocketStream.Handler {
+public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
     /**
      * Logger used for unstructured diagnostic output on parse failures,
      * receive-pipeline failures, and protocol-message helper failures.
@@ -163,11 +169,11 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     private static final int OFFLINE_COUNT_TOO_HIGH_THRESHOLD = 11;
 
     /**
-     * Owning {@link WhatsAppClient} used to send acknowledgments and
+     * Owning {@link LinkedWhatsAppClient} used to send acknowledgments and
      * receipts, access the store, dispatch listener callbacks, and ship peer
      * messages from protocol-message key-request handling.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Parses and decrypts the inbound stanza into the typed
@@ -235,13 +241,13 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      *
      * @implNote
      * This implementation derives the receipt handler from the supplied
-     * {@link WhatsAppClient} and constructs the history-sync service in place
+     * {@link LinkedWhatsAppClient} and constructs the history-sync service in place
      * because both are owned solely by the message handler. The
      * {@link SyncKeyRotationService} is pulled off the supplied
      * {@link WebAppStateService} so that the two services share their
      * underlying state.
      *
-     * @param whatsapp                the owning {@link WhatsAppClient}
+     * @param whatsapp                the owning {@link LinkedWhatsAppClient}
      * @param messageService          the {@link MessageService} that drives
      *                                parsing and decryption
      * @param snapshotRecoveryService the {@link SnapshotRecoveryService}
@@ -263,7 +269,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      *                                pipeline
      */
     public MessageStreamHandler(
-            WhatsAppClient whatsapp,
+            LinkedWhatsAppClient whatsapp,
             MessageService messageService,
             SnapshotRecoveryService snapshotRecoveryService,
             WebAppStateService webAppStateService,
@@ -280,8 +286,22 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         this.lidMigrationService = Objects.requireNonNull(lidMigrationService, "lidMigrationService cannot be null");
         this.wamService = Objects.requireNonNull(wamService, "wamService cannot be null");
         Objects.requireNonNull(mediaConnectionService, "mediaConnectionService cannot be null");
-        this.webHistorySyncService = new WebHistorySyncService(whatsapp, lidMigrationService, wamService, mediaConnectionService);
+        this.webHistorySyncService = new LiveWebHistorySyncService(whatsapp, lidMigrationService, wamService, mediaConnectionService);
         this.ackSender = Objects.requireNonNull(ackSender, "ackSender cannot be null");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote
+     * This implementation keys ordering on the {@code from} JID so every message in a chat is
+     * processed in arrival order, ensuring a group sender-key distribution message is applied before
+     * the sender-key messages that depend on it. A message with no {@code from} attribute (which
+     * {@link #handle(Node)} drops) maps to the empty key.
+     */
+    @Override
+    protected String orderingKey(Node node) {
+        return node.getAttributeAsString("from", "");
     }
 
     /**
@@ -298,7 +318,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      * exception yields a {@code 500} NACK. The transport
      * {@code <ack class="message">} is sent unconditionally up front; when
      * the relay is muting non-essential pushes the embedder uses
-     * {@link WhatsAppClient#enablePassiveMode()} rather than gating the ack
+     * {@link LinkedWhatsAppClient#enablePassiveMode()} rather than gating the ack
      * itself.
      *
      * @implNote
@@ -329,8 +349,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         try {
             stanza = MessageReceiveStanzaParser.parse(
                     node,
-                    whatsapp.store().jid().orElse(null),
-                    whatsapp.store().lid().orElse(null));
+                    whatsapp.store().accountStore().jid().orElse(null),
+                    whatsapp.store().accountStore().lid().orElse(null));
         } catch (RuntimeException exception) {
             LOGGER.log(System.Logger.Level.WARNING,
                     "Failed to parse incoming message stanza: {0}",
@@ -353,7 +373,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                     emitStructuredMessageReceiveIfApplicable(stanza);
                 }
                 resolveOrphanPayment(info);
-                var quoted = whatsapp.store().findQuotedMessage(info);
+                var quoted = whatsapp.store().chatStore().findQuotedMessage(info);
                 notifyMessageReceived(info, quoted);
             }
 
@@ -417,7 +437,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
             storeIncomingMessage(info);
             resolveOrphanPayment(info);
-            var quoted = whatsapp.store().findQuotedMessage(info);
+            var quoted = whatsapp.store().chatStore().findQuotedMessage(info);
             notifyMessageReceived(info, quoted);
             if (info instanceof NewsletterMessageInfo newsletterInfo) {
                 emitMessageReceiveForNewsletterMessage(newsletterInfo);
@@ -467,6 +487,10 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
         var errorCode = exception.errorCode().orElse(null);
         if (errorCode != null) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "NACK (" + errorCode + ") for message " + stanza.id()
+                            + " from " + stanza.senderJid(),
+                    exception);
             receiptHandler.sendNackReceipt(stanza, parseErrorCode(errorCode));
             return;
         }
@@ -521,10 +545,10 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
         var builder = new MessageHighRetryCountEventBuilder()
                 .retryCount(retryCount)
-                .messageType(wamService.getWamMessageTypeFromStanzaType(stanza.messageType()));
+                .messageType(WamMsgUtils.getWamMessageTypeFromStanzaType(stanza.messageType()));
 
-        var selfJid = whatsapp.store().jid().orElse(null);
-        var senderType = wamService.getWamE2eSenderType(stanza.senderJid(), selfJid);
+        var selfJid = whatsapp.store().accountStore().jid().orElse(null);
+        var senderType = WamMsgUtils.getWamE2eSenderType(stanza.senderJid(), selfJid);
         if (senderType != null) {
             builder.e2eSenderType(senderType);
         }
@@ -594,13 +618,13 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             builder.mediaType(mediaType);
         }
 
-        var messageType = wamService.getWamMessageTypeFromStanzaType(stanza.messageType());
+        var messageType = WamMsgUtils.getWamMessageTypeFromStanzaType(stanza.messageType());
         if (messageType != null) {
             builder.messageType(messageType);
         }
 
-        var selfJid = whatsapp.store().jid().orElse(null);
-        var senderType = wamService.getWamE2eSenderType(stanza.senderJid(), selfJid);
+        var selfJid = whatsapp.store().accountStore().jid().orElse(null);
+        var senderType = WamMsgUtils.getWamE2eSenderType(stanza.senderJid(), selfJid);
         if (senderType != null) {
             builder.e2eSenderType(senderType);
         }
@@ -924,9 +948,9 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     ) {
         var builder = new MessageReceiveEventBuilder();
 
-        builder.messageType(wamService.getWamMessageType(info));
+        builder.messageType(WamMsgUtils.getWamMessageType(info));
 
-        builder.messageMediaType(wamService.getWamMediaType(info));
+        builder.messageMediaType(WamMsgUtils.getWamMediaType(info));
 
         builder.messageIsOffline(stanza.isOffline());
 
@@ -983,8 +1007,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         builder.messageReceiveT1(Instant.ofEpochMilli(0));
         builder.messageReceiveT2(Instant.ofEpochMilli(0));
 
-        var selfJid = whatsapp.store().jid().orElse(null);
-        var senderType = wamService.getWamE2eSenderType(stanza.senderJid(), selfJid);
+        var selfJid = whatsapp.store().accountStore().jid().orElse(null);
+        var senderType = WamMsgUtils.getWamE2eSenderType(stanza.senderJid(), selfJid);
         if (senderType != null) {
             builder.e2eSenderType(senderType);
         }
@@ -1105,9 +1129,9 @@ public final class MessageStreamHandler implements SocketStream.Handler {
         var builder = new MessageReceiveEventBuilder();
 
         var parent = info.key().parentJid().orElse(null);
-        builder.messageType(wamService.getWamMessageType(parent));
+        builder.messageType(WamMsgUtils.getWamMessageType(parent));
 
-        builder.messageMediaType(wamService.getWamMediaType(info.message()));
+        builder.messageMediaType(WamMsgUtils.getWamMediaType(info.message()));
 
         builder.messageIsOffline(false);
 
@@ -1581,9 +1605,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                     return;
                 }
 
-                var newsletter = whatsapp.store()
-                        .findNewsletterByJid(newsletterJid)
-                        .orElseGet(() -> whatsapp.store().addNewNewsletter(newsletterJid));
+                var newsletter = whatsapp.store().chatStore().findNewsletterByJid(newsletterJid)
+                        .orElseGet(() -> whatsapp.store().chatStore().addNewNewsletter(newsletterJid));
                 newsletter.setTimestamp(newsletterInfo.timestamp().orElse(null));
                 if (!newsletterInfo.key().fromMe()) {
                     newsletter.setUnreadMessagesCount(newsletter.unreadMessagesCount() + 1);
@@ -1592,7 +1615,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             }
             case ChatMessageInfo chatInfo -> {
                 if (isStatusMessage(chatInfo)) {
-                    whatsapp.store().addStatus(chatInfo);
+                    whatsapp.store().chatStore().addStatus(chatInfo);
                     return;
                 }
 
@@ -1601,9 +1624,8 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                     return;
                 }
 
-                var chat = whatsapp.store()
-                        .findChatByJid(chatJid)
-                        .orElseGet(() -> whatsapp.store().addNewChat(chatJid));
+                var chat = whatsapp.store().chatStore().findChatByJid(chatJid)
+                        .orElseGet(() -> whatsapp.store().chatStore().addNewChat(chatJid));
                 var timestamp = chatInfo.timestamp().orElse(null);
                 chat.setLastMsgTimestamp(timestamp);
                 chat.setConversationTimestamp(timestamp);
@@ -1636,13 +1658,17 @@ public final class MessageStreamHandler implements SocketStream.Handler {
     private void notifyMessageReceived(MessageInfo info, Optional<? extends MessageInfo> quotedMessage) {
         var statusMessage = isStatusMessage(info);
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> {
-                listener.onNewMessage(whatsapp, info);
-                if (statusMessage && info instanceof ChatMessageInfo chatMessageInfo) {
-                    listener.onNewStatus(whatsapp, chatMessageInfo);
-                }
-                quotedMessage.ifPresent(quoted -> listener.onMessageReply(whatsapp, info, quoted));
-            });
+            if (listener instanceof NewMessageListener typed) {
+                Thread.startVirtualThread(() -> typed.onNewMessage(whatsapp, info));
+            }
+            if (statusMessage && info instanceof ChatMessageInfo chatMessageInfo
+                    && listener instanceof NewStatusListener typed) {
+                Thread.startVirtualThread(() -> typed.onNewStatus(whatsapp, chatMessageInfo));
+            }
+            if (quotedMessage.isPresent() && listener instanceof MessageReplyListener typed) {
+                var quoted = quotedMessage.get();
+                Thread.startVirtualThread(() -> typed.onMessageReply(whatsapp, info, quoted));
+            }
         }
     }
 
@@ -1692,7 +1718,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
         var orphan = chatMessageInfo.key()
                 .id()
-                .flatMap(whatsapp.store()::removeOrphanPaymentNotification)
+                .flatMap(whatsapp.store().businessStore()::removeOrphanPaymentNotification)
                 .orElse(null);
         if (orphan == null) {
             return;
@@ -1741,7 +1767,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return;
         }
 
-        var self = whatsapp.store().jid().orElse(null);
+        var self = whatsapp.store().accountStore().jid().orElse(null);
         var fromMe = self != null && Objects.equals(self.toUserJid(), sender.toUserJid());
         var group = transaction.getAttributeAsJid("group").orElse(null);
         var remote = group != null ? group : fromMe ? receiver : sender;
@@ -1749,7 +1775,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
         var message = findPaymentMessage(remote, participant, messageId, fromMe);
         if (!(message instanceof ChatMessageInfo chatMessageInfo)) {
-            whatsapp.store().addOrphanPaymentNotification(new OrphanPaymentNotificationBuilder()
+            whatsapp.store().businessStore().addOrphanPaymentNotification(new OrphanPaymentNotificationBuilder()
                     .messageId(messageId)
                     .receiverJid(receiver)
                     .currency(transaction.getAttributeAsString("currency", null))
@@ -1774,9 +1800,11 @@ public final class MessageStreamHandler implements SocketStream.Handler {
 
         chatMessageInfo.setPaymentInfo(paymentInfo);
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> listener.onMessageStatus(whatsapp, chatMessageInfo));
+            if (listener instanceof MessageStatusListener typed) {
+                Thread.startVirtualThread(() -> typed.onMessageStatus(whatsapp, chatMessageInfo));
+            }
         }
-        whatsapp.store().removeOrphanPaymentNotification(messageId);
+        whatsapp.store().businessStore().removeOrphanPaymentNotification(messageId);
     }
 
     /**
@@ -1804,8 +1832,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      *         found
      */
     private MessageInfo findPaymentMessage(Jid remote, Jid participant, String messageId, boolean fromMe) {
-        var direct = whatsapp.store()
-                .findMessageByKey(new MessageKeyBuilder()
+        var direct = whatsapp.store().chatStore().findMessageByKey(new MessageKeyBuilder()
                         .id(messageId)
                         .parentJid(remote)
                         .fromMe(fromMe)
@@ -1816,7 +1843,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return direct;
         }
 
-        return whatsapp.store().findMessageById(remote, messageId)
+        return whatsapp.store().chatStore().findMessageById(remote, messageId)
                 .map(MessageInfo.class::cast)
                 .orElse(null);
     }
@@ -2125,8 +2152,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 .ifPresent(webHistorySyncService::process);
 
         protocolMessage.initialSecurityNotificationSettingSync()
-                .ifPresent(sync -> whatsapp.store()
-                        .setShowSecurityNotifications(sync.securityNotificationEnabled()));
+                .ifPresent(sync -> whatsapp.store().settingsStore().setShowSecurityNotifications(sync.securityNotificationEnabled()));
     }
 
     /**
@@ -2187,7 +2213,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
      * companion device asks the primary for keys it is missing, this method
      * assembles a peer protocol message containing the subset of requested
      * keys that the local store knows about and dispatches it via
-     * {@link WhatsAppClient#sendPeerMessage(com.github.auties00.cobalt.model.jid.JidProvider, ChatMessageInfo)}.
+     * {@link LinkedWhatsAppClient#sendPeerMessage(com.github.auties00.cobalt.model.jid.JidProvider, ChatMessageInfo)}.
      *
      * @implNote
      * This implementation packs a placeholder entry with just the key id when
@@ -2217,7 +2243,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
                 continue;
             }
 
-            var keyToShare = whatsapp.store().findWebAppStateKeyById(rawKeyId)
+            var keyToShare = whatsapp.store().syncStore().findWebAppStateKeyById(rawKeyId)
                     .orElseGet(() -> new AppStateSyncKeyBuilder()
                             .keyId(new AppStateSyncKeyIdBuilder()
                                     .keyId(rawKeyId)
@@ -2241,7 +2267,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             var messageContainer = new MessageContainerBuilder()
                     .protocolMessage(protocolMessage)
                     .build();
-            var self = whatsapp.store().jid().orElse(null);
+            var self = whatsapp.store().accountStore().jid().orElse(null);
             if (self == null) {
                 return;
             }
@@ -2372,7 +2398,7 @@ public final class MessageStreamHandler implements SocketStream.Handler {
             return Optional.empty();
         }
 
-        try (var protobufStream = ProtobufInputStream.fromStream(new GZIPInputStream(new ByteArrayInputStream(payload)))) {
+        try (var protobufStream = new BufferedProtobufInputStream(new GZIPInputStream(new ByteArrayInputStream(payload)))) {
             return Optional.of(LIDMigrationMappingSyncPayloadSpec.decode(protobufStream));
         } catch (Exception exception) {
             LOGGER.log(System.Logger.Level.WARNING,

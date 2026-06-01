@@ -20,7 +20,7 @@ import java.util.Objects;
  * community: phone number plus Noise key pair (server handshake) plus
  * Signal identity key pair (end-to-end encryption) plus identity
  * identifier. Cobalt loads a store from these via
- * {@link WhatsAppClientBuilder.Client.Mobile#createConnection(WhatsAppClientSixPartsKeys)}
+ * {@link LinkedWhatsAppClientBuilder.Client.Mobile#createConnection(WhatsAppClientSixPartsKeys)}
  * and emits them back via {@link #toString()}. The serialised shape
  * reads as
  * {@snippet :
@@ -29,7 +29,7 @@ import java.util.Objects;
  * where every cryptographic field is standard Base64 and the phone
  * number is decimal with an optional {@code +} prefix.
  *
- * @see WhatsAppClientBuilder
+ * @see LinkedWhatsAppClientBuilder
  * @see SignalIdentityKeyPair
  */
 public final class WhatsAppClientSixPartsKeys {

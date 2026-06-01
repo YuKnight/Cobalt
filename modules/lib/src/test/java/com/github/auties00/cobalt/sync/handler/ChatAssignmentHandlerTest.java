@@ -110,23 +110,23 @@ class ChatAssignmentHandlerTest {
         @Test
         @DisplayName("a non-empty agent id installs a new ChatAssignment when the agent + chat exist")
         void installsAssignment() {
-            store.addNewChat(CHAT_JID);
-            store.putAgentState(new AgentStateBuilder().agentId("agent-1").name("A").deviceId(0).deleted(false).build());
+            store.chatStore().addNewChat(CHAT_JID);
+            store.businessStore().putAgentState(new AgentStateBuilder().agentId("agent-1").name("A").deviceId(0).deleted(false).build());
             var action = new ChatAssignmentActionBuilder().deviceAgentID("agent-1").build();
 
             var result = handler.applyMutation(client,
                     buildMutation(CHAT_JID.toString(), action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var assignment = store.findChatAssignment(CHAT_JID).orElseThrow();
+            var assignment = store.businessStore().findChatAssignment(CHAT_JID).orElseThrow();
             assertEquals("agent-1", assignment.agentId().orElseThrow());
         }
 
         @Test
         @DisplayName("an empty agent id clears the assignment for the chat")
         void emptyAgentIdUnassigns() {
-            store.addNewChat(CHAT_JID);
-            store.putChatAssignment(new ChatAssignmentBuilder()
+            store.chatStore().addNewChat(CHAT_JID);
+            store.businessStore().putChatAssignment(new ChatAssignmentBuilder()
                     .chatJid(CHAT_JID)
                     .agentId("agent-1")
                     .opened(true)
@@ -137,16 +137,16 @@ class ChatAssignmentHandlerTest {
                     buildMutation(CHAT_JID.toString(), action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findChatAssignment(CHAT_JID).isEmpty(),
+            assertTrue(store.businessStore().findChatAssignment(CHAT_JID).isEmpty(),
                     "an empty agent id must clear the assignment for the chat");
         }
 
         @Test
         @DisplayName("re-assignment preserves the prior 'opened' flag")
         void reassignmentPreservesOpenedFlag() {
-            store.addNewChat(CHAT_JID);
-            store.putAgentState(new AgentStateBuilder().agentId("agent-2").name("B").deviceId(0).deleted(false).build());
-            store.putChatAssignment(new ChatAssignmentBuilder()
+            store.chatStore().addNewChat(CHAT_JID);
+            store.businessStore().putAgentState(new AgentStateBuilder().agentId("agent-2").name("B").deviceId(0).deleted(false).build());
+            store.businessStore().putChatAssignment(new ChatAssignmentBuilder()
                     .chatJid(CHAT_JID)
                     .agentId("agent-1")
                     .opened(true)
@@ -156,7 +156,7 @@ class ChatAssignmentHandlerTest {
             handler.applyMutation(client,
                     buildMutation(CHAT_JID.toString(), action, SyncdOperation.SET, Instant.now()));
 
-            var stored = store.findChatAssignment(CHAT_JID).orElseThrow();
+            var stored = store.businessStore().findChatAssignment(CHAT_JID).orElseThrow();
             assertEquals("agent-2", stored.agentId().orElseThrow());
             assertTrue(stored.opened(), "the prior 'opened' flag is carried into the new assignment");
         }
@@ -168,7 +168,7 @@ class ChatAssignmentHandlerTest {
         @Test
         @DisplayName("a chat absent locally returns ORPHAN with the chat JID as modelId")
         void orphanChat() {
-            store.putAgentState(new AgentStateBuilder().agentId("agent-1").name("A").deviceId(0).deleted(false).build());
+            store.businessStore().putAgentState(new AgentStateBuilder().agentId("agent-1").name("A").deviceId(0).deleted(false).build());
             var action = new ChatAssignmentActionBuilder().deviceAgentID("agent-1").build();
 
             var result = handler.applyMutation(client,
@@ -182,7 +182,7 @@ class ChatAssignmentHandlerTest {
         @Test
         @DisplayName("a non-empty agent id with no matching agent returns ORPHAN with the agent id as modelId")
         void orphanAgent() {
-            store.addNewChat(CHAT_JID);
+            store.chatStore().addNewChat(CHAT_JID);
             var action = new ChatAssignmentActionBuilder().deviceAgentID("missing-agent").build();
 
             var result = handler.applyMutation(client,
@@ -208,7 +208,7 @@ class ChatAssignmentHandlerTest {
             var index = JSON.toJSONString(List.of(handler.actionName(), CHAT_JID.toString()));
             var mutation = new DecryptedMutation.Trusted(index, value, SyncdOperation.SET, ts, handler.version());
 
-            store.addNewChat(CHAT_JID);
+            store.chatStore().addNewChat(CHAT_JID);
             assertEquals(SyncActionState.MALFORMED, handler.applyMutation(client, mutation).actionState());
         }
     }
@@ -245,7 +245,7 @@ class ChatAssignmentHandlerTest {
         @Test
         @DisplayName("REMOVE operation returns UNSUPPORTED")
         void removeUnsupported() {
-            store.addNewChat(CHAT_JID);
+            store.chatStore().addNewChat(CHAT_JID);
             var action = new ChatAssignmentActionBuilder().deviceAgentID("agent-1").build();
 
             var result = handler.applyMutation(client,

@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingBuilder
 import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayloadBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -38,13 +38,13 @@ class LidMigrationServiceProcessProtocolMessageTest {
     private static final Jid PEER_LID = Jid.of("258252122116273@lid");
     private static final Jid PEER_LID_LATEST = Jid.of("999999999999999@lid");
 
-    private record Harness(TestWhatsAppClient client, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, LiveLidMigrationService service) {}
 
     private static Harness build(TestABPropsService props) {
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, service);
     }
 
@@ -57,7 +57,7 @@ class LidMigrationServiceProcessProtocolMessageTest {
                 .build();
     }
 
-    private static void advanceToWaitingMappings(LidMigrationService service) {
+    private static void advanceToWaitingMappings(LiveLidMigrationService service) {
         service.initialize();
         service.enableMigration();
     }
@@ -131,7 +131,7 @@ class LidMigrationServiceProcessProtocolMessageTest {
     @DisplayName("typical mappings -> caches populated, contact LID mirrored, mapping registered")
     void typicalMappings() {
         var h = build(defaultProps());
-        h.client.store().addNewContact(PEER_PN);
+        h.client.store().contactStore().addNewContact(PEER_PN);
         advanceToWaitingMappings(h.service);
 
         var mapping = new LIDMigrationMappingBuilder()
@@ -148,18 +148,18 @@ class LidMigrationServiceProcessProtocolMessageTest {
         assertEquals(PEER_LID, h.service.lookupLid(PEER_PN).orElseThrow());
 
         // Contact LID mirrored (set by processSingleMapping).
-        var contact = h.client.store().findContactByJid(PEER_PN).orElseThrow();
+        var contact = h.client.store().contactStore().findContactByJid(PEER_PN).orElseThrow();
         assertEquals(PEER_LID, contact.lid().orElseThrow());
 
         // Bidirectional store mapping is also seeded.
-        assertEquals(PEER_LID, h.client.store().findLidByPhone(PEER_PN).orElseThrow());
+        assertEquals(PEER_LID, h.client.store().contactStore().findLidByPhone(PEER_PN).orElseThrow());
     }
 
     @Test
     @DisplayName("mapping without latestLid: only the assigned LID is cached, no latest entry")
     void mappingWithoutLatestLid() {
         var h = build(defaultProps());
-        h.client.store().addNewContact(PEER_PN);
+        h.client.store().contactStore().addNewContact(PEER_PN);
         advanceToWaitingMappings(h.service);
 
         var mapping = new LIDMigrationMappingBuilder()
@@ -178,7 +178,7 @@ class LidMigrationServiceProcessProtocolMessageTest {
         // The latest-LID cache participation can be checked via a ctwa-LID chat path:
         // we create a LID chat with PEER_LID and ctwa origin; primaryPnToLatestLidCache is empty,
         // so the origin must stay as "ctwa".
-        var chat = h.client.store().addNewChat(PEER_LID);
+        var chat = h.client.store().chatStore().addNewChat(PEER_LID);
         chat.setLidOriginType("ctwa");
         h.service.resolveThread(chat);
         assertEquals("ctwa", chat.lidOriginType().orElseThrow(),

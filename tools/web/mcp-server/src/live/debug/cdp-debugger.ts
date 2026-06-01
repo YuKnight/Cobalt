@@ -13,6 +13,7 @@ import type {
   WasmMemoryReadResult,
 } from "../../types/live/debug.js";
 import { createLogger } from "../../utils/logger.js";
+import { CdpMux } from "./cdp-mux.js";
 
 const log = createLogger("live:debugger");
 
@@ -37,13 +38,20 @@ export class LiveCdpDebugger {
   private readonly replacements = new Map<string, string>();
   private readonly requireContext: () => BrowserContext;
   private readonly requirePage: () => Page;
+  private readonly mux: CdpMux;
 
-  constructor(requireContext: () => BrowserContext, requirePage: () => Page) {
+  constructor(
+    requireContext: () => BrowserContext,
+    requirePage: () => Page,
+    getCdpPort: () => number | null
+  ) {
     this.requireContext = requireContext;
     this.requirePage = requirePage;
+    this.mux = new CdpMux(getCdpPort);
   }
 
   async detach(): Promise<void> {
+    this.mux.close();
     if (!this.cdp) return;
     log.info("detaching CDP debugger session");
     await this.cdp.detach().catch(() => undefined);
@@ -100,9 +108,10 @@ export class LiveCdpDebugger {
 
 
   async listScripts(filter?: string, limit: number = 200): Promise<DebugScriptInfo[]> {
-    await this.ensureCdp();
+    await this.mux.ensure();
     const normalizedFilter = filter ? filter.toLowerCase() : null;
-    return [...this.debugScripts.values()]
+    return this.mux
+      .listScripts()
       .filter((script) =>
         normalizedFilter ? script.url.toLowerCase().includes(normalizedFilter) : true
       )
@@ -159,16 +168,22 @@ export class LiveCdpDebugger {
     columnNumberOneBased: number = 1,
     condition?: string
   ): Promise<SetBreakpointResult> {
-    const cdp = await this.ensureCdp();
-    const responseRaw = await cdp.send("Debugger.setBreakpoint", {
-      location: {
-        scriptId,
-        lineNumber: Math.max(0, lineNumberOneBased - 1),
-        columnNumber: Math.max(0, columnNumberOneBased - 1),
+    await this.mux.ensure();
+    const sessionId = this.mux.sessionForScript(scriptId);
+    const responseRaw = await this.mux.send(
+      "Debugger.setBreakpoint",
+      {
+        location: {
+          scriptId,
+          lineNumber: Math.max(0, lineNumberOneBased - 1),
+          columnNumber: Math.max(0, columnNumberOneBased - 1),
+        },
+        condition,
       },
-      condition,
-    });
+      sessionId
+    );
     const response = responseRaw as DebuggerSetBreakpointResponse;
+    if (sessionId) this.mux.rememberBreakpoint(response.breakpointId, sessionId);
     const location = response.actualLocation ? [response.actualLocation] : [];
     return {
       breakpointId: response.breakpointId,
@@ -188,12 +203,27 @@ export class LiveCdpDebugger {
     byteOffset: number,
     condition?: string
   ): Promise<SetBreakpointResult> {
-    const cdp = await this.ensureCdp();
-    const responseRaw = await cdp.send("Debugger.setBreakpoint", {
-      location: { scriptId, lineNumber: 0, columnNumber: Math.max(0, byteOffset) },
-      condition,
-    });
+    await this.mux.ensure();
+    const sessionId = this.mux.sessionForScript(scriptId);
+    const responseRaw = await this.mux.send(
+      "Debugger.setBreakpoint",
+      {
+        location: { scriptId, lineNumber: 0, columnNumber: Math.max(0, byteOffset) },
+        condition,
+      },
+      sessionId
+    );
     const response = responseRaw as DebuggerSetBreakpointResponse;
+    if (sessionId) this.mux.rememberBreakpoint(response.breakpointId, sessionId);
+    // Also register the offset as a pending URL breakpoint so future instances of
+    // the same wasm (e.g. a VoIP worker respawned for the next call) bind it before
+    // they execute. The byte offset is module-absolute and stable across instances
+    // because every instance loads the identical wasm.
+    const script = this.mux.listScripts().find((s) => s.scriptId === scriptId);
+    if (script?.url) {
+      const urlRegex = script.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      this.mux.addPendingUrlBreakpoint(`wasm:${urlRegex}:${byteOffset}`, urlRegex, byteOffset, condition);
+    }
     return {
       breakpointId: response.breakpointId,
       locations: response.actualLocation ? [response.actualLocation] : [],
@@ -207,7 +237,8 @@ export class LiveCdpDebugger {
    * large reads.
    */
   async readWasmMemory(callFrameId: string, addr: number, len: number): Promise<WasmMemoryReadResult> {
-    const cdp = await this.ensureCdp();
+    await this.mux.ensure();
+    const sessionId = this.mux.getLastPaused()?.sessionId;
     const expression = `(() => {
       const mem = (typeof memories !== "undefined" && memories[0]) || (typeof memory !== "undefined" && memory);
       if (!mem) return { __err: "no memory in frame scope" };
@@ -219,11 +250,11 @@ export class LiveCdpDebugger {
       return { __b64: btoa(bin) };
     })()`;
     try {
-      const responseRaw = await cdp.send("Debugger.evaluateOnCallFrame", {
-        callFrameId,
-        expression,
-        returnByValue: true,
-      });
+      const responseRaw = await this.mux.send(
+        "Debugger.evaluateOnCallFrame",
+        { callFrameId, expression, returnByValue: true },
+        sessionId
+      );
       const response = responseRaw as RuntimeEvaluateResponse;
       const value = response.result?.value as { __b64?: string; __err?: string } | undefined;
       if (response.exceptionDetails) {
@@ -238,13 +269,13 @@ export class LiveCdpDebugger {
 
   /** Evaluates an expression in a paused frame's context, returning by value. */
   async evaluateOnCallFrame(callFrameId: string, expression: string): Promise<EvaluateResult> {
-    const cdp = await this.ensureCdp();
-    const responseRaw = await cdp.send("Debugger.evaluateOnCallFrame", {
-      callFrameId,
-      expression,
-      returnByValue: true,
-      generatePreview: true,
-    });
+    await this.mux.ensure();
+    const sessionId = this.mux.getLastPaused()?.sessionId;
+    const responseRaw = await this.mux.send(
+      "Debugger.evaluateOnCallFrame",
+      { callFrameId, expression, returnByValue: true, generatePreview: true },
+      sessionId
+    );
     const response = responseRaw as RuntimeEvaluateResponse;
     const result = response.result;
     return {
@@ -260,37 +291,46 @@ export class LiveCdpDebugger {
   }
 
   async removeBreakpoint(breakpointId: string): Promise<void> {
-    const cdp = await this.ensureCdp();
-    await cdp.send("Debugger.removeBreakpoint", { breakpointId });
+    await this.mux.ensure();
+    const sessionId = this.mux.sessionForBreakpoint(breakpointId);
+    await this.mux.send("Debugger.removeBreakpoint", { breakpointId }, sessionId);
   }
 
   async command(command: DebugCommand): Promise<void> {
-    const cdp = await this.ensureCdp();
+    await this.mux.ensure();
+    // Stepping/resume/pause act on the session that is currently paused; only one
+    // target pauses at a time across the multiplexed connection.
+    const sessionId = this.mux.getLastPaused()?.sessionId;
     if (command === "pause") {
-      await cdp.send("Debugger.pause");
+      await this.mux.send("Debugger.pause", {}, sessionId);
       return;
     }
     if (command === "resume") {
-      this.lastPausedState = null;
-      await cdp.send("Debugger.resume");
+      this.mux.clearPaused();
+      await this.mux.send("Debugger.resume", {}, sessionId);
       return;
     }
     if (command === "step_over") {
-      await cdp.send("Debugger.stepOver");
+      await this.mux.send("Debugger.stepOver", {}, sessionId);
       return;
     }
     if (command === "step_into") {
-      await cdp.send("Debugger.stepInto");
+      await this.mux.send("Debugger.stepInto", {}, sessionId);
       return;
     }
-    await cdp.send("Debugger.stepOut");
+    await this.mux.send("Debugger.stepOut", {}, sessionId);
   }
 
   async getPausedState(): Promise<PausedState | null> {
-    if (!this.lastPausedState) return null;
-
-    const cdp = await this.ensureCdp();
-    const enriched = { ...this.lastPausedState };
+    await this.mux.ensure();
+    const paused = this.mux.getLastPaused();
+    if (!paused) return null;
+    const sessionId = paused.sessionId;
+    const enriched: PausedState = {
+      reason: paused.reason,
+      ts: paused.ts,
+      callFrames: paused.callFrames.map((f) => ({ ...f, scopeChain: f.scopeChain, variables: [] })),
+    };
 
     for (const frame of enriched.callFrames) {
       if (!frame.scopeChain) continue;
@@ -303,17 +343,51 @@ export class LiveCdpDebugger {
         if (scope.type === "global") continue;
         if (!scope.object?.objectId) continue;
         try {
-          const propsResult = await cdp.send("Runtime.getProperties", {
-            objectId: scope.object.objectId,
-            ownProperties: true,
-            generatePreview: true,
-          });
-          const props = propsResult as { result: Array<{ name: string; value?: { type: string; value?: unknown; description?: string } }> };
+          const propsResult = await this.mux.send(
+            "Runtime.getProperties",
+            {
+              objectId: scope.object.objectId,
+              ownProperties: true,
+              generatePreview: true,
+            },
+            sessionId
+          );
+          const props = propsResult as {
+            result: Array<{
+              name: string;
+              value?: { type: string; subtype?: string; value?: unknown; description?: string; objectId?: string };
+            }>;
+          };
           for (const prop of (props.result ?? []).slice(0, cap)) {
+            const pv = prop.value;
+            let valueStr = pv?.description ?? String(pv?.value ?? "undefined");
+            // Wasm locals/params are returned as opaque "wasmvalue" objects whose
+            // description is just the type (e.g. "i32"); the actual number lives in
+            // a nested "value" property, so drill one level to surface it.
+            const isWasmValue =
+              pv?.type === "object" &&
+              pv.objectId != null &&
+              (pv.subtype === "wasmvalue" || /^(i32|i64|f32|f64|v128)$/.test(pv.description ?? ""));
+            if (isWasmValue && pv?.objectId) {
+              try {
+                const inner = (await this.mux.send(
+                  "Runtime.getProperties",
+                  { objectId: pv.objectId, ownProperties: true, generatePreview: false },
+                  sessionId
+                )) as { result: Array<{ name: string; value?: { value?: unknown; description?: string } }> };
+                const valProp = (inner.result ?? []).find((p) => p.name === "value");
+                if (valProp) {
+                  const n = valProp.value?.value ?? valProp.value?.description ?? "";
+                  valueStr = `${pv.description}:${n}`;
+                }
+              } catch {
+                /* drilling is best-effort */
+              }
+            }
             scopeVars.push({
               name: prop.name,
-              value: prop.value?.description ?? String(prop.value?.value ?? "undefined"),
-              type: prop.value?.type ?? "undefined",
+              value: valueStr,
+              type: pv?.description ?? pv?.type ?? "undefined",
             });
           }
         } catch { /* scope may be unavailable */ }

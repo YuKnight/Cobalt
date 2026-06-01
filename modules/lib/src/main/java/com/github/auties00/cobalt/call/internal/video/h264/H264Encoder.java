@@ -63,7 +63,7 @@ import java.util.Objects;
  */
 public final class H264Encoder implements AutoCloseable {
     static {
-        NativeLibLoader.load("openh264", Arena.global());
+        NativeLibLoader.load("cobalt-native", Arena.global());
     }
 
     /**

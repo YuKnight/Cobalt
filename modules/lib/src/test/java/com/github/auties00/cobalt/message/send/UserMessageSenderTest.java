@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.message.send;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.StubDeviceService;
@@ -22,7 +23,8 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.DisplayName;
@@ -187,10 +189,11 @@ class UserMessageSenderTest {
     private static UserMessageSender userMessageSender(TestWhatsAppClient client, WhatsAppStore store, StubDeviceService deviceService) {
         var ab = client.abPropsService();
         var encryption = new MessageEncryption(store,
-                new SignalSessionCipher(store),
-                new SignalGroupCipher(store));
-        var wamService = new DefaultWamService(client, ab);
-        var lidMigrationService = new LidMigrationService(client, ab, wamService);
+                new SignalSessionCipher(store.signalStore()),
+                new SignalGroupCipher(store.signalStore()),
+                new SignalCryptoLocks());
+        var wamService = new LiveWamService(client, ab);
+        var lidMigrationService = new LiveLidMigrationService(client, ab, wamService);
         var bot = new BotStanza(encryption, new BotProtobufTransform(store));
         var biz = new BizStanza(store);
         var meta = new MetaStanza(store);

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.wam.binary;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
@@ -26,7 +27,10 @@ import static com.github.auties00.cobalt.wam.binary.WamTags.*;
  *       a file without holding the full buffer in memory.
  * </ul>
  *
- * <p>Construct either via the static {@code of(...)} factories.
+ * <p>Construct either via the static {@code toBytes(...)} or
+ * {@code toStream(...)} factories; the {@code toBufferedStream(...)} factories
+ * wrap the sink in a {@link BufferedOutputStream} and take ownership of it, so
+ * the encoder must be {@link #close() closed} to flush and release it.
  *
  * <p>The event-layer convenience methods ({@link #writeEventMarker},
  * {@link #writeIntField}, {@link #writeBoolField},
@@ -42,6 +46,7 @@ import static com.github.auties00.cobalt.wam.binary.WamTags.*;
  * @see WamTags
  */
 public abstract sealed class WamEventEncoder
+        implements AutoCloseable
         permits WamEventEncoder.ByteArray, WamEventEncoder.Stream {
 
     private static final VarHandle SHORT_HANDLE =
@@ -66,7 +71,7 @@ public abstract sealed class WamEventEncoder
      * @param destination the destination array, must not be {@code null}
      * @return a new byte-array-backed encoder
      */
-    public static WamEventEncoder of(byte[] destination) {
+    public static WamEventEncoder toBytes(byte[] destination) {
         return new ByteArray(destination, 0, destination.length);
     }
 
@@ -79,7 +84,7 @@ public abstract sealed class WamEventEncoder
      * @param length      the maximum number of bytes that may be written
      * @return a new byte-array-backed encoder
      */
-    public static WamEventEncoder of(byte[] destination, int offset, int length) {
+    public static WamEventEncoder toBytes(byte[] destination, int offset, int length) {
         return new ByteArray(destination, offset, length);
     }
 
@@ -87,10 +92,14 @@ public abstract sealed class WamEventEncoder
      * Returns an encoder writing into the given output stream with no
      * size limit.
      *
+     * <p>The encoder does not buffer; each value is written straight to
+     * {@code destination} in small chunks. Prefer {@link #toBufferedStream(OutputStream)}
+     * when the destination is an unbuffered file, socket, or cipher stream.
+     *
      * @param destination the destination stream, must not be {@code null}
      * @return a new stream-backed encoder
      */
-    public static WamEventEncoder of(OutputStream destination) {
+    public static WamEventEncoder toStream(OutputStream destination) {
         return new Stream(destination, -1);
     }
 
@@ -108,8 +117,45 @@ public abstract sealed class WamEventEncoder
      *                    limit
      * @return a new stream-backed encoder
      */
-    public static WamEventEncoder of(OutputStream destination, int length) {
+    public static WamEventEncoder toStream(OutputStream destination, int length) {
         return new Stream(destination, length);
+    }
+
+    /**
+     * Returns an encoder writing into the given output stream through a
+     * {@link BufferedOutputStream} of the default size, coalescing the
+     * encoder's many small writes into block writes.
+     *
+     * <p>The encoder takes ownership of {@code destination}: {@link #close()}
+     * flushes the buffer and closes the underlying stream, so the encoder must
+     * be closed (ideally with try-with-resources) or buffered output is lost.
+     *
+     * @param destination the destination stream, must not be {@code null}
+     * @return a new buffered stream-backed encoder
+     * @throws NullPointerException if {@code destination} is {@code null}
+     */
+    public static WamEventEncoder toBufferedStream(OutputStream destination) {
+        Objects.requireNonNull(destination, "destination cannot be null");
+        return new Stream(new BufferedOutputStream(destination), -1);
+    }
+
+    /**
+     * Returns an encoder writing into the given output stream through a
+     * {@link BufferedOutputStream} of the given size.
+     *
+     * <p>The encoder takes ownership of {@code destination}: {@link #close()}
+     * flushes the buffer and closes the underlying stream, so the encoder must
+     * be closed (ideally with try-with-resources) or buffered output is lost.
+     *
+     * @param destination the destination stream, must not be {@code null}
+     * @param bufferSize  the buffer size in bytes
+     * @return a new buffered stream-backed encoder
+     * @throws NullPointerException     if {@code destination} is {@code null}
+     * @throws IllegalArgumentException if {@code bufferSize} is not positive
+     */
+    public static WamEventEncoder toBufferedStream(OutputStream destination, int bufferSize) {
+        Objects.requireNonNull(destination, "destination cannot be null");
+        return new Stream(new BufferedOutputStream(destination, bufferSize), -1);
     }
 
     /**
@@ -164,6 +210,19 @@ public abstract sealed class WamEventEncoder
      * @param length the number of bytes to copy
      */
     public abstract void writeRaw(byte[] source, int offset, int length);
+
+    /**
+     * Flushes any buffered output and releases the sink.
+     *
+     * <p>For a byte-array sink this is a no-op. For a stream sink it closes the
+     * underlying {@link OutputStream}; when the encoder was created through
+     * {@link #toBufferedStream(OutputStream)} this also flushes the buffer, so a
+     * buffered encoder must be closed or its trailing output is lost.
+     *
+     * @throws UncheckedIOException if closing the underlying stream fails
+     */
+    @Override
+    public abstract void close();
 
     /**
      * Writes a null value entry (tag-only) into the sink when the
@@ -387,6 +446,11 @@ public abstract sealed class WamEventEncoder
                                 + ", limit " + limit);
             }
         }
+
+        @Override
+        public void close() {
+            // A byte-array sink holds no resource to release.
+        }
     }
 
     /**
@@ -526,6 +590,15 @@ public abstract sealed class WamEventEncoder
                         "WAM encode would exceed stream budget: need " + n
                                 + " more bytes after " + written
                                 + ", limit " + limit);
+            }
+        }
+
+        @Override
+        public void close() {
+            try {
+                out.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
             }
         }
     }

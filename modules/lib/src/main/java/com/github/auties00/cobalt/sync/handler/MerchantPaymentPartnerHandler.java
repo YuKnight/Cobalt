@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -31,7 +31,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote
  * This implementation persists the action through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setMerchantPaymentPartner(MerchantPaymentPartnerAction)}
+ * {@link com.github.auties00.cobalt.store.BusinessStore#setMerchantPaymentPartner(MerchantPaymentPartnerAction)}
  * instead of WA Web's UserPrefs write, since Cobalt has no UserPrefs
  * key-value store. The SMB and A/B-prop gates are evaluated per mutation
  * rather than once for the batch, so a server-side prop flip reaches the next
@@ -87,11 +87,11 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
      * {@link MutationApplicationResult#unsupported()}. When both gates are
      * open and the operation is {@link SyncdOperation#SET}, the value is
      * persisted directly through
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setMerchantPaymentPartner(MerchantPaymentPartnerAction)}.
+     * {@link com.github.auties00.cobalt.store.BusinessStore#setMerchantPaymentPartner(MerchantPaymentPartnerAction)}.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var platform = client.store().device().platform();
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        var platform = client.store().accountStore().device().platform();
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
             return MutationApplicationResult.unsupported();
         }
@@ -108,7 +108,7 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        client.store().setMerchantPaymentPartner(action);
+        client.store().businessStore().setMerchantPaymentPartner(action);
         return MutationApplicationResult.success();
     }
 }

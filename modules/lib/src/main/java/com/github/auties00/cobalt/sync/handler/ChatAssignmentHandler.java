@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -20,7 +20,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * single chat is assigned to (or unassigned from) a named agent. When the
  * assignment changes on another device, the server replays it here and the
  * result becomes observable through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findChatAssignment(Jid)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findChatAssignment(Jid)}.
  *
  * @implNote
  * This implementation collapses WA Web's per-batch
@@ -82,7 +82,7 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebChatAssignmentSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() <= 1) {
@@ -102,22 +102,22 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
             }
 
             var agentId = action.deviceAgentID().orElse("");
-            if (!agentId.isEmpty() && client.store().findAgentState(agentId).isEmpty()) {
+            if (!agentId.isEmpty() && client.store().businessStore().findAgentState(agentId).isEmpty()) {
                 return MutationApplicationResult.orphan(agentId, "Agent");
             }
 
             var chatJid = Jid.of(chatJidString);
-            var chat = client.store().findChatByJid(chatJid);
+            var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
             var resolvedChatJid = chat.get().toJid();
             if (agentId.isEmpty()) {
-                client.store().removeChatAssignment(resolvedChatJid);
+                client.store().businessStore().removeChatAssignment(resolvedChatJid);
             } else {
-                var existing = client.store().findChatAssignment(resolvedChatJid).orElse(null);
-                client.store().putChatAssignment(new ChatAssignmentBuilder()
+                var existing = client.store().businessStore().findChatAssignment(resolvedChatJid).orElse(null);
+                client.store().businessStore().putChatAssignment(new ChatAssignmentBuilder()
                         .chatJid(resolvedChatJid)
                         .agentId(agentId)
                         .opened(existing != null && existing.opened())

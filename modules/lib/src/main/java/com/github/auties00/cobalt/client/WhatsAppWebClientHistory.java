@@ -31,7 +31,7 @@ import java.util.Objects;
  * 59206 cap on the standard preset is a Cobalt-chosen mid-range value;
  * WhatsApp computes its quota dynamically from local storage estimation.
  *
- * @see WhatsAppClient
+ * @see LinkedWhatsAppClient
  */
 @ProtobufMessage
 @WhatsAppWebModule(moduleName = "WAWebProtobufsCompanionReg.pb")

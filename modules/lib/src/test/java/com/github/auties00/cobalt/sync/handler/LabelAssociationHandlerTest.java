@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link LabelAssociationMutationFactory} builder.
  *
  * <p>Tests run against a fresh in-memory {@link DeviceFixtures#temporaryStore}
- * through {@link TestWhatsAppClient} so the {@link WhatsAppStore#findLabel(String)}
+ * through {@link TestWhatsAppClient} so the {@link com.github.auties00.cobalt.store.SettingsStore#findLabel(String)}
  * read-back can be asserted directly. Label assignments live inside the
  * {@link com.github.auties00.cobalt.model.preference.Label} model rather than in
  * a side table.
@@ -98,12 +98,12 @@ class LabelAssociationHandlerTest {
         @Test
         @DisplayName("labeled=true on an existing label adds the chat JID to its assignment set")
         void addAssignment() {
-            store.addLabel(new LabelBuilder().id("42").name("Customers").color(0).build());
+            store.settingsStore().addLabel(new LabelBuilder().id("42").name("Customers").color(0).build());
 
             var result = handler.applyMutation(client, buildSet("42", CHAT_JID, true, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findLabel("42").orElseThrow().assignments().contains(CHAT_JID),
+            assertTrue(store.settingsStore().findLabel("42").orElseThrow().assignments().contains(CHAT_JID),
                     "labeled=true must add the chat JID to the label's assignment set");
         }
 
@@ -112,23 +112,23 @@ class LabelAssociationHandlerTest {
         void removeAssignment() {
             var label = new LabelBuilder().id("42").name("Customers").color(0).build();
             label.addAssignment(CHAT_JID);
-            store.addLabel(label);
+            store.settingsStore().addLabel(label);
 
             var result = handler.applyMutation(client, buildSet("42", CHAT_JID, false, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertFalse(store.findLabel("42").orElseThrow().assignments().contains(CHAT_JID));
+            assertFalse(store.settingsStore().findLabel("42").orElseThrow().assignments().contains(CHAT_JID));
         }
 
         @Test
         @DisplayName("labeled=true on an unknown label creates a stub label to hold the association")
         void createsStubLabel() {
-            assertTrue(store.findLabel("42").isEmpty(), "precondition: no label 42");
+            assertTrue(store.settingsStore().findLabel("42").isEmpty(), "precondition: no label 42");
 
             var result = handler.applyMutation(client, buildSet("42", CHAT_JID, true, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stub = store.findLabel("42").orElseThrow();
+            var stub = store.settingsStore().findLabel("42").orElseThrow();
             assertTrue(stub.assignments().contains(CHAT_JID),
                     "the stub created on-the-fly must record the association");
         }

@@ -1,11 +1,12 @@
 package com.github.auties00.cobalt.call;
+import com.github.auties00.cobalt.call.internal.TestLiveCallServiceFactory;
 
 import com.github.auties00.cobalt.call.frame.audio.AudioFrame;
 import com.github.auties00.cobalt.call.CallEndReason;
 import com.github.auties00.cobalt.call.internal.transport.ActiveCallTransport;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -44,10 +45,10 @@ public class ActiveCallTest {
         Wiring() {
             var store = MessageFixtures.temporaryStore(SELF, null);
             this.client = TestWhatsAppClient.create().withStore(store);
-            store.addListener(new WhatsAppClientListener() {
-                @Override public void onNodeSent(WhatsAppClient w, Node node) { sentNodes.add(node); }
+            store.addListener(new LinkedWhatsAppClientListener() {
+                @Override public void onNodeSent(LinkedWhatsAppClient w, Node node) { sentNodes.add(node); }
             });
-            this.service = new CallService(client, null);
+            this.service = TestLiveCallServiceFactory.create(client, null);
         }
 
         // Counts dispatched <description><childTag/></description> stanzas.

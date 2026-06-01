@@ -76,8 +76,11 @@ import static java.lang.foreign.ValueLayout.JAVA_INT;
 final class PersistentMessageStore implements AutoCloseable {
     /**
      * The platform-agnostic native library name resolved by {@link NativeLibLoader}.
+     *
+     * <p>Every native dependency, libmdbx included, is linked into one combined {@code cobalt-native}
+     * library, so this is the same name every other native consumer loads.
      */
-    private static final String LIBRARY_NAME = "mdbx";
+    private static final String LIBRARY_NAME = "cobalt-native";
 
     /**
      * The byte separating the JID prefix from the message-id suffix in composite keys.
@@ -615,7 +618,7 @@ final class PersistentMessageStore implements AutoCloseable {
      * Removes every chat message stored for the given chat.
      *
      * @apiNote
-     * Called from {@link PersistentChat#removeMessages()} and from {@link PersistentStore#removeChat}
+     * Called from {@link PersistentChat#removeMessages()} and from {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#removeChat}
      * so a removed chat's body history does not outlive its metadata.
      *
      * @param chatJid the JID identifying the owning chat
@@ -708,7 +711,7 @@ final class PersistentMessageStore implements AutoCloseable {
      *
      * @apiNote
      * Called from {@link PersistentNewsletter#getMessageById(String)} and from
-     * {@link PersistentStore#findMessageById(com.github.auties00.cobalt.model.newsletter.Newsletter, String)}
+     * {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#findMessageById(com.github.auties00.cobalt.model.newsletter.Newsletter, String)}
      * as the fast path before the per-newsletter scan fallback.
      *
      * @param newsletterJid the JID identifying the owning newsletter
@@ -741,7 +744,7 @@ final class PersistentMessageStore implements AutoCloseable {
      *
      * @apiNote
      * Called from {@link PersistentNewsletter#removeMessages()} and from
-     * {@link PersistentStore#removeNewsletter} so a removed newsletter's body history does not outlive
+     * {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#removeNewsletter} so a removed newsletter's body history does not outlive
      * its metadata.
      *
      * @param newsletterJid the JID identifying the owning newsletter
@@ -819,7 +822,7 @@ final class PersistentMessageStore implements AutoCloseable {
      * Inserts or replaces a status-feed message keyed by message id.
      *
      * @apiNote
-     * Called from {@link PersistentStore#addStatus(ChatMessageInfo)}. A message with no key id is
+     * Called from {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#addStatus(ChatMessageInfo)}. A message with no key id is
      * silently dropped because the key requires one.
      *
      * @param info the message to persist
@@ -839,8 +842,8 @@ final class PersistentMessageStore implements AutoCloseable {
      * Returns the status-feed message under the flat key {@code msgId}, or empty.
      *
      * @apiNote
-     * Called from {@link PersistentStore#findStatusById(String)} and as a status-broadcast branch of
-     * {@link PersistentStore#findMessageById}.
+     * Called from {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#findStatusById(String)} and as a status-broadcast branch of
+     * {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#findMessageById}.
      *
      * @param msgId the message key id
      * @return the decoded message, or empty
@@ -853,7 +856,7 @@ final class PersistentMessageStore implements AutoCloseable {
      * Removes the status-feed message under {@code msgId} and returns its previous value.
      *
      * @apiNote
-     * Called from {@link PersistentStore#removeStatus(String)}.
+     * Called from {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#removeStatus(String)}.
      *
      * @implNote
      * This implementation reads the value first inside the write transaction so the caller can observe
@@ -903,7 +906,7 @@ final class PersistentMessageStore implements AutoCloseable {
      * Returns a lazy stream of every status-feed message in cursor order.
      *
      * @apiNote
-     * Called from {@link PersistentStore#status()}; the stream is consumed inside a try-with-resources
+     * Called from {@link com.github.auties00.cobalt.store.persistent.PersistentChatStore#status()}; the stream is consumed inside a try-with-resources
      * block and collected into a list.
      *
      * @return a closeable stream of decoded status messages

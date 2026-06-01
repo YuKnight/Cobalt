@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -95,7 +95,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = {"applyMutations", "getMessageRange", "$DeleteChatSync$p_1", "deleteChat"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -130,7 +130,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
-            var chat = client.store().findChatByJid(chatJid);
+            var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
@@ -140,7 +140,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
             //       queryAndRemoveMessagesInMessageRange in that branch; Cobalt
             //       currently falls through to a full removal and loses the messages
             //       outside the incoming range.
-            client.store().removeChat(chat.get());
+            client.store().chatStore().removeChat(chat.get());
 
             return MutationApplicationResult.success();
         } catch (Exception e) {

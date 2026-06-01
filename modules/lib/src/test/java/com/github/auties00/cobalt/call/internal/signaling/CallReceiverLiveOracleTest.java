@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.call.internal.signaling;
+import com.github.auties00.cobalt.call.internal.TestLiveCallServiceFactory;
 
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.call.ActiveCall;
@@ -8,8 +9,8 @@ import com.github.auties00.cobalt.call.CallOptions;
 import com.github.auties00.cobalt.call.internal.CallService;
 import com.github.auties00.cobalt.call.IncomingCall;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -30,12 +31,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Replays captured inbound {@code <call>} stanzas through a real {@link CallReceiver} wired to a
  * {@link TestWhatsAppClient} and a real {@link CallService}, then asserts the outgoing receipt or ack
- * stanza shape, which {@link WhatsAppClientListener} callback fired and with what arguments, and the
+ * stanza shape, which {@link LinkedWhatsAppClientListener} callback fired and with what arguments, and the
  * store-side effects (LID-to-PN mapping, push name updates, call registry add/remove).
  *
  * <p>Fixtures live under {@code fixtures/call/}; each topic's {@code .callee.jsonl} file carries the
  * inbound side captured by the primary session of {@code capture-call-corpus.mjs}. The {@code Harness}
- * helper installs a recording {@link WhatsAppClientListener} that captures both the listener-method
+ * helper installs a recording {@link LinkedWhatsAppClientListener} that captures both the listener-method
  * invocations and the outgoing stanzas seen via {@code onNodeSent}. Tests are guarded with
  * {@link CallFixtures#isAvailable(String)} so regenerated corpora without a given topic skip cleanly.
  */
@@ -53,12 +54,12 @@ class CallReceiverLiveOracleTest {
             var store = MessageFixtures.temporaryStore(selfPn, selfLid);
             store.addListener(listener);
             this.client = TestWhatsAppClient.create().withStore(store);
-            store.addListener(new WhatsAppClientListener() {
-                @Override public void onNodeSent(WhatsAppClient whatsapp, Node node) {
+            store.addListener(new LinkedWhatsAppClientListener() {
+                @Override public void onNodeSent(LinkedWhatsAppClient whatsapp, Node node) {
                     sentNodes.add(node);
                 }
             });
-            this.service = new CallService(client, /* wamService */ null);
+            this.service = TestLiveCallServiceFactory.create(client, /* wamService */ null);
             this.receiver = new CallReceiver(client, service, new AckSender(client));
         }
 
@@ -68,7 +69,7 @@ class CallReceiverLiveOracleTest {
         }
     }
 
-    private static final class ListenerRecorder implements WhatsAppClientListener {
+    private static final class ListenerRecorder implements LinkedWhatsAppClientListener {
         final ConcurrentLinkedQueue<IncomingCall> calls = new ConcurrentLinkedQueue<>();
         final ConcurrentLinkedQueue<EndedCall> ended = new ConcurrentLinkedQueue<>();
         final ConcurrentLinkedQueue<MuteChange> mutes = new ConcurrentLinkedQueue<>();
@@ -78,26 +79,26 @@ class CallReceiverLiveOracleTest {
         final ConcurrentLinkedQueue<PeerStateChange> peerStates = new ConcurrentLinkedQueue<>();
         final ConcurrentLinkedQueue<ParticipantsChange> participants = new ConcurrentLinkedQueue<>();
 
-        @Override public void onCall(WhatsAppClient w, IncomingCall c) { calls.add(c); }
-        @Override public void onCallEnded(WhatsAppClient w, String callId, Jid fromJid, CallEndReason reason) {
+        @Override public void onCall(LinkedWhatsAppClient w, IncomingCall c) { calls.add(c); }
+        @Override public void onCallEnded(LinkedWhatsAppClient w, String callId, Jid fromJid, CallEndReason reason) {
             ended.add(new EndedCall(callId, fromJid, reason));
         }
-        @Override public void onCallMuteChanged(WhatsAppClient w, String callId, Jid fromJid, boolean muted) {
+        @Override public void onCallMuteChanged(LinkedWhatsAppClient w, String callId, Jid fromJid, boolean muted) {
             mutes.add(new MuteChange(callId, fromJid, muted));
         }
-        @Override public void onCallVideoStateChanged(WhatsAppClient w, String callId, Jid fromJid, boolean enabled) {
+        @Override public void onCallVideoStateChanged(LinkedWhatsAppClient w, String callId, Jid fromJid, boolean enabled) {
             videos.add(new VideoStateChange(callId, fromJid, enabled));
         }
-        @Override public void onCallPreaccept(WhatsAppClient w, String callId, Jid fromJid) {
+        @Override public void onCallPreaccept(LinkedWhatsAppClient w, String callId, Jid fromJid) {
             preaccepts.add(callId);
         }
-        @Override public void onCallOfferNotice(WhatsAppClient w, IncomingCall call) {
+        @Override public void onCallOfferNotice(LinkedWhatsAppClient w, IncomingCall call) {
             notices.add(call);
         }
-        @Override public void onCallPeerStateChanged(WhatsAppClient w, String callId, Jid fromJid, CallPeerState state) {
+        @Override public void onCallPeerStateChanged(LinkedWhatsAppClient w, String callId, Jid fromJid, CallPeerState state) {
             peerStates.add(new PeerStateChange(callId, fromJid, state));
         }
-        @Override public void onCallParticipantsChanged(WhatsAppClient w, String callId, Jid groupJid, List<Jid> ps, boolean added) {
+        @Override public void onCallParticipantsChanged(LinkedWhatsAppClient w, String callId, Jid groupJid, List<Jid> ps, boolean added) {
             participants.add(new ParticipantsChange(callId, groupJid, List.copyOf(ps), added));
         }
     }
@@ -126,10 +127,10 @@ class CallReceiverLiveOracleTest {
     }
 
     @Nested
-    @DisplayName("offer — inbound 1:1 audio")
+    @DisplayName("offer â€” inbound 1:1 audio")
     class OfferInbound {
         @Test
-        @DisplayName("inbound offer → outgoing receipt + onCall listener fires + store has the call")
+        @DisplayName("inbound offer â†’ outgoing receipt + onCall listener fires + store has the call")
         void offerFires() {
             var topic = "1to1/audio-accept.callee";
             if (!CallFixtures.isAvailable(topic)) return;
@@ -154,10 +155,10 @@ class CallReceiverLiveOracleTest {
     }
 
     @Nested
-    @DisplayName("accept — peer accepted our outbound offer")
+    @DisplayName("accept â€” peer accepted our outbound offer")
     class AcceptInbound {
         @Test
-        @DisplayName("inbound accept → outgoing receipt + service.onPeerAccept routed")
+        @DisplayName("inbound accept â†’ outgoing receipt + service.onPeerAccept routed")
         void acceptFires() {
             var topic = "1to1/audio-accept.caller";
             if (!CallFixtures.isAvailable(topic)) return;
@@ -188,10 +189,10 @@ class CallReceiverLiveOracleTest {
     }
 
     @Nested
-    @DisplayName("reject — peer rejected our outbound offer")
+    @DisplayName("reject â€” peer rejected our outbound offer")
     class RejectInbound {
         @Test
-        @DisplayName("inbound reject → outgoing receipt + onCallEnded fires with REJECT_*")
+        @DisplayName("inbound reject â†’ outgoing receipt + onCallEnded fires with REJECT_*")
         void rejectFires() {
             var topic = "1to1/audio-reject.caller";
             if (!CallFixtures.isAvailable(topic)) return;
@@ -203,10 +204,10 @@ class CallReceiverLiveOracleTest {
     }
 
     @Nested
-    @DisplayName("preaccept — server-side alert acknowledgement")
+    @DisplayName("preaccept â€” server-side alert acknowledgement")
     class PreacceptInbound {
         @Test
-        @DisplayName("inbound preaccept → outgoing ack + onCallPreaccept fires")
+        @DisplayName("inbound preaccept â†’ outgoing ack + onCallPreaccept fires")
         void preacceptFires() {
             // A successful audio-accept flow's caller side records the
             // server's preaccept fan-out before the callee actually answers.
@@ -226,10 +227,10 @@ class CallReceiverLiveOracleTest {
     }
 
     @Nested
-    @DisplayName("terminate — bare top-level <terminate> (e.g. accepted_elsewhere)")
+    @DisplayName("terminate â€” bare top-level <terminate> (e.g. accepted_elsewhere)")
     class TerminateInbound {
         @Test
-        @DisplayName("inbound bare <terminate> → onCallEnded fires with the wire reason")
+        @DisplayName("inbound bare <terminate> â†’ onCallEnded fires with the wire reason")
         void terminateFires() throws InterruptedException {
             var topic = "1to1/callee-terminate-post-accept.caller.terminate";
             if (!CallFixtures.isAvailable(topic)) return;
@@ -250,10 +251,10 @@ class CallReceiverLiveOracleTest {
     }
 
     @Nested
-    @DisplayName("mute_v2 / video_state — in-call peer state announcements")
+    @DisplayName("mute_v2 / video_state â€” in-call peer state announcements")
     class StateChangeInbound {
         @Test
-        @DisplayName("inbound mute_v2 → onCallMuteChanged fires with peer state")
+        @DisplayName("inbound mute_v2 â†’ onCallMuteChanged fires with peer state")
         void muteFires() {
             // The caller-side fixture captures the callee's inbound mute_v2
             // when the callee toggles its mic. Use the caller capture so we
@@ -266,7 +267,7 @@ class CallReceiverLiveOracleTest {
         }
 
         @Test
-        @DisplayName("inbound video_state: TODO — no <video_state> stanza observed on the wire")
+        @DisplayName("inbound video_state: TODO â€” no <video_state> stanza observed on the wire")
         void videoStateFires() {
             // No `<call><video_state/></call>` envelope appears in any
             // captured side of the video-state-toggle flow. The state
@@ -276,10 +277,10 @@ class CallReceiverLiveOracleTest {
     }
 
     @Nested
-    @DisplayName("group_update — mid-call participant add / remove")
+    @DisplayName("group_update â€” mid-call participant add / remove")
     class GroupUpdateInbound {
         @Test
-        @DisplayName("inbound group_update add → onCallParticipantsChanged(added=true)")
+        @DisplayName("inbound group_update add â†’ onCallParticipantsChanged(added=true)")
         void groupUpdateAddFires() {
             var topic = "group/update-add.callee";
             if (!CallFixtures.isAvailable(topic)) return;
@@ -292,7 +293,7 @@ class CallReceiverLiveOracleTest {
         }
 
         @Test
-        @DisplayName("inbound group_update remove → TODO (corpus inbound side unavailable)")
+        @DisplayName("inbound group_update remove â†’ TODO (corpus inbound side unavailable)")
         void groupUpdateRemoveFires() {
             // TODO: callee-side .jsonl for group/update-remove is empty in
             // the current corpus (WA server does not always deliver the
@@ -303,10 +304,10 @@ class CallReceiverLiveOracleTest {
     }
 
     @Nested
-    @DisplayName("offer_notice — missed-call notification on next connect")
+    @DisplayName("offer_notice â€” missed-call notification on next connect")
     class OfferNoticeInbound {
         @Test
-        @DisplayName("offer_notice → TODO — server queues only when ALL devices of the account are offline")
+        @DisplayName("offer_notice â†’ TODO â€” server queues only when ALL devices of the account are offline")
         void offerNoticeFires() {
             // Empirically verified (2026-05-14): the server queues
             // offer_notice for redelivery only when EVERY device of the
@@ -328,10 +329,10 @@ class CallReceiverLiveOracleTest {
     }
 
     @Nested
-    @DisplayName("server media-plane signals — transport / relaylatency / etc.")
+    @DisplayName("server media-plane signals â€” transport / relaylatency / etc.")
     class MediaPlaneInbound {
         @Test
-        @DisplayName("relaylatency → outgoing ack (drop-through, no listener fires)")
+        @DisplayName("relaylatency â†’ outgoing ack (drop-through, no listener fires)")
         void relayLatencyAcked() {
             var topic = "1to1/server-relay-signals.caller";
             if (!CallFixtures.isAvailable(topic)) return;

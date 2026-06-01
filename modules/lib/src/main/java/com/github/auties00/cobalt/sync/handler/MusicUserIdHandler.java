@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.MusicUserIdAction;
@@ -80,7 +80,7 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
      * {@link MusicUserIdAction#musicUserIdMap()} empty is rejected as
      * {@link MutationApplicationResult#malformed()}; on success the resolved
      * action is written via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setMusicUserIdState(MusicUserIdAction)}.
+     * {@link com.github.auties00.cobalt.store.BusinessStore#setMusicUserIdState(MusicUserIdAction)}.
      *
      * @implNote
      * This implementation rejects the all-empty payload so a
@@ -89,7 +89,7 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
      * map and there is no semantic for {@code REMOVE}.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -102,7 +102,7 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setMusicUserIdState(action);
+        client.store().businessStore().setMusicUserIdState(action);
         return MutationApplicationResult.success();
     }
 }

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.message.send;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
@@ -68,14 +68,14 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
      * <p>Constructed once by {@link MessageSendingService}; embedders should not
      * instantiate directly.
      *
-     * @param client         the {@link WhatsAppClient} used to dispatch stanzas
+     * @param client         the {@link LinkedWhatsAppClient} used to dispatch stanzas
      * @param abPropsService the {@link ABPropsService} consulted by the base
      *                       sender
      * @param wamService     the {@link WamService} shared with the base sender
      */
     @WhatsAppWebExport(moduleName = "WAWebNewsletterSendMessageQueryJob", exports = "querySendNewsletterMessage",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    NewsletterMessageSender(WhatsAppClient client, ABPropsService abPropsService, WamService wamService) {
+    NewsletterMessageSender(LinkedWhatsAppClient client, ABPropsService abPropsService, WamService wamService) {
         super(client, abPropsService, wamService);
     }
 
@@ -94,7 +94,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
     @WhatsAppWebExport(moduleName = "WAWebNewsletterSendMessageQueryJob", exports = "querySendNewsletterMessage",
             adaptation = WhatsAppAdaptation.DIRECT)
     @Override
-    AckResult send(Jid newsletterJid, NewsletterMessageInfo messageInfo) {
+    AckResult doSend(Jid newsletterJid, NewsletterMessageInfo messageInfo) {
         var container = messageInfo.message();
         var containerType = container.futureProofContentType();
 
@@ -435,7 +435,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
         if (targetKey == null) {
             return 0;
         }
-        return store.findMessageByKey(targetKey)
+        return store.chatStore().findMessageByKey(targetKey)
                 .filter(msg -> msg instanceof NewsletterMessageInfo)
                 .map(msg -> ((NewsletterMessageInfo) msg).serverId())
                 .orElse(0);
@@ -466,7 +466,7 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
             return null;
         }
 
-        var parentMessage = store.findMessageByKey(pollKey.get());
+        var parentMessage = store.chatStore().findMessageByKey(pollKey.get());
         if (parentMessage.isEmpty()
                 || !(parentMessage.get() instanceof NewsletterMessageInfo parentNewsletter)
                 || !(parentNewsletter.message().content() instanceof PollCreationMessage pollCreationMessage)) {

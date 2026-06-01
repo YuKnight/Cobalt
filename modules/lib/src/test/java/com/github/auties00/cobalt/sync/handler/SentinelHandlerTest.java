@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyBuilder;
@@ -42,7 +42,7 @@ class SentinelHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -70,7 +70,7 @@ class SentinelHandlerTest {
                 .keyData(new byte[32])
                 .timestamp(Instant.now())
                 .build();
-        client.store().addWebAppStateKeys(List.of(
+        client.store().syncStore().addWebAppStateKeys(List.of(
                 new AppStateSyncKeyBuilder().keyId(keyId).keyData(keyData).build()));
     }
 
@@ -105,15 +105,15 @@ class SentinelHandlerTest {
         @DisplayName("expired epoch matching a stored key flips that key's data timestamp to EPOCH")
         void expiresStoredKey() {
             seedSyncKey(0, 5);
-            assertEquals(1, client.store().appStateKeys().size());
+            assertEquals(1, client.store().syncStore().appStateKeys().size());
 
             var result = new SentinelHandler().applyMutation(
                     client, sentinelMutation(5, SyncdOperation.SET, Instant.ofEpochSecond(1700000000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(1, client.store().appStateKeys().size(),
+            assertEquals(1, client.store().syncStore().appStateKeys().size(),
                     "the key is NOT removed; only its data.timestamp is set to Instant.EPOCH");
-            var key = client.store().appStateKeys().iterator().next();
+            var key = client.store().syncStore().appStateKeys().iterator().next();
             var timestamp = key.keyData().orElseThrow().timestamp().orElseThrow();
             assertEquals(Instant.EPOCH, timestamp,
                     "the matching key's data timestamp must be set to Instant.EPOCH");
@@ -123,16 +123,16 @@ class SentinelHandlerTest {
         @DisplayName("an epoch not matching any stored key leaves the timestamp untouched")
         void noMatchingKey() {
             seedSyncKey(0, 5);
-            var beforeTs = client.store().appStateKeys().iterator().next()
+            var beforeTs = client.store().syncStore().appStateKeys().iterator().next()
                     .keyData().orElseThrow().timestamp().orElseThrow();
 
             var result = new SentinelHandler().applyMutation(
                     client, sentinelMutation(99, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(1, client.store().appStateKeys().size(),
+            assertEquals(1, client.store().syncStore().appStateKeys().size(),
                     "no key matches the expired epoch - nothing to expire");
-            var afterTs = client.store().appStateKeys().iterator().next()
+            var afterTs = client.store().syncStore().appStateKeys().iterator().next()
                     .keyData().orElseThrow().timestamp().orElseThrow();
             assertEquals(beforeTs, afterTs,
                     "the unmatched key's timestamp must remain as seeded");
@@ -191,7 +191,7 @@ class SentinelHandlerTest {
                     client, sentinelMutation(5, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertEquals(1, client.store().appStateKeys().size(),
+            assertEquals(1, client.store().syncStore().appStateKeys().size(),
                     "REMOVE must not expire any key");
         }
     }
@@ -272,7 +272,7 @@ class SentinelHandlerTest {
             assertEquals(SyncActionState.SUCCESS, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
             assertEquals(SyncActionState.UNSUPPORTED, results.get(2).actionState());
-            assertEquals(2, client.store().appStateKeys().size(),
+            assertEquals(2, client.store().syncStore().appStateKeys().size(),
                     "neither SET nor REMOVE removes keys; expireAppStateKeysByEpoch only flips data timestamps");
         }
     }

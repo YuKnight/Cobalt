@@ -18,11 +18,13 @@ import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentityS
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.message.FutureProofMessageType;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.model.message.MessageThreadId;
 import com.github.auties00.cobalt.model.message.system.DeviceSentMessage;
+import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.store.WhatsAppStore;
@@ -115,8 +117,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     ChatMessageInfo receive(Node node, Jid fromJid) {
-        var selfJid = store.jid().orElse(null);
-        var selfLidJid = store.lid().orElse(null);
+        var selfJid = store.accountStore().jid().orElse(null);
+        var selfLidJid = store.accountStore().lid().orElse(null);
         var stanza = MessageReceiveStanzaParser.parse(node, selfJid, selfLidJid);
 
         if (stanza.isUnavailable()) {
@@ -161,12 +163,13 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         var chatJid = resolveChatJid(stanza);
         var effectiveContainer = container;
 
-        if (container.content() instanceof DeviceSentMessage dsm) {
+        if (container.futureProofContentType() == FutureProofMessageType.DEVICE_SENT) {
+            var dsm = container.deviceSentMessage().orElseThrow();
             effectiveContainer = unwrapDeviceSentMessage(container, dsm, stanza);
             chatJid = dsm.destinationJid().orElseThrow(() ->
                     new WhatsAppMessageException.Receive.InvalidDeviceSentMessage(
                             DsmErrorType.INVALID_DSM));
-        } else if (shouldHaveDeviceSentMessage(stanza)) {
+        } else if (shouldHaveDeviceSentMessage(stanza, container)) {
             throw new WhatsAppMessageException.Receive.InvalidDeviceSentMessage(
                     DsmErrorType.MISSING_DSM);
         }
@@ -361,7 +364,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
             var signedIdentity = ADVSignedDeviceIdentitySpec.decode(deviceIdentityBytes);
 
             var primaryJid = stanza.senderJid().toUserJid();
-            var storedKey = store.findIdentityByAddress(
+            var storedKey = store.signalStore().findIdentityByAddress(
                     primaryJid.toSignalAddress());
 
             if (storedKey.isEmpty()) {
@@ -535,7 +538,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      * @implNote
      * This implementation skips WhatsApp Web's {@code WAWebMsmsgMsgSecretCache} layer
      * and reads the target message straight from the store via
-     * {@link WhatsAppStore#findMessageById(com.github.auties00.cobalt.model.jid.JidProvider, String)},
+     * {@link com.github.auties00.cobalt.store.ChatStore#findMessageById(com.github.auties00.cobalt.model.jid.JidProvider, String)},
      * keyed by {@code (targetChatJid, targetId)}. The result is accepted only when the
      * resolved {@link ChatMessageInfo#messageSecret()} is non-empty; an absent secret
      * raises {@link WhatsAppMessageException.Receive.InvalidMessage} rather than WA
@@ -557,7 +560,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
 
         var targetChatJid = stanza.targetChatJid().orElse(stanza.chatJid());
 
-        var targetMessage = store.findMessageById(targetChatJid, targetId)
+        var targetMessage = store.chatStore().findMessageById(targetChatJid, targetId)
                 .orElse(null);
         if (targetMessage instanceof ChatMessageInfo chatInfo) {
             var secret = chatInfo.messageSecret().orElse(null);
@@ -686,35 +689,113 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      * {@link DsmErrorType#MISSING_DSM}.
      *
      * @implNote
-     * This implementation switches on {@link MessageReceiveStanza#messageType()}
-     * with the same per-type rules as WA Web:
+     * This implementation mirrors WA Web's {@code parseMessage} pre-switch
+     * bypass plus its per-type rules:
      * <ul>
+     *   <li>{@code protocolMessage} carrying any of {@code historySyncNotification},
+     *       {@code initialSecurityNotificationSettingSync},
+     *       {@code appStateSyncKeyShare}, {@code appStateSyncKeyRequest},
+     *       {@code peerDataOperationRequestMessage},
+     *       {@code peerDataOperationRequestResponseMessage},
+     *       {@code cloudApiThreadControlNotification}, or
+     *       {@code lidMigrationMappingSyncMessage}: never (control-plane
+     *       short-circuit).</li>
      *   <li>{@code CHAT}: always.</li>
      *   <li>{@code OTHER_BROADCAST}, {@code OTHER_STATUS}, {@code PEER_CHAT}:
      *       never.</li>
-     *   <li>{@code GROUP}, {@code DIRECT_PEER_STATUS}: only when
+     *   <li>{@code GROUP}: only when {@link MessageReceiveStanza#isDirect()} is
+     *       {@code true} AND the message is not the appdata-default sender-key
+     *       distribution bootstrap (WA Web's {@code K(e)} predicate).</li>
+     *   <li>{@code DIRECT_PEER_STATUS}: only when
      *       {@link MessageReceiveStanza#isDirect()} is {@code true}.</li>
-     *   <li>{@code PEER_BROADCAST}: only when none of the encs is an SKMSG (the
-     *       WA Web {@code SkMsg} short-circuit inside its type switch).</li>
+     *   <li>{@code PEER_BROADCAST}: only when none of the encs is an SKMSG and
+     *       the stanza is not a delivery retry (WA Web's
+     *       {@code isMessageRetry && deviceSentMessage == null} short-circuit).</li>
      * </ul>
      *
-     * @param stanza the parsed stanza
+     * @param stanza    the parsed stanza
+     * @param container the decoded message container, consulted for the
+     *                  protocol-message bypass and the appdata-default
+     *                  sender-key-distribution exception
      * @return {@code true} if a DSM wrapper should be present
      */
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingApiUtils", exports = "parseMessage",
             adaptation = WhatsAppAdaptation.DIRECT)
-    private boolean shouldHaveDeviceSentMessage(MessageReceiveStanza stanza) {
+    private boolean shouldHaveDeviceSentMessage(MessageReceiveStanza stanza, MessageContainer container) {
         if (!isFromMe(stanza)) {
+            return false;
+        }
+
+        if (isProtocolMessageBypass(container)) {
             return false;
         }
 
         return switch (stanza.messageType()) {
             case CHAT -> true;
             case OTHER_BROADCAST, OTHER_STATUS, PEER_CHAT -> false;
-            case GROUP, DIRECT_PEER_STATUS -> stanza.isDirect();
-            case PEER_BROADCAST -> stanza.encs().stream()
-                    .noneMatch(enc -> enc.e2eType().isSenderKeyMessage());
+            case GROUP -> stanza.isDirect() && !isAppdataDefaultSenderKeyOnly(stanza, container);
+            case DIRECT_PEER_STATUS -> stanza.isDirect();
+            case PEER_BROADCAST -> {
+                var hasSenderKeyEnc = stanza.encs().stream()
+                        .anyMatch(enc -> enc.e2eType().isSenderKeyMessage());
+                if (hasSenderKeyEnc) {
+                    yield false;
+                }
+                yield !stanza.isRetry();
+            }
         };
+    }
+
+    /**
+     * Returns whether the decoded container carries a control-plane
+     * {@link ProtocolMessage} variant that is exempt from the
+     * device-sent-message requirement.
+     *
+     * <p>Mirrors the pre-switch short-circuit in WA Web's {@code parseMessage}:
+     * any of the eight listed protocol-message variants routes through
+     * {@code parseProtocolMessage} (or the {@code lidMigrationSyncMessage}
+     * sibling branch) without consulting the DSM expectation.
+     *
+     * @param container the decoded message container
+     * @return {@code true} when the container carries a bypass-eligible
+     *         protocol message
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMsgProcessingApiUtils", exports = "parseMessage",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private boolean isProtocolMessageBypass(MessageContainer container) {
+        if (!(container.content() instanceof ProtocolMessage protocolMessage)) {
+            return false;
+        }
+        return protocolMessage.historySyncNotification().isPresent()
+                || protocolMessage.initialSecurityNotificationSettingSync().isPresent()
+                || protocolMessage.appStateSyncKeyShare().isPresent()
+                || protocolMessage.appStateSyncKeyRequest().isPresent()
+                || protocolMessage.peerDataOperationRequestMessage().isPresent()
+                || protocolMessage.peerDataOperationRequestResponseMessage().isPresent()
+                || protocolMessage.cloudApiThreadControlNotification().isPresent()
+                || protocolMessage.lidMigrationMappingSyncMessage().isPresent();
+    }
+
+    /**
+     * Returns whether a group stanza is the appdata-default sender-key
+     * distribution bootstrap that WA Web excludes from the DSM expectation.
+     *
+     * <p>Mirrors WA Web's {@code K(e)} predicate: the stanza's
+     * {@code meta.appdata} attribute is {@code "default"} and the decoded
+     * container carries a {@link com.github.auties00.cobalt.model.message.group.SenderKeyDistributionMessage}
+     * side channel. In that case, the GROUP-direct self message is allowed to
+     * arrive without a DSM wrapper because it is a key-rotation bootstrap
+     * rather than a user-visible payload.
+     *
+     * @param stanza    the parsed stanza
+     * @param container the decoded message container
+     * @return {@code true} when the bootstrap exception applies
+     */
+    @WhatsAppWebExport(moduleName = "WAWebMsgProcessingApiUtils", exports = "parseMessage",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private boolean isAppdataDefaultSenderKeyOnly(MessageReceiveStanza stanza, MessageContainer container) {
+        return stanza.appdata().filter("default"::equals).isPresent()
+                && container.senderKeyDistributionMessage().isPresent();
     }
 
     /**

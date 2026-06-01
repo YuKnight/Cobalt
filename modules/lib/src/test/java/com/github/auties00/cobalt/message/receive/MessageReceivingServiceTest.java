@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.model.message.MessageContainerSpec;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.Assertions;
@@ -42,7 +43,7 @@ class MessageReceivingServiceTest {
         var store = MessageFixtures.temporaryStore(RECIPIENT_BARE, null);
         var decryption = decryption(store);
         assertThrows(NullPointerException.class,
-                () -> new MessageReceivingService(null, decryption));
+                () -> new LiveMessageReceivingService(null, decryption));
     }
 
     @Test
@@ -53,14 +54,15 @@ class MessageReceivingServiceTest {
         TestSignalSession.establishSession(senderStore, Jid.of("19254863482:0@s.whatsapp.net"), recipientStore);
 
         var senderEncryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
         var payload = senderEncryption.encryptForDevice(
                 Jid.of("19254863482:0@s.whatsapp.net"),
                 MessageContainerSpec.encode(MessageContainer.of("dispatched via chat")));
 
         var inbound = buildInbound("3EB0RCV0001", SENDER_PRIMARY, "pkmsg", payload.ciphertext());
-        var service = new MessageReceivingService(recipientStore, decryption(recipientStore));
+        var service = new LiveMessageReceivingService(recipientStore, decryption(recipientStore));
 
         var info = service.process(inbound);
 
@@ -79,8 +81,9 @@ class MessageReceivingServiceTest {
         TestSignalSession.establishSession(senderStore, Jid.of("19254863482:0@s.whatsapp.net"), recipientStore);
 
         var senderEncryption = new MessageEncryption(senderStore,
-                new SignalSessionCipher(senderStore),
-                new SignalGroupCipher(senderStore));
+                new SignalSessionCipher(senderStore.signalStore()),
+                new SignalGroupCipher(senderStore.signalStore()),
+                new SignalCryptoLocks());
 
         var firstPayload = senderEncryption.encryptForDevice(
                 Jid.of("19254863482:0@s.whatsapp.net"),
@@ -93,7 +96,7 @@ class MessageReceivingServiceTest {
         var secondInbound = buildInbound("3EB0DEDUP02", SENDER_PRIMARY,
                 secondPayload.type().protocolValue(), secondPayload.ciphertext());
 
-        var service = new MessageReceivingService(recipientStore, decryption(recipientStore));
+        var service = new LiveMessageReceivingService(recipientStore, decryption(recipientStore));
 
         var first = service.process(firstInbound);
         assertNotNull(first, "first message processes successfully");
@@ -105,7 +108,7 @@ class MessageReceivingServiceTest {
     @DisplayName("process: null node throws NullPointerException")
     void nullNodeThrows() {
         var store = MessageFixtures.temporaryStore(RECIPIENT_BARE, null);
-        var service = new MessageReceivingService(store, decryption(store));
+        var service = new LiveMessageReceivingService(store, decryption(store));
         assertThrows(NullPointerException.class, () -> service.process(null));
     }
 
@@ -113,7 +116,7 @@ class MessageReceivingServiceTest {
     @DisplayName("clearPendingMessages: safe to call on a fresh service (idempotent no-op)")
     void clearPendingMessagesIdempotent() {
         var store = MessageFixtures.temporaryStore(RECIPIENT_BARE, null);
-        var service = new MessageReceivingService(store, decryption(store));
+        var service = new LiveMessageReceivingService(store, decryption(store));
         Assertions.assertDoesNotThrow(service::clearPendingMessages);
         Assertions.assertDoesNotThrow(service::clearPendingMessages);
     }
@@ -124,7 +127,7 @@ class MessageReceivingServiceTest {
     @DisplayName("process: newsletter-server JID routes to NewsletterMessageReceiver; missing <plaintext> returns null")
     void newsletterDispatchRecognised() {
         var store = MessageFixtures.temporaryStore(RECIPIENT_BARE, null);
-        var service = new MessageReceivingService(store, decryption(store));
+        var service = new LiveMessageReceivingService(store, decryption(store));
 
         var inbound = new NodeBuilder()
                 .description("message")
@@ -142,8 +145,9 @@ class MessageReceivingServiceTest {
 
     private static MessageDecryption decryption(WhatsAppStore store) {
         return new MessageDecryption(store,
-                new SignalSessionCipher(store),
-                new SignalGroupCipher(store));
+                new SignalSessionCipher(store.signalStore()),
+                new SignalGroupCipher(store.signalStore()),
+                new SignalCryptoLocks());
     }
 
     private static Node buildInbound(String id, Jid fromJid, String encType, byte[] ciphertext) {

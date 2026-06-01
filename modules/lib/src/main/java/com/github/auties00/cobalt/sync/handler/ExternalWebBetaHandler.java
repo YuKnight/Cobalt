@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -25,7 +25,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote
  * This implementation persists the bit through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setExternalWebBeta(boolean)}
+ * {@link com.github.auties00.cobalt.store.SyncStore#setExternalWebBeta(boolean)}
  * and performs none of the backend restart, A/B-prop refresh or telemetry that
  * the build-channel negotiation would otherwise trigger, because a Cobalt
  * embedder does not negotiate its build channel through Meta's update service.
@@ -84,7 +84,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
      * flag is off; non-{@link SyncdOperation#SET} operations are also reported
      * as unsupported and a missing or mistyped action payload yields a
      * malformed result. When the flag is on the value is persisted through
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setExternalWebBeta(boolean)}.
+     * {@link com.github.auties00.cobalt.store.SyncStore#setExternalWebBeta(boolean)}.
      *
      * @implNote
      * This implementation re-reads the A/B prop on every mutation rather than
@@ -93,7 +93,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!abPropsService.getBool(ABProp.EXTERNAL_BETA_CAN_JOIN)) {
             return MutationApplicationResult.unsupported();
         }
@@ -106,7 +106,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        client.store().setExternalWebBeta(action.isOptIn());
+        client.store().syncStore().setExternalWebBeta(action.isOptIn());
         return MutationApplicationResult.success();
     }
 }

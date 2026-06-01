@@ -26,13 +26,13 @@ class InactiveGroupLidMigrationServiceTest {
     private static final Jid SELF_PN = Jid.of("19254863482@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594056@lid");
 
-    private record Harness(TestWhatsAppClient client, InactiveGroupLidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, LiveInactiveGroupLidMigrationService service) {}
 
     private static Harness build() {
         var props = TestABPropsService.builder().build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var service = new InactiveGroupLidMigrationService(client, props);
+        var service = new LiveInactiveGroupLidMigrationService(client, props);
         return new Harness(client, service);
     }
 
@@ -56,8 +56,8 @@ class InactiveGroupLidMigrationServiceTest {
         h.service.setInactiveGroupLidMigrationComplete();
 
         var pnGroup = groupJid(1);
-        h.client.store().addNewChat(pnGroup);
-        h.client.store().addChatMetadata(new GroupMetadataBuilder()
+        h.client.store().chatStore().addNewChat(pnGroup);
+        h.client.store().chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(pnGroup)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
@@ -83,55 +83,55 @@ class InactiveGroupLidMigrationServiceTest {
         var store = h.client.store();
 
         var pnGroup = groupJid(1);
-        store.addNewChat(pnGroup);
-        store.addChatMetadata(new GroupMetadataBuilder()
+        store.chatStore().addNewChat(pnGroup);
+        store.chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(pnGroup)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
                 .build());
 
         var lidGroup = groupJid(2);
-        store.addNewChat(lidGroup);
-        store.addChatMetadata(new GroupMetadataBuilder()
+        store.chatStore().addNewChat(lidGroup);
+        store.chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(lidGroup)
                 .subject("Test Group")
                 .isLidAddressingMode(true)
                 .build());
 
         var suspendedGroup = groupJid(3);
-        store.addNewChat(suspendedGroup);
+        store.chatStore().addNewChat(suspendedGroup);
         var suspendedMeta = new GroupMetadataBuilder()
                 .jid(suspendedGroup)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
                 .build();
         suspendedMeta.setSuspended(true);
-        store.addChatMetadata(suspendedMeta);
+        store.chatStore().addChatMetadata(suspendedMeta);
 
         var terminatedGroup = groupJid(4);
-        store.addNewChat(terminatedGroup);
+        store.chatStore().addNewChat(terminatedGroup);
         var terminatedMeta = new GroupMetadataBuilder()
                 .jid(terminatedGroup)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
                 .build();
         terminatedMeta.setTerminated(true);
-        store.addChatMetadata(terminatedMeta);
+        store.chatStore().addChatMetadata(terminatedMeta);
 
-        store.addNewChat(Jid.of("12025550100@s.whatsapp.net"));
+        store.chatStore().addNewChat(Jid.of("12025550100@s.whatsapp.net"));
 
         var noMetaGroup = groupJid(5);
-        store.addNewChat(noMetaGroup);
+        store.chatStore().addNewChat(noMetaGroup);
 
         var suspendedCommunity = groupJid(6);
-        store.addNewChat(suspendedCommunity);
+        store.chatStore().addNewChat(suspendedCommunity);
         var communityMeta = new CommunityMetadataBuilder()
                 .jid(suspendedCommunity)
                 .subject("Test Community")
                 .isLidAddressingMode(false)
                 .build();
         communityMeta.setSuspended(true);
-        store.addChatMetadata(communityMeta);
+        store.chatStore().addChatMetadata(communityMeta);
 
         var pnGroups = h.service.findPnGroups();
 
@@ -146,8 +146,8 @@ class InactiveGroupLidMigrationServiceTest {
         var store = h.client.store();
 
         var pnGroup = groupJid(1);
-        store.addNewChat(pnGroup);
-        store.addChatMetadata(new GroupMetadataBuilder()
+        store.chatStore().addNewChat(pnGroup);
+        store.chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(pnGroup)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
@@ -163,7 +163,7 @@ class InactiveGroupLidMigrationServiceTest {
 
         // TestWhatsAppClient does not auto-refresh cached metadata after queryChatMetadata,
         // so rewrite the stored metadata to simulate the server-driven flip to LID.
-        store.addChatMetadata(new GroupMetadataBuilder()
+        store.chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(pnGroup)
                 .subject("Test Group")
                 .isLidAddressingMode(true)
@@ -180,8 +180,8 @@ class InactiveGroupLidMigrationServiceTest {
         var h = build();
         var store = h.client.store();
         var pnGroup = groupJid(1);
-        store.addNewChat(pnGroup);
-        store.addChatMetadata(new GroupMetadataBuilder()
+        store.chatStore().addNewChat(pnGroup);
+        store.chatStore().addChatMetadata(new GroupMetadataBuilder()
                 .jid(pnGroup)
                 .subject("Test Group")
                 .isLidAddressingMode(false)
@@ -200,13 +200,13 @@ class InactiveGroupLidMigrationServiceTest {
 
         var pnGroup1 = groupJid(1);
         var pnGroup2 = groupJid(2);
-        store.addNewChat(pnGroup1);
-        store.addNewChat(pnGroup2);
+        store.chatStore().addNewChat(pnGroup1);
+        store.chatStore().addNewChat(pnGroup2);
 
         var meta1 = new GroupMetadataBuilder().jid(pnGroup1).subject("Test Group").isLidAddressingMode(false).build();
         var meta2 = new GroupMetadataBuilder().jid(pnGroup2).subject("Test Group").isLidAddressingMode(false).build();
-        store.addChatMetadata(meta1);
-        store.addChatMetadata(meta2);
+        store.chatStore().addChatMetadata(meta1);
+        store.chatStore().addChatMetadata(meta2);
         h.client.withChatMetadata(pnGroup1, meta1);
         h.client.withChatMetadata(pnGroup2, meta2);
 

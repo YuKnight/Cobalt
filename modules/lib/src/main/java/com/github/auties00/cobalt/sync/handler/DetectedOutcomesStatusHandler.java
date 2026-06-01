@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -22,7 +22,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote
  * This implementation persists the bit through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setDetectedOutcomesEnabled(boolean)}
+ * {@link com.github.auties00.cobalt.store.BusinessStore#setDetectedOutcomesEnabled(boolean)}
  * instead of WA Web's
  * {@code frontendSendAndReceive("ctwaDetectedOutcomeOnboardingStatusUpdate")}
  * RPC, since Cobalt has no JS frontend to notify. The malformed-on-null
@@ -83,7 +83,7 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDetectedOutcomesStatusSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -92,7 +92,7 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setDetectedOutcomesEnabled(action.isEnabled());
+        client.store().businessStore().setDetectedOutcomesEnabled(action.isEnabled());
         return MutationApplicationResult.success();
     }
 }

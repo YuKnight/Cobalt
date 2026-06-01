@@ -1,25 +1,26 @@
 package com.github.auties00.cobalt.stream.control;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
+import com.github.auties00.cobalt.stream.NodeStreamService;
 
 /**
  * Handles the {@code <xmlstreamend>} stanza that the WhatsApp server emits to signal a graceful end of the encrypted
  * stream.
  *
- * <p>The handler is registered under the {@code "xmlstreamend"} tag inside {@link SocketStream} and runs as the final
+ * <p>The handler is registered under the {@code "xmlstreamend"} tag inside {@link NodeStreamService} and runs as the final
  * stanza on every clean server-initiated close. It only logs the stanza and sends no acknowledgement back; the reader
  * loop recognises this stanza as the terminal frame and stops reading once it has been dispatched, so the underlying
  * socket teardown needs no reply sent here.
  *
- * @implNote This implementation is a pure log call because {@link SocketStream} never auto-acks on its own, so a no-op
+ * @implNote This implementation is a pure log call because {@link NodeStreamService} never auto-acks on its own, so a no-op
  * handler reproduces WA Web's {@code "NO_ACK"} wire behaviour for the {@code "xmlstreamend"} branch.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
-public final class XmlStreamEndStreamHandler implements SocketStream.Handler {
+public final class XmlStreamEndStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * The system logger used to record the diagnostic line emitted when the server signals end-of-stream.
      */

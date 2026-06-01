@@ -64,7 +64,7 @@ class WamTagsKatTest {
         var expectedLength = vector.getIntValue("byteLength");
 
         var buffer = new byte[MAX_BUFFER];
-        var encoder = WamEventEncoder.of(buffer);
+        var encoder = WamEventEncoder.toBytes(buffer);
 
         switch (role) {
             case "global" -> encodeGlobal(encoder, args);

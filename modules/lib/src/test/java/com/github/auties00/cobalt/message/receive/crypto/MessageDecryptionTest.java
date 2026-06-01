@@ -7,6 +7,7 @@ import com.github.auties00.cobalt.message.TestSignalSession;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.DisplayName;
@@ -91,11 +92,13 @@ class MessageDecryptionTest {
     @DisplayName("constructor: null collaborators throw NullPointerException")
     void constructorNullArgs() {
         var store = MessageFixtures.temporaryStore(RECIPIENT_JID, null);
-        var session = new SignalSessionCipher(store);
-        var group = new SignalGroupCipher(store);
-        assertThrows(NullPointerException.class, () -> new MessageDecryption(null, session, group));
-        assertThrows(NullPointerException.class, () -> new MessageDecryption(store, null, group));
-        assertThrows(NullPointerException.class, () -> new MessageDecryption(store, session, null));
+        var session = new SignalSessionCipher(store.signalStore());
+        var group = new SignalGroupCipher(store.signalStore());
+        var locks = new SignalCryptoLocks();
+        assertThrows(NullPointerException.class, () -> new MessageDecryption(null, session, group, locks));
+        assertThrows(NullPointerException.class, () -> new MessageDecryption(store, null, group, locks));
+        assertThrows(NullPointerException.class, () -> new MessageDecryption(store, session, null, locks));
+        assertThrows(NullPointerException.class, () -> new MessageDecryption(store, session, group, null));
     }
 
     @Test
@@ -109,11 +112,11 @@ class MessageDecryptionTest {
 
     // Sender side: session and group ciphers share the supplied store so both ends keep the same protocol state.
     private static MessageEncryption encryption(WhatsAppStore store) {
-        return new MessageEncryption(store, new SignalSessionCipher(store), new SignalGroupCipher(store));
+        return new MessageEncryption(store, new SignalSessionCipher(store.signalStore()), new SignalGroupCipher(store.signalStore()), new SignalCryptoLocks());
     }
 
     // Recipient side: session and group ciphers share the supplied store so both ends keep the same protocol state.
     private static MessageDecryption decryption(WhatsAppStore store) {
-        return new MessageDecryption(store, new SignalSessionCipher(store), new SignalGroupCipher(store));
+        return new MessageDecryption(store, new SignalSessionCipher(store.signalStore()), new SignalGroupCipher(store.signalStore()), new SignalCryptoLocks());
     }
 }

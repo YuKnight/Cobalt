@@ -50,7 +50,7 @@ class DevicePreKeyHandlerTest {
     void emptyInput() {
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var sessionCipher = new SignalSessionCipher(store);
+        var sessionCipher = new SignalSessionCipher(store.signalStore());
         var handler = new DevicePreKeyHandler(client, sessionCipher);
 
         var depleted = handler.ensureSessions(List.of());

@@ -109,7 +109,7 @@ class BusinessBroadcastListHandlerTest {
                     buildMutation("list-1", action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findBusinessBroadcastList("list-1").orElseThrow();
+            var stored = store.businessStore().findBusinessBroadcastList("list-1").orElseThrow();
             assertEquals("list-1", stored.id());
         }
 
@@ -126,7 +126,7 @@ class BusinessBroadcastListHandlerTest {
                     buildMutation("list-empty", action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findBusinessBroadcastList("list-empty").isPresent());
+            assertTrue(store.businessStore().findBusinessBroadcastList("list-empty").isPresent());
         }
     }
 
@@ -202,7 +202,7 @@ class BusinessBroadcastListHandlerTest {
                     buildMutation("list-rm", null, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findBusinessBroadcastList("list-rm").isEmpty());
+            assertTrue(store.businessStore().findBusinessBroadcastList("list-rm").isEmpty());
         }
 
         @Test

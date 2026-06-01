@@ -8,7 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.reportInAppCommsEvent} — emits
+ * Input model for {@code LinkedWhatsAppClient.reportInAppCommsEvent} — emits
  * a single in-app marketing telemetry event (impression, click,
  * dismissal) to the relay.
  *

@@ -110,7 +110,7 @@ final class MessagePreparer {
         Objects.requireNonNull(chatJid, "chatJid");
         Objects.requireNonNull(container, "container");
 
-        var localJid = store.jid()
+        var localJid = store.accountStore().jid()
                 .orElseThrow(() -> new IllegalStateException("Not logged in"));
         var messageId = MessageIdGenerator.generate(MessageIdVersion.V2, localJid);
         var timestamp = Instant.now();
@@ -165,9 +165,9 @@ final class MessagePreparer {
         Objects.requireNonNull(newsletterJid, "newsletterJid");
         Objects.requireNonNull(container, "container");
 
-        var localJid = store.jid()
+        var localJid = store.accountStore().jid()
                 .orElseThrow(() -> new IllegalStateException("Not logged in"));
-        var newsletter = store.findNewsletterByJid(newsletterJid)
+        var newsletter = store.chatStore().findNewsletterByJid(newsletterJid)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Cannot send to a newsletter that you didn't join: " + newsletterJid));
         var oldServerId = newsletter.newestMessage()
@@ -300,7 +300,7 @@ final class MessagePreparer {
             return false;
         }
 
-        var metadata = store.findChatMetadata(chatJid).orElse(null);
+        var metadata = store.chatStore().findChatMetadata(chatJid).orElse(null);
         return metadata instanceof GroupMetadata group
                 && group.isDefaultSubgroup();
     }
@@ -322,7 +322,7 @@ final class MessagePreparer {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private Optional<ChatMessageInfo> resolveParentMessage(Jid parentJid, MessageKey key) {
         return key == null ? Optional.empty() : key.id()
-                .flatMap(id -> store.findMessageById(parentJid, id))
+                .flatMap(id -> store.chatStore().findMessageById(parentJid, id))
                 .filter(entry -> entry instanceof ChatMessageInfo)
                 .map(entry -> (ChatMessageInfo) entry);
     }

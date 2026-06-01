@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -32,12 +32,12 @@ import java.util.Collection;
  *
  * @implNote
  * This implementation persists the per-CTA state through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#putInteractiveMessageState(InteractiveMessageState)}
+ * {@link com.github.auties00.cobalt.store.BusinessStore#putInteractiveMessageState(InteractiveMessageState)}
  * keyed by {@code agmId|<id>}, {@code messageId|<id>} and the full composite
  * index, resolving the chat directly via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findChatByJid(com.github.auties00.cobalt.model.jid.JidProvider)}
+ * {@link com.github.auties00.cobalt.store.ChatStore#findChatByJid(com.github.auties00.cobalt.model.jid.JidProvider)}
  * and the message via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findMessageById(com.github.auties00.cobalt.model.chat.Chat, String)}
+ * {@link com.github.auties00.cobalt.store.ChatStore#findMessageById(com.github.auties00.cobalt.model.chat.Chat, String)}
  * rather than through a batched resolution cache.
  */
 @WhatsAppWebModule(moduleName = "WAWebInteractiveMessageSync")
@@ -101,7 +101,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebInteractiveMessageSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
                 return MutationApplicationResult.unsupported();
@@ -136,7 +136,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
             }
 
             var chatJid = Jid.of(chatJidString);
-            var localChat = client.store().findChatByJid(chatJid);
+            var localChat = client.store().chatStore().findChatByJid(chatJid);
 
             var agmId = action.agmId().orElse(null);
 
@@ -147,10 +147,10 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
                 );
             }
 
-            var maybeMessage = client.store().findMessageById(localChat.get(), messageId);
+            var maybeMessage = client.store().chatStore().findMessageById(localChat.get(), messageId);
 
             if (agmId != null) {
-                client.store().putInteractiveMessageState(new InteractiveMessageStateBuilder()
+                client.store().businessStore().putInteractiveMessageState(new InteractiveMessageStateBuilder()
                         .messageId("agmId|" + agmId)
                         .type(action.type())
                         .agmId(action.agmId().orElse(null))
@@ -175,12 +175,12 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
             }
 
             var messageKeyId = chatMessage.key().id().orElse(messageId);
-            client.store().putInteractiveMessageState(new InteractiveMessageStateBuilder()
+            client.store().businessStore().putInteractiveMessageState(new InteractiveMessageStateBuilder()
                     .messageId("messageId|" + messageKeyId)
                     .type(action.type())
                     .agmId(action.agmId().orElse(null))
                     .build());
-            client.store().putInteractiveMessageState(new InteractiveMessageStateBuilder()
+            client.store().businessStore().putInteractiveMessageState(new InteractiveMessageStateBuilder()
                     .messageId("%s|%s|%s|%s|%s".formatted(chatJidString, messageId, fromMeString, participantString, subIdString))
                     .type(action.type())
                     .agmId(action.agmId().orElse(null))
@@ -230,15 +230,15 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
      * entries currently tracked in the store.
      *
      * <p>Reads the live, immutable view recorded by
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} so test
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} so test
      * suites can inspect the handler's effect without holding a direct
      * reference to the store.
      *
-     * @param client the {@link WhatsAppClient} whose store should be read
+     * @param client the {@link LinkedWhatsAppClient} whose store should be read
      * @return the live, immutable view of the store's interactive message
      *         states
      */
-    public Collection<InteractiveMessageState> interactiveMessageStates(WhatsAppClient client) {
-        return client.store().interactiveMessageStates();
+    public Collection<InteractiveMessageState> interactiveMessageStates(LinkedWhatsAppClient client) {
+        return client.store().businessStore().interactiveMessageStates();
     }
 }

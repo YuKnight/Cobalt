@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -27,7 +27,7 @@ import java.util.logging.Logger;
  * edited, or deleted on another device, the server replays the change here as a
  * {@link SyncdOperation#SET} (upsert) or {@link SyncdOperation#REMOVE}; the
  * result is read back through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findBusinessBroadcastCampaign(String)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findBusinessBroadcastCampaign(String)}.
  *
  * @implNote
  * This implementation drops two WA Web side effects: the
@@ -36,7 +36,7 @@ import java.util.logging.Logger;
  * exposure here) and the post-batch
  * {@code refreshBroadcastCampaignState} fire-and-forget event (Cobalt
  * has no browser frontend bridge). The malformed-mutation count is
- * still logged from {@link #applyMutationBatch(WhatsAppClient, List)}
+ * still logged from {@link #applyMutationBatch(LinkedWhatsAppClient, List)}
  * to match WA Web's per-batch warning.
  */
 @WhatsAppWebModule(moduleName = "WAWebBroadcastCampaignSync")
@@ -92,7 +92,7 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastCampaignSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() <= 1) {
@@ -112,7 +112,7 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
-                client.store().putBusinessBroadcastCampaign(new BusinessBroadcastCampaignBuilder()
+                client.store().businessStore().putBusinessBroadcastCampaign(new BusinessBroadcastCampaignBuilder()
                         .id(campaignId)
                         .deviceId(action.deviceId().isPresent() ? action.deviceId().getAsInt() : null)
                         .adId(action.adId().orElse(null))
@@ -128,7 +128,7 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
             }
 
             if (mutation.operation() == SyncdOperation.REMOVE) {
-                client.store().removeBusinessBroadcastCampaign(campaignId);
+                client.store().businessStore().removeBusinessBroadcastCampaign(campaignId);
                 return MutationApplicationResult.success();
             }
 
@@ -142,7 +142,7 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
      * {@inheritDoc}
      *
      * <p>Iterates the batch, applying each mutation via
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} and
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} and
      * aggregating a malformed-mutation count for the warning log.
      *
      * @implNote
@@ -154,7 +154,7 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBroadcastCampaignSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var malformedCount = 0;
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) {

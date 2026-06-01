@@ -99,7 +99,7 @@ class AgentActionHandlerTest {
                     buildMutation("agent-1", action, SyncdOperation.SET, Instant.ofEpochSecond(1_700_000_000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findAgentState("agent-1").orElseThrow();
+            var stored = store.businessStore().findAgentState("agent-1").orElseThrow();
             assertEquals("agent-1", stored.agentId());
             assertEquals("Alice", stored.name().orElseThrow());
             assertEquals(3, stored.deviceId().orElseThrow());
@@ -120,7 +120,7 @@ class AgentActionHandlerTest {
                     buildMutation("agent-tombstone", action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findAgentState("agent-tombstone").orElseThrow();
+            var stored = store.businessStore().findAgentState("agent-tombstone").orElseThrow();
             assertTrue(stored.deleted(), "isDeleted=true must propagate to the stored entry");
         }
     }
@@ -136,7 +136,7 @@ class AgentActionHandlerTest {
             var result = handler.applyMutation(client,
                     buildMutation("brand-new", action, SyncdOperation.SET, Instant.now()));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findAgentState("brand-new").isPresent());
+            assertTrue(store.businessStore().findAgentState("brand-new").isPresent());
         }
     }
 
@@ -190,7 +190,7 @@ class AgentActionHandlerTest {
         @Test
         @DisplayName("REMOVE drops the agent from the store and returns SUCCESS")
         void removeDropsAgent() {
-            store.putAgentState(new AgentStateBuilder()
+            store.businessStore().putAgentState(new AgentStateBuilder()
                     .agentId("agent-rm")
                     .name("Old")
                     .deviceId(1)
@@ -201,7 +201,7 @@ class AgentActionHandlerTest {
                     buildMutation("agent-rm", null, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findAgentState("agent-rm").isEmpty());
+            assertTrue(store.businessStore().findAgentState("agent-rm").isEmpty());
         }
 
         @Test

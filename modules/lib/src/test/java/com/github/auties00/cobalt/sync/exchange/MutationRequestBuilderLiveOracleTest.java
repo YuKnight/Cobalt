@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdPatchSpec;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.SyncFixtures;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -52,11 +52,11 @@ class MutationRequestBuilderLiveOracleTest {
     void setUp() {
         var props = TestABPropsService.builder().build();
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         client = TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(props);
-        var wam = new DefaultWamService(client, props);
+        var wam = new LiveWamService(client, props);
         builder = new MutationRequestBuilder(client, props, wam, TestMediaConnectionService.create());
     }
 

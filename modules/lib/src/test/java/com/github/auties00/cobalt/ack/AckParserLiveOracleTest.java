@@ -48,7 +48,7 @@ class AckParserLiveOracleTest {
             assertEquals("in", event.getString("direction"), "all captured acks are inbound");
 
             var ack = MessageFixtures.buildNodeFromEvent(event);
-            var result = AckParser.parse(ack);
+            var result = (MessageAck) AckParser.parse(ack);
 
             assertTrue(result.timestamp().isPresent(),
                     "server ack must carry t= timestamp for topic " + topic);
@@ -72,7 +72,7 @@ class AckParserLiveOracleTest {
         var events = MessageFixtures.loadEvents(topic + ".ack");
         for (var event : events) {
             var ack = MessageFixtures.buildNodeFromEvent(event);
-            var result = AckParser.parse(ack);
+            var result = (MessageAck) AckParser.parse(ack);
             assertTrue(result.count().isPresent(),
                     "group ack must carry count= attribute for topic " + topic);
             assertTrue(result.count().getAsInt() > 0,

@@ -1,10 +1,10 @@
 package com.github.auties00.cobalt.client;
 
 /**
- * Names the reason a {@link WhatsAppClient} session was torn down.
+ * Names the reason a {@link LinkedWhatsAppClient} session was torn down.
  *
  * @apiNote
- * Receivers of {@link WhatsAppClientListener#onDisconnected(WhatsAppClient, WhatsAppClientDisconnectReason)}
+ * Receivers of {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onDisconnected(LinkedWhatsAppClient, WhatsAppClientDisconnectReason)}
  * read this value to decide whether to retry, prompt the user to
  * re-authenticate, or surface a permanent failure. The mapping is fixed:
  * {@link WhatsAppClientErrorHandler.Result#DISCONNECT} produces
@@ -13,8 +13,8 @@ package com.github.auties00.cobalt.client;
  * produces {@link #LOGGED_OUT}, and {@link WhatsAppClientErrorHandler.Result#BAN}
  * produces {@link #BANNED}.
  *
- * @see WhatsAppClient#disconnect(WhatsAppClientDisconnectReason)
- * @see WhatsAppClientListener#onDisconnected(WhatsAppClient, WhatsAppClientDisconnectReason)
+ * @see LinkedWhatsAppClient#disconnect(WhatsAppClientDisconnectReason)
+ * @see com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onDisconnected(LinkedWhatsAppClient, WhatsAppClientDisconnectReason)
  * @see WhatsAppClientErrorHandler
  */
 public enum WhatsAppClientDisconnectReason {
@@ -23,10 +23,10 @@ public enum WhatsAppClientDisconnectReason {
      * deletion.
      *
      * @apiNote
-     * Emitted when the application calls {@link WhatsAppClient#disconnect()}
+     * Emitted when the application calls {@link LinkedWhatsAppClient#disconnect()}
      * directly or when the library tears the socket down without intending
      * to recover. The session stays linked, so a later
-     * {@link WhatsAppClient#connect()} resumes against the same store.
+     * {@link LinkedWhatsAppClient#connect()} resumes against the same store.
      */
     DISCONNECTED,
 
@@ -44,7 +44,7 @@ public enum WhatsAppClientDisconnectReason {
      * A logout that deletes session credentials from the store.
      *
      * @apiNote
-     * Triggered by an explicit {@link WhatsAppClient#logout()} or by a
+     * Triggered by an explicit {@link LinkedWhatsAppClient#logout()} or by a
      * server-driven unpair. Re-authentication (QR scan, pairing code, or
      * mobile registration) is required before the same account can be
      * used again.

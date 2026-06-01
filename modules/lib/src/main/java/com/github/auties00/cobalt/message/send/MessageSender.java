@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.message.send;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
 import com.github.auties00.cobalt.exception.WhatsAppCorruptedStoreException;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
@@ -61,6 +61,10 @@ import com.github.auties00.cobalt.wam.type.PlaceholderReasonType;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 /**
  * Provides the cross-cutting helpers shared by the per-chat-kind senders.
@@ -89,7 +93,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * Dispatches wire stanzas and surfaces fatal store-persistence failures to
      * the embedder's error handler.
      */
-    final WhatsAppClient client;
+    final LinkedWhatsAppClient client;
 
     /**
      * Carries Signal sessions, device-list state, identity records, sender-key
@@ -110,12 +114,24 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     final WamService wamService;
 
     /**
+     * Holds the per-conversation locks that serialise the whole send pipeline
+     * for one target JID.
+     *
+     * <p>Each lock guards the multi-step group, status, and broadcast pipeline
+     * (device-partition read, key-rotation decision, sender-key distribution,
+     * SKMSG ratchet, and distribution bookkeeping) so two sends to the same
+     * conversation cannot interleave; sends to different conversations acquire
+     * distinct locks and proceed in parallel.
+     */
+    private final ConcurrentMap<String, ReentrantLock> sendLocks;
+
+    /**
      * Constructs a {@link MessageSender} bound to the supplied dependencies.
      *
      * <p>Invoked only by the sealed subclasses; the package-private visibility
      * is intentional.
      *
-     * @param client         the {@link WhatsAppClient} used to dispatch
+     * @param client         the {@link LinkedWhatsAppClient} used to dispatch
      *                       stanzas and surface failures
      * @param abPropsService the {@link ABPropsService} consulted for
      *                       feature-gating decisions
@@ -123,28 +139,90 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      *                       events
      * @throws NullPointerException if any argument is {@code null}
      */
-    MessageSender(WhatsAppClient client, ABPropsService abPropsService, WamService wamService) {
+    MessageSender(LinkedWhatsAppClient client, ABPropsService abPropsService, WamService wamService) {
         this.client = Objects.requireNonNull(client, "client");
         this.store = client.store();
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
         this.wamService = Objects.requireNonNull(wamService, "wamService");
+        this.sendLocks = new ConcurrentHashMap<>();
     }
 
     /**
      * Dispatches the supplied {@link MessageInfo} to the given chat or audience
-     * JID.
+     * JID, serialised per conversation.
      *
-     * @implSpec
-     * Each subclass implements the chat-kind-specific stanza shape and
-     * encryption flow; the dispatch from
-     * {@link MessageSendingService#send(MessageInfo)} routes by JID server.
+     * <p>Waits for the offline backlog to drain, then runs {@link #doSend} while
+     * holding the per-conversation lock so concurrent sends to the same target
+     * cannot interleave their sender-key distribution, rotation, and ratchet
+     * steps. Sends to different conversations run in parallel; the per-session
+     * and per-sender-key ratchets are additionally guarded by
+     * {@link com.github.auties00.cobalt.message.crypto.SignalCryptoLocks}. The
+     * dispatch from {@link MessageSendingService#send(MessageInfo)} routes by JID
+     * server.
      *
      * @param chatJid     the target chat, group, status, newsletter, or
      *                    peer-device JID
      * @param messageInfo the prepared message info
      * @return the parsed server {@link AckResult}
      */
-    abstract AckResult send(Jid chatJid, T messageInfo);
+    final AckResult send(Jid chatJid, T messageInfo) {
+        waitForOfflineDelivery();
+        return enqueue(chatJid.toString(), () -> doSend(chatJid, messageInfo));
+    }
+
+    /**
+     * Builds and dispatches the chat-kind-specific wire stanza for the given
+     * message.
+     *
+     * @implSpec
+     * Each subclass implements the chat-kind-specific stanza shape and
+     * encryption flow. By the time this runs the base class has already drained
+     * the offline backlog and acquired the per-conversation lock, so an
+     * implementation must not call {@link #waitForOfflineDelivery()} or
+     * {@link #enqueue(String, Supplier)} again; it composes the stanza,
+     * encrypts, dispatches, and reacts to the server ack.
+     *
+     * @param chatJid     the target chat, group, status, newsletter, or
+     *                    peer-device JID
+     * @param messageInfo the prepared message info
+     * @return the parsed server {@link AckResult}
+     */
+    abstract AckResult doSend(Jid chatJid, T messageInfo);
+
+    /**
+     * Runs {@code task} while holding the {@link ReentrantLock} associated with
+     * {@code conversationKey}, creating the lock on first use.
+     *
+     * <p>Serialises the whole send pipeline for one conversation so the
+     * device-partition read, the key-rotation decision, the sender-key
+     * distribution, and the SKMSG ratchet cannot interleave with another send to
+     * the same target. The base {@link #send(Jid, MessageInfo)} routes every
+     * send through this; {@link GroupMessageSender#sendKeyDistribution(Jid, String)}
+     * also calls it directly for the standalone distribution flow.
+     *
+     * @implNote This implementation mirrors WA Web's per-conversation
+     * {@code sendMsgQueueMap.enqueue}; WA Web needs no cross-thread lock because
+     * its JavaScript is single-threaded, whereas Cobalt sends on virtual threads.
+     *
+     * @param <R>             the {@code task} result type
+     * @param conversationKey the lock key, the target JID string
+     * @param task            the send pipeline to run under the lock
+     * @return the value returned by {@code task}
+     * @throws NullPointerException if any argument is {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebSendMsgQueueMap", exports = "sendMsgQueueMap",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    <R> R enqueue(String conversationKey, Supplier<R> task) {
+        Objects.requireNonNull(conversationKey, "conversationKey");
+        Objects.requireNonNull(task, "task");
+        var lock = sendLocks.computeIfAbsent(conversationKey, _ -> new ReentrantLock());
+        lock.lock();
+        try {
+            return task.get();
+        } finally {
+            lock.unlock();
+        }
+    }
 
     /**
      * Blocks the current virtual thread until the offline-message backlog has
@@ -191,9 +269,9 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * survive a process crash immediately after the wire write.
      *
      * <p>Every subclass calls this after building the stanza and before
-     * invoking {@link WhatsAppClient#sendNode(NodeBuilder)}; a persistence
+     * invoking {@link LinkedWhatsAppClient#sendNode(NodeBuilder)}; a persistence
      * failure is routed through the client's
-     * {@link WhatsAppClient#handleFailure(com.github.auties00.cobalt.exception.WhatsAppException)} error handler as a
+     * {@link LinkedWhatsAppClient#handleFailure(com.github.auties00.cobalt.exception.WhatsAppException)} error handler as a
      * {@link WhatsAppCorruptedStoreException}.
      */
     @WhatsAppWebExport(moduleName = "WAWebSignalProtocolStore", exports = "flushBufferToDiskIfNotMemOnlyMode",
@@ -216,7 +294,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * @throws IllegalStateException if the client is not logged in
      */
     Jid requireSelfJid() {
-        return store.jid().orElseThrow(() ->
+        return store.accountStore().jid().orElseThrow(() ->
                 new IllegalStateException("Not logged in"));
     }
 
@@ -231,7 +309,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      *         paired
      */
     Jid selfLidOrPn() {
-        return store.lid().orElseGet(this::requireSelfJid);
+        return store.accountStore().lid().orElseGet(this::requireSelfJid);
     }
 
     /**
@@ -242,7 +320,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * carrying only the sender ICDC; non-self recipient devices receive both
      * the sender and recipient ICDC. Devices whose encryption raises any
      * exception are logged and dropped from the result; the receipts recorded
-     * against them via {@link WhatsAppStore#updateIdentityRange} still cover the
+     * against them via {@link com.github.auties00.cobalt.store.SignalStore#updateIdentityRange} still cover the
      * full input list so identity ranges stay aligned with the dispatched
      * fanout.
      *
@@ -271,8 +349,8 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
             IcdcResult senderIcdc,
             IcdcResult recipientIcdc
     ) {
-        var selfPn = store.jid().map(Jid::toUserJid).orElse(null);
-        var selfLid = store.lid().map(Jid::toUserJid).orElse(null);
+        var selfPn = store.accountStore().jid().map(Jid::toUserJid).orElse(null);
+        var selfLid = store.accountStore().lid().map(Jid::toUserJid).orElse(null);
         var results = new ArrayList<MessageEncryptedPayload>(devices.size());
 
         var companionContainer = IcdcEnricher.enrich(container, senderIcdc, null);
@@ -311,7 +389,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
             }
         }
 
-        store.updateIdentityRange(devices);
+        store.signalStore().updateIdentityRange(devices);
 
         return results;
     }
@@ -543,7 +621,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi", exports = "getADVEncodedIdentity",
             adaptation = WhatsAppAdaptation.DIRECT)
     Node buildIdentityNode() {
-        return store.signedDeviceIdentity()
+        return store.signalStore().signedDeviceIdentity()
                 .map(identity -> new NodeBuilder()
                         .description("device-identity")
                         .content(ADVSignedDeviceIdentitySpec.encode(identity))
@@ -577,7 +655,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      *
      * <p>Called from the per-device loop in
      * {@link #encryptForDevices(MessageEncryption, Collection, MessageContainer, Jid, IcdcResult, IcdcResult)}
-     * and from {@link PeerMessageSender#send(Jid, com.github.auties00.cobalt.model.chat.ChatMessageInfo)}.
+     * and from {@link PeerMessageSender#doSend(Jid, com.github.auties00.cobalt.model.chat.ChatMessageInfo)}.
      *
      * @implNote
      * This implementation collapses WA Web's

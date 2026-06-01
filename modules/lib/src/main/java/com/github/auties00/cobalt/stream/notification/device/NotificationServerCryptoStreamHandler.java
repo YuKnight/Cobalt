@@ -1,9 +1,12 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.listener.DeviceIdentityChangedListener;
+import com.github.auties00.cobalt.client.listener.RegistrationCodeListener;
+import com.github.auties00.cobalt.client.listener.WhatsAppListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.media.MediaProvider;
@@ -12,7 +15,6 @@ import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.WaOldCodeEventBuilder;
 
@@ -34,7 +36,7 @@ import java.util.function.Consumer;
  * {@code mediaretry} (re-uploaded CDN URL delivery), {@code server} (log upload and AB prop sync
  * requests), and {@code registration} (device-switch OTP). Most branches trigger a side-effect on
  * the local crypto or AB state: pre-key low uploads more pre-keys to the server, identity change
- * wipes the Signal session and fires {@link WhatsAppClientListener#onDeviceIdentityChanged}, media
+ * wipes the Signal session and fires {@link DeviceIdentityChangedListener#onDeviceIdentityChanged}, media
  * retry decrypts the new direct path and writes it onto the message, server runs the matching
  * maintenance task, and registration delivers the device-switch OTP to listeners. Every supported
  * stanza is acknowledged even when its branch throws; unsupported types return without
@@ -53,7 +55,7 @@ import java.util.function.Consumer;
 @WhatsAppWebModule(moduleName = "WAWebHandleServerNotification")
 @WhatsAppWebModule(moduleName = "WAWebHandleDeviceSwitchingNotification")
 @WhatsAppWebModule(moduleName = "WAWebHandleDigestKey")
-final class NotificationServerCryptoStreamHandler implements SocketStream.Handler {
+final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * Logs warnings and debug messages about server-crypto notification handling.
      */
@@ -75,7 +77,7 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
     /**
      * Provides store reads, Signal session mutations, pre-key uploads, and ack sends.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Re-syncs AB props from the server for the {@code server/abprops} branch.
@@ -109,12 +111,12 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      *
      * <p>Called once by {@link NotificationDeviceDispatcher}.
      *
-     * @param whatsapp       the {@link WhatsAppClient}
+     * @param whatsapp       the {@link LinkedWhatsAppClient}
      * @param abPropsService the {@link ABPropsService}
      * @param wamService     the {@link WamService}
      * @param ackSender      the {@link AckSender}
      */
-    NotificationServerCryptoStreamHandler(WhatsAppClient whatsapp, ABPropsService abPropsService, WamService wamService, AckSender ackSender) {
+    NotificationServerCryptoStreamHandler(LinkedWhatsAppClient whatsapp, ABPropsService abPropsService, WamService wamService, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.abPropsService = abPropsService;
         this.wamService = wamService;
@@ -235,7 +237,7 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * {@code display_name} attribute, when non-blank, updates the contact's chosen name. The handler
      * then marks the identity change, cleans up the Signal session, clears the sender-key
      * distribution for the participant, marks the user for key rotation, and fires
-     * {@link WhatsAppClientListener#onDeviceIdentityChanged} so the embedder can drive the
+     * {@link DeviceIdentityChangedListener#onDeviceIdentityChanged} so the embedder can drive the
      * equivalent UI.
      *
      * @param node the {@code <notification type="encrypt"/>} stanza with an {@code <identity/>} child
@@ -247,7 +249,7 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
         }
 
         var userJid = deviceJid.toUserJid();
-        var selfJid = whatsapp.store().jid()
+        var selfJid = whatsapp.store().accountStore().jid()
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (selfJid != null && selfJid.equals(userJid)) {
@@ -260,23 +262,22 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (lid != null) {
-            whatsapp.store().registerLidMapping(userJid, lid);
+            whatsapp.store().contactStore().registerLidMapping(userJid, lid);
         }
 
         var displayName = node.getAttributeAsString("display_name", null);
-        var contact = whatsapp.store()
-                .findContactByJid(userJid)
-                .orElseGet(() -> whatsapp.store().addNewContact(userJid));
+        var contact = whatsapp.store().contactStore().findContactByJid(userJid)
+                .orElseGet(() -> whatsapp.store().contactStore().addNewContact(userJid));
         if (displayName != null && !displayName.isBlank()) {
             contact.setChosenName(displayName);
         }
-        whatsapp.store().addContact(contact);
+        whatsapp.store().contactStore().addContact(contact);
 
-        whatsapp.store().markIdentityChange(deviceJid);
-        whatsapp.store().cleanupSignalSessions(deviceJid);
-        whatsapp.store().clearSenderKeyDistributionForParticipant(deviceJid);
-        whatsapp.store().markKeyRotation(userJid);
-        fireListeners(listener -> listener.onDeviceIdentityChanged(whatsapp, userJid, Set.of(deviceJid)));
+        whatsapp.store().signalStore().markIdentityChange(deviceJid);
+        whatsapp.store().signalStore().cleanupSignalSessions(deviceJid);
+        whatsapp.store().signalStore().clearSenderKeyDistributionForParticipant(deviceJid);
+        whatsapp.store().signalStore().markKeyRotation(userJid);
+        fireListeners(DeviceIdentityChangedListener.class, listener -> listener.onDeviceIdentityChanged(whatsapp, userJid, Set.of(deviceJid)));
     }
 
     /**
@@ -369,11 +370,11 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
      * <p>Returns early when the stanza lacks a {@code <wa_old_registration>} child, and drops the
      * notification when the code or expiry is missing or the OTP has already expired against the
      * current epoch second. A numeric code is delivered via
-     * {@link WhatsAppClientListener#onRegistrationCode}; the WAM event is committed afterward with
+     * {@link RegistrationCodeListener#onRegistrationCode}; the WAM event is committed afterward with
      * the local device id.
      *
      * @implNote This implementation parses the numeric OTP and debug-logs non-numeric values because
-     * the {@link WhatsAppClientListener#onRegistrationCode} callback requires a {@code long}, whereas
+     * the {@link RegistrationCodeListener#onRegistrationCode} callback requires a {@code long}, whereas
      * WA Web passes the raw string through.
      *
      * @param node the {@code <notification type="registration"/>} stanza
@@ -396,14 +397,14 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
 
         try {
             var numericCode = Long.parseLong(code);
-            fireListeners(listener -> listener.onRegistrationCode(whatsapp, numericCode));
+            fireListeners(RegistrationCodeListener.class, listener -> listener.onRegistrationCode(whatsapp, numericCode));
         } catch (NumberFormatException exception) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring non-numeric device-switch code {0}",
                     code);
         }
 
-        var meDeviceId = whatsapp.store().jid()
+        var meDeviceId = whatsapp.store().accountStore().jid()
                 .map(Jid::device)
                 .map(String::valueOf)
                 .orElse(null);
@@ -413,15 +414,21 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
     }
 
     /**
-     * Fans the callback out to every registered listener on its own virtual thread.
+     * Fans the callback out to every registered listener of the given type on
+     * its own virtual thread.
      *
      * <p>Used by {@link #handleIdentityChange(Node)} and {@link #handleRegistration(Node)}.
      *
-     * @param consumer the callback to invoke against each listener
+     * @param type     the per-event listener interface to dispatch against
+     * @param consumer the callback to invoke against each matching listener
+     * @param <L>      the per-event listener interface
      */
-    private void fireListeners(Consumer<WhatsAppClientListener> consumer) {
+    private <L extends WhatsAppListener> void fireListeners(Class<L> type, Consumer<L> consumer) {
         for (var listener : whatsapp.store().listeners()) {
-            Thread.startVirtualThread(() -> consumer.accept(listener));
+            if (type.isInstance(listener)) {
+                var typed = type.cast(listener);
+                Thread.startVirtualThread(() -> consumer.accept(typed));
+            }
         }
     }
 
@@ -440,20 +447,20 @@ final class NotificationServerCryptoStreamHandler implements SocketStream.Handle
             return null;
         }
 
-        for (var chat : whatsapp.store().chats()) {
-            var message = whatsapp.store().findMessageById(chat, id).orElse(null);
+        for (var chat : whatsapp.store().chatStore().chats()) {
+            var message = whatsapp.store().chatStore().findMessageById(chat, id).orElse(null);
             if (message != null) {
                 return message;
             }
         }
 
-        var statusMessage = whatsapp.store().findStatusById(id).orElse(null);
+        var statusMessage = whatsapp.store().chatStore().findStatusById(id).orElse(null);
         if (statusMessage != null) {
             return statusMessage;
         }
 
-        for (var newsletter : whatsapp.store().newsletters()) {
-            var message = whatsapp.store().findMessageById(newsletter, id).orElse(null);
+        for (var newsletter : whatsapp.store().chatStore().newsletters()) {
+            var message = whatsapp.store().chatStore().findMessageById(newsletter, id).orElse(null);
             if (message != null) {
                 return message;
             }

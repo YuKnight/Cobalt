@@ -60,11 +60,14 @@ public interface WhatsAppSocketListener {
      * Receives notification that the underlying connection has closed
      * and the reader loop has terminated.
      *
-     * <p>This fires exactly once per
-     * {@link WhatsAppSocketClient#connect(WhatsAppSocketListener)} regardless
-     * of whether the close was orderly (caller invoked
-     * {@link WhatsAppSocketClient#disconnect()}) or remote-initiated (server
-     * dropped the connection or the reader hit a fatal error). No further
+     * <p>This fires only for an unsolicited close: the server dropped the
+     * connection, the reader hit a fatal transport error, or the stream
+     * ended on its own. A caller-initiated
+     * {@link WhatsAppSocketClient#disconnect()} does NOT trigger this
+     * callback, because the caller already knows it tore the socket down and
+     * a recovering listener must not reconnect against its own teardown. It
+     * therefore fires at most once per
+     * {@link WhatsAppSocketClient#connect(WhatsAppSocketListener)}. No further
      * {@link #onNode(Node)} or {@link #onError(WhatsAppException)} callbacks
      * are delivered after this call returns.
      */

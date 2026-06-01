@@ -1,4 +1,7 @@
 package com.github.auties00.cobalt.device;
+import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
+import com.github.auties00.cobalt.sync.LiveWebAppStateService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
@@ -13,7 +16,7 @@ import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import org.junit.jupiter.api.DisplayName;
@@ -65,17 +68,17 @@ class DeviceServiceTest {
     private static Harness build() {
         var props = TestABPropsService.builder().build();
         var store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
-        store.setLid(SELF_LID_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setLid(SELF_LID_DEVICE_1);
 
         var client = TestWhatsAppClient.create().withStore(store);
 
-        var wamService = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wamService);
-        var snapshotRecovery = new SnapshotRecoveryService(client, props, wamService);
-        var webAppState = new WebAppStateService(client, props, lidMigration, snapshotRecovery, wamService, TestMediaConnectionService.create());
-        var sessionCipher = new SignalSessionCipher(store);
-        var deviceService = new DefaultDeviceService(client, webAppState, props, sessionCipher, wamService);
+        var wamService = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wamService);
+        var snapshotRecovery = new LiveSnapshotRecoveryService(client, props, wamService);
+        var webAppState = new LiveWebAppStateService(client, props, lidMigration, snapshotRecovery, wamService, TestMediaConnectionService.create());
+        var sessionCipher = new SignalSessionCipher(store.signalStore());
+        var deviceService = new LiveDeviceService(client, webAppState, props, sessionCipher, wamService);
 
         return new Harness(client, props, deviceService);
     }
@@ -93,7 +96,7 @@ class DeviceServiceTest {
                 .currentIndex(0)
                 .validIndexes(new LinkedHashSet<>())
                 .build();
-        h.client.store().addDeviceList(peerList);
+        h.client.store().contactStore().addDeviceList(peerList);
 
         var selfList = new DeviceListBuilder()
                 .userJid(SELF_PN)
@@ -102,7 +105,7 @@ class DeviceServiceTest {
                 .currentIndex(0)
                 .validIndexes(new LinkedHashSet<>())
                 .build();
-        h.client.store().addDeviceList(selfList);
+        h.client.store().contactStore().addDeviceList(selfList);
 
         var fanout = h.deviceService.getUserFanout(PEER, null);
 
@@ -127,7 +130,7 @@ class DeviceServiceTest {
                 .currentIndex(0)
                 .validIndexes(new LinkedHashSet<>())
                 .build();
-        h.client.store().addDeviceList(selfList);
+        h.client.store().contactStore().addDeviceList(selfList);
 
         var fanout = h.deviceService.getUserFanout(SELF_PN, null);
 
@@ -148,7 +151,7 @@ class DeviceServiceTest {
                 .currentIndex(0)
                 .validIndexes(new LinkedHashSet<>())
                 .build();
-        h.client.store().addDeviceList(peerList);
+        h.client.store().contactStore().addDeviceList(peerList);
 
         var icdc = h.deviceService.computeIcdc(PEER);
         assertTrue(icdc.isPresent(), "computeIcdc should produce a result for a cached peer");
@@ -158,8 +161,8 @@ class DeviceServiceTest {
 
     // Parity KAT against the captured group-phashes oracle; fails if WA Web changes its phashV2 derivation
     @Test
-    @DisplayName("getGroupFanout phash matches WA Web's phashV2 oracle (byte-equality, three group sizes)")
-    void groupFanoutPhashMatchesLiveOracle() throws Exception {
+    @DisplayName("computeGroupPhash matches WA Web's phashV2 oracle (byte-equality, three group sizes)")
+    void groupPhashMatchesLiveOracle() throws Exception {
         var raw = DeviceFixtures.loadExpected("group-phashes").getJSONObject("result").getString("value");
         var samples = JSON.parseArray(raw);
 
@@ -175,7 +178,7 @@ class DeviceServiceTest {
                 participantJids.add(Jid.of(devices.getString(j)));
             }
             for (var pjid : participantJids) {
-                h.client.store().addDeviceList(new DeviceListBuilder()
+                h.client.store().contactStore().addDeviceList(new DeviceListBuilder()
                         .userJid(pjid.toUserJid())
                         .devices(List.of(DeviceInfo.ofE2EE(0, 0)))
                         .timestamp(Instant.now())
@@ -194,6 +197,56 @@ class DeviceServiceTest {
         }
     }
 
+    // Guards the status-send regression: getStatusFanout must resolve the audience's devices from
+    // cache without any group-metadata query (it takes audience JIDs, never status@broadcast).
+    @Test
+    @DisplayName("getStatusFanout resolves audience devices from cache and excludes the sending device")
+    void statusFanoutResolvesAudienceDevices() {
+        var h = build();
+        var audienceCompanion = Jid.of("393495089819:5@s.whatsapp.net");
+        h.client.store().contactStore().addDeviceList(new DeviceListBuilder()
+                .userJid(PEER)
+                .devices(List.of(DeviceInfo.ofE2EE(0, 0), DeviceInfo.ofE2EE(5, 1)))
+                .timestamp(Instant.now())
+                .currentIndex(0)
+                .validIndexes(new LinkedHashSet<>())
+                .build());
+
+        var fanout = h.deviceService.getStatusFanout(List.of(PEER));
+
+        assertTrue(fanout.contains(PEER.toUserJid()),
+                "status fanout must include the audience's primary device");
+        assertTrue(fanout.contains(audienceCompanion),
+                "status fanout must include the audience's companion device");
+        assertFalse(fanout.contains(SELF_LID_DEVICE_1),
+                "status fanout must exclude the sending device");
+    }
+
+    // Guards the broadcast-send fix: getBroadcastFanout must resolve recipient devices from cache
+    // (no group-metadata query) and exclude the sending device, mirroring status.
+    @Test
+    @DisplayName("getBroadcastFanout resolves recipient devices from cache and excludes the sending device")
+    void broadcastFanoutResolvesRecipientDevices() {
+        var h = build();
+        var recipientCompanion = Jid.of("393495089819:5@s.whatsapp.net");
+        h.client.store().contactStore().addDeviceList(new DeviceListBuilder()
+                .userJid(PEER)
+                .devices(List.of(DeviceInfo.ofE2EE(0, 0), DeviceInfo.ofE2EE(5, 1)))
+                .timestamp(Instant.now())
+                .currentIndex(0)
+                .validIndexes(new LinkedHashSet<>())
+                .build());
+
+        var fanout = h.deviceService.getBroadcastFanout(Jid.of("12345@broadcast"), List.of(PEER));
+
+        assertTrue(fanout.contains(PEER.toUserJid()),
+                "broadcast fanout must include the recipient's primary device");
+        assertTrue(fanout.contains(recipientCompanion),
+                "broadcast fanout must include the recipient's companion device");
+        assertFalse(fanout.contains(SELF_LID_DEVICE_1),
+                "broadcast fanout must exclude the sending device");
+    }
+
     @Test
     @DisplayName("getDeviceLists with shouldMergeAltDevices=true augments device ids without collapsing entries")
     void shouldMergeAltDevicesAugmentsDeviceIds() {
@@ -201,7 +254,7 @@ class DeviceServiceTest {
         var peerPn = Jid.of("393495089819@s.whatsapp.net");
         var peerLid = Jid.of("72104938291847@lid");
 
-        h.client.store().registerLidMapping(peerPn, peerLid);
+        h.client.store().contactStore().registerLidMapping(peerPn, peerLid);
 
         var pnList = new DeviceListBuilder()
                 .userJid(peerPn)
@@ -217,8 +270,8 @@ class DeviceServiceTest {
                 .currentIndex(0)
                 .validIndexes(new LinkedHashSet<>())
                 .build();
-        h.client.store().addDeviceList(pnList);
-        h.client.store().addDeviceList(lidList);
+        h.client.store().contactStore().addDeviceList(pnList);
+        h.client.store().contactStore().addDeviceList(lidList);
 
         var unmerged = h.deviceService.getDeviceLists(List.of(peerPn, peerLid), "message", null, false);
         assertEquals(2, unmerged.size(),

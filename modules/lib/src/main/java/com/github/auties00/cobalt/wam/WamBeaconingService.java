@@ -19,7 +19,7 @@ import java.util.OptionalLong;
  * global is emitted. A non-empty {@link #nextSequenceNumber(String)} result is
  * the only path through which beaconing globals enter the wire.
  *
- * <p>The production implementation is {@link DefaultWamBeaconingService}; tests
+ * <p>The production implementation is {@link LiveWamBeaconingService}; tests
  * substitute their own controllable variant.
  *
  * @implSpec

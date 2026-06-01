@@ -119,7 +119,7 @@ class MarkChatAsReadHandlerTest {
         @Test
         @DisplayName("read=true marks the chat as read with unreadCount=0")
         void marksAsRead() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
             chat.setMarkedAsUnread(true);
             chat.setUnreadCount(7);
 
@@ -134,7 +134,7 @@ class MarkChatAsReadHandlerTest {
         @Test
         @DisplayName("read=false marks the chat as unread with the MARKED_AS_UNREAD sentinel (-1)")
         void marksAsUnread() {
-            var chat = client.store().addNewChat(PEER);
+            var chat = client.store().chatStore().addNewChat(PEER);
 
             var result = new MarkChatAsReadHandler().applyMutation(
                     client, readMutation(false, PEER, Instant.ofEpochSecond(1L)));
@@ -166,7 +166,7 @@ class MarkChatAsReadHandlerTest {
         @Test
         @DisplayName("a SyncActionValue carrying a pinAction instead of markChatAsReadAction is MALFORMED")
         void wrongActionTypeIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var wrong = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .pinAction(new PinActionBuilder().pinned(true).build())
@@ -186,7 +186,7 @@ class MarkChatAsReadHandlerTest {
         @Test
         @DisplayName("an empty chat JID at slot 1 is MALFORMED")
         void emptyChatJidIsMalformed() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var value = new SyncActionValueBuilder()
                     .timestamp(Instant.ofEpochSecond(1L))
                     .markChatAsReadAction(new MarkChatAsReadActionBuilder().read(true).build())
@@ -206,7 +206,7 @@ class MarkChatAsReadHandlerTest {
         @Test
         @DisplayName("REMOVE returns UNSUPPORTED")
         void removeReturnsUnsupported() {
-            client.store().addNewChat(PEER);
+            client.store().chatStore().addNewChat(PEER);
             var mutation = new DecryptedMutation.Trusted(
                     JSON.toJSONString(List.of("markChatAsRead", PEER.toString())),
                     new SyncActionValueBuilder()

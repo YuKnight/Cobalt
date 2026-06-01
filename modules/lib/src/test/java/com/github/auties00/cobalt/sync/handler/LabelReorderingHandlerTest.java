@@ -99,9 +99,9 @@ class LabelReorderingHandlerTest {
         @Test
         @DisplayName("each label's orderIndex matches its position in sortedLabelIds")
         void writesPositionsInOrder() {
-            store.addLabel(new LabelBuilder().id("10").name("A").color(0).build());
-            store.addLabel(new LabelBuilder().id("20").name("B").color(0).build());
-            store.addLabel(new LabelBuilder().id("30").name("C").color(0).build());
+            store.settingsStore().addLabel(new LabelBuilder().id("10").name("A").color(0).build());
+            store.settingsStore().addLabel(new LabelBuilder().id("20").name("B").color(0).build());
+            store.settingsStore().addLabel(new LabelBuilder().id("30").name("C").color(0).build());
 
             var action = new LabelReorderingActionBuilder()
                     .sortedLabelIds(List.of(30, 10, 20))
@@ -111,16 +111,16 @@ class LabelReorderingHandlerTest {
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
             // position 0 -> label 30; position 1 -> label 10; position 2 -> label 20
-            assertEquals(0, store.findLabel("30").orElseThrow().orderIndex().orElseThrow());
-            assertEquals(1, store.findLabel("10").orElseThrow().orderIndex().orElseThrow());
-            assertEquals(2, store.findLabel("20").orElseThrow().orderIndex().orElseThrow());
+            assertEquals(0, store.settingsStore().findLabel("30").orElseThrow().orderIndex().orElseThrow());
+            assertEquals(1, store.settingsStore().findLabel("10").orElseThrow().orderIndex().orElseThrow());
+            assertEquals(2, store.settingsStore().findLabel("20").orElseThrow().orderIndex().orElseThrow());
         }
 
         @Test
         @DisplayName("labels in sortedLabelIds but missing from the store are silently skipped")
         void missingLabelsSkipped() {
             // Only label 10 is present; the action also references 20 and 30.
-            store.addLabel(new LabelBuilder().id("10").name("A").color(0).build());
+            store.settingsStore().addLabel(new LabelBuilder().id("10").name("A").color(0).build());
             var action = new LabelReorderingActionBuilder()
                     .sortedLabelIds(List.of(30, 10, 20))
                     .build();
@@ -128,17 +128,17 @@ class LabelReorderingHandlerTest {
             var result = handler.applyMutation(client, buildMutation(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(1, store.findLabel("10").orElseThrow().orderIndex().orElseThrow(),
+            assertEquals(1, store.settingsStore().findLabel("10").orElseThrow().orderIndex().orElseThrow(),
                     "the lone present label is positioned at its zero-based index in the sortedLabelIds list");
-            assertTrue(store.findLabel("20").isEmpty(), "missing labels are not implicitly created");
-            assertTrue(store.findLabel("30").isEmpty(), "missing labels are not implicitly created");
+            assertTrue(store.settingsStore().findLabel("20").isEmpty(), "missing labels are not implicitly created");
+            assertTrue(store.settingsStore().findLabel("30").isEmpty(), "missing labels are not implicitly created");
         }
 
         @Test
         @DisplayName("labels present locally but absent from sortedLabelIds keep their existing orderIndex")
         void unreferencedLabelsKeepTheirOrder() {
-            store.addLabel(new LabelBuilder().id("10").name("A").color(0).orderIndex(7).build());
-            store.addLabel(new LabelBuilder().id("20").name("B").color(0).build());
+            store.settingsStore().addLabel(new LabelBuilder().id("10").name("A").color(0).orderIndex(7).build());
+            store.settingsStore().addLabel(new LabelBuilder().id("20").name("B").color(0).build());
 
             var action = new LabelReorderingActionBuilder()
                     .sortedLabelIds(List.of(20))
@@ -146,8 +146,8 @@ class LabelReorderingHandlerTest {
             var result = handler.applyMutation(client, buildMutation(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(0, store.findLabel("20").orElseThrow().orderIndex().orElseThrow());
-            assertEquals(7, store.findLabel("10").orElseThrow().orderIndex().orElseThrow(),
+            assertEquals(0, store.settingsStore().findLabel("20").orElseThrow().orderIndex().orElseThrow());
+            assertEquals(7, store.settingsStore().findLabel("10").orElseThrow().orderIndex().orElseThrow(),
                     "unreferenced labels retain their existing orderIndex");
         }
     }
@@ -208,7 +208,7 @@ class LabelReorderingHandlerTest {
         void indexUnused() {
             // The handler never reads the index array, so an empty or malformed index slot
             // must not prevent a valid SET from succeeding.
-            store.addLabel(new LabelBuilder().id("10").name("A").color(0).build());
+            store.settingsStore().addLabel(new LabelBuilder().id("10").name("A").color(0).build());
             var action = new LabelReorderingActionBuilder().sortedLabelIds(List.of(10)).build();
             var ts = Instant.now();
             var value = new SyncActionValueBuilder().timestamp(ts).labelReorderingAction(action).build();

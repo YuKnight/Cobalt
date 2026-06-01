@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.reportGroupForSpam} — reports a
+ * Input model for {@code LinkedWhatsAppClient.reportGroupForSpam} — reports a
  * group chat for trust-and-safety review.
  *
  * <p>{@link #group} and {@link #spamFlow} are required. The other

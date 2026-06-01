@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.call.internal.transport;
 
+import com.github.auties00.cobalt.ack.CallRelay;
+import com.github.auties00.cobalt.call.ActiveCall;
 import com.github.auties00.cobalt.call.internal.interaction.InteractionStreamState;
 import com.github.auties00.cobalt.call.internal.rtp.srtp.SrtpEndpoint;
 import com.github.auties00.cobalt.call.internal.rtp.srtp.SrtpRole;
@@ -7,6 +9,9 @@ import com.github.auties00.cobalt.call.internal.transport.dtls.DtlsCertificate;
 import com.github.auties00.cobalt.call.internal.transport.dtls.DtlsSrtpDriver;
 import com.github.auties00.cobalt.call.internal.transport.dtls.DtlsSrtpEndpoint;
 import com.github.auties00.cobalt.call.internal.transport.ice.IceAgent;
+import com.github.auties00.cobalt.call.internal.transport.ice.IceCandidate;
+import com.github.auties00.cobalt.call.internal.transport.ice.IceCandidatePair;
+import com.github.auties00.cobalt.call.internal.transport.ice.IceComponent;
 import com.github.auties00.cobalt.call.internal.transport.ice.IceCredentials;
 import com.github.auties00.cobalt.call.internal.transport.relay.WaRelayConnector;
 import com.github.auties00.cobalt.call.internal.transport.sctp.SctpDtlsBridge;
@@ -19,7 +24,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import com.github.auties00.cobalt.call.ActiveCall;
 
 /**
  * Owns the transport-layer state of one {@link ActiveCall}.
@@ -40,6 +44,33 @@ import com.github.auties00.cobalt.call.ActiveCall;
  * be constructed and exercised without firing real UDP input or output.
  */
 public final class ActiveCallTransport implements AutoCloseable {
+    /**
+     * The hardcoded peer DTLS SHA-256 fingerprint used in every WA Web call.
+     *
+     * <p>WhatsApp's transport model does not perform mutual DTLS certificate verification: the
+     * relay vouches for both endpoints via the ICE credentials (auth_token as ufrag, relay_key as
+     * pwd, both from the relay-tokens block). The "remote answer SDP" the WA Web JS feeds into
+     * {@code RTCPeerConnection.setRemoteDescription} is fabricated locally from the relay
+     * credentials and this hardcoded fingerprint string; the relay-side wasm accepts whatever
+     * cert the client presents and the client trusts whatever fingerprint the local code injects.
+     *
+     * <p>Source: {@code WAWebVoipRelayConnectionUtils.createAnswerSdp} in the WA Web bundle,
+     * confirmed against every captured remote-answer SDP.
+     *
+     * <p>Callers pass this constant as {@link StartParameters#peerFingerprintSha256()}
+     * regardless of which peer is being called.
+     */
+    public static final byte[] WA_PEER_DTLS_FINGERPRINT_SHA256 = {
+            (byte) 0xF9, (byte) 0xCA, (byte) 0x0C, (byte) 0x98,
+            (byte) 0xA3, (byte) 0xCC, (byte) 0x71, (byte) 0xD6,
+            (byte) 0x42, (byte) 0xCE, (byte) 0x5A, (byte) 0xE2,
+            (byte) 0x53, (byte) 0xD2, (byte) 0x15, (byte) 0x20,
+            (byte) 0xD3, (byte) 0x1B, (byte) 0xBA, (byte) 0xD8,
+            (byte) 0x57, (byte) 0xA4, (byte) 0xF0, (byte) 0xAF,
+            (byte) 0xBE, (byte) 0x0B, (byte) 0xFB, (byte) 0xF3,
+            (byte) 0x6B, (byte) 0x0C, (byte) 0xA0, (byte) 0x68
+    };
+
     /**
      * Enumerates the strictly forward-progressing lifecycle of an {@link ActiveCallTransport}.
      *
@@ -77,7 +108,7 @@ public final class ActiveCallTransport implements AutoCloseable {
      * @param localCert             the self-signed DTLS certificate of the local side
      * @param peerFingerprintSha256 the peer's certificate fingerprint advertised in the offer or accept
      * @param dtlsClient            {@code true} when the local side acts as DTLS client, that is, is the call placer
-     * @param offerSpec             the parsed {@link OfferTransportSpec} from the inbound offer, read by
+     * @param relay             the parsed {@link CallRelay} from the inbound offer, read by
      *                              {@link #connectRelay()} to drive the WA relay handshake; {@code null} on the
      *                              outgoing-call path until the outgoing offer builder fills its own spec
      */
@@ -86,7 +117,7 @@ public final class ActiveCallTransport implements AutoCloseable {
             DtlsCertificate localCert,
             byte[] peerFingerprintSha256,
             boolean dtlsClient,
-            OfferTransportSpec offerSpec
+            CallRelay relay
     ) {
     }
 
@@ -224,7 +255,7 @@ public final class ActiveCallTransport implements AutoCloseable {
      * input or output; production paths call it explicitly after {@link #start(StartParameters)}.
      *
      * @return the relay allocation result
-     * @throws IllegalStateException if no {@link OfferTransportSpec} was supplied at start, or if the
+     * @throws IllegalStateException if no {@link CallRelay} was supplied at start, or if the
      *                               transport is not in {@link State#STARTED}
      */
     public WaRelayConnector.Allocation connectRelay() {
@@ -232,11 +263,14 @@ public final class ActiveCallTransport implements AutoCloseable {
             throw new IllegalStateException("connectRelay requires state=STARTED, got " + state.get());
         }
         var params = this.startParameters;
-        if (params == null || params.offerSpec() == null) {
-            throw new IllegalStateException("connectRelay requires StartParameters.offerSpec to be non-null");
+        if (params == null || params.relay() == null) {
+            throw new IllegalStateException("connectRelay requires StartParameters.relay to be non-null");
         }
         var connector = new WaRelayConnector();
-        var allocation = connector.connect(params.offerSpec(), 0);
+        // Try every te2 endpoint and, failing those, the relaylatency-advertised endpoints: captured
+        // traffic shows a successful client allocates to the <relaylatency><te> endpoints rather than
+        // the offer-ACK <te2> endpoints (which time out).
+        var allocation = connector.connectAny(params.relay(), java.util.List.copyOf(relayLatencyEndpoints));
         this.relayAllocation = allocation;
         return allocation;
     }
@@ -257,7 +291,7 @@ public final class ActiveCallTransport implements AutoCloseable {
     }
 
     /**
-     * Holds the DTLS-SRTP driver that wraps the relay transport with the TLS state machine and
+     * Holds the DTLS-SRTP driver that wraps the WhatsApp Web GraphQL transport with the TLS state machine and
      * demultiplexes STUN, DTLS, and SRTP byte ranges per RFC 7983; {@code null} until
      * {@link #connectDtls(long, TimeUnit)} runs.
      */
@@ -295,13 +329,136 @@ public final class ActiveCallTransport implements AutoCloseable {
         var role = params.dtlsClient()
                 ? SrtpRole.CLIENT
                 : SrtpRole.SERVER;
+        // Prefer the relay-tunneled DatagramTransport when the relay-channel driver is alive: peer
+        // DTLS bytes ride INSIDE the relay's DataChannel (WA's edgeray forwards non-STUN traffic
+        // to the bound peer endpoint), so a raw-UDP socket would never reach the remote side.
+        com.github.auties00.cobalt.call.internal.transport.ice.DatagramTransport peerTransport;
+        if (allocation.driver() != null && allocation.driver().channel() != null) {
+            peerTransport = new com.github.auties00.cobalt.call.internal.transport.relay.RelayDatagramTransport(
+                    allocation.driver(), allocation.driver().channel());
+        } else {
+            peerTransport = allocation.transport();
+        }
         var driver = new DtlsSrtpDriver(
-                allocation.transport(), role,
+                peerTransport, role,
                 params.localCert(), params.peerFingerprintSha256());
         driver.start();
         var srtpEndpoint = driver.awaitHandshake(timeout, unit);
         this.dtlsDriver = driver;
         return srtpEndpoint;
+    }
+
+    /**
+     * Drives the ICE connectivity check over the relay-allocated UDP socket and blocks until a
+     * candidate pair succeeds, or the timeout elapses.
+     *
+     * <p>Constructs an {@link IceAgent} keyed on the relay credentials whose outbound STUN sink writes
+     * through the supplied {@link DtlsSrtpDriver} (RFC 7983 byte-0 demux multiplexes STUN, DTLS, and
+     * SRTP on the one relay socket), adds the local host candidate and the relay endpoint as the remote
+     * candidate, points the driver's STUN handler back at {@link IceAgent#handleInboundStun(byte[])},
+     * then starts the agent and drives {@link IceAgent#tick()} on a virtual thread until a check
+     * succeeds. The binding requests carry no USERNAME and a MESSAGE-INTEGRITY keyed by the relay
+     * {@code <key>}, matching the native Desktop client's wire form. This replaces the no-op agent
+     * created by {@link #start(StartParameters)}.
+     *
+     * @param driver  the DTLS-SRTP driver wrapping the relay socket, whose STUN send/receive seam the
+     *                agent drives
+     * @param timeout the maximum time to wait for a successful connectivity check
+     * @param unit    the unit of {@code timeout}
+     * @return {@code true} if a connectivity check succeeded within the budget, {@code false} otherwise
+     * @throws IllegalStateException if {@link #connectRelay()} or {@link #start(StartParameters)} has
+     *                               not run
+     */
+    public boolean connectIce(DtlsSrtpDriver driver, long timeout, TimeUnit unit) {
+        var allocation = this.relayAllocation;
+        var params = this.startParameters;
+        if (allocation == null || params == null) {
+            throw new IllegalStateException("connectIce requires connectRelay() and start() to have run");
+        }
+        var udp = allocation.transport();
+        if (udp == null) {
+            // Edgeray DataChannel allocation: there is no raw UDP socket to run an ICE binding over.
+            // The relay tunnels STUN/media inside the pre-negotiated DataChannel and forwards by
+            // call-id, so no separate connectivity check is needed; report not-bound and let the
+            // caller pump media over the RelayDatagramTransport.
+            return false;
+        }
+        var agent = new IceAgent(params.dtlsClient(), params.credentials(),
+                (packet, destination) -> driver.sendStun(packet));
+        this.ice = agent;
+        agent.addLocalCandidate(IceCandidate.host(IceComponent.RTP, udp.localAddress(), "host"));
+        agent.addRemoteCandidate(IceCandidate.host(IceComponent.RTP, udp.remoteAddress(), "relay"));
+        var succeeded = new java.util.concurrent.CountDownLatch(1);
+        agent.setListener(new IceAgent.Listener() {
+            @Override
+            public void onCheckSucceeded(IceCandidatePair pair) {
+                succeeded.countDown();
+            }
+
+            @Override
+            public void onNominated(IceCandidatePair pair) {
+                succeeded.countDown();
+            }
+        });
+        driver.setStunHandler(agent::handleInboundStun);
+        agent.start();
+        var ticker = Thread.ofVirtual().name("ice-tick-" + udp.localAddress().getPort()).start(() -> {
+            try {
+                while (succeeded.getCount() > 0 && !Thread.currentThread().isInterrupted()) {
+                    agent.tick();
+                    Thread.sleep(50);
+                }
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        try {
+            return succeeded.await(timeout, unit);
+        } catch (InterruptedException _) {
+            Thread.currentThread().interrupt();
+            return false;
+        } finally {
+            ticker.interrupt();
+        }
+    }
+
+    /**
+     * Builds the DTLS-SRTP driver over the relay-tunneled transport and stores it WITHOUT starting it
+     * or awaiting a handshake, for the hop-by-hop media path where the SRTP keys come from the relay
+     * {@code <hbh_key>} rather than a peer DTLS export.
+     *
+     * <p>The relay forwards SRTP and the peer never completes a peer DTLS handshake (the WhatsApp P2P
+     * path is disabled), so awaiting one would always time out. The driver is still used purely as the
+     * byte transport: its {@code sendSrtp} writes raw SRTP to the relay DataChannel and its inbound
+     * demux forwards raw SRTP to the handler, both independent of DTLS state. The caller starts the
+     * driver via {@code VoiceCallSession.start()}, which kicks the (ignored) handshake and installs the
+     * inbound demux.
+     *
+     * @return the built driver
+     * @throws IllegalStateException if {@link #connectRelay()} has not yet succeeded, or if start
+     *                               parameters are missing
+     */
+    public DtlsSrtpDriver buildDtlsDriver() {
+        var allocation = this.relayAllocation;
+        if (allocation == null) {
+            throw new IllegalStateException("buildDtlsDriver requires connectRelay() to have succeeded first");
+        }
+        var params = this.startParameters;
+        if (params == null) {
+            throw new IllegalStateException("buildDtlsDriver requires StartParameters");
+        }
+        var role = params.dtlsClient() ? SrtpRole.CLIENT : SrtpRole.SERVER;
+        com.github.auties00.cobalt.call.internal.transport.ice.DatagramTransport peerTransport;
+        if (allocation.driver() != null && allocation.driver().channel() != null) {
+            peerTransport = new com.github.auties00.cobalt.call.internal.transport.relay.RelayDatagramTransport(
+                    allocation.driver(), allocation.driver().channel());
+        } else {
+            peerTransport = allocation.transport();
+        }
+        var driver = new DtlsSrtpDriver(
+                peerTransport, role, params.localCert(), params.peerFingerprintSha256());
+        this.dtlsDriver = driver;
+        return driver;
     }
 
     /**
@@ -326,6 +483,86 @@ public final class ActiveCallTransport implements AutoCloseable {
      * Holds the SCTP-over-DTLS inbound bridge produced by {@link #connectDataChannel(int, int)}.
      */
     private volatile SctpDtlsBridge sctpDtlsBridge;
+
+    /**
+     * Holds the most recent observed RTT sample per WhatsApp Web GraphQL endpoint, populated from inbound
+     * {@code <relaylatency><te latency=... relay_name=...>} stanzas via
+     * {@link #recordRelayLatency(String, long)}. The map keeps the latest sample per
+     * {@code relay_name} so a future relay re-election can pick the lowest-RTT candidate.
+     */
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> relayLatencies =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Records one round-trip-time sample for a named relay.
+     *
+     * <p>Called by the call receiver when a {@code <relaylatency><te ... />} stanza arrives.
+     * Replaces any previous sample for the relay, since callers track the freshest value rather
+     * than a moving average for the simple relay-election heuristic.
+     *
+     * @param relayName the WhatsApp Web GraphQL endpoint identifier ({@code relay_name} attribute), or
+     *                  {@code null} to skip the recording
+     * @param latency   the round-trip-time sample (units mirror the wire value)
+     */
+    public void recordRelayLatency(String relayName, long latency) {
+        if (relayName == null) {
+            return;
+        }
+        relayLatencies.put(relayName, latency);
+    }
+
+    /**
+     * Holds the relay transport addresses advertised in {@code <relaylatency><te>} stanzas.
+     *
+     * <p>These are the relay endpoints the server tells the client to measure and allocate against;
+     * the captured corpus shows a successful client allocates to these rather than to the offer-ACK
+     * {@code <te2>} endpoints. Recorded by {@link #recordRelayEndpoint(java.net.InetSocketAddress)} and
+     * consumed by {@link #connectRelay()} as additional Allocate targets.
+     */
+    private final java.util.List<java.net.InetSocketAddress> relayLatencyEndpoints =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    /**
+     * Records one relay transport address advertised in a {@code <relaylatency><te>} stanza.
+     *
+     * @param endpoint the relay transport address, or {@code null} to skip
+     */
+    public void recordRelayEndpoint(java.net.InetSocketAddress endpoint) {
+        if (endpoint != null && !relayLatencyEndpoints.contains(endpoint)) {
+            relayLatencyEndpoints.add(endpoint);
+        }
+    }
+
+    /**
+     * Returns the relay endpoints advertised in {@code <relaylatency><te>} stanzas, in arrival order.
+     *
+     * @return the relaylatency-advertised relay endpoints
+     */
+    public java.util.List<java.net.InetSocketAddress> relayLatencyEndpoints() {
+        return java.util.List.copyOf(relayLatencyEndpoints);
+    }
+
+    /**
+     * Returns the latest RTT sample for a relay, if any has been observed.
+     *
+     * @param relayName the WhatsApp Web GraphQL endpoint identifier
+     * @return the latest sample, or empty when none has been observed
+     */
+    public Optional<Long> relayLatency(String relayName) {
+        if (relayName == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(relayLatencies.get(relayName));
+    }
+
+    /**
+     * Returns an immutable snapshot of all observed relay-latency samples, keyed by relay name.
+     *
+     * @return the snapshot
+     */
+    public java.util.Map<String, Long> relayLatencies() {
+        return java.util.Map.copyOf(relayLatencies);
+    }
 
     /**
      * Opens the SCTP association and prepares the data-channel transport.

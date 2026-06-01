@@ -34,7 +34,7 @@ public final class FetchNewsletterFollowersMexRequest implements MexOperation.Re
      *
      * <p>Sent as the {@code query_id} attribute of the outgoing {@code <query>} child.
      */
-    public static final String QUERY_ID = "25895136756785869";
+    public static final String QUERY_ID = "27472091235714801";
 
     /**
      * Holds the GraphQL operation name reported by WhatsApp Web's MEX perf tracker for this query.

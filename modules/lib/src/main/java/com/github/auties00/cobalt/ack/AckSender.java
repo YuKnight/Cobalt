@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.ack;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -28,20 +28,20 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebCreateNackFromStanza")
 public final class AckSender {
     /**
-     * The {@link WhatsAppClient} that ships the assembled ack stanza fire-and-forget through
-     * {@link WhatsAppClient#sendNodeWithNoResponse(Node)}.
+     * The {@link LinkedWhatsAppClient} that ships the assembled ack stanza fire-and-forget through
+     * {@link LinkedWhatsAppClient#sendNodeWithNoResponse(Node)}.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
-     * Constructs a sender bound to the given {@link WhatsAppClient}.
+     * Constructs a sender bound to the given {@link LinkedWhatsAppClient}.
      *
      * <p>One {@code AckSender} is created per logical client; the lifecycle wiring threads the same
      * instance into every stream handler that needs to emit an ack.
      *
-     * @param whatsapp the {@link WhatsAppClient} used to dispatch the assembled ack stanza
+     * @param whatsapp the {@link LinkedWhatsAppClient} used to dispatch the assembled ack stanza
      */
-    public AckSender(WhatsAppClient whatsapp) {
+    public AckSender(LinkedWhatsAppClient whatsapp) {
         this.whatsapp = Objects.requireNonNull(whatsapp, "whatsapp");
     }
 
@@ -139,13 +139,13 @@ public final class AckSender {
     }
 
     /**
-     * Dispatches the given assembled ack stanza through the underlying {@link WhatsAppClient}.
+     * Dispatches the given assembled ack stanza through the underlying {@link LinkedWhatsAppClient}.
      *
      * <p>Called only from {@link AckBuilder#send()}; package-private so callers cannot bypass the
      * builder's id and from precondition.
      *
      * @implNote This implementation routes through
-     * {@link WhatsAppClient#sendNodeWithNoResponse(Node)} so the ack is sent fire-and-forget; the
+     * {@link LinkedWhatsAppClient#sendNodeWithNoResponse(Node)} so the ack is sent fire-and-forget; the
      * socket layer raises a
      * {@link com.github.auties00.cobalt.exception.WhatsAppSessionException.Closed} when the
      * connection is down at the time of the send.

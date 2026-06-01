@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -35,7 +35,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      * @implNote
      * This implementation reads the literal {@code "recent_sticker"} directly
      * from
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#primaryFeatures()}
+     * {@link com.github.auties00.cobalt.store.SyncStore#primaryFeatures()}
      * rather than going through {@code WAWebPrimaryFeatures.primaryFeatureEnabled};
      * the predicate is identical because that helper is just a containment
      * check against the same set.
@@ -102,8 +102,8 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        if (!client.store().primaryFeatures().contains(RECENT_STICKER_FEATURE)) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
+        if (!client.store().syncStore().primaryFeatures().contains(RECENT_STICKER_FEATURE)) {
             return MutationApplicationResult.unsupported();
         }
 
@@ -123,14 +123,14 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
         var action = mutation.value().action().orElse(null) instanceof RemoveRecentStickerAction entry ? entry : null;
         var lastStickerSentTs = action == null ? null : action.lastStickerSentTs().orElse(null);
 
-        var sticker = client.store().findRecentSticker(stickerHash);
+        var sticker = client.store().settingsStore().findRecentSticker(stickerHash);
         if (sticker.isEmpty()) {
             return MutationApplicationResult.orphan();
         }
 
         var stickerTimestamp = sticker.get().timestamp().orElse(0L);
         if (lastStickerSentTs == null || stickerTimestamp <= toEpochComparable(lastStickerSentTs)) {
-            client.store().removeRecentSticker(stickerHash);
+            client.store().settingsStore().removeRecentSticker(stickerHash);
         }
 
         return MutationApplicationResult.success();
@@ -142,7 +142,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
      *
      * <p>Unwraps the {@link Instant} to its epoch-second value so the
      * {@code localTs <= lastSent} comparison performed by
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} stays
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} stays
      * purely numeric.
      *
      * @implNote

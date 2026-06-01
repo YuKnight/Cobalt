@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.bot.UGCBotAction;
@@ -15,7 +15,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * <p>The sync dispatcher would route incoming {@code ugc_bot} mutations here if
  * the server ever emits one. The handler captures the raw protobuf
  * {@code definition} bytes into
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setUserCreatedBotDefinition(byte[])}
+ * {@link com.github.auties00.cobalt.store.BusinessStore#setUserCreatedBotDefinition(byte[])}
  * so downstream code can pick them up once the matching WA Web sync module
  * ships.
  *
@@ -81,14 +81,14 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#unsupported()}, a missing
      * {@link UGCBotAction#definition()} is reported as malformed, and the raw
      * definition bytes are otherwise persisted via
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setUserCreatedBotDefinition(byte[])}.
+     * {@link com.github.auties00.cobalt.store.BusinessStore#setUserCreatedBotDefinition(byte[])}.
      *
      * @implNote
      * This implementation follows the canonical single-payload shape of sibling
      * handlers because WA Web ships no concrete handler to mirror.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -98,7 +98,7 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setUserCreatedBotDefinition(action.definition().get());
+        client.store().businessStore().setUserCreatedBotDefinition(action.definition().get());
         return MutationApplicationResult.success();
     }
 }

@@ -8,7 +8,8 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.sync.SyncdCoordinator;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -54,11 +55,12 @@ class MissingSyncKeyRequestServiceTest {
         props.set(ABProp.SYNCD_WAIT_FOR_KEY_TIMEOUT_DAYS, 30);
 
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         client = TestWhatsAppClient.create().withStore(store);
-        var wam = new DefaultWamService(client, props);
-        requestService = new MissingSyncKeyRequestService(client, wam);
-        timeoutScheduler = new MissingSyncKeyTimeoutScheduler(client, props, requestService);
+        var wam = new LiveWamService(client, props);
+        var coordinator = new SyncdCoordinator();
+        requestService = new LiveMissingSyncKeyRequestService(client, wam, coordinator);
+        timeoutScheduler = new MissingSyncKeyTimeoutScheduler(client, props, requestService, coordinator);
         requestService.setTimeoutScheduler(timeoutScheduler);
     }
 
@@ -75,7 +77,7 @@ class MissingSyncKeyRequestServiceTest {
         void emptyIsNoOp() {
             store.setOfflineResumeState(WhatsAppClientOfflineResumeState.COMPLETE);
             assertDoesNotThrow(() -> requestService.requestMissingKeys(List.of()));
-            assertTrue(store.missingSyncKeys().isEmpty(),
+            assertTrue(store.syncStore().missingSyncKeys().isEmpty(),
                     "empty input must not track anything in the missing-key store");
         }
 
@@ -86,7 +88,7 @@ class MissingSyncKeyRequestServiceTest {
         void resumeIncompleteShortCircuits() {
             assertDoesNotThrow(() -> requestService.requestMissingKeys(
                     List.of(new byte[]{1, 2, 3, 4, 5, 6})));
-            assertTrue(store.missingSyncKeys().isEmpty(),
+            assertTrue(store.syncStore().missingSyncKeys().isEmpty(),
                     "no missing-key tracking until resume completes");
         }
 
@@ -95,7 +97,7 @@ class MissingSyncKeyRequestServiceTest {
         void allAlreadyTrackedShortCircuits() {
             store.setOfflineResumeState(WhatsAppClientOfflineResumeState.COMPLETE);
             var keyId = new byte[]{1, 2, 3, 4, 5, 6};
-            store.addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
+            store.syncStore().addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
                     .keyId(keyId)
                     .timestamp(Instant.now())
                     .askedDevices(Set.of(0))
@@ -103,7 +105,7 @@ class MissingSyncKeyRequestServiceTest {
 
             assertDoesNotThrow(() -> requestService.requestMissingKeys(List.of(keyId)),
                     "already-tracked id reduces the filter to empty; sendKeyRequestToAllDevices is never reached");
-            assertTrue(store.findMissingSyncKey(keyId).isPresent(),
+            assertTrue(store.syncStore().findMissingSyncKey(keyId).isPresent(),
                     "existing missing-key tracker stays in place");
         }
 

@@ -2,7 +2,6 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.StubDeviceService;
-import com.github.auties00.cobalt.device.fanout.DeviceGroupFanoutResult;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.TestSignalSession;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
@@ -22,7 +21,8 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
 import com.github.auties00.cobalt.store.WhatsAppStore;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.DisplayName;
@@ -58,13 +58,13 @@ class GroupMessageSenderTest {
     void steadyStateSkmsg() {
         var senderStore = MessageFixtures.temporaryStore(SELF_PN, SELF_LID);
         seedGroupMetadata(senderStore, /*lidAddressing*/ true);
-        senderStore.markSenderKeyDistributed(GROUP, PARTICIPANT_LID);
+        senderStore.signalStore().markSenderKeyDistributed(GROUP, PARTICIPANT_LID);
 
         var captured = new AtomicReference<Node>();
         var client = clientWithCapture(senderStore, captured);
         var sender = groupMessageSender(client, senderStore,
                 StubDeviceService.create().withGroupFanout(
-                        (g, s) -> new DeviceGroupFanoutResult(Set.of(PARTICIPANT_LID), "2:hash")));
+                        g -> Set.of(PARTICIPANT_LID)));
 
         sender.send(GROUP, chatMessage("3EB0GRP0001", GROUP, MessageContainer.of("hi")));
 
@@ -97,7 +97,7 @@ class GroupMessageSenderTest {
         var sender = groupMessageSender(client, senderStore,
                 StubDeviceService.create()
                         .withGroupFanout(
-                                (g, s) -> new DeviceGroupFanoutResult(Set.of(PARTICIPANT_LID), "2:hash"))
+                                g -> Set.of(PARTICIPANT_LID))
                         .withEnsureSessions(devices -> 0));
 
         sender.send(GROUP, chatMessage("3EB0GRP0002", GROUP, MessageContainer.of("hello group")));
@@ -130,13 +130,13 @@ class GroupMessageSenderTest {
         var senderStore = MessageFixtures.temporaryStore(SELF_PN, SELF_LID);
         var participantPn = Jid.of("19254863482:0@s.whatsapp.net");
         seedGroupMetadata(senderStore, /*lidAddressing*/ false);
-        senderStore.markSenderKeyDistributed(GROUP, participantPn);
+        senderStore.signalStore().markSenderKeyDistributed(GROUP, participantPn);
 
         var captured = new AtomicReference<Node>();
         var client = clientWithCapture(senderStore, captured);
         var sender = groupMessageSender(client, senderStore,
                 StubDeviceService.create().withGroupFanout(
-                        (g, s) -> new DeviceGroupFanoutResult(Set.of(participantPn), "2:hash")));
+                        g -> Set.of(participantPn)));
 
         sender.send(GROUP, chatMessage("3EB0GRPPN01", GROUP, MessageContainer.of("hi")));
 
@@ -153,7 +153,7 @@ class GroupMessageSenderTest {
                 .subject("test group")
                 .isLidAddressingMode(lidAddressing)
                 .build();
-        store.addChatMetadata(metadata);
+        store.chatStore().addChatMetadata(metadata);
     }
 
     // The returned ack carries only the t attribute, which AckParser reads as
@@ -174,9 +174,10 @@ class GroupMessageSenderTest {
     private static GroupMessageSender groupMessageSender(TestWhatsAppClient client, WhatsAppStore store, StubDeviceService deviceService) {
         var ab = client.abPropsService();
         var encryption = new MessageEncryption(store,
-                new SignalSessionCipher(store),
-                new SignalGroupCipher(store));
-        var wamService = new DefaultWamService(client, ab);
+                new SignalSessionCipher(store.signalStore()),
+                new SignalGroupCipher(store.signalStore()),
+                new SignalCryptoLocks());
+        var wamService = new LiveWamService(client, ab);
         var skDistribution = new SenderKeyDistribution(encryption, deviceService, store);
         var bot = new BotStanza(encryption, new BotProtobufTransform(store));
         var biz = new BizStanza(store);

@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.migration;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -31,14 +31,14 @@ class LidMigrationServiceChangeLidTest {
     private static final Jid PEER_LID_OLD = Jid.of("258252122116273@lid");
     private static final Jid PEER_LID_NEW = Jid.of("999999999999999@lid");
 
-    private record Harness(TestWhatsAppClient client, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, LiveLidMigrationService service) {}
 
     private static Harness build() {
         var props = TestABPropsService.builder().build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, service);
     }
 
@@ -48,7 +48,7 @@ class LidMigrationServiceChangeLidTest {
         var h = build();
         h.service.changeLid(null, PEER_LID_NEW, PEER_LID_OLD);
         // Nothing throws; nothing populated.
-        assertFalse(h.client.store().findLidByPhone(PEER_PN).isPresent());
+        assertFalse(h.client.store().contactStore().findLidByPhone(PEER_PN).isPresent());
     }
 
     @Test
@@ -56,7 +56,7 @@ class LidMigrationServiceChangeLidTest {
     void changeLidNullNewLid() {
         var h = build();
         h.service.changeLid(PEER_PN, null, PEER_LID_OLD);
-        assertFalse(h.client.store().findLidByPhone(PEER_PN).isPresent());
+        assertFalse(h.client.store().contactStore().findLidByPhone(PEER_PN).isPresent());
     }
 
     @Test
@@ -66,17 +66,17 @@ class LidMigrationServiceChangeLidTest {
         var store = h.client.store();
 
         // Pre-existing state: contact + chat under the phone JID.
-        store.addNewContact(PEER_PN);
-        store.addNewChat(PEER_PN);
+        store.contactStore().addNewContact(PEER_PN);
+        store.chatStore().addNewChat(PEER_PN);
 
         h.service.changeLid(PEER_PN, PEER_LID_NEW, PEER_LID_OLD);
 
-        assertEquals(PEER_LID_NEW, store.findLidByPhone(PEER_PN).orElseThrow());
+        assertEquals(PEER_LID_NEW, store.contactStore().findLidByPhone(PEER_PN).orElseThrow());
 
-        var contact = store.findContactByJid(PEER_PN).orElseThrow();
+        var contact = store.contactStore().findContactByJid(PEER_PN).orElseThrow();
         assertEquals(PEER_LID_NEW, contact.lid().orElseThrow());
 
-        var chat = store.findChatByJid(PEER_PN).orElseThrow();
+        var chat = store.chatStore().findChatByJid(PEER_PN).orElseThrow();
         assertEquals(PEER_LID_NEW, chat.lid().orElseThrow());
         assertEquals(PEER_PN, chat.phoneNumberJid().orElseThrow());
 
@@ -88,13 +88,13 @@ class LidMigrationServiceChangeLidTest {
     @DisplayName("changeLid still works when only the contact is pre-existing (no chat)")
     void changeLidContactOnly() {
         var h = build();
-        h.client.store().addNewContact(PEER_PN);
+        h.client.store().contactStore().addNewContact(PEER_PN);
 
         h.service.changeLid(PEER_PN, PEER_LID_NEW, null);
 
-        assertEquals(PEER_LID_NEW, h.client.store().findLidByPhone(PEER_PN).orElseThrow());
-        assertEquals(PEER_LID_NEW, h.client.store().findContactByJid(PEER_PN).orElseThrow().lid().orElseThrow());
-        assertFalse(h.client.store().findChatByJid(PEER_PN).isPresent());
+        assertEquals(PEER_LID_NEW, h.client.store().contactStore().findLidByPhone(PEER_PN).orElseThrow());
+        assertEquals(PEER_LID_NEW, h.client.store().contactStore().findContactByJid(PEER_PN).orElseThrow().lid().orElseThrow());
+        assertFalse(h.client.store().chatStore().findChatByJid(PEER_PN).isPresent());
     }
 
     @Test
@@ -118,10 +118,10 @@ class LidMigrationServiceChangeLidTest {
         var store = h.client.store();
 
         // PN-only chat with no primary cache hit and no localLid, so the fallback cache is consulted.
-        store.addNewChat(PEER_PN);
+        store.chatStore().addNewChat(PEER_PN);
         h.service.registerOriginalLid(PEER_PN, PEER_LID_OLD);
 
-        var chat = store.findChatByJid(PEER_PN).orElseThrow();
+        var chat = store.chatStore().findChatByJid(PEER_PN).orElseThrow();
         var resolution = h.service.resolveThread(chat);
 
         assertInstanceOfMigrate(resolution, PEER_LID_OLD.toUserJid());

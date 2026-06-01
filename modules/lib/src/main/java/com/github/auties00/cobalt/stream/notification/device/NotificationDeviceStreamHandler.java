@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +32,7 @@ import java.util.List;
  * {@link DeviceService#handleDeviceNotification(Node, String, Jid)}.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleDeviceNotification")
-public final class NotificationDeviceStreamHandler implements SocketStream.Handler {
+public final class NotificationDeviceStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs warnings about malformed stanzas and errors surfaced by the per-entry processing loop.
@@ -43,7 +43,7 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
     /**
      * Provides store reads and LID-PN mapping registration.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Applies the parsed device action (add, remove, or update) to the cached device list.
@@ -61,11 +61,11 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
      *
      * <p>Called once by {@link NotificationDeviceDispatcher}.
      *
-     * @param whatsapp      the {@link WhatsAppClient}
+     * @param whatsapp      the {@link LinkedWhatsAppClient}
      * @param deviceService the {@link DeviceService}
      * @param ackSender     the {@link AckSender}
      */
-    public NotificationDeviceStreamHandler(WhatsAppClient whatsapp, DeviceService deviceService, AckSender ackSender) {
+    public NotificationDeviceStreamHandler(LinkedWhatsAppClient whatsapp, DeviceService deviceService, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.deviceService = deviceService;
         this.ackSender = ackSender;
@@ -120,11 +120,11 @@ public final class NotificationDeviceStreamHandler implements SocketStream.Handl
                 : null;
 
         var secondaryJid = userJid.hasLidServer()
-                ? whatsapp.store().findPhoneByLid(userJid).orElse(null)
+                ? whatsapp.store().contactStore().findPhoneByLid(userJid).orElse(null)
                 : lidUser;
 
         if (lidUser != null) {
-            whatsapp.store().registerLidMapping(userJid, lidUser);
+            whatsapp.store().contactStore().registerLidMapping(userJid, lidUser);
         }
 
         var entries = new ArrayList<Jid>();

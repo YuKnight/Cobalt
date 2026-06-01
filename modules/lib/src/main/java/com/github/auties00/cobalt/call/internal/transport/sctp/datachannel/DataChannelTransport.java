@@ -332,12 +332,38 @@ public final class DataChannelTransport implements AutoCloseable {
      */
     void sendDataMessage(int streamId, int ppid, byte[] payload, boolean ordered) {
         try {
-            // TODO: route through a sctp_sendv_spa container with sctp_prinfo so the channel's
-            //  maxRetransmits/maxLifetimeMs are honoured on the local outbound path; today the
-            //  send is always fully reliable regardless of the negotiated partial-reliability
             association.send(streamId, ppid, payload, ordered);
         } catch (WhatsAppCallException.Sctp e) {
             throw new WhatsAppCallException.DataChannel("SCTP send failed on stream " + streamId, e);
+        }
+    }
+
+    /**
+     * Sends a DataChannel application message under a partial-reliability policy.
+     *
+     * <p>Routes through {@link SctpAssociation#sendWithPolicy(int, int, byte[], boolean, short, int)}
+     * with the supplied policy operand so usrsctp honours the channel's negotiated
+     * {@code maxRetransmits} or {@code maxLifetimeMs} on the local outbound path. The previous
+     * fully-reliable send path remains available via
+     * {@link #sendDataMessage(int, int, byte[], boolean)} for channels that did not negotiate
+     * partial reliability.
+     *
+     * @param streamId the SCTP stream id
+     * @param ppid     the PPID, one of {@link #PPID_STRING}, {@link #PPID_BINARY},
+     *                 {@link #PPID_STRING_EMPTY}, or {@link #PPID_BINARY_EMPTY}
+     * @param payload  the message bytes
+     * @param ordered  whether to preserve message ordering
+     * @param prPolicy one of the {@code SCTP_PR_SCTP_NONE / TTL / RTX} constants
+     * @param prValue  the policy operand: max retransmissions for {@code RTX}, lifetime
+     *                 milliseconds for {@code TTL}
+     * @throws WhatsAppCallException.DataChannel if the SCTP send fails
+     */
+    void sendDataMessage(int streamId, int ppid, byte[] payload, boolean ordered,
+                         short prPolicy, int prValue) {
+        try {
+            association.sendWithPolicy(streamId, ppid, payload, ordered, prPolicy, prValue);
+        } catch (WhatsAppCallException.Sctp e) {
+            throw new WhatsAppCallException.DataChannel("SCTP send (SPA) failed on stream " + streamId, e);
         }
     }
 

@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.StatusPostOptInNotificationPreferencesAction;
@@ -81,7 +81,7 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      * {@link MutationApplicationResult#unsupported()}, a value that does not decode
      * to a {@link StatusPostOptInNotificationPreferencesAction} is reported as
      * malformed, and the {@code enabled} field is otherwise written to
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#setStatusPostOptInNotificationPreferencesEnabled(Boolean)}.
+     * {@link com.github.auties00.cobalt.store.SettingsStore#setStatusPostOptInNotificationPreferencesEnabled(Boolean)}.
      *
      * @implNote
      * This implementation follows the canonical single-boolean-payload shape used
@@ -89,7 +89,7 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      * action; the shape is inferred from the protobuf schema and a sibling handler.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -98,7 +98,7 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setStatusPostOptInNotificationPreferencesEnabled(action.enabled());
+        client.store().settingsStore().setStatusPostOptInNotificationPreferencesEnabled(action.enabled());
         return MutationApplicationResult.success();
     }
 }

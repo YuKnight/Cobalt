@@ -1,14 +1,14 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 /**
  * Handles {@code type="contacts"} notifications carrying server-side mutations to the user's contact
@@ -24,7 +24,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * {@code refreshTextStatus} which Cobalt's chat-presence pipeline handles via separate stanzas.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleContactNotification")
-final class NotificationContactStreamHandler implements SocketStream.Handler {
+final class NotificationContactStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
      * Logs warnings about malformed stanzas and debug messages about unhandled child types.
@@ -34,7 +34,7 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
     /**
      * Holds the client used for store reads and name queries.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Holds the ack sender used to ship the post-processing
@@ -48,7 +48,7 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
      * @param whatsapp  the non-{@code null} client
      * @param ackSender the non-{@code null} ack sender
      */
-    NotificationContactStreamHandler(WhatsAppClient whatsapp, AckSender ackSender) {
+    NotificationContactStreamHandler(LinkedWhatsAppClient whatsapp, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.ackSender = ackSender;
     }
@@ -85,7 +85,7 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
      * {@code sync}) and routes by description.
      *
      * <p>The {@code sync} branch flips
-     * {@link com.github.auties00.cobalt.store.AbstractWhatsAppStore#setSyncedContacts} to {@code false}
+     * {@link com.github.auties00.cobalt.store.SyncStore#setSyncedContacts} to {@code false}
      * so the next reconnect re-runs the contact bootstrap. The {@code add} and {@code remove} children,
      * although recognised when scanning for an action child, fall through to the {@code default} branch
      * and are debug-logged.</p>
@@ -114,7 +114,7 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
             case "modify" -> handleModify(node, actionNode);
             case "sync" -> {
                 LOGGER.log(System.Logger.Level.DEBUG, "Received contact sync notification");
-                whatsapp.store().setSyncedContacts(false);
+                whatsapp.store().syncStore().setSyncedContacts(false);
             }
             default ->
                     LOGGER.log(System.Logger.Level.DEBUG,
@@ -150,9 +150,8 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
                 return;
             }
 
-            var contact = whatsapp.store()
-                    .findContactByJid(targetJid)
-                    .orElseGet(() -> whatsapp.store().addNewContact(targetJid));
+            var contact = whatsapp.store().contactStore().findContactByJid(targetJid)
+                    .orElseGet(() -> whatsapp.store().contactStore().addNewContact(targetJid));
 
             contact.setLastKnownPresence(ContactStatus.UNAVAILABLE);
 
@@ -209,26 +208,25 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
                 .map(Jid::toUserJid)
                 .orElse(null);
 
-        whatsapp.store().findChatByJid(oldJid).ifPresent(chat -> {
+        whatsapp.store().chatStore().findChatByJid(oldJid).ifPresent(chat -> {
             chat.setNewJid(newJid);
         });
 
-        whatsapp.store().findChatByJid(newJid).ifPresent(chat -> {
+        whatsapp.store().chatStore().findChatByJid(newJid).ifPresent(chat -> {
             chat.setOldJid(oldJid);
         });
 
         if (oldLid != null && newLid != null) {
-            whatsapp.store().registerLidMapping(oldJid, oldLid);
-            whatsapp.store().registerLidMapping(newJid, newLid);
+            whatsapp.store().contactStore().registerLidMapping(oldJid, oldLid);
+            whatsapp.store().contactStore().registerLidMapping(newJid, newLid);
         }
 
-        var updated = whatsapp.store()
-                .findContactByJid(newJid)
-                .orElseGet(() -> whatsapp.store().addNewContact(newJid));
+        var updated = whatsapp.store().contactStore().findContactByJid(newJid)
+                .orElseGet(() -> whatsapp.store().contactStore().addNewContact(newJid));
         if (newLid != null) {
             updated.setLid(newLid);
         }
-        whatsapp.store().addContact(updated);
+        whatsapp.store().contactStore().addContact(updated);
     }
 
     /**
@@ -250,7 +248,7 @@ final class NotificationContactStreamHandler implements SocketStream.Handler {
                     throwable.getMessage());
         }
 
-        whatsapp.store().addContact(contact);
+        whatsapp.store().contactStore().addContact(contact);
     }
 
     /**

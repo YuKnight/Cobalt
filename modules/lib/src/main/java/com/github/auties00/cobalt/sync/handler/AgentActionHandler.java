@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -19,7 +19,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * account. {@link SyncdOperation#SET} mutations upsert an agent entry by id;
  * {@link SyncdOperation#REMOVE} mutations drop an entry by id. The reconciled
  * roster is read back through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#findAgentState(String)}.
+ * {@link com.github.auties00.cobalt.store.BusinessStore#findAgentState(String)}.
  *
  * @implNote
  * This implementation omits two side effects that WA Web performs after
@@ -94,7 +94,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebAgentSync", exports = {"applyMutations", "getValidatedContentSet", "getValidatedContentRemove"}, adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() <= 1) {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
@@ -105,7 +105,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
         }
 
         if (mutation.operation() == SyncdOperation.REMOVE) {
-            client.store().removeAgentState(agentId);
+            client.store().businessStore().removeAgentState(agentId);
             return MutationApplicationResult.success();
         }
 
@@ -117,7 +117,7 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        client.store().putAgentState(new AgentStateBuilder()
+        client.store().businessStore().putAgentState(new AgentStateBuilder()
                 .agentId(agentId)
                 .name(action.name().orElse(null))
                 .deviceId(action.deviceID().isPresent() ? action.deviceID().getAsInt() : null)

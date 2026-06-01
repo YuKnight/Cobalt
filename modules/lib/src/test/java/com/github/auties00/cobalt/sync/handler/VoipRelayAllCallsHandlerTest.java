@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.*;
@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Covers {@link VoipRelayAllCallsHandler}: the wire-constant trio, the happy {@code SET} branch
- * that persists the boolean to {@link com.github.auties00.cobalt.store.WhatsAppStore#setRelayAllCalls(boolean)},
+ * that persists the boolean to {@link com.github.auties00.cobalt.store.SettingsStore#setRelayAllCalls(boolean)},
  * the malformed action branch, the {@link SyncdOperation#REMOVE} unsupported branch, the outgoing
  * builder shape from {@link VoipRelayAllCallsMutationFactory}, and the default conflict-resolution
  * tiebreaker. Each test runs against a fresh temporary store carrying only the local identity, so
@@ -34,7 +34,7 @@ class VoipRelayAllCallsHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
 
     @BeforeEach
     void setUp() {
@@ -83,21 +83,21 @@ class VoipRelayAllCallsHandlerTest {
         @Test
         @DisplayName("SET true updates the store flag and returns SUCCESS")
         void setsTrue() {
-            assertFalse(client.store().relayAllCalls(), "precondition: starts false");
+            assertFalse(client.store().settingsStore().relayAllCalls(), "precondition: starts false");
             var result = new VoipRelayAllCallsHandler().applyMutation(client,
                     mutation(true, SyncdOperation.SET, Instant.ofEpochSecond(1_700_000_000L)));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().relayAllCalls());
+            assertTrue(client.store().settingsStore().relayAllCalls());
         }
 
         @Test
         @DisplayName("SET false flips the flag back to false")
         void setsFalse() {
-            client.store().setRelayAllCalls(true);
+            client.store().settingsStore().setRelayAllCalls(true);
             var result = new VoipRelayAllCallsHandler().applyMutation(client,
                     mutation(false, SyncdOperation.SET, Instant.ofEpochSecond(1_700_000_000L)));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertFalse(client.store().relayAllCalls());
+            assertFalse(client.store().settingsStore().relayAllCalls());
         }
     }
 
@@ -195,7 +195,7 @@ class VoipRelayAllCallsHandlerTest {
             assertEquals(2, results.size());
             assertEquals(SyncActionState.SUCCESS, results.get(0).actionState());
             assertEquals(SyncActionState.SUCCESS, results.get(1).actionState());
-            assertFalse(client.store().relayAllCalls(),
+            assertFalse(client.store().settingsStore().relayAllCalls(),
                     "the second SET overwrites the first under the default sequential apply");
         }
     }

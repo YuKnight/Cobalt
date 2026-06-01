@@ -1,4 +1,6 @@
 package com.github.auties00.cobalt.message.send;
+import com.github.auties00.cobalt.media.transcode.LiveMediaTranscoderService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.StubDeviceService;
@@ -15,7 +17,8 @@ import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import org.junit.jupiter.api.DisplayName;
@@ -177,12 +180,13 @@ class MessageSendingServiceTest {
                 .withStore(store)
                 .withAbPropsService(TestABPropsService.builder().build());
         var encryption = new MessageEncryption(store,
-                new SignalSessionCipher(store),
-                new SignalGroupCipher(store));
-        var wam = new DefaultWamService(client, client.abPropsService());
-        var migration = new LidMigrationService(client, client.abPropsService(), wam);
-        return new MessageSendingService(client, encryption,
+                new SignalSessionCipher(store.signalStore()),
+                new SignalGroupCipher(store.signalStore()),
+                new SignalCryptoLocks());
+        var wam = new LiveWamService(client, client.abPropsService());
+        var migration = new LiveLidMigrationService(client, client.abPropsService(), wam);
+        return new LiveMessageSendingService(client, encryption,
                 StubDeviceService.create(), migration, client.abPropsService(), wam,
-                new MediaTranscoderService(client, client.abPropsService(), TestMediaConnectionService.create()));
+                new LiveMediaTranscoderService(client, client.abPropsService(), TestMediaConnectionService.create()));
     }
 }

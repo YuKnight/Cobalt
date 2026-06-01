@@ -57,7 +57,7 @@ Unchanged from the previous agent contract. For each export:
 2. Read the mapped Cobalt method.
 3. Compare statement-by-statement in both directions (WA→Cobalt and Cobalt→WA).
 4. Classify: `MATCH` / `MISMATCH` / `MISSING_IN_COBALT` / `MISSING_IN_WA_WEB` / `ADAPTED`.
-5. Fix every issue in owned files. Never dismiss a store-op gap — implement it in `WhatsAppStore` / `AbstractWhatsAppStore`.
+5. Fix every issue in owned files. Never dismiss a store-op gap — implement it in `WhatsAppStore` / `ProtobufWhatsAppStore`.
 6. Apply `@WhatsAppWebExport` annotations + javadoc per CLAUDE.md. Inline `// WAWebFoo.bar` comments on statements with a direct WA counterpart. `// ADAPTED: WAWebFoo.bar` when structurally different. `// NO_WA_BASIS` only when truly Java-specific.
 
 **Lib-only rule for `@WhatsAppWebModule` / `@WhatsAppWebExport` / `@WhatsAppMobileClass` / `@WhatsAppMobileMethod`:** these annotations are **only allowed in `modules/lib/src/main/java/`**. NEVER add them (or the `cobalt-source-meta` dependency / `requires static com.github.auties00.cobalt.meta` directive that lets them resolve) to `modules/model`, `modules/proto`, `modules/cobalt-source-meta`, or any other Maven submodule. If a class you'd otherwise annotate lives outside `modules/lib` (e.g. `Jid` in `modules/model`), record provenance on the lib-side **consumer** of that class instead, and note in the report "annotations skipped — counterpart lives outside lib". Adaptation prose belongs in the validation report or in the lib-side consumer's javadoc, not in the model class's javadoc.

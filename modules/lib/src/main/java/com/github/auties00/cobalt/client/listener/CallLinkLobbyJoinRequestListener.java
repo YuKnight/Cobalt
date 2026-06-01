@@ -1,0 +1,31 @@
+package com.github.auties00.cobalt.client.listener;
+
+import com.github.auties00.cobalt.call.CallLink;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.model.jid.Jid;
+
+/**
+ * A functional interface for the {@link LinkedWhatsAppClientListener#onCallLinkLobbyJoinRequest onCallLinkLobbyJoinRequest} event.
+ *
+ * <p>{@link LinkedWhatsAppClientListener} extends this interface and supplies an empty
+ * default implementation, so the event can also be observed in isolation as a
+ * lambda.
+ *
+ * @see LinkedWhatsAppClientListener
+ */
+@FunctionalInterface
+public interface CallLinkLobbyJoinRequestListener extends WhatsAppListener {
+    /**
+     * Notifies the listener that someone has clicked a call-link the
+     * local user owns and is now waiting in the lobby for the host to
+     * admit them.
+     *
+     * <p>The host is expected to admit or deny the waiting joiner in
+     * response.
+     *
+     * @param whatsapp the client emitting the event
+     * @param link     the link the joiner is waiting on
+     * @param peer     the JID of the joiner waiting in the lobby
+     */
+    void onCallLinkLobbyJoinRequest(LinkedWhatsAppClient whatsapp, CallLink link, Jid peer);
+}

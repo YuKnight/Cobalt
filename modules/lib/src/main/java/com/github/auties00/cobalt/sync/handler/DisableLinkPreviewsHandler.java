@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -68,7 +68,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      * <p>Walks the batch once classifying each mutation, tracks the last valid
      * {@link PrivacySettingDisableLinkPreviewsAction#isPreviewsDisabled()} flag
      * carried by a {@link SyncdOperation#SET}, and persists that single value
-     * via {@link com.github.auties00.cobalt.store.WhatsAppStore#setDisableLinkPreviews(boolean)}
+     * via {@link com.github.auties00.cobalt.store.SettingsStore#setDisableLinkPreviews(boolean)}
      * after the loop. Non-{@code SET} operations yield
      * {@link MutationApplicationResult#unsupported()} and entries whose action
      * payload is not a {@link PrivacySettingDisableLinkPreviewsAction} yield
@@ -81,7 +81,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.isEmpty()) {
             return List.of();
         }
@@ -103,7 +103,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
         }
 
         if (lastValid != null) {
-            client.store().setDisableLinkPreviews(lastValid);
+            client.store().settingsStore().setDisableLinkPreviews(lastValid);
         }
 
         return results;
@@ -116,7 +116,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      * {@link MutationApplicationResult#unsupported()} and action payloads that
      * are not a {@link PrivacySettingDisableLinkPreviewsAction} as
      * {@link MutationApplicationResult#malformed()}, then persists the value
-     * through {@link com.github.auties00.cobalt.store.WhatsAppStore#setDisableLinkPreviews(boolean)}.
+     * through {@link com.github.auties00.cobalt.store.SettingsStore#setDisableLinkPreviews(boolean)}.
      *
      * @implNote
      * This implementation persists the value eagerly rather than folding it,
@@ -124,7 +124,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -133,7 +133,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setDisableLinkPreviews(action.isPreviewsDisabled());
+        client.store().settingsStore().setDisableLinkPreviews(action.isPreviewsDisabled());
         return MutationApplicationResult.success();
     }
 

@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.suggestNewSubgroup} — recommend
+ * Input model for {@code LinkedWhatsAppClient.suggestNewSubgroup} — recommend
  * a brand-new sub-group be linked under a community parent.
  *
  * <p>{@link #community} and {@link #subject} are required.

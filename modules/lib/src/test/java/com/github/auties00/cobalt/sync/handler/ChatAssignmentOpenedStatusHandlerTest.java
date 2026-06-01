@@ -119,8 +119,8 @@ class ChatAssignmentOpenedStatusHandlerTest {
         @Test
         @DisplayName("a SET with chatOpened=true flips the assignment's opened flag")
         void opensTheAssignment() {
-            store.addNewChat(CHAT_JID);
-            store.putChatAssignment(new ChatAssignmentBuilder()
+            store.chatStore().addNewChat(CHAT_JID);
+            store.businessStore().putChatAssignment(new ChatAssignmentBuilder()
                     .chatJid(CHAT_JID)
                     .agentId(AGENT_ID)
                     .opened(false)
@@ -131,14 +131,14 @@ class ChatAssignmentOpenedStatusHandlerTest {
                     buildMutation(CHAT_JID.toString(), AGENT_ID, action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findChatAssignment(CHAT_JID).orElseThrow().opened());
+            assertTrue(store.businessStore().findChatAssignment(CHAT_JID).orElseThrow().opened());
         }
 
         @Test
         @DisplayName("a SET with chatOpened=false clears the opened flag")
         void closesTheAssignment() {
-            store.addNewChat(CHAT_JID);
-            store.putChatAssignment(new ChatAssignmentBuilder()
+            store.chatStore().addNewChat(CHAT_JID);
+            store.businessStore().putChatAssignment(new ChatAssignmentBuilder()
                     .chatJid(CHAT_JID)
                     .agentId(AGENT_ID)
                     .opened(true)
@@ -148,7 +148,7 @@ class ChatAssignmentOpenedStatusHandlerTest {
             handler.applyMutation(client,
                     buildMutation(CHAT_JID.toString(), AGENT_ID, action, SyncdOperation.SET, Instant.now()));
 
-            assertTrue(!store.findChatAssignment(CHAT_JID).orElseThrow().opened());
+            assertTrue(!store.businessStore().findChatAssignment(CHAT_JID).orElseThrow().opened());
         }
     }
 
@@ -171,7 +171,7 @@ class ChatAssignmentOpenedStatusHandlerTest {
         @Test
         @DisplayName("a chat with no matching assignment returns ORPHAN with ChatAssignment metadata")
         void orphanAssignmentAbsent() {
-            store.addNewChat(CHAT_JID);
+            store.chatStore().addNewChat(CHAT_JID);
             var action = new ChatAssignmentOpenedStatusActionBuilder().chatOpened(true).build();
 
             var result = handler.applyMutation(client,
@@ -184,8 +184,8 @@ class ChatAssignmentOpenedStatusHandlerTest {
         @Test
         @DisplayName("an assignment held by a different agent returns ORPHAN")
         void orphanAssignmentDifferentAgent() {
-            store.addNewChat(CHAT_JID);
-            store.putChatAssignment(new ChatAssignmentBuilder()
+            store.chatStore().addNewChat(CHAT_JID);
+            store.businessStore().putChatAssignment(new ChatAssignmentBuilder()
                     .chatJid(CHAT_JID)
                     .agentId("someone-else")
                     .opened(false)
@@ -206,8 +206,8 @@ class ChatAssignmentOpenedStatusHandlerTest {
         @Test
         @DisplayName("a value carrying the wrong action returns MALFORMED")
         void wrongActionType() {
-            store.addNewChat(CHAT_JID);
-            store.putChatAssignment(new ChatAssignmentBuilder()
+            store.chatStore().addNewChat(CHAT_JID);
+            store.businessStore().putChatAssignment(new ChatAssignmentBuilder()
                     .chatJid(CHAT_JID)
                     .agentId(AGENT_ID)
                     .opened(false)

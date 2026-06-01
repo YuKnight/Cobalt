@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -32,14 +32,14 @@ class LidMigrationServiceMessageKeyAlternatesTest {
     private static final Jid STATUS_BROADCAST = Jid.of("status@broadcast");
     private static final Jid PEER_PN_DEVICE_2 = Jid.of("393495089819:2@s.whatsapp.net");
 
-    private record Harness(TestWhatsAppClient client, LidMigrationService service) {}
+    private record Harness(TestWhatsAppClient client, LiveLidMigrationService service) {}
 
     private static Harness build() {
         var props = TestABPropsService.builder().build();
         var store = MigrationFixtures.temporaryStore(SELF_PN, SELF_LID);
         var client = TestWhatsAppClient.create().withStore(store);
-        var wamService = new DefaultWamService(client, props);
-        var service = new LidMigrationService(client, props, wamService);
+        var wamService = new LiveWamService(client, props);
+        var service = new LiveLidMigrationService(client, props, wamService);
         return new Harness(client, service);
     }
 
@@ -68,7 +68,7 @@ class LidMigrationServiceMessageKeyAlternatesTest {
     @DisplayName("1:1 PN remote -> swaps to LID when mapping is known")
     void oneOnOnePnToLid() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var key = new MessageKeyBuilder()
                 .id("ABC")
                 .fromMe(true)
@@ -84,7 +84,7 @@ class LidMigrationServiceMessageKeyAlternatesTest {
     @DisplayName("1:1 LID remote -> swaps to PN when mapping is known")
     void oneOnOneLidToPn() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var key = new MessageKeyBuilder()
                 .id("XYZ")
                 .fromMe(false)
@@ -109,7 +109,7 @@ class LidMigrationServiceMessageKeyAlternatesTest {
     @DisplayName("group -> swaps participant when mapping is known")
     void groupSwapsParticipant() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var key = new MessageKeyBuilder()
                 .id("G1")
                 .parentJid(GROUP)
@@ -124,7 +124,7 @@ class LidMigrationServiceMessageKeyAlternatesTest {
     @DisplayName("group -> strips device suffix from participant before lookup")
     void groupStripsDeviceFromParticipant() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var key = new MessageKeyBuilder()
                 .id("G2")
                 .parentJid(GROUP)
@@ -165,7 +165,7 @@ class LidMigrationServiceMessageKeyAlternatesTest {
     @DisplayName("broadcast -> swaps participant when mapping is known")
     void broadcastSwapsParticipant() {
         var h = build();
-        h.client.store().registerLidMapping(PEER_PN, PEER_LID);
+        h.client.store().contactStore().registerLidMapping(PEER_PN, PEER_LID);
         var key = new MessageKeyBuilder()
                 .id("B1")
                 .parentJid(BROADCAST)
@@ -180,7 +180,7 @@ class LidMigrationServiceMessageKeyAlternatesTest {
     @DisplayName("status broadcast -> swaps participant when mapping is known")
     void statusBroadcastSwapsParticipant() {
         var h = build();
-        h.client.store().registerLidMapping(OTHER_PN, OTHER_LID);
+        h.client.store().contactStore().registerLidMapping(OTHER_PN, OTHER_LID);
         var key = new MessageKeyBuilder()
                 .id("S1")
                 .parentJid(STATUS_BROADCAST)

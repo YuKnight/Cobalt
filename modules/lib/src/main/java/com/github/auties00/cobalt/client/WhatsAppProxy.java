@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The proxy configuration a {@link WhatsAppClient} uses when opening the
+ * The proxy configuration a {@link LinkedWhatsAppClient} uses when opening the
  * socket to the WhatsApp servers.
  *
  * <p>Two protocol families are supported: HTTP {@code CONNECT} tunnels
@@ -18,7 +18,7 @@ import java.util.Optional;
  *
  * @apiNote
  * Wire this into the client through the proxy setter on
- * {@link WhatsAppClientBuilder} when all outbound traffic must be routed
+ * {@link LinkedWhatsAppClientBuilder} when all outbound traffic must be routed
  * through an intermediate hop. Prefer {@link #of(URI)} when the proxy is
  * supplied through an environment variable.
  *

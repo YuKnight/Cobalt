@@ -101,7 +101,8 @@ export class LiveWebSession {
     );
     this.debuggerBridge = new LiveCdpDebugger(
       () => this.requireContext(),
-      () => this.requirePage()
+      () => this.requirePage(),
+      () => this.getCdpPort()
     );
     this.networkCapture = new NetworkCapture(
       () => this.requireContext(),
@@ -519,7 +520,16 @@ export class LiveWebSession {
       // target multiplexing, Fetch.requestPaused with arbitrary
       // handlers, child-target-bound Runtime.evaluate, etc.
       this.cdpPort = await LiveWebSession.findFreeTcpPort();
-      const cdpArgs = [`--remote-debugging-port=${this.cdpPort}`];
+      // --use-fake-device-for-media-stream supplies a synthetic mic (a 440Hz beep) and camera so a
+      // session can place/stay in a WhatsApp call without real hardware; --use-fake-ui-for-media-stream
+      // auto-grants the getUserMedia permission so no prompt blocks the voip stack. This keeps an
+      // automated caller alive in a call (a mic-less tab drops it) and lets the synthetic audio be
+      // verified end-to-end against another participant.
+      const cdpArgs = [
+        `--remote-debugging-port=${this.cdpPort}`,
+        "--use-fake-device-for-media-stream",
+        "--use-fake-ui-for-media-stream",
+      ];
       if (this.userDataDir) {
         if (!existsSync(this.userDataDir)) {
           mkdirSync(this.userDataDir, { recursive: true });
@@ -582,6 +592,10 @@ export class LiveWebSession {
   private async startDesktopSession(options: StartSessionOptions): Promise<LiveSessionInfo> {
     const cdpPort = options.desktopCdpPort ?? DEFAULT_DESKTOP_CDP_PORT;
     const cdpUrl = `http://localhost:${cdpPort}`;
+    // Expose the desktop CDP port to the worker-target multiplexer (CdpMux) so
+    // wasm/worker breakpoints work against WhatsApp Desktop exactly as they do
+    // against the browser session.
+    this.cdpPort = cdpPort;
     log.info(`[${this.sessionId}] startDesktopSession: cdpPort=${cdpPort}`);
 
     if (this.browser) {

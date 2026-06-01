@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
 
 /**
  * Routes inbound {@code <notification>} stanzas in the account category to the matching per-type handler.
@@ -26,7 +26,7 @@ import com.github.auties00.cobalt.stream.SocketStream;
  * parent notification stream manageable.
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
-public final class NotificationAccountDispatcher implements SocketStream.Handler {
+public final class NotificationAccountDispatcher extends SocketStreamHandler.Concurrent {
     /**
      * Handles {@code type="account_sync"} notifications.
      *
@@ -71,11 +71,11 @@ public final class NotificationAccountDispatcher implements SocketStream.Handler
      * uses it when refreshing the authenticated user's own device list; the {@code whatsapp} client and
      * {@code ackSender} are forwarded to every sub-handler.</p>
      *
-     * @param whatsapp      the {@link WhatsAppClient} forwarded to every sub-handler for store and node access
+     * @param whatsapp      the {@link LinkedWhatsAppClient} forwarded to every sub-handler for store and node access
      * @param deviceService the {@link DeviceService} consumed only by {@link NotificationAccountStreamHandler}
      * @param ackSender     the {@link AckSender} forwarded to every sub-handler for the per-notification {@code <ack>} stanza
      */
-    public NotificationAccountDispatcher(WhatsAppClient whatsapp, DeviceService deviceService, AckSender ackSender) {
+    public NotificationAccountDispatcher(LinkedWhatsAppClient whatsapp, DeviceService deviceService, AckSender ackSender) {
         this.accountHandler = new NotificationAccountStreamHandler(whatsapp, deviceService, ackSender);
         this.contactHandler = new NotificationContactStreamHandler(whatsapp, ackSender);
         this.disappearingModeHandler = new NotificationDisappearingModeStreamHandler(whatsapp, ackSender);
@@ -118,7 +118,7 @@ public final class NotificationAccountDispatcher implements SocketStream.Handler
     /**
      * Propagates the reset signal to every sub-handler so per-session caches are cleared on a socket reconnect.
      *
-     * <p>Invoked by the parent notification stream when {@link SocketStream.Handler#reset()} fires, clearing
+     * <p>Invoked by the parent notification stream when {@link SocketStreamHandler#reset()} fires, clearing
      * each sub-handler's pending acks and in-flight refresh jobs.</p>
      */
     @Override

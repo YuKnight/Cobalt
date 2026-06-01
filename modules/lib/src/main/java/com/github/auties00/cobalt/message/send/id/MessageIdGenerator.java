@@ -73,7 +73,7 @@ public final class MessageIdGenerator {
      * The {@code senderJid} is folded into the V2 pre-image so two accounts sending at the same instant cannot collide
      * deterministically; it is ignored for {@link MessageIdVersion#V1}. Typical usage:
      * {@snippet :
-     *     var id = MessageIdGenerator.generate(MessageIdVersion.V2, store.jid().orElseThrow());
+     *     var id = MessageIdGenerator.generate(MessageIdVersion.V2, store.accountStore().jid().orElseThrow());
      * }
      *
      * @implNote This implementation silently falls back to {@link MessageIdVersion#V1} when

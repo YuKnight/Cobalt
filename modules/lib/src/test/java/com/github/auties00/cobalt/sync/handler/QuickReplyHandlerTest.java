@@ -69,7 +69,7 @@ class QuickReplyHandlerTest {
     }
 
     @Nested
-    @DisplayName("metadata — wire identity")
+    @DisplayName("metadata â€” wire identity")
     class Metadata {
         @Test
         @DisplayName("actionName() returns the QuickReplyAction wire constant")
@@ -93,7 +93,7 @@ class QuickReplyHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — SET upsert (happy path)")
+    @DisplayName("applyMutation â€” SET upsert (happy path)")
     class ApplySetUpsert {
         @Test
         @DisplayName("a non-deleted action with shortcut + message upserts the quick reply")
@@ -110,7 +110,7 @@ class QuickReplyHandlerTest {
                     buildMutation("qr-1", action, SyncdOperation.SET, Instant.ofEpochSecond(1_700_000_000L)));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            var stored = store.findQuickReply("qr-1").orElseThrow();
+            var stored = store.settingsStore().findQuickReply("qr-1").orElseThrow();
             assertEquals("qr-1", stored.id());
             assertEquals("/hi", stored.shortcut());
             assertEquals("Hi there!", stored.message());
@@ -120,7 +120,7 @@ class QuickReplyHandlerTest {
         @Test
         @DisplayName("a SET on an existing id replaces the prior entry")
         void replacesExistingEntry() {
-            store.addQuickReply(new QuickReplyBuilder()
+            store.settingsStore().addQuickReply(new QuickReplyBuilder()
                     .id("qr-2")
                     .shortcut("/old")
                     .message("old body")
@@ -138,7 +138,7 @@ class QuickReplyHandlerTest {
             handler.applyMutation(client,
                     buildMutation("qr-2", action, SyncdOperation.SET, Instant.now()));
 
-            var stored = store.findQuickReply("qr-2").orElseThrow();
+            var stored = store.settingsStore().findQuickReply("qr-2").orElseThrow();
             assertEquals("/new", stored.shortcut());
             assertEquals("new body", stored.message());
             assertEquals(List.of("a", "b"), stored.keywords());
@@ -147,7 +147,7 @@ class QuickReplyHandlerTest {
         @Test
         @DisplayName("deleted=true removes the entry from the store")
         void deletedRemovesEntry() {
-            store.addQuickReply(new QuickReplyBuilder()
+            store.settingsStore().addQuickReply(new QuickReplyBuilder()
                     .id("qr-3")
                     .shortcut("/x")
                     .message("body")
@@ -166,13 +166,13 @@ class QuickReplyHandlerTest {
                     buildMutation("qr-3", action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(store.findQuickReply("qr-3").isEmpty(),
+            assertTrue(store.settingsStore().findQuickReply("qr-3").isEmpty(),
                     "deleted=true must remove the entry from the store");
         }
     }
 
     @Nested
-    @DisplayName("applyMutation — orphan dimension is n/a")
+    @DisplayName("applyMutation â€” orphan dimension is n/a")
     class OrphanDimension {
         @Test
         @DisplayName("an upsert of an unknown id succeeds rather than producing an ORPHAN result")
@@ -195,7 +195,7 @@ class QuickReplyHandlerTest {
         }
 
         @Test
-        @DisplayName("a delete of an unknown id still succeeds — remove is idempotent")
+        @DisplayName("a delete of an unknown id still succeeds â€” remove is idempotent")
         void deleteUnknownIdSucceeds() {
             var action = new QuickReplyActionBuilder()
                     .deleted(true)
@@ -213,7 +213,7 @@ class QuickReplyHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed value")
+    @DisplayName("applyMutation â€” malformed value")
     class MalformedValue {
         @Test
         @DisplayName("a value carrying the wrong action returns MALFORMED")
@@ -265,7 +265,7 @@ class QuickReplyHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — malformed index")
+    @DisplayName("applyMutation â€” malformed index")
     class MalformedIndex {
         @Test
         @DisplayName("a missing index slot returns MALFORMED")
@@ -303,7 +303,7 @@ class QuickReplyHandlerTest {
     }
 
     @Nested
-    @DisplayName("applyMutation — REMOVE")
+    @DisplayName("applyMutation â€” REMOVE")
     class ApplyRemove {
         @Test
         @DisplayName("REMOVE operation returns UNSUPPORTED")
@@ -324,10 +324,10 @@ class QuickReplyHandlerTest {
     }
 
     @Nested
-    @DisplayName("resolveConflicts — default timestamp comparison")
+    @DisplayName("resolveConflicts â€” default timestamp comparison")
     class ResolveConflicts {
         @Test
-        @DisplayName("newer remote wins — APPLY_REMOTE_DROP_LOCAL")
+        @DisplayName("newer remote wins â€” APPLY_REMOTE_DROP_LOCAL")
         void newerRemoteApplies() {
             var local = mutationAt(Instant.ofEpochSecond(1_000));
             var remote = mutationAt(Instant.ofEpochSecond(2_000));
@@ -336,7 +336,7 @@ class QuickReplyHandlerTest {
         }
 
         @Test
-        @DisplayName("equal timestamps — APPLY_REMOTE_DROP_LOCAL (remote wins on tie)")
+        @DisplayName("equal timestamps â€” APPLY_REMOTE_DROP_LOCAL (remote wins on tie)")
         void equalTimestampApplies() {
             var ts = Instant.ofEpochSecond(1_500);
             assertEquals(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL,
@@ -344,7 +344,7 @@ class QuickReplyHandlerTest {
         }
 
         @Test
-        @DisplayName("older remote — SKIP_REMOTE")
+        @DisplayName("older remote â€” SKIP_REMOTE")
         void olderRemoteSkipped() {
             var local = mutationAt(Instant.ofEpochSecond(2_000));
             var remote = mutationAt(Instant.ofEpochSecond(1_000));
@@ -365,7 +365,7 @@ class QuickReplyHandlerTest {
     }
 
     @Nested
-    @DisplayName("static builder — getQuickReplyAddOrEditMutation")
+    @DisplayName("static builder â€” getQuickReplyAddOrEditMutation")
     class AddOrEditBuilder {
         @Test
         @DisplayName("produces a SET pending mutation whose payload mirrors the inputs")
@@ -390,7 +390,7 @@ class QuickReplyHandlerTest {
     }
 
     @Nested
-    @DisplayName("static builder — getQuickReplyDeleteMutation")
+    @DisplayName("static builder â€” getQuickReplyDeleteMutation")
     class DeleteBuilder {
         @Test
         @DisplayName("produces a SET pending mutation flagged as deleted")

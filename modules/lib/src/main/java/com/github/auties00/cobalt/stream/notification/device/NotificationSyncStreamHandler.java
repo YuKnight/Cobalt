@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.stream.notification.device;
 
+import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.stream.SocketStream;
 import com.github.auties00.cobalt.stream.control.OfflineNotificationsReporter;
 
 import java.util.ArrayList;
@@ -27,12 +27,12 @@ import java.util.stream.Collectors;
  * pushed to {@link OfflineNotificationsReporter} for the {@code MdAppStateOfflineNotifications} WAM
  * event, and the protocol-level ACK is always sent.
  *
- * @implNote This implementation pulls directly via {@link WhatsAppClient#pullWebAppState(SyncPatchType...)},
+ * @implNote This implementation pulls directly via {@link LinkedWhatsAppClient#pullWebAppState(SyncPatchType...)},
  * whereas WA Web routes through a sync marker that batches with other markers; Cobalt's pull is
  * direct because the Cobalt store has no equivalent marker indirection.
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleServerSyncNotification")
-public final class NotificationSyncStreamHandler implements SocketStream.Handler {
+public final class NotificationSyncStreamHandler extends SocketStreamHandler.Concurrent {
     /**
      * Logs warnings about unknown collection names and errors during sync.
      */
@@ -42,7 +42,7 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
     /**
      * Provides store reads and app-state pulls.
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Accumulates per-collection observation counts during the offline window for the
@@ -61,11 +61,11 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      *
      * <p>Called once by {@link NotificationDeviceDispatcher}.
      *
-     * @param whatsapp                     the {@link WhatsAppClient}
+     * @param whatsapp                     the {@link LinkedWhatsAppClient}
      * @param offlineNotificationsReporter the {@link OfflineNotificationsReporter}
      * @param ackSender                    the {@link AckSender}
      */
-    public NotificationSyncStreamHandler(WhatsAppClient whatsapp, OfflineNotificationsReporter offlineNotificationsReporter, AckSender ackSender) {
+    public NotificationSyncStreamHandler(LinkedWhatsAppClient whatsapp, OfflineNotificationsReporter offlineNotificationsReporter, AckSender ackSender) {
         this.whatsapp = whatsapp;
         this.offlineNotificationsReporter = offlineNotificationsReporter;
         this.ackSender = ackSender;
@@ -118,7 +118,7 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      * {@code offline} attribute, every changed collection is reported to
      * {@link OfflineNotificationsReporter}. While {@link #isCriticalDataSyncInProcess()} holds, the
      * pull list is narrowed to critical collections. A non-empty pull list is pulled via
-     * {@link WhatsAppClient#pullWebAppState(SyncPatchType...)}.
+     * {@link LinkedWhatsAppClient#pullWebAppState(SyncPatchType...)}.
      *
      * @implNote This implementation caps the unknown-name warning at three names per stanza,
      * mirroring WA Web's guard which limits log spam during a server-side collection rollout.
@@ -191,8 +191,7 @@ public final class NotificationSyncStreamHandler implements SocketStream.Handler
      * @return {@code true} when the bootstrap is still in progress
      */
     private boolean isCriticalDataSyncInProcess() {
-        return !whatsapp.store()
-                .findWebAppState(SyncPatchType.CRITICAL_BLOCK)
+        return !whatsapp.store().syncStore().findWebAppState(SyncPatchType.CRITICAL_BLOCK)
                 .bootstrapped();
     }
 

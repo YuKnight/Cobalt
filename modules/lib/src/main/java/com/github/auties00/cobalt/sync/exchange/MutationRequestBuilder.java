@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.exchange;
 
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.media.MediaConnectionService;
@@ -15,7 +15,7 @@ import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyData;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyId;
 import com.github.auties00.cobalt.model.signal.KeyIdBuilder;
-import com.github.auties00.cobalt.model.sync.SyncHashValue;
+import com.github.auties00.cobalt.model.sync.SyncCollectionMetadata;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.SyncActionEntry;
 import com.github.auties00.cobalt.node.Node;
@@ -78,10 +78,10 @@ public final class MutationRequestBuilder {
     private static final Logger LOGGER = Logger.getLogger(MutationRequestBuilder.class.getName());
 
     /**
-     * Holds the injected {@link WhatsAppClient} used for store access (sync keys, hash state,
+     * Holds the injected {@link LinkedWhatsAppClient} used for store access (sync keys, hash state,
      * sync action entries).
      */
-    private final WhatsAppClient whatsapp;
+    private final LinkedWhatsAppClient whatsapp;
 
     /**
      * Holds the {@link ABPropsService} used to read {@code syncd_inline_mutations_max_count},
@@ -107,12 +107,12 @@ public final class MutationRequestBuilder {
      * <p>The builder holds no per-collection state, so a single instance handles every patch
      * type.
      *
-     * @param whatsapp the {@link WhatsAppClient} that owns the store
+     * @param whatsapp the {@link LinkedWhatsAppClient} that owns the store
      * @param abPropsService the {@link ABPropsService} used to read upload thresholds
      * @param wamService the {@link WamService} used to commit media-upload events
      * @param mediaConnectionService the {@link MediaConnectionService} used to upload external mutations
      */
-    public MutationRequestBuilder(WhatsAppClient whatsapp, ABPropsService abPropsService, WamService wamService,
+    public MutationRequestBuilder(LinkedWhatsAppClient whatsapp, ABPropsService abPropsService, WamService wamService,
                                   MediaConnectionService mediaConnectionService) {
         this.whatsapp = whatsapp;
         this.abPropsService = abPropsService;
@@ -143,16 +143,14 @@ public final class MutationRequestBuilder {
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilder", exports = "buildAppStateSyncRequest", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderBuild", exports = "buildSyncIqNode", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncRequest buildSyncRequest(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches) {
-        var hashState = whatsapp.store()
-                .findWebAppHashStateByName(patchType)
-                .orElseGet(() -> new SyncHashValue(patchType));
+        var collectionState = whatsapp.store().syncStore().findWebAppState(patchType);
 
-        var bootstrapped = whatsapp.store().findWebAppState(patchType).bootstrapped();
+        var bootstrapped = collectionState.bootstrapped();
 
         var collectionBuilder = new NodeBuilder()
                 .description("collection")
                 .attribute("name", patchType.toString())
-                .attribute("version", hashState.version())
+                .attribute("version", collectionState.version())
                 .attribute("return_snapshot", !bootstrapped ? "true" : "false");
 
         SyncRequest.UploadedPatchInfo uploadInfo = null;
@@ -166,7 +164,7 @@ public final class MutationRequestBuilder {
 
             var compacted = compactPatch(patches);
             if (!compacted.isEmpty()) {
-                var buildResult = buildPatchProtobuf(patchType, compacted, hashState, List.copyOf(allMutationIds));
+                var buildResult = buildPatchProtobuf(patchType, compacted, collectionState, List.copyOf(allMutationIds));
                 var patchNode = new NodeBuilder()
                         .description("patch")
                         .content(buildResult.bytes())
@@ -199,7 +197,7 @@ public final class MutationRequestBuilder {
      * Pairs the encoded {@code SyncdPatch} bytes with the upload metadata captured at build time.
      *
      * <p>Internal carrier used between {@link #buildPatchProtobuf(SyncPatchType,
-     * SequencedCollection, SyncHashValue, List)} and its callers so the two outputs stay paired.
+     * SequencedCollection, SyncCollectionMetadata, List)} and its callers so the two outputs stay paired.
      *
      * @param bytes the serialized {@code SyncdPatch} protobuf bytes
      * @param uploadInfo the upload metadata for the post-response success path
@@ -251,14 +249,14 @@ public final class MutationRequestBuilder {
      *
      * @param patchType the collection type
      * @param patches the compacted pending mutations
-     * @param hashState the current hash state for this collection
+     * @param collectionState the current persisted app-state record (version and LT-Hash) for this collection
      * @param allMutationIds all original pending mutation ids (pre-compaction)
      * @return the serialized patch bytes paired with upload metadata
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdMMSUpload", exports = "exceedInlineMutationCount", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdMMSUpload", exports = "exceedPatchProtobufSize", adaptation = WhatsAppAdaptation.ADAPTED)
-    private PatchBuildResult buildPatchProtobuf(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches, SyncHashValue hashState, List<String> allMutationIds) {
-        var keys = whatsapp.store().appStateKeys();
+    private PatchBuildResult buildPatchProtobuf(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches, SyncCollectionMetadata collectionState, List<String> allMutationIds) {
+        var keys = whatsapp.store().syncStore().appStateKeys();
         if (keys.isEmpty()) {
             throw new IllegalStateException("No app state sync keys available");
         }
@@ -275,7 +273,7 @@ public final class MutationRequestBuilder {
                 .orElseThrow(() -> new IllegalStateException("Latest app state sync key data has no ID"));
 
         try (var derivedKeys = MutationKeys.ofSyncKey(latestKeyData)) {
-            var storedEntries = whatsapp.store().getSyncActionEntries(patchType);
+            var storedEntries = whatsapp.store().syncStore().getSyncActionEntries(patchType);
             var storedIndices = new HashSet<String>(storedEntries.size());
             for (var entry : storedEntries) {
                 if (entry.actionIndex() != null) {
@@ -300,18 +298,16 @@ public final class MutationRequestBuilder {
             var keyRotationMutations = buildKeyRotationMutations(patchType, patches, storedEntries, derivedKeys, latestKeyId, keyRotationSources);
             encryptedMutations.addAll(keyRotationMutations);
 
-            var currentLtHash = hashState.hash() != null ? hashState.hash() : MutationLTHash.EMPTY_HASH;
+            var currentLtHash = collectionState.ltHash() != null ? collectionState.ltHash() : MutationLTHash.EMPTY_HASH;
             var toAdd = new ArrayList<byte[]>(encryptedMutations.size());
             var toRemove = new ArrayList<byte[]>();
             for (var encrypted : encryptedMutations) {
                 if (encrypted.operation() == SyncdOperation.SET) {
-                    whatsapp.store()
-                            .findSyncActionEntry(patchType, encrypted.indexMac())
+                    whatsapp.store().syncStore().findSyncActionEntry(patchType, encrypted.indexMac())
                             .ifPresent(existing -> toRemove.add(existing.valueMac()));
                     toAdd.add(encrypted.valueMac());
                 } else {
-                    whatsapp.store()
-                            .findSyncActionEntry(patchType, encrypted.indexMac())
+                    whatsapp.store().syncStore().findSyncActionEntry(patchType, encrypted.indexMac())
                             .ifPresent(existing -> toRemove.add(existing.valueMac()));
                 }
             }
@@ -341,7 +337,7 @@ public final class MutationRequestBuilder {
                 index++;
             }
 
-            var newVersion = hashState.version() + 1;
+            var newVersion = collectionState.version() + 1;
             var snapshotMac = MutationIntegrityVerifier.computeSnapshotMac(
                     derivedKeys.snapshotMacKey(), newLtHash, newVersion, patchType);
             var valueMacs = encryptedMutations.stream()
@@ -363,7 +359,7 @@ public final class MutationRequestBuilder {
                         .build());
             }
 
-            var deviceIndex = whatsapp.store().jid()
+            var deviceIndex = whatsapp.store().accountStore().jid()
                     .map(jid -> jid.device())
                     .orElse(0);
             var debugData = new PatchDebugDataBuilder()
@@ -451,14 +447,12 @@ public final class MutationRequestBuilder {
             EncryptedMutation encrypted;
 
             if (mutation.operation() == SyncdOperation.REMOVE) {
-                var originalEntry = whatsapp.store()
-                        .findSyncActionEntryByActionIndex(patchType, mutation.index())
+                var originalEntry = whatsapp.store().syncStore().findSyncActionEntryByActionIndex(patchType, mutation.index())
                         .orElseThrow(() -> new IllegalStateException(
                                 "Cannot find original key for REMOVE operation on index: " + mutation.index()
                         ));
 
-                var originalKeyData = whatsapp.store()
-                        .findWebAppStateKeyById(originalEntry.keyId())
+                var originalKeyData = whatsapp.store().syncStore().findWebAppStateKeyById(originalEntry.keyId())
                         .flatMap(AppStateSyncKey::keyData)
                         .flatMap(AppStateSyncKeyData::keyData)
                         .orElseThrow(() -> new IllegalStateException(
@@ -585,8 +579,7 @@ public final class MutationRequestBuilder {
             keyRotationSourcesOut.add(removeTrusted);
             var removePending = new SyncPendingMutation(removeTrusted, 0);
 
-            var originalKeyData = whatsapp.store()
-                    .findWebAppStateKeyById(entry.keyId())
+            var originalKeyData = whatsapp.store().syncStore().findWebAppStateKeyById(entry.keyId())
                     .flatMap(AppStateSyncKey::keyData)
                     .flatMap(AppStateSyncKeyData::keyData)
                     .orElseThrow(() -> new IllegalStateException(
@@ -632,16 +625,14 @@ public final class MutationRequestBuilder {
             var patchType = entry.getKey();
             var patches = entry.getValue();
 
-            var hashState = whatsapp.store()
-                    .findWebAppHashStateByName(patchType)
-                    .orElseGet(() -> new SyncHashValue(patchType));
+            var collectionState = whatsapp.store().syncStore().findWebAppState(patchType);
 
-            var bootstrapped = whatsapp.store().findWebAppState(patchType).bootstrapped();
+            var bootstrapped = collectionState.bootstrapped();
 
             var collectionBuilder = new NodeBuilder()
                     .description("collection")
                     .attribute("name", patchType.toString())
-                    .attribute("version", hashState.version())
+                    .attribute("version", collectionState.version())
                     .attribute("return_snapshot", !bootstrapped ? "true" : "false");
 
             if (bootstrapped) {
@@ -654,7 +645,7 @@ public final class MutationRequestBuilder {
 
                 var compacted = compactPatch(patches);
                 if (!compacted.isEmpty()) {
-                    var buildResult = buildPatchProtobuf(patchType, compacted, hashState, List.copyOf(allMutationIds));
+                    var buildResult = buildPatchProtobuf(patchType, compacted, collectionState, List.copyOf(allMutationIds));
                     var patchNode = new NodeBuilder()
                             .description("patch")
                             .content(buildResult.bytes())

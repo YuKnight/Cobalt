@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.ConflictResolutionState;
@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers {@link WamoUserIdentifierHandler}, the forward-looking adapter for the
  * {@code generated_wui} action: the wire-constant trio, the happy {@code SET} branch that persists
- * the resolved identifier on {@link WhatsAppStore#setNewsletterSubscriptionUserIdentifier(String)},
+ * the resolved identifier on {@link com.github.auties00.cobalt.store.SettingsStore#setNewsletterSubscriptionUserIdentifier(String)},
  * the malformed branches (missing action, empty string, blank string), the
  * {@link SyncdOperation#REMOVE} unsupported branch, and the default conflict-resolution tiebreaker.
  * WA Web ships no concrete handler, so the test surface enforces the Cobalt-inferred shape. A
@@ -42,7 +42,7 @@ class WamoUserIdentifierHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
     private WhatsAppStore store;
-    private WhatsAppClient client;
+    private LinkedWhatsAppClient client;
     private WamoUserIdentifierHandler handler;
 
     @BeforeEach
@@ -90,7 +90,7 @@ class WamoUserIdentifierHandlerTest {
         @Test
         @DisplayName("SET with a non-blank identifier persists it on the store")
         void setsIdentifier() {
-            assertTrue(store.newsletterSubscriptionUserIdentifier().isEmpty(),
+            assertTrue(store.settingsStore().newsletterSubscriptionUserIdentifier().isEmpty(),
                     "precondition: identifier is unset");
             var action = new WamoUserIdentifierActionBuilder()
                     .identifier("wamo-user-abc-123").build();
@@ -99,19 +99,19 @@ class WamoUserIdentifierHandlerTest {
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
             assertEquals("wamo-user-abc-123",
-                    store.newsletterSubscriptionUserIdentifier().orElseThrow());
+                    store.settingsStore().newsletterSubscriptionUserIdentifier().orElseThrow());
         }
 
         @Test
         @DisplayName("SET overwrites any prior identifier")
         void overwrites() {
-            store.setNewsletterSubscriptionUserIdentifier("old-id");
+            store.settingsStore().setNewsletterSubscriptionUserIdentifier("old-id");
             var action = new WamoUserIdentifierActionBuilder().identifier("new-id").build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals("new-id", store.newsletterSubscriptionUserIdentifier().orElseThrow());
+            assertEquals("new-id", store.settingsStore().newsletterSubscriptionUserIdentifier().orElseThrow());
         }
     }
 
@@ -164,7 +164,7 @@ class WamoUserIdentifierHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.newsletterSubscriptionUserIdentifier().isEmpty());
+            assertTrue(store.settingsStore().newsletterSubscriptionUserIdentifier().isEmpty());
         }
     }
 

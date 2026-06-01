@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -33,7 +33,7 @@ import java.util.List;
  * @implNote
  * This implementation flattens WA Web's batch entry point plus the per-mutation
  * {@code $SettingsSync$p_1} closure into a single
- * {@link #applyMutationBatch(WhatsAppClient, List)} that reproduces the
+ * {@link #applyMutationBatch(LinkedWhatsAppClient, List)} that reproduces the
  * latest-mutation-per-index dedup map. Mutations whose index is unique within
  * the batch reach the validation pipeline; mutations displaced by a later
  * same-index entry are reported as {@link MutationApplicationResult#skipped()}.
@@ -112,12 +112,12 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#malformed()} when no {@code SET} exists for
      * that index, {@link MutationApplicationResult#skipped()} when a later
      * {@code SET} supersedes this one, or the
-     * {@link #applyOne(WhatsAppClient, DecryptedMutation.Trusted)} result for the
+     * {@link #applyOne(LinkedWhatsAppClient, DecryptedMutation.Trusted)} result for the
      * per-index winner.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public List<MutationApplicationResult> applyMutationBatch(WhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
+    public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (!isSettingsSyncEnabled(client)) {
             var unsupported = new ArrayList<MutationApplicationResult>(mutations.size());
             for (var ignored : mutations) {
@@ -157,7 +157,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      *
      * <p>This is the per-mutation adapter for callers that bypass the batch entry
      * point. It performs the same {@code settings_sync_enabled} gate and
-     * delegates to {@link #applyOne(WhatsAppClient, DecryptedMutation.Trusted)}.
+     * delegates to {@link #applyOne(LinkedWhatsAppClient, DecryptedMutation.Trusted)}.
      * Non-{@link SyncdOperation#SET} operations are reported as
      * {@link MutationApplicationResult#unsupported()}; in the batch entry point
      * such mutations never reach the per-mutation path because the dedup map only
@@ -165,7 +165,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!isSettingsSyncEnabled(client)) {
             return MutationApplicationResult.unsupported();
         }
@@ -180,8 +180,8 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * into the store.
      *
      * <p>Serves as the per-mutation worker for both
-     * {@link #applyMutation(WhatsAppClient, DecryptedMutation.Trusted)} and
-     * {@link #applyMutationBatch(WhatsAppClient, List)}; the caller is responsible
+     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)} and
+     * {@link #applyMutationBatch(LinkedWhatsAppClient, List)}; the caller is responsible
      * for the {@code settings_sync_enabled} gate and the {@code SET} operation
      * filter. The JSON index is parsed and required to hold exactly
      * {@value #INDEX_PARTS_LENGTH} elements. The mutation is gated on the
@@ -192,18 +192,18 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * {@link SettingsSyncAction.SettingKey#SETTING_KEY_UNKNOWN}), the value is
      * verified to carry a {@link SettingsSyncAction} with the field that backs the
      * key, and the resolved value is written through
-     * {@link #applySettingUpdate(WhatsAppClient, SettingsSyncAction, SettingsSyncAction.SettingKey, String)}.
+     * {@link #applySettingUpdate(LinkedWhatsAppClient, SettingsSyncAction, SettingsSyncAction.SettingKey, String)}.
      *
      * @implNote
      * This implementation omits WA Web's trailing {@code WALogger.WARN}/{@code ERROR}
      * messages as telemetry.
      *
-     * @param client   the {@link WhatsAppClient} whose store receives the update
+     * @param client   the {@link LinkedWhatsAppClient} whose store receives the update
      * @param mutation the mutation to apply
      * @return the detailed application result
      */
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "$SettingsSync$p_1", adaptation = WhatsAppAdaptation.ADAPTED)
-    private MutationApplicationResult applyOne(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    private MutationApplicationResult applyOne(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         JSONArray indexArray;
         try {
             indexArray = JSON.parseArray(mutation.index());
@@ -256,11 +256,11 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * paired phone) and {@link ABProp#SETTINGS_SYNC_ENABLED} must be {@code true};
      * either gate disables the entire batch.
      *
-     * @param client the {@link WhatsAppClient} whose feature flags are inspected
+     * @param client the {@link LinkedWhatsAppClient} whose feature flags are inspected
      * @return {@code true} if both gates are open
      */
-    private boolean isSettingsSyncEnabled(WhatsAppClient client) {
-        return client.store().primaryFeatures().contains("settings_sync_enabled")
+    private boolean isSettingsSyncEnabled(LinkedWhatsAppClient client) {
+        return client.store().syncStore().primaryFeatures().contains("settings_sync_enabled")
                 && abPropsService.getBool(ABProp.SETTINGS_SYNC_ENABLED);
     }
 
@@ -334,21 +334,21 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      *
      * @implNote
      * This implementation reads the paired-device platform from
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore#device()} rather than
+     * {@link com.github.auties00.cobalt.store.AccountStore#device()} rather than
      * from a runtime environment probe; Cobalt has no per-client environment
      * object equivalent to WA Web's {@code WAWebEnvironment.isWindows} check.
      *
-     * @param client   the {@link WhatsAppClient} whose paired-device platform is consulted
+     * @param client   the {@link LinkedWhatsAppClient} whose paired-device platform is consulted
      * @param platform the parsed platform from the mutation index, may be {@code null}
      * @return {@code true} if the mutation should be applied
      */
-    private boolean appliesToCurrentPlatform(WhatsAppClient client, SettingsSyncAction.SettingPlatform platform) {
+    private boolean appliesToCurrentPlatform(LinkedWhatsAppClient client, SettingsSyncAction.SettingPlatform platform) {
         if (platform == null) {
             return false;
         }
         return switch (platform) {
             case WEB -> true;
-            case HYBRID -> client.store().device() != null && client.store().device().platform() == ClientPlatformType.WINDOWS;
+            case HYBRID -> client.store().accountStore().device() != null && client.store().accountStore().device().platform() == ClientPlatformType.WINDOWS;
             default -> false;
         };
     }
@@ -427,13 +427,13 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
      * the only persisted keys are {@code LANGUAGE} and {@code DISABLE_LINK_PREVIEWS},
      * which are the two keys with a backing store field.
      *
-     * @param client     the {@link WhatsAppClient} whose store receives the update
+     * @param client     the {@link LinkedWhatsAppClient} whose store receives the update
      * @param action     the decoded settings sync action carrying the new value
      * @param settingKey the setting key whose value should be persisted
      * @param scope      either {@link #APP_SCOPE} for global settings or a chat JID string
      */
     @WhatsAppWebExport(moduleName = "WAWebSettingsSyncHelpers", exports = "applySettingUpdate", adaptation = WhatsAppAdaptation.ADAPTED)
-    private void applySettingUpdate(WhatsAppClient client,
+    private void applySettingUpdate(LinkedWhatsAppClient client,
                                     SettingsSyncAction action,
                                     SettingsSyncAction.SettingKey settingKey,
                                     String scope) {
@@ -442,58 +442,58 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
         }
         var store = client.store();
         switch (settingKey) {
-            case START_AT_LOGIN -> store.setStartAtLogin(action.startAtLogin());
-            case MINIMIZE_TO_TRAY -> store.setMinimizeToTray(action.minimizeToTray());
-            case LANGUAGE -> action.language().ifPresent(store::setLocale);
-            case REPLACE_TEXT_WITH_EMOJI -> store.setReplaceTextWithEmoji(action.replaceTextWithEmoji());
+            case START_AT_LOGIN -> store.settingsStore().setStartAtLogin(action.startAtLogin());
+            case MINIMIZE_TO_TRAY -> store.settingsStore().setMinimizeToTray(action.minimizeToTray());
+            case LANGUAGE -> action.language().ifPresent(store.accountStore()::setLocale);
+            case REPLACE_TEXT_WITH_EMOJI -> store.settingsStore().setReplaceTextWithEmoji(action.replaceTextWithEmoji());
             case BANNER_NOTIFICATION_DISPLAY_MODE ->
-                    action.bannerNotificationDisplayMode().ifPresent(store::setBannerNotificationDisplayMode);
+                    action.bannerNotificationDisplayMode().ifPresent(store.settingsStore()::setBannerNotificationDisplayMode);
             case UNREAD_COUNTER_BADGE_DISPLAY_MODE ->
-                    action.unreadCounterBadgeDisplayMode().ifPresent(store::setUnreadCounterBadgeDisplayMode);
+                    action.unreadCounterBadgeDisplayMode().ifPresent(store.settingsStore()::setUnreadCounterBadgeDisplayMode);
             case IS_MESSAGES_NOTIFICATION_ENABLED ->
-                    store.setMessagesNotificationEnabled(action.isMessagesNotificationEnabled());
+                    store.settingsStore().setMessagesNotificationEnabled(action.isMessagesNotificationEnabled());
             case IS_CALLS_NOTIFICATION_ENABLED ->
-                    store.setCallsNotificationEnabled(action.isCallsNotificationEnabled());
+                    store.settingsStore().setCallsNotificationEnabled(action.isCallsNotificationEnabled());
             case IS_REACTIONS_NOTIFICATION_ENABLED ->
-                    store.setReactionsNotificationEnabled(action.isReactionsNotificationEnabled());
+                    store.settingsStore().setReactionsNotificationEnabled(action.isReactionsNotificationEnabled());
             case IS_STATUS_REACTIONS_NOTIFICATION_ENABLED ->
-                    store.setStatusReactionsNotificationEnabled(action.isStatusReactionsNotificationEnabled());
+                    store.settingsStore().setStatusReactionsNotificationEnabled(action.isStatusReactionsNotificationEnabled());
             case IS_TEXT_PREVIEW_FOR_NOTIFICATION_ENABLED ->
-                    store.setTextPreviewForNotificationEnabled(action.isTextPreviewForNotificationEnabled());
+                    store.settingsStore().setTextPreviewForNotificationEnabled(action.isTextPreviewForNotificationEnabled());
             case DEFAULT_NOTIFICATION_TONE_ID ->
-                    action.defaultNotificationToneId().ifPresent(value -> store.setDefaultNotificationToneId(value));
+                    action.defaultNotificationToneId().ifPresent(value -> store.settingsStore().setDefaultNotificationToneId(value));
             case GROUP_DEFAULT_NOTIFICATION_TONE_ID ->
-                    action.groupDefaultNotificationToneId().ifPresent(value -> store.setGroupDefaultNotificationToneId(value));
-            case APP_THEME -> action.appTheme().ifPresent(store::setAppTheme);
-            case WALLPAPER_ID -> action.wallpaperId().ifPresent(value -> store.setWallpaperId(value));
+                    action.groupDefaultNotificationToneId().ifPresent(value -> store.settingsStore().setGroupDefaultNotificationToneId(value));
+            case APP_THEME -> action.appTheme().ifPresent(store.settingsStore()::setAppTheme);
+            case WALLPAPER_ID -> action.wallpaperId().ifPresent(value -> store.settingsStore().setWallpaperId(value));
             case IS_DOODLE_WALLPAPER_ENABLED ->
-                    store.setDoodleWallpaperEnabled(action.isDoodleWallpaperEnabled());
-            case FONT_SIZE -> action.fontSize().ifPresent(value -> store.setFontSize(value));
+                    store.settingsStore().setDoodleWallpaperEnabled(action.isDoodleWallpaperEnabled());
+            case FONT_SIZE -> action.fontSize().ifPresent(value -> store.settingsStore().setFontSize(value));
             case IS_PHOTOS_AUTODOWNLOAD_ENABLED ->
-                    store.setPhotosAutodownloadEnabled(action.isPhotosAutodownloadEnabled());
+                    store.settingsStore().setPhotosAutodownloadEnabled(action.isPhotosAutodownloadEnabled());
             case IS_AUDIOS_AUTODOWNLOAD_ENABLED ->
-                    store.setAudiosAutodownloadEnabled(action.isAudiosAutodownloadEnabled());
+                    store.settingsStore().setAudiosAutodownloadEnabled(action.isAudiosAutodownloadEnabled());
             case IS_VIDEOS_AUTODOWNLOAD_ENABLED ->
-                    store.setVideosAutodownloadEnabled(action.isVideosAutodownloadEnabled());
+                    store.settingsStore().setVideosAutodownloadEnabled(action.isVideosAutodownloadEnabled());
             case IS_DOCUMENTS_AUTODOWNLOAD_ENABLED ->
-                    store.setDocumentsAutodownloadEnabled(action.isDocumentsAutodownloadEnabled());
-            case DISABLE_LINK_PREVIEWS -> store.setDisableLinkPreviews(action.disableLinkPreviews());
+                    store.settingsStore().setDocumentsAutodownloadEnabled(action.isDocumentsAutodownloadEnabled());
+            case DISABLE_LINK_PREVIEWS -> store.settingsStore().setDisableLinkPreviews(action.disableLinkPreviews());
             case NOTIFICATION_TONE_ID ->
-                    action.notificationToneId().ifPresent(value -> store.setNotificationToneId(value));
+                    action.notificationToneId().ifPresent(value -> store.settingsStore().setNotificationToneId(value));
             case MEDIA_UPLOAD_QUALITY ->
-                    action.mediaUploadQuality().ifPresent(store::setMediaUploadQuality);
-            case IS_SPELL_CHECK_ENABLED -> store.setSpellCheckEnabled(action.isSpellCheckEnabled());
-            case IS_ENTER_TO_SEND_ENABLED -> store.setEnterToSendEnabled(action.isEnterToSendEnabled());
+                    action.mediaUploadQuality().ifPresent(store.settingsStore()::setMediaUploadQuality);
+            case IS_SPELL_CHECK_ENABLED -> store.settingsStore().setSpellCheckEnabled(action.isSpellCheckEnabled());
+            case IS_ENTER_TO_SEND_ENABLED -> store.settingsStore().setEnterToSendEnabled(action.isEnterToSendEnabled());
             case IS_GROUP_MESSAGE_NOTIFICATION_ENABLED ->
-                    store.setGroupMessageNotificationEnabled(action.isGroupMessageNotificationEnabled());
+                    store.settingsStore().setGroupMessageNotificationEnabled(action.isGroupMessageNotificationEnabled());
             case IS_GROUP_REACTIONS_NOTIFICATION_ENABLED ->
-                    store.setGroupReactionsNotificationEnabled(action.isGroupReactionsNotificationEnabled());
+                    store.settingsStore().setGroupReactionsNotificationEnabled(action.isGroupReactionsNotificationEnabled());
             case IS_STATUS_NOTIFICATION_ENABLED ->
-                    store.setStatusNotificationEnabled(action.isStatusNotificationEnabled());
+                    store.settingsStore().setStatusNotificationEnabled(action.isStatusNotificationEnabled());
             case STATUS_NOTIFICATION_TONE_ID ->
-                    action.statusNotificationToneId().ifPresent(value -> store.setStatusNotificationToneId(value));
+                    action.statusNotificationToneId().ifPresent(value -> store.settingsStore().setStatusNotificationToneId(value));
             case SHOULD_PLAY_SOUND_FOR_CALL_NOTIFICATION ->
-                    store.setPlaySoundForCallNotification(action.shouldPlaySoundForCallNotification());
+                    store.settingsStore().setPlaySoundForCallNotification(action.shouldPlaySoundForCallNotification());
             case SETTING_KEY_UNKNOWN -> {
             }
         }

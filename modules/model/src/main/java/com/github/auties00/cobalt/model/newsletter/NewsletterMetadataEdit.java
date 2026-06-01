@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Input model for {@code WhatsAppClient.editNewsletterMetadata}. The
+ * Input model for {@code LinkedWhatsAppClient.editNewsletterMetadata}. The
  * {@link #newsletter} JID identifies the target; the remaining fields
  * are optional and only the ones that are set are written to the server.
  *

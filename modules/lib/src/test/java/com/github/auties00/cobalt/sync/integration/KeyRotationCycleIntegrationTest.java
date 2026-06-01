@@ -1,4 +1,7 @@
 package com.github.auties00.cobalt.sync.integration;
+import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
+import com.github.auties00.cobalt.sync.LiveWebAppStateService;
+import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceFixtures;
@@ -16,7 +19,7 @@ import com.github.auties00.cobalt.sync.SyncFixtures;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.sync.key.SyncKeyRotationService;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
-import com.github.auties00.cobalt.wam.DefaultWamService;
+import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -57,14 +60,14 @@ class KeyRotationCycleIntegrationTest {
     void setUp() {
         var props = TestABPropsService.builder().build();
         store = DeviceFixtures.temporaryStore(SELF_PN, SELF_LID);
-        store.setJid(SELF_PN_DEVICE_1);
+        store.accountStore().setJid(SELF_PN_DEVICE_1);
         client = TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(props);
-        var wam = new DefaultWamService(client, props);
-        var lidMigration = new LidMigrationService(client, props, wam);
-        var snapshotRecovery = new SnapshotRecoveryService(client, props, wam);
-        var webAppState = new WebAppStateService(client, props, lidMigration, snapshotRecovery, wam, TestMediaConnectionService.create());
+        var wam = new LiveWamService(client, props);
+        var lidMigration = new LiveLidMigrationService(client, props, wam);
+        var snapshotRecovery = new LiveSnapshotRecoveryService(client, props, wam);
+        var webAppState = new LiveWebAppStateService(client, props, lidMigration, snapshotRecovery, wam, TestMediaConnectionService.create());
         rotation = webAppState.syncKeyRotationService();
     }
 
@@ -83,30 +86,30 @@ class KeyRotationCycleIntegrationTest {
     }
 
     @Nested
-    @DisplayName("synthetic — key share + missing-key clear behaviours")
+    @DisplayName("synthetic â€” key share + missing-key clear behaviours")
     class Smoke {
         @Test
         @DisplayName("a fresh share installs the key in the active store")
         void freshShareInstalls() {
-            assertTrue(store.appStateKeys().isEmpty(), "precondition: empty key store");
+            assertTrue(store.syncStore().appStateKeys().isEmpty(), "precondition: empty key store");
             var keyId = SyncKeyUtils.buildKeyId(1, 1);
             rotation.handleKeyShare(0, List.of(syncKey(keyId, filled(32, 0x42))));
-            assertTrue(store.findWebAppStateKeyById(keyId).isPresent());
+            assertTrue(store.syncStore().findWebAppStateKeyById(keyId).isPresent());
         }
 
         @Test
         @DisplayName("re-sharing an already-installed key does not duplicate")
         void reShareIsIdempotent() {
             var keyId = SyncKeyUtils.buildKeyId(1, 1);
-            store.addWebAppStateKeys(List.of(syncKey(keyId, filled(32, 0x42))));
+            store.syncStore().addWebAppStateKeys(List.of(syncKey(keyId, filled(32, 0x42))));
             rotation.handleKeyShare(0, List.of(syncKey(keyId, filled(32, 0x42))));
-            assertEquals(1, store.appStateKeys().size());
+            assertEquals(1, store.syncStore().appStateKeys().size());
         }
 
         @Test
         @DisplayName("getActiveKey throws when the store has no keys")
         void noKeysThrows() {
-            assertFalse(store.appStateKeys().iterator().hasNext());
+            assertFalse(store.syncStore().appStateKeys().iterator().hasNext());
             Assertions.assertThrows(
                     IllegalStateException.class,
                     () -> rotation.getActiveKey(true));
@@ -114,7 +117,7 @@ class KeyRotationCycleIntegrationTest {
     }
 
     @Nested
-    @DisplayName("captured cycle — oracle parity once fixtures land")
+    @DisplayName("captured cycle â€” oracle parity once fixtures land")
     class CapturedCycle {
         @Test
         @DisplayName("forced rotation produces a key-share peer message matching the captured WA Web payload")

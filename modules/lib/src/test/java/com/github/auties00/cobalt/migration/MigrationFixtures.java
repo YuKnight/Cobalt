@@ -224,7 +224,7 @@ public final class MigrationFixtures {
     /**
      * Creates an in-memory temporary {@link WhatsAppStore} configured with the given self-PN and optional
      * self-LID, the standard {@code store} dependency for any migration-package test that builds a
-     * {@link com.github.auties00.cobalt.client.WhatsAppClient} harness. The store is pre-advanced past the
+     * {@link com.github.auties00.cobalt.client.LinkedWhatsAppClient} harness. The store is pre-advanced past the
      * offline-delivery gate so {@link LidMigrationService#executeMigration()} proceeds immediately;
      * production code drives that gate through the connection lifecycle.
      *
@@ -240,9 +240,9 @@ public final class MigrationFixtures {
         try {
             var store = WhatsAppStoreFactory.temporary()
                     .create(WhatsAppClientType.WEB, Long.parseLong(selfPn.user()));
-            store.setJid(selfPn);
+            store.accountStore().setJid(selfPn);
             if (selfLid != null) {
-                store.setLid(selfLid);
+                store.accountStore().setLid(selfLid);
             }
             store.setOfflineResumeState(WhatsAppClientOfflineResumeState.COMPLETE);
             return store;

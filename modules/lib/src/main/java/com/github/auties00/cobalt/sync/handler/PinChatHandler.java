@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.auties00.cobalt.client.WhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.newsletter.NewsletterPin;
 import com.github.auties00.cobalt.model.newsletter.NewsletterPinBuilder;
@@ -131,7 +131,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * is accepted; a chat JID without an {@code @} server is treated as
      * {@link SyncdIndexUtils#malformedActionIndex(String, String)}; newsletter
      * JIDs are routed to
-     * {@link #applyNewsletterPinMutation(WhatsAppClient, Jid, PinAction, Instant)}
+     * {@link #applyNewsletterPinMutation(LinkedWhatsAppClient, Jid, PinAction, Instant)}
      * because Cobalt stores newsletters separately from chats; the unpin path
      * zeros the chat's {@code pinnedTimestamp}; the pin path early-outs on
      * already-pinned chats, accepts when the cap is not yet reached, and
@@ -143,7 +143,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * as {@link MutationApplicationResult#malformed()}.
      */
     @Override
-    public MutationApplicationResult applyMutation(WhatsAppClient client, DecryptedMutation.Trusted mutation) {
+    public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
             return MutationApplicationResult.unsupported();
         }
@@ -180,7 +180,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
                 return applyNewsletterPinMutation(client, chatJid, action, currentTimestamp);
             }
 
-            var chat = client.store().findChatByJid(chatJid);
+            var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
@@ -190,7 +190,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
                 return MutationApplicationResult.success();
             }
 
-            var allPinnedChats = client.store().chats().stream()
+            var allPinnedChats = client.store().chatStore().chats().stream()
                     .filter(c -> c.pinnedTimestamp().isPresent())
                     .toList();
 
@@ -247,37 +247,37 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * {@link com.github.auties00.cobalt.model.newsletter.Newsletter} model has
      * no {@code pinnedTimestamp} field.
      *
-     * @param client            the {@link WhatsAppClient} whose store is mutated
+     * @param client            the {@link LinkedWhatsAppClient} whose store is mutated
      * @param newsletterJid     the newsletter JID
      * @param action            the pin action carrying the {@code pinned} flag
      * @param currentTimestamp  the mutation timestamp
      * @return the detailed application result
      */
     private MutationApplicationResult applyNewsletterPinMutation(
-            WhatsAppClient client,
+            LinkedWhatsAppClient client,
             Jid newsletterJid,
             PinAction action,
             Instant currentTimestamp
     ) {
-        var newsletter = client.store().findNewsletterByJid(newsletterJid);
+        var newsletter = client.store().chatStore().findNewsletterByJid(newsletterJid);
         if (newsletter.isEmpty()) {
             return MutationApplicationResult.orphan(newsletterJid.toString(), "Newsletter");
         }
 
         if (!action.pinned()) {
-            client.store().removeNewsletterPin(newsletterJid);
+            client.store().chatStore().removeNewsletterPin(newsletterJid);
             return MutationApplicationResult.success();
         }
 
-        var existing = client.store().findNewsletterPin(newsletterJid).orElse(null);
+        var existing = client.store().chatStore().findNewsletterPin(newsletterJid).orElse(null);
         if (existing != null) {
-            client.store().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
+            client.store().chatStore().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
             return MutationApplicationResult.success();
         }
 
-        var pins = client.store().newsletterPinStates();
+        var pins = client.store().chatStore().newsletterPinStates();
         if (pins.size() < MAX_PINNED_NEWSLETTERS) {
-            client.store().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
+            client.store().chatStore().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
             return MutationApplicationResult.success();
         }
 
@@ -290,8 +290,8 @@ public final class PinChatHandler implements WebAppStateActionHandler {
                 .orElseThrow();
 
         if (oldest.pinnedAt().isBefore(currentTimestamp)) {
-            client.store().removeNewsletterPin(oldest.newsletterJid());
-            client.store().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
+            client.store().chatStore().removeNewsletterPin(oldest.newsletterJid());
+            client.store().chatStore().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
             queueUnpinMutation(client, oldest.newsletterJid(), currentTimestamp);
             return MutationApplicationResult.success();
         }
@@ -311,13 +311,13 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * {@link #getPinMutation(Instant, boolean, Jid)} and appends it to the
      * pending mutations table.
      *
-     * @param client    the {@link WhatsAppClient} whose store receives the queued mutation
+     * @param client    the {@link LinkedWhatsAppClient} whose store receives the queued mutation
      * @param chatJid   the chat or newsletter JID to unpin
      * @param timestamp the mutation timestamp
      */
-    private void queueUnpinMutation(WhatsAppClient client, Jid chatJid, Instant timestamp) {
+    private void queueUnpinMutation(LinkedWhatsAppClient client, Jid chatJid, Instant timestamp) {
         var pending = getPinMutation(timestamp, false, chatJid);
-        client.store().addPendingMutations(collectionName(), List.of(pending));
+        client.store().syncStore().addPendingMutations(collectionName(), List.of(pending));
     }
 
     /**
