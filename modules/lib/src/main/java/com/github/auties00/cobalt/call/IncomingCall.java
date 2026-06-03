@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.call;
 
 import com.github.auties00.cobalt.ack.CallRelay;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.time.Instant;
@@ -14,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * any media is exchanged.
  *
  * <p>An offer is delivered through
- * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onCall(LinkedWhatsAppClient, IncomingCall)}
+ * {@link LinkedWhatsAppClientListener#onCall(LinkedWhatsAppClient, IncomingCall)}
  * when an inbound call offer arrives from the peer. The listener responds
  * by calling
  * {@link LinkedWhatsAppClient#acceptCall(IncomingCall, CallOptions)} or

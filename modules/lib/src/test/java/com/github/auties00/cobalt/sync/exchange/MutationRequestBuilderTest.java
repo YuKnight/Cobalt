@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.Assertions;
@@ -41,7 +41,7 @@ class MutationRequestBuilderTest {
 
     private static final Jid SELF_PN_DEVICE_1 = Jid.of("19250000001:1@s.whatsapp.net");
 
-    private record Harness(TestWhatsAppClient client, MutationRequestBuilder builder, WhatsAppStore store) {
+    private record Harness(TestWhatsAppClient client, MutationRequestBuilder builder, LinkedWhatsAppStore store) {
     }
 
     private static Harness build() {

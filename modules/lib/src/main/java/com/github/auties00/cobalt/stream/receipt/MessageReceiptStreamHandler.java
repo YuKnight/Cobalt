@@ -1,10 +1,11 @@
 package com.github.auties00.cobalt.stream.receipt;
 
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.MessageStatusListener;
+import com.github.auties00.cobalt.listener.linked.LinkedMessageStatusListener;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -19,7 +20,6 @@ import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdRetryFromUnknownDeviceEventBuilder;
@@ -42,7 +42,7 @@ import java.util.Objects;
  * and retry acknowledgements, then mirrors them into the local store.
  *
  * <p>This handler drives the per-message read/delivery status fanned out via
- * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onMessageStatus}
+ * {@link LinkedWhatsAppClientListener#onMessageStatus}
  * and, for retry receipts, transparently re-encrypts and re-ships the
  * original outbound message. {@link ReceiptStreamHandler} forwards every
  * non-call receipt here regardless of whether it is a retry or a regular
@@ -930,7 +930,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
     /**
      * Folds one per-participant receipt event into the existing
      * {@link MessageInfo}, then fans out
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onMessageStatus}.
+     * {@link LinkedWhatsAppClientListener#onMessageStatus}.
      *
      * <p>Both {@link ChatMessageInfo} and {@link NewsletterMessageInfo} are
      * mutated in place because the store hands out the same instance across
@@ -1644,7 +1644,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
 
     /**
      * Fans out an {@code onMessageStatus} notification to every registered
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener}.
+     * {@link LinkedWhatsAppClientListener}.
      *
      * @implNote
      * This implementation starts one virtual thread per listener so that
@@ -1655,7 +1655,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      */
     private void notifyMessageStatus(MessageInfo info) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof MessageStatusListener typed) {
+            if (listener instanceof LinkedMessageStatusListener typed) {
                 Thread.startVirtualThread(() -> typed.onMessageStatus(whatsapp, info));
             }
         }

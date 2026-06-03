@@ -410,8 +410,6 @@ server.tool(
   }
 );
 
-// Native module tools ---
-
 server.tool(
   "list_native_modules",
   "Lists all native (WASM) modules in the snapshot with name, URL, content hash, and byte size.",
@@ -654,8 +652,6 @@ server.tool(
   }
 );
 
-// Persistent annotations ---
-
 server.tool(
   "manage_annotations",
   "Manages persistent module annotations for the current snapshot. Actions: 'set' (create/update), 'get' (read one), 'list' (read all with optional filter), 'remove' (delete).",
@@ -730,8 +726,6 @@ server.tool(
     }
   }
 );
-
-// Snapshot switching ---
 
 server.tool(
   "switch_snapshot",

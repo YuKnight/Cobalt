@@ -9,15 +9,15 @@ import com.github.auties00.cobalt.call.internal.CallService;
 import com.github.auties00.cobalt.call.IncomingCall;
 import com.github.auties00.cobalt.ack.CallRelay;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.CallEndedListener;
-import com.github.auties00.cobalt.client.listener.CallInteractionListener;
-import com.github.auties00.cobalt.client.listener.CallListener;
-import com.github.auties00.cobalt.client.listener.CallMuteChangedListener;
-import com.github.auties00.cobalt.client.listener.CallOfferNoticeListener;
-import com.github.auties00.cobalt.client.listener.CallParticipantsChangedListener;
-import com.github.auties00.cobalt.client.listener.CallPeerStateChangedListener;
-import com.github.auties00.cobalt.client.listener.CallPreacceptListener;
-import com.github.auties00.cobalt.client.listener.CallVideoStateChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallEndedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallInteractionListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallMuteChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallOfferNoticeListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallParticipantsChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallPeerStateChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallPreacceptListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallVideoStateChangedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -38,7 +38,7 @@ import com.github.auties00.cobalt.call.CallEndReason;
  * It parses each stanza into its constituent fields (peer {@link Jid}, call creator, call identifier,
  * timestamp, and similar), persists the LID-to-phone-number mappings and caller push names the stanza
  * carries, updates the local call model in the
- * {@link com.github.auties00.cobalt.store.WhatsAppStore}, and sends the receipt or acknowledgement the
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore}, and sends the receipt or acknowledgement the
  * payload type requires back to the server. The supported payload tags are {@code offer},
  * {@code accept}, {@code reject}, {@code preaccept}, {@code enc_rekey}, {@code terminate},
  * {@code mute_v2}, {@code video_state}, {@code peer_state}, {@code group_update}, {@code offer_notice},
@@ -746,7 +746,7 @@ public final class CallReceiver extends SocketStreamHandler.Concurrent {
      */
     private void notifyCall(IncomingCall call) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallListener typed) {
+            if (listener instanceof LinkedCallListener typed) {
                 Thread.startVirtualThread(() -> typed.onCall(whatsapp, call));
             }
         }
@@ -766,7 +766,7 @@ public final class CallReceiver extends SocketStreamHandler.Concurrent {
     private void notifyEnded(String callId, Jid fromJid, String wireReason) {
         var parsed = CallEndReason.fromWireValue(wireReason);
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallEndedListener typed) {
+            if (listener instanceof LinkedCallEndedListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallEnded(whatsapp, callId, fromJid, parsed));
             }
         }
@@ -782,7 +782,7 @@ public final class CallReceiver extends SocketStreamHandler.Concurrent {
      */
     private void notifyPreaccept(String callId, Jid fromJid) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallPreacceptListener typed) {
+            if (listener instanceof LinkedCallPreacceptListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallPreaccept(whatsapp, callId, fromJid));
             }
         }
@@ -799,7 +799,7 @@ public final class CallReceiver extends SocketStreamHandler.Concurrent {
      */
     private void notifyMute(String callId, Jid fromJid, boolean muted) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallMuteChangedListener typed) {
+            if (listener instanceof LinkedCallMuteChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallMuteChanged(whatsapp, callId, fromJid, muted));
             }
         }
@@ -817,7 +817,7 @@ public final class CallReceiver extends SocketStreamHandler.Concurrent {
      */
     private void notifyInteraction(String callId, Jid fromJid, CallInteraction interaction) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallInteractionListener typed) {
+            if (listener instanceof LinkedCallInteractionListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallInteraction(whatsapp, callId, fromJid, interaction));
             }
         }
@@ -834,7 +834,7 @@ public final class CallReceiver extends SocketStreamHandler.Concurrent {
      */
     private void notifyVideoState(String callId, Jid fromJid, boolean enabled) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallVideoStateChangedListener typed) {
+            if (listener instanceof LinkedCallVideoStateChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallVideoStateChanged(whatsapp, callId, fromJid, enabled));
             }
         }
@@ -854,7 +854,7 @@ public final class CallReceiver extends SocketStreamHandler.Concurrent {
     private void notifyPeerState(String callId, Jid fromJid, String wireState) {
         var parsed = CallPeerState.fromWireValue(wireState);
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallPeerStateChangedListener typed) {
+            if (listener instanceof LinkedCallPeerStateChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallPeerStateChanged(whatsapp, callId, fromJid, parsed));
             }
         }
@@ -873,7 +873,7 @@ public final class CallReceiver extends SocketStreamHandler.Concurrent {
      */
     private void notifyParticipantsChanged(String callId, Jid groupJid, List<Jid> participants, boolean added) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallParticipantsChangedListener typed) {
+            if (listener instanceof LinkedCallParticipantsChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallParticipantsChanged(whatsapp, callId, groupJid, participants, added));
             }
         }
@@ -888,7 +888,7 @@ public final class CallReceiver extends SocketStreamHandler.Concurrent {
      */
     private void notifyOfferNotice(IncomingCall call) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallOfferNoticeListener typed) {
+            if (listener instanceof LinkedCallOfferNoticeListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallOfferNotice(whatsapp, call));
             }
         }

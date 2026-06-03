@@ -148,8 +148,7 @@ export class CdpBridge implements PlatformBridge {
         { encoding: "utf-8" }
       );
     } catch {
-      // Port may not be bound
-      // That's fine, we're about to bind it.
+
     }
   }
 
@@ -167,8 +166,7 @@ export class CdpBridge implements PlatformBridge {
         { encoding: "utf-8" }
       );
     } catch {
-      // Non-Windows or powershell not available
-      // Skip env var setup
+
     }
   }
 
@@ -179,7 +177,7 @@ export class CdpBridge implements PlatformBridge {
         { encoding: "utf-8" }
       );
     } catch {
-      // Process may not exist
+
     }
   }
 

@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -52,7 +52,7 @@ public final class CsTokenStanza {
     /**
      * Holds the store consulted for the NCT salt and the chat's {@code accountLid}.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Gates token emission via the {@link ABProp#WA_NCT_TOKEN_SEND_ENABLED} prop.
@@ -74,13 +74,13 @@ public final class CsTokenStanza {
      * <p>
      * The per-salt HMAC cache lives on this instance, so reusing the builder across sends amortises the HMAC cost.
      *
-     * @param store          the {@link WhatsAppStore} used to retrieve the NCT salt and chat account LID
+     * @param store          the {@link LinkedWhatsAppStore} used to retrieve the NCT salt and chat account LID
      * @param abPropsService the {@link ABPropsService} used to gate token emission
      * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "genCsTokenBody",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public CsTokenStanza(WhatsAppStore store, ABPropsService abPropsService) {
+    public CsTokenStanza(LinkedWhatsAppStore store, ABPropsService abPropsService) {
         this.store = Objects.requireNonNull(store, "store");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
         this.hmacCache = new LinkedHashMap<>();

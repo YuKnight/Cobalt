@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyD
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyIdBuilder;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.wam.LiveWamService;
@@ -53,7 +53,7 @@ class SyncKeyRotationServiceTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
     private static final Jid SELF_PN_DEVICE_1 = Jid.of("19250000001:1@s.whatsapp.net");
 
-    private record Harness(TestWhatsAppClient client, WhatsAppStore store, SyncKeyRotationService rotation) {
+    private record Harness(TestWhatsAppClient client, LinkedWhatsAppStore store, SyncKeyRotationService rotation) {
     }
 
     private static Harness build() {

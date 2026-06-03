@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.RemoveRecentStickerAction;
 import com.github.auties00.cobalt.model.sync.action.media.RemoveRecentStickerActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.RemoveRecentStickerMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +44,7 @@ class RemoveRecentStickerHandlerTest {
     private static final String STICKER_HASH = "recent-hash-12345";
     private static final String RECENT_STICKER_FEATURE = "recent_sticker";
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient client;
 
     // The recent_sticker primary feature is intentionally not pre-enabled; tests that need

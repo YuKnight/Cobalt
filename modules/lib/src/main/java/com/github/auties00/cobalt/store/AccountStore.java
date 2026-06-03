@@ -32,10 +32,10 @@ import java.util.UUID;
  * and the linked-Meta-account state.
  *
  * @apiNote
- * Embedders reach this through {@link WhatsAppStore#accountStore()}. Identity
+ * Embedders reach this through {@link LinkedWhatsAppStore#accountStore()}. Identity
  * and profile values are the most commonly read store data.
  *
- * @see WhatsAppStore
+ * @see LinkedWhatsAppStore
  */
 @WhatsAppWebModule(moduleName = "WAWebUserPrefsLoginKeys")
 @WhatsAppWebModule(moduleName = "WAWebUserPrefsKeys")

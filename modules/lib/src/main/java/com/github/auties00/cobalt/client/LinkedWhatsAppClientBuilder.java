@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.model.contact.ContactTextStatusBuilder;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.model.device.pairing.ClientPayload;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 
 import java.io.IOException;
@@ -110,7 +110,7 @@ public sealed class LinkedWhatsAppClientBuilder {
     /**
      * Returns a low-level builder that bypasses the
      * {@link WhatsAppStoreFactory} flow and accepts a pre-built
-     * {@link WhatsAppStore} directly.
+     * {@link LinkedWhatsAppStore} directly.
      *
      * @return the custom client builder
      */
@@ -477,7 +477,7 @@ public sealed class LinkedWhatsAppClientBuilder {
 
     /**
      * A builder stage that applies session-wide options to a resolved
-     * {@link WhatsAppStore} before the client is materialised.
+     * {@link LinkedWhatsAppStore} before the client is materialised.
      *
      * <p>Every fluent setter on this stage writes directly into the
      * underlying store (for things that must be persisted, such as the
@@ -491,7 +491,7 @@ public sealed class LinkedWhatsAppClientBuilder {
         /**
          * The resolved store on which configuration writes are applied.
          */
-        final WhatsAppStore store;
+        final LinkedWhatsAppStore store;
         /**
          * The error handler installed on the future client.
          */
@@ -504,7 +504,7 @@ public sealed class LinkedWhatsAppClientBuilder {
          * @param store the store to configure; must not be {@code null}
          * @throws NullPointerException if {@code store} is {@code null}
          */
-        private Options(WhatsAppStore store) {
+        private Options(LinkedWhatsAppStore store) {
             this.store = Objects.requireNonNull(store, "store must not be null");
         }
 
@@ -609,7 +609,7 @@ public sealed class LinkedWhatsAppClientBuilder {
              *
              * @param store the store resolved by the previous stage
              */
-            private Web(WhatsAppStore store) {
+            private Web(LinkedWhatsAppStore store) {
                 super(store);
             }
 
@@ -800,7 +800,7 @@ public sealed class LinkedWhatsAppClientBuilder {
              *
              * @param store the store resolved by the previous stage
              */
-            private Mobile(WhatsAppStore store) {
+            private Mobile(LinkedWhatsAppStore store) {
                 super(store);
             }
 
@@ -1322,7 +1322,7 @@ public sealed class LinkedWhatsAppClientBuilder {
     /**
      * A low-level builder stage that bypasses the
      * {@link WhatsAppStoreFactory} flow and lets the caller supply a
-     * pre-built {@link WhatsAppStore}.
+     * pre-built {@link LinkedWhatsAppStore}.
      *
      * <p>{@code Custom} is useful for test harnesses or for integrators
      * that already own a store (for example, one loaded from an external
@@ -1335,7 +1335,7 @@ public sealed class LinkedWhatsAppClientBuilder {
         /**
          * The externally-supplied store.
          */
-        private WhatsAppStore store;
+        private LinkedWhatsAppStore store;
         /**
          * The error handler to install on the built client.
          */
@@ -1362,7 +1362,7 @@ public sealed class LinkedWhatsAppClientBuilder {
          *              (which fails fast at {@link #build()})
          * @return this builder, for chaining
          */
-        public Custom store(WhatsAppStore store) {
+        public Custom store(LinkedWhatsAppStore store) {
             this.store = store;
             return this;
         }

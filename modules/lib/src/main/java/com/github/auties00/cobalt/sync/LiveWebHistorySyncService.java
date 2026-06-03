@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.sync;
 
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.ChatsListener;
-import com.github.auties00.cobalt.client.listener.ContactsListener;
-import com.github.auties00.cobalt.client.listener.NewStatusListener;
-import com.github.auties00.cobalt.client.listener.StatusListener;
-import com.github.auties00.cobalt.client.listener.WebHistorySyncMessagesListener;
-import com.github.auties00.cobalt.client.listener.WebHistorySyncPastParticipantsListener;
-import com.github.auties00.cobalt.client.listener.WebHistorySyncProgressListener;
+import com.github.auties00.cobalt.listener.linked.LinkedChatsListener;
+import com.github.auties00.cobalt.listener.linked.LinkedContactsListener;
+import com.github.auties00.cobalt.listener.linked.LinkedNewStatusListener;
+import com.github.auties00.cobalt.listener.linked.LinkedStatusListener;
+import com.github.auties00.cobalt.listener.linked.LinkedWebHistorySyncMessagesListener;
+import com.github.auties00.cobalt.listener.linked.LinkedWebHistorySyncPastParticipantsListener;
+import com.github.auties00.cobalt.listener.linked.LinkedWebHistorySyncProgressListener;
 import com.github.auties00.cobalt.exception.WhatsAppHistorySyncException;
 import com.github.auties00.cobalt.exception.WhatsAppMediaException;
 import com.github.auties00.cobalt.media.MediaConnectionService;
@@ -23,7 +23,7 @@ import com.github.auties00.cobalt.model.message.system.history.HistorySyncNotifi
 import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
 import com.github.auties00.cobalt.model.preference.StickerBuilder;
 import com.github.auties00.cobalt.model.sync.history.HistorySync;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.*;
 import com.github.auties00.cobalt.wam.type.*;
@@ -769,7 +769,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
 
     /**
      * Applies every wire-shape mutation carried by the decoded chunk to the
-     * {@link WhatsAppStore} and fans the result out to every registered
+     * {@link LinkedWhatsAppStore} and fans the result out to every registered
      * {@code LinkedWhatsAppClientListener}.
      *
      * <p>Invoked from the success branch of {@link #processSync}; it ingests
@@ -780,7 +780,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
      * dedicated virtual thread so a slow listener cannot block the next
      * chunk or the LID-mapping ingest. Per-chunk store mutations cover
      * the data shapes that have an equivalent in
-     * {@link WhatsAppStore}: every {@code conversation} is merged into
+     * {@link LinkedWhatsAppStore}: every {@code conversation} is merged into
      * the local {@link Chat} record (metadata fields plus embedded
      * messages); every {@code pushname} is folded into a
      * {@link com.github.auties00.cobalt.model.contact.Contact} via
@@ -796,13 +796,13 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
      * {@code WAWebRecentStickerCollectionMd} row id; the
      * {@code companionMmsAuthNonce} (wire field {@code companionMetaNonce})
      * is captured into
-     * {@link WhatsAppStore#setCompanionMmsAuthNonce(String)} so it can
+     * {@link LinkedWhatsAppStore#setCompanionMmsAuthNonce(String)} so it can
      * authorise the post-apply MMS blob-deletion call, matching WA Web's
      * write to {@code userPrefsIdb["WAWebCompanionMetaNonce"]} inside
      * {@code WAWebHistoryMsgHandlerAction.handleInitialSyncMsgs};
      * the {@code shareableChatLinkKey} (wire field
      * {@code shareableChatIdentifierEncryptionKey}) is captured into
-     * {@link WhatsAppStore#setShareableChatLinkKey(byte[])} and
+     * {@link LinkedWhatsAppStore#setShareableChatLinkKey(byte[])} and
      * persisted alongside the rest of the store so the
      * shareable-chat-link encryption material survives across restarts;
      * the WA Web bundle itself never reads the value (the deep-link
@@ -854,7 +854,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         var isLastChunk = progressValue >= 100;
 
         for (var listener : listeners) {
-            if (listener instanceof WebHistorySyncProgressListener typed) {
+            if (listener instanceof LinkedWebHistorySyncProgressListener typed) {
                 Thread.startVirtualThread(() -> typed.onWebHistorySyncProgress(whatsapp, progressValue, recent));
             }
         }
@@ -866,7 +866,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         if (!historyChats.isEmpty()) {
             List<Chat> syncedChats = List.copyOf(historyChats);
             for (var listener : listeners) {
-                if (listener instanceof WebHistorySyncMessagesListener typed) {
+                if (listener instanceof LinkedWebHistorySyncMessagesListener typed) {
                     Thread.startVirtualThread(() -> typed.onWebHistorySyncMessages(whatsapp, syncedChats, isLastChunk));
                 }
             }
@@ -879,7 +879,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         for (var statusMessage : historySync.statusV3Messages()) {
             store.chatStore().addStatus(statusMessage);
             for (var listener : listeners) {
-                if (listener instanceof NewStatusListener typed) {
+                if (listener instanceof LinkedNewStatusListener typed) {
                     Thread.startVirtualThread(() -> typed.onNewStatus(whatsapp, statusMessage));
                 }
             }
@@ -908,7 +908,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
             }
             var participants = pastParticipants.pastParticipants();
             for (var listener : listeners) {
-                if (listener instanceof WebHistorySyncPastParticipantsListener typed) {
+                if (listener instanceof LinkedWebHistorySyncPastParticipantsListener typed) {
                     Thread.startVirtualThread(() -> typed.onWebHistorySyncPastParticipants(whatsapp, groupJid, participants));
                 }
             }
@@ -918,7 +918,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
             store.syncStore().setSyncedChats(true);
             var chats = store.chatStore().chats();
             for (var listener : listeners) {
-                if (listener instanceof ChatsListener typed) {
+                if (listener instanceof LinkedChatsListener typed) {
                     Thread.startVirtualThread(() -> typed.onChats(whatsapp, chats));
                 }
             }
@@ -928,7 +928,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
             store.syncStore().setSyncedContacts(true);
             var contacts = store.contactStore().contacts();
             for (var listener : listeners) {
-                if (listener instanceof ContactsListener typed) {
+                if (listener instanceof LinkedContactsListener typed) {
                     Thread.startVirtualThread(() -> typed.onContacts(whatsapp, contacts));
                 }
             }
@@ -938,7 +938,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
             store.syncStore().setSyncedStatus(true);
             var status = store.chatStore().status();
             for (var listener : listeners) {
-                if (listener instanceof StatusListener typed) {
+                if (listener instanceof LinkedStatusListener typed) {
                     Thread.startVirtualThread(() -> typed.onStatus(whatsapp, status));
                 }
             }
@@ -966,7 +966,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
     @WhatsAppWebExport(moduleName = "WAWebHistorySyncStickers",
             exports = "processRecentStickers",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    private static void applyRecentSticker(StickerMetadata sticker, WhatsAppStore store) {
+    private static void applyRecentSticker(StickerMetadata sticker, LinkedWhatsAppStore store) {
         var fileSha256 = sticker.fileSha256().orElse(null);
         if (fileSha256 == null) {
             return;
@@ -1012,7 +1012,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
      *                    embedded messages
      * @param store       the store to mutate
      */
-    private static void applyChat(Chat historyChat, WhatsAppStore store) {
+    private static void applyChat(Chat historyChat, LinkedWhatsAppStore store) {
         var jid = historyChat.jid();
         var localChat = store.chatStore().findChatByJid(jid)
                 .orElseGet(() -> store.chatStore().addNewChat(jid));
@@ -1026,7 +1026,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
      * Copies every present chat-metadata field from {@code from} to
      * {@code to}.
      *
-     * <p>Invoked from {@link #applyChat(Chat, WhatsAppStore)} to transcribe
+     * <p>Invoked from {@link #applyChat(Chat, LinkedWhatsAppStore)} to transcribe
      * the chunk's chat metadata onto the store-resident chat.
      *
      * @implNote This implementation only touches the target chat when the
@@ -1111,7 +1111,7 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
      * @param pushname the wire-shape pushname record
      * @param store    the store to mutate
      */
-    private static void applyPushname(HistorySync.Pushname pushname, WhatsAppStore store) {
+    private static void applyPushname(HistorySync.Pushname pushname, LinkedWhatsAppStore store) {
         var rawId = pushname.id().orElse(null);
         if (rawId == null || rawId.isEmpty()) {
             return;

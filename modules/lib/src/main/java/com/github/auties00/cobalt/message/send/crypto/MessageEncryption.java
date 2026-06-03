@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.SignalSessionCipher;
@@ -53,7 +53,7 @@ public final class MessageEncryption {
     /**
      * Holds the store consulted for Signal session and sender-key lookups.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Holds the per-device Signal session cipher used by {@link #encryptForDevice(Jid, byte[])}.
@@ -86,7 +86,7 @@ public final class MessageEncryption {
     /**
      * Constructs an encryption service bound to the given Signal dependencies.
      * <p>
-     * The same {@link WhatsAppStore} must be shared with the {@link SignalSessionCipher} and {@link SignalGroupCipher} so
+     * The same {@link LinkedWhatsAppStore} must be shared with the {@link SignalSessionCipher} and {@link SignalGroupCipher} so
      * that session lookups during encrypt-then-cleanup observe the same backing state.
      *
      * @param store         the store providing Signal protocol state
@@ -100,7 +100,7 @@ public final class MessageEncryption {
     @WhatsAppWebExport(moduleName = "WAWebEncryptMsgProtobuf", exports = {"encryptMsgProtobuf", "encryptMsgSenderKey"},
             adaptation = WhatsAppAdaptation.ADAPTED)
     public MessageEncryption(
-            WhatsAppStore store,
+            LinkedWhatsAppStore store,
             SignalSessionCipher sessionCipher,
             SignalGroupCipher groupCipher,
             SignalCryptoLocks cryptoLocks

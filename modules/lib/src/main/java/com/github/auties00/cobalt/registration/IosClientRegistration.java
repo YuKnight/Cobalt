@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.registration;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.client.WhatsAppClientDeviceAttestor;
 import com.github.auties00.cobalt.client.WhatsAppClientDevicePushClient;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -38,7 +38,7 @@ import java.util.Objects;
  * </ul>
  *
  * <p>Package-private because instances are obtained through
- * {@link MobileClientRegistration#newRegistration(WhatsAppStore,
+ * {@link MobileClientRegistration#newRegistration(LinkedWhatsAppStore,
  * WhatsAppClientVerificationHandler.Mobile, WhatsAppClientDeviceAttestor,
  * WhatsAppClientDevicePushClient)} rather than constructed directly.
  *
@@ -87,7 +87,7 @@ final class IosClientRegistration extends MobileClientRegistration {
      * Constructs an iOS registration bound to the given collaborators.
      *
      * <p>Invoked only from
-     * {@link MobileClientRegistration#newRegistration(WhatsAppStore,
+     * {@link MobileClientRegistration#newRegistration(LinkedWhatsAppStore,
      * WhatsAppClientVerificationHandler.Mobile,
      * WhatsAppClientDeviceAttestor, WhatsAppClientDevicePushClient)}. A
      * {@code null} attestor or push client is replaced by the
@@ -104,7 +104,7 @@ final class IosClientRegistration extends MobileClientRegistration {
      *                     to {@link WhatsAppClientDevicePushClient#noop()}
      */
     IosClientRegistration(
-            WhatsAppStore store,
+            LinkedWhatsAppStore store,
             WhatsAppClientVerificationHandler.Mobile verification,
             WhatsAppClientDeviceAttestor.Ios attestor,
             WhatsAppClientDevicePushClient pushClient) {

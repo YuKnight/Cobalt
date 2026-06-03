@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.ProxyServer;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * confirm no state leaks across sessions.
  *
  * <p>Harness design: each proxy-flavour test stands up a local {@link ProxyServer} torn down in
- * {@link #tearDown()}; every scenario uses a fresh {@link WhatsAppStore} from
+ * {@link #tearDown()}; every scenario uses a fresh {@link LinkedWhatsAppStore} from
  * {@link WhatsAppStoreFactory#temporary()}; the {@link CapturingListener} latches on the first
  * node or close event so a scenario can verify the handshake landed without blocking on the full
  * connect/auth flow. HTTPS-proxy tests use {@link #trustAllSslContextFactory()} because the local
@@ -284,7 +284,7 @@ class WhatsAppSocketTest {
         listener.await();
     }
 
-    private static WhatsAppStore createMobileStore() {
+    private static LinkedWhatsAppStore createMobileStore() {
         try {
             return WhatsAppStoreFactory.temporary()
                     .create(WhatsAppClientType.MOBILE, 15551234567L);
@@ -293,7 +293,7 @@ class WhatsAppSocketTest {
         }
     }
 
-    private static WhatsAppStore createWebStore() {
+    private static LinkedWhatsAppStore createWebStore() {
         try {
             var store = WhatsAppStoreFactory.temporary()
                     .create(WhatsAppClientType.WEB, UUID.randomUUID());
@@ -309,7 +309,7 @@ class WhatsAppSocketTest {
         }
     }
 
-    private static WhatsAppStore createDesktopStore() {
+    private static LinkedWhatsAppStore createDesktopStore() {
         try {
             var store = WhatsAppStoreFactory.temporary()
                     .create(WhatsAppClientType.WEB, UUID.randomUUID());

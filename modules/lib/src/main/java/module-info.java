@@ -1,3 +1,6 @@
+import com.github.auties00.cobalt.listener.WhatsAppListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
+
 /**
  * Defines the Cobalt library, a Java reimplementation of the WhatsApp Web, Desktop, and Mobile clients.
  *
@@ -11,10 +14,10 @@
  *   <li>Connection and control through {@link com.github.auties00.cobalt.client.LinkedWhatsAppClient}, the
  *       single facade for pairing, connecting, sending and receiving traffic, and driving every other
  *       feature.</li>
- *   <li>Event delivery through {@link com.github.auties00.cobalt.client.listener.WhatsAppListener} and its
- *       aggregator {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener}, the
+ *   <li>Event delivery through {@link WhatsAppListener} and its
+ *       aggregator {@link LinkedWhatsAppClientListener}, the
  *       callback interfaces for incoming messages, presence, calls, and other asynchronous notifications.</li>
- *   <li>Session and entity persistence through {@link com.github.auties00.cobalt.store.WhatsAppStore},
+ *   <li>Session and entity persistence through {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore},
  *       which holds chats, contacts, messages, and the Signal protocol material for a session.</li>
  *   <li>The {@code call} packages, which expose voice and video calling together with audio and video
  *       frame sources, sinks, and filters.</li>
@@ -30,14 +33,20 @@
  * media, and transport dependencies this library relies on are not re-exported.
  */
 module com.github.auties00.cobalt {
-    // Source provenance annotations
+    // Source provenance annotations (only source requires them, optional)
     requires static com.github.auties00.cobalt.meta;
 
-    // Vector API
+    // Vector API (only optimized paths requires it, optional until it comes out of incubation)
     requires static jdk.incubator.vector;
+
+    // Logging
+    requires java.logging;
 
     // Http client
     requires java.net.http;
+
+    // Built-in webhook receiver for the Cloud API client
+    requires jdk.httpserver;
 
     // Cryptography
     requires com.github.auties00.libsignal;
@@ -59,9 +68,6 @@ module com.github.auties00.cobalt {
 
     // Message store
     requires com.github.auties00.collections;
-
-    // Logging
-    requires java.logging;
 
     // PDF rendering (document thumbnails in the upload transcoder)
     requires org.apache.pdfbox;
@@ -92,23 +98,22 @@ module com.github.auties00.cobalt {
 
     // Client API
     exports com.github.auties00.cobalt.client;
-    exports com.github.auties00.cobalt.client.listener;
+
+    // Listeners
+    exports com.github.auties00.cobalt.listener;
+    exports com.github.auties00.cobalt.listener.linked;
+    exports com.github.auties00.cobalt.listener.cloud;
 
     // Exceptions
     exports com.github.auties00.cobalt.exception;
 
     // Node/Stanza
     // Exported so the user can make his own queries
-    // TODO: Should we expose IQ/MEX/SMAX implementations queries as well?
     exports com.github.auties00.cobalt.node;
     exports com.github.auties00.cobalt.node.iq;
     exports com.github.auties00.cobalt.node.mex;
     exports com.github.auties00.cobalt.node.smax;
     exports com.github.auties00.cobalt.node.usync;
-
-    // GraphQL HTTP transports (not stanza-based, so kept outside the node package)
-    exports com.github.auties00.cobalt.graphql.web;
-    exports com.github.auties00.cobalt.graphql.facebook;
 
     // Store
     // Exported for obvious reasons

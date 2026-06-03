@@ -239,7 +239,7 @@ export class AndroidSdk {
         installedIds.add(id);
       }
     }
-    // Second pass: emit one entry per unique system image id we saw.
+
     const seen = new Set<string>();
     for (const raw of lines) {
       const line = raw.trim();
@@ -248,7 +248,7 @@ export class AndroidSdk {
       if (seen.has(id)) continue;
       seen.add(id);
       const parts = id.split(";");
-      // system-images;android-XX;tag;abi
+
       const apiLevelRaw = parts[1]?.replace(/^android-/, "");
       const apiLevel = apiLevelRaw ? parseInt(apiLevelRaw, 10) : null;
       out.push({
@@ -309,7 +309,7 @@ export class AndroidSdk {
           return;
         }
       } catch {
-        // device may not yet be in the adb device list; keep polling
+
       }
       await sleep(2_000);
     }
@@ -328,7 +328,7 @@ export class AndroidSdk {
           return expected;
         }
       } catch {
-        // adb server not yet up
+
       }
       await sleep(1_000);
     }

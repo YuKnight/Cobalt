@@ -27,7 +27,6 @@ import java.util.Objects;
  * protocol-level string identifier used in XMPP stanzas.
  *
  * @see GroupParticipant
- * @see GroupAction
  */
 @ProtobufEnum(name = "GroupParticipant.Rank")
 public enum GroupPartipantRole {

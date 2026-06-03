@@ -121,6 +121,10 @@ public final class VoiceCallSession implements AutoCloseable {
      */
     private RtpReceiver rtpReceiver;
 
+    // TODO: temporary inbound-audio diagnostics for the 1:1 connected-call timeout investigation
+    private volatile long DBG_INBOUND;
+    private volatile long DBG_INBOUND_ALL;
+
     /**
      * The SRTP endpoint media is keyed with, set by {@link #wireMedia(SrtpEndpoint)}.
      *
@@ -129,6 +133,27 @@ public final class VoiceCallSession implements AutoCloseable {
      * (the DTLS driver's {@code srtpEndpoint()} is {@code null} when no peer DTLS handshake ran).
      */
     private volatile SrtpEndpoint activeSrtp;
+
+    /**
+     * The interval, in milliseconds, between periodic RTCP sender reports.
+     *
+     * @implNote This implementation uses {@code 1000 ms}. WhatsApp's voip engine ends a media leg with
+     * {@code reason=timeout} after roughly five missing report intervals (observed near 18 to 19
+     * seconds); a one-second cadence keeps the reverse RTCP path comfortably fresh while the RTCP
+     * traffic stays a negligible fraction of the audio bandwidth.
+     */
+    private static final long RTCP_INTERVAL_MS = 1000L;
+
+    /**
+     * The thread that emits periodic RTCP sender reports on the audio stream for the call's lifetime,
+     * or {@code null} until {@link #wireMedia(SrtpEndpoint)} starts it.
+     *
+     * <p>WhatsApp's voip engine treats a media leg as dead when it receives no RTCP from the remote
+     * within roughly five report intervals and ends the call with {@code reason=timeout}; it also
+     * withholds its own uplink audio until the reverse RTCP path is confirmed. Cobalt therefore must
+     * keep this ticker running so the peer observes a live reverse RTCP path.
+     */
+    private volatile Thread rtcpTicker;
 
     /**
      * The active video tracks, keyed by {@link VideoTrackOptions.Kind}.
@@ -548,6 +573,11 @@ public final class VoiceCallSession implements AutoCloseable {
             return;
         }
         closed = true;
+        var ticker = this.rtcpTicker;
+        if (ticker != null) {
+            ticker.interrupt();
+            this.rtcpTicker = null;
+        }
         for (var track : videoTracks.values()) {
             try {
                 track.pipeline().close();
@@ -619,6 +649,7 @@ public final class VoiceCallSession implements AutoCloseable {
         // only for the loopback tests, which share a handshake instead of a relay.
         var hbh = this.hopByHopKey;
         if (hbh != null) {
+            com.github.auties00.cobalt.call.internal.CallMediaCapture.keys(call.callId(), hbh);
             srtp = SrtpEndpoint.fromHopByHopKey(hbh);
         }
         this.activeSrtp = srtp;
@@ -641,6 +672,122 @@ public final class VoiceCallSession implements AutoCloseable {
             }
             this.audio = pipeline;
         }
+        startRtcpTicker();
+    }
+
+    /**
+     * Starts the periodic RTCP sender-report ticker once, if not already running.
+     *
+     * <p>The ticker emits a compound RTCP sender report on the audio SSRC shortly after media is
+     * wired and then at a steady interval for the call's lifetime, so the peer observes a live reverse
+     * RTCP path and does not end the call with {@code reason=timeout}. A {@link #reconnect} preserves
+     * the running ticker rather than starting a second one.
+     */
+    private synchronized void startRtcpTicker() {
+        if (rtcpTicker != null || closed) {
+            return;
+        }
+        rtcpTicker = Thread.ofVirtual().name("call-rtcp-" + call.callId()).start(() -> {
+            try {
+                Thread.sleep(250);
+                while (!closed && !Thread.currentThread().isInterrupted()) {
+                    sendSenderReport();
+                    Thread.sleep(RTCP_INTERVAL_MS);
+                }
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+        });
+    }
+
+    /**
+     * Builds, SRTCP-protects, and sends one compound RTCP packet (a sender report followed by a
+     * source-description CNAME chunk) on the audio stream.
+     *
+     * <p>The sender report carries the audio SSRC, an NTP-format wall-clock timestamp, the RTP
+     * timestamp and packet and octet counts taken from the live {@link RtpSender}, and no reception
+     * report blocks. The packet is protected with the SRTCP context keyed by the local audio SSRC and
+     * written to the relay over the same raw transport sink as media SRTP; the peer demultiplexes it
+     * by its RTCP payload-type byte. Any failure is swallowed so a transient transport error does not
+     * stop the ticker.
+     */
+    private void sendSenderReport() {
+        var srtp = activeSrtp;
+        var sender = rtpSender;
+        if (srtp == null || sender == null) {
+            return;
+        }
+        try {
+            var report = buildSenderReport(options.localAudioSsrc(),
+                    sender.lastRtpTimestamp(), sender.sentPackets(), sender.sentOctets());
+            var protectedReport = srtp.protectRtcp(report, options.localAudioSsrc());
+            dtls.sendSrtp(protectedReport);
+        } catch (RuntimeException _) {
+        }
+    }
+
+    /**
+     * Encodes a compound RTCP packet of a sender report with no reception report blocks followed by a
+     * source-description chunk carrying a CNAME item, per RFC 3550 sections 6.4.1 and 6.5.
+     *
+     * @param ssrc          the sender SSRC carried by both the sender report and the SDES chunk
+     * @param rtpTimestamp  the RTP timestamp of the most recently sent media packet
+     * @param packetCount   the cumulative count of media packets sent
+     * @param octetCount    the cumulative count of media payload octets sent
+     * @return the plaintext compound RTCP packet
+     */
+    private static byte[] buildSenderReport(int ssrc, long rtpTimestamp,
+                                            long packetCount, long octetCount) {
+        // NTP timestamp: seconds since 1900-01-01 in the high 32 bits, fractional seconds in the low.
+        var nowMs = System.currentTimeMillis();
+        var ntpSeconds = (nowMs / 1000L) + 2208988800L;
+        var ntpFraction = ((nowMs % 1000L) << 32) / 1000L;
+        var cname = ("cobalt-" + Integer.toUnsignedString(ssrc)).getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        // SDES chunk: SSRC(4) + item type(1) + item len(1) + cname + terminator(1), padded to 32 bits.
+        var sdesChunkLen = 4 + 1 + 1 + cname.length + 1;
+        var sdesChunkPadded = (sdesChunkLen + 3) & ~3;
+        var srLen = 28;
+        var sdesLen = 4 + sdesChunkPadded;
+        var out = new byte[srLen + sdesLen];
+        var i = 0;
+        // Sender report.
+        out[i++] = (byte) 0x80;            // V=2, P=0, RC=0
+        out[i++] = (byte) 200;             // PT=SR
+        var srWords = (srLen / 4) - 1;
+        out[i++] = (byte) (srWords >> 8);
+        out[i++] = (byte) srWords;
+        writeInt(out, i, ssrc); i += 4;
+        writeInt(out, i, (int) ntpSeconds); i += 4;
+        writeInt(out, i, (int) ntpFraction); i += 4;
+        writeInt(out, i, (int) rtpTimestamp); i += 4;
+        writeInt(out, i, (int) packetCount); i += 4;
+        writeInt(out, i, (int) octetCount); i += 4;
+        // Source description.
+        out[i++] = (byte) 0x81;            // V=2, P=0, SC=1
+        out[i++] = (byte) 202;             // PT=SDES
+        var sdesWords = (sdesLen / 4) - 1;
+        out[i++] = (byte) (sdesWords >> 8);
+        out[i++] = (byte) sdesWords;
+        writeInt(out, i, ssrc); i += 4;
+        out[i++] = 1;                       // CNAME item type
+        out[i++] = (byte) cname.length;
+        System.arraycopy(cname, 0, out, i, cname.length); i += cname.length;
+        // remaining bytes stay zero: the null item terminator and 32-bit padding.
+        return out;
+    }
+
+    /**
+     * Writes a big-endian 32-bit integer into the buffer at the given offset.
+     *
+     * @param b      the destination buffer
+     * @param offset the offset at which the integer begins
+     * @param value  the value to write
+     */
+    private static void writeInt(byte[] b, int offset, int value) {
+        b[offset] = (byte) (value >>> 24);
+        b[offset + 1] = (byte) (value >>> 16);
+        b[offset + 2] = (byte) (value >>> 8);
+        b[offset + 3] = (byte) value;
     }
 
     /**
@@ -658,6 +805,24 @@ public final class VoiceCallSession implements AutoCloseable {
      * length.
      */
     private void onProtectedSrtp(byte[] protectedPacket) {
+        if (protectedPacket.length < 2) {
+            return;
+        }
+        com.github.auties00.cobalt.call.internal.CallMediaCapture.packet(call.callId(), protectedPacket);
+        // RFC 5761 multiplexing: a packet whose payload-type byte masks into [64, 95] is RTCP, since
+        // RTP payload types never fall in that range. Inbound RTCP (the peer's sender reports and
+        // feedback) is not media; drop it here rather than mismatching it against a media SSRC.
+        var ptByte = protectedPacket[1] & 0x7F;
+        var nAll = ++DBG_INBOUND_ALL;
+        if (nAll <= 12 || nAll % 250 == 0) {
+            System.out.println("[INBOUND-ANY] n=" + nAll
+                    + " b0=" + String.format("%02x", protectedPacket[0] & 0xFF)
+                    + " b1=" + String.format("%02x", protectedPacket[1] & 0xFF)
+                    + " len=" + protectedPacket.length + " ptByte=" + ptByte);
+        }
+        if (ptByte >= 64 && ptByte <= 95) {
+            return;
+        }
         if (protectedPacket.length < 12) {
             return;
         }
@@ -665,18 +830,47 @@ public final class VoiceCallSession implements AutoCloseable {
                    | ((protectedPacket[9] & 0xFF) << 16)
                    | ((protectedPacket[10] & 0xFF) << 8)
                    | (protectedPacket[11] & 0xFF);
-        var audioReceiver = rtpReceiver;
-        if (audioReceiver != null && ssrc == options.remoteAudioSsrc()) {
-            audioReceiver.onSrtpPacket(protectedPacket);
-            audioReceiver.drain();
-            return;
-        }
+        // A known video SSRC routes to its track; everything else is the single audio stream.
         for (var track : videoTracks.values()) {
             if (ssrc == track.options().remoteVideoSsrc()) {
                 track.receiver().onSrtpPacket(protectedPacket);
                 track.receiver().drain();
                 return;
             }
+        }
+        var audioReceiver = rtpReceiver;
+        if (audioReceiver != null) {
+            // A relayed WhatsApp peer chooses its own audio SSRC and stamps a fixed media payload type
+            // that need not equal the locally assumed default; latch onto the first inbound stream.
+            if (ssrc != audioReceiver.expectedSsrc()) {
+                audioReceiver.adoptSsrc(ssrc);
+            }
+            if (ptByte != audioReceiver.expectedPayloadType()) {
+                audioReceiver.adoptPayloadType(ptByte);
+            }
+            var nIn = ++DBG_INBOUND;
+            if (nIn <= 4) {
+                var ph = new StringBuilder("[PKT] n=" + nIn + " len=" + protectedPacket.length + " hex=");
+                for (var b : protectedPacket) ph.append(String.format("%02x", b & 0xFF));
+                System.out.println(ph);
+            }
+            if (nIn <= 3 || nIn % 250 == 0) {
+                var sb = new StringBuilder("[INBOUND-AUDIO] n=" + nIn + " ssrc=" + Integer.toUnsignedString(ssrc)
+                        + " pt=" + ptByte + " b0=" + String.format("%02x", protectedPacket[0] & 0xFF));
+                // RTP header + extension are cleartext under SRTP; dump the X-block if present (CC=0 here).
+                if ((protectedPacket[0] & 0x10) != 0 && protectedPacket.length >= 16) {
+                    var extProfile = ((protectedPacket[12] & 0xFF) << 8) | (protectedPacket[13] & 0xFF);
+                    var extWords = ((protectedPacket[14] & 0xFF) << 8) | (protectedPacket[15] & 0xFF);
+                    sb.append(" extProfile=0x").append(Integer.toHexString(extProfile)).append(" extWords=").append(extWords).append(" extBytes=");
+                    var end = Math.min(protectedPacket.length, 16 + extWords * 4);
+                    for (var k = 16; k < end; k++) {
+                        sb.append(String.format("%02x", protectedPacket[k] & 0xFF));
+                    }
+                }
+                System.out.println(sb);
+            }
+            audioReceiver.onSrtpPacket(protectedPacket);
+            audioReceiver.drain();
         }
     }
 

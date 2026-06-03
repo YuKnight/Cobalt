@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.client;
 
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import it.auties.protobuf.annotation.ProtobufEnum;
 
 /**
@@ -10,7 +11,7 @@ import it.auties.protobuf.annotation.ProtobufEnum;
  * Picked at builder time and persisted in the store so the same flavour
  * is used on every reconnect. The value drives transport selection,
  * handshake payload shape, registration code paths, history-sync
- * behaviour, and which {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener} callbacks fire.
+ * behaviour, and which {@link LinkedWhatsAppClientListener} callbacks fire.
  *
  * @see LinkedWhatsAppClientBuilder
  * @see WhatsAppClientDevice
@@ -37,7 +38,7 @@ public enum WhatsAppClientType {
      * Selected by {@link LinkedWhatsAppClientBuilder#mobileClient()}. The
      * client owns the phone number and runs the full SMS, voice, or
      * in-app verification flow, surfacing
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onRegistrationCode(LinkedWhatsAppClient, long)}
+     * {@link LinkedWhatsAppClientListener#onRegistrationCode(LinkedWhatsAppClient, long)}
      * during registration.
      */
     MOBILE

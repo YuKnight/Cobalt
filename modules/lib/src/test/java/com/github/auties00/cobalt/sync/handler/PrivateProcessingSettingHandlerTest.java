@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSet
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingAction.PrivateProcessingStatus;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +41,7 @@ class PrivateProcessingSettingHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private LinkedWhatsAppClient client;
     private PrivateProcessingSettingHandler handler;
 

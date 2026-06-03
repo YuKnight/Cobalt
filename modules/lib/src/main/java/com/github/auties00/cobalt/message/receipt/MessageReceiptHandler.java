@@ -11,7 +11,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.key.SignalPreKeyPair;
@@ -75,7 +75,7 @@ public final class MessageReceiptHandler {
      * Holds the central session store used to look up the local PN/LID, signed prekey pair,
      * one-time prekeys, and the device-identity blob attached to the prekey bundle.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Constructs a receipt handler bound to the given client.

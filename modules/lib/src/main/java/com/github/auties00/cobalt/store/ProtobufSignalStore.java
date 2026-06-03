@@ -44,7 +44,7 @@ import static java.util.Objects.requireNonNullElseGet;
  * Noise and identity key pairs, signed pre-key, device/identity/backup byte buffers) so a freshly
  * built instance is immediately a usable {@link com.github.auties00.libsignal.SignalProtocolStore};
  * on deserialization the persisted values are present and the defaulting is a no-op. The self-address
- * special case of {@code findIdentityByAddress} is handled by {@link WhatsAppStore} because it also
+ * special case of {@code findIdentityByAddress} is handled by {@link LinkedWhatsAppStore} because it also
  * needs the account JID, which lives in a different sub-store.
  */
 @ProtobufMessage

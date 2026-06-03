@@ -1,7 +1,4 @@
-// Shared low-level reader for the WebAssembly binary format. Both the
-// structural analyzer (wasm-analyzer.ts) and the instruction decoder
-// (wasm-decoder.ts) build on this so there is exactly one LEB128 / value-type
-// implementation in the codebase.
+
 
 export const VAL_TYPE_NAMES: Record<number, string> = {
   0x7f: "i32",
@@ -32,7 +29,6 @@ export class BinaryReader {
     return this.bytes[this.pos++];
   }
 
-  /** Returns the byte at the current position without advancing. */
   peekByte(): number {
     return this.bytes[this.pos];
   }
@@ -75,12 +71,6 @@ export class BinaryReader {
     return result;
   }
 
-  /**
-   * Reads a signed LEB128 constrained to 33 bits, the encoding used by the
-   * block type immediate. A non-negative result is a type index; a negative
-   * result encodes a value type whose byte is {@code result & 0x7f}. Returns a
-   * plain number because a 33-bit signed value fits exactly in a double.
-   */
   readS33(): number {
     let result = 0n;
     let shift = 0n;
@@ -112,7 +102,6 @@ export class BinaryReader {
     return val;
   }
 
-  /** Reads {@code n} raw bytes as a copy and advances the cursor. */
   readBytes(n: number): Uint8Array {
     const out = this.bytes.slice(this.pos, this.pos + n);
     this.pos += n;

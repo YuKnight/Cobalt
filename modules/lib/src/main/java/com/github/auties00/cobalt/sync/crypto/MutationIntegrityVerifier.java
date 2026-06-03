@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.signal.KeyId;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdPatch;
 import com.github.auties00.cobalt.model.sync.data.SyncdSnapshot;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -41,7 +41,7 @@ public final class MutationIntegrityVerifier {
     /**
      * The store backing key-id resolution and collection-state lookups.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Constructs a verifier bound to a store.
@@ -49,7 +49,7 @@ public final class MutationIntegrityVerifier {
      * @param store the store from which sync keys, collection versions, and
      *              the mac-mismatch latch are read
      */
-    public MutationIntegrityVerifier(WhatsAppStore store) {
+    public MutationIntegrityVerifier(LinkedWhatsAppStore store) {
         this.store = store;
     }
 

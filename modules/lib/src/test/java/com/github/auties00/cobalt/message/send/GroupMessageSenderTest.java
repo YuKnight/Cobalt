@@ -20,7 +20,7 @@ import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
@@ -147,7 +147,7 @@ class GroupMessageSenderTest {
 
     // Seeds group metadata so the sender resolves the addressing mode locally
     // instead of going through the live group-metadata fetch path.
-    private static void seedGroupMetadata(WhatsAppStore store, boolean lidAddressing) {
+    private static void seedGroupMetadata(LinkedWhatsAppStore store, boolean lidAddressing) {
         var metadata = new GroupMetadataBuilder()
                 .jid(GROUP)
                 .subject("test group")
@@ -158,7 +158,7 @@ class GroupMessageSenderTest {
 
     // The returned ack carries only the t attribute, which AckParser reads as
     // a success result with no error code.
-    private static TestWhatsAppClient clientWithCapture(WhatsAppStore store, AtomicReference<Node> capturedStanza) {
+    private static TestWhatsAppClient clientWithCapture(LinkedWhatsAppStore store, AtomicReference<Node> capturedStanza) {
         return TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(TestABPropsService.builder().build())
@@ -171,7 +171,7 @@ class GroupMessageSenderTest {
                 });
     }
 
-    private static GroupMessageSender groupMessageSender(TestWhatsAppClient client, WhatsAppStore store, StubDeviceService deviceService) {
+    private static GroupMessageSender groupMessageSender(TestWhatsAppClient client, LinkedWhatsAppStore store, StubDeviceService deviceService) {
         var ab = client.abPropsService();
         var encryption = new MessageEncryption(store,
                 new SignalSessionCipher(store.signalStore()),

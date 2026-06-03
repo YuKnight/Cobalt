@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * <p>Persists a list of {@link RecentEmojiWeight} entries
  * ({@code (emoji, weight)} pairs) on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} so the emoji
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} so the emoji
  * suggestion ranker reflects the same usage counts on every device. Only
  * {@link SyncdOperation#SET} is accepted; any other operation is reported as
  * {@link MutationApplicationResult#unsupported()} and a wrong-typed value as
@@ -93,7 +93,7 @@ public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler
      * semantic for {@code REMOVE}. A wrong-typed value surfaces as
      * {@link MutationApplicationResult#malformed()}; on success the resolved
      * {@link RecentEmojiWeight} list is written via
-     * {@code WhatsAppStore.setRecentEmojiWeights}.
+     * {@code LinkedWhatsAppStore.setRecentEmojiWeights}.
      */
     @Override
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {

@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.client;
+import com.github.auties00.cobalt.listener.linked.*;
 import com.github.auties00.cobalt.message.LiveMessageService;
 import com.github.auties00.cobalt.media.transcode.LiveMediaTranscoderService;
 import com.github.auties00.cobalt.sync.LiveSnapshotRecoveryService;
@@ -20,7 +21,6 @@ import com.github.auties00.cobalt.call.CallOptions;
 import com.github.auties00.cobalt.call.IncomingCall;
 import com.github.auties00.cobalt.call.internal.CallService;
 import com.github.auties00.cobalt.call.internal.signaling.CallStanza;
-import com.github.auties00.cobalt.client.listener.*;
 import com.github.auties00.cobalt.device.LiveDeviceService;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.*;
@@ -94,7 +94,6 @@ import com.github.auties00.cobalt.model.chat.*;
 import com.github.auties00.cobalt.model.chat.community.*;
 import com.github.auties00.cobalt.model.chat.group.*;
 import com.github.auties00.cobalt.model.contact.*;
-import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 import com.github.auties00.cobalt.model.error.DisconnectCode;
 import com.github.auties00.cobalt.model.federated.*;
 import com.github.auties00.cobalt.model.jid.*;
@@ -261,7 +260,7 @@ import com.github.auties00.cobalt.props.LiveABPropsService;
 import com.github.auties00.cobalt.socket.WhatsAppSocketClient;
 import com.github.auties00.cobalt.socket.WhatsAppSocketListener;
 import com.github.auties00.cobalt.socket.WhatsAppSocketStanza;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.stream.LiveNodeStreamService;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
@@ -329,7 +328,7 @@ import java.util.stream.Stream;
  * Cobalt.
  *
  * <p>A {@code LinkedWhatsAppClient} owns the lifecycle of a single session: it
- * wires together the persisted {@link WhatsAppStore}, the Noise-encrypted
+ * wires together the persisted {@link LinkedWhatsAppStore}, the Noise-encrypted
  * socket, the Signal protocol ciphers, and the constellation of services
  * responsible for device management, message send/receive, sync, LID
  * migration, and telemetry. Callers obtain instances through
@@ -417,7 +416,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * The persisted session state (credentials, chats, contacts, Signal
      * keys, listeners) bound to this client.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
     /**
      * The call engine that backs {@link #startCall(JidProvider, CallOptions)},
      * {@link #acceptCall(IncomingCall, CallOptions)}, and
@@ -789,7 +788,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      *                                   is required but missing, or
      *                                   present when it should not be
      */
-    LiveLinkedWhatsAppClient(WhatsAppStore store, WhatsAppClientVerificationHandler.Web webVerificationHandler, WhatsAppClientErrorHandler errorHandler) {
+    LiveLinkedWhatsAppClient(LinkedWhatsAppStore store, WhatsAppClientVerificationHandler.Web webVerificationHandler, WhatsAppClientErrorHandler errorHandler) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.errorHandler = Objects.requireNonNull(errorHandler, "errorHandler cannot be null");
         if ((store.accountStore().clientType() == WhatsAppClientType.WEB) == (webVerificationHandler == null)) {
@@ -874,7 +873,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
     /** {@inheritDoc} */
     @Override
-    public WhatsAppStore store() {
+    public LinkedWhatsAppStore store() {
         return store;
     }
 
@@ -1068,7 +1067,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     private void onNode(Node node) {
         try {
             for (var listener : store.listeners()) {
-                if (listener instanceof NodeReceivedListener typed) {
+                if (listener instanceof LinkedNodeReceivedListener typed) {
                     Thread.startVirtualThread(() -> typed.onNodeReceived(this, node));
                 }
             }
@@ -1190,7 +1189,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         }
 
         for (var listener : store.listeners()) {
-            if (listener instanceof DisconnectedListener typed) {
+            if (listener instanceof LinkedDisconnectedListener typed) {
                 typed.onDisconnected(this, reason);
             }
         }
@@ -1265,7 +1264,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             throw new WhatsAppSessionException.Closed();
         }
         for (var listener : store.listeners()) {
-            if (listener instanceof NodeSentListener typed) {
+            if (listener instanceof LinkedNodeSentListener typed) {
                 Thread.startVirtualThread(() -> typed.onNodeSent(this, node));
             }
         }
@@ -1320,7 +1319,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         }
 
         for (var listener : store.listeners()) {
-            if (listener instanceof NodeSentListener typed) {
+            if (listener instanceof LinkedNodeSentListener typed) {
                 Thread.startVirtualThread(() -> typed.onNodeSent(this, outgoing));
             }
         }
@@ -1448,7 +1447,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             } catch (IOException ignored) {
             }
             for (var listener : store.listeners()) {
-                if (listener instanceof WhatsAppWebGraphQlSessionChangedListener typed) {
+                if (listener instanceof LinkedWhatsAppWebGraphQlSessionChangedListener typed) {
                     Thread.startVirtualThread(() -> typed.onWhatsAppWebGraphQlSessionChanged(this, refreshed));
                 }
             }
@@ -1521,7 +1520,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             } catch (IOException ignored) {
             }
             for (var listener : store.listeners()) {
-                if (listener instanceof FacebookGraphQlSessionChangedListener typed) {
+                if (listener instanceof LinkedFacebookGraphQlSessionChangedListener typed) {
                     Thread.startVirtualThread(() -> typed.onFacebookGraphQlSessionChanged(this, session));
                 }
             }
@@ -2794,7 +2793,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var request = IqSetMerchantComplianceRequest.builder()
                 .registered(edit.registered())
                 .entityName(edit.entityName().orElse(null))
-                .entityType(edit.entityType().orElse(null))
+                .entityType(edit.entityType().map(MerchantEntityType::data).orElse(null))
                 .entityTypeCustom(edit.entityTypeCustom().orElse(null))
                 .customerCareDetails(customerCare)
                 .grievanceOfficerDetails(grievanceOfficer)
@@ -3546,7 +3545,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             store.syncStore().setSyncedNewsletters(true);
             var snapshot = store.chatStore().newsletters();
             for (var listener : store.listeners()) {
-                if (listener instanceof NewslettersListener typed) {
+                if (listener instanceof LinkedNewslettersListener typed) {
                     Thread.startVirtualThread(() -> typed.onNewsletters(this, snapshot));
                 }
             }
@@ -3587,7 +3586,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 });
         var snapshot = List.copyOf(groups);
         for (var listener : store.listeners()) {
-            if (listener instanceof GroupsListener typed) {
+            if (listener instanceof LinkedGroupsListener typed) {
                 typed.onGroups(this, snapshot);
             }
         }
@@ -5526,7 +5525,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             if (!Objects.equals(oldAbout, newAbout)) {
                 store.accountStore().setSelfTextStatus(new ContactTextStatusBuilder().text(newAbout).build());
                 for (var listener : store.listeners()) {
-                    if (listener instanceof AboutChangedListener typed) {
+                    if (listener instanceof LinkedAboutChangedListener typed) {
                         Thread.startVirtualThread(() -> typed.onAboutChanged(this, oldAbout, newAbout));
                     }
                 }
@@ -5542,7 +5541,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 store.contactStore().addContactTextStatus(contactJid, status);
                 var fired = status;
                 for (var listener : store.listeners()) {
-                    if (listener instanceof ContactTextStatusListener typed) {
+                    if (listener instanceof LinkedContactTextStatusListener typed) {
                         Thread.startVirtualThread(() -> typed.onContactTextStatus(this, contactJid, fired));
                     }
                 }
@@ -5719,7 +5718,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             result.put(jid, status);
             store.contactStore().addContactTextStatus(jid, status);
             for (var listener : store.listeners()) {
-                if (listener instanceof ContactTextStatusListener typed) {
+                if (listener instanceof LinkedContactTextStatusListener typed) {
                     Thread.startVirtualThread(() -> typed.onContactTextStatus(this, jid, status));
                 }
             }
@@ -6114,7 +6113,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         }
         if (!previous.equals(current)) {
             for (var listener : store.listeners()) {
-                if (listener instanceof BlockedContactsListener typed) {
+                if (listener instanceof LinkedBlockedContactsListener typed) {
                     typed.onBlockedContacts(this, current);
                 }
             }
@@ -6365,7 +6364,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         store.contactStore().addBlockedContact(contact);
         logBlockEvent(contact, BlockEventActionType.BLOCK);
         for (var listener : store.listeners()) {
-            if (listener instanceof ContactBlockedListener typed) {
+            if (listener instanceof LinkedContactBlockedListener typed) {
                 typed.onContactBlocked(this, contact);
             }
         }
@@ -6381,7 +6380,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         store.contactStore().removeBlockedContact(contact);
         logBlockEvent(contact, BlockEventActionType.UNBLOCK);
         for (var listener : store.listeners()) {
-            if (listener instanceof ContactBlockedListener typed) {
+            if (listener instanceof LinkedContactBlockedListener typed) {
                 typed.onContactBlocked(this, contact);
             }
         }
@@ -6458,7 +6457,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 var entries = toOptOutEntries(v.listItem());
                 store.settingsStore().setOptOutList(category, v.listDhash().orElse(null), entries);
                 for (var listener : store.listeners()) {
-                    if (listener instanceof OptOutListListener typed) {
+                    if (listener instanceof LinkedOptOutListListener typed) {
                         typed.onOptOutList(this, category, entries);
                     }
                 }
@@ -6547,7 +6546,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                         .toList();
                 store.settingsStore().setContactBlacklist(category, dhash, jids);
                 for (var listener : store.listeners()) {
-                    if (listener instanceof ContactBlacklistListener typed) {
+                    if (listener instanceof LinkedContactBlacklistListener typed) {
                         typed.onContactBlacklist(this, category, jids);
                     }
                 }
@@ -6563,7 +6562,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                         .toList();
                 store.settingsStore().setContactBlacklist(category, dhash, jids);
                 for (var listener : store.listeners()) {
-                    if (listener instanceof ContactBlacklistListener typed) {
+                    if (listener instanceof LinkedContactBlacklistListener typed) {
                         typed.onContactBlacklist(this, category, jids);
                     }
                 }
@@ -6692,7 +6691,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var picture = queryPicture(self);
         store.accountStore().setProfilePicture(picture.orElse(null));
         for (var listener : store.listeners()) {
-            if (listener instanceof ProfilePictureChangedListener typed) {
+            if (listener instanceof LinkedProfilePictureChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onProfilePictureChanged(this, self));
             }
         }
@@ -6919,10 +6918,15 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSendMsgJob", exports = "encryptAndSendMsg",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public void sendMessage(JidProvider jidProvider, MessageContainer container) {
+    public MessageKey sendMessage(JidProvider jidProvider, MessageContainer container) {
         var jid = Objects.requireNonNull(jidProvider, "jid cannot be null").toJid();
         Objects.requireNonNull(container, "container cannot be null");
-        messageService.send(jid, container);
+        var ack = messageService.send(jid, container);
+        return new MessageKeyBuilder()
+                .parentJid(jid)
+                .fromMe(true)
+                .id(ack.id())
+                .build();
     }
 
     /** {@inheritDoc} */
@@ -7365,7 +7369,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .build();
         store.settingsStore().setStatusPrivacy(setting);
         for (var listener : store.listeners()) {
-            if (listener instanceof StatusPrivacyChangedListener typed) {
+            if (listener instanceof LinkedStatusPrivacyChangedListener typed) {
                 typed.onStatusPrivacyChanged(this, setting);
             }
         }
@@ -8737,7 +8741,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         };
         store.settingsStore().setDisappearingMode(mode);
         for (var listener : store.listeners()) {
-            if (listener instanceof DisappearingModeChangedListener typed) {
+            if (listener instanceof LinkedDisappearingModeChangedListener typed) {
                 typed.onDisappearingModeChanged(this, mode);
             }
         }
@@ -8899,7 +8903,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 store.settingsStore().setTosNotices(ids);
                 var snapshot = Set.copyOf(ids);
                 for (var listener : store.listeners()) {
-                    if (listener instanceof TosNoticesChangedListener typed) {
+                    if (listener instanceof LinkedTosNoticesChangedListener typed) {
                         Thread.startVirtualThread(() -> typed.onTosNoticesChanged(this, snapshot));
                     }
                 }
@@ -11396,7 +11400,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 var consent = BusinessDataSharingConsent.ofWire(success.dataSharingConsent());
                 consent.ifPresent(value -> {
                     for (var listener : store.listeners()) {
-                        if (listener instanceof BusinessPrivacySettingChangedListener typed) {
+                        if (listener instanceof LinkedBusinessPrivacySettingChangedListener typed) {
                             Thread.startVirtualThread(() -> typed.onBusinessPrivacySettingChanged(this, value));
                         }
                     }
@@ -11426,7 +11430,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 store.businessStore().setBusinessPrivacySetting(dataSharingConsent == null ? null : dataSharingConsent.wireValue());
                 if (dataSharingConsent != null) {
                     for (var listener : store.listeners()) {
-                        if (listener instanceof BusinessPrivacySettingChangedListener typed) {
+                        if (listener instanceof LinkedBusinessPrivacySettingChangedListener typed) {
                             Thread.startVirtualThread(() -> typed.onBusinessPrivacySettingChanged(this, dataSharingConsent));
                         }
                     }
@@ -12356,217 +12360,217 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         return wireList;
     }
 
-    public LinkedWhatsAppClient addListener(WhatsAppListener listener) {
+    public LinkedWhatsAppClient addListener(WhatsAppLinkedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         store.addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient removeListener(WhatsAppListener listener) {
+    public LinkedWhatsAppClient removeListener(WhatsAppLinkedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         store.removeListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addChatsListener(ChatsListener listener) {
+    public LinkedWhatsAppClient addChatsListener(LinkedChatsListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addContactsListener(ContactsListener listener) {
+    public LinkedWhatsAppClient addContactsListener(LinkedContactsListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addStatusListener(StatusListener listener) {
+    public LinkedWhatsAppClient addStatusListener(LinkedStatusListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addNodeSentListener(NodeSentListener listener) {
+    public LinkedWhatsAppClient addNodeSentListener(LinkedNodeSentListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addLoggedInListener(LoggedInListener listener) {
+    public LinkedWhatsAppClient addLoggedInListener(LinkedLoggedInListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallListener(CallListener listener) {
+    public LinkedWhatsAppClient addCallListener(LinkedCallListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addWebHistorySyncPastParticipantsListener(WebHistorySyncPastParticipantsListener listener) {
+    public LinkedWhatsAppClient addWebHistorySyncPastParticipantsListener(LinkedWebHistorySyncPastParticipantsListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addDisconnectedListener(DisconnectedListener listener) {
+    public LinkedWhatsAppClient addDisconnectedListener(LinkedDisconnectedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addWebAppPrimaryFeaturesListener(WebAppPrimaryFeaturesListener listener) {
+    public LinkedWhatsAppClient addWebAppPrimaryFeaturesListener(LinkedWebAppPrimaryFeaturesListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addContactPresenceListener(ContactPresenceListener listener) {
+    public LinkedWhatsAppClient addContactPresenceListener(LinkedContactPresenceListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addNewslettersListener(NewslettersListener listener) {
+    public LinkedWhatsAppClient addNewslettersListener(LinkedNewslettersListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addNodeReceivedListener(NodeReceivedListener listener) {
+    public LinkedWhatsAppClient addNodeReceivedListener(LinkedNodeReceivedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addWebAppStateActionListener(WebAppStateActionListener listener) {
+    public LinkedWhatsAppClient addWebAppStateActionListener(LinkedWebAppStateActionListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addWebHistorySyncMessagesListener(WebHistorySyncMessagesListener listener) {
+    public LinkedWhatsAppClient addWebHistorySyncMessagesListener(LinkedWebHistorySyncMessagesListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addNewStatusListener(NewStatusListener listener) {
+    public LinkedWhatsAppClient addNewStatusListener(LinkedNewStatusListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addAccountTypeChangedListener(AccountTypeChangedListener listener) {
+    public LinkedWhatsAppClient addAccountTypeChangedListener(LinkedAccountTypeChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addAboutChangedListener(AboutChangedListener listener) {
+    public LinkedWhatsAppClient addAboutChangedListener(LinkedAboutChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addNewMessageListener(NewMessageListener listener) {
+    public LinkedWhatsAppClient addNewMessageListener(LinkedNewMessageListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addMessageDeletedListener(MessageDeletedListener listener) {
+    public LinkedWhatsAppClient addMessageDeletedListener(LinkedMessageDeletedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addPrivacySettingChangedListener(PrivacySettingChangedListener listener) {
+    public LinkedWhatsAppClient addPrivacySettingChangedListener(LinkedPrivacySettingChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addWebHistorySyncProgressListener(WebHistorySyncProgressListener listener) {
+    public LinkedWhatsAppClient addWebHistorySyncProgressListener(LinkedWebHistorySyncProgressListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addProfilePictureChangedListener(ProfilePictureChangedListener listener) {
+    public LinkedWhatsAppClient addProfilePictureChangedListener(LinkedProfilePictureChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addMessageStatusListener(MessageStatusListener listener) {
+    public LinkedWhatsAppClient addMessageStatusListener(LinkedMessageStatusListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addNameChangedListener(NameChangedListener listener) {
+    public LinkedWhatsAppClient addNameChangedListener(LinkedNameChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addMessageReplyListener(MessageReplyListener listener) {
+    public LinkedWhatsAppClient addMessageReplyListener(LinkedMessageReplyListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addDeviceIdentityChangedListener(DeviceIdentityChangedListener listener) {
+    public LinkedWhatsAppClient addDeviceIdentityChangedListener(LinkedDeviceIdentityChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addNewContactListener(NewContactListener listener) {
+    public LinkedWhatsAppClient addNewContactListener(LinkedNewContactListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addContactBlockedListener(ContactBlockedListener listener) {
+    public LinkedWhatsAppClient addContactBlockedListener(LinkedContactBlockedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addContactTextStatusListener(ContactTextStatusListener listener) {
+    public LinkedWhatsAppClient addContactTextStatusListener(LinkedContactTextStatusListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addLocaleChangedListener(LocaleChangedListener listener) {
+    public LinkedWhatsAppClient addLocaleChangedListener(LinkedLocaleChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addRegistrationCodeListener(RegistrationCodeListener listener) {
+    public LinkedWhatsAppClient addRegistrationCodeListener(LinkedRegistrationCodeListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addGroupsListener(GroupsListener listener) {
+    public LinkedWhatsAppClient addGroupsListener(LinkedGroupsListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addBlockedContactsListener(BlockedContactsListener listener) {
+    public LinkedWhatsAppClient addBlockedContactsListener(LinkedBlockedContactsListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addContactBlacklistListener(ContactBlacklistListener listener) {
+    public LinkedWhatsAppClient addContactBlacklistListener(LinkedContactBlacklistListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
@@ -12578,115 +12582,115 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         return this;
     }
 
-    public LinkedWhatsAppClient addStatusPrivacyChangedListener(StatusPrivacyChangedListener listener) {
+    public LinkedWhatsAppClient addStatusPrivacyChangedListener(LinkedStatusPrivacyChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addDisappearingModeChangedListener(DisappearingModeChangedListener listener) {
+    public LinkedWhatsAppClient addDisappearingModeChangedListener(LinkedDisappearingModeChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addOptOutListListener(OptOutListListener listener) {
+    public LinkedWhatsAppClient addOptOutListListener(LinkedOptOutListListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallEndedListener(CallEndedListener listener) {
+    public LinkedWhatsAppClient addCallEndedListener(LinkedCallEndedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallPreacceptListener(CallPreacceptListener listener) {
+    public LinkedWhatsAppClient addCallPreacceptListener(LinkedCallPreacceptListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallMuteChangedListener(CallMuteChangedListener listener) {
+    public LinkedWhatsAppClient addCallMuteChangedListener(LinkedCallMuteChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallVideoStateChangedListener(CallVideoStateChangedListener listener) {
+    public LinkedWhatsAppClient addCallVideoStateChangedListener(LinkedCallVideoStateChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallVideoUpgradeRequestListener(CallVideoUpgradeRequestListener listener) {
+    public LinkedWhatsAppClient addCallVideoUpgradeRequestListener(LinkedCallVideoUpgradeRequestListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallLinkLobbyJoinRequestListener(CallLinkLobbyJoinRequestListener listener) {
+    public LinkedWhatsAppClient addCallLinkLobbyJoinRequestListener(LinkedCallLinkLobbyJoinRequestListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallLinkAdmittedListener(CallLinkAdmittedListener listener) {
+    public LinkedWhatsAppClient addCallLinkAdmittedListener(LinkedCallLinkAdmittedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallLinkDeniedListener(CallLinkDeniedListener listener) {
+    public LinkedWhatsAppClient addCallLinkDeniedListener(LinkedCallLinkDeniedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallInteractionListener(CallInteractionListener listener) {
+    public LinkedWhatsAppClient addCallInteractionListener(LinkedCallInteractionListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallParticipantsChangedListener(CallParticipantsChangedListener listener) {
+    public LinkedWhatsAppClient addCallParticipantsChangedListener(LinkedCallParticipantsChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallPeerStateChangedListener(CallPeerStateChangedListener listener) {
+    public LinkedWhatsAppClient addCallPeerStateChangedListener(LinkedCallPeerStateChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addCallOfferNoticeListener(CallOfferNoticeListener listener) {
+    public LinkedWhatsAppClient addCallOfferNoticeListener(LinkedCallOfferNoticeListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addWhatsAppWebGraphQlSessionChangedListener(WhatsAppWebGraphQlSessionChangedListener listener) {
+    public LinkedWhatsAppClient addWhatsAppWebGraphQlSessionChangedListener(LinkedWhatsAppWebGraphQlSessionChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addFacebookGraphQlSessionChangedListener(FacebookGraphQlSessionChangedListener listener) {
+    public LinkedWhatsAppClient addFacebookGraphQlSessionChangedListener(LinkedFacebookGraphQlSessionChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addBusinessPrivacySettingChangedListener(BusinessPrivacySettingChangedListener listener) {
+    public LinkedWhatsAppClient addBusinessPrivacySettingChangedListener(LinkedBusinessPrivacySettingChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addTosNoticesChangedListener(TosNoticesChangedListener listener) {
+    public LinkedWhatsAppClient addTosNoticesChangedListener(LinkedTosNoticesChangedListener listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         addListener(listener);
         return this;
@@ -13399,56 +13403,50 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (hasAnyGroupSettingsFlag(edit)) {
             sendGroupSettingsIq(edit);
         }
-        // Each property pair is processed independently because both halves are set-only toggles
-        // whose dispatch shape differs; a single edit may only flip one half of a pair at a time.
-        if (edit.limitSharingEnabled()) {
-            sendMexGroupPropertyUpdate(group,
-                    "{\"limit_sharing\":{\"limit_sharing_enabled\":true,\"limit_sharing_trigger\":\"CHAT_SETTING\"}}");
-            wamService.commit(new LimitSharingSettingUpdateEventBuilder()
-                    .toggleUpdateAction(ToggleUpdateAction.TURN_ON)
-                    .build());
-        } else if (edit.limitSharingDisabled()) {
-            sendMexGroupPropertyUpdate(group,
-                    "{\"limit_sharing\":{\"limit_sharing_enabled\":false,\"limit_sharing_trigger\":\"CHAT_SETTING\"}}");
-            wamService.commit(new LimitSharingSettingUpdateEventBuilder()
-                    .toggleUpdateAction(ToggleUpdateAction.TURN_OFF)
-                    .build());
-        }
-        if (edit.memberAddAdminOnly()) {
-            sendMexGroupPropertyUpdate(group, "{\"member_add_mode\":\"ADMIN_ADD\"}");
-        } else if (edit.memberAddAllMember()) {
-            sendMexGroupPropertyUpdate(group, "{\"member_add_mode\":\"ALL_MEMBER_ADD\"}");
-        }
-        if (edit.memberLinkAdminOnly()) {
-            sendMexGroupPropertyUpdate(group, "{\"member_link_mode\":\"ADMIN_LINK\"}");
-        } else if (edit.memberLinkAllMember()) {
-            sendMexGroupPropertyUpdate(group, "{\"member_link_mode\":\"ALL_MEMBER_LINK\"}");
-        }
-        if (edit.memberShareGroupHistoryAdminOnly()) {
-            sendMexGroupPropertyUpdate(group, "{\"member_share_group_history_mode\":\"ADMIN_SHARE\"}");
-        } else if (edit.memberShareGroupHistoryAllMember()) {
-            sendMexGroupPropertyUpdate(group, "{\"member_share_group_history_mode\":\"ALL_MEMBER_SHARE\"}");
-        }
-        if (edit.allowNonAdminSubGroupCreation()) {
-            sendMexGroupPropertyUpdate(group, "{\"allow_non_admin_sub_group_creation\":true}");
-            commitCommunityGroupJourneyEvent(
-                    ChatFilterActionTypes.SELECT_EVERYONE_CAN_ADD_GROUPS,
-                    SurfaceType.COMMUNITY_SETTINGS,
-                    group);
-        } else if (edit.notAllowNonAdminSubGroupCreation()) {
-            sendMexGroupPropertyUpdate(group, "{\"allow_non_admin_sub_group_creation\":false}");
-            commitCommunityGroupJourneyEvent(
-                    ChatFilterActionTypes.SELECT_COMMUNITY_ADMINS_CAN_ADD_GROUPS,
-                    SurfaceType.COMMUNITY_SETTINGS,
-                    group);
-        }
-        // A present ephemeral expiration takes precedence over notEphemeral because it always
-        // means "enable with this duration".
-        if (edit.ephemeralExpiration().isPresent()) {
-            editEphemeralTimer(group, ChatEphemeralTimer.of(edit.ephemeralExpiration().getAsInt()));
-        } else if (edit.notEphemeral()) {
-            editEphemeralTimer(group, ChatEphemeralTimer.OFF);
-        }
+        edit.limitSharing().ifPresent(enabled -> {
+            if (enabled) {
+                sendMexGroupPropertyUpdate(group,
+                        "{\"limit_sharing\":{\"limit_sharing_enabled\":true,\"limit_sharing_trigger\":\"CHAT_SETTING\"}}");
+                wamService.commit(new LimitSharingSettingUpdateEventBuilder()
+                        .toggleUpdateAction(ToggleUpdateAction.TURN_ON)
+                        .build());
+            } else {
+                sendMexGroupPropertyUpdate(group,
+                        "{\"limit_sharing\":{\"limit_sharing_enabled\":false,\"limit_sharing_trigger\":\"CHAT_SETTING\"}}");
+                wamService.commit(new LimitSharingSettingUpdateEventBuilder()
+                        .toggleUpdateAction(ToggleUpdateAction.TURN_OFF)
+                        .build());
+            }
+        });
+        edit.memberAddPolicy().ifPresent(policy -> sendMexGroupPropertyUpdate(group,
+                policy == ChatPolicy.ADMINS
+                        ? "{\"member_add_mode\":\"ADMIN_ADD\"}"
+                        : "{\"member_add_mode\":\"ALL_MEMBER_ADD\"}"));
+        edit.memberLinkPolicy().ifPresent(policy -> sendMexGroupPropertyUpdate(group,
+                policy == ChatPolicy.ADMINS
+                        ? "{\"member_link_mode\":\"ADMIN_LINK\"}"
+                        : "{\"member_link_mode\":\"ALL_MEMBER_LINK\"}"));
+        edit.memberShareGroupHistoryPolicy().ifPresent(policy -> sendMexGroupPropertyUpdate(group,
+                policy == ChatPolicy.ADMINS
+                        ? "{\"member_share_group_history_mode\":\"ADMIN_SHARE\"}"
+                        : "{\"member_share_group_history_mode\":\"ALL_MEMBER_SHARE\"}"));
+        edit.subGroupCreationPolicy().ifPresent(policy -> {
+            if (policy == ChatPolicy.ANYONE) {
+                sendMexGroupPropertyUpdate(group, "{\"allow_non_admin_sub_group_creation\":true}");
+                commitCommunityGroupJourneyEvent(
+                        ChatFilterActionTypes.SELECT_EVERYONE_CAN_ADD_GROUPS,
+                        SurfaceType.COMMUNITY_SETTINGS,
+                        group);
+            } else {
+                sendMexGroupPropertyUpdate(group, "{\"allow_non_admin_sub_group_creation\":false}");
+                commitCommunityGroupJourneyEvent(
+                        ChatFilterActionTypes.SELECT_COMMUNITY_ADMINS_CAN_ADD_GROUPS,
+                        SurfaceType.COMMUNITY_SETTINGS,
+                        group);
+            }
+        });
+        // TODO: forward ephemeralTrigger() to editEphemeralTimer once the timer path carries a trigger
+        edit.ephemeralTimer().ifPresent(timer -> editEphemeralTimer(group, timer));
         edit.statusMuted().ifPresent(existing::setStatusMuted);
         return Optional.of(existing);
     }
@@ -13471,12 +13469,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @return {@code true} when any batched toggle is set
      */
     private static boolean hasAnyGroupSettingsFlag(GroupMetadataEdit edit) {
-        return edit.locked() || edit.unlocked()
-                || edit.announcement() || edit.notAnnouncement()
-                || edit.noFrequentlyForwarded() || edit.frequentlyForwardedOk()
-                || edit.allowAdminReports() || edit.notAllowAdminReports()
-                || edit.groupHistory() || edit.noGroupHistory()
-                || edit.membershipApprovalGroupJoinMode().isPresent();
+        return edit.editInfoPolicy().isPresent()
+                || edit.sendMessagePolicy().isPresent()
+                || edit.frequentlyForwardedAllowed().isPresent()
+                || edit.adminReportsAllowed().isPresent()
+                || edit.groupHistoryShared().isPresent()
+                || edit.membershipApprovalRequired().isPresent();
     }
 
     /**
@@ -13590,12 +13588,30 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         // here: the former are dispatched through editEphemeralTimer (so the in-memory chat
         // ephemerality state and EphemeralSettingChangeWamEvent commit also fire), and the latter
         // journey WAM commit.
-        var request = new SmaxGroupsSetPropertyRequest(group, edit.locked(), edit.announcement(),
-                edit.noFrequentlyForwarded(), null, null, edit.unlocked(),
-                edit.notAnnouncement(), edit.frequentlyForwardedOk(), false,
-                edit.membershipApprovalGroupJoinMode().orElse(null), edit.allowAdminReports(),
-                edit.notAllowAdminReports(), false,
-                false, edit.groupHistory(), edit.noGroupHistory());
+        var editInfo = edit.editInfoPolicy().orElse(null);
+        var sendMessage = edit.sendMessagePolicy().orElse(null);
+        var frequentlyForwarded = edit.frequentlyForwardedAllowed().orElse(null);
+        var adminReports = edit.adminReportsAllowed().orElse(null);
+        var groupHistory = edit.groupHistoryShared().orElse(null);
+        var joinMode = edit.membershipApprovalRequired()
+                .map(required -> required ? "on" : "off")
+                .orElse(null);
+        var request = new SmaxGroupsSetPropertyRequest(group,
+                editInfo == ChatPolicy.ADMINS,
+                sendMessage == ChatPolicy.ADMINS,
+                Boolean.FALSE.equals(frequentlyForwarded),
+                null, null,
+                editInfo == ChatPolicy.ANYONE,
+                sendMessage == ChatPolicy.ANYONE,
+                Boolean.TRUE.equals(frequentlyForwarded),
+                false,
+                joinMode,
+                Boolean.TRUE.equals(adminReports),
+                Boolean.FALSE.equals(adminReports),
+                false,
+                false,
+                Boolean.TRUE.equals(groupHistory),
+                Boolean.FALSE.equals(groupHistory));
         var requestNode = request.toNode();
         var response = sendNode(requestNode);
         var parsed = SmaxGroupsSetPropertyResponse.of(response, requestNode.build()).orElse(null);

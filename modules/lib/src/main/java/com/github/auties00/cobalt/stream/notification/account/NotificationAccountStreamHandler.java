@@ -4,12 +4,12 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.AboutChangedListener;
-import com.github.auties00.cobalt.client.listener.ContactBlockedListener;
-import com.github.auties00.cobalt.client.listener.ProfilePictureChangedListener;
-import com.github.auties00.cobalt.client.listener.TosNoticesChangedListener;
-import com.github.auties00.cobalt.client.listener.ContactTextStatusListener;
-import com.github.auties00.cobalt.client.listener.WhatsAppListener;
+import com.github.auties00.cobalt.listener.linked.LinkedAboutChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedContactBlockedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedProfilePictureChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedTosNoticesChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedContactTextStatusListener;
+import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
@@ -19,9 +19,8 @@ import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.usync.UsyncContext;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -213,7 +212,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
      *
      * <p>Triggered by a {@code <status/>} child, meaning the user changed their about on another device.
      * Queries the current about for the local account, compares it against the stored value, and on a
-     * change writes the new value to the store and fires {@link AboutChangedListener#onAboutChanged}.</p>
+     * change writes the new value to the store and fires {@link LinkedAboutChangedListener#onAboutChanged}.</p>
      *
      * @implNote This implementation compares the stored about against the queried value before writing,
      * avoiding a redundant listener fire when the server pushes a value Cobalt already has; WA Web fires
@@ -235,7 +234,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
                 .text(newAbout)
                 .build();
         whatsapp.store().accountStore().setSelfTextStatus(newStatus);
-        fireListeners(AboutChangedListener.class, listener -> listener.onAboutChanged(whatsapp, oldAbout, newAbout));
+        fireListeners(LinkedAboutChangedListener.class, listener -> listener.onAboutChanged(whatsapp, oldAbout, newAbout));
     }
 
     /**
@@ -246,7 +245,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
      * user via {@link #updateOwnTextStatus(Node)}; otherwise it applies to the user named in the
      * stanza's {@code from} attribute (falling back to the local account), reading the inline
      * {@code text}, {@code emoji}, {@code ephemeral_duration_sec}, and {@code last_update_time} fields.
-     * Either path drives {@link ContactTextStatusListener#onContactTextStatus} for the changed contact.</p>
+     * Either path drives {@link LinkedContactTextStatusListener#onContactTextStatus} for the changed contact.</p>
      *
      * @implNote This implementation collapses the WA Web {@code action === "modify"} path (which
      * re-queries the text status from the server) into the same stanza-driven update used for the
@@ -323,7 +322,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
      * notification's {@code <devices>} child.
      *
      * <p>Reproduces WA Web's {@code WAWebHandleAccountSyncNotification} {@code DEVICES} case. While the
-     * resume-from-restart sequence is still running ({@link WhatsAppStore#isResumeFromRestartComplete()}
+     * resume-from-restart sequence is still running ({@link LinkedWhatsAppStore#isResumeFromRestartComplete()}
      * is {@code false}) the inline payload is not trusted: the sender is stashed as a
      * {@link PendingDeviceSync} carrying this notification's deferred ack, so the authoritative device
      * list is fetched by a USync replay once the socket reaches steady state and the ack is shipped only
@@ -338,7 +337,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
      *
      * @implNote This implementation collapses WA Web's secondary
      * {@code isResumeOnSocketDisconnectInProgress()} branch into the single
-     * {@link WhatsAppStore#isResumeFromRestartComplete()} gate, because Cobalt has no browser-tab
+     * {@link LinkedWhatsAppStore#isResumeFromRestartComplete()} gate, because Cobalt has no browser-tab
      * concept and therefore no distinct open-tab resume state. It also drops WA Web's
      * {@code cleanupCampaignsWithInvalidDevices} follow-up, as Cobalt has no business-broadcast campaign
      * store. The deferred ack rides on the persisted {@link PendingDeviceSync} rather than WA Web's
@@ -450,7 +449,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
 
     /**
      * Refreshes the authenticated user's profile-picture URI by querying the server and firing
-     * {@link ProfilePictureChangedListener#onProfilePictureChanged} when the URI changed.
+     * {@link LinkedProfilePictureChangedListener#onProfilePictureChanged} when the URI changed.
      *
      * <p>Triggered when the user updates their profile picture on another paired device. Compares the
      * queried URI against the stored URI and writes plus fires the listener only on a change.</p>
@@ -471,7 +470,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
         }
 
         whatsapp.store().accountStore().setProfilePicture(newPicture);
-        fireListeners(ProfilePictureChangedListener.class, listener -> listener.onProfilePictureChanged(whatsapp, self));
+        fireListeners(LinkedProfilePictureChangedListener.class, listener -> listener.onProfilePictureChanged(whatsapp, self));
     }
 
     /**
@@ -541,7 +540,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
             currentNotices.addAll(notices);
             whatsapp.store().settingsStore().setTosNotices(currentNotices);
             var snapshot = Set.copyOf(currentNotices);
-            fireListeners(TosNoticesChangedListener.class, listener -> listener.onTosNoticesChanged(whatsapp, snapshot));
+            fireListeners(LinkedTosNoticesChangedListener.class, listener -> listener.onTosNoticesChanged(whatsapp, snapshot));
         }
     }
 
@@ -576,7 +575,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
             currentNotices.add(noticeId);
             whatsapp.store().settingsStore().setTosNotices(currentNotices);
             var snapshot = Set.copyOf(currentNotices);
-            fireListeners(TosNoticesChangedListener.class, listener -> listener.onTosNoticesChanged(whatsapp, snapshot));
+            fireListeners(LinkedTosNoticesChangedListener.class, listener -> listener.onTosNoticesChanged(whatsapp, snapshot));
         }
     }
 
@@ -600,7 +599,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
      * Reconciles the local business-opt-out blocklist against the {@code <biz_opt_out_list>} child.
      *
      * <p>Applies each {@code <item action=... biz_jid=.../>} entry to the matching contact's blocked
-     * flag and updates the stored hash on success, firing {@link ContactBlockedListener#onContactBlocked}
+     * flag and updates the stored hash on success, firing {@link LinkedContactBlockedListener#onContactBlocked}
      * for any contact whose flag changed. The reconciliation is skipped entirely when {@code prev_dhash}
      * does not match the stored hash.</p>
      *
@@ -635,7 +634,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
                 if (contact.blocked() != isBlocked) {
                     contact.setBlocked(isBlocked);
                     whatsapp.store().contactStore().addContact(contact);
-                    fireListeners(ContactBlockedListener.class, listener -> listener.onContactBlocked(whatsapp, userJid));
+                    fireListeners(LinkedContactBlockedListener.class, listener -> listener.onContactBlocked(whatsapp, userJid));
                 }
             }
             whatsapp.store().businessStore().setBusinessOptOutListHash(dhash);
@@ -712,14 +711,14 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
     }
 
     /**
-     * Fires {@link ContactTextStatusListener#onContactTextStatus} on every registered listener, each on its
+     * Fires {@link LinkedContactTextStatusListener#onContactTextStatus} on every registered listener, each on its
      * own virtual thread.
      *
      * @param contactJid the JID whose text status changed
      * @param status     the updated text-status record
      */
     private void notifyContactTextStatusChanged(Jid contactJid, ContactTextStatus status) {
-        fireListeners(ContactTextStatusListener.class, listener -> listener.onContactTextStatus(whatsapp, contactJid, status));
+        fireListeners(LinkedContactTextStatusListener.class, listener -> listener.onContactTextStatus(whatsapp, contactJid, status));
     }
 
     /**

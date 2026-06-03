@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * The factory contract for constructing and loading {@link WhatsAppStore} instances.
+ * The factory contract for constructing and loading {@link LinkedWhatsAppStore} instances.
  *
  * @apiNote
  * Embedders pick a storage strategy through one of the static factory methods on this interface
@@ -21,7 +21,7 @@ import java.util.UUID;
  * factory types directly.
  *
  * @implSpec
- * Implementations must produce stores that conform to the {@link WhatsAppStore} contract. The
+ * Implementations must produce stores that conform to the {@link LinkedWhatsAppStore} contract. The
  * {@code load} methods must return {@link Optional#empty()} when no session matches the
  * argument; the {@code create} methods must always return a fresh, non-{@code null} store ready
  * to be used by the rest of the client.
@@ -106,7 +106,7 @@ public interface WhatsAppStoreFactory {
      * @return the loaded store, or {@link Optional#empty()} if no session exists for that UUID
      * @throws IOException if the store file cannot be read or decoded
      */
-    Optional<WhatsAppStore> load(WhatsAppClientType clientType, UUID uuid) throws IOException;
+    Optional<LinkedWhatsAppStore> load(WhatsAppClientType clientType, UUID uuid) throws IOException;
 
     /**
      * Loads an existing session store identified by its phone number.
@@ -125,7 +125,7 @@ public interface WhatsAppStoreFactory {
      *         number
      * @throws IOException if the store file cannot be read or decoded
      */
-    Optional<WhatsAppStore> load(WhatsAppClientType clientType, long phoneNumber) throws IOException;
+    Optional<LinkedWhatsAppStore> load(WhatsAppClientType clientType, long phoneNumber) throws IOException;
 
     /**
      * Loads the most recently persisted session for the given client type.
@@ -143,7 +143,7 @@ public interface WhatsAppStoreFactory {
      * @return the most recent store, or {@link Optional#empty()} if no session directory exists
      * @throws IOException if the store file cannot be read or decoded
      */
-    Optional<WhatsAppStore> loadLatest(WhatsAppClientType clientType) throws IOException;
+    Optional<LinkedWhatsAppStore> loadLatest(WhatsAppClientType clientType) throws IOException;
 
     /**
      * Creates a new, empty session store identified by the given UUID.
@@ -161,7 +161,7 @@ public interface WhatsAppStoreFactory {
      * @return the newly created store
      * @throws IOException if the store directory cannot be created
      */
-    WhatsAppStore create(WhatsAppClientType clientType, UUID uuid) throws IOException;
+    LinkedWhatsAppStore create(WhatsAppClientType clientType, UUID uuid) throws IOException;
 
     /**
      * Creates a new, empty session store identified by the given phone number.
@@ -180,7 +180,7 @@ public interface WhatsAppStoreFactory {
      * @return the newly created store
      * @throws IOException if the store directory cannot be created
      */
-    WhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) throws IOException;
+    LinkedWhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) throws IOException;
 
     /**
      * Creates a new session store using the data in {@code sixPartsKeys}.
@@ -202,5 +202,5 @@ public interface WhatsAppStoreFactory {
      * @return the newly created store
      * @throws IOException if the store directory cannot be created
      */
-    WhatsAppStore create(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys sixPartsKeys) throws IOException;
+    LinkedWhatsAppStore create(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys sixPartsKeys) throws IOException;
 }

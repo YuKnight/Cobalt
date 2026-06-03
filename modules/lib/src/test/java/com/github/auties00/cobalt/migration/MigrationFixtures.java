@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 
 import java.io.BufferedReader;
@@ -222,7 +222,7 @@ public final class MigrationFixtures {
     }
 
     /**
-     * Creates an in-memory temporary {@link WhatsAppStore} configured with the given self-PN and optional
+     * Creates an in-memory temporary {@link LinkedWhatsAppStore} configured with the given self-PN and optional
      * self-LID, the standard {@code store} dependency for any migration-package test that builds a
      * {@link com.github.auties00.cobalt.client.LinkedWhatsAppClient} harness. The store is pre-advanced past the
      * offline-delivery gate so {@link LidMigrationService#executeMigration()} proceeds immediately;
@@ -235,7 +235,7 @@ public final class MigrationFixtures {
      * @throws UncheckedIOException when the underlying factory cannot
      *                              create the store
      */
-    public static WhatsAppStore temporaryStore(Jid selfPn, Jid selfLid) {
+    public static LinkedWhatsAppStore temporaryStore(Jid selfPn, Jid selfLid) {
         Objects.requireNonNull(selfPn, "selfPn");
         try {
             var store = WhatsAppStoreFactory.temporary()

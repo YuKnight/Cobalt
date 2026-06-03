@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentAction;
 import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentActionBuilder;
 import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.ChatAssignmentMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +48,7 @@ class ChatAssignmentHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
     private static final Jid CHAT_JID = Jid.of("12345@s.whatsapp.net");
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient client;
     private ChatAssignmentHandler handler;
     private ChatAssignmentMutationFactory factory;

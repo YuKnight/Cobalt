@@ -2,12 +2,12 @@ package com.github.auties00.cobalt.stream.control;
 
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.ChatsListener;
-import com.github.auties00.cobalt.client.listener.ContactsListener;
-import com.github.auties00.cobalt.client.listener.LoggedInListener;
-import com.github.auties00.cobalt.client.listener.NameChangedListener;
-import com.github.auties00.cobalt.client.listener.NewslettersListener;
-import com.github.auties00.cobalt.client.listener.StatusListener;
+import com.github.auties00.cobalt.listener.linked.LinkedChatsListener;
+import com.github.auties00.cobalt.listener.linked.LinkedContactsListener;
+import com.github.auties00.cobalt.listener.linked.LinkedLoggedInListener;
+import com.github.auties00.cobalt.listener.linked.LinkedNameChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedNewslettersListener;
+import com.github.auties00.cobalt.listener.linked.LinkedStatusListener;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.WhatsAppFacebookGraphQlException;
@@ -49,7 +49,7 @@ import java.util.function.Supplier;
  * the parsed attributes, sync A/B props, enable or disable LID migration, start the WAM service, schedule the ADV
  * device check, resume web app-state syncing, send the {@code <iq xmlns="passive"><active/></iq>} stanza that
  * transitions the server out of passive mode, run the launch-time compliance probes and notify
- * {@link LoggedInListener#onLoggedIn(LinkedWhatsAppClient)}. A one-shot {@link AtomicBoolean} guard ensures the
+ * {@link LinkedLoggedInListener#onLoggedIn(LinkedWhatsAppClient)}. A one-shot {@link AtomicBoolean} guard ensures the
  * bootstrap runs at most once per connection; {@link #reset()} clears it on socket teardown so the next reconnect
  * repeats the bootstrap.
  *
@@ -187,7 +187,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
      * Drives the one-shot post-handshake bootstrap sequence: parses the {@code <success>} attributes, updates the
      * {@code me} identity, syncs A/B props, primes LID migration, starts the WAM, device and inactive-group services,
      * resumes app-state syncing, transitions the socket out of passive mode, fans out
-     * {@link LoggedInListener#onLoggedIn(LinkedWhatsAppClient)} and persists the store.
+     * {@link LinkedLoggedInListener#onLoggedIn(LinkedWhatsAppClient)} and persists the store.
      *
      * <p>Reachable only via {@link #handle(Node)} the first time a {@code <success>} stanza is observed on the current
      * connection.
@@ -241,7 +241,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
             store.accountStore().setName(displayName);
             if (!Objects.equals(oldName, displayName)) {
                 for (var listener : store.listeners()) {
-                    if (listener instanceof NameChangedListener typed) {
+                    if (listener instanceof LinkedNameChangedListener typed) {
                         Thread.startVirtualThread(() -> typed.onNameChanged(whatsapp, oldName, displayName));
                     }
                 }
@@ -293,7 +293,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         syncPrivacyDisallowedListsMex();
 
         for (var listener : store.listeners()) {
-            if (listener instanceof LoggedInListener typed) {
+            if (listener instanceof LinkedLoggedInListener typed) {
                 Thread.startVirtualThread(() -> typed.onLoggedIn(whatsapp));
             }
         }
@@ -332,10 +332,10 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
      * collection that was already synced when the connection was established.
      *
      * <p>Surfaces each dataset exactly once per login through
-     * {@link ChatsListener#onChats(LinkedWhatsAppClient, java.util.Collection)},
-     * {@link ContactsListener#onContacts(LinkedWhatsAppClient, java.util.Collection)},
-     * {@link NewslettersListener#onNewsletters(LinkedWhatsAppClient, java.util.Collection)} and
-     * {@link StatusListener#onStatus(LinkedWhatsAppClient, java.util.Collection)}. This path covers the reconnect
+     * {@link LinkedChatsListener#onChats(LinkedWhatsAppClient, java.util.Collection)},
+     * {@link LinkedContactsListener#onContacts(LinkedWhatsAppClient, java.util.Collection)},
+     * {@link LinkedNewslettersListener#onNewsletters(LinkedWhatsAppClient, java.util.Collection)} and
+     * {@link LinkedStatusListener#onStatus(LinkedWhatsAppClient, java.util.Collection)}. This path covers the reconnect
      * case, where the data was synced in a prior session and read back from the persisted store: the history-sync
      * pipeline will not re-deliver it, so a fresh listener would otherwise never see it. A collection that was still
      * unsynced at connection time is deliberately skipped here, because
@@ -363,7 +363,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         if (replayChats) {
             var chats = store.chatStore().chats();
             for (var listener : listeners) {
-                if (listener instanceof ChatsListener typed) {
+                if (listener instanceof LinkedChatsListener typed) {
                     Thread.startVirtualThread(() -> typed.onChats(whatsapp, chats));
                 }
             }
@@ -371,7 +371,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         if (replayContacts) {
             var contacts = store.contactStore().contacts();
             for (var listener : listeners) {
-                if (listener instanceof ContactsListener typed) {
+                if (listener instanceof LinkedContactsListener typed) {
                     Thread.startVirtualThread(() -> typed.onContacts(whatsapp, contacts));
                 }
             }
@@ -379,7 +379,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         if (replayNewsletters) {
             var newsletters = store.chatStore().newsletters();
             for (var listener : listeners) {
-                if (listener instanceof NewslettersListener typed) {
+                if (listener instanceof LinkedNewslettersListener typed) {
                     Thread.startVirtualThread(() -> typed.onNewsletters(whatsapp, newsletters));
                 }
             }
@@ -387,7 +387,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         if (replayStatus) {
             var status = store.chatStore().status();
             for (var listener : listeners) {
-                if (listener instanceof StatusListener typed) {
+                if (listener instanceof LinkedStatusListener typed) {
                     Thread.startVirtualThread(() -> typed.onStatus(whatsapp, status));
                 }
             }
@@ -400,7 +400,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
      * <p>Gated on three conditions: this is a web client (newsletters are a web-only companion feature), the configured
      * {@link com.github.auties00.cobalt.client.WhatsAppWebClientHistory} policy includes newsletters, and the
      * newsletter sync gate is still false. The {@link LinkedWhatsAppClient#refreshNewsletters()} call sets the gate and fans
-     * out {@link NewslettersListener#onNewsletters(LinkedWhatsAppClient, java.util.Collection)} internally.
+     * out {@link LinkedNewslettersListener#onNewsletters(LinkedWhatsAppClient, java.util.Collection)} internally.
      *
      * @implNote This implementation runs the fetch on a fresh virtual thread because the round trip can be slow on
      * first install; failures are logged through {@link #LOGGER_COMPLIANCE} and swallowed so the rest of the bootstrap

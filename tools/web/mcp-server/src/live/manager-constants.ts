@@ -5,7 +5,7 @@ export const DEFAULT_NAVIGATION_TIMEOUT_MS = 60_000;
 export const DEFAULT_PAIRING_CODE_TIMEOUT_MS = 45_000;
 export const DEFAULT_WEB_LOCALE = process.env.WEB_MCP_WEB_LOCALE ?? "en-US";
 export const PHONE_TYPE_DELAY_MS = 85;
-export const DEFAULT_DESKTOP_CDP_PORT = 47832; // Using 9222 (Chromium's default) collided with already-running WebView2 processes like Windows Widgets' MSN startfeed, which would grab the port before WhatsApp Desktop could.
+export const DEFAULT_DESKTOP_CDP_PORT = 47832;
 
 export const MAX_CONCURRENT_SESSIONS = (() => {
   const raw = process.env.WEB_MCP_MAX_SESSIONS;

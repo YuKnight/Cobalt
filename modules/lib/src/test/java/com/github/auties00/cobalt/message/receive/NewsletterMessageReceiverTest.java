@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link MessageStatus#DELIVERED}. Synthetic inbound {@code <message>} nodes are driven through
  * {@link NewsletterMessageReceiver#receive(com.github.auties00.cobalt.node.Node, Jid)} directly; the
  * receiver reads only the local JID from its
- * {@link com.github.auties00.cobalt.store.WhatsAppStore}, so no signal-session installation is
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore}, so no signal-session installation is
  * required.
  */
 @DisplayName("NewsletterMessageReceiver")

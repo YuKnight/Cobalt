@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.BusinessPrivacySettingChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedBusinessPrivacySettingChangedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.business.BusinessCampaignStatusBuilder;
 import com.github.auties00.cobalt.model.business.BusinessFeatureFlagBuilder;
@@ -499,7 +499,7 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
         whatsapp.store().businessStore().setBusinessPrivacySetting(consent);
         BusinessDataSharingConsent.ofWire(consent).ifPresent(value -> {
             for (var listener : whatsapp.store().listeners()) {
-                if (listener instanceof BusinessPrivacySettingChangedListener typed) {
+                if (listener instanceof LinkedBusinessPrivacySettingChangedListener typed) {
                     Thread.startVirtualThread(() -> typed.onBusinessPrivacySettingChanged(whatsapp, value));
                 }
             }

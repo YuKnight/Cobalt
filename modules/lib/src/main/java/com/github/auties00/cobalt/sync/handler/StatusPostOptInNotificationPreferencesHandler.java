@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * <p>The sync dispatcher would route incoming
  * {@code "status_post_opt_in_notification_preferences_action"} mutations here if
  * the server ever emits one. The handler persists the boolean opt-in flag on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} so notification delivery
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} so notification delivery
  * for status posts respects the user's last choice.
  *
  * @implNote

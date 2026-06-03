@@ -4,9 +4,8 @@ import { join, basename } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { createWriteStream } from "node:fs";
 
-// Mach-O constants
 const FAT_MAGIC = 0xcafebabe;
-const MH_MAGIC_64 = 0xfeedface + 1; // 0xFEEDFACF
+const MH_MAGIC_64 = 0xfeedface + 1;
 const CPU_TYPE_ARM64 = 0x0100000c;
 const LC_ENCRYPTION_INFO_64 = 0x2c;
 const LC_ENCRYPTION_INFO = 0x21;
@@ -121,14 +120,13 @@ export async function extractIpa(
     const entryPath: string = entry.path;
     const type: string = entry.type;
 
-    // Find the .app directory
     if (!appDirPrefix && entryPath.startsWith("Payload/") && entryPath.includes(".app/")) {
       const parts = entryPath.split("/");
       appDirPrefix = `${parts[0]}/${parts[1]}/`;
     }
 
     if (type === "File") {
-      // Collect Info.plist to find the executable name
+
       if (appDirPrefix && entryPath === `${appDirPrefix}Info.plist`) {
         const buf: Buffer = await entry.buffer();
         const plistInfo = parseBinaryPlist(buf);
@@ -138,7 +136,6 @@ export async function extractIpa(
         continue;
       }
 
-      // Collect framework binaries
       if (appDirPrefix && entryPath.includes("/Frameworks/") && !entryPath.endsWith("/")) {
         const relPath = entryPath.slice(appDirPrefix.length);
         const fwMatch = relPath.match(/^Frameworks\/([^/]+)\.framework\/\1$/);
@@ -150,10 +147,9 @@ export async function extractIpa(
         }
       }
 
-      // Collect the main executable (we'll identify it after reading Info.plist)
       if (appDirPrefix) {
         const relPath = entryPath.slice(appDirPrefix.length);
-        // Only store top-level files (potential executables) and framework binaries
+
         if (!relPath.includes("/") || relPath.startsWith("Frameworks/")) {
           const buf: Buffer = await entry.buffer();
           entries.push({ path: relPath, buffer: buf });
@@ -169,7 +165,7 @@ export async function extractIpa(
   }
 
   if (!executableName) {
-    // Fallback: try to find a binary file at the root of the .app
+
     for (const e of entries) {
       if (!e.path.includes("/") && e.buffer.length > 4) {
         const magic = e.buffer.readUInt32BE(0);
@@ -186,7 +182,6 @@ export async function extractIpa(
     throw new Error("Could not determine executable name from IPA.");
   }
 
-  // Write the main binary
   const mainEntry = entries.find((e) => e.path === executableName);
   if (!mainEntry) {
     throw new Error(`Executable "${executableName}" not found in IPA.`);
@@ -195,7 +190,6 @@ export async function extractIpa(
   const binaryPath = join(outputDir, executableName);
   await writeFile(binaryPath, mainEntry.buffer);
 
-  // Write framework binaries
   for (const e of entries) {
     if (e.path.startsWith("Frameworks/")) {
       const fwPath = join(outputDir, e.path);
@@ -260,7 +254,7 @@ export async function extractAppBundle(
       if (match) frameworks.push(match[1]);
     }
   } catch {
-    // No Frameworks directory — fine.
+
   }
 
   return {
@@ -297,7 +291,7 @@ function parseBinaryPlist(buffer: Buffer): {
   bundleId: string | null;
   bundleVersion: string | null;
 } {
-  // Try XML plist first (simple regex for the keys we need)
+
   const text = buffer.toString("utf8");
 
   let executableName: string | null = null;
@@ -323,16 +317,14 @@ function parseBinaryPlist(buffer: Buffer): {
     return { executableName, bundleId, bundleVersion };
   }
 
-  // Try binary plist: search for the keys as UTF-8 strings
-  // CFBundleExecutable value typically follows the key in binary plist
   const cfBundleExec = "CFBundleExecutable";
   const keyIndex = buffer.indexOf(cfBundleExec, 0, "utf8");
   if (keyIndex !== -1) {
-    // In binary plists, strings are often nearby. Search for a reasonable string after the key.
+
     const searchStart = keyIndex + cfBundleExec.length;
     const searchEnd = Math.min(searchStart + 200, buffer.length);
     const chunk = buffer.subarray(searchStart, searchEnd).toString("utf8");
-    // Look for a word-like string (the executable name)
+
     const nameMatch = chunk.match(/([A-Za-z][A-Za-z0-9._-]{1,50})/);
     if (nameMatch) {
       executableName = nameMatch[1];

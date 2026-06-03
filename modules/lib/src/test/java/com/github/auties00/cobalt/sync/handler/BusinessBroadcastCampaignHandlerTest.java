@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCa
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastCampaignActionBuilder;
 import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.BusinessBroadcastCampaignMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +39,7 @@ class BusinessBroadcastCampaignHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
     private static final String BROADCAST_JID = "123-1234567890@broadcast";
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient client;
     private BusinessBroadcastCampaignHandler handler;
     private BusinessBroadcastCampaignMutationFactory factory;

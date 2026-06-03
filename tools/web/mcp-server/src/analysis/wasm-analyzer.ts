@@ -101,12 +101,6 @@ function skipInitExpr(r: BinaryReader): void {
   decodeConstExpr(r);
 }
 
-/**
- * Parses the element section into structured segments. Handles all eight flag
- * encodings: the funcidx-vector forms (flags 0-3) and the expression forms
- * (flags 4-7), resolving each active segment's constant offset and the function
- * indices it installs ({@code -1} for a {@code ref.null} hole).
- */
 function parseElementSection(r: BinaryReader, section: RawSection): WasmElementSegment[] {
   r.pos = section.contentOffset;
   return r.readVec(() => {
@@ -114,19 +108,17 @@ function parseElementSection(r: BinaryReader, section: RawSection): WasmElementS
     const active = (flags & 0x01) === 0;
     const explicitTable = (flags & 0x02) !== 0;
     const usesExpr = (flags & 0x04) !== 0;
-    const declared = !active && explicitTable; // flags 3 and 7
+    const declared = !active && explicitTable;
 
     let tableIndex = 0;
     let offset: number | null = null;
 
     if (active) {
-      if (explicitTable) tableIndex = r.readU32Leb(); // flags 2, 6
+      if (explicitTable) tableIndex = r.readU32Leb();
       const off = decodeConstExpr(r);
       offset = off.kind === "i32" ? off.value : null;
     }
 
-    // An elemkind/reftype byte precedes the items for every form whose low two
-    // bits are non-zero; flags 0 and 4 (implicit funcref) omit it.
     if ((flags & 0x03) !== 0) r.readByte();
 
     const funcIndices: number[] = [];
@@ -145,12 +137,6 @@ function parseElementSection(r: BinaryReader, section: RawSection): WasmElementS
   });
 }
 
-/**
- * Parses the data section into descriptors (no bytes inlined). Records each
- * segment's mode, target memory, resolved constant base address for active
- * segments, byte length, and the absolute file offset of its bytes so the raw
- * content can be fetched on demand.
- */
 function parseDataSection(r: BinaryReader, section: RawSection): WasmDataSegment[] {
   r.pos = section.contentOffset;
   return r.readVec(() => {
@@ -507,11 +493,6 @@ function toFreshUint8Array(binary: Buffer | Uint8Array): Uint8Array {
   return copy;
 }
 
-// All post-MVP WebAssembly features WABT must be told to accept when parsing.
-// WA's VoIP wasm is built with shared memory (threads) and passive data segments
-// (bulk_memory); without these flags readWasm aborts with errors such as
-// "memory may not be shared: threads not allowed". Enabling every feature keeps the
-// disassembler working across any module the snapshot may contain.
 const WABT_READ_OPTIONS = {
   readDebugNames: true,
   exceptions: true,

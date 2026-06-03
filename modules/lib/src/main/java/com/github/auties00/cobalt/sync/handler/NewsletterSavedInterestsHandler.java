@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * <p>This handler persists an opaque, server-defined token blob describing the
  * user's subscribed newsletter interest categories on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} so the personalised
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} so the personalised
  * channel directory can render the same selection across linked devices. Only
  * {@link SyncdOperation#SET} is accepted; any other operation is reported as
  * {@link MutationApplicationResult#unsupported()} and a missing or empty

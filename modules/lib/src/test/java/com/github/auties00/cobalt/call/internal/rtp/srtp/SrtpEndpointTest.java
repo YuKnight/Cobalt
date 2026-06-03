@@ -140,21 +140,28 @@ public class SrtpEndpointTest {
                 () -> SrtpEndpoint.fromDtlsKeyingMaterial(new byte[61], SrtpRole.CLIENT));
     }
 
-    // The relayed-media leg keys both endpoints from the SAME 30-byte <hbh_key>; the directions are
-    // kept distinct by SSRC, not by separate keys. Two endpoints built from the one hop-by-hop key
-    // must round-trip RTP both ways, end to end.
+    // The relayed-media leg is asymmetric: the relay re-encrypts as it forwards, so the uplink the
+    // caller sends is keyed from the uplink master and the downlink it receives from the downlink
+    // master. fromHopByHopKey keys the caller (outbound = uplink, inbound = downlink); the relay end
+    // is its mirror (inbound = uplink, outbound = downlink). Media must round-trip both ways.
     @Test
     public void hopByHopKeyRoundTripsBothDirections() {
         var hbhKey = new byte[HbhKeyDerivation.HBH_KEY_LENGTH];
         new SecureRandom().nextBytes(hbhKey);
+        var uplink = HbhKeyDerivation.deriveKeymat(hbhKey, HbhKeyDerivation.Group.UPLINK_SRTCP);
+        var downlink = HbhKeyDerivation.deriveKeymat(hbhKey, HbhKeyDerivation.Group.DOWNLINK_SRTCP);
+        assertNotEquals(toHex(HbhKeyDerivation.masterKey(uplink)), toHex(HbhKeyDerivation.masterKey(downlink)),
+                "uplink and downlink legs must use distinct masters");
         try (var caller = SrtpEndpoint.fromHopByHopKey(hbhKey);
-             var relay = SrtpEndpoint.fromHopByHopKey(hbhKey)) {
+             var relay = new SrtpEndpoint(
+                     HbhKeyDerivation.masterKey(downlink), HbhKeyDerivation.masterSalt(downlink),
+                     HbhKeyDerivation.masterKey(uplink), HbhKeyDerivation.masterSalt(uplink))) {
             var up = makeRtpPacket(0xCA11E400, 7, 700, "uplink frame".getBytes());
             assertArrayEquals(up, relay.unprotectRtp(caller.protectRtp(up)),
-                    "uplink media must round-trip under the hop-by-hop key");
+                    "uplink media must round-trip under the uplink hop-by-hop master");
             var down = makeRtpPacket(0x9E1A4000, 9, 900, "downlink frame".getBytes());
             assertArrayEquals(down, caller.unprotectRtp(relay.protectRtp(down)),
-                    "downlink media must round-trip under the same hop-by-hop key");
+                    "downlink media must round-trip under the downlink hop-by-hop master");
         }
     }
 

@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.time.Instant;
 import java.util.Base64;
@@ -49,9 +49,9 @@ public final class TcTokenStanza {
     private static final int MAX_TC_TOKEN_DURATION_SECONDS = 15_552_000;
 
     /**
-     * Holds the {@link WhatsAppStore} used to look up the recipient chat.
+     * Holds the {@link LinkedWhatsAppStore} used to look up the recipient chat.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Holds the {@link ABPropsService} consulted for the token-emission gate and the lifetime
@@ -64,13 +64,13 @@ public final class TcTokenStanza {
      *
      * <p>Constructed once per client; the builder is otherwise stateless.
      *
-     * @param store          the {@link WhatsAppStore}
+     * @param store          the {@link LinkedWhatsAppStore}
      * @param abPropsService the {@link ABPropsService}
      * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCreateFanoutStanza", exports = "createFanoutMsgStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public TcTokenStanza(WhatsAppStore store, ABPropsService abPropsService) {
+    public TcTokenStanza(LinkedWhatsAppStore store, ABPropsService abPropsService) {
         this.store = Objects.requireNonNull(store, "store");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
     }

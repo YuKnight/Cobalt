@@ -140,6 +140,18 @@ public final class ActiveCallTransport implements AutoCloseable {
     private volatile IceAgent ice;
 
     /**
+     * Holds the virtual thread that keeps the edgeray STUN bind consent-fresh for the call's
+     * lifetime; {@code null} on the raw-UDP path and before {@link #connectIce(DtlsSrtpDriver, long, TimeUnit)}.
+     *
+     * <p>An edgeray relay forwards a participant's media only while that participant keeps the relay
+     * bind path consent-refreshed; unlike a plain TURN relay (which bridges by call-id with no
+     * connectivity check), the edge drops the forwarding after its consent timeout. This thread runs
+     * the {@link IceAgent} tick loop over the DataChannel STUN seam until {@link #close()} interrupts
+     * it, so the relay keeps forwarding for the whole call rather than dropping it after a few seconds.
+     */
+    private volatile Thread iceConsentTicker;
+
+    /**
      * Holds the DTLS-SRTP endpoint built after ICE nominates a pair; {@code null} until then.
      */
     private volatile DtlsSrtpEndpoint dtls;
@@ -377,11 +389,54 @@ public final class ActiveCallTransport implements AutoCloseable {
         }
         var udp = allocation.transport();
         if (udp == null) {
-            // Edgeray DataChannel allocation: there is no raw UDP socket to run an ICE binding over.
-            // The relay tunnels STUN/media inside the pre-negotiated DataChannel and forwards by
-            // call-id, so no separate connectivity check is needed; report not-bound and let the
-            // caller pump media over the RelayDatagramTransport.
-            return false;
+            // Edgeray DataChannel path: there is no raw UDP socket, but the relay still requires the
+            // STUN bind path to be established AND kept consent-fresh before it forwards this
+            // participant's media to the call. (A plain TURN relay bridges by call-id with no check;
+            // an edgeray edge does not, and drops the forwarding after a consent timeout.) Run the
+            // IceAgent over the supplied driver's DataChannel STUN seam, respond to the relay's inbound
+            // binding requests, and keep ticking for the whole call so consent never lapses.
+            var relayDriver = allocation.driver();
+            if (relayDriver == null) {
+                return false;
+            }
+            var edgeAgent = new IceAgent(params.dtlsClient(), params.credentials(),
+                    (packet, destination) -> driver.sendStun(packet));
+            this.ice = edgeAgent;
+            edgeAgent.addLocalCandidate(IceCandidate.host(IceComponent.RTP, allocation.relayedAddress(), "host"));
+            edgeAgent.addRemoteCandidate(IceCandidate.host(IceComponent.RTP, relayDriver.remote(), "relay"));
+            var edgeBound = new java.util.concurrent.CountDownLatch(1);
+            edgeAgent.setListener(new IceAgent.Listener() {
+                @Override
+                public void onCheckSucceeded(IceCandidatePair pair) {
+                    edgeBound.countDown();
+                }
+
+                @Override
+                public void onNominated(IceCandidatePair pair) {
+                    edgeBound.countDown();
+                }
+            });
+            driver.setStunHandler(edgeAgent::handleInboundStun);
+            edgeAgent.start();
+            var consent = Thread.ofVirtual().name("ice-consent-edgeray").start(() -> {
+                try {
+                    while (state.get() != State.CLOSED && !Thread.currentThread().isInterrupted()) {
+                        edgeAgent.tick();
+                        Thread.sleep(50);
+                    }
+                } catch (InterruptedException _) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            this.iceConsentTicker = consent;
+            try {
+                // Report bound once the first check succeeds, but leave the consent ticker running for
+                // the call's lifetime so the relay keeps forwarding.
+                return edgeBound.await(timeout, unit);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
         }
         var agent = new IceAgent(params.dtlsClient(), params.credentials(),
                 (packet, destination) -> driver.sendStun(packet));
@@ -404,7 +459,7 @@ public final class ActiveCallTransport implements AutoCloseable {
         agent.start();
         var ticker = Thread.ofVirtual().name("ice-tick-" + udp.localAddress().getPort()).start(() -> {
             try {
-                while (succeeded.getCount() > 0 && !Thread.currentThread().isInterrupted()) {
+                while (state.get() != State.CLOSED && !Thread.currentThread().isInterrupted()) {
                     agent.tick();
                     Thread.sleep(50);
                 }
@@ -412,13 +467,12 @@ public final class ActiveCallTransport implements AutoCloseable {
                 Thread.currentThread().interrupt();
             }
         });
+        this.iceConsentTicker = ticker;
         try {
             return succeeded.await(timeout, unit);
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             return false;
-        } finally {
-            ticker.interrupt();
         }
     }
 
@@ -652,6 +706,11 @@ public final class ActiveCallTransport implements AutoCloseable {
         if (allocation != null) {
             try { allocation.transport().close(); } catch (RuntimeException _) {}
             this.relayAllocation = null;
+        }
+        var consent = this.iceConsentTicker;
+        if (consent != null) {
+            consent.interrupt();
+            this.iceConsentTicker = null;
         }
         this.dtls = null;
         this.ice = null;

@@ -64,7 +64,7 @@ import java.util.Objects;
  * is carried on the existing
  * {@link com.github.auties00.cobalt.model.message.MessageReceipt} records created
  * via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#createOrMergeReceiptRecords(String, java.util.Collection)},
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore#createOrMergeReceiptRecords(String, java.util.Collection)},
  * which collapses WA Web's per-clone {@code ackLevel} into the Cobalt-uniform
  * receipt model.
  */

@@ -85,7 +85,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
      * WA Web accumulates valid entries across the whole batch and flushes them
      * once through {@code WAWebUpdateLidMetadataJob}; Cobalt collapses that
      * pipeline into a direct per-mutation contact update because the unified
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore} is itself the source
+     * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} is itself the source
      * of truth and there is no IDB layer to batch.
      */
     @Override

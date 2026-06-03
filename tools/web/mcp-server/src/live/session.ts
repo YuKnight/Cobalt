@@ -90,8 +90,7 @@ export class LiveWebSession {
     this.sessionId = sessionId;
     this.mode = mode;
     this.ephemeral = options.ephemeral ?? false;
-    // Desktop modes connect to an external app's own profile; no persistent
-    // dir is managed by us.
+
     this.userDataDir =
       mode === "web" && !this.ephemeral
         ? pathJoin(DEFAULT_USER_DATA_DIR_ROOT, sessionIdToDirName(sessionId), "chromium")
@@ -178,7 +177,7 @@ export class LiveWebSession {
     }
 
     return this.page.evaluate(() => {
-      // DOM structural checks (locale-independent) ---
+
       const hasLoggedUi =
         document.querySelector("#pane-side") != null ||
         document.querySelector('[data-testid="chat-list-search"]') != null ||
@@ -192,7 +191,6 @@ export class LiveWebSession {
       const hasPhoneInput =
         document.querySelector('input[type="tel"]') != null;
 
-      // Pairing code: DOM first, then text regex fallback ---
       let code: string | null = null;
 
       const codeContainer = document.querySelector(
@@ -235,7 +233,6 @@ export class LiveWebSession {
         }
       }
 
-      // Text-based fallback (English only, DOM checks are primary) ---
       const bodyText = (document.body?.innerText ?? "").toLowerCase();
 
       const isRateLimited =
@@ -466,7 +463,7 @@ export class LiveWebSession {
         await page.keyboard.type(fullPhoneValue, { delay: PHONE_TYPE_DELAY_MS });
         return fullPhoneValue;
       } catch {
-        // continue
+
       }
     }
 
@@ -483,7 +480,7 @@ export class LiveWebSession {
         await page.keyboard.type(fullPhoneValue, { delay: PHONE_TYPE_DELAY_MS });
         return fullPhoneValue;
       } catch {
-        // continue
+
       }
     }
 
@@ -513,18 +510,9 @@ export class LiveWebSession {
     log.info(`[${this.sessionId}] startWebSession: locale=${locale} slowMo=${slowMoMs} timeout=${navigationTimeoutMs} persistent=${this.userDataDir ? "yes" : "no"}`);
 
     if (!this.context) {
-      // Allocate a free TCP port up front and pass it via
-      // --remote-debugging-port. External clients (LLMs, debuggers,
-      // custom scripts) can then connect raw CDP at this port for
-      // capabilities the Playwright session cannot reach — worker
-      // target multiplexing, Fetch.requestPaused with arbitrary
-      // handlers, child-target-bound Runtime.evaluate, etc.
+
       this.cdpPort = await LiveWebSession.findFreeTcpPort();
-      // --use-fake-device-for-media-stream supplies a synthetic mic (a 440Hz beep) and camera so a
-      // session can place/stay in a WhatsApp call without real hardware; --use-fake-ui-for-media-stream
-      // auto-grants the getUserMedia permission so no prompt blocks the voip stack. This keeps an
-      // automated caller alive in a call (a mic-less tab drops it) and lets the synthetic audio be
-      // verified end-to-end against another participant.
+
       const cdpArgs = [
         `--remote-debugging-port=${this.cdpPort}`,
         "--use-fake-device-for-media-stream",
@@ -534,8 +522,7 @@ export class LiveWebSession {
         if (!existsSync(this.userDataDir)) {
           mkdirSync(this.userDataDir, { recursive: true });
         }
-        // launchPersistentContext returns a BrowserContext whose underlying
-        // browser is tied to it — context.close() closes the browser.
+
         this.context = await chromium.launchPersistentContext(this.userDataDir, {
           headless: false,
           slowMo: slowMoMs,
@@ -592,9 +579,7 @@ export class LiveWebSession {
   private async startDesktopSession(options: StartSessionOptions): Promise<LiveSessionInfo> {
     const cdpPort = options.desktopCdpPort ?? DEFAULT_DESKTOP_CDP_PORT;
     const cdpUrl = `http://localhost:${cdpPort}`;
-    // Expose the desktop CDP port to the worker-target multiplexer (CdpMux) so
-    // wasm/worker breakpoints work against WhatsApp Desktop exactly as they do
-    // against the browser session.
+
     this.cdpPort = cdpPort;
     log.info(`[${this.sessionId}] startDesktopSession: cdpPort=${cdpPort}`);
 
@@ -691,7 +676,6 @@ export class LiveWebSession {
       this.pairingCode = normalizePairingCode(auth.pairingCode);
     }
 
-    // Identity lifecycle: populate on transition to logged_in, drop when not logged in.
     if (auth.authState === "logged_in") {
       if (this.lastAuthState !== "logged_in" || this.identity === null) {
         this.linkedAt = this.linkedAt ?? new Date().toISOString();
@@ -888,28 +872,10 @@ export class LiveWebSession {
     return this.debuggerBridge.evaluate(expression, awaitPromise);
   }
 
-  /**
-   * Returns the externally-reachable Chrome DevTools Protocol port for
-   * this session, or {@code null} if the browser is not running.
-   *
-   * <p>External clients connect raw CDP at
-   * {@code http://localhost:<port>/json/version} (browser-level
-   * metadata + WebSocket URL) and {@code http://localhost:<port>/json}
-   * (per-target WebSocket URLs for direct attach to pages, workers,
-   * service workers, etc).
-   */
   getCdpPort(): number | null {
     return this.cdpPort;
   }
 
-  /**
-   * Allocates a free TCP port by binding a server to port {@code 0} and
-   * reading back the OS-assigned port. The server is closed before the
-   * port is returned, leaving a small race window — callers must use
-   * the port before another process claims it.
-   *
-   * @returns a free TCP port on the loopback interface
-   */
   private static async findFreeTcpPort(): Promise<number> {
     return new Promise<number>((resolve, reject) => {
       const server = createServer();

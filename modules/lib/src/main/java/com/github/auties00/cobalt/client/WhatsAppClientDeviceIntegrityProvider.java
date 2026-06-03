@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.client;
 
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 /**
  * Produces a platform-specific device-attestation payload that the mobile
@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.store.WhatsAppStore;
  * results. Both sub-interfaces are {@code non-sealed} and
  * {@link FunctionalInterface functional}, so a target-typed lambda
  * suffices to supply one, and each covariantly narrows the return type of
- * {@link #mint(WhatsAppStore)} so the wrong result type cannot be produced
+ * {@link #mint(LinkedWhatsAppStore)} so the wrong result type cannot be produced
  * for a given platform.
  *
  * @apiNote
@@ -25,7 +25,7 @@ import com.github.auties00.cobalt.store.WhatsAppStore;
  *
  * @implSpec
  * Implementations are not required to be thread-safe; the registration
- * code invokes {@link #mint(WhatsAppStore)} sequentially from the thread
+ * code invokes {@link #mint(LinkedWhatsAppStore)} sequentially from the thread
  * that drives the registration ceremony and never concurrently.
  *
  * @see WhatsAppClientDeviceIntegrityResult
@@ -58,7 +58,7 @@ public sealed interface WhatsAppClientDeviceIntegrityProvider
      *                          registration code treats any throw as a
      *                          fatal registration failure
      */
-    WhatsAppClientDeviceIntegrityResult mint(WhatsAppStore store);
+    WhatsAppClientDeviceIntegrityResult mint(LinkedWhatsAppStore store);
 
     /**
      * A supplier that mints Google Play Integrity verdicts for the Android
@@ -66,7 +66,7 @@ public sealed interface WhatsAppClientDeviceIntegrityProvider
      *
      * <p>Wired in via the Android registration variants on
      * {@link LinkedWhatsAppClientBuilder}. The narrowed return type of
-     * {@link #mint(WhatsAppStore)} guarantees at compile time that an
+     * {@link #mint(LinkedWhatsAppStore)} guarantees at compile time that an
      * Android supplier can only produce a
      * {@link WhatsAppClientDeviceIntegrityResult.PlayIntegrity}.
      */
@@ -83,7 +83,7 @@ public sealed interface WhatsAppClientDeviceIntegrityProvider
          *         {@code null}
          */
         @Override
-        WhatsAppClientDeviceIntegrityResult.PlayIntegrity mint(WhatsAppStore store);
+        WhatsAppClientDeviceIntegrityResult.PlayIntegrity mint(LinkedWhatsAppStore store);
     }
 
     /**
@@ -92,7 +92,7 @@ public sealed interface WhatsAppClientDeviceIntegrityProvider
      *
      * <p>Wired in via the iOS registration variants on
      * {@link LinkedWhatsAppClientBuilder}. The narrowed return type of
-     * {@link #mint(WhatsAppStore)} guarantees at compile time that an iOS
+     * {@link #mint(LinkedWhatsAppStore)} guarantees at compile time that an iOS
      * supplier can only produce a
      * {@link WhatsAppClientDeviceIntegrityResult.AppAttest}.
      */
@@ -108,6 +108,6 @@ public sealed interface WhatsAppClientDeviceIntegrityProvider
          * @return the App Attest attestation result; never {@code null}
          */
         @Override
-        WhatsAppClientDeviceIntegrityResult.AppAttest mint(WhatsAppStore store);
+        WhatsAppClientDeviceIntegrityResult.AppAttest mint(LinkedWhatsAppStore store);
     }
 }

@@ -90,7 +90,7 @@ export class LiveWebSessionRegistry {
     try {
       return await session.start(options);
     } catch (error) {
-      // Rollback: failed start leaves no session in the registry.
+
       this.sessions.delete(sessionId);
       throw error;
     }

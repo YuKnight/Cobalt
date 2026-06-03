@@ -38,9 +38,9 @@ import java.util.Set;
  * newsletter/channel preferences.
  *
  * @apiNote
- * Embedders reach this through {@link WhatsAppStore#settingsStore()}.
+ * Embedders reach this through {@link LinkedWhatsAppStore#settingsStore()}.
  *
- * @see WhatsAppStore
+ * @see LinkedWhatsAppStore
  */
 @WhatsAppWebModule(moduleName = "WAWebUserPrefsBase")
 @WhatsAppWebModule(moduleName = "WAWebUserPrefsStore")

@@ -18,7 +18,7 @@ import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyI
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyRequest;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyRequestBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncdCoordinator;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
@@ -70,7 +70,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
      * Holds the shared store consulted for the current device list, the offline resume state,
      * the missing-key tracker, and the {@link SyncPatchType#CRITICAL_BLOCK} bootstrap flag.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Holds the companion timeout scheduler wired in after construction via
@@ -147,7 +147,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
      * {@inheritDoc}
      *
      * @implNote This implementation intentionally bypasses the {@code handleMissingKeys} body:
-     * the resume gate ({@link WhatsAppStore#isResumeFromRestartComplete()}) and the
+     * the resume gate ({@link LinkedWhatsAppStore#isResumeFromRestartComplete()}) and the
      * deduplication filter against {@link com.github.auties00.cobalt.store.SyncStore#findMissingSyncKey(byte[])} are skipped
      * because the keys are by construction already tracked and the periodic job runs only after
      * resume has long completed.
@@ -228,7 +228,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
      *
      * <p>The shared body invoked by both {@link #requestMissingKeys(Collection)} and the
      * single-id overload. Returns early when the offline-resume sequence has not yet completed
-     * ({@link WhatsAppStore#isResumeFromRestartComplete()} is {@code false}), when the input is
+     * ({@link LinkedWhatsAppStore#isResumeFromRestartComplete()} is {@code false}), when the input is
      * empty, and when every supplied id is already tracked. Surviving ids are wrapped into an
      * {@code AppStateSyncKeyRequest} and broadcast; the accepting device ids are then recorded
      * against the tracker.

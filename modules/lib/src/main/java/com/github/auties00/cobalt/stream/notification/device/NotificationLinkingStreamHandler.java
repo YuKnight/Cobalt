@@ -4,12 +4,11 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.NewContactListener;
-import com.github.auties00.cobalt.client.listener.WhatsAppListener;
+import com.github.auties00.cobalt.listener.linked.LinkedNewContactListener;
+import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.node.smax.coexistence.SmaxCoexistenceOffboardingNotificationResponse;
 import com.github.auties00.cobalt.node.smax.coexistence.SmaxCoexistenceOnboardingStatusNotificationResponse;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
@@ -368,7 +367,7 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
      * <p>Resolves the recipient JID from {@code <invite><receiver user="..."/></invite>} and
      * returns early when it is absent. An existing contact and chat are reused; otherwise a new
      * contact and chat are created. The contact's chosen name is refreshed from a name query (best
-     * effort; failures are debug-logged), and {@link NewContactListener#onNewContact} fires when
+     * effort; failures are debug-logged), and {@link LinkedNewContactListener#onNewContact} fires when
      * the contact did not previously exist.
      *
      * @implNote This implementation commits a {@code ChatMessageCounts} WAM event with
@@ -406,7 +405,7 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
         whatsapp.store().contactStore().addContact(contact);
 
         if (!existed) {
-            fireListeners(NewContactListener.class, listener -> listener.onNewContact(whatsapp, contact));
+            fireListeners(LinkedNewContactListener.class, listener -> listener.onNewContact(whatsapp, contact));
         }
 
         if (chatCreated) {

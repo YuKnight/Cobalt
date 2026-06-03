@@ -298,6 +298,16 @@ public final class CallRelay {
         var callId = relay.getAttributeAsString("call-id", null);
         var joinable = "1".equals(relay.getAttributeAsString("joinable", null));
 
+        if (callId != null) {
+            var dump = new StringBuilder("attrs=").append(relay.attributes());
+            dump.append(" children=[");
+            for (var c : relay.children()) {
+                dump.append(c.description()).append(c.attributes()).append(' ');
+            }
+            dump.append(']');
+            com.github.auties00.cobalt.call.internal.CallMediaCapture.relay(callId, dump.toString());
+        }
+
         var participants = new ArrayList<CallParticipant>();
         var tokens = new ArrayList<RelayToken>();
         var authTokens = new ArrayList<AuthToken>();

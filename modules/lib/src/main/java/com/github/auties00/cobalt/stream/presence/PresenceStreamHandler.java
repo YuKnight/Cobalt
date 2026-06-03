@@ -1,8 +1,9 @@
 package com.github.auties00.cobalt.stream.presence;
 
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.ContactPresenceListener;
+import com.github.auties00.cobalt.listener.linked.LinkedContactPresenceListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -234,7 +235,7 @@ public final class PresenceStreamHandler extends SocketStreamHandler.Concurrent 
 
     /**
      * Fans out a presence notification to every registered
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener}.
+     * {@link LinkedWhatsAppClientListener}.
      *
      * <p>The {@code conversation} and {@code participant} arguments are equal for {@code <presence>} stanzas (presence
      * is always per-contact, never per-group); they are kept distinct in the listener signature so the same callback
@@ -249,7 +250,7 @@ public final class PresenceStreamHandler extends SocketStreamHandler.Concurrent 
      */
     private void notifyPresence(Jid conversation, Jid participant) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof ContactPresenceListener typed) {
+            if (listener instanceof LinkedContactPresenceListener typed) {
                 Thread.startVirtualThread(() -> typed.onContactPresence(whatsapp, conversation, participant));
             }
         }

@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastAs
 import com.github.auties00.cobalt.model.sync.action.business.BusinessBroadcastAssociationActionBuilder;
 import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers {@link BusinessBroadcastAssociationHandler}, which associates (SET, {@code deleted=false})
  * or disassociates (SET, {@code deleted=true}) a recipient JID inside a parent broadcast list on
- * {@link WhatsAppStore}, keyed by the list id at {@code indexParts[1]} and the recipient at
+ * {@link LinkedWhatsAppStore}, keyed by the list id at {@code indexParts[1]} and the recipient at
  * {@code indexParts[2]}. WA Web defines the {@code BusinessBroadcastAssociationAction} protobuf but
  * ships no corresponding sync-handler module, so this handler is Cobalt-inferred.
  */
@@ -43,7 +43,7 @@ class BusinessBroadcastAssociationHandlerTest {
     private static final Jid CONTACT_PN = Jid.of("33330000@s.whatsapp.net");
     private static final String LIST_ID = "list-abc";
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private LinkedWhatsAppClient client;
     private BusinessBroadcastAssociationHandler handler;
 

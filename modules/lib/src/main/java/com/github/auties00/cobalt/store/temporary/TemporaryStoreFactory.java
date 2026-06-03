@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.store.ProtobufSignalStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufSyncStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufWebSessionStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufWhatsAppStore;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 import com.github.auties00.cobalt.client.WhatsAppClientSixPartsKeys;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
@@ -65,7 +65,7 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
      * have no on-disk presence to load.
      */
     @Override
-    public Optional<WhatsAppStore> load(WhatsAppClientType clientType, UUID uuid) {
+    public Optional<LinkedWhatsAppStore> load(WhatsAppClientType clientType, UUID uuid) {
         return Optional.empty();
     }
 
@@ -77,7 +77,7 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
      * have no on-disk presence to load.
      */
     @Override
-    public Optional<WhatsAppStore> load(WhatsAppClientType clientType, long phoneNumber) {
+    public Optional<LinkedWhatsAppStore> load(WhatsAppClientType clientType, long phoneNumber) {
         return Optional.empty();
     }
 
@@ -89,7 +89,7 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
      * have no on-disk presence to enumerate.
      */
     @Override
-    public Optional<WhatsAppStore> loadLatest(WhatsAppClientType clientType) {
+    public Optional<LinkedWhatsAppStore> loadLatest(WhatsAppClientType clientType) {
         return Optional.empty();
     }
 
@@ -101,7 +101,7 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
      * to {@link #newStore} with the identity-bearing scalars all left {@code null}.
      */
     @Override
-    public WhatsAppStore create(WhatsAppClientType clientType, UUID uuid) {
+    public LinkedWhatsAppStore create(WhatsAppClientType clientType, UUID uuid) {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         return newStore(clientType, Objects.requireNonNullElseGet(uuid, UUID::randomUUID), null, null, null, null, null);
     }
@@ -114,7 +114,7 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
      * identity-bearing scalars left {@code null}; the phone number alone is retained.
      */
     @Override
-    public WhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) {
+    public LinkedWhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         return newStore(clientType, UUID.randomUUID(), phoneNumber, null, null, null, null);
     }
@@ -128,7 +128,7 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
      * be used to bootstrap a transient session without a fresh pairing flow.
      */
     @Override
-    public WhatsAppStore create(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys sixPartsKeys) {
+    public LinkedWhatsAppStore create(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys sixPartsKeys) {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         Objects.requireNonNull(sixPartsKeys, "sixPartsKeys cannot be null");
         var phoneNumber = sixPartsKeys.phoneNumber();
@@ -159,7 +159,7 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
      * @param jid             the user JID, or {@code null}
      * @return a freshly built store
      */
-    private static WhatsAppStore newStore(WhatsAppClientType clientType, UUID uuid, Long phoneNumber, SignalIdentityKeyPair noiseKeyPair, SignalIdentityKeyPair identityKeyPair, byte[] identityId, Jid jid) {
+    private static LinkedWhatsAppStore newStore(WhatsAppClientType clientType, UUID uuid, Long phoneNumber, SignalIdentityKeyPair noiseKeyPair, SignalIdentityKeyPair identityKeyPair, byte[] identityId, Jid jid) {
         var device = switch (clientType) {
             case WEB -> WhatsAppClientDevice.desktop();
             case MOBILE -> WhatsAppClientDevice.ios(false);

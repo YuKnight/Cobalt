@@ -31,7 +31,7 @@ import com.github.auties00.cobalt.socket.tunnel.SocksTunnel;
 import com.github.auties00.cobalt.socket.websocket.WebSocketFrameInputStream;
 import com.github.auties00.cobalt.socket.websocket.WebSocketFrameOutputStream;
 import com.github.auties00.cobalt.socket.websocket.WebSocketUpgrade;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
@@ -185,7 +185,7 @@ public sealed abstract class WhatsAppSocketClient {
      * TLS configuration.
      *
      * <p>This is equivalent to
-     * {@link #newCipheredSocketClient(WhatsAppStore, WhatsAppSslContextFactory)}
+     * {@link #newCipheredSocketClient(LinkedWhatsAppStore, WhatsAppSslContextFactory)}
      * with {@link WhatsAppSslContextFactory#chrome()} and is the standard
      * entry point for embedders that do not need a custom truststore or
      * trust-all factory. {@code WEB} and {@code WINDOWS} platforms get the
@@ -199,7 +199,7 @@ public sealed abstract class WhatsAppSocketClient {
      * @return a socket client ready to
      *         {@link #connect(WhatsAppSocketListener)}
      */
-    public static WhatsAppSocketClient newCipheredSocketClient(WhatsAppStore store) {
+    public static WhatsAppSocketClient newCipheredSocketClient(LinkedWhatsAppStore store) {
         return newCipheredSocketClient(store, WhatsAppSslContextFactory.chrome());
     }
 
@@ -222,7 +222,7 @@ public sealed abstract class WhatsAppSocketClient {
      *                              {@code sslContextFactory} is
      *                              {@code null}
      */
-    public static WhatsAppSocketClient newCipheredSocketClient(WhatsAppStore store, WhatsAppSslContextFactory sslContextFactory) {
+    public static WhatsAppSocketClient newCipheredSocketClient(LinkedWhatsAppStore store, WhatsAppSslContextFactory sslContextFactory) {
         Objects.requireNonNull(store, "store cannot be null");
         Objects.requireNonNull(sslContextFactory, "sslContextFactory cannot be null");
         var platform = store.accountStore().device().platform();
@@ -236,7 +236,7 @@ public sealed abstract class WhatsAppSocketClient {
      * The WhatsApp store, owning the identity keys and platform
      * metadata required to assemble the handshake payload.
      */
-    final WhatsAppStore store;
+    final LinkedWhatsAppStore store;
 
     /**
      * The SSL configuration applied to every TLS hop on this
@@ -342,7 +342,7 @@ public sealed abstract class WhatsAppSocketClient {
      * @param sslContextFactory the SSL configuration applied to
      *                          every TLS hop on this connection
      */
-    private WhatsAppSocketClient(WhatsAppStore store, WhatsAppSslContextFactory sslContextFactory) {
+    private WhatsAppSocketClient(LinkedWhatsAppStore store, WhatsAppSslContextFactory sslContextFactory) {
         this.store = store;
         this.sslContextFactory = sslContextFactory;
     }
@@ -1220,7 +1220,7 @@ public sealed abstract class WhatsAppSocketClient {
          *                          when tunnelling through a TLS
          *                          proxy
          */
-        Tcp(WhatsAppStore store, WhatsAppSslContextFactory sslContextFactory) {
+        Tcp(LinkedWhatsAppStore store, WhatsAppSslContextFactory sslContextFactory) {
             super(store, sslContextFactory);
         }
 
@@ -1311,7 +1311,7 @@ public sealed abstract class WhatsAppSocketClient {
          * @param sslContextFactory the SSL configuration for the
          *                          WebSocket TLS hop
          */
-        WebSocket(WhatsAppStore store, WhatsAppSslContextFactory sslContextFactory) {
+        WebSocket(LinkedWhatsAppStore store, WhatsAppSslContextFactory sslContextFactory) {
             super(store, sslContextFactory);
         }
 

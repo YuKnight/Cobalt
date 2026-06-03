@@ -8,9 +8,9 @@ export interface DebugScriptInfo {
   hash: string | null;
   executionContextId: number | null;
   length: number | null;
-  /** "WebAssembly" for wasm scripts, "JavaScript"/undefined for JS. */
+
   scriptLanguage: string | null;
-  /** For wasm scripts, the module-relative byte offset of the code section. */
+
   codeOffset: number | null;
 }
 
@@ -65,7 +65,7 @@ export interface DebuggerScriptParsedEvent {
 export interface WasmMemoryReadResult {
   addr: number;
   len: number;
-  /** Base64 of the linear-memory slice, or {@code null} if the read failed. */
+
   base64: string | null;
   error?: string;
 }
@@ -91,14 +91,14 @@ export interface DebuggerSetBreakpointByUrlResponse {
 export type DebugCommand = "pause" | "resume" | "step_over" | "step_into" | "step_out";
 
 export interface PausedCallFrame {
-  /** CDP call-frame id, required for evaluateOnCallFrame / wasm memory reads. */
+
   callFrameId: string;
   functionName: string;
   scriptId: string;
   url: string;
   lineNumber: number;
   columnNumber: number;
-  /** "WebAssembly" when this frame is a wasm frame, else undefined. */
+
   scriptLanguage?: string;
   scopeChain: Array<{
     type: string;

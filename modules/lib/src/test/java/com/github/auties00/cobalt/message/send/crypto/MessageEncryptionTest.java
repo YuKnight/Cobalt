@@ -4,7 +4,7 @@ import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.TestSignalSession;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
@@ -168,7 +168,7 @@ class MessageEncryptionTest {
                 "PKMSG is not a sender-key message");
     }
 
-    private static MessageEncryption encryption(WhatsAppStore store) {
+    private static MessageEncryption encryption(LinkedWhatsAppStore store) {
         return new MessageEncryption(store, new SignalSessionCipher(store.signalStore()), new SignalGroupCipher(store.signalStore()), new SignalCryptoLocks());
     }
 

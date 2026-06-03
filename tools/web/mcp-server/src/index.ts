@@ -125,7 +125,6 @@ async function mainHttp(): Promise<void> {
     const httpServer = createServer(async (req, res) => {
         const url = new URL(req.url ?? "/", `http://localhost:${port}`);
 
-        // CORS headers for local dev
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
@@ -137,14 +136,12 @@ async function mainHttp(): Promise<void> {
             return;
         }
 
-        // Health endpoint — used by orchestrator to check readiness
         if (url.pathname === "/health") {
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ready: bootstrapDone, version: "3.0.0" }));
             return;
         }
 
-        // MCP endpoint — stateless: new server + transport per request
         if (url.pathname === "/mcp") {
             if (req.method === "POST") {
                 try {
@@ -166,7 +163,6 @@ async function mainHttp(): Promise<void> {
                 return;
             }
 
-            // GET and DELETE are not needed in stateless mode
             res.writeHead(405, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: "Method not allowed (stateless mode)" }));
             return;

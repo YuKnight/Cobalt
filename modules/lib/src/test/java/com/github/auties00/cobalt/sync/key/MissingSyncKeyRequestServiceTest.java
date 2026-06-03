@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKeyBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncdCoordinator;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import org.junit.jupiter.api.AfterEach;
@@ -44,7 +44,7 @@ class MissingSyncKeyRequestServiceTest {
     private static final Jid SELF_PN_DEVICE_1 = Jid.of("19250000001:1@s.whatsapp.net");
 
     private TestWhatsAppClient client;
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestABPropsService props;
     private MissingSyncKeyRequestService requestService;
     private MissingSyncKeyTimeoutScheduler timeoutScheduler;

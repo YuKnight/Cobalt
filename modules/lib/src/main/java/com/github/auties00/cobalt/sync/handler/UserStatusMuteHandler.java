@@ -28,7 +28,7 @@ import java.util.List;
  * writes the new value to the matching
  * {@link com.github.auties00.cobalt.model.contact.Contact#setStatusMuted(boolean)} record or to
  * {@link GroupMetadata#statusMuted()} on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore}. Mutations referencing an unknown contact
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore}. Mutations referencing an unknown contact
  * or group are reported as {@link MutationApplicationResult#orphan(String, String)} so a later
  * contact or group-metadata sync can retry them.
  */

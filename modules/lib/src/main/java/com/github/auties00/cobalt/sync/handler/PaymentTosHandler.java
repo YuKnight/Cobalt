@@ -33,7 +33,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * @implNote
  * This implementation collapses WA Web's
  * {@code WAWebUserPrefsPaymentTos.setPaymentTos} call into a single
- * {@code WhatsAppStore.setPaymentTos} write; the per-batch {@code WARN}
+ * {@code LinkedWhatsAppStore.setPaymentTos} write; the per-batch {@code WARN}
  * counters are dropped.
  */
 @WhatsAppWebModule(moduleName = "WAWebPaymentTosSync")
@@ -95,7 +95,7 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#unsupported()}; a missing payload
      * surfaces as {@link SyncdIndexUtils#malformedActionValue(String)}. On
      * success the resolved action is written via
-     * {@code WhatsAppStore.setPaymentTos}.
+     * {@code LinkedWhatsAppStore.setPaymentTos}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)

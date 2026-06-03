@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * per-provider music account identifiers.
  *
  * <p>This handler persists the user's resolved music identifiers on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} so per-provider music
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} so per-provider music
  * accounts are visible across linked devices. Only {@link SyncdOperation#SET}
  * is accepted; non-{@code SET} operations and payloads where both
  * {@link MusicUserIdAction#musicUserId()} and

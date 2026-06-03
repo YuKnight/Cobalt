@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
 import com.github.auties00.cobalt.model.business.*;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
@@ -58,7 +58,7 @@ import java.util.*;
  * ephemeral keypair and a hardcoded server registration key, then
  * Base64-URL encoded and wrapped in an {@code ENC=...} form field.
  *
- * <p>An instance is obtained through {@link #newRegistration(WhatsAppStore,
+ * <p>An instance is obtained through {@link #newRegistration(LinkedWhatsAppStore,
  * WhatsAppClientVerificationHandler.Mobile, WhatsAppClientDeviceAttestor,
  * WhatsAppClientDevicePushClient)}, which selects
  * {@link AndroidClientRegistration} or {@link IosClientRegistration}
@@ -130,7 +130,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * {@link com.github.auties00.cobalt.store.AccountStore#setRegistered} and
      * {@link com.github.auties00.cobalt.store.AccountStore#setJid}.
      */
-    protected final WhatsAppStore store;
+    protected final LinkedWhatsAppStore store;
 
     /**
      * Callback the registration consults to pick the verification
@@ -221,7 +221,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      * handler.
      *
      * <p>Invoked only from the concrete subclasses, which are
-     * themselves created by {@link #newRegistration(WhatsAppStore,
+     * themselves created by {@link #newRegistration(LinkedWhatsAppStore,
      * WhatsAppClientVerificationHandler.Mobile,
      * WhatsAppClientDeviceAttestor, WhatsAppClientDevicePushClient)}. Both
      * arguments are validated as non-{@code null} and the shared
@@ -234,7 +234,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *                     {@code null}
      * @throws NullPointerException if either argument is {@code null}
      */
-    protected MobileClientRegistration(WhatsAppStore store, WhatsAppClientVerificationHandler.Mobile verification) {
+    protected MobileClientRegistration(LinkedWhatsAppStore store, WhatsAppClientVerificationHandler.Mobile verification) {
         Objects.requireNonNull(store, "store cannot be null");
         Objects.requireNonNull(verification, "verification cannot be null");
         this.store = store;
@@ -284,7 +284,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *                                  match that platform
      */
     public static MobileClientRegistration newRegistration(
-            WhatsAppStore store,
+            LinkedWhatsAppStore store,
             WhatsAppClientVerificationHandler.Mobile verification,
             WhatsAppClientDeviceAttestor attestor,
             WhatsAppClientDevicePushClient pushClient) {
@@ -1252,7 +1252,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *                                       number or it cannot be
      *                                       parsed
      */
-    protected static PhoneNumber getPhoneNumber(WhatsAppStore store) {
+    protected static PhoneNumber getPhoneNumber(LinkedWhatsAppStore store) {
         var phoneNumber = store.accountStore().phoneNumber()
                 .orElseThrow(() -> new WhatsAppRegistrationException("Phone number wasn't set"));
         try {

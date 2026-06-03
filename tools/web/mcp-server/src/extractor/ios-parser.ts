@@ -31,14 +31,12 @@ export function parseGhidraOutput(output: GhidraOutput): ParsedModule[] {
     }
   }
 
-  // Try to extract superclass info from decompiled code
   for (const cls of classMap.values()) {
     cls.superClass = inferSuperClass(cls);
   }
 
   const modules: ParsedModule[] = [];
 
-  // Each ObjC class becomes a module
   for (const cls of classMap.values()) {
     const exports = cls.methods.map((m) => {
       const match = OBJC_METHOD_RE.exec(m.name);
@@ -56,7 +54,6 @@ export function parseGhidraOutput(output: GhidraOutput): ParsedModule[] {
     });
   }
 
-  // Group remaining C functions by module/file if possible
   if (standaloneFunctions.length > 0) {
     const grouped = groupStandaloneFunctions(standaloneFunctions);
     for (const [groupName, funcs] of grouped) {
@@ -78,9 +75,9 @@ export function parseGhidraOutput(output: GhidraOutput): ParsedModule[] {
 }
 
 function inferSuperClass(cls: ObjCClass): string | null {
-  // Look for patterns like "objc_msgSendSuper" calls or class_getSuperclass
+
   for (const method of cls.methods) {
-    // Ghidra decompiler output often includes super class references
+
     const superMatch = method.code.match(
       /\b(\w+)_super\b|objc_msgSendSuper.*?&OBJC_CLASS_\$_(\w+)/
     );
@@ -98,8 +95,7 @@ function inferDependencies(
   const deps = new Set<string>();
 
   for (const method of cls.methods) {
-    // Find references to other known classes in the decompiled code
-    // Pattern: OBJC_CLASS_$_ClassName or [ClassName method]
+
     const classRefPattern = /OBJC_CLASS_\$_(\w+)/g;
     let match: RegExpExecArray | null;
     while ((match = classRefPattern.exec(method.code))) {
@@ -109,7 +105,6 @@ function inferDependencies(
       }
     }
 
-    // Pattern: [ClassName alloc] or [ClassName new] etc.
     const msgSendPattern = /\[(\w+)\s+\w+/g;
     while ((match = msgSendPattern.exec(method.code))) {
       const refClass = match[1];
@@ -123,7 +118,6 @@ function inferDependencies(
       }
     }
 
-    // Pattern: type references in signatures (ClassName *)
     const typeRefPattern = /(\w+)\s*\*/g;
     while ((match = typeRefPattern.exec(method.signature))) {
       const refClass = match[1];
@@ -148,12 +142,10 @@ function inferDependencies(
 function generateClassSource(cls: ObjCClass): string {
   const lines: string[] = [];
 
-  // Header
   const superPart = cls.superClass ? ` : ${cls.superClass}` : "";
   lines.push(`@interface ${cls.name}${superPart}`);
   lines.push("");
 
-  // Method declarations
   const instanceMethods = cls.methods.filter((m) => m.name.startsWith("-["));
   const classMethods = cls.methods.filter((m) => m.name.startsWith("+["));
 
@@ -180,7 +172,6 @@ function generateClassSource(cls: ObjCClass): string {
   lines.push("// === Decompiled Implementation ===");
   lines.push("");
 
-  // Full decompiled code for each method
   for (const m of [...classMethods, ...instanceMethods]) {
     lines.push(`// ${m.name}`);
     lines.push(`// Address: ${m.address} | Size: ${m.size} bytes`);
@@ -192,7 +183,7 @@ function generateClassSource(cls: ObjCClass): string {
 }
 
 function extractReturnType(signature: string): string {
-  // Ghidra signatures look like: "void -[Class method:](id self, SEL sel, ...)"
+
   const match = signature.match(/^(\S+)\s/);
   if (match) {
     const type = match[1];
@@ -210,10 +201,9 @@ function groupStandaloneFunctions(
   const groups = new Map<string, GhidraDecompiledFunction[]>();
 
   for (const func of functions) {
-    // Group by prefix: functions starting with the same prefix likely belong together
+
     let groupName = "_CFunctions";
 
-    // Try to extract a meaningful group from the function name
     const prefixMatch = func.name.match(/^_?([A-Z][a-zA-Z]+?)_/);
     if (prefixMatch) {
       groupName = `_C_${prefixMatch[1]}`;

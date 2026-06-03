@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.SecretMessageContainerSpec;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.exception.*;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
@@ -116,7 +116,7 @@ public final class MessageDecryption {
      * Holds the central session store used for Signal-session and sender-key existence
      * checks and for resolving bot-message metadata.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Holds the Signal session cipher used by
@@ -155,7 +155,7 @@ public final class MessageDecryption {
     @WhatsAppWebExport(moduleName = "WAWebMsgProcessingDecryptEnc", exports = "decryptEnc",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public MessageDecryption(
-            WhatsAppStore store,
+            LinkedWhatsAppStore store,
             SignalSessionCipher sessionCipher,
             SignalGroupCipher groupCipher,
             SignalCryptoLocks cryptoLocks

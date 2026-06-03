@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.call.internal.signaling;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.call.internal.CallService;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.CallEndedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallEndedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -100,7 +100,7 @@ public final class CallTerminateReceiver extends SocketStreamHandler.Concurrent 
     private void notifyEnded(String callId, Jid fromJid, String wireReason) {
         var parsed = CallEndReason.fromWireValue(wireReason);
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallEndedListener typed) {
+            if (listener instanceof LinkedCallEndedListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallEnded(whatsapp, callId, fromJid, parsed));
             }
         }

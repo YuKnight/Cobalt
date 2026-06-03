@@ -242,7 +242,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
      * @implNote
      * This implementation tracks newsletter pin state via a dedicated
      * {@code newsletterPinStates} map on
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore} keyed by the
+     * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} keyed by the
      * newsletter JID, because Cobalt's
      * {@link com.github.auties00.cobalt.model.newsletter.Newsletter} model has
      * no {@code pinnedTimestamp} field.

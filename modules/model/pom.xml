@@ -31,9 +31,6 @@
                             <version>${protoc.version}</version>
                         </annotationProcessorPath>
                     </annotationProcessorPaths>
-                    <compilerArgs>
-                        <compilerArg>--enable-preview</compilerArg>
-                    </compilerArgs>
                 </configuration>
             </plugin>
         </plugins>

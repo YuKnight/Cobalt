@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.stream.control;
 
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.TosNoticesChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedTosNoticesChangedListener;
 import com.github.auties00.cobalt.client.WhatsAppClientOfflineResumeState;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -643,7 +643,7 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
         whatsapp.store().settingsStore().setTosNotices(notices);
         var snapshot = Set.copyOf(notices);
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof TosNoticesChangedListener typed) {
+            if (listener instanceof LinkedTosNoticesChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onTosNoticesChanged(whatsapp, snapshot));
             }
         }

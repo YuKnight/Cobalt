@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyI
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyIdBuilder;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -460,7 +460,7 @@ public final class SyncFixtures {
      * @param syncKeyData the 32-byte symmetric key material
      * @return the configured temporary store with the key planted
      */
-    public static WhatsAppStore temporaryStoreWithSyncKey(Jid selfPn, Jid selfLid, byte[] syncKeyId, byte[] syncKeyData) {
+    public static LinkedWhatsAppStore temporaryStoreWithSyncKey(Jid selfPn, Jid selfLid, byte[] syncKeyId, byte[] syncKeyData) {
         Objects.requireNonNull(syncKeyId, "syncKeyId");
         Objects.requireNonNull(syncKeyData, "syncKeyData");
         var store = DeviceFixtures.temporaryStore(selfPn, selfLid);

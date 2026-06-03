@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.model.sync.action.contact.LabelAssociationActi
 import com.github.auties00.cobalt.model.sync.action.contact.LabelAssociationActionBuilder;
 import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.LabelAssociationMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +48,7 @@ class LabelAssociationHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
     private static final Jid CHAT_JID = Jid.of("11110000@s.whatsapp.net");
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient client;
     private LabelAssociationHandler handler;
     private LabelAssociationMutationFactory factory;

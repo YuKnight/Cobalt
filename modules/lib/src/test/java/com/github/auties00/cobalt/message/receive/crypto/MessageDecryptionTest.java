@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.message.TestSignalSession;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
@@ -111,12 +111,12 @@ class MessageDecryptionTest {
     }
 
     // Sender side: session and group ciphers share the supplied store so both ends keep the same protocol state.
-    private static MessageEncryption encryption(WhatsAppStore store) {
+    private static MessageEncryption encryption(LinkedWhatsAppStore store) {
         return new MessageEncryption(store, new SignalSessionCipher(store.signalStore()), new SignalGroupCipher(store.signalStore()), new SignalCryptoLocks());
     }
 
     // Recipient side: session and group ciphers share the supplied store so both ends keep the same protocol state.
-    private static MessageDecryption decryption(WhatsAppStore store) {
+    private static MessageDecryption decryption(LinkedWhatsAppStore store) {
         return new MessageDecryption(store, new SignalSessionCipher(store.signalStore()), new SignalGroupCipher(store.signalStore()), new SignalCryptoLocks());
     }
 }

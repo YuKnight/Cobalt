@@ -24,7 +24,7 @@ import java.util.logging.Logger;
  *
  * <p>The sync dispatcher routes incoming mutations here whenever a
  * Business-account subscription state changes. The handler rewrites the
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} business feature flag
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} business feature flag
  * and subscription tables in full ("rewrite" semantics) so the next read sees
  * only the new snapshot.
  */
@@ -92,7 +92,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
      * {@inheritDoc}
      *
      * <p>On {@link SyncdOperation#SET} the decoded {@link SubscriptionsSyncV2Action}
-     * clears and refills the two {@link com.github.auties00.cobalt.store.WhatsAppStore}
+     * clears and refills the two {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore}
      * maps that back business feature flags and subscriptions; a value that does
      * not decode is reported as malformed. {@link SyncdOperation#REMOVE} returns
      * {@link MutationApplicationResult#success()} without mutating state; any other

@@ -36,7 +36,7 @@ import java.util.logging.Logger;
  *
  * @implNote
  * This implementation persists the contact directly through
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} and stores the
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} and stores the
  * username on the contact record so a later remove can recognise it as a
  * username-added contact. After a successful set, any orphan
  * {@link UserStatusMuteAction} mutations keyed by the same LID JID are replayed

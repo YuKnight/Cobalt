@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.store;
 
-import com.github.auties00.cobalt.client.listener.WhatsAppListener;
+import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.client.WhatsAppClientOfflineResumeState;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.client.WhatsAppProxy;
@@ -39,7 +39,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The in-memory backbone shared by every {@link WhatsAppStore} persistence strategy.
+ * The in-memory backbone shared by every {@link LinkedWhatsAppStore} persistence strategy.
  *
  * <p>This abstract aggregate composes the seven domain sub-stores ({@link SignalStore},
  * {@link AccountStore}, {@link ContactStore}, {@link ChatStore}, {@link SyncStore},
@@ -60,7 +60,7 @@ import java.util.concurrent.TimeUnit;
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @ProtobufMessage
-public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
+public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
     /**
      * The time-to-live for a cached device-list entry before it is considered stale.
      *
@@ -333,7 +333,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setProxy(WhatsAppProxy proxy) {
+    public LinkedWhatsAppStore setProxy(WhatsAppProxy proxy) {
         this.proxy = proxy;
         return this;
     }
@@ -344,7 +344,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setOfflineResumeState(WhatsAppClientOfflineResumeState state) {
+    public LinkedWhatsAppStore setOfflineResumeState(WhatsAppClientOfflineResumeState state) {
         this.offlineResumeState = Objects.requireNonNull(state, "state cannot be null");
         if (state == WhatsAppClientOfflineResumeState.COMPLETE) {
             offlineDeliveryLatch.countDown();
@@ -378,7 +378,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setRoutingInfo(byte[] routingInfo) {
+    public LinkedWhatsAppStore setRoutingInfo(byte[] routingInfo) {
         this.routingInfo = routingInfo;
         return this;
     }
@@ -389,7 +389,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setRoutingDomain(String routingDomain) {
+    public LinkedWhatsAppStore setRoutingDomain(String routingDomain) {
         this.routingDomain = routingDomain;
         return this;
     }
@@ -400,7 +400,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setClientExpiration(Instant clientExpiration) {
+    public LinkedWhatsAppStore setClientExpiration(Instant clientExpiration) {
         this.clientExpiration = clientExpiration;
         return this;
     }
@@ -438,7 +438,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setLinkedDevices(Collection<Jid> linkedDevices) {
+    public LinkedWhatsAppStore setLinkedDevices(Collection<Jid> linkedDevices) {
         this.linkedDevices = linkedDevices == null ? null : List.copyOf(linkedDevices);
         return this;
     }
@@ -449,7 +449,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setPairingTimestamp(Instant pairingTimestamp) {
+    public LinkedWhatsAppStore setPairingTimestamp(Instant pairingTimestamp) {
         this.pairingTimestamp = pairingTimestamp;
         return this;
     }
@@ -460,7 +460,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setHasAvatar(Boolean hasAvatar) {
+    public LinkedWhatsAppStore setHasAvatar(Boolean hasAvatar) {
         this.hasAvatar = hasAvatar;
         return this;
     }
@@ -471,7 +471,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setNotificationContentTokenSalt(byte[] salt) {
+    public LinkedWhatsAppStore setNotificationContentTokenSalt(byte[] salt) {
         this.notificationContentTokenSalt = salt;
         return this;
     }
@@ -482,7 +482,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setCompanionMmsAuthNonce(String nonce) {
+    public LinkedWhatsAppStore setCompanionMmsAuthNonce(String nonce) {
         this.companionMmsAuthNonce = nonce;
         return this;
     }
@@ -493,7 +493,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setShareableChatLinkKey(byte[] key) {
+    public LinkedWhatsAppStore setShareableChatLinkKey(byte[] key) {
         this.shareableChatLinkKey = key;
         return this;
     }
@@ -504,7 +504,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore setUsernameChatStartMode(UsernameChatStartModeAction.ChatStartMode mode) {
+    public LinkedWhatsAppStore setUsernameChatStartMode(UsernameChatStartModeAction.ChatStartMode mode) {
         this.usernameChatStartMode = mode;
         return this;
     }
@@ -517,7 +517,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore putWamSequenceNumber(WamChannel channel, int sequenceNumber) {
+    public LinkedWhatsAppStore putWamSequenceNumber(WamChannel channel, int sequenceNumber) {
         Objects.requireNonNull(channel, "channel cannot be null");
         wamSequenceNumbersMap.put(channel.id(), sequenceNumber);
         return this;
@@ -588,7 +588,7 @@ public abstract class ProtobufWhatsAppStore implements WhatsAppStore {
     }
 
     @Override
-    public WhatsAppStore clearWamPendingBuffers() throws IOException {
+    public LinkedWhatsAppStore clearWamPendingBuffers() throws IOException {
         if (directory == null) {
             return this;
         }

@@ -5,7 +5,7 @@ import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageStatus;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -148,7 +148,7 @@ class MessagePreparerTest {
         assertThrows(NullPointerException.class, () -> new MessagePreparer(null));
     }
 
-    private static WhatsAppStore store() {
+    private static LinkedWhatsAppStore store() {
         return MessageFixtures.temporaryStore(SELF_PN, SELF_LID);
     }
 }

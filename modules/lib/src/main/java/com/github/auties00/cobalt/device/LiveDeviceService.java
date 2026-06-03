@@ -3,9 +3,9 @@ package com.github.auties00.cobalt.device;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.AccountTypeChangedListener;
-import com.github.auties00.cobalt.client.listener.DeviceIdentityChangedListener;
-import com.github.auties00.cobalt.client.listener.NewMessageListener;
+import com.github.auties00.cobalt.listener.linked.LinkedAccountTypeChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedDeviceIdentityChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedNewMessageListener;
 import com.github.auties00.cobalt.device.adv.DeviceADVChecker;
 import com.github.auties00.cobalt.device.adv.DeviceADVValidator;
 import com.github.auties00.cobalt.device.adv.ValidatedKeyIndexListResult;
@@ -18,6 +18,7 @@ import com.github.auties00.cobalt.device.icdc.IcdcResult;
 import com.github.auties00.cobalt.device.key.DevicePreKeyHandler;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncQueryBuilder;
 import com.github.auties00.cobalt.device.stanza.DeviceUSyncResponseParser;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.node.usync.UsyncContext;
 import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
 import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
@@ -42,7 +43,7 @@ import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.CoexPrivacySysMsgEventBuilder;
@@ -70,7 +71,7 @@ import java.util.stream.Stream;
  * {@code WAWebAdvHandlerApi}, {@code WAWebHandleAdvOmittedResultApi},
  * {@code WAWebHandleAdvDeviceNotificationApi}, {@code WAWebIcdcHandlerApi},
  * {@code WAWebApiDeviceList}) into a single service. It owns the per-user device-list cache via
- * {@link WhatsAppStore}, deduplicates concurrent USync IQs, runs the daily ADV expiration check
+ * {@link LinkedWhatsAppStore}, deduplicates concurrent USync IQs, runs the daily ADV expiration check
  * via {@link DeviceADVChecker}, computes per-message fanout via {@link DeviceFanoutCalculator},
  * attaches ICDC metadata via {@link IcdcComputer}, validates ADV signatures via
  * {@link DeviceADVValidator}, and inserts the business-coexistence system messages that mark
@@ -127,12 +128,12 @@ public final class LiveDeviceService implements DeviceService {
     private final WebAppStateService webAppStateService;
 
     /**
-     * The {@link WhatsAppStore} that persists device lists, ADV records, and Signal state.
+     * The {@link LinkedWhatsAppStore} that persists device lists, ADV records, and Signal state.
      *
      * <p>This backs WA Web's {@code WAWebApiDeviceList} table plus the Signal session and identity
      * tables; every read and write the service performs goes through this collaborator.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * The per-JID in-flight USync fetch futures keyed by user JID.
@@ -260,7 +261,7 @@ public final class LiveDeviceService implements DeviceService {
      * This implementation owns the lifecycle of every helper it instantiates
      * ({@link DevicePreKeyHandler}, {@link DeviceADVValidator}, {@link DeviceFanoutCalculator},
      * {@link IcdcComputer}, {@link DevicePhashCalculator}, {@link DeviceUSyncResponseParser},
-     * {@link DeviceADVChecker}) so they share the same {@link WhatsAppStore} and
+     * {@link DeviceADVChecker}) so they share the same {@link LinkedWhatsAppStore} and
      * {@link ABPropsService} instances and therefore a single coherent view of device state.
      *
      * @param client             the {@link LinkedWhatsAppClient} providing store and socket access
@@ -838,7 +839,7 @@ public final class LiveDeviceService implements DeviceService {
                                 }
 
                                 for (var listener : client.store().listeners()) {
-                                    if (listener instanceof DeviceIdentityChangedListener typed) {
+                                    if (listener instanceof LinkedDeviceIdentityChangedListener typed) {
                                         Thread.startVirtualThread(() ->
                                                 typed.onDeviceIdentityChanged(client, trackedList.userJid(), changes.identityChangedDevices())
                                         );
@@ -1217,7 +1218,7 @@ public final class LiveDeviceService implements DeviceService {
      * {@code advAccountType} from the cached record, or when a {@link DeviceListResult.Omitted}
      * carries an implicit {@code HOSTED -> E2EE} transition. Clients listening on
      * {@link LinkedWhatsAppClient#store()} receive
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onAccountTypeChanged onAccountTypeChanged}.
+     * {@link LinkedWhatsAppClientListener#onAccountTypeChanged onAccountTypeChanged}.
      *
      * @implNote
      * This implementation rejects {@code -> HOSTED} transitions for JIDs absent from the
@@ -1256,7 +1257,7 @@ public final class LiveDeviceService implements DeviceService {
         store.contactStore().findContactByJid(userJid).ifPresent(contact -> contact.setEncryptionType(newType));
 
         for (var listener : client.store().listeners()) {
-            if (listener instanceof AccountTypeChangedListener typed) {
+            if (listener instanceof LinkedAccountTypeChangedListener typed) {
                 Thread.startVirtualThread(() ->
                         typed.onAccountTypeChanged(client, userJid, oldType, newType)
                 );
@@ -1274,7 +1275,7 @@ public final class LiveDeviceService implements DeviceService {
      * {@code HOSTED -> E2EE} (stub {@link ChatMessageInfo.StubType#E2E_ENCRYPTED_NOW}) and the
      * counterpart {@link ChatMessageInfo.StubType#CIPHERTEXT} banner for {@code E2EE -> HOSTED}.
      * Listeners on {@link LinkedWhatsAppClient#store()} receive
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onNewMessage onNewMessage}.
+     * {@link LinkedWhatsAppClientListener#onNewMessage onNewMessage}.
      *
      * @implNote
      * This implementation deduplicates the initial {@code -> HOSTED} message per second via
@@ -1324,7 +1325,7 @@ public final class LiveDeviceService implements DeviceService {
         chat.addMessage(message);
 
         for (var listener : client.store().listeners()) {
-            if (listener instanceof NewMessageListener typed) {
+            if (listener instanceof LinkedNewMessageListener typed) {
                 Thread.startVirtualThread(() -> typed.onNewMessage(client, message));
             }
         }
@@ -2122,7 +2123,7 @@ public final class LiveDeviceService implements DeviceService {
      *
      * @param chatJid the chat JID that determines addressing mode
      * @return the sender's device JID, in the matching addressing mode
-     * @throws IllegalStateException when the {@link WhatsAppStore} has no recorded
+     * @throws IllegalStateException when the {@link LinkedWhatsAppStore} has no recorded
      *                               {@link Jid#device()}
      */
     @WhatsAppWebExport(moduleName = "WAWebUserPrefsMeUser",
@@ -2556,7 +2557,7 @@ public final class LiveDeviceService implements DeviceService {
             }
 
             for (var listener : store.listeners()) {
-                if (listener instanceof DeviceIdentityChangedListener typed) {
+                if (listener instanceof LinkedDeviceIdentityChangedListener typed) {
                     Thread.startVirtualThread(() ->
                             typed.onDeviceIdentityChanged(client, userJid, changes.identityChangedDevices())
                     );
@@ -2855,7 +2856,7 @@ public final class LiveDeviceService implements DeviceService {
      * @implNote
      * This implementation routes the USync immediately when the resume-from-restart
      * sequence is finished
-     * ({@link WhatsAppStore#isResumeFromRestartComplete()}); during resume, the request
+     * ({@link LinkedWhatsAppStore#isResumeFromRestartComplete()}); during resume, the request
      * is buffered as a {@link PendingDeviceSync} so it replays alongside the rest of the
      * suspended sync queue once the socket reaches steady state, matching WA Web's
      * {@code OfflinePendingDeviceCache.addOfflinePendingDevice} path.

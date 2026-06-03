@@ -40,13 +40,22 @@ public final class RtpReceiver {
     /**
      * SSRC accepted by this receiver; a packet bearing a different SSRC is dropped, since one
      * receiver does not multiplex multiple sources.
+     *
+     * <p>The value seeds from the constructor but may be re-pointed once at the peer's real SSRC via
+     * {@link #adoptSsrc(int)}: a relayed WhatsApp peer chooses its own SSRC rather than the locally
+     * assumed one, so the receiver latches onto the first inbound stream of the expected payload type.
      */
-    private final int expectedSsrc;
+    private volatile int expectedSsrc;
 
     /**
      * Payload type accepted by this receiver; a packet bearing a different type is dropped.
+     *
+     * <p>The value seeds from the constructor but may be re-pointed once at the peer's real payload
+     * type via {@link #adoptPayloadType(int)}: WhatsApp stamps a fixed dynamic type on its media RTP
+     * that need not equal the locally assumed default, so the receiver latches onto the first inbound
+     * stream's type.
      */
-    private final int expectedPayloadType;
+    private volatile int expectedPayloadType;
 
     /**
      * Reorder and miss-detection buffer feeding {@link #drain()}.
@@ -145,6 +154,30 @@ public final class RtpReceiver {
     }
 
     /**
+     * Re-points this receiver at the given SSRC, used to latch onto the peer's actual stream when it
+     * differs from the SSRC assumed at construction.
+     *
+     * <p>A relayed WhatsApp peer picks its own audio SSRC, so the demultiplexer adopts the SSRC of
+     * the first inbound packet that bears the expected payload type rather than dropping every packet
+     * against a locally assumed value.
+     *
+     * @param ssrc the SSRC to accept from now on
+     */
+    public void adoptSsrc(int ssrc) {
+        this.expectedSsrc = ssrc;
+    }
+
+    /**
+     * Re-points this receiver at the given RTP payload type, used to latch onto the peer's actual
+     * media type when it differs from the type assumed at construction.
+     *
+     * @param payloadType the payload type to accept from now on
+     */
+    public void adoptPayloadType(int payloadType) {
+        this.expectedPayloadType = payloadType;
+    }
+
+    /**
      * Returns the payload type this receiver accepts.
      *
      * @return the accepted payload type
@@ -169,20 +202,26 @@ public final class RtpReceiver {
         byte[] rtpBytes;
         try {
             rtpBytes = srtp.unprotectRtp(srtpBytes);
-        } catch (RuntimeException _) {
+        } catch (RuntimeException e) {
+            if (DBG_RX++ < 8) System.out.println("[RX-SRTP] UNPROTECT FAILED (hbh key mismatch?): " + e.getMessage());
             return;
         }
         RtpPacket packet;
         try {
             packet = RtpPacket.decode(rtpBytes);
-        } catch (WhatsAppCallException.Rtp _) {
+        } catch (WhatsAppCallException.Rtp e) {
+            if (DBG_RX++ < 8) System.out.println("[RX-SRTP] decode failed: " + e.getMessage());
             return;
         }
         if (packet.ssrc() != expectedSsrc || packet.payloadType() != expectedPayloadType) {
             return;
         }
+        if (DBG_RX++ < 8) System.out.println("[RX-SRTP] DECRYPT OK payloadLen=" + packet.payload().length + " pt=" + packet.payloadType());
         jitter.offer(packet);
     }
+
+    // TODO: temporary inbound SRTP-decrypt diagnostics for the 1:1 audible-media investigation
+    private int DBG_RX;
 
     /**
      * Drains the jitter buffer, emitting every in-order packet and concealment trigger currently

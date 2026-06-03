@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.message;
 
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.key.SignalPreKeyPair;
 import com.github.auties00.libsignal.state.SignalPreKeyBundleBuilder;
 
 /**
- * Test helper that builds a libsignal session between two {@link WhatsAppStore} instances so
+ * Test helper that builds a libsignal session between two {@link LinkedWhatsAppStore} instances so
  * the {@link com.github.auties00.cobalt.message.send.crypto.MessageEncryption} pipeline can
  * encrypt for a recipient the sender has never talked to. It mimics the production wire flow
  * in two steps: the recipient's store advertises a prekey bundle (identity key, signed prekey,
@@ -31,7 +31,7 @@ public final class TestSignalSession {
      * @param store the store to seed
      * @return the existing or newly added prekey
      */
-    public static SignalPreKeyPair seedOneTimePreKey(WhatsAppStore store) {
+    public static SignalPreKeyPair seedOneTimePreKey(LinkedWhatsAppStore store) {
         var existing = store.signalStore().preKeys();
         if (!existing.isEmpty()) {
             return existing.iterator().next();
@@ -52,7 +52,7 @@ public final class TestSignalSession {
      * @param recipientJid   the recipient device JID
      * @param recipientStore the recipient's protocol store
      */
-    public static void establishSession(WhatsAppStore senderStore, Jid recipientJid, WhatsAppStore recipientStore) {
+    public static void establishSession(LinkedWhatsAppStore senderStore, Jid recipientJid, LinkedWhatsAppStore recipientStore) {
         var preKey = seedOneTimePreKey(recipientStore);
         var signedKey = recipientStore.signalStore().signedKeyPair();
         var bundle = new SignalPreKeyBundleBuilder()

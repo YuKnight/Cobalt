@@ -11,7 +11,7 @@ import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.util.Arrays;
 import java.util.List;
@@ -349,7 +349,7 @@ public final class SyncdIndexUtils {
      * form (e.g. {@link StarMessageHandler} returning a populated
      * {@link MutationApplicationResult#orphan(String, String)}).
      *
-     * @param store       the {@link WhatsAppStore} consulted for the current user's JID
+     * @param store       the {@link LinkedWhatsAppStore} consulted for the current user's JID
      * @param remote      the chat JID string
      * @param id          the message id string
      * @param fromMe      the {@code fromMe} flag as {@code "0"} or {@code "1"}
@@ -357,7 +357,7 @@ public final class SyncdIndexUtils {
      * @return the resolved {@link MessageKey}, or empty when the input is invalid
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdIndexUtils", exports = "syncKeyToMsgKey", adaptation = WhatsAppAdaptation.ADAPTED)
-    static Optional<MessageKey> syncKeyToMsgKey(WhatsAppStore store, String remote, String id, String fromMe, String participant) {
+    static Optional<MessageKey> syncKeyToMsgKey(LinkedWhatsAppStore store, String remote, String id, String fromMe, String participant) {
         if (remote == null || remote.isEmpty()) {
             LOGGER.warning("syncKeyToMsgKey: invalid remote value");
             return Optional.empty();
@@ -404,17 +404,17 @@ public final class SyncdIndexUtils {
      * Extracts a {@link MessageKey} from a star-action index.
      *
      * <p>Requires the parsed array to have at least five elements and delegates to
-     * {@link #syncKeyToMsgKey(WhatsAppStore, String, String, String, String)} on
+     * {@link #syncKeyToMsgKey(LinkedWhatsAppStore, String, String, String, String)} on
      * slots {@code [1..4]}, returning empty when the input is malformed. Suits
      * callers that already hold the raw JSON-encoded star-action index and want the
      * rebuilt message key without parsing the JSON themselves.
      *
-     * @param store the {@link WhatsAppStore} consulted for the current user's JID
+     * @param store the {@link LinkedWhatsAppStore} consulted for the current user's JID
      * @param index the JSON-encoded star-action index string
      * @return the resolved {@link MessageKey}, or empty when the input is malformed
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdIndexUtils", exports = "getMsgKeyFromStarActionIndex", adaptation = WhatsAppAdaptation.ADAPTED)
-    static Optional<MessageKey> getMsgKeyFromStarActionIndex(WhatsAppStore store, String index) {
+    static Optional<MessageKey> getMsgKeyFromStarActionIndex(LinkedWhatsAppStore store, String index) {
         var parsed = JSON.parseArray(index);
         if (parsed == null || parsed.size() < 5) {
             LOGGER.warning("[sync-action] star action index malformed, cannot create MsgKey");

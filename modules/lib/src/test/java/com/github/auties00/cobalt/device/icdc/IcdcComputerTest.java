@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -69,7 +69,7 @@ class IcdcComputerTest {
                 .build();
     }
 
-    private static IcdcComputer newComputer(WhatsAppStore store, TestABPropsService props) {
+    private static IcdcComputer newComputer(LinkedWhatsAppStore store, TestABPropsService props) {
         return new IcdcComputer(store, props);
     }
 

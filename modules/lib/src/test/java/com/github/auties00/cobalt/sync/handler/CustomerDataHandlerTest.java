@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.model.sync.action.business.CustomerDataAction;
 import com.github.auties00.cobalt.model.sync.action.business.CustomerDataActionBuilder;
 import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +43,7 @@ class CustomerDataHandlerTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
     private static final String CHAT_JID = "12345@s.whatsapp.net";
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient client;
     private CustomerDataHandler handler;
 

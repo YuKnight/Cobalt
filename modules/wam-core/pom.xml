@@ -25,9 +25,6 @@
                     <target>${java.version}</target>
                     <release>${java.version}</release>
                     <proc>none</proc>
-                    <compilerArgs>
-                        <compilerArg>--enable-preview</compilerArg>
-                    </compilerArgs>
                 </configuration>
             </plugin>
         </plugins>

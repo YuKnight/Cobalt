@@ -36,7 +36,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * This implementation collapses WA Web's
  * {@code setCPIInfo} bridge chain (which diff-checks against the current value
  * and emits a change event) into a single
- * {@code WhatsAppStore.setPaymentInstructionCpi} call: there is no UI consumer
+ * {@code LinkedWhatsAppStore.setPaymentInstructionCpi} call: there is no UI consumer
  * to dispatch the change event to, and the diff check is a UI-render
  * optimisation with no behavioural side effect. The per-batch {@code WARN}
  * counters are dropped.
@@ -101,7 +101,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
      * missing CPI string surfaces as
      * {@link SyncdIndexUtils#malformedActionValue(String)}. On success the
      * resolved CPI string is written via
-     * {@code WhatsAppStore.setPaymentInstructionCpi}.
+     * {@code LinkedWhatsAppStore.setPaymentInstructionCpi}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebPaymentInfoSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)

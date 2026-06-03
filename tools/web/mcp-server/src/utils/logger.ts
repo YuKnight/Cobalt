@@ -73,7 +73,7 @@ class Logger {
     const label = LEVEL_LABELS[level];
     const prefix = this.component ? `[${this.component}]` : "";
     const message = formatArgs(args);
-    // Always write to stderr since stdout is reserved for MCP stdio transport
+
     process.stderr.write(`${ts} ${label} ${prefix} ${message}\n`);
   }
 

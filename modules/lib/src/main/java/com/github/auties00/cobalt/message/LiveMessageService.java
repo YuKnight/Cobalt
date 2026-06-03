@@ -221,6 +221,15 @@ public final class LiveMessageService implements MessageService {
             }
         }
 
+        // TEMP EXPERIMENT: force fresh Signal sessions (PKMSG) for every peer device to test whether a
+        // stale/one-sided session on the recipient's primary causes it to silently reject the call.
+        for (var deviceJid : peerDeviceJids) {
+            try {
+                store.signalStore().removeSession(deviceJid.toSignalAddress());
+            } catch (RuntimeException _) {
+            }
+        }
+
         // Ensure a Signal session exists for every peer device before per-device encryption.
         deviceService.ensureSessions(peerDeviceJids);
 
@@ -229,6 +238,11 @@ public final class LiveMessageService implements MessageService {
         for (var deviceJid : peerDeviceJids) {
             destinationPayloads.add(encryption.encryptForDevice(deviceJid, plaintext));
         }
+        System.out.println("[CALL-FANOUT] resolvedPeer=" + resolvedPeer
+                + " selfDevice=" + selfJid.device()
+                + " peerDevices=" + peerDeviceJids
+                + " encTypes=" + destinationPayloads.stream()
+                        .map(p -> p.recipientJid() + "=" + p.type() + "/" + p.ciphertext().length).toList());
 
         var deviceIdentity = store.signalStore().signedDeviceIdentity()
                 .map(ADVSignedDeviceIdentitySpec::encode)

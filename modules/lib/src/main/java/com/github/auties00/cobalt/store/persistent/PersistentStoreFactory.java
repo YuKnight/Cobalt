@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.store.ProtobufSignalStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufSyncStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufWebSessionStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufWhatsAppStore;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 import com.github.auties00.cobalt.client.WhatsAppClientSixPartsKeys;
 import com.github.auties00.cobalt.client.WhatsAppClientType;
@@ -139,7 +139,7 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * UUID stringified.
      */
     @Override
-    public Optional<WhatsAppStore> load(WhatsAppClientType clientType, UUID uuid) throws IOException {
+    public Optional<LinkedWhatsAppStore> load(WhatsAppClientType clientType, UUID uuid) throws IOException {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         Objects.requireNonNull(uuid, "uuid cannot be null");
         return loadSession(clientType, uuid.toString());
@@ -153,7 +153,7 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * phone number stringified.
      */
     @Override
-    public Optional<WhatsAppStore> load(WhatsAppClientType clientType, long phoneNumber) throws IOException {
+    public Optional<LinkedWhatsAppStore> load(WhatsAppClientType clientType, long phoneNumber) throws IOException {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         return loadSession(clientType, String.valueOf(phoneNumber));
     }
@@ -168,7 +168,7 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * result is {@link Optional#empty()}.
      */
     @Override
-    public Optional<WhatsAppStore> loadLatest(WhatsAppClientType clientType) throws IOException {
+    public Optional<LinkedWhatsAppStore> loadLatest(WhatsAppClientType clientType) throws IOException {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         var pointer = readLatestSession(clientType);
         if (pointer.isEmpty()) {
@@ -190,7 +190,7 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      *         that session
      * @throws IOException if the metadata file cannot be read or decoded
      */
-    private Optional<WhatsAppStore> loadSession(WhatsAppClientType clientType, String sessionId) throws IOException {
+    private Optional<LinkedWhatsAppStore> loadSession(WhatsAppClientType clientType, String sessionId) throws IOException {
         var storeFile = PersistentStore.storeFilePath(clientType, directory, sessionId);
         if (Files.notExists(storeFile)) {
             return Optional.empty();
@@ -244,7 +244,7 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * descriptor.
      */
     @Override
-    public WhatsAppStore create(WhatsAppClientType clientType, UUID uuid) throws IOException {
+    public LinkedWhatsAppStore create(WhatsAppClientType clientType, UUID uuid) throws IOException {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         var resolvedUuid = Objects.requireNonNullElseGet(uuid, UUID::randomUUID);
         var sessionId = resolvedUuid.toString();
@@ -273,7 +273,7 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * a fresh random UUID.
      */
     @Override
-    public WhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) throws IOException {
+    public LinkedWhatsAppStore create(WhatsAppClientType clientType, long phoneNumber) throws IOException {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         var sessionId = String.valueOf(phoneNumber);
         var store = new PersistentStore(
@@ -304,7 +304,7 @@ public final class PersistentStoreFactory implements WhatsAppStoreFactory {
      * previously exported six-parts key blob without a fresh QR pairing flow.
      */
     @Override
-    public WhatsAppStore create(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys sixPartsKeys) throws IOException {
+    public LinkedWhatsAppStore create(WhatsAppClientType clientType, WhatsAppClientSixPartsKeys sixPartsKeys) throws IOException {
         Objects.requireNonNull(clientType, "clientType cannot be null");
         Objects.requireNonNull(sixPartsKeys, "sixPartsKeys cannot be null");
         var phoneNumber = sixPartsKeys.phoneNumber();

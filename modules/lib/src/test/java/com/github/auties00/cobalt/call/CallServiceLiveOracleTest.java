@@ -1,10 +1,9 @@
 package com.github.auties00.cobalt.call;
 import com.github.auties00.cobalt.call.internal.TestLiveCallServiceFactory;
 
-import com.github.auties00.cobalt.call.CallEndReason;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;

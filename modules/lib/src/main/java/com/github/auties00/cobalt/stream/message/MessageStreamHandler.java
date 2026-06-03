@@ -6,10 +6,10 @@ import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.ack.NackReason;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.MessageReplyListener;
-import com.github.auties00.cobalt.client.listener.MessageStatusListener;
-import com.github.auties00.cobalt.client.listener.NewMessageListener;
-import com.github.auties00.cobalt.client.listener.NewStatusListener;
+import com.github.auties00.cobalt.listener.linked.LinkedMessageReplyListener;
+import com.github.auties00.cobalt.listener.linked.LinkedMessageStatusListener;
+import com.github.auties00.cobalt.listener.linked.LinkedNewMessageListener;
+import com.github.auties00.cobalt.listener.linked.LinkedNewStatusListener;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.media.MediaConnectionService;
@@ -1658,14 +1658,14 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
     private void notifyMessageReceived(MessageInfo info, Optional<? extends MessageInfo> quotedMessage) {
         var statusMessage = isStatusMessage(info);
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof NewMessageListener typed) {
+            if (listener instanceof LinkedNewMessageListener typed) {
                 Thread.startVirtualThread(() -> typed.onNewMessage(whatsapp, info));
             }
             if (statusMessage && info instanceof ChatMessageInfo chatMessageInfo
-                    && listener instanceof NewStatusListener typed) {
+                    && listener instanceof LinkedNewStatusListener typed) {
                 Thread.startVirtualThread(() -> typed.onNewStatus(whatsapp, chatMessageInfo));
             }
-            if (quotedMessage.isPresent() && listener instanceof MessageReplyListener typed) {
+            if (quotedMessage.isPresent() && listener instanceof LinkedMessageReplyListener typed) {
                 var quoted = quotedMessage.get();
                 Thread.startVirtualThread(() -> typed.onMessageReply(whatsapp, info, quoted));
             }
@@ -1800,7 +1800,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
 
         chatMessageInfo.setPaymentInfo(paymentInfo);
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof MessageStatusListener typed) {
+            if (listener instanceof LinkedMessageStatusListener typed) {
                 Thread.startVirtualThread(() -> typed.onMessageStatus(whatsapp, chatMessageInfo));
             }
         }

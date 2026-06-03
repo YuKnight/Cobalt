@@ -96,7 +96,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
      *       {@link MutationApplicationResult#malformed()} via
      *       {@link SyncdIndexUtils#malformedActionIndex(String, String)};</li>
      *   <li>the resolved {@code byte[]} salt is written via
-     *       {@link com.github.auties00.cobalt.store.WhatsAppStore#setNotificationContentTokenSalt(byte[])}.</li>
+     *       {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore#setNotificationContentTokenSalt(byte[])}.</li>
      * </ul>
      *
      * @implNote

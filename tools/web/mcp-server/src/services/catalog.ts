@@ -462,8 +462,6 @@ export class SnapshotCatalog {
     return this.crossModuleEdgesByCaller.get(moduleName) ?? [];
   }
 
-  // Literal cross-references ---
-
   searchLiterals(
     pattern: string,
     mode: "regex" | "literal",
@@ -494,8 +492,6 @@ export class SnapshotCatalog {
     return results;
   }
 
-  // Native modules ---
-
   listNativeModules(): NativeModuleMetadataResponse[] {
     return [...this.nativeModuleMap.values()].map((native) => ({
       snapshotId: this.snapshotId,
@@ -522,9 +518,6 @@ export class SnapshotCatalog {
     }
     const analysis = await this.loadNativeAnalysisByPath(record.analysisPath);
 
-    // Backfill the element/data descriptors for analyses produced before those
-    // sections were parsed, so old snapshots need no re-extraction. Fresh
-    // extractions already carry them and skip this path.
     if ((!analysis.elements || !analysis.dataSegments) && this.loadNativeBinaryByPath) {
       try {
         const binary = await this.loadNativeBinaryByPath(record.filePath);
@@ -540,11 +533,6 @@ export class SnapshotCatalog {
     return analysis;
   }
 
-  /**
-   * Returns the derived reverse-engineering index for a native module, built
-   * lazily from the raw binary and memoized by content hash. Concurrent callers
-   * share one in-flight build (the cache stores the promise, not the result).
-   */
   async getWasmIndex(name: string): Promise<WasmIndex> {
     const record = this.getNativeModuleRecord(name);
     if (!this.loadNativeBinaryByPath) {
@@ -639,15 +627,6 @@ export class SnapshotCatalog {
     };
   }
 
-  // Native reverse-engineering queries (the WASM analogue of find_references /
-  // search_code / trace_dependencies, plus C++ vtable recovery) ---
-
-  /**
-   * Finds the functions in a native module that reference a target. A numeric
-   * target (decimal or {@code 0x...}) is treated as a linear-memory address and
-   * resolved to the data string containing it; otherwise the target is matched
-   * as a substring of extracted data strings.
-   */
   async findNativeReferences(
     name: string,
     target: string,
@@ -674,7 +653,6 @@ export class SnapshotCatalog {
     return out;
   }
 
-  /** Searches a native module's extracted data strings by regex or literal. */
   async searchNativeData(
     name: string,
     pattern: string,
@@ -693,7 +671,6 @@ export class SnapshotCatalog {
     }));
   }
 
-  /** Finds functions whose body contains a given {@code i32.const} value. */
   async findNativeConst(name: string, value: number, maxResults: number): Promise<NativeReferenceResult[]> {
     const idx = await this.getWasmIndex(name);
     return idx
@@ -702,7 +679,6 @@ export class SnapshotCatalog {
       .map((fn) => ({ funcIndex: fn, name: idx.nameOf(fn) }));
   }
 
-  /** BFS over a native module's function call graph from a starting function. */
   async traceNativeCallGraph(
     name: string,
     funcIndex: number,
@@ -738,14 +714,6 @@ export class SnapshotCatalog {
     return out;
   }
 
-  /**
-   * Recovers C++ vtables for a given Itanium typeinfo name (mangled, e.g.
-   * {@code N8facebook3rtc...E}, or a substring). Walks the data image:
-   * {@code _ZTS} name string -> enclosing {@code _ZTI} object -> the vtable slot
-   * that points at it -> the address point -> consecutive table-index slots
-   * mapped to function indices. Reports failure modes (missing RTTI, passive
-   * segments, unusual layouts) in {@code notes} rather than throwing.
-   */
   async recoverNativeVtables(name: string, typeName: string, maxResults: number): Promise<NativeVtable[]> {
     const idx = await this.getWasmIndex(name);
     const out: NativeVtable[] = [];
@@ -776,18 +744,16 @@ export class SnapshotCatalog {
       let addressPoint: number | null = null;
       const slots: NativeVtableSlot[] = [];
 
-      // The _ZTI typeinfo object holds a pointer to the _ZTS name string as its
-      // second word, so the object begins one pointer earlier.
       for (const namePtr of idx.findWordsEqualTo(ztsAddr)) {
         const ztiCandidate = namePtr - 4;
         const typeinfoSlots = idx.findWordsEqualTo(ztiCandidate);
         if (typeinfoSlots.length === 0) continue;
         ztiAddr = ztiCandidate;
         for (const tiSlot of typeinfoSlots) {
-          const ap = tiSlot + 4; // address point: first virtual function slot
+          const ap = tiSlot + 4;
           const fns = readVtableSlots(idx, ap);
           if (fns.length === 0) continue;
-          vtableAddr = tiSlot - 4; // offset-to-top precedes the typeinfo slot
+          vtableAddr = tiSlot - 4;
           addressPoint = ap;
           for (let k = 0; k < fns.length; k++) {
             slots.push({ slot: k, funcIndex: fns[k], name: idx.nameOf(fns[k]) });
@@ -808,7 +774,6 @@ export class SnapshotCatalog {
   }
 }
 
-/** Parses a decimal or {@code 0x}-prefixed hex address, or returns {@code null}. */
 function parseAddress(s: string): number | null {
   const t = s.trim();
   if (/^0x[0-9a-fA-F]+$/.test(t)) return Number.parseInt(t, 16);
@@ -816,9 +781,6 @@ function parseAddress(s: string): number | null {
   return null;
 }
 
-/** Reads consecutive vtable slots from the address point, mapping each table
- * index to a function index; stops at the first slot that is not a valid
- * function-table entry (the vtable boundary). */
 function readVtableSlots(idx: WasmIndex, addressPoint: number): number[] {
   const out: number[] = [];
   const MAX_SLOTS = 4096;
@@ -832,8 +794,6 @@ function readVtableSlots(idx: WasmIndex, addressPoint: number): number[] {
   return out;
 }
 
-/** Minimal Itanium demangler for nested names ({@code N..E}) and length-prefixed
- * source names; returns the input unchanged when it does not match. */
 function demangleItanium(name: string): string {
   const m = /^_Z(?:TS|TI|TV)(.*)$/.exec(name);
   const body = m ? m[1] : name;

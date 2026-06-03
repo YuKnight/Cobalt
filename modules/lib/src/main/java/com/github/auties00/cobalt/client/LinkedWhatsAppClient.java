@@ -5,10 +5,11 @@ import com.github.auties00.cobalt.call.ActiveCall;
 import com.github.auties00.cobalt.call.CallEndReason;
 import com.github.auties00.cobalt.call.CallOptions;
 import com.github.auties00.cobalt.call.IncomingCall;
-import com.github.auties00.cobalt.client.listener.*;
 import com.github.auties00.cobalt.exception.*;
 import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
 import com.github.auties00.cobalt.graphql.web.WhatsAppWebGraphQlOperation;
+import com.github.auties00.cobalt.listener.WhatsAppListener;
+import com.github.auties00.cobalt.listener.linked.*;
 import com.github.auties00.cobalt.model.bot.profile.BotDirectory;
 import com.github.auties00.cobalt.model.bot.profile.BotProfile;
 import com.github.auties00.cobalt.model.business.*;
@@ -104,7 +105,7 @@ import com.github.auties00.cobalt.node.mex.MexOperation;
 import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import com.github.auties00.cobalt.node.usync.UsyncQuery;
 import com.github.auties00.cobalt.node.usync.UsyncResult;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.util.BusinessLabelConstants;
 
@@ -142,7 +143,7 @@ import java.util.function.Function;
  * notes (WA-source mappings, timing, adaptation comments) remain on the impl
  * via {@code com.github.auties00.cobalt.meta.*} annotations and {@code @implNote}.
  */
-public interface LinkedWhatsAppClient {
+public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
     /**
      * Returns the entry point for assembling a configured
      * {@link LinkedWhatsAppClient}.
@@ -162,18 +163,18 @@ public interface LinkedWhatsAppClient {
     }
 
     /**
-     * Returns the {@link WhatsAppStore} that backs this session.
+     * Returns the {@link LinkedWhatsAppStore} that backs this session.
      *
      * @apiNote
      * The store is the single source of truth for every persisted
      * entity this session knows about: chats, contacts, messages,
      * Signal keys, app-state versions, AB-prop overrides, and presence.
      * Embedders read state directly via its accessors and subscribe to
-     * live updates with {@link WhatsAppStore#addListener}.
+     * live updates with {@link LinkedWhatsAppStore#addListener}.
      *
      * @return the live store backing this client
      */
-    WhatsAppStore store();
+    LinkedWhatsAppStore store();
 
     /**
      * Brings the encrypted socket up and starts the stanza pump.
@@ -671,7 +672,7 @@ public interface LinkedWhatsAppClient {
      * or whenever the Linked Devices settings surface should redraw
      * against an authoritative copy. The primary device (slot 0)
      * appears first; companions follow in server order. The new list
-     * replaces {@link WhatsAppStore#linkedDevices()} and
+     * replaces {@link LinkedWhatsAppStore#linkedDevices()} and
      * {@link LinkedWhatsAppClientListener#onLinkedDevices} fires with the
      * new authoritative set.
      *
@@ -1720,7 +1721,7 @@ public interface LinkedWhatsAppClient {
      * @apiNote
      * Use to redraw the Channels surface against an authoritative copy
      * of the newsletters this account follows. Every followed
-     * newsletter is merged into {@link WhatsAppStore} keyed by its
+     * newsletter is merged into {@link LinkedWhatsAppStore} keyed by its
      * JID, and {@link LinkedWhatsAppClientListener#onNewsletters} fires once
      * with the new authoritative set the first time the refresh
      * succeeds for the session.
@@ -1736,7 +1737,7 @@ public interface LinkedWhatsAppClient {
      * @apiNote
      * Use to redraw the groups surface against an authoritative copy
      * of the groups this account participates in. Every group is
-     * merged into {@link WhatsAppStore} (chat record plus parsed
+     * merged into {@link LinkedWhatsAppStore} (chat record plus parsed
      * {@link GroupMetadata}), and
      * {@link LinkedWhatsAppClientListener#onGroups} fires once with the new
      * authoritative set.
@@ -3246,7 +3247,7 @@ public interface LinkedWhatsAppClient {
      * Use after the user toggles a block from another paired device,
      * or whenever the Blocked Contacts surface should redraw against
      * an authoritative copy. The blocked-contact set on
-     * {@link WhatsAppStore} is replaced with the server's view, and
+     * {@link LinkedWhatsAppStore} is replaced with the server's view, and
      * {@link LinkedWhatsAppClientListener#onContactBlocked} fires once per
      * contact whose blocked flag flipped. If WhatsApp is in the
      * middle of migrating phone numbers to LID identifiers on this
@@ -3273,7 +3274,7 @@ public interface LinkedWhatsAppClient {
      * Drives the "Block contact" action: after this returns, the
      * contact can no longer send messages or see this account's
      * presence. On success the contact is added to the
-     * {@link WhatsAppStore} block list eagerly.
+     * {@link LinkedWhatsAppStore} block list eagerly.
      *
      * @param contact the contact to block
      * @throws NullPointerException           if {@code contact} is
@@ -3289,7 +3290,7 @@ public interface LinkedWhatsAppClient {
      * @apiNote
      * Drives the "Unblock contact" action: the contact is restored to
      * the normal messaging and presence channels. On success the
-     * contact is removed from the {@link WhatsAppStore} block list
+     * contact is removed from the {@link LinkedWhatsAppStore} block list
      * eagerly.
      *
      * @param contact the contact to unblock
@@ -3609,7 +3610,7 @@ public interface LinkedWhatsAppClient {
     void unsubscribeFromPresence(JidProvider target);
 
     /**
-     * Sends a fresh message to a chat.
+     * Sends a fresh message to a chat and returns the key that identifies it.
      *
      * @apiNote
      * Primary outgoing-message entry point: prepares the raw
@@ -3620,6 +3621,7 @@ public interface LinkedWhatsAppClient {
      *
      * @param jid       the destination chat JID
      * @param container the message payload to send
+     * @return the {@link MessageKey} of the dispatched message
      * @throws NullPointerException                           if any
      *                                                        argument is
      *                                                        {@code null}
@@ -3629,7 +3631,8 @@ public interface LinkedWhatsAppClient {
      *                                                        supported
      *                                                        chat type
      */
-    void sendMessage(JidProvider jid, MessageContainer container);
+    @Override
+    MessageKey sendMessage(JidProvider jid, MessageContainer container);
 
     /**
      * Sends a pre-built {@link MessageInfo} without re-running the
@@ -4578,7 +4581,7 @@ public interface LinkedWhatsAppClient {
      * {@link PrivacySettingValue#CONTACTS_EXCEPT} (block these
      * contacts) and {@link PrivacySettingValue#CONTACTS_ONLY} (allow
      * only these contacts). Observers registered via
-     * {@link #addPrivacySettingChangedListener(PrivacySettingChangedListener)}
+     * {@link #addPrivacySettingChangedListener(LinkedPrivacySettingChangedListener)}
      * see the new state after the server acknowledges the change
      * without another round trip.
      *
@@ -7057,20 +7060,22 @@ public interface LinkedWhatsAppClient {
      *       updates or removes the group icon;
      *       {@link GroupPicture.Set Set} uploads the picture bytes,
      *       {@link GroupPicture.Clear Clear} removes it.</li>
-     *   <li>Each binary toggle (locked, announcement, and siblings)
-     *       is batched into a single property-update request.</li>
+     *   <li>Each batched toggle (the
+     *       {@link GroupMetadataEdit#editInfoPolicy() editInfoPolicy},
+     *       {@link GroupMetadataEdit#sendMessagePolicy() sendMessagePolicy},
+     *       and siblings) is batched into a single property-update
+     *       request.</li>
      *   <li>Each
-     *       {@link GroupMetadataEdit#limitSharingEnabled() limitSharing},
-     *       {@link GroupMetadataEdit#memberAddAdminOnly() memberAdd},
-     *       {@link GroupMetadataEdit#memberLinkAdminOnly() memberLink},
-     *       {@link GroupMetadataEdit#memberShareGroupHistoryAdminOnly() memberShareGroupHistory},
+     *       {@link GroupMetadataEdit#limitSharing() limitSharing},
+     *       {@link GroupMetadataEdit#memberAddPolicy() memberAddPolicy},
+     *       {@link GroupMetadataEdit#memberLinkPolicy() memberLinkPolicy},
+     *       {@link GroupMetadataEdit#memberShareGroupHistoryPolicy() memberShareGroupHistoryPolicy},
      *       and
-     *       {@link GroupMetadataEdit#allowNonAdminSubGroupCreation() allowNonAdminSubGroupCreation}
-     *       toggle is applied through its corresponding property
+     *       {@link GroupMetadataEdit#subGroupCreationPolicy() subGroupCreationPolicy}
+     *       setting is applied through its corresponding property
      *       mutation.</li>
-     *   <li>{@link GroupMetadataEdit#ephemeralExpiration() ephemeralExpiration}
-     *       present or {@link GroupMetadataEdit#notEphemeral() notEphemeral}
-     *       {@code true} is routed through
+     *   <li>{@link GroupMetadataEdit#ephemeralTimer() ephemeralTimer}
+     *       present is routed through
      *       {@link #editEphemeralTimer(JidProvider, ChatEphemeralTimer)},
      *       which applies the disappearing-message timer change and
      *       the in-memory chat-ephemerality state update.</li>
@@ -8572,8 +8577,8 @@ public interface LinkedWhatsAppClient {
      * Registers an event listener.
      *
      * <p>The argument may be any {@link WhatsAppListener} subtype: a per-event
-     * functional interface (for example {@link NewMessageListener},
-     * {@link ChatsListener}, {@link ContactPresenceListener}) or the
+     * functional interface (for example {@link LinkedNewMessageListener},
+     * {@link LinkedChatsListener}, {@link LinkedContactPresenceListener}) or the
      * aggregator {@link LinkedWhatsAppClientListener}. The dispatch layer
      * recovers the concrete event interface through {@code instanceof}
      * pattern matching, so a single-event lambda only ever receives the
@@ -8582,78 +8587,78 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addListener(WhatsAppListener listener);
+    LinkedWhatsAppClient addListener(WhatsAppLinkedListener listener);
 
     /**
      * Unregisters an event listener previously passed to
-     * {@link #addListener(WhatsAppListener)}.
+     * {@link #addListener(WhatsAppLinkedListener)}.
      *
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient removeListener(WhatsAppListener listener);
+    LinkedWhatsAppClient removeListener(WhatsAppLinkedListener listener);
 
-    LinkedWhatsAppClient addChatsListener(ChatsListener listener);
+    LinkedWhatsAppClient addChatsListener(LinkedChatsListener listener);
 
-    LinkedWhatsAppClient addContactsListener(ContactsListener listener);
+    LinkedWhatsAppClient addContactsListener(LinkedContactsListener listener);
 
-    LinkedWhatsAppClient addStatusListener(StatusListener listener);
+    LinkedWhatsAppClient addStatusListener(LinkedStatusListener listener);
 
-    LinkedWhatsAppClient addNodeSentListener(NodeSentListener listener);
+    LinkedWhatsAppClient addNodeSentListener(LinkedNodeSentListener listener);
 
-    LinkedWhatsAppClient addLoggedInListener(LoggedInListener listener);
+    LinkedWhatsAppClient addLoggedInListener(LinkedLoggedInListener listener);
 
-    LinkedWhatsAppClient addCallListener(CallListener listener);
+    LinkedWhatsAppClient addCallListener(LinkedCallListener listener);
 
-    LinkedWhatsAppClient addWebHistorySyncPastParticipantsListener(WebHistorySyncPastParticipantsListener listener);
+    LinkedWhatsAppClient addWebHistorySyncPastParticipantsListener(LinkedWebHistorySyncPastParticipantsListener listener);
 
-    LinkedWhatsAppClient addDisconnectedListener(DisconnectedListener listener);
+    LinkedWhatsAppClient addDisconnectedListener(LinkedDisconnectedListener listener);
 
-    LinkedWhatsAppClient addWebAppPrimaryFeaturesListener(WebAppPrimaryFeaturesListener listener);
+    LinkedWhatsAppClient addWebAppPrimaryFeaturesListener(LinkedWebAppPrimaryFeaturesListener listener);
 
-    LinkedWhatsAppClient addContactPresenceListener(ContactPresenceListener listener);
+    LinkedWhatsAppClient addContactPresenceListener(LinkedContactPresenceListener listener);
 
-    LinkedWhatsAppClient addNewslettersListener(NewslettersListener listener);
+    LinkedWhatsAppClient addNewslettersListener(LinkedNewslettersListener listener);
 
-    LinkedWhatsAppClient addNodeReceivedListener(NodeReceivedListener listener);
+    LinkedWhatsAppClient addNodeReceivedListener(LinkedNodeReceivedListener listener);
 
-    LinkedWhatsAppClient addWebAppStateActionListener(WebAppStateActionListener listener);
+    LinkedWhatsAppClient addWebAppStateActionListener(LinkedWebAppStateActionListener listener);
 
-    LinkedWhatsAppClient addWebHistorySyncMessagesListener(WebHistorySyncMessagesListener listener);
+    LinkedWhatsAppClient addWebHistorySyncMessagesListener(LinkedWebHistorySyncMessagesListener listener);
 
-    LinkedWhatsAppClient addNewStatusListener(NewStatusListener listener);
+    LinkedWhatsAppClient addNewStatusListener(LinkedNewStatusListener listener);
 
-    LinkedWhatsAppClient addAccountTypeChangedListener(AccountTypeChangedListener listener);
+    LinkedWhatsAppClient addAccountTypeChangedListener(LinkedAccountTypeChangedListener listener);
 
-    LinkedWhatsAppClient addAboutChangedListener(AboutChangedListener listener);
+    LinkedWhatsAppClient addAboutChangedListener(LinkedAboutChangedListener listener);
 
-    LinkedWhatsAppClient addNewMessageListener(NewMessageListener listener);
+    LinkedWhatsAppClient addNewMessageListener(LinkedNewMessageListener listener);
 
-    LinkedWhatsAppClient addMessageDeletedListener(MessageDeletedListener listener);
+    LinkedWhatsAppClient addMessageDeletedListener(LinkedMessageDeletedListener listener);
 
-    LinkedWhatsAppClient addPrivacySettingChangedListener(PrivacySettingChangedListener listener);
+    LinkedWhatsAppClient addPrivacySettingChangedListener(LinkedPrivacySettingChangedListener listener);
 
-    LinkedWhatsAppClient addWebHistorySyncProgressListener(WebHistorySyncProgressListener listener);
+    LinkedWhatsAppClient addWebHistorySyncProgressListener(LinkedWebHistorySyncProgressListener listener);
 
-    LinkedWhatsAppClient addProfilePictureChangedListener(ProfilePictureChangedListener listener);
+    LinkedWhatsAppClient addProfilePictureChangedListener(LinkedProfilePictureChangedListener listener);
 
-    LinkedWhatsAppClient addMessageStatusListener(MessageStatusListener listener);
+    LinkedWhatsAppClient addMessageStatusListener(LinkedMessageStatusListener listener);
 
-    LinkedWhatsAppClient addNameChangedListener(NameChangedListener listener);
+    LinkedWhatsAppClient addNameChangedListener(LinkedNameChangedListener listener);
 
-    LinkedWhatsAppClient addMessageReplyListener(MessageReplyListener listener);
+    LinkedWhatsAppClient addMessageReplyListener(LinkedMessageReplyListener listener);
 
-    LinkedWhatsAppClient addDeviceIdentityChangedListener(DeviceIdentityChangedListener listener);
+    LinkedWhatsAppClient addDeviceIdentityChangedListener(LinkedDeviceIdentityChangedListener listener);
 
-    LinkedWhatsAppClient addNewContactListener(NewContactListener listener);
+    LinkedWhatsAppClient addNewContactListener(LinkedNewContactListener listener);
 
-    LinkedWhatsAppClient addContactBlockedListener(ContactBlockedListener listener);
+    LinkedWhatsAppClient addContactBlockedListener(LinkedContactBlockedListener listener);
 
-    LinkedWhatsAppClient addContactTextStatusListener(ContactTextStatusListener listener);
+    LinkedWhatsAppClient addContactTextStatusListener(LinkedContactTextStatusListener listener);
 
-    LinkedWhatsAppClient addLocaleChangedListener(LocaleChangedListener listener);
+    LinkedWhatsAppClient addLocaleChangedListener(LinkedLocaleChangedListener listener);
 
-    LinkedWhatsAppClient addRegistrationCodeListener(RegistrationCodeListener listener);
+    LinkedWhatsAppClient addRegistrationCodeListener(LinkedRegistrationCodeListener listener);
 
     /**
      * Registers a per-event listener that is notified when the group list
@@ -8662,7 +8667,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addGroupsListener(GroupsListener listener);
+    LinkedWhatsAppClient addGroupsListener(LinkedGroupsListener listener);
 
     /**
      * Registers a per-event listener that is notified when the global block
@@ -8671,7 +8676,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addBlockedContactsListener(BlockedContactsListener listener);
+    LinkedWhatsAppClient addBlockedContactsListener(LinkedBlockedContactsListener listener);
 
     /**
      * Registers a per-event listener that is notified when a category
@@ -8680,7 +8685,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addContactBlacklistListener(ContactBlacklistListener listener);
+    LinkedWhatsAppClient addContactBlacklistListener(LinkedContactBlacklistListener listener);
 
     /**
      * Registers a per-event listener that is notified when the list of
@@ -8698,7 +8703,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addStatusPrivacyChangedListener(StatusPrivacyChangedListener listener);
+    LinkedWhatsAppClient addStatusPrivacyChangedListener(LinkedStatusPrivacyChangedListener listener);
 
     /**
      * Registers a per-event listener that is notified when the account's
@@ -8707,7 +8712,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addDisappearingModeChangedListener(DisappearingModeChangedListener listener);
+    LinkedWhatsAppClient addDisappearingModeChangedListener(LinkedDisappearingModeChangedListener listener);
 
     /**
      * Registers a per-event listener that is notified when the recipient
@@ -8716,7 +8721,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addOptOutListListener(OptOutListListener listener);
+    LinkedWhatsAppClient addOptOutListListener(LinkedOptOutListListener listener);
 
     /**
      * Registers a per-event listener that is notified when a call ends
@@ -8725,7 +8730,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallEndedListener(CallEndedListener listener);
+    LinkedWhatsAppClient addCallEndedListener(LinkedCallEndedListener listener);
 
     /**
      * Registers a per-event listener that is notified when a peer pre-accepts
@@ -8734,7 +8739,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallPreacceptListener(CallPreacceptListener listener);
+    LinkedWhatsAppClient addCallPreacceptListener(LinkedCallPreacceptListener listener);
 
     /**
      * Registers a per-event listener that is notified when a participant's
@@ -8743,7 +8748,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallMuteChangedListener(CallMuteChangedListener listener);
+    LinkedWhatsAppClient addCallMuteChangedListener(LinkedCallMuteChangedListener listener);
 
     /**
      * Registers a per-event listener that is notified when a participant's
@@ -8752,7 +8757,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallVideoStateChangedListener(CallVideoStateChangedListener listener);
+    LinkedWhatsAppClient addCallVideoStateChangedListener(LinkedCallVideoStateChangedListener listener);
 
     /**
      * Registers a per-event listener that is notified when a peer requests
@@ -8761,7 +8766,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallVideoUpgradeRequestListener(CallVideoUpgradeRequestListener listener);
+    LinkedWhatsAppClient addCallVideoUpgradeRequestListener(LinkedCallVideoUpgradeRequestListener listener);
 
     /**
      * Registers a per-event listener that is notified when a peer requests
@@ -8770,7 +8775,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallLinkLobbyJoinRequestListener(CallLinkLobbyJoinRequestListener listener);
+    LinkedWhatsAppClient addCallLinkLobbyJoinRequestListener(LinkedCallLinkLobbyJoinRequestListener listener);
 
     /**
      * Registers a per-event listener that is notified when the host admits
@@ -8779,7 +8784,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallLinkAdmittedListener(CallLinkAdmittedListener listener);
+    LinkedWhatsAppClient addCallLinkAdmittedListener(LinkedCallLinkAdmittedListener listener);
 
     /**
      * Registers a per-event listener that is notified when the host denies
@@ -8788,7 +8793,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallLinkDeniedListener(CallLinkDeniedListener listener);
+    LinkedWhatsAppClient addCallLinkDeniedListener(LinkedCallLinkDeniedListener listener);
 
     /**
      * Registers a per-event listener that is notified when a call
@@ -8798,7 +8803,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallInteractionListener(CallInteractionListener listener);
+    LinkedWhatsAppClient addCallInteractionListener(LinkedCallInteractionListener listener);
 
     /**
      * Registers a per-event listener that is notified when participants join
@@ -8807,7 +8812,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallParticipantsChangedListener(CallParticipantsChangedListener listener);
+    LinkedWhatsAppClient addCallParticipantsChangedListener(LinkedCallParticipantsChangedListener listener);
 
     /**
      * Registers a per-event listener that is notified when a peer transitions
@@ -8816,7 +8821,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallPeerStateChangedListener(CallPeerStateChangedListener listener);
+    LinkedWhatsAppClient addCallPeerStateChangedListener(LinkedCallPeerStateChangedListener listener);
 
     /**
      * Registers a per-event listener that is notified of the high-priority
@@ -8825,7 +8830,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addCallOfferNoticeListener(CallOfferNoticeListener listener);
+    LinkedWhatsAppClient addCallOfferNoticeListener(LinkedCallOfferNoticeListener listener);
 
     /**
      * Registers a per-event listener that is notified when the relay GraphQL
@@ -8834,7 +8839,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addWhatsAppWebGraphQlSessionChangedListener(WhatsAppWebGraphQlSessionChangedListener listener);
+    LinkedWhatsAppClient addWhatsAppWebGraphQlSessionChangedListener(LinkedWhatsAppWebGraphQlSessionChangedListener listener);
 
     /**
      * Registers a per-event listener that is notified when the comet
@@ -8843,7 +8848,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addFacebookGraphQlSessionChangedListener(FacebookGraphQlSessionChangedListener listener);
+    LinkedWhatsAppClient addFacebookGraphQlSessionChangedListener(LinkedFacebookGraphQlSessionChangedListener listener);
 
     /**
      * Registers a per-event listener that is notified when the business
@@ -8852,7 +8857,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addBusinessPrivacySettingChangedListener(BusinessPrivacySettingChangedListener listener);
+    LinkedWhatsAppClient addBusinessPrivacySettingChangedListener(LinkedBusinessPrivacySettingChangedListener listener);
 
     /**
      * Registers a per-event listener that is notified when the set of
@@ -8861,7 +8866,7 @@ public interface LinkedWhatsAppClient {
      * @param listener the listener
      * @return this client
      */
-    LinkedWhatsAppClient addTosNoticesChangedListener(TosNoticesChangedListener listener);
+    LinkedWhatsAppClient addTosNoticesChangedListener(LinkedTosNoticesChangedListener listener);
 
     /**
      * Adds a product to a business catalog owned by the given account.

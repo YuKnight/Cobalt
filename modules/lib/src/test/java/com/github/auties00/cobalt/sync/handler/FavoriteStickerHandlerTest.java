@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.StickerAction;
 import com.github.auties00.cobalt.model.sync.action.media.StickerActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.FavoriteStickerMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +48,7 @@ class FavoriteStickerHandlerTest {
     private static final String STICKER_HASH = "stickerhash-abcdef";
     private static final String FAVORITE_STICKER_FEATURE = "favorite_sticker";
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient client;
 
     @BeforeEach

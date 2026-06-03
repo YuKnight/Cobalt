@@ -11,7 +11,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.curve25519.Curve25519;
 import com.github.auties00.libsignal.SignalProtocolAddress;
@@ -113,7 +113,7 @@ public final class DeviceADVValidator {
      * Holds the store providing the local identity key pair, the ADV secret key, and stored peer
      * identity keys.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Holds the AB props service used to gate hosted-device behaviour.
@@ -130,7 +130,7 @@ public final class DeviceADVValidator {
     @WhatsAppWebExport(moduleName = "WAWebAdvSignatureApi",
             exports = "validateADVwithIdentityKey",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public DeviceADVValidator(WhatsAppStore store, ABPropsService abProps) {
+    public DeviceADVValidator(LinkedWhatsAppStore store, ABPropsService abProps) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.abProps = Objects.requireNonNull(abProps, "abProps cannot be null");
     }

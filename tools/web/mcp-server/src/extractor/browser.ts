@@ -253,8 +253,6 @@ async function collectResponses(
     );
   }
 
-  // Discover already-loaded resources (relevant for desktop platforms
-  // where the page is already loaded before we connect)
   const alreadyLoaded = await bridge.getLoadedResourceUrls();
   for (const url of alreadyLoaded.jsUrls) jsUrls.add(url);
   for (const url of alreadyLoaded.wasmUrls) {
@@ -268,7 +266,6 @@ async function collectResponses(
     );
   }
 
-  // Listen for new responses during lazy loading
   bridge.onResponse((response) => {
     if (response.url.endsWith(".js")) {
       jsUrls.add(response.url);
@@ -288,8 +285,6 @@ async function collectResponses(
     }
   });
 
-  // For web platform: navigate (listeners are already set up, so all
-  // responses from the initial page load will be captured)
   if (bridge.platform === "web") {
     await bridge.navigate("https://web.whatsapp.com/", {
       timeout: PAGE_LOAD_TIMEOUT,
@@ -302,10 +297,8 @@ async function collectResponses(
 
   await ensureLoggedIn(bridge);
 
-  // Force load lazy chunks
   await forceLoadAllChunks(bridge);
 
-  // Discover and fetch WASM URLs embedded in inline scripts
   const bxWasmUrls = await discoverBxDataWasmUrls(bridge);
   for (const url of bxWasmUrls) {
     if (wasmCaptures.has(url)) continue;
@@ -319,7 +312,6 @@ async function collectResponses(
     );
   }
 
-  // Trigger runtime WASM loading (voip, etc.)
   await triggerWasmLoadersAgnostic(bridge);
 
   await Promise.all(pendingCaptures);

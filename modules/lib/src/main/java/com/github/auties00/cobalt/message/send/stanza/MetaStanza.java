@@ -19,7 +19,7 @@ import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.system.history.MessageHistoryNotice;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.util.Objects;
 
@@ -47,19 +47,19 @@ public final class MetaStanza {
     /**
      * Holds the store consulted for chat LID origin and verified business name lookup.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Constructs a builder backed by the given store.
      * <p>
      * The builder is stateless and reusable.
      *
-     * @param store the {@link WhatsAppStore}
+     * @param store the {@link LinkedWhatsAppStore}
      * @throws NullPointerException if {@code store} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgMetaNode", exports = "genMetaNode",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public MetaStanza(WhatsAppStore store) {
+    public MetaStanza(LinkedWhatsAppStore store) {
         this.store = Objects.requireNonNull(store, "store");
     }
 

@@ -47,7 +47,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.E2eMessageSendEventBuilder;
 import com.github.auties00.cobalt.wam.type.AddressingMode;
@@ -100,7 +100,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
      * distribution flags, chat metadata, and receipt records consulted by every
      * subclass.
      */
-    final WhatsAppStore store;
+    final LinkedWhatsAppStore store;
 
     /**
      * Supplies the resend-timeout AB prop read by the base class and the
@@ -264,7 +264,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     }
 
     /**
-     * Flushes the {@link WhatsAppStore} to its persistent backing so the Signal
+     * Flushes the {@link LinkedWhatsAppStore} to its persistent backing so the Signal
      * session ratchets and pre-key updates produced by the encryption step
      * survive a process crash immediately after the wire write.
      *

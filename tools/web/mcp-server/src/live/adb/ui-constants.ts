@@ -2,10 +2,6 @@ export const DEFAULT_STEP_TIMEOUT_MS = 25_000;
 export const DEFAULT_POLL_INTERVAL_MS = 500;
 export const FAST_POLL_INTERVAL_MS = 250;
 
-// WA ships as two Android packages with identical resource-id suffixes:
-// com.whatsapp (personal) and com.whatsapp.w4b (business). Every id
-// defined below is auto-expanded to match both variants so the pairing /
-// linked-devices flow works against either APK.
 function bothPackages(ids: string[]): string[] {
   const out: string[] = [];
   for (const id of ids) {

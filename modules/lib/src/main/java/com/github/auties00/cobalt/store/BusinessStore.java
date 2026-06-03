@@ -44,10 +44,10 @@ import java.util.SequencedCollection;
  * <p>None of this state is persisted; it is rebuilt at runtime from server pushes and queries.
  *
  * @apiNote
- * Embedders reach this through {@link WhatsAppStore#businessStore()}; most of it is only meaningful
+ * Embedders reach this through {@link LinkedWhatsAppStore#businessStore()}; most of it is only meaningful
  * on WhatsApp Business client flavours.
  *
- * @see WhatsAppStore
+ * @see LinkedWhatsAppStore
  */
 @WhatsAppWebModule(moduleName = "WAWebCollections")
 @SuppressWarnings({"unused", "UnusedReturnValue"})

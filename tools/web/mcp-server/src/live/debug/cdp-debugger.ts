@@ -62,13 +62,6 @@ export class LiveCdpDebugger {
     this.replacements.clear();
   }
 
-  /**
-   * Serves the bytes of {@code filePath} in place of any request whose URL
-   * contains {@code urlSubstring}, via CDP Fetch interception. Used to install a
-   * patched WASM binary without touching the JS/wasm import boundary. Restricted
-   * to wasm-like requests to minimize interception overhead; subsequent loads of
-   * the module receive the replacement.
-   */
   async serveReplacement(urlSubstring: string, filePath: string): Promise<void> {
     const cdp = await this.ensureCdp();
     this.replacements.set(urlSubstring, filePath);
@@ -89,7 +82,7 @@ export class LiveCdpDebugger {
           return;
         }
       } catch {
-        /* fall through to continue the request unmodified */
+
       }
       await cdp.send("Fetch.continueRequest", { requestId: e.requestId }).catch(() => undefined);
     });
@@ -97,7 +90,6 @@ export class LiveCdpDebugger {
     this.fetchEnabled = true;
   }
 
-  /** Removes all serve replacements and disables Fetch interception. */
   async clearReplacements(): Promise<void> {
     this.replacements.clear();
     if (this.fetchEnabled && this.cdp) {
@@ -105,7 +97,6 @@ export class LiveCdpDebugger {
       this.fetchEnabled = false;
     }
   }
-
 
   async listScripts(filter?: string, limit: number = 200): Promise<DebugScriptInfo[]> {
     await this.mux.ensure();
@@ -191,13 +182,6 @@ export class LiveCdpDebugger {
     };
   }
 
-  /**
-   * Sets a breakpoint inside a wasm script at an absolute module byte offset.
-   * For wasm, V8 locates instructions by {@code lineNumber: 0} plus a
-   * {@code columnNumber} equal to the byte offset, so this bypasses the
-   * one-based line/column convention of {@link setBreakpointByScriptId}. The
-   * caller computes the offset as {@code codeOffset + bodyOffset + instrOffset}.
-   */
   async setWasmBreakpoint(
     scriptId: string,
     byteOffset: number,
@@ -215,10 +199,7 @@ export class LiveCdpDebugger {
     );
     const response = responseRaw as DebuggerSetBreakpointResponse;
     if (sessionId) this.mux.rememberBreakpoint(response.breakpointId, sessionId);
-    // Also register the offset as a pending URL breakpoint so future instances of
-    // the same wasm (e.g. a VoIP worker respawned for the next call) bind it before
-    // they execute. The byte offset is module-absolute and stable across instances
-    // because every instance loads the identical wasm.
+
     const script = this.mux.listScripts().find((s) => s.scriptId === scriptId);
     if (script?.url) {
       const urlRegex = script.url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -230,12 +211,6 @@ export class LiveCdpDebugger {
     };
   }
 
-  /**
-   * Reads a slice of a paused wasm frame's linear memory and returns it as
-   * base64. Evaluates in the frame context against the {@code module} scope's
-   * {@code memories[0]}, chunking the copy to avoid argument-count limits on
-   * large reads.
-   */
   async readWasmMemory(callFrameId: string, addr: number, len: number): Promise<WasmMemoryReadResult> {
     await this.mux.ensure();
     const sessionId = this.mux.getLastPaused()?.sessionId;
@@ -267,7 +242,6 @@ export class LiveCdpDebugger {
     }
   }
 
-  /** Evaluates an expression in a paused frame's context, returning by value. */
   async evaluateOnCallFrame(callFrameId: string, expression: string): Promise<EvaluateResult> {
     await this.mux.ensure();
     const sessionId = this.mux.getLastPaused()?.sessionId;
@@ -298,8 +272,7 @@ export class LiveCdpDebugger {
 
   async command(command: DebugCommand): Promise<void> {
     await this.mux.ensure();
-    // Stepping/resume/pause act on the session that is currently paused; only one
-    // target pauses at a time across the multiplexed connection.
+
     const sessionId = this.mux.getLastPaused()?.sessionId;
     if (command === "pause") {
       await this.mux.send("Debugger.pause", {}, sessionId);
@@ -334,9 +307,7 @@ export class LiveCdpDebugger {
 
     for (const frame of enriched.callFrames) {
       if (!frame.scopeChain) continue;
-      // Wasm frames expose locals, globals, and the operand stack as scopes
-      // (none of type "global"), so they are enumerated here; the module scope
-      // can be large, so allow more properties for wasm than for JS.
+
       const cap = frame.scriptLanguage === "WebAssembly" ? 200 : 20;
       const scopeVars: Array<{ name: string; value: string; type: string }> = [];
       for (const scope of frame.scopeChain) {
@@ -361,9 +332,7 @@ export class LiveCdpDebugger {
           for (const prop of (props.result ?? []).slice(0, cap)) {
             const pv = prop.value;
             let valueStr = pv?.description ?? String(pv?.value ?? "undefined");
-            // Wasm locals/params are returned as opaque "wasmvalue" objects whose
-            // description is just the type (e.g. "i32"); the actual number lives in
-            // a nested "value" property, so drill one level to surface it.
+
             const isWasmValue =
               pv?.type === "object" &&
               pv.objectId != null &&
@@ -381,7 +350,7 @@ export class LiveCdpDebugger {
                   valueStr = `${pv.description}:${n}`;
                 }
               } catch {
-                /* drilling is best-effort */
+
               }
             }
             scopeVars.push({
@@ -390,7 +359,7 @@ export class LiveCdpDebugger {
               type: pv?.description ?? pv?.type ?? "undefined",
             });
           }
-        } catch { /* scope may be unavailable */ }
+        } catch {  }
       }
       frame.variables = scopeVars;
     }

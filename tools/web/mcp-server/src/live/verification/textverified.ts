@@ -74,7 +74,7 @@ function normalizeToE164(raw: string, defaultCountry: string = "US"): string {
   if (parsed?.isPossible()) {
     return parsed.number;
   }
-  // Last-resort: prepend "+" so downstream splitters have a country marker.
+
   return trimmed.startsWith("+") ? trimmed : `+${trimmed.replace(/\D/g, "")}`;
 }
 
@@ -184,7 +184,6 @@ export class TextVerifiedProvider implements SmsVerificationProvider {
       verificationId = extractVerificationIdFromHref(link.href);
     }
 
-    // Follow up with a details fetch to get the assigned phone number.
     const details = await this.call<TvVerificationDetails>(
       `/verifications/${verificationId}`
     );

@@ -135,7 +135,7 @@ public final class BizSetMerchantComplianceWhatsAppWebGraphQlRequest implements 
         edit.entityType().ifPresent(value -> {
             writer.writeName("entity_type");
             writer.writeColon();
-            writer.writeString(value);
+            writer.writeString(value.data());
         });
         writer.writeName("is_registered");
         writer.writeColon();

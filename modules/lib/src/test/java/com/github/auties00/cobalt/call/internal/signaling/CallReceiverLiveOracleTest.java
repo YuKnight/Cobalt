@@ -2,15 +2,13 @@ package com.github.auties00.cobalt.call.internal.signaling;
 import com.github.auties00.cobalt.call.internal.TestLiveCallServiceFactory;
 
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.call.ActiveCall;
 import com.github.auties00.cobalt.call.CallEndReason;
 import com.github.auties00.cobalt.call.CallFixtures;
-import com.github.auties00.cobalt.call.CallOptions;
 import com.github.auties00.cobalt.call.internal.CallService;
 import com.github.auties00.cobalt.call.IncomingCall;
 import com.github.auties00.cobalt.client.TestWhatsAppClient;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
@@ -20,7 +18,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

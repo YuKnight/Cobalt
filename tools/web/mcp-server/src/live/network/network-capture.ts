@@ -64,10 +64,10 @@ export class NetworkCapture {
     if (!this.cdp) return;
     try {
       await this.cdp.send("Network.disable");
-    } catch { /* ignore */ }
+    } catch {  }
     try {
       await this.cdp.detach();
-    } catch { /* ignore */ }
+    } catch {  }
     this.cdp = null;
     this.capturing = false;
   }

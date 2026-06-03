@@ -17,7 +17,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * <p>When another device creates, updates, or deletes the user's Meta-AI
  * avatar, the resulting state is mirrored into
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#hasAvatar()}, and the
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore#hasAvatar()}, and the
  * recent-avatar-sticker cache is cleared on every mutation.
  *
  * @implNote

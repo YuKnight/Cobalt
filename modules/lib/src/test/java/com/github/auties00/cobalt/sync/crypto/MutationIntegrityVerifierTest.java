@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdPatchBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdVersion;
 import com.github.auties00.cobalt.model.sync.data.SyncdVersionBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,7 +52,7 @@ class MutationIntegrityVerifierTest {
 
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
 
     private MutationIntegrityVerifier verifier;
 

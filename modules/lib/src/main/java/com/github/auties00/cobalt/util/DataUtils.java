@@ -329,6 +329,28 @@ public final class DataUtils {
     }
 
     /**
+     * Copies {@code source} into {@code destination} starting at {@code offset} and returns the
+     * offset immediately past the copied region.
+     *
+     * <p>Threads the returned offset into the next call to assemble a fixed-layout buffer from a
+     * sequence of segments without a manual running index or a
+     * {@link java.io.ByteArrayOutputStream}, suiting callers that have already sized the
+     * destination exactly.
+     *
+     * @param destination the buffer to copy into
+     * @param offset      the index in {@code destination} at which to start writing
+     * @param source      the segment to copy
+     * @return the offset immediately past the copied segment, that is
+     *         {@code offset + source.length}
+     * @throws IndexOutOfBoundsException if {@code source} does not fit in {@code destination} at
+     *                                   {@code offset}
+     */
+    public static int append(byte[] destination, int offset, byte[] source) {
+        System.arraycopy(source, 0, destination, offset, source.length);
+        return offset + source.length;
+    }
+
+    /**
      * Returns a random uppercase hexadecimal string produced by sampling
      * {@code byteCount} cryptographically-random bytes and encoding them with
      * the alphabet {@code [0-9 A-F]}.

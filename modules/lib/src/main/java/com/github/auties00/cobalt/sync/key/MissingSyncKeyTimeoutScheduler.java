@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncdCoordinator;
 
 import java.time.Duration;
@@ -68,7 +68,7 @@ public final class MissingSyncKeyTimeoutScheduler {
      * Holds the shared store consulted for the live missing-key tracker and for the resolved
      * app state sync key store, the latter used to confirm that a key never arrived.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Holds the AB prop source used to read the live {@code syncd_wait_for_key_timeout_days}

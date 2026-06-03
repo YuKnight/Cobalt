@@ -1,38 +1,28 @@
-// Derived reverse-engineering index over a single WASM module.
-//
-// Everything here is computed from the raw bytes plus the structural
-// WasmAnalysis, and is far too heavy to bake into the stored analysis.json, so
-// it is built on demand and memoized (the catalog caches one instance per
-// content hash). Facets are independently lazy: the cheap string table does not
-// pay for the full instruction decode, and the instruction decode does not pay
-// for the vtable memory scan.
+
 
 import type { WasmAnalysis } from "../types/wasm.js";
 import { BinaryReader } from "./wasm-binary-reader.js";
 import { walkFunctionBody } from "./wasm-decoder.js";
 
-/** A direct or indirect call edge target with the byte offset of the call site. */
 export interface IndirectSite {
   typeIndex: number;
   tableIndex: number;
   at: number;
 }
 
-/** Call-graph facet: forward edges, reverse edges, and indirect call sites. */
 export interface CallGraph {
-  /** funcidx -> set of direct callees (via {@code call} and {@code ref.func}). */
+
   calls: Map<number, Set<number>>;
-  /** funcidx -> set of direct callers. */
+
   callers: Map<number, Set<number>>;
-  /** funcidx -> indirect ({@code call_indirect}) sites in its body. */
+
   indirect: Map<number, IndirectSite[]>;
 }
 
-/** String-reference facet: the symbol-recovery cross-reference. */
 export interface StringRefs {
-  /** funcidx -> distinct data strings its body loads via {@code i32.const}. */
+
   byFunction: Map<number, string[]>;
-  /** data string -> funcidxs whose bodies load its address. */
+
   byString: Map<string, number[]>;
 }
 
@@ -85,14 +75,10 @@ export class WasmIndex {
     }
   }
 
-  /** Returns the recorded name for a function index, or {@code undefined}. */
   nameOf(funcIdx: number): string | undefined {
     return this.funcName.get(funcIdx);
   }
 
-  // --- Table / element facet ---------------------------------------------
-
-  /** Map of {@code tableIndex -> (slot -> funcidx)} from active element segments. */
   slotMap(): Map<number, Map<number, number>> {
     if (this._slotMap) return this._slotMap;
     const map = new Map<number, Map<number, number>>();
@@ -111,7 +97,7 @@ export class WasmIndex {
       }
       for (let k = 0; k < seg.funcIndices.length; k++) {
         const fn = seg.funcIndices[k];
-        if (fn < 0) continue; // ref.null hole
+        if (fn < 0) continue;
         table.set(seg.offset + k, fn);
         funcs.add(fn);
       }
@@ -121,7 +107,6 @@ export class WasmIndex {
     return map;
   }
 
-  /** Resolves a table slot to the function index installed there, or {@code -1}. */
   funcAtSlot(slot: number, tableIndex = 0): number {
     return this.slotMap().get(tableIndex)?.get(slot) ?? -1;
   }
@@ -143,12 +128,6 @@ export class WasmIndex {
     return map;
   }
 
-  /**
-   * Resolves the candidate callees of a {@code call_indirect} site: functions
-   * installed in the given table whose signature matches the site's type index.
-   * This narrows the (often large) table to the handful of type-compatible
-   * targets.
-   */
   resolveIndirect(typeIndex: number, tableIndex = 0): number[] {
     const inTable = this.tableFuncs().get(tableIndex);
     if (!inTable) return [];
@@ -158,8 +137,6 @@ export class WasmIndex {
     }
     return out;
   }
-
-  // --- Memory image / data string facet ----------------------------------
 
   private segments(): MemorySegment[] {
     if (this._segments) return this._segments;
@@ -172,7 +149,7 @@ export class WasmIndex {
       const seg = dataSegs[i];
       let base: number | null = null;
       if (seg.mode === "active") base = seg.offset;
-      else base = passiveBases.get(i) ?? null; // passive: resolved from memory.init
+      else base = passiveBases.get(i) ?? null;
       if (base == null) continue;
       segs.push({ base, bytes: this.bytes.subarray(seg.fileOffset, seg.fileOffset + seg.byteLength) });
     }
@@ -183,12 +160,6 @@ export class WasmIndex {
 
   private _passiveBases?: Map<number, number>;
 
-  /**
-   * Resolves the linear-memory base of each passive data segment by scanning
-   * function bodies for the {@code memory.init dataidx} that places it (with a
-   * literal {@code i32.const} destination). This recovers static data for
-   * Emscripten pthread/shared-memory builds, whose segments are all passive.
-   */
   private passiveBases(): Map<number, number> {
     if (this._passiveBases) return this._passiveBases;
     const map = new Map<number, number>();
@@ -224,7 +195,6 @@ export class WasmIndex {
     return entries;
   }
 
-  /** Returns the data string at exactly {@code addr}, if any. */
   stringAt(addr: number): string | null {
     const entries = this.stringEntries();
     const i = this.floorIndex(entries, addr);
@@ -232,7 +202,6 @@ export class WasmIndex {
     return entries[i].start === addr ? entries[i].str : null;
   }
 
-  /** Returns the data string whose byte range contains {@code addr}, if any. */
   stringContaining(addr: number): string | null {
     const entries = this.stringEntries();
     const i = this.floorIndex(entries, addr);
@@ -241,7 +210,6 @@ export class WasmIndex {
     return addr >= e.start && addr < e.start + e.str.length ? e.str : null;
   }
 
-  /** Number of distinct extracted data strings. */
   stringCount(): number {
     return this.stringEntries().length;
   }
@@ -262,7 +230,6 @@ export class WasmIndex {
     return ans;
   }
 
-  /** Reads {@code len} bytes of linear memory at {@code addr} from active segments. */
   readMemory(addr: number, len: number): Uint8Array | null {
     for (const seg of this.segments()) {
       if (addr >= seg.base && addr + len <= seg.base + seg.bytes.length) {
@@ -273,14 +240,12 @@ export class WasmIndex {
     return null;
   }
 
-  /** Reads a little-endian 32-bit word at {@code addr}, or {@code null} if unmapped. */
   readU32(addr: number): number | null {
     const b = this.readMemory(addr, 4);
     if (!b) return null;
     return (b[0] | (b[1] << 8) | (b[2] << 16) | (b[3] << 24)) >>> 0;
   }
 
-  /** Linear-memory addresses whose 4-byte LE word equals {@code value}. */
   findWordsEqualTo(value: number): number[] {
     const target = value >>> 0;
     const out: number[] = [];
@@ -293,8 +258,6 @@ export class WasmIndex {
     }
     return out;
   }
-
-  // --- Code scan facet (call graph + string refs) ------------------------
 
   private codeScan(): void {
     if (this._callGraph && this._stringRefs) return;
@@ -315,7 +278,7 @@ export class WasmIndex {
     };
 
     for (const fn of this.analysis.functions) {
-      const seen = new Set<string>(); // de-dup strings per function
+      const seen = new Set<string>();
       walkFunctionBody(this.reader, fn.bodyOffset, fn.bodySize, {
         onCall: (callee) => addEdge(fn.index, callee),
         onRefFunc: (callee) => addEdge(fn.index, callee),
@@ -342,24 +305,20 @@ export class WasmIndex {
     this._stringRefs = { byFunction: refByFunction, byString: refByString };
   }
 
-  /** The call-graph facet (built on first access). */
   callGraph(): CallGraph {
     this.codeScan();
     return this._callGraph!;
   }
 
-  /** The string-reference facet (built on first access). */
   stringRefs(): StringRefs {
     this.codeScan();
     return this._stringRefs!;
   }
 
-  /** Function indices whose bodies load the address of an exact data string. */
   functionsReferencing(str: string): number[] {
     return [...(this.stringRefs().byString.get(str) ?? [])].sort((a, b) => a - b);
   }
 
-  /** Function indices whose bodies load the address of any string containing {@code needle}. */
   functionsReferencingSubstring(needle: string): number[] {
     const hits = new Set<number>();
     for (const [str, fns] of this.stringRefs().byString) {
@@ -368,7 +327,6 @@ export class WasmIndex {
     return [...hits].sort((a, b) => a - b);
   }
 
-  /** Extracted data strings matching {@code test}, up to {@code max}, with their addresses. */
   matchStrings(test: (s: string) => boolean, max: number): Array<{ address: number; value: string }> {
     const out: Array<{ address: number; value: string }> = [];
     for (const e of this.stringEntries()) {
@@ -378,12 +336,6 @@ export class WasmIndex {
     return out;
   }
 
-  /**
-   * Function indices whose bodies contain an {@code i32.const} equal to
-   * {@code value}. Runs a fresh full-body decode (not memoized) because the
-   * standing index only retains constants that resolve to a data string; this
-   * is the gated, explicit path for locating an arbitrary magic number.
-   */
   functionsWithI32Const(value: number): number[] {
     const hits: number[] = [];
     for (const fn of this.analysis.functions) {
@@ -399,7 +351,6 @@ export class WasmIndex {
   }
 }
 
-/** Builds a fresh index. The catalog memoizes the result per content hash. */
 export function buildWasmIndex(binary: Buffer | Uint8Array, analysis: WasmAnalysis): WasmIndex {
   return new WasmIndex(binary, analysis);
 }

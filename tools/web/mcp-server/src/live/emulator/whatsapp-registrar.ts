@@ -259,11 +259,7 @@ export class WhatsAppRegistrar {
             };
 
           case "Loading":
-            // Transient modal; wait longer than a normal probe and let the
-            // loop re-dump. Do not count towards successiveUnknowns — the
-            // loop's end-of-iteration reset handles that on the next pass
-            // (the fall-through intentionally skips the Unknown branch's
-            // `continue`).
+
             await sleep(1500);
             break;
 
@@ -340,12 +336,6 @@ export class WhatsAppRegistrar {
   private classifyScreen(nodes: UiNode[]): ScreenId {
     if (hasAnyShortResourceId(nodes, CHAT_LIST_IDS)) return "ChatList";
 
-    // Modal "Loading…" progress dialog WA shows between flow steps (e.g.
-    // after declining the backup-restore permission). Identified by the
-    // Android AlertDialog panel IDs + a ProgressBar at android:id/progress
-    // + a message TextView at android:id/message. Classified as a
-    // transient state so the outer loop waits for it to resolve instead
-    // of counting probes against the Unknown-screen failure threshold.
     const hasProgress = nodes.some(
       (n) =>
         n.resourceId === "android:id/progress" &&
@@ -358,11 +348,6 @@ export class WhatsAppRegistrar {
       return "Loading";
     }
 
-    // WA optional-feature onboarding prompt (observed: "Create a catalog").
-    // Uses WA's native onboarding layout with accept/decline buttons by
-    // known resource-ids. Decline is the desired action for validation
-    // runs — consistent with the always-skip policy on the business
-    // profile sub-steps.
     if (
       nodes.some(
         (n) =>
@@ -372,11 +357,6 @@ export class WhatsAppRegistrar {
       return "OnboardingPrompt";
     }
 
-    // Google Play Services "Choose a phone number" consent bottom sheet —
-    // auto-offered to pre-fill WA's phone entry with the emulator's
-    // default fake number (555) 123-4567, which is not a real SMS target.
-    // We dismiss it to fall through to the regular PhoneEntry where the
-    // TextVerified rental is typed.
     if (
       nodes.some(
         (n) => n.resourceId === "com.google.android.gms:id/phone_number_list"
@@ -385,67 +365,32 @@ export class WhatsAppRegistrar {
       return "GmsPhoneNumberHint";
     }
 
-    // Account-ban screen (TOS violation). Structurally identified by the
-    // ban_info_text_layout container — locale-independent, unlike the
-    // headline copy. Checked early because the ban screen carries no other
-    // registration-flow affordances and is strictly terminal.
     if (hasAnyShortResourceId(nodes, BAN_SCREEN_IDS)) {
       return "Banned";
     }
 
-    // Two-step-verification PIN prompt appears when the rented number had
-    // 2FA enabled by its previous owner. Handled by tapping FORGOT PIN →
-    // Reset account; detect before any generic screen so we don't get
-    // stuck typing the code input.
     if (hasAnyShortResourceId(nodes, TWO_STEP_FORGOT_IDS)) {
       return "TwoStepVerification";
     }
 
-    // "Choose how to verify" bottom sheet shown after tapping the fallback
-    // link on DeviceConfirmMovingPhones (or via "DIDN'T RECEIVE CODE?" on
-    // the regular CodeEntry). The sheet offers SMS / voice / retry-other-
-    // device; we pick SMS so TextVerified receives the code at the rented
-    // number. Checked before DeviceConfirmMovingPhones because the sheet
-    // overlays it, and before CODE_INPUT_IDS because the underlying code-
-    // entry layout stays in the tree behind the sheet.
     if (hasAnyShortResourceId(nodes, VERIFICATION_METHOD_CHOOSER_IDS)) {
       return "VerificationMethodChooser";
     }
 
-    // "Confirm moving phones" screen — WA detects the rented number was
-    // previously registered on a different device and wants us to prove
-    // ownership via a notice sent to that device. Handled by tapping
-    // "Confirm with another code" to fall back to a fresh SMS/call code.
     if (hasAnyShortResourceId(nodes, DEVICE_CONFIRM_SCREEN_IDS)) {
       return "DeviceConfirmMovingPhones";
     }
 
-    // PermissionRequest (e.g. WA's "Contacts and media" prompt) is a
-    // custom LinearLayout that overlays the underlying screen — typically
-    // Profile Info right after verification succeeds. Check before
-    // ProfileName so the dialog wins over the screen behind it.
     if (hasAnyShortResourceId(nodes, [PERMISSION_DIALOG_ID])) {
       return "PermissionRequest";
     }
 
-    // WA Business profile creation (Compose-rendered, so interactive nodes
-    // have no resource-ids). Detected structurally via the fragment
-    // container id. Must win over ProfileName because the business flow
-    // skips the personal-name step entirely.
     if (hasAnyShortResourceId(nodes, BUSINESS_PROFILE_CONTAINER_IDS)) {
       return "BusinessProfileCreation";
     }
 
     if (hasAnyShortResourceId(nodes, PROFILE_NAME_INPUT_IDS)) return "ProfileName";
 
-    // When the code-entry screen is overlaid with a rate-limit message
-    // ("Please wait before trying again") WA reuses the same layout — the
-    // code-input resource-ids are present on both the healthy and the
-    // rate-limited state. Run text-based error classification first so
-    // the rate-limit case is caught; the tightened regexes in
-    // {@link classifyErrorDialog} do not false-positive on the healthy
-    // CodeEntry description ("...sent by SMS to +1 (xxx) xxx-xxxx.
-    // Wrong number?").
     const errorScreenEarly = this.classifyErrorDialog(nodes);
     if (errorScreenEarly) return errorScreenEarly;
 
@@ -455,10 +400,6 @@ export class WhatsAppRegistrar {
 
     if (hasAnyShortResourceId(nodes, EULA_ACCEPT_IDS)) return "Eula";
 
-    // ConfirmDialog must be detected before PhoneEntry because WA's "Is
-    // this the correct number?" dialog is an overlay on the phone-entry
-    // screen — the phone-entry resource-ids are still present in the tree
-    // under the modal, so PhoneEntry would otherwise win.
     if (this.looksLikeConfirmDialog(nodes)) return "ConfirmDialog";
 
     if (
@@ -478,9 +419,7 @@ export class WhatsAppRegistrar {
     const lower = nodes
       .map((node) => `${node.text} ${node.contentDesc}`.toLowerCase())
       .join(" ");
-    // "Login not available right now" is a WA fraud-prevention full-
-    // screen — usually shown when the rented number has been used too
-    // recently or flagged. No retry can recover it in the short term.
+
     if (/login not available|can'?t log you in right now|for security reasons, we can/.test(lower)) {
       return "LoginUnavailable";
     }
@@ -498,9 +437,7 @@ export class WhatsAppRegistrar {
     ) {
       return "RateLimit";
     }
-    // Match only explicit invalid-number error copy. "wrong number" on its
-    // own is excluded because WA uses it as a correction-link affordance on
-    // the code-entry screen ("...sent to +1 (xxx) xxx-xxxx. Wrong number?").
+
     if (
       /(invalid|incorrect) (phone )?number|not a valid (phone )?number|please enter a valid (phone )?number|check (your |the )?(number|country)|country code.*missing/.test(
         lower
@@ -800,8 +737,7 @@ export class WhatsAppRegistrar {
     const nameNodes = nodes.filter(
       (n) => shortResourceId(n.resourceId) === VERIFICATION_METHOD_ROW_NAME_ID
     );
-    // WA offers "Retry on other device", "Receive SMS", "Voice call".
-    // Pick SMS because TextVerified only captures SMS, not voice calls.
+
     const smsRow = nameNodes.find((n) => /\bsms\b/i.test(n.text ?? ""));
     if (!smsRow) {
       throw new Error(
@@ -832,9 +768,7 @@ export class WhatsAppRegistrar {
     nodes: UiNode[],
     details: string[]
   ): Promise<void> {
-    // If the reset-confirmation AlertDialog is present, tap its positive
-    // button to confirm. The positive button's text varies ("RESET
-    // ACCOUNT", "OK") but the android:id/button1 id is stable.
+
     const confirm = nodes.find((n) => n.resourceId === DIALOG_BUTTON_POSITIVE);
     if (confirm) {
       const tapped = await this.adb.emuTapNode(serial, confirm);
@@ -916,14 +850,7 @@ export class WhatsAppRegistrar {
     nodes: UiNode[],
     details: string[]
   ): Promise<void> {
-    // The business onboarding reuses the same fragment container
-    // (profile_creation_fragment_container) across several Compose-rendered
-    // sub-steps (name entry, category picker, optional extras). All sub-
-    // steps have no resource-ids on interactive nodes, so we dispatch by
-    // visible shape. Skip wins over every other branch: if WA offers a
-    // Skip affordance, the field is optional and we always skip it —
-    // avoids having to type a syntactically-valid address / description /
-    // URL into fields that trigger server-side validation dialogs.
+
     const skipNode = nodes.find(
       (n) => n.clickable && n.enabled && /^\s*skip\s*$/i.test(n.text ?? "")
     );
@@ -966,16 +893,7 @@ export class WhatsAppRegistrar {
     }
 
     if (radios.length > 0) {
-      // Radio-button sub-step (observed: business-hours chooser with
-      // "Open for selected hours" / "Always open" / "Appointments only").
-      // Prefer "Always open" via its content-desc marker — the other
-      // options trigger follow-up time-picker / appointment sub-steps we
-      // would otherwise need to handle. Fall back to the first radio for
-      // any future RadioButton screen where "always" doesn't appear.
-      // WA Business renders each radio row with a (non-clickable) content-
-      // desc node wrapped by a clickable parent that shares the same
-      // bounds. Match on contentDesc alone and let emuTapNode's center
-      // tap resolve to the clickable ancestor.
+
       const alwaysOpenRow = nodes.find((n) =>
         /always\s*open/i.test(n.contentDesc ?? "")
       );
@@ -986,7 +904,7 @@ export class WhatsAppRegistrar {
           "BusinessProfileCreation/radio: could not tap radio option."
         );
       }
-      // Next is disabled until selection registers in Compose.
+
       await sleep(800);
       if (!next) {
         throw new Error(
@@ -1006,9 +924,7 @@ export class WhatsAppRegistrar {
     }
 
     if (checkboxes.length > 0) {
-      // Pick the first offered category (WA requires at least one selection
-      // to enable Next). "Other Business" is typically first in US locale,
-      // but any category satisfies the requirement.
+
       const firstCategory = checkboxes[0];
       const tappedCategory = await this.adb.emuTapNode(serial, firstCategory);
       if (!tappedCategory) {
@@ -1032,11 +948,6 @@ export class WhatsAppRegistrar {
       return;
     }
 
-    // Review / accept-defaults sub-step. No input controls surface — WA
-    // has pre-populated the fields and just wants us to confirm. If Next
-    // is present and enabled, tap it and move on. The per-day "Select
-    // hours" screen is intentionally not handled here because the radio
-    // branch always picks "Always open", which skips it.
     if (next && next.enabled) {
       const tappedNext = await this.adb.emuTapNode(serial, next);
       if (!tappedNext) {
@@ -1063,10 +974,7 @@ export class WhatsAppRegistrar {
       throw new Error("ProfileName: name input not found.");
     }
     await this.focusField(serial, input);
-    // A name requires alphabetic keys. The on-screen keyboard switches to
-    // QWERTY here automatically. We emit a canned default via adb shell
-    // input text — the profile-name field is not one of the anti-automation-
-    // gated inputs, so this path does work here.
+
     await this.adb.typeText(serial, "Cobalt Test");
     await sleep(500);
     const buttons = sortedVisibleButtons(nodes);
@@ -1114,14 +1022,14 @@ export class WhatsAppRegistrar {
       writeFileSync(p, xml, "utf-8");
       paths.push(p);
     } catch {
-      /* swallow */
+
     }
     try {
       const p = pathJoin(root, `${stamp}-${tag}.png`);
       await this.adb.screenshot(serial, p);
       paths.push(p);
     } catch {
-      /* swallow */
+
     }
     return paths;
   }

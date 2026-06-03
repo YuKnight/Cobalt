@@ -167,7 +167,7 @@ export class Emulator {
       try {
         this.process.kill();
       } catch {
-        // already exited
+
       }
     }
     this.process = null;
@@ -191,7 +191,7 @@ export class Emulator {
       const { rmSync } = await import("node:fs");
       if (existsSync(this.stateFile)) rmSync(this.stateFile);
     } catch {
-      // ignore
+
     }
   }
 
@@ -202,7 +202,7 @@ export class Emulator {
     this.updateState({
       apkVariant: target,
       accountType: target === "business" ? "business" : "personal",
-      // Re-installing resets any prior registration state on that AVD.
+
       registrationState:
         target !== this.record.apkVariant ? "unregistered" : this.record.registrationState,
       accountPhone: target !== this.record.apkVariant ? null : this.record.accountPhone,
@@ -228,17 +228,13 @@ export class Emulator {
         countryCode: options.countryCode,
       });
       if (result.success) {
-        // On a resumed registration (WA was already past PhoneEntry on
-        // launch), the registrar never ran its rental step so
-        // result.accountPhone is null. Preserve whatever phone we recorded
-        // on the prior attempt rather than clobbering it back to null.
+
         this.updateState({
           registrationState: "registered" as EmulatorRegistrationState,
           accountPhone: result.accountPhone ?? this.record.accountPhone,
         });
       } else {
-        // Same preservation on failure. A failed resume attempt shouldn't
-        // wipe the phone number captured by an earlier successful rental.
+
         this.updateState({
           registrationState: "invalidated",
           accountPhone: this.record.accountPhone,

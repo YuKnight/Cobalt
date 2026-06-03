@@ -4,9 +4,8 @@ import com.github.auties00.cobalt.call.frame.audio.*;
 import com.github.auties00.cobalt.call.frame.video.*;
 import com.github.auties00.cobalt.call.internal.session.GroupCallSession;
 import com.github.auties00.cobalt.call.internal.session.VoiceCallSession;
-import com.github.auties00.cobalt.call.CallEndReason;
-import com.github.auties00.cobalt.call.CallInteraction;
 import com.github.auties00.cobalt.call.internal.transport.ActiveCallTransport;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload;
 import com.github.auties00.cobalt.model.jid.Jid;
 
@@ -479,9 +478,9 @@ public final class ActiveCall implements AutoCloseable {
      *
      * <p>The request asks the peer to switch to a video call; it is a no-op
      * once the call has ended. The peer's reply surfaces through
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onCallVideoStateChanged(com.github.auties00.cobalt.client.LinkedWhatsAppClient, String, Jid, boolean)}
+     * {@link LinkedWhatsAppClientListener#onCallVideoStateChanged(com.github.auties00.cobalt.client.LinkedWhatsAppClient, String, Jid, boolean)}
      * on acceptance or
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onCallEnded(com.github.auties00.cobalt.client.LinkedWhatsAppClient, String, Jid, CallEndReason)}
+     * {@link LinkedWhatsAppClientListener#onCallEnded(com.github.auties00.cobalt.client.LinkedWhatsAppClient, String, Jid, CallEndReason)}
      * on rejection.
      */
     public void requestVideoUpgrade() {
@@ -551,7 +550,7 @@ public final class ActiveCall implements AutoCloseable {
      * Broadcasts an emoji reaction to the call.
      *
      * <p>Other participants observe the reaction through
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onCallInteraction(com.github.auties00.cobalt.client.LinkedWhatsAppClient, String, Jid, CallInteraction)}.
+     * {@link LinkedWhatsAppClientListener#onCallInteraction(com.github.auties00.cobalt.client.LinkedWhatsAppClient, String, Jid, CallInteraction)}.
      *
      * @param emoji the emoji glyph, typically a single grapheme
      */

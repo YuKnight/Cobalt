@@ -26,7 +26,7 @@ import java.util.List;
  * <p>The sync dispatcher routes incoming {@code status_privacy} mutations here
  * whenever the user changes the status audience on another device. The handler
  * rewrites the {@link PrivacySettingType#STATUS} entry on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} so subsequent status
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} so subsequent status
  * posts use the new audience.
  */
 @WhatsAppWebModule(moduleName = "WAWebStatusPrivacySettingSync")

@@ -71,6 +71,18 @@ public final class IceAgent {
     private static final Duration CHECK_TIMEOUT = Duration.ofMillis(500);
 
     /**
+     * The interval at which a STUN consent-refresh binding request is re-sent on the nominated pair
+     * once a connection is established, per RFC 7675 consent freshness.
+     *
+     * @implNote This implementation uses {@code 2 s}. A WhatsApp edge relay forwards a participant's
+     * media only while that participant keeps the bind path consent-fresh by re-sending binding
+     * requests; a relay drops the forwarding roughly 30 seconds after the last successful check. A
+     * 2-second cadence leaves a wide margin against that timeout while keeping the consent traffic
+     * negligible (one ~28-byte packet every two seconds).
+     */
+    private static final Duration CONSENT_INTERVAL = Duration.ofSeconds(2);
+
+    /**
      * The outbound packet sink the agent writes encoded STUN packets to, paired with their
      * destination address; performing the actual datagram send is the caller's responsibility.
      */
@@ -134,6 +146,13 @@ public final class IceAgent {
      * {@code null} until then.
      */
     private volatile IceCandidatePair nominatedPair;
+
+    /**
+     * The instant the last consent-refresh binding request was sent on the nominated pair, or
+     * {@code null} until the first one fires; used to pace consent refreshes at
+     * {@link #CONSENT_INTERVAL}.
+     */
+    private volatile java.time.Instant lastConsentCheck;
 
     /**
      * Receives encoded outbound STUN packets together with their destination address.
@@ -364,6 +383,46 @@ public final class IceAgent {
             }
         }
         triggerNextWaitingCheck();
+        maybeRefreshConsent(now);
+    }
+
+    /**
+     * Re-sends a STUN consent-refresh binding request on the nominated pair when the configured
+     * {@link #CONSENT_INTERVAL} has elapsed since the last one, per RFC 7675.
+     *
+     * <p>Once a pair is nominated the connectivity-check state machine goes idle, but a WhatsApp edge
+     * relay only keeps forwarding this participant's media while the participant keeps the bind path
+     * consent-fresh. This method, driven from {@link #tick()}, fires a fresh binding request on the
+     * nominated pair at a steady cadence for the call's lifetime. The request reuses the pair's remote
+     * address and the per-call relay key but does not alter the pair's check state; the matching
+     * binding success arrives with a transaction id absent from {@link #inFlight} and is harmlessly
+     * ignored, because keeping the relay's consent alive only requires that the request be sent.
+     *
+     * @param now the current instant, supplied by the calling {@link #tick()}
+     */
+    private void maybeRefreshConsent(java.time.Instant now) {
+        var pair = nominatedPair;
+        if (pair == null) {
+            return;
+        }
+        var last = lastConsentCheck;
+        if (last != null && Duration.between(last, now).compareTo(CONSENT_INTERVAL) < 0) {
+            return;
+        }
+        lastConsentCheck = now;
+        var txId = newTransactionId();
+        var attrs = new ArrayList<WaRelayAttribute>();
+        attrs.add(new WaRelayAttribute(
+                WaRelayAttributeType.MESSAGE_INTEGRITY.wireValue(),
+                new byte[WaRelayMessageIntegrity.MAC_LENGTH]));
+        var request = new WaRelayPacket(
+                WaRelayMessageType.BINDING_REQUEST.wireValue(), txId, attrs);
+        var encoded = request.encode();
+        WaRelayMessageIntegrity.stamp(encoded, credentials.remotePassword());
+        try {
+            outboundSink.send(encoded, pair.remote().transportAddress());
+        } catch (RuntimeException _) {
+        }
     }
 
     /**
@@ -386,6 +445,7 @@ public final class IceAgent {
             return;
         }
         var msgType = parsed.messageType();
+        System.out.println("[ICE] STUN-IN type=0x" + Integer.toHexString(msgType & 0xFFFF) + " len=" + packet.length);
         if (msgType == WaRelayMessageType.BINDING_SUCCESS.wireValue()) {
             handleBindingResponse(parsed, true);
         } else if (msgType == WaRelayMessageType.BINDING_REQUEST.wireValue()) {
@@ -508,6 +568,8 @@ public final class IceAgent {
         WaRelayMessageIntegrity.stamp(encoded, credentials.remotePassword());
         pair.markInFlight(txId, clock.instant());
         inFlight.put(hex(txId), pair);
+        System.out.println("[ICE] BIND-REQ -> " + pair.remote().transportAddress()
+                + " encLen=" + encoded.length + " miKeyLen=" + (credentials.remotePassword() == null ? -1 : credentials.remotePassword().length));
         try {
             outboundSink.send(encoded, pair.remote().transportAddress());
         } catch (RuntimeException _) {
@@ -531,12 +593,15 @@ public final class IceAgent {
         var txKey = hex(packet.transactionId());
         var pair = inFlight.remove(txKey);
         if (pair == null) {
+            System.out.println("[ICE] BIND-RESP tx not in flight (consent refresh or stale)");
             return;
         }
         if (verifyMi && !verifyMessageIntegrity(packet)) {
+            System.out.println("[ICE] BIND-RESP MI VERIFY FAILED -> failing pair");
             failPair(pair);
             return;
         }
+        System.out.println("[ICE] BIND-RESP OK -> pair SUCCEEDED " + pair.remote().transportAddress());
         pair.transition(IceCheckState.IN_PROGRESS, IceCheckState.SUCCEEDED);
         pair.clearInFlight();
         var l = listener;

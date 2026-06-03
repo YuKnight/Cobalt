@@ -22,7 +22,7 @@ import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
@@ -173,7 +173,7 @@ class UserMessageSenderTest {
 
     // The returned ack carries only the t attribute, which AckParser reads as
     // a success result.
-    private static TestWhatsAppClient clientWithCapture(WhatsAppStore store, AtomicReference<Node> capturedStanza) {
+    private static TestWhatsAppClient clientWithCapture(LinkedWhatsAppStore store, AtomicReference<Node> capturedStanza) {
         return TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(TestABPropsService.builder().build())
@@ -186,7 +186,7 @@ class UserMessageSenderTest {
                 });
     }
 
-    private static UserMessageSender userMessageSender(TestWhatsAppClient client, WhatsAppStore store, StubDeviceService deviceService) {
+    private static UserMessageSender userMessageSender(TestWhatsAppClient client, LinkedWhatsAppStore store, StubDeviceService deviceService) {
         var ab = client.abPropsService();
         var encryption = new MessageEncryption(store,
                 new SignalSessionCipher(store.signalStore()),

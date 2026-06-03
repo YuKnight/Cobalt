@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.groups.SignalGroupCipher;
@@ -143,7 +143,7 @@ class MessageReceivingServiceTest {
                 "newsletter dispatch + no <plaintext> then null, not a chat-decryption throw");
     }
 
-    private static MessageDecryption decryption(WhatsAppStore store) {
+    private static MessageDecryption decryption(LinkedWhatsAppStore store) {
         return new MessageDecryption(store,
                 new SignalSessionCipher(store.signalStore()),
                 new SignalGroupCipher(store.signalStore()),

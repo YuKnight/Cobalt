@@ -4,13 +4,12 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.ContactTextStatusListener;
-import com.github.auties00.cobalt.client.listener.ProfilePictureChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedContactTextStatusListener;
+import com.github.auties00.cobalt.listener.linked.LinkedProfilePictureChangedListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -489,7 +488,7 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
      */
     private void fireProfilePictureChanged(Jid jid) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof ProfilePictureChangedListener typed) {
+            if (listener instanceof LinkedProfilePictureChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onProfilePictureChanged(whatsapp, jid));
             }
         }
@@ -506,7 +505,7 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
      */
     private void notifyContactTextStatusChanged(Jid contactJid, ContactTextStatus status) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof ContactTextStatusListener typed) {
+            if (listener instanceof LinkedContactTextStatusListener typed) {
                 Thread.startVirtualThread(() -> typed.onContactTextStatus(whatsapp, contactJid, status));
             }
         }

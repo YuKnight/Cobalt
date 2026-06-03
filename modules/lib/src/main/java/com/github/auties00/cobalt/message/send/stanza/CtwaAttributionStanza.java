@@ -11,7 +11,7 @@ import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -47,7 +47,7 @@ public final class CtwaAttributionStanza {
     /**
      * Holds the store used to look up the chat and count its messages for the first-message logging policy.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Holds the AB-props service consulted for the CTWA-related props.
@@ -59,13 +59,13 @@ public final class CtwaAttributionStanza {
      * <p>
      * The entry-point cache lives on this instance.
      *
-     * @param store          the {@link WhatsAppStore}
+     * @param store          the {@link LinkedWhatsAppStore}
      * @param abPropsService the {@link ABPropsService}
      * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebSendMsgCtwaAttributionNode", exports = "getCtwaAttributionNode",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public CtwaAttributionStanza(WhatsAppStore store, ABPropsService abPropsService) {
+    public CtwaAttributionStanza(LinkedWhatsAppStore store, ABPropsService abPropsService) {
         this.store = Objects.requireNonNull(store, "store");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
         this.entryPoints = new ConcurrentHashMap<>();

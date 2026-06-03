@@ -35,7 +35,7 @@ import java.util.Set;
  * is used for Android devices and an APNS-based implementation for iOS
  * devices, but both expose the same surface and are kept stateful by the
  * embedder so neither method needs the live
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} as input.
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} as input.
  *
  * @apiNote
  * Implementations are not required to be stateless or thread-safe: the

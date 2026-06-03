@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.client.WhatsAppClientType;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 
 import java.io.BufferedReader;
@@ -187,7 +187,7 @@ public final class DeviceFixtures {
     }
 
     /**
-     * Creates an in-memory temporary {@link WhatsAppStore} pre-configured with the given self-PN
+     * Creates an in-memory temporary {@link LinkedWhatsAppStore} pre-configured with the given self-PN
      * and self-LID.
      *
      * @param selfPn  the local user's PN-form bare JID
@@ -196,7 +196,7 @@ public final class DeviceFixtures {
      * @return the configured temporary store
      * @throws UncheckedIOException if the underlying factory cannot create the store
      */
-    public static WhatsAppStore temporaryStore(Jid selfPn, Jid selfLid) {
+    public static LinkedWhatsAppStore temporaryStore(Jid selfPn, Jid selfLid) {
         Objects.requireNonNull(selfPn, "selfPn");
         try {
             var store = WhatsAppStoreFactory.temporary()

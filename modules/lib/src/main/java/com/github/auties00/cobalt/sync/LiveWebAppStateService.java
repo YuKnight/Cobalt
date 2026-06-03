@@ -34,7 +34,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadAction;
 import com.github.auties00.cobalt.model.sync.data.*;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.crypto.MutationIntegrityVerifier;
 import com.github.auties00.cobalt.sync.crypto.MutationKeys;
@@ -134,7 +134,7 @@ import java.util.logging.Logger;
  *
  * @implNote
  * This implementation collapses WA Web's twelve-IndexedDB schema into the
- * in-memory {@link WhatsAppStore}, so the {@code loadStatesFromDb} /
+ * in-memory {@link LinkedWhatsAppStore}, so the {@code loadStatesFromDb} /
  * {@code persistToDb} cycle WA Web performs around every sync round
  * becomes a no-op. State is recovered after a JVM restart by
  * {@link #resumeAfterRestart()} from whatever the store happens to hold
@@ -179,7 +179,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      * recomputation, version reads) do not pay for the indirection on
      * every mutation.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * The builder that constructs outgoing sync IQ nodes and encrypts
@@ -461,7 +461,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      * This implementation derives the set from the store's
      * {@link SyncCollectionState#IN_FLIGHT} marker rather than from a
      * module-level Set as WA Web does, since Cobalt stores the per-
-     * collection state machine in {@link WhatsAppStore}.
+     * collection state machine in {@link LinkedWhatsAppStore}.
      *
      * @return an unmodifiable {@link Set} of collections in
      *         {@link SyncCollectionState#IN_FLIGHT}
@@ -706,7 +706,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      * @implNote
      * This implementation iterates the closed {@link SyncPatchType} enum and
      * dispatches each collection's orphans separately rather than querying a
-     * unified table, matching {@link WhatsAppStore}'s per-collection storage
+     * unified table, matching {@link LinkedWhatsAppStore}'s per-collection storage
      * layout.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdOrphan", exports = "applyAllOrphansAndUnsupported", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -764,7 +764,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      *
      * @implNote
      * This implementation performs no separate LID enrichment pass; LID
-     * resolution happens inside {@link WhatsAppStore} during lookup.
+     * resolution happens inside {@link LinkedWhatsAppStore} during lookup.
      *
      * @param msgIds the message identifiers to retry against;
      *               {@code null} or empty is a no-op
@@ -787,7 +787,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      *
      * @implNote
      * This implementation performs no forced-history enrichment; LID
-     * resolution is owned by {@link WhatsAppStore}.
+     * resolution is owned by {@link LinkedWhatsAppStore}.
      *
      * @param chatIds the chat identifiers to retry against;
      *                {@code null} or empty is a no-op
@@ -1014,7 +1014,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      * {@code syncPendingMutationsAndBlockedCollections} in one pass;
      * Cobalt does not maintain the IndexedDB-backed state machine that
      * WA Web reloads on startup, so the equivalent of
-     * {@code loadStatesFromDb} is implicit in {@link WhatsAppStore}'s
+     * {@code loadStatesFromDb} is implicit in {@link LinkedWhatsAppStore}'s
      * boot. {@code ERROR_FATAL} is treated as terminal because Cobalt
      * has no UI callback equivalent to
      * {@code WAWebSyncdDbCallbacksApi.handleSyncdFatal}.

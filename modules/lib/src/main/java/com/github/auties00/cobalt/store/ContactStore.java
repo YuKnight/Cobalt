@@ -30,12 +30,12 @@ import java.util.Set;
  * <p>Phone-number/LID resolution ({@link #findPhoneByLid(Jid)} and
  * {@link #findLidByPhone(Jid)}) consults the local account identity for the
  * self-address case; that identity is supplied by the owning
- * {@link WhatsAppStore}.
+ * {@link LinkedWhatsAppStore}.
  *
  * @apiNote
- * Embedders reach this through {@link WhatsAppStore#contactStore()}.
+ * Embedders reach this through {@link LinkedWhatsAppStore#contactStore()}.
  *
- * @see WhatsAppStore
+ * @see LinkedWhatsAppStore
  */
 @WhatsAppWebModule(moduleName = "WAWebCollections")
 @SuppressWarnings({"unused", "UnusedReturnValue"})

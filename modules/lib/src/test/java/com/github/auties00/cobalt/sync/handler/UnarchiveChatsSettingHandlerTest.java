@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * mutation and asserting the {@code unarchiveChats} store flag plus the
  * matching unarchive/re-archive side-effect, including the
  * last-mutation-wins batch semantics. Tests seed the
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} sync-action
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} sync-action
  * entries directly to drive the side-effect helpers.
  */
 @DisplayName("UnarchiveChatsSettingHandler")

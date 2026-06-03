@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
@@ -8,7 +9,7 @@ import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.ack.NackReason;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.ContactTextStatusListener;
+import com.github.auties00.cobalt.listener.linked.LinkedContactTextStatusListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.model.chat.Chat;
@@ -750,7 +751,7 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
     }
 
     /**
-     * Fires {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onContactTextStatus(LinkedWhatsAppClient, Jid, ContactTextStatus)}
+     * Fires {@link LinkedWhatsAppClientListener#onContactTextStatus(LinkedWhatsAppClient, Jid, ContactTextStatus)}
      * on every registered listener on its own virtual thread.
      *
      * @param contactJid the JID whose text status changed
@@ -758,7 +759,7 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
      */
     private void notifyContactTextStatusChanged(Jid contactJid, ContactTextStatus status) {
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof ContactTextStatusListener typed) {
+            if (listener instanceof LinkedContactTextStatusListener typed) {
                 Thread.startVirtualThread(() -> typed.onContactTextStatus(whatsapp, contactJid, status));
             }
         }

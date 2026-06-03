@@ -22,15 +22,15 @@ public final class MerchantComplianceEdit {
     final String entityName;
 
     /**
-     * Wire-level entity type category, or {@code null} to leave the
-     * field unchanged.
+     * Legal-entity type category, or {@code null} to leave the field
+     * unchanged.
      */
-    @ProtobufProperty(index = 2, type = ProtobufType.STRING)
-    final String entityType;
+    @ProtobufProperty(index = 2, type = ProtobufType.ENUM)
+    final MerchantEntityType entityType;
 
     /**
      * Free-form entity-type description used when {@link #entityType} is
-     * set to a custom-bucket sentinel, or {@code null} to leave the
+     * {@link MerchantEntityType#OTHER}, or {@code null} to leave the
      * field unchanged.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
@@ -61,13 +61,13 @@ public final class MerchantComplianceEdit {
      * Constructs a new {@code MerchantComplianceEdit}.
      *
      * @param entityName              the legal-entity name, or {@code null}
-     * @param entityType              the wire-level entity-type code, or {@code null}
+     * @param entityType              the legal-entity type, or {@code null}
      * @param entityTypeCustom        the custom entity-type description, or {@code null}
      * @param registered              whether the business is declared registered
      * @param customerCareDetails     the customer-care contact block, or {@code null}
      * @param grievanceOfficerDetails the grievance-officer block, or {@code null}
      */
-    MerchantComplianceEdit(String entityName, String entityType, String entityTypeCustom,
+    MerchantComplianceEdit(String entityName, MerchantEntityType entityType, String entityTypeCustom,
                            boolean registered, BusinessContactDetails customerCareDetails,
                            BusinessGrievanceOfficerDetails grievanceOfficerDetails) {
         this.entityName = entityName;
@@ -88,11 +88,11 @@ public final class MerchantComplianceEdit {
     }
 
     /**
-     * Returns the wire-level entity-type code.
+     * Returns the legal-entity type.
      *
      * @return an {@code Optional} carrying the entity type, or empty when unset
      */
-    public Optional<String> entityType() {
+    public Optional<MerchantEntityType> entityType() {
         return Optional.ofNullable(entityType);
     }
 

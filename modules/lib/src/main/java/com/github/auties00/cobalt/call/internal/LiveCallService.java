@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.call.internal;
 
-import com.github.auties00.cobalt.ack.CallAck;
 import com.github.auties00.cobalt.ack.CallRelay;
 import com.github.auties00.cobalt.call.*;
 import com.github.auties00.cobalt.call.internal.audio.AudioPipelineOptions;
@@ -19,7 +18,7 @@ import com.github.auties00.cobalt.call.internal.transport.relay.WaRelayConnector
 import com.github.auties00.cobalt.call.session.VoiceCallOptions;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.CallEndedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallEndedListener;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload;
@@ -179,9 +178,16 @@ public class LiveCallService implements CallService {
     private static final int DEFAULT_REMOTE_SCREEN_SSRC = 0xCB06;
 
     /**
-     * Default Opus payload type used in the captured 16 kHz wideband profile.
+     * Default Opus RTP payload type.
+     *
+     * @implNote This implementation uses {@code 120}, the dynamic payload type WhatsApp's voip engine
+     * stamps on Opus media RTP. A live 1:1 call to a WhatsApp Android client shows its outbound audio
+     * arriving with payload type {@code 120}; sending any other type leaves the peer unable to map the
+     * stream to a codec, so it never reaches the connected media state. The payload type is not carried
+     * in the {@code <audio>} call-signaling element, so it is a fixed profile constant rather than a
+     * negotiated value.
      */
-    private static final int DEFAULT_OPUS_PAYLOAD_TYPE = 111;
+    private static final int DEFAULT_OPUS_PAYLOAD_TYPE = 120;
 
     /**
      * DTLS-handshake timeout used by the media-session bring-up before the call is marked
@@ -686,7 +692,7 @@ public class LiveCallService implements CallService {
         whatsapp.sendNodeWithNoResponse(CallStanza.reject(offer.peer(), offer.callId()).build());
         whatsapp.store().chatStore().removeCall(offer.callId());
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallEndedListener typed) {
+            if (listener instanceof LinkedCallEndedListener typed) {
                 Thread.startVirtualThread(() ->
                         typed.onCallEnded(whatsapp, offer.callId(), offer.peer(), reason));
             }
@@ -1301,7 +1307,7 @@ public class LiveCallService implements CallService {
     public void notifyEnded(String callId, Jid fromJid, String wireReason) {
         var parsed = CallEndReason.fromWireValue(wireReason);
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof CallEndedListener typed) {
+            if (listener instanceof LinkedCallEndedListener typed) {
                 Thread.startVirtualThread(() -> typed.onCallEnded(whatsapp, callId, fromJid, parsed));
             }
         }

@@ -3,7 +3,7 @@ package com.github.auties00.cobalt.registration;
 import com.github.auties00.cobalt.client.WhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.client.WhatsAppClientDeviceAttestor;
 import com.github.auties00.cobalt.client.WhatsAppClientDevicePushClient;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -41,7 +41,7 @@ import java.util.UUID;
  * </ul>
  *
  * <p>Package-private because instances are obtained through
- * {@link MobileClientRegistration#newRegistration(WhatsAppStore,
+ * {@link MobileClientRegistration#newRegistration(LinkedWhatsAppStore,
  * WhatsAppClientVerificationHandler.Mobile, WhatsAppClientDeviceAttestor,
  * WhatsAppClientDevicePushClient)} rather than constructed directly.
  *
@@ -86,7 +86,7 @@ final class AndroidClientRegistration extends MobileClientRegistration {
      * collaborators.
      *
      * <p>Invoked only from
-     * {@link MobileClientRegistration#newRegistration(WhatsAppStore,
+     * {@link MobileClientRegistration#newRegistration(LinkedWhatsAppStore,
      * WhatsAppClientVerificationHandler.Mobile,
      * WhatsAppClientDeviceAttestor, WhatsAppClientDevicePushClient)}. A
      * {@code null} attestor or push client is replaced by the
@@ -103,7 +103,7 @@ final class AndroidClientRegistration extends MobileClientRegistration {
      *                     to {@link WhatsAppClientDevicePushClient#noop()}
      */
     AndroidClientRegistration(
-            WhatsAppStore store,
+            LinkedWhatsAppStore store,
             WhatsAppClientVerificationHandler.Mobile verification,
             WhatsAppClientDeviceAttestor.Android attestor,
             WhatsAppClientDevicePushClient pushClient) {
@@ -147,7 +147,7 @@ final class AndroidClientRegistration extends MobileClientRegistration {
      * {@inheritDoc}
      *
      * <p>On Android, hex-encodes the signature returned by
-     * {@link WhatsAppClientDeviceAttestor.Android#sign(WhatsAppStore, byte[])}
+     * {@link WhatsAppClientDeviceAttestor.Android#sign(LinkedWhatsAppStore, byte[])}
      * (lowercase, no separator, the format the server expects in the
      * {@code &H=} suffix) and URL-safe-base64-encodes the certificate
      * chain without padding (the format the server expects in the

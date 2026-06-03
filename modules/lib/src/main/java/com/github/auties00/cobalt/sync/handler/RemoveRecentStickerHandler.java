@@ -19,7 +19,7 @@ import java.time.Instant;
  * <p>The sync dispatcher routes incoming {@code removeRecentSticker} mutations
  * here whenever the paired phone curates its recent-stickers list. The handler
  * deletes the matching entry from the local
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} recent-stickers map so
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} recent-stickers map so
  * the sticker picker on this device stops surfacing the retired sticker.
  */
 @WhatsAppWebModule(moduleName = "WAWebStickersRemoveRecentSyncAction")

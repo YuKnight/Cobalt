@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.client;
 
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 /**
  * Bridge between Cobalt and an embedder-supplied real mobile device for
@@ -91,12 +91,12 @@ public sealed interface WhatsAppClientDeviceAttestor
          */
         Android NONE = new Android() {
             @Override
-            public PlayIntegrityData attest(WhatsAppStore store) {
+            public PlayIntegrityData attest(LinkedWhatsAppStore store) {
                 return PlayIntegrityData.EMPTY;
             }
 
             @Override
-            public KeystoreAttestation sign(WhatsAppStore store, byte[] encBody) {
+            public KeystoreAttestation sign(LinkedWhatsAppStore store, byte[] encBody) {
                 return KeystoreAttestation.EMPTY;
             }
 
@@ -127,7 +127,7 @@ public sealed interface WhatsAppClientDeviceAttestor
          *                          any throw as a fatal registration
          *                          failure
          */
-        PlayIntegrityData attest(WhatsAppStore store);
+        PlayIntegrityData attest(LinkedWhatsAppStore store);
 
         /**
          * Signs the outer AES-GCM-encrypted body with a TEE-backed
@@ -152,7 +152,7 @@ public sealed interface WhatsAppClientDeviceAttestor
          * @throws RuntimeException if the attestor cannot produce a
          *                          signature
          */
-        KeystoreAttestation sign(WhatsAppStore store, byte[] encBody);
+        KeystoreAttestation sign(LinkedWhatsAppStore store, byte[] encBody);
 
         /**
          * Returns the install-source value the registration body reports
@@ -276,7 +276,7 @@ public sealed interface WhatsAppClientDeviceAttestor
         }
 
         /**
-         * Result of {@link Android#sign(WhatsAppStore, byte[])}: the
+         * Result of {@link Android#sign(LinkedWhatsAppStore, byte[])}: the
          * TEE-backed signature over the outer encrypted body together
          * with the attestation certificate chain for the signing key.
          *
@@ -338,7 +338,7 @@ public sealed interface WhatsAppClientDeviceAttestor
          */
         Ios NONE = new Ios() {
             @Override
-            public AppAttestData attest(WhatsAppStore store) {
+            public AppAttestData attest(LinkedWhatsAppStore store) {
                 return AppAttestData.EMPTY;
             }
         };
@@ -357,7 +357,7 @@ public sealed interface WhatsAppClientDeviceAttestor
          * @throws RuntimeException if the attestor cannot produce an
          *                          assertion
          */
-        AppAttestData attest(WhatsAppStore store);
+        AppAttestData attest(LinkedWhatsAppStore store);
 
         /**
          * Triple of Apple App Attest payloads the iOS registration

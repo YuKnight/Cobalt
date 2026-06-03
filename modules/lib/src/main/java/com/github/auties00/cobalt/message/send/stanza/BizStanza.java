@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -27,17 +27,17 @@ public final class BizStanza {
     /**
      * Holds the store consulted for the recipient's {@link BusinessVerifiedName} privacy-mode record.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Constructs a builder backed by the given store.
      * <p>
      * The instance is stateless and may be reused across sends.
      *
-     * @param store the {@link WhatsAppStore} used to resolve the recipient's verified business name
+     * @param store the {@link LinkedWhatsAppStore} used to resolve the recipient's verified business name
      * @throws NullPointerException if {@code store} is {@code null}
      */
-    public BizStanza(WhatsAppStore store) {
+    public BizStanza(LinkedWhatsAppStore store) {
         this.store = Objects.requireNonNull(store, "store");
     }
 

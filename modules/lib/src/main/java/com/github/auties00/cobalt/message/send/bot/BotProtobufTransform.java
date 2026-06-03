@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.message.context.ContextualMessage;
 import com.github.auties00.cobalt.model.message.system.FutureProofMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.util.Objects;
 
@@ -31,7 +31,7 @@ public final class BotProtobufTransform {
      * Holds the store consulted for LID-to-PN lookups when retargeting FBID-bot
      * participants.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Constructs a transform bound to the given store.
@@ -44,7 +44,7 @@ public final class BotProtobufTransform {
      * @param store the store providing JID resolution
      * @throws NullPointerException if {@code store} is {@code null}
      */
-    public BotProtobufTransform(WhatsAppStore store) {
+    public BotProtobufTransform(LinkedWhatsAppStore store) {
         this.store = Objects.requireNonNull(store, "store");
     }
 

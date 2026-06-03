@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * personalised channel recommendations across linked devices.
  *
  * <p>Persists a single {@code isUserOptedOut} flag on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} so the Channels
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} so the Channels
  * personalised recommendation surface honours the opt-out uniformly across
  * devices. Only {@link SyncdOperation#SET} is accepted; any other operation is
  * reported as {@link MutationApplicationResult#unsupported()} and a
@@ -94,7 +94,7 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
      * {@code REMOVE}. A wrong-typed value surfaces as
      * {@link MutationApplicationResult#malformed()}; on success the resolved
      * boolean is written via
-     * {@code WhatsAppStore.setChannelsPersonalisedRecommendationOptOut}. The
+     * {@code LinkedWhatsAppStore.setChannelsPersonalisedRecommendationOptOut}. The
      * {@link PrivacySettingChannelsPersonalisedRecommendationAction#isUserOptedOut()}
      * accessor coalesces a missing flag to {@code false} per the project
      * nullable boolean rule.

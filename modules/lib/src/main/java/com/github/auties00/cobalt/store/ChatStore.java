@@ -34,9 +34,9 @@ import java.util.Optional;
  * so they are implemented per-variant; the remaining state is strategy-independent.
  *
  * @apiNote
- * Embedders reach this through {@link WhatsAppStore#chatStore()}.
+ * Embedders reach this through {@link LinkedWhatsAppStore#chatStore()}.
  *
- * @see WhatsAppStore
+ * @see LinkedWhatsAppStore
  */
 @WhatsAppWebModule(moduleName = "WAWebModelStorageInitialize")
 @SuppressWarnings({"unused", "UnusedReturnValue"})

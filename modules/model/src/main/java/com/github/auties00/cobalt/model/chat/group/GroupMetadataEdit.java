@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.model.chat.group;
 
+import com.github.auties00.cobalt.model.chat.ChatDisappearingMode;
+import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
+import com.github.auties00.cobalt.model.chat.ChatPolicy;
 import com.github.auties00.cobalt.model.jid.Jid;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
@@ -7,14 +10,12 @@ import it.auties.protobuf.model.ProtobufType;
 
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalInt;
 
 /**
  * Input model describing a batch of edits to apply to a WhatsApp group's
  * metadata. The {@link #group} JID identifies the target; every other
  * field is optional and only triggers a server- or store-side mutation
- * when it carries a value (or, for the explicit clear flags, when it is
- * {@code true}).
+ * when it carries a value.
  *
  * <p>The same edit packet drives several distinct sites:
  * <ul>
@@ -23,24 +24,23 @@ import java.util.OptionalInt;
  *       translated into a single {@code iq} stanza each and sent to the
  *       relay.</li>
  *   <li><strong>Batched {@code WASmaxGroupsSetPropertyRPC} edits</strong>
- *       (all the legacy binary toggles plus
- *       {@link #ephemeralExpiration}, {@link #ephemeralTrigger},
- *       {@link #notEphemeral} and
- *       {@link #membershipApprovalGroupJoinMode}) are batched into a
- *       single {@code w:g2} property IQ.</li>
- *   <li><strong>MEX-dispatched edits</strong>
- *       ({@link #limitSharingEnabled}, {@link #limitSharingDisabled},
- *       {@link #memberAddAdminOnly}, {@link #memberAddAllMember},
- *       {@link #memberLinkAdminOnly}, {@link #memberLinkAllMember},
- *       {@link #memberShareGroupHistoryAdminOnly},
- *       {@link #memberShareGroupHistoryAllMember},
- *       {@link #allowNonAdminSubGroupCreation},
- *       {@link #notAllowNonAdminSubGroupCreation}) flow through the
+ *       ({@link #editInfoPolicy}, {@link #sendMessagePolicy},
+ *       {@link #frequentlyForwardedAllowed}, {@link #adminReportsAllowed},
+ *       {@link #groupHistoryShared} and
+ *       {@link #membershipApprovalRequired}) are batched into a single
+ *       {@code w:g2} property IQ.</li>
+ *   <li><strong>MEX-dispatched edits</strong> ({@link #limitSharing},
+ *       {@link #memberAddPolicy}, {@link #memberLinkPolicy},
+ *       {@link #memberShareGroupHistoryPolicy} and
+ *       {@link #subGroupCreationPolicy}) flow through the
  *       {@code WAWebMexUpdateGroupPropertyJob} GraphQL endpoint. The
- *       {@link #limitSharingEnabled} / {@link #limitSharingDisabled}
- *       and {@link #allowNonAdminSubGroupCreation} /
- *       {@link #notAllowNonAdminSubGroupCreation} pairs additionally
- *       commit a WAM event after the mutation completes.</li>
+ *       {@link #limitSharing} and {@link #subGroupCreationPolicy} edits
+ *       additionally commit a WAM event after the mutation completes.</li>
+ *   <li><strong>Disappearing-message edits</strong>
+ *       ({@link #ephemeralTimer}, {@link #ephemeralTrigger}) are routed
+ *       through the disappearing-message timer path so the in-memory
+ *       chat-ephemerality state and the
+ *       {@code EphemeralSettingChangeWamEvent} commit also fire.</li>
  *   <li><strong>Local-only edits</strong> ({@link #statusMuted}) are
  *       merged into the in-memory {@link GroupMetadata} row for the
  *       target group without producing a network packet. This branch
@@ -49,17 +49,20 @@ import java.util.OptionalInt;
  *       client is only reflecting it locally.</li>
  * </ul>
  *
- * <p>Each settings boolean (locked/unlocked, announcement/notAnnouncement,
- * etc.) stays a primitive {@code boolean} because the wire encoding from
- * WA Web treats both sides of every binary setting as independent
- * set-only commands and "off" is encoded as the matching negated toggle,
- * not the absence of the positive flag. The two non-trivial scalar
- * properties — {@link #description} and {@link #picture} — instead use
- * the sealed {@link GroupDescription} and {@link GroupPicture} types to
- * fold the "replace" and "clear" intents into one field each; a
- * {@code null} field still means "leave untouched". {@link #subject}
- * stays a nullable {@link String} because WA Web has no clear-subject
- * operation for groups.
+ * <p>Every setting is modelled as a single nullable field whose absence
+ * ({@code null}) means "leave untouched". Settings that gate an action
+ * behind administrator status use {@link ChatPolicy}: {@link ChatPolicy#ADMINS}
+ * restricts the action to admins, {@link ChatPolicy#ANYONE} opens it to all
+ * members, and the editor emits the matching positive or negated wire toggle.
+ * Plain on/off settings use a nullable {@link Boolean} so a present
+ * {@code false} (the "off" toggle) is distinguishable from an absent value.
+ * The disappearing-message window uses {@link ChatEphemeralTimer}, where
+ * {@link ChatEphemeralTimer#OFF} disables the feature and any other constant
+ * enables it for that duration. The two non-trivial scalar properties,
+ * {@link #description} and {@link #picture}, use the sealed
+ * {@link GroupDescription} and {@link GroupPicture} types to fold the "replace"
+ * and "clear" intents into one field each. {@link #subject} stays a nullable
+ * {@link String} because WA Web has no clear-subject operation for groups.
  *
  * <p>{@link #statusMuted} is declared as a nullable {@code Boolean} so
  * that a present {@code false} is distinguishable from an absent value.
@@ -76,106 +79,81 @@ public final class GroupMetadataEdit {
     final Jid group;
 
     /**
-     * Locks the group so that only admins can send messages.
+     * Policy governing who may edit the group info (subject, description,
+     * picture). {@link ChatPolicy#ADMINS} locks editing to admins,
+     * {@link ChatPolicy#ANYONE} opens it to all members; {@code null}
+     * leaves the setting untouched.
      */
-    @ProtobufProperty(index = 2, type = ProtobufType.BOOL)
-    final boolean locked;
+    @ProtobufProperty(index = 2, type = ProtobufType.ENUM)
+    final ChatPolicy editInfoPolicy;
 
     /**
-     * Switches the group into announcement mode.
+     * Policy governing who may send messages. {@link ChatPolicy#ADMINS}
+     * switches the group into announcement mode, {@link ChatPolicy#ANYONE}
+     * lets every member post; {@code null} leaves the setting untouched.
      */
-    @ProtobufProperty(index = 3, type = ProtobufType.BOOL)
-    final boolean announcement;
+    @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
+    final ChatPolicy sendMessagePolicy;
 
     /**
-     * Disables the "frequently forwarded" badge on group messages.
+     * Whether messages that have been forwarded many times are allowed.
+     * A present {@code true} restores the "frequently forwarded" badge,
+     * a present {@code false} disables it, and {@code null} leaves the
+     * setting untouched.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.BOOL)
-    final boolean noFrequentlyForwarded;
+    final Boolean frequentlyForwardedAllowed;
 
     /**
-     * Optional ephemeral-message expiration window, in seconds.
+     * Disappearing-message timer for the group. {@link ChatEphemeralTimer#OFF}
+     * disables ephemeral messages while any other constant enables them for
+     * that duration; {@code null} leaves the timer untouched.
      */
     @ProtobufProperty(index = 5, type = ProtobufType.INT32)
-    final Integer ephemeralExpiration;
+    final ChatEphemeralTimer ephemeralTimer;
 
     /**
-     * Optional ephemeral-message trigger code identifying who flipped
-     * the ephemeral timer.
+     * Trigger context identifying what mechanism initiated the
+     * disappearing-message change carried by {@link #ephemeralTimer}, or
+     * {@code null} when no trigger is supplied.
      */
-    @ProtobufProperty(index = 6, type = ProtobufType.INT32)
-    final Integer ephemeralTrigger;
+    @ProtobufProperty(index = 6, type = ProtobufType.ENUM)
+    final ChatDisappearingMode.Trigger ephemeralTrigger;
 
     /**
-     * Unlocks a previously locked group.
+     * Whether new members must be approved by an admin before joining. A
+     * present {@code true} requires approval, a present {@code false}
+     * disables it, and {@code null} leaves the join mode untouched.
      */
     @ProtobufProperty(index = 7, type = ProtobufType.BOOL)
-    final boolean unlocked;
+    final Boolean membershipApprovalRequired;
 
     /**
-     * Switches the group out of announcement mode.
+     * Whether members can report messages to administrators. A present
+     * {@code true} enables admin reports, a present {@code false} disables
+     * them, and {@code null} leaves the setting untouched.
      */
     @ProtobufProperty(index = 8, type = ProtobufType.BOOL)
-    final boolean notAnnouncement;
+    final Boolean adminReportsAllowed;
 
     /**
-     * Restores the "frequently forwarded" badge after it was disabled.
+     * Policy governing who may create sub-groups under this community
+     * parent. {@link ChatPolicy#ANYONE} allows non-admins to create
+     * sub-groups, {@link ChatPolicy#ADMINS} restricts creation to admins;
+     * {@code null} leaves the setting untouched. Dispatched through the
+     * {@code WAWebMexUpdateGroupPropertyJob} GraphQL endpoint and followed
+     * by a {@code CommunityGroupJourneyEvent} WAM commit.
      */
-    @ProtobufProperty(index = 9, type = ProtobufType.BOOL)
-    final boolean frequentlyForwardedOk;
+    @ProtobufProperty(index = 9, type = ProtobufType.ENUM)
+    final ChatPolicy subGroupCreationPolicy;
 
     /**
-     * Disables ephemeral messages for the group.
+     * Whether new joiners can see past messages ("group history"). A
+     * present {@code true} enables shared history, a present {@code false}
+     * disables it, and {@code null} leaves the setting untouched.
      */
     @ProtobufProperty(index = 10, type = ProtobufType.BOOL)
-    final boolean notEphemeral;
-
-    /**
-     * Optional membership-approval join-mode code; {@code null} leaves
-     * the existing join mode untouched.
-     */
-    @ProtobufProperty(index = 11, type = ProtobufType.STRING)
-    final String membershipApprovalGroupJoinMode;
-
-    /**
-     * Allows admins to file reports on behalf of the group.
-     */
-    @ProtobufProperty(index = 12, type = ProtobufType.BOOL)
-    final boolean allowAdminReports;
-
-    /**
-     * Inverse of {@link #allowAdminReports}.
-     */
-    @ProtobufProperty(index = 13, type = ProtobufType.BOOL)
-    final boolean notAllowAdminReports;
-
-    /**
-     * Allows non-admins to create sub-groups under this community
-     * parent. Dispatched through the
-     * {@code WAWebMexUpdateGroupPropertyJob} GraphQL endpoint and
-     * followed by a {@code CommunityGroupJourneyEvent} WAM commit.
-     */
-    @ProtobufProperty(index = 14, type = ProtobufType.BOOL)
-    final boolean allowNonAdminSubGroupCreation;
-
-    /**
-     * Inverse of {@link #allowNonAdminSubGroupCreation}.
-     */
-    @ProtobufProperty(index = 15, type = ProtobufType.BOOL)
-    final boolean notAllowNonAdminSubGroupCreation;
-
-    /**
-     * Enables the "group history" feature, allowing new joiners to see
-     * past messages.
-     */
-    @ProtobufProperty(index = 16, type = ProtobufType.BOOL)
-    final boolean groupHistory;
-
-    /**
-     * Inverse of {@link #groupHistory}.
-     */
-    @ProtobufProperty(index = 17, type = ProtobufType.BOOL)
-    final boolean noGroupHistory;
+    final Boolean groupHistoryShared;
 
     /**
      * New group subject (display name). When non-{@code null}, the
@@ -183,7 +161,7 @@ public final class GroupMetadataEdit {
      * {@code w:g2} {@code iq} of type {@code set}. When {@code null},
      * the subject is left untouched.
      */
-    @ProtobufProperty(index = 18, type = ProtobufType.STRING)
+    @ProtobufProperty(index = 11, type = ProtobufType.STRING)
     final String subject;
 
     /**
@@ -194,7 +172,7 @@ public final class GroupMetadataEdit {
      * body matching WA Web's {@code hasDescriptionDeleteTrue:!0}
      * branch. When {@code null}, the description is left untouched.
      */
-    @ProtobufProperty(index = 19, type = ProtobufType.STRING)
+    @ProtobufProperty(index = 12, type = ProtobufType.STRING)
     final GroupDescription description;
 
     /**
@@ -206,169 +184,110 @@ public final class GroupMetadataEdit {
      * WA Web's {@code WAWebSendProfilePictureJob(group, null)} removal
      * path. When {@code null}, the picture is left untouched.
      */
-    @ProtobufProperty(index = 21, type = ProtobufType.BYTES)
+    @ProtobufProperty(index = 13, type = ProtobufType.BYTES)
     final GroupPicture picture;
 
     /**
      * Local-only override for the group's
      * {@link GroupMetadata#statusMuted()} flag. When non-{@code null},
      * the editor merges this value into the in-memory metadata row
-     * without producing any network packet — the relay has already
+     * without producing any network packet; the relay has already
      * decided the value (the sync action carrying this edit is itself
      * server-driven). When {@code null}, the flag is left untouched.
      */
-    @ProtobufProperty(index = 23, type = ProtobufType.BOOL)
+    @ProtobufProperty(index = 14, type = ProtobufType.BOOL)
     final Boolean statusMuted;
 
     /**
-     * Enables the per-chat "limit sharing" anti-forward feature.
-     * Dispatched through {@code WAWebMexUpdateGroupPropertyJob} with
-     * {@code limit_sharing.limit_sharing_enabled=true} and followed by
-     * a {@code LimitSharingSettingUpdateWamEvent} commit carrying
-     * {@code toggleUpdateAction=TURN_ON}.
+     * Whether the per-chat "limit sharing" anti-forward feature is
+     * enabled. A present {@code true} enables it, a present {@code false}
+     * disables it, and {@code null} leaves the setting untouched.
+     * Dispatched through {@code WAWebMexUpdateGroupPropertyJob} and
+     * followed by a {@code LimitSharingSettingUpdateWamEvent} commit.
      */
-    @ProtobufProperty(index = 24, type = ProtobufType.BOOL)
-    final boolean limitSharingEnabled;
+    @ProtobufProperty(index = 15, type = ProtobufType.BOOL)
+    final Boolean limitSharing;
 
     /**
-     * Inverse of {@link #limitSharingEnabled}. Emits
-     * {@code limit_sharing.limit_sharing_enabled=false} and commits a
-     * {@code LimitSharingSettingUpdateWamEvent} carrying
-     * {@code toggleUpdateAction=TURN_OFF}.
+     * Policy governing who may add new members. {@link ChatPolicy#ADMINS}
+     * restricts adding to admins ({@code member_add_mode="ADMIN_ADD"}),
+     * {@link ChatPolicy#ANYONE} opens it to all members
+     * ({@code "ALL_MEMBER_ADD"}); {@code null} leaves the setting
+     * untouched. Dispatched through {@code WAWebMexUpdateGroupPropertyJob}.
      */
-    @ProtobufProperty(index = 25, type = ProtobufType.BOOL)
-    final boolean limitSharingDisabled;
+    @ProtobufProperty(index = 16, type = ProtobufType.ENUM)
+    final ChatPolicy memberAddPolicy;
 
     /**
-     * Restricts adding new members to admins. Dispatched through
-     * {@code WAWebMexUpdateGroupPropertyJob} with
-     * {@code member_add_mode="ADMIN_ADD"}, matching the WA Web
-     * {@code WAWebSetPropertyGroupAction} {@code GROUP_SETTING_TYPE
-     * .MEMBER_ADD_MODE} ADMINS branch.
+     * Policy governing who may share the invite link. {@link ChatPolicy#ADMINS}
+     * restricts sharing to admins ({@code member_link_mode="ADMIN_LINK"}),
+     * {@link ChatPolicy#ANYONE} opens it to all members
+     * ({@code "ALL_MEMBER_LINK"}); {@code null} leaves the setting
+     * untouched. Dispatched through {@code WAWebMexUpdateGroupPropertyJob}.
      */
-    @ProtobufProperty(index = 26, type = ProtobufType.BOOL)
-    final boolean memberAddAdminOnly;
+    @ProtobufProperty(index = 17, type = ProtobufType.ENUM)
+    final ChatPolicy memberLinkPolicy;
 
     /**
-     * Inverse of {@link #memberAddAdminOnly}. Emits
-     * {@code member_add_mode="ALL_MEMBER_ADD"}, matching the WA Web
-     * non-ADMINS branch.
+     * Policy governing who may share the message history with newly added
+     * members. {@link ChatPolicy#ADMINS} restricts sharing to admins
+     * ({@code member_share_group_history_mode="ADMIN_SHARE"}),
+     * {@link ChatPolicy#ANYONE} opens it to all members
+     * ({@code "ALL_MEMBER_SHARE"}); {@code null} leaves the setting
+     * untouched. Dispatched through {@code WAWebMexUpdateGroupPropertyJob}.
      */
-    @ProtobufProperty(index = 27, type = ProtobufType.BOOL)
-    final boolean memberAddAllMember;
-
-    /**
-     * Restricts sharing the invite link to admins. Dispatched through
-     * {@code WAWebMexUpdateGroupPropertyJob} with
-     * {@code member_link_mode="ADMIN_LINK"}, matching the WA Web
-     * {@code MEMBER_LINK_MODE} ADMINS branch.
-     */
-    @ProtobufProperty(index = 28, type = ProtobufType.BOOL)
-    final boolean memberLinkAdminOnly;
-
-    /**
-     * Inverse of {@link #memberLinkAdminOnly}. Emits
-     * {@code member_link_mode="ALL_MEMBER_LINK"}, matching the WA Web
-     * non-ADMINS branch.
-     */
-    @ProtobufProperty(index = 29, type = ProtobufType.BOOL)
-    final boolean memberLinkAllMember;
-
-    /**
-     * Restricts sharing the message history with newly added members
-     * to admins. Dispatched through
-     * {@code WAWebMexUpdateGroupPropertyJob} with
-     * {@code member_share_group_history_mode="ADMIN_SHARE"}, matching
-     * the WA Web {@code MEMBER_SHARE_GROUP_HISTORY_MODE} ADMINS
-     * branch.
-     */
-    @ProtobufProperty(index = 30, type = ProtobufType.BOOL)
-    final boolean memberShareGroupHistoryAdminOnly;
-
-    /**
-     * Inverse of {@link #memberShareGroupHistoryAdminOnly}. Emits
-     * {@code member_share_group_history_mode="ALL_MEMBER_SHARE"},
-     * matching the WA Web non-ADMINS branch.
-     */
-    @ProtobufProperty(index = 31, type = ProtobufType.BOOL)
-    final boolean memberShareGroupHistoryAllMember;
+    @ProtobufProperty(index = 18, type = ProtobufType.ENUM)
+    final ChatPolicy memberShareGroupHistoryPolicy;
 
     /**
      * Constructs a new {@code GroupMetadataEdit}.
      *
-     * @param group                            the group JID; required
-     * @param locked                           whether to lock the group
-     * @param announcement                     whether to enable announcement mode
-     * @param noFrequentlyForwarded            whether to disable the frequently-forwarded badge
-     * @param ephemeralExpiration              optional ephemeral expiration in seconds
-     * @param ephemeralTrigger                 optional ephemeral trigger code
-     * @param unlocked                         whether to unlock the group
-     * @param notAnnouncement                  whether to disable announcement mode
-     * @param frequentlyForwardedOk            whether to restore the frequently-forwarded badge
-     * @param notEphemeral                     whether to disable ephemeral messages
-     * @param membershipApprovalGroupJoinMode  optional join-mode code, or {@code null}
-     * @param allowAdminReports                whether to allow admin reports
-     * @param notAllowAdminReports             whether to disable admin reports
-     * @param allowNonAdminSubGroupCreation    whether to allow non-admin sub-group creation
-     * @param notAllowNonAdminSubGroupCreation whether to disable non-admin sub-group creation
-     * @param groupHistory                     whether to enable group history
-     * @param noGroupHistory                   whether to disable group history
-     * @param subject                          new group subject, or {@code null} to leave unchanged
-     * @param description                      description-edit intent, or {@code null} to leave unchanged
-     * @param picture                          picture-edit intent, or {@code null} to leave unchanged
-     * @param statusMuted                      new local statusMuted flag, or {@code null} to leave unchanged
-     * @param limitSharingEnabled              whether to enable the per-chat sharing limit
-     * @param limitSharingDisabled             whether to disable the per-chat sharing limit
-     * @param memberAddAdminOnly               whether to restrict member-add to admins
-     * @param memberAddAllMember               whether to open member-add to all members
-     * @param memberLinkAdminOnly              whether to restrict invite-link sharing to admins
-     * @param memberLinkAllMember              whether to open invite-link sharing to all members
-     * @param memberShareGroupHistoryAdminOnly whether to restrict history sharing to admins
-     * @param memberShareGroupHistoryAllMember whether to open history sharing to all members
+     * @param group                         the group JID; required
+     * @param editInfoPolicy                policy for editing group info, or {@code null}
+     * @param sendMessagePolicy             policy for sending messages, or {@code null}
+     * @param frequentlyForwardedAllowed    whether frequently-forwarded messages are allowed, or {@code null}
+     * @param ephemeralTimer                disappearing-message timer, or {@code null}
+     * @param ephemeralTrigger              disappearing-message change trigger, or {@code null}
+     * @param membershipApprovalRequired    whether membership approval is required, or {@code null}
+     * @param adminReportsAllowed           whether admin reports are allowed, or {@code null}
+     * @param subGroupCreationPolicy        policy for sub-group creation, or {@code null}
+     * @param groupHistoryShared            whether group history is shared, or {@code null}
+     * @param subject                       new group subject, or {@code null} to leave unchanged
+     * @param description                   description-edit intent, or {@code null} to leave unchanged
+     * @param picture                       picture-edit intent, or {@code null} to leave unchanged
+     * @param statusMuted                   new local statusMuted flag, or {@code null} to leave unchanged
+     * @param limitSharing                  whether the per-chat sharing limit is enabled, or {@code null}
+     * @param memberAddPolicy               policy for adding members, or {@code null}
+     * @param memberLinkPolicy              policy for sharing the invite link, or {@code null}
+     * @param memberShareGroupHistoryPolicy policy for sharing history with new members, or {@code null}
      * @throws NullPointerException if {@code group} is {@code null}
      */
-    GroupMetadataEdit(Jid group, boolean locked, boolean announcement, boolean noFrequentlyForwarded,
-                      Integer ephemeralExpiration, Integer ephemeralTrigger, boolean unlocked,
-                      boolean notAnnouncement, boolean frequentlyForwardedOk, boolean notEphemeral,
-                      String membershipApprovalGroupJoinMode, boolean allowAdminReports,
-                      boolean notAllowAdminReports, boolean allowNonAdminSubGroupCreation,
-                      boolean notAllowNonAdminSubGroupCreation, boolean groupHistory,
-                      boolean noGroupHistory, String subject, GroupDescription description,
-                      GroupPicture picture, Boolean statusMuted,
-                      boolean limitSharingEnabled, boolean limitSharingDisabled,
-                      boolean memberAddAdminOnly, boolean memberAddAllMember,
-                      boolean memberLinkAdminOnly, boolean memberLinkAllMember,
-                      boolean memberShareGroupHistoryAdminOnly,
-                      boolean memberShareGroupHistoryAllMember) {
+    GroupMetadataEdit(Jid group, ChatPolicy editInfoPolicy, ChatPolicy sendMessagePolicy,
+                      Boolean frequentlyForwardedAllowed, ChatEphemeralTimer ephemeralTimer,
+                      ChatDisappearingMode.Trigger ephemeralTrigger, Boolean membershipApprovalRequired,
+                      Boolean adminReportsAllowed, ChatPolicy subGroupCreationPolicy,
+                      Boolean groupHistoryShared, String subject, GroupDescription description,
+                      GroupPicture picture, Boolean statusMuted, Boolean limitSharing,
+                      ChatPolicy memberAddPolicy, ChatPolicy memberLinkPolicy,
+                      ChatPolicy memberShareGroupHistoryPolicy) {
         this.group = Objects.requireNonNull(group, "group cannot be null");
-        this.locked = locked;
-        this.announcement = announcement;
-        this.noFrequentlyForwarded = noFrequentlyForwarded;
-        this.ephemeralExpiration = ephemeralExpiration;
+        this.editInfoPolicy = editInfoPolicy;
+        this.sendMessagePolicy = sendMessagePolicy;
+        this.frequentlyForwardedAllowed = frequentlyForwardedAllowed;
+        this.ephemeralTimer = ephemeralTimer;
         this.ephemeralTrigger = ephemeralTrigger;
-        this.unlocked = unlocked;
-        this.notAnnouncement = notAnnouncement;
-        this.frequentlyForwardedOk = frequentlyForwardedOk;
-        this.notEphemeral = notEphemeral;
-        this.membershipApprovalGroupJoinMode = membershipApprovalGroupJoinMode;
-        this.allowAdminReports = allowAdminReports;
-        this.notAllowAdminReports = notAllowAdminReports;
-        this.allowNonAdminSubGroupCreation = allowNonAdminSubGroupCreation;
-        this.notAllowNonAdminSubGroupCreation = notAllowNonAdminSubGroupCreation;
-        this.groupHistory = groupHistory;
-        this.noGroupHistory = noGroupHistory;
+        this.membershipApprovalRequired = membershipApprovalRequired;
+        this.adminReportsAllowed = adminReportsAllowed;
+        this.subGroupCreationPolicy = subGroupCreationPolicy;
+        this.groupHistoryShared = groupHistoryShared;
         this.subject = subject;
         this.description = description;
         this.picture = picture;
         this.statusMuted = statusMuted;
-        this.limitSharingEnabled = limitSharingEnabled;
-        this.limitSharingDisabled = limitSharingDisabled;
-        this.memberAddAdminOnly = memberAddAdminOnly;
-        this.memberAddAllMember = memberAddAllMember;
-        this.memberLinkAdminOnly = memberLinkAdminOnly;
-        this.memberLinkAllMember = memberLinkAllMember;
-        this.memberShareGroupHistoryAdminOnly = memberShareGroupHistoryAdminOnly;
-        this.memberShareGroupHistoryAllMember = memberShareGroupHistoryAllMember;
+        this.limitSharing = limitSharing;
+        this.memberAddPolicy = memberAddPolicy;
+        this.memberLinkPolicy = memberLinkPolicy;
+        this.memberShareGroupHistoryPolicy = memberShareGroupHistoryPolicy;
     }
 
     /**
@@ -381,150 +300,89 @@ public final class GroupMetadataEdit {
     }
 
     /**
-     * Returns the locked flag.
+     * Returns the optional group-info edit policy.
      *
-     * @return {@code true} to lock the group
+     * @return an {@link Optional} carrying the policy, or empty when unset
      */
-    public boolean locked() {
-        return locked;
+    public Optional<ChatPolicy> editInfoPolicy() {
+        return Optional.ofNullable(editInfoPolicy);
     }
 
     /**
-     * Returns the announcement flag.
+     * Returns the optional send-message policy.
      *
-     * @return {@code true} to enable announcement mode
+     * @return an {@link Optional} carrying the policy, or empty when unset
      */
-    public boolean announcement() {
-        return announcement;
+    public Optional<ChatPolicy> sendMessagePolicy() {
+        return Optional.ofNullable(sendMessagePolicy);
     }
 
     /**
-     * Returns the no-frequently-forwarded flag.
+     * Returns the optional frequently-forwarded-allowed flag.
      *
-     * @return {@code true} to disable the frequently-forwarded badge
-     */
-    public boolean noFrequentlyForwarded() {
-        return noFrequentlyForwarded;
-    }
-
-    /**
-     * Returns the optional ephemeral-expiration window.
-     *
-     * @return an {@link OptionalInt} carrying the expiration in seconds,
+     * @return an {@link Optional} carrying {@code true} to allow
+     *         frequently-forwarded messages, {@code false} to block them,
      *         or empty when unset
      */
-    public OptionalInt ephemeralExpiration() {
-        return ephemeralExpiration == null ? OptionalInt.empty() : OptionalInt.of(ephemeralExpiration);
+    public Optional<Boolean> frequentlyForwardedAllowed() {
+        return Optional.ofNullable(frequentlyForwardedAllowed);
     }
 
     /**
-     * Returns the optional ephemeral-trigger code.
+     * Returns the optional disappearing-message timer.
      *
-     * @return an {@link OptionalInt} carrying the trigger code, or
-     *         empty when unset
+     * @return an {@link Optional} carrying the timer, or empty when unset
      */
-    public OptionalInt ephemeralTrigger() {
-        return ephemeralTrigger == null ? OptionalInt.empty() : OptionalInt.of(ephemeralTrigger);
+    public Optional<ChatEphemeralTimer> ephemeralTimer() {
+        return Optional.ofNullable(ephemeralTimer);
     }
 
     /**
-     * Returns the unlocked flag.
+     * Returns the optional disappearing-message change trigger.
      *
-     * @return {@code true} to unlock the group
+     * @return an {@link Optional} carrying the trigger, or empty when unset
      */
-    public boolean unlocked() {
-        return unlocked;
+    public Optional<ChatDisappearingMode.Trigger> ephemeralTrigger() {
+        return Optional.ofNullable(ephemeralTrigger);
     }
 
     /**
-     * Returns the not-announcement flag.
+     * Returns the optional membership-approval-required flag.
      *
-     * @return {@code true} to disable announcement mode
+     * @return an {@link Optional} carrying {@code true} to require approval,
+     *         {@code false} to disable it, or empty when unset
      */
-    public boolean notAnnouncement() {
-        return notAnnouncement;
+    public Optional<Boolean> membershipApprovalRequired() {
+        return Optional.ofNullable(membershipApprovalRequired);
     }
 
     /**
-     * Returns the frequently-forwarded-OK flag.
+     * Returns the optional admin-reports-allowed flag.
      *
-     * @return {@code true} to restore the frequently-forwarded badge
+     * @return an {@link Optional} carrying {@code true} to allow admin
+     *         reports, {@code false} to disable them, or empty when unset
      */
-    public boolean frequentlyForwardedOk() {
-        return frequentlyForwardedOk;
+    public Optional<Boolean> adminReportsAllowed() {
+        return Optional.ofNullable(adminReportsAllowed);
     }
 
     /**
-     * Returns the not-ephemeral flag.
+     * Returns the optional sub-group-creation policy.
      *
-     * @return {@code true} to disable ephemeral messages
+     * @return an {@link Optional} carrying the policy, or empty when unset
      */
-    public boolean notEphemeral() {
-        return notEphemeral;
+    public Optional<ChatPolicy> subGroupCreationPolicy() {
+        return Optional.ofNullable(subGroupCreationPolicy);
     }
 
     /**
-     * Returns the optional membership-approval join-mode code.
+     * Returns the optional group-history-shared flag.
      *
-     * @return an {@link Optional} carrying the join-mode code, or empty
-     *         when unset
+     * @return an {@link Optional} carrying {@code true} to share history,
+     *         {@code false} to disable it, or empty when unset
      */
-    public Optional<String> membershipApprovalGroupJoinMode() {
-        return Optional.ofNullable(membershipApprovalGroupJoinMode);
-    }
-
-    /**
-     * Returns the allow-admin-reports flag.
-     *
-     * @return {@code true} to allow admin reports
-     */
-    public boolean allowAdminReports() {
-        return allowAdminReports;
-    }
-
-    /**
-     * Returns the not-allow-admin-reports flag.
-     *
-     * @return {@code true} to disable admin reports
-     */
-    public boolean notAllowAdminReports() {
-        return notAllowAdminReports;
-    }
-
-    /**
-     * Returns the allow-non-admin-sub-group-creation flag.
-     *
-     * @return {@code true} to allow non-admin sub-group creation
-     */
-    public boolean allowNonAdminSubGroupCreation() {
-        return allowNonAdminSubGroupCreation;
-    }
-
-    /**
-     * Returns the not-allow-non-admin-sub-group-creation flag.
-     *
-     * @return {@code true} to disable non-admin sub-group creation
-     */
-    public boolean notAllowNonAdminSubGroupCreation() {
-        return notAllowNonAdminSubGroupCreation;
-    }
-
-    /**
-     * Returns the group-history flag.
-     *
-     * @return {@code true} to enable group history
-     */
-    public boolean groupHistory() {
-        return groupHistory;
-    }
-
-    /**
-     * Returns the no-group-history flag.
-     *
-     * @return {@code true} to disable group history
-     */
-    public boolean noGroupHistory() {
-        return noGroupHistory;
+    public Optional<Boolean> groupHistoryShared() {
+        return Optional.ofNullable(groupHistoryShared);
     }
 
     /**
@@ -578,75 +436,41 @@ public final class GroupMetadataEdit {
     }
 
     /**
-     * Returns the limit-sharing-enabled flag.
+     * Returns the optional limit-sharing flag.
      *
-     * @return {@code true} to enable the per-chat sharing limit
+     * @return an {@link Optional} carrying {@code true} to enable the
+     *         per-chat sharing limit, {@code false} to disable it, or
+     *         empty when unset
      */
-    public boolean limitSharingEnabled() {
-        return limitSharingEnabled;
+    public Optional<Boolean> limitSharing() {
+        return Optional.ofNullable(limitSharing);
     }
 
     /**
-     * Returns the limit-sharing-disabled flag.
+     * Returns the optional member-add policy.
      *
-     * @return {@code true} to disable the per-chat sharing limit
+     * @return an {@link Optional} carrying the policy, or empty when unset
      */
-    public boolean limitSharingDisabled() {
-        return limitSharingDisabled;
+    public Optional<ChatPolicy> memberAddPolicy() {
+        return Optional.ofNullable(memberAddPolicy);
     }
 
     /**
-     * Returns the member-add-admin-only flag.
+     * Returns the optional member-link policy.
      *
-     * @return {@code true} to restrict member-add to admins
+     * @return an {@link Optional} carrying the policy, or empty when unset
      */
-    public boolean memberAddAdminOnly() {
-        return memberAddAdminOnly;
+    public Optional<ChatPolicy> memberLinkPolicy() {
+        return Optional.ofNullable(memberLinkPolicy);
     }
 
     /**
-     * Returns the member-add-all-member flag.
+     * Returns the optional member-share-group-history policy.
      *
-     * @return {@code true} to open member-add to all members
+     * @return an {@link Optional} carrying the policy, or empty when unset
      */
-    public boolean memberAddAllMember() {
-        return memberAddAllMember;
-    }
-
-    /**
-     * Returns the member-link-admin-only flag.
-     *
-     * @return {@code true} to restrict invite-link sharing to admins
-     */
-    public boolean memberLinkAdminOnly() {
-        return memberLinkAdminOnly;
-    }
-
-    /**
-     * Returns the member-link-all-member flag.
-     *
-     * @return {@code true} to open invite-link sharing to all members
-     */
-    public boolean memberLinkAllMember() {
-        return memberLinkAllMember;
-    }
-
-    /**
-     * Returns the member-share-group-history-admin-only flag.
-     *
-     * @return {@code true} to restrict history sharing to admins
-     */
-    public boolean memberShareGroupHistoryAdminOnly() {
-        return memberShareGroupHistoryAdminOnly;
-    }
-
-    /**
-     * Returns the member-share-group-history-all-member flag.
-     *
-     * @return {@code true} to open history sharing to all members
-     */
-    public boolean memberShareGroupHistoryAllMember() {
-        return memberShareGroupHistoryAllMember;
+    public Optional<ChatPolicy> memberShareGroupHistoryPolicy() {
+        return Optional.ofNullable(memberShareGroupHistoryPolicy);
     }
 
     @Override
@@ -655,79 +479,53 @@ public final class GroupMetadataEdit {
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (GroupMetadataEdit) obj;
         return Objects.equals(group, that.group) &&
-                locked == that.locked &&
-                announcement == that.announcement &&
-                noFrequentlyForwarded == that.noFrequentlyForwarded &&
-                Objects.equals(ephemeralExpiration, that.ephemeralExpiration) &&
-                Objects.equals(ephemeralTrigger, that.ephemeralTrigger) &&
-                unlocked == that.unlocked &&
-                notAnnouncement == that.notAnnouncement &&
-                frequentlyForwardedOk == that.frequentlyForwardedOk &&
-                notEphemeral == that.notEphemeral &&
-                Objects.equals(membershipApprovalGroupJoinMode, that.membershipApprovalGroupJoinMode) &&
-                allowAdminReports == that.allowAdminReports &&
-                notAllowAdminReports == that.notAllowAdminReports &&
-                allowNonAdminSubGroupCreation == that.allowNonAdminSubGroupCreation &&
-                notAllowNonAdminSubGroupCreation == that.notAllowNonAdminSubGroupCreation &&
-                groupHistory == that.groupHistory &&
-                noGroupHistory == that.noGroupHistory &&
+                editInfoPolicy == that.editInfoPolicy &&
+                sendMessagePolicy == that.sendMessagePolicy &&
+                Objects.equals(frequentlyForwardedAllowed, that.frequentlyForwardedAllowed) &&
+                ephemeralTimer == that.ephemeralTimer &&
+                ephemeralTrigger == that.ephemeralTrigger &&
+                Objects.equals(membershipApprovalRequired, that.membershipApprovalRequired) &&
+                Objects.equals(adminReportsAllowed, that.adminReportsAllowed) &&
+                subGroupCreationPolicy == that.subGroupCreationPolicy &&
+                Objects.equals(groupHistoryShared, that.groupHistoryShared) &&
                 Objects.equals(subject, that.subject) &&
                 Objects.equals(description, that.description) &&
                 Objects.equals(picture, that.picture) &&
                 Objects.equals(statusMuted, that.statusMuted) &&
-                limitSharingEnabled == that.limitSharingEnabled &&
-                limitSharingDisabled == that.limitSharingDisabled &&
-                memberAddAdminOnly == that.memberAddAdminOnly &&
-                memberAddAllMember == that.memberAddAllMember &&
-                memberLinkAdminOnly == that.memberLinkAdminOnly &&
-                memberLinkAllMember == that.memberLinkAllMember &&
-                memberShareGroupHistoryAdminOnly == that.memberShareGroupHistoryAdminOnly &&
-                memberShareGroupHistoryAllMember == that.memberShareGroupHistoryAllMember;
+                Objects.equals(limitSharing, that.limitSharing) &&
+                memberAddPolicy == that.memberAddPolicy &&
+                memberLinkPolicy == that.memberLinkPolicy &&
+                memberShareGroupHistoryPolicy == that.memberShareGroupHistoryPolicy;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(group, locked, announcement, noFrequentlyForwarded, ephemeralExpiration,
-                ephemeralTrigger, unlocked, notAnnouncement, frequentlyForwardedOk, notEphemeral,
-                membershipApprovalGroupJoinMode, allowAdminReports, notAllowAdminReports,
-                allowNonAdminSubGroupCreation, notAllowNonAdminSubGroupCreation, groupHistory,
-                noGroupHistory, subject, description, picture, statusMuted,
-                limitSharingEnabled, limitSharingDisabled, memberAddAdminOnly, memberAddAllMember,
-                memberLinkAdminOnly, memberLinkAllMember, memberShareGroupHistoryAdminOnly,
-                memberShareGroupHistoryAllMember);
+        return Objects.hash(group, editInfoPolicy, sendMessagePolicy, frequentlyForwardedAllowed,
+                ephemeralTimer, ephemeralTrigger, membershipApprovalRequired, adminReportsAllowed,
+                subGroupCreationPolicy, groupHistoryShared, subject, description, picture, statusMuted,
+                limitSharing, memberAddPolicy, memberLinkPolicy, memberShareGroupHistoryPolicy);
     }
 
     @Override
     public String toString() {
         return "GroupMetadataEdit[" +
                 "group=" + group + ", " +
-                "locked=" + locked + ", " +
-                "announcement=" + announcement + ", " +
-                "noFrequentlyForwarded=" + noFrequentlyForwarded + ", " +
-                "ephemeralExpiration=" + ephemeralExpiration + ", " +
+                "editInfoPolicy=" + editInfoPolicy + ", " +
+                "sendMessagePolicy=" + sendMessagePolicy + ", " +
+                "frequentlyForwardedAllowed=" + frequentlyForwardedAllowed + ", " +
+                "ephemeralTimer=" + ephemeralTimer + ", " +
                 "ephemeralTrigger=" + ephemeralTrigger + ", " +
-                "unlocked=" + unlocked + ", " +
-                "notAnnouncement=" + notAnnouncement + ", " +
-                "frequentlyForwardedOk=" + frequentlyForwardedOk + ", " +
-                "notEphemeral=" + notEphemeral + ", " +
-                "membershipApprovalGroupJoinMode=" + membershipApprovalGroupJoinMode + ", " +
-                "allowAdminReports=" + allowAdminReports + ", " +
-                "notAllowAdminReports=" + notAllowAdminReports + ", " +
-                "allowNonAdminSubGroupCreation=" + allowNonAdminSubGroupCreation + ", " +
-                "notAllowNonAdminSubGroupCreation=" + notAllowNonAdminSubGroupCreation + ", " +
-                "groupHistory=" + groupHistory + ", " +
-                "noGroupHistory=" + noGroupHistory + ", " +
+                "membershipApprovalRequired=" + membershipApprovalRequired + ", " +
+                "adminReportsAllowed=" + adminReportsAllowed + ", " +
+                "subGroupCreationPolicy=" + subGroupCreationPolicy + ", " +
+                "groupHistoryShared=" + groupHistoryShared + ", " +
                 "subject=" + subject + ", " +
                 "description=" + description + ", " +
                 "picture=" + picture + ", " +
                 "statusMuted=" + statusMuted + ", " +
-                "limitSharingEnabled=" + limitSharingEnabled + ", " +
-                "limitSharingDisabled=" + limitSharingDisabled + ", " +
-                "memberAddAdminOnly=" + memberAddAdminOnly + ", " +
-                "memberAddAllMember=" + memberAddAllMember + ", " +
-                "memberLinkAdminOnly=" + memberLinkAdminOnly + ", " +
-                "memberLinkAllMember=" + memberLinkAllMember + ", " +
-                "memberShareGroupHistoryAdminOnly=" + memberShareGroupHistoryAdminOnly + ", " +
-                "memberShareGroupHistoryAllMember=" + memberShareGroupHistoryAllMember + ']';
+                "limitSharing=" + limitSharing + ", " +
+                "memberAddPolicy=" + memberAddPolicy + ", " +
+                "memberLinkPolicy=" + memberLinkPolicy + ", " +
+                "memberShareGroupHistoryPolicy=" + memberShareGroupHistoryPolicy + ']';
     }
 }

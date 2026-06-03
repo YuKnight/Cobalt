@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.NameChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedNameChangedListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -25,7 +26,7 @@ import com.github.auties00.cobalt.wam.WamService;
  * {@code <presence name="..."/>} stanza, persists the new name to
  * {@link com.github.auties00.cobalt.store.AccountStore#setName(String)},
  * mirrors it onto the self-contact's {@code chosenName}, and fires
- * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onNameChanged(LinkedWhatsAppClient, String, String)}
+ * {@link LinkedWhatsAppClientListener#onNameChanged(LinkedWhatsAppClient, String, String)}
  * on every registered listener via virtual threads. The mutation index is the
  * singleton {@snippet :
  *     ["setting_pushName"]
@@ -35,7 +36,7 @@ import com.github.auties00.cobalt.wam.WamService;
  * This implementation collapses WA Web's two preference-side writes
  * ({@code WAWebConnModel.Conn.pushname} and
  * {@code WAWebUserPrefsGeneral.setPushname}) into a single
- * {@code WhatsAppStore.setName} call: Cobalt's store is the sole source of
+ * {@code LinkedWhatsAppStore.setName} call: Cobalt's store is the sole source of
  * truth for the broadcast pushname. The WA Web {@code syncdCritical}
  * coordination is omitted because Cobalt tracks bootstrap state at the
  * {@link com.github.auties00.cobalt.sync.WebAppStateService} layer keyed by
@@ -102,10 +103,10 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      * emission; a {@code <presence name="..."/>} stanza is dispatched via
      * {@link LinkedWhatsAppClient#sendNodeWithNoResponse(com.github.auties00.cobalt.node.Node)}
      * with no {@code type} attribute; the new name is persisted via
-     * {@code WhatsAppStore.setName}; the self-contact's
+     * {@code LinkedWhatsAppStore.setName}; the self-contact's
      * {@link com.github.auties00.cobalt.model.contact.Contact#setChosenName(String)}
      * is updated when present;
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onNameChanged(LinkedWhatsAppClient, String, String)}
+     * {@link LinkedWhatsAppClientListener#onNameChanged(LinkedWhatsAppClient, String, String)}
      * is dispatched on every registered listener via a fresh virtual thread
      * per listener; and a
      * {@link BootstrapAppStateDataStageCode#PUSHNAME_APPLIED} WAM stage is
@@ -148,7 +149,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
                 .ifPresent(contact -> contact.setChosenName(name));
 
         for (var listener : client.store().listeners()) {
-            if (listener instanceof NameChangedListener typed) {
+            if (listener instanceof LinkedNameChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onNameChanged(client, oldName, name));
             }
         }

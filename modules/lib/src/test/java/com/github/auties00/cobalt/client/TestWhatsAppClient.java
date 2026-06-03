@@ -5,23 +5,10 @@ import com.github.auties00.cobalt.call.ActiveCall;
 import com.github.auties00.cobalt.call.CallOptions;
 import com.github.auties00.cobalt.call.IncomingCall;
 import com.github.auties00.cobalt.call.CallEndReason;
-import com.github.auties00.cobalt.client.listener.*;
 import com.github.auties00.cobalt.exception.WhatsAppException;
 import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
-import com.github.auties00.cobalt.graphql.facebook.ads.*;
-import com.github.auties00.cobalt.graphql.facebook.business.*;
-import com.github.auties00.cobalt.graphql.facebook.group.*;
-import com.github.auties00.cobalt.graphql.facebook.misc.*;
 import com.github.auties00.cobalt.graphql.web.WhatsAppWebGraphQlOperation;
-import com.github.auties00.cobalt.graphql.web.business.*;
-import com.github.auties00.cobalt.graphql.web.misc.*;
-import com.github.auties00.cobalt.graphql.web.auth.*;
-import com.github.auties00.cobalt.graphql.web.ads.*;
-import com.github.auties00.cobalt.graphql.web.promotion.*;
-import com.github.auties00.cobalt.graphql.web.acs.*;
-import com.github.auties00.cobalt.graphql.web.user.*;
-import com.github.auties00.cobalt.graphql.web.group.*;
-import com.github.auties00.cobalt.media.MediaConnectionService;
+import com.github.auties00.cobalt.listener.linked.*;
 import com.github.auties00.cobalt.model.bot.profile.BotDirectory;
 import com.github.auties00.cobalt.model.bot.profile.BotProfile;
 import com.github.auties00.cobalt.model.business.BusinessBroadcastBillingAccount;
@@ -114,7 +101,6 @@ import com.github.auties00.cobalt.model.business.ctwa.CtwaAccessTokenSession;
 import com.github.auties00.cobalt.model.business.ctwa.CtwaAdMediaEntry;
 import com.github.auties00.cobalt.model.business.ctwa.CtwaSilentNonceResult;
 import com.github.auties00.cobalt.model.business.webgraphql.WhatsAppWebGraphQlSession;
-import com.github.auties00.cobalt.model.business.crossposting.CrossPostingDestination;
 import com.github.auties00.cobalt.model.business.crossposting.CrossPostingEligibility;
 import com.github.auties00.cobalt.model.business.crossposting.CrossPostingEligibilityQuery;
 import com.github.auties00.cobalt.model.business.crossposting.CrossPostingServiceData;
@@ -173,7 +159,6 @@ import com.github.auties00.cobalt.model.chat.*;
 import com.github.auties00.cobalt.model.chat.community.*;
 import com.github.auties00.cobalt.model.chat.group.*;
 import com.github.auties00.cobalt.model.contact.*;
-import com.github.auties00.cobalt.model.device.identity.ADVEncryptionType;
 import com.github.auties00.cobalt.model.federated.*;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
@@ -199,7 +184,6 @@ import com.github.auties00.cobalt.model.setting.push.PushConfig;
 import com.github.auties00.cobalt.model.signal.*;
 import com.github.auties00.cobalt.model.sync.AppStateSyncCollection;
 import com.github.auties00.cobalt.model.sync.AppStateSyncResult;
-import com.github.auties00.cobalt.model.sync.SyncAction;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeight;
 import com.github.auties00.cobalt.model.sync.action.payment.CustomPaymentMethod;
@@ -213,7 +197,7 @@ import com.github.auties00.cobalt.node.smax.SmaxOperation;
 import com.github.auties00.cobalt.node.usync.UsyncQuery;
 import com.github.auties00.cobalt.node.usync.UsyncResult;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 
 import java.io.InputStream;
@@ -229,14 +213,14 @@ import java.util.function.Function;
  * builder methods. Only a handful of overrides are wired to caller-installed state; every other
  * contract method throws {@link UnsupportedOperationException} naming itself, so a test that leans
  * on an unstubbed call fails loudly rather than silently. The wired overrides are {@link #store()}
- * ({@link #withStore(WhatsAppStore)}), {@link #sendNode(NodeBuilder)} (a caller-supplied
+ * ({@link #withStore(LinkedWhatsAppStore)}), {@link #sendNode(NodeBuilder)} (a caller-supplied
  * {@link Function} returning canned responses), {@link #handleFailure(WhatsAppException)} (records
  * into {@link #failures()}), {@link #queryChatMetadata(JidProvider)} (a preset map from
  * {@link #withChatMetadata(JidProvider, ChatMetadata)}), and {@link #isConnected()}
  * ({@link #withIsConnected(boolean)}).
  */
 public final class TestWhatsAppClient implements LinkedWhatsAppClient {
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private ABPropsService abPropsService;
     private Function<NodeBuilder, Node> sendNodeHandler = node -> {
         throw new UnsupportedOperationException("TestWhatsAppClient.sendNode: no handler configured");
@@ -250,8 +234,8 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
         return new TestWhatsAppClient();
     }
 
-    /** Installs the {@link WhatsAppStore} returned by {@link #store()}. */
-    public TestWhatsAppClient withStore(WhatsAppStore store) {
+    /** Installs the {@link LinkedWhatsAppStore} returned by {@link #store()}. */
+    public TestWhatsAppClient withStore(LinkedWhatsAppStore store) {
         this.store = store;
         return this;
     }
@@ -288,7 +272,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public WhatsAppStore store() {
+    public LinkedWhatsAppStore store() {
         return store;
     }
 
@@ -324,7 +308,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     public void sendNodeWithNoResponse(Node node) {
         if (store != null) {
             for (var listener : store.listeners()) {
-                if (listener instanceof NodeSentListener typed) {
+                if (listener instanceof LinkedNodeSentListener typed) {
                     typed.onNodeSent(this, node);
                 }
             }
@@ -1181,7 +1165,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public void sendMessage(JidProvider jidProvider, MessageContainer container) {
+    public MessageKey sendMessage(JidProvider jidProvider, MessageContainer container) {
         throw new UnsupportedOperationException("TestWhatsAppClient: sendMessage(..) is not stubbed");
     }
 
@@ -1936,257 +1920,257 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public LinkedWhatsAppClient addListener(WhatsAppListener listener) {
+    public LinkedWhatsAppClient addListener(WhatsAppLinkedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient removeListener(WhatsAppListener listener) {
+    public LinkedWhatsAppClient removeListener(WhatsAppLinkedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: removeListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addChatsListener(ChatsListener listener) {
+    public LinkedWhatsAppClient addChatsListener(LinkedChatsListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addChatsListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addContactsListener(ContactsListener listener) {
+    public LinkedWhatsAppClient addContactsListener(LinkedContactsListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addContactsListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addStatusListener(StatusListener listener) {
+    public LinkedWhatsAppClient addStatusListener(LinkedStatusListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addStatusListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addNodeSentListener(NodeSentListener listener) {
+    public LinkedWhatsAppClient addNodeSentListener(LinkedNodeSentListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addNodeSentListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addLoggedInListener(LoggedInListener listener) {
+    public LinkedWhatsAppClient addLoggedInListener(LinkedLoggedInListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addLoggedInListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallListener(CallListener listener) {
+    public LinkedWhatsAppClient addCallListener(LinkedCallListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addWebHistorySyncPastParticipantsListener(WebHistorySyncPastParticipantsListener listener) {
+    public LinkedWhatsAppClient addWebHistorySyncPastParticipantsListener(LinkedWebHistorySyncPastParticipantsListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addWebHistorySyncPastParticipantsListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addDisconnectedListener(DisconnectedListener listener) {
+    public LinkedWhatsAppClient addDisconnectedListener(LinkedDisconnectedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addDisconnectedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addWebAppPrimaryFeaturesListener(WebAppPrimaryFeaturesListener listener) {
+    public LinkedWhatsAppClient addWebAppPrimaryFeaturesListener(LinkedWebAppPrimaryFeaturesListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addWebAppPrimaryFeaturesListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addContactPresenceListener(ContactPresenceListener listener) {
+    public LinkedWhatsAppClient addContactPresenceListener(LinkedContactPresenceListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addContactPresenceListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addNewslettersListener(NewslettersListener listener) {
+    public LinkedWhatsAppClient addNewslettersListener(LinkedNewslettersListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addNewslettersListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addNodeReceivedListener(NodeReceivedListener listener) {
+    public LinkedWhatsAppClient addNodeReceivedListener(LinkedNodeReceivedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addNodeReceivedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addWebAppStateActionListener(WebAppStateActionListener listener) {
+    public LinkedWhatsAppClient addWebAppStateActionListener(LinkedWebAppStateActionListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addWebAppStateActionListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addWebHistorySyncMessagesListener(WebHistorySyncMessagesListener listener) {
+    public LinkedWhatsAppClient addWebHistorySyncMessagesListener(LinkedWebHistorySyncMessagesListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addWebHistorySyncMessagesListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addNewStatusListener(NewStatusListener listener) {
+    public LinkedWhatsAppClient addNewStatusListener(LinkedNewStatusListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addNewStatusListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addAccountTypeChangedListener(AccountTypeChangedListener listener) {
+    public LinkedWhatsAppClient addAccountTypeChangedListener(LinkedAccountTypeChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addAccountTypeChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addAboutChangedListener(AboutChangedListener listener) {
+    public LinkedWhatsAppClient addAboutChangedListener(LinkedAboutChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addAboutChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addNewMessageListener(NewMessageListener listener) {
+    public LinkedWhatsAppClient addNewMessageListener(LinkedNewMessageListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addNewMessageListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addMessageDeletedListener(MessageDeletedListener listener) {
+    public LinkedWhatsAppClient addMessageDeletedListener(LinkedMessageDeletedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addMessageDeletedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addPrivacySettingChangedListener(PrivacySettingChangedListener listener) {
+    public LinkedWhatsAppClient addPrivacySettingChangedListener(LinkedPrivacySettingChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addPrivacySettingChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addWebHistorySyncProgressListener(WebHistorySyncProgressListener listener) {
+    public LinkedWhatsAppClient addWebHistorySyncProgressListener(LinkedWebHistorySyncProgressListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addWebHistorySyncProgressListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addProfilePictureChangedListener(ProfilePictureChangedListener listener) {
+    public LinkedWhatsAppClient addProfilePictureChangedListener(LinkedProfilePictureChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addProfilePictureChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addMessageStatusListener(MessageStatusListener listener) {
+    public LinkedWhatsAppClient addMessageStatusListener(LinkedMessageStatusListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addMessageStatusListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addNameChangedListener(NameChangedListener listener) {
+    public LinkedWhatsAppClient addNameChangedListener(LinkedNameChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addNameChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addMessageReplyListener(MessageReplyListener listener) {
+    public LinkedWhatsAppClient addMessageReplyListener(LinkedMessageReplyListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addMessageReplyListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addDeviceIdentityChangedListener(DeviceIdentityChangedListener listener) {
+    public LinkedWhatsAppClient addDeviceIdentityChangedListener(LinkedDeviceIdentityChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addDeviceIdentityChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addNewContactListener(NewContactListener listener) {
+    public LinkedWhatsAppClient addNewContactListener(LinkedNewContactListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addNewContactListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addContactBlockedListener(ContactBlockedListener listener) {
+    public LinkedWhatsAppClient addContactBlockedListener(LinkedContactBlockedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addContactBlockedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addContactTextStatusListener(ContactTextStatusListener listener) {
+    public LinkedWhatsAppClient addContactTextStatusListener(LinkedContactTextStatusListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addContactTextStatusListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addLocaleChangedListener(LocaleChangedListener listener) {
+    public LinkedWhatsAppClient addLocaleChangedListener(LinkedLocaleChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addLocaleChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addRegistrationCodeListener(RegistrationCodeListener listener) {
+    public LinkedWhatsAppClient addRegistrationCodeListener(LinkedRegistrationCodeListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addRegistrationCodeListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addBlockedContactsListener(BlockedContactsListener listener) {
+    public LinkedWhatsAppClient addBlockedContactsListener(LinkedBlockedContactsListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addBlockedContactsListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addBusinessPrivacySettingChangedListener(BusinessPrivacySettingChangedListener listener) {
+    public LinkedWhatsAppClient addBusinessPrivacySettingChangedListener(LinkedBusinessPrivacySettingChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addBusinessPrivacySettingChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallEndedListener(CallEndedListener listener) {
+    public LinkedWhatsAppClient addCallEndedListener(LinkedCallEndedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallEndedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallInteractionListener(CallInteractionListener listener) {
+    public LinkedWhatsAppClient addCallInteractionListener(LinkedCallInteractionListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallInteractionListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallLinkAdmittedListener(CallLinkAdmittedListener listener) {
+    public LinkedWhatsAppClient addCallLinkAdmittedListener(LinkedCallLinkAdmittedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallLinkAdmittedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallLinkDeniedListener(CallLinkDeniedListener listener) {
+    public LinkedWhatsAppClient addCallLinkDeniedListener(LinkedCallLinkDeniedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallLinkDeniedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallLinkLobbyJoinRequestListener(CallLinkLobbyJoinRequestListener listener) {
+    public LinkedWhatsAppClient addCallLinkLobbyJoinRequestListener(LinkedCallLinkLobbyJoinRequestListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallLinkLobbyJoinRequestListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallMuteChangedListener(CallMuteChangedListener listener) {
+    public LinkedWhatsAppClient addCallMuteChangedListener(LinkedCallMuteChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallMuteChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallOfferNoticeListener(CallOfferNoticeListener listener) {
+    public LinkedWhatsAppClient addCallOfferNoticeListener(LinkedCallOfferNoticeListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallOfferNoticeListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallParticipantsChangedListener(CallParticipantsChangedListener listener) {
+    public LinkedWhatsAppClient addCallParticipantsChangedListener(LinkedCallParticipantsChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallParticipantsChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallPeerStateChangedListener(CallPeerStateChangedListener listener) {
+    public LinkedWhatsAppClient addCallPeerStateChangedListener(LinkedCallPeerStateChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallPeerStateChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallPreacceptListener(CallPreacceptListener listener) {
+    public LinkedWhatsAppClient addCallPreacceptListener(LinkedCallPreacceptListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallPreacceptListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallVideoStateChangedListener(CallVideoStateChangedListener listener) {
+    public LinkedWhatsAppClient addCallVideoStateChangedListener(LinkedCallVideoStateChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallVideoStateChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addCallVideoUpgradeRequestListener(CallVideoUpgradeRequestListener listener) {
+    public LinkedWhatsAppClient addCallVideoUpgradeRequestListener(LinkedCallVideoUpgradeRequestListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCallVideoUpgradeRequestListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addFacebookGraphQlSessionChangedListener(FacebookGraphQlSessionChangedListener listener) {
+    public LinkedWhatsAppClient addFacebookGraphQlSessionChangedListener(LinkedFacebookGraphQlSessionChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addFacebookGraphQlSessionChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addContactBlacklistListener(ContactBlacklistListener listener) {
+    public LinkedWhatsAppClient addContactBlacklistListener(LinkedContactBlacklistListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addContactBlacklistListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addDisappearingModeChangedListener(DisappearingModeChangedListener listener) {
+    public LinkedWhatsAppClient addDisappearingModeChangedListener(LinkedDisappearingModeChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addDisappearingModeChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addGroupsListener(GroupsListener listener) {
+    public LinkedWhatsAppClient addGroupsListener(LinkedGroupsListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addGroupsListener(..) is not stubbed");
     }
 
@@ -2196,22 +2180,22 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public LinkedWhatsAppClient addOptOutListListener(OptOutListListener listener) {
+    public LinkedWhatsAppClient addOptOutListListener(LinkedOptOutListListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addOptOutListListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addWhatsAppWebGraphQlSessionChangedListener(WhatsAppWebGraphQlSessionChangedListener listener) {
+    public LinkedWhatsAppClient addWhatsAppWebGraphQlSessionChangedListener(LinkedWhatsAppWebGraphQlSessionChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addWhatsAppWebGraphQlSessionChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addStatusPrivacyChangedListener(StatusPrivacyChangedListener listener) {
+    public LinkedWhatsAppClient addStatusPrivacyChangedListener(LinkedStatusPrivacyChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addStatusPrivacyChangedListener(..) is not stubbed");
     }
 
     @Override
-    public LinkedWhatsAppClient addTosNoticesChangedListener(TosNoticesChangedListener listener) {
+    public LinkedWhatsAppClient addTosNoticesChangedListener(LinkedTosNoticesChangedListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addTosNoticesChangedListener(..) is not stubbed");
     }
 

@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Covers {@link NctSaltSyncHandler}: a {@link SyncdOperation#SET} with a non-{@code null} salt
  * writes the bytes via
- * {@link com.github.auties00.cobalt.store.WhatsAppStore#setNotificationContentTokenSalt(byte[])},
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore#setNotificationContentTokenSalt(byte[])},
  * {@link SyncdOperation#REMOVE} clears it, a SET with the wrong action type or with no salt field
  * surfaces as {@link SyncActionState#MALFORMED}, the default {@code resolveConflicts} chooses the
  * later timestamp, and the default batch path applies each mutation in order.

@@ -29,7 +29,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * @implNote
  * This implementation collapses WA Web's two-tier NUX preference layout into a
  * single map keyed by NUX key on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore}; the timestamp WA Web
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore}; the timestamp WA Web
  * carries alongside the acknowledgement is not preserved because no Cobalt
  * consumer reads it. A missing {@link NuxAction} on the value defaults
  * {@code acknowledged} to {@code false} and still returns

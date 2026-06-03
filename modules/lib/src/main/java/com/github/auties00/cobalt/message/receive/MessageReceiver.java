@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.util.Objects;
 
@@ -47,7 +47,7 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
      * message cache that every concrete receiver uses to identify the self account and
      * to look up bot-message metadata.
      */
-    final WhatsAppStore store;
+    final LinkedWhatsAppStore store;
 
     /**
      * Constructs a receiver bound to the given store.
@@ -55,7 +55,7 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
      * @param store the central session store; must be non-{@code null}
      * @throws NullPointerException if {@code store} is {@code null}
      */
-    MessageReceiver(WhatsAppStore store) {
+    MessageReceiver(LinkedWhatsAppStore store) {
         this.store = Objects.requireNonNull(store, "store");
     }
 

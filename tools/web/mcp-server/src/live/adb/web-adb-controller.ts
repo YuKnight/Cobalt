@@ -273,17 +273,11 @@ export class WebAdbController {
       .sort((a, b) => a.bounds.top - b.bounds.top)
       .map((entry) => entry.node);
 
-    // Match by title text first — WA Personal and WA Business show a
-    // different set of overflow items (Business adds Advertise / New
-    // broadcast / Communities / Lists / Orders), so the fixed index that
-    // works on Personal lands on Communities on Business.
     const byText = titles.find((node) =>
       /linked\s*device/i.test(node.text ?? "")
     );
     if (byText) return byText;
 
-    // Fall back to the legacy fixed-index lookup for WA Personal layouts
-    // where the title text may be absent or localized differently.
     if (titles.length <= OVERFLOW_LINKED_DEVICES_INDEX) return null;
     return titles[OVERFLOW_LINKED_DEVICES_INDEX];
   }
@@ -541,10 +535,7 @@ export class WebAdbController {
       )
         return false;
       if (node.password) return true;
-      // Match only "pin"-prefixed/suffixed ids. The "code" substring was
-      // previously included here but false-positived on the pairing-code
-      // entry screen (e.g. com.whatsapp:id/enter_code_description),
-      // which blocked the very flow this detector is meant to support.
+
       const resourceId = node.resourceId.toLowerCase();
       return resourceId.includes("pin");
     });
@@ -983,11 +974,7 @@ export class WebAdbController {
       };
     }
     if (selectedPhoneNumberLinking) {
-      // The modern enter_code_boxes layout is a container spanning 8
-      // per-character EditTexts. Tapping the container's center lands on
-      // field 4 or 5 — characters typed there would not fill from field
-      // 1. Find the leftmost EditText inside the container and tap it
-      // explicitly so input starts at field 1 and auto-advances.
+
       const containerNode =
         codeInputNodes.find(
           (n) => n.resourceId === "com.whatsapp:id/enter_code_boxes"
@@ -1010,12 +997,6 @@ export class WebAdbController {
     await this.pressKeyCode(serial, 66);
     details.push("Code typed into Android app.");
 
-    // WA shows a "This may be a scam" confirmation immediately after the
-    // code is accepted (primary_button = LINK DEVICE, secondary_button =
-    // DON'T LINK). We must tap LINK DEVICE within a few seconds — the
-    // server-side pairing code rotates every ~60s and tapping a stale
-    // code drops us back to a "Couldn't link device" error. The button
-    // id must match both com.whatsapp and com.whatsapp.w4b.
     const SCAM_LINK_BUTTON_IDS = [
       "com.whatsapp:id/primary_button",
       "com.whatsapp.w4b:id/primary_button",

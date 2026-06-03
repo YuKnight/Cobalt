@@ -20,7 +20,7 @@ import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.setting.GlobalSettings;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
 import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
@@ -160,10 +160,10 @@ public final class LiveLidMigrationService implements LidMigrationService {
     private final LinkedWhatsAppClient whatsapp;
 
     /**
-     * The flat {@link WhatsAppStore} that persists chats, contacts, and the
+     * The flat {@link LinkedWhatsAppStore} that persists chats, contacts, and the
      * bidirectional LID/PN mapping table.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * The {@link ABPropsService} used to read the AB props that gate the
@@ -832,7 +832,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
      * {@link #processProtocolMessage(LIDMigrationMappingSyncPayload)} once the
      * primary device delivers its mapping sync, but exposed publicly so callers
      * can re-drive the sweep if needed. It blocks until
-     * {@link WhatsAppStore#waitForOfflineDeliveryEnd()} completes so that no
+     * {@link LinkedWhatsAppStore#waitForOfflineDeliveryEnd()} completes so that no
      * message arriving from the Signal offline delivery window can race the
      * chat-rewriting loop. It aborts via
      * {@link LinkedWhatsAppClient#handleFailure(com.github.auties00.cobalt.exception.WhatsAppException)}
@@ -1147,7 +1147,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
      * This implementation walks the chat's messages once and applies three
      * orthogonal rules. The broadcast exemption short-circuits when every
      * message is a safe stub or a broadcast and the
-     * {@link WhatsAppStore#pairingTimestamp()} is at or before the oldest
+     * {@link LinkedWhatsAppStore#pairingTimestamp()} is at or before the oldest
      * message timestamp (interpreted as "the broadcast existed before this
      * device joined"). Any chat carrying ephemeral settings, lock, archive, or
      * mute state is preserved unless the ephemeral-account-setting exemption
@@ -1311,7 +1311,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
      * generated the content and the chat is safe to drop.
      *
      * @param messageTimestamp the timestamp to compare against the pairing time
-     * @return {@code true} when {@link WhatsAppStore#pairingTimestamp()} is
+     * @return {@code true} when {@link LinkedWhatsAppStore#pairingTimestamp()} is
      *         present and not after {@code messageTimestamp}
      */
     @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "H",

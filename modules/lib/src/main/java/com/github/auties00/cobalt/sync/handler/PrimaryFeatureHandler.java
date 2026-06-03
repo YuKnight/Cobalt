@@ -89,7 +89,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      * type), or a {@link MutationApplicationResult#success()} entry; in
      * parallel it tracks the latest valid mutation by timestamp. After the
      * walk, the latest mutation's flags are persisted via
-     * {@code WhatsAppStore.setPrimaryFeatures}; an empty flags list is accepted
+     * {@code LinkedWhatsAppStore.setPrimaryFeatures}; an empty flags list is accepted
      * as success (only a missing action payload triggers malformed).
      */
     @Override
@@ -131,7 +131,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
      * {@link MutationApplicationResult#unsupported()}, a wrong action type as
      * {@link SyncdIndexUtils#malformedActionValue(String)}, and a valid
      * mutation persists its {@link PrimaryFeatureAction#flags()} via
-     * {@code WhatsAppStore.setPrimaryFeatures} and returns
+     * {@code LinkedWhatsAppStore.setPrimaryFeatures} and returns
      * {@link MutationApplicationResult#success()}. An empty flags list is
      * accepted as success.
      */

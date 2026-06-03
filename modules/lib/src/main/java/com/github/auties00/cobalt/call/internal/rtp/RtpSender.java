@@ -66,6 +66,23 @@ public final class RtpSender {
     private long lastPtsMs = -1;
 
     /**
+     * The RTP timestamp stamped on the most recently sent packet, exposed for RTCP sender reports.
+     */
+    private volatile long lastRtpTimestamp;
+
+    /**
+     * The running count of packets sent on this stream, exposed for the RTCP sender report's
+     * sender's packet count field.
+     */
+    private volatile long sentPackets;
+
+    /**
+     * The running count of payload octets sent on this stream, exposed for the RTCP sender report's
+     * sender's octet count field.
+     */
+    private volatile long sentOctets;
+
+    /**
      * Constructs a sender with a randomised initial sequence number and timestamp.
      *
      * @param payloadType   the RTP payload type in {@code [0, 127]}
@@ -158,6 +175,39 @@ public final class RtpSender {
             throw new WhatsAppCallException.Rtp("protected sink threw", e);
         }
         lastPtsMs = ptsMs;
+        lastRtpTimestamp = timestamp;
+        sentPackets++;
+        sentOctets += payload.length;
+    }
+
+    /**
+     * Returns the RTP timestamp stamped on the most recently sent packet.
+     *
+     * <p>Used to populate the RTP timestamp field of an RTCP sender report so the report shares the
+     * stream's timeline; the value is {@code 0} before the first {@link #send(byte[], long, boolean)}.
+     *
+     * @return the last sent RTP timestamp as an unsigned 32-bit value held in a {@code long}
+     */
+    public long lastRtpTimestamp() {
+        return lastRtpTimestamp;
+    }
+
+    /**
+     * Returns the number of packets sent on this stream.
+     *
+     * @return the cumulative sent packet count
+     */
+    public long sentPackets() {
+        return sentPackets;
+    }
+
+    /**
+     * Returns the number of payload octets sent on this stream, excluding RTP headers.
+     *
+     * @return the cumulative sent octet count
+     */
+    public long sentOctets() {
+        return sentOctets;
     }
 
     /**

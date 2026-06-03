@@ -204,7 +204,7 @@ export function extractExportNames(
     "g"
   );
   while ((match = spreadPattern.exec(body))) {
-    // Can't statically resolve these, but mark the source identifier
+
   }
 
   return [...exports];

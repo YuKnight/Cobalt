@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.handler.ArchiveChatHandler;
@@ -38,7 +38,7 @@ class ConflictResolutionCycleIntegrationTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
     private static final String CHAT = "1234@s.whatsapp.net";
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
 
     @BeforeEach
     void setUp() {

@@ -29,10 +29,10 @@ import java.util.Set;
  * device-sync retry queue, and the AB-props feature-flag bundle delivered by the server.
  *
  * @apiNote
- * Embedders reach this through {@link WhatsAppStore#syncStore()}; it is consumed almost entirely by
+ * Embedders reach this through {@link LinkedWhatsAppStore#syncStore()}; it is consumed almost entirely by
  * the internal app-state sync pipeline.
  *
- * @see WhatsAppStore
+ * @see LinkedWhatsAppStore
  */
 @WhatsAppWebModule(moduleName = "WAWebGetSyncKey")
 @WhatsAppWebModule(moduleName = "WAWebGetSyncAction")

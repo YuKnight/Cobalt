@@ -1,4 +1,5 @@
 package com.github.auties00.cobalt.sync.integration;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.sync.LiveWebHistorySyncService;
 import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
@@ -11,7 +12,7 @@ import com.github.auties00.cobalt.model.message.system.history.HistorySyncNotifi
 import com.github.auties00.cobalt.model.message.system.history.HistorySyncType;
 import com.github.auties00.cobalt.media.TestMediaConnectionService;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncFixtures;
 import com.github.auties00.cobalt.sync.WebHistorySyncService;
 import com.github.auties00.cobalt.wam.LiveWamService;
@@ -31,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * encrypted blob, AES-CBC decrypt it, validate the HMAC, inflate the gzip stream,
  * decode a {@link com.github.auties00.cobalt.model.sync.history.HistorySync}
  * payload, and fan the chunk out to
- * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener} callbacks and
+ * {@link LinkedWhatsAppClientListener} callbacks and
  * the {@link LidMigrationService}. The pipeline is wired in-process via
  * {@link TestWhatsAppClient} with no network IO. The synthetic group asserts
  * null and empty inputs are non-fatal across every {@link HistorySyncType}; the
@@ -45,7 +46,7 @@ class HistorySyncCycleIntegrationTest {
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
     private static final Jid SELF_PN_DEVICE_1 = Jid.of("19250000001:1@s.whatsapp.net");
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private WebHistorySyncService service;
 
     @BeforeEach

@@ -101,4 +101,5 @@ module com.github.auties00.cobalt.model {
     exports com.github.auties00.cobalt.model.business.aichannel;
     exports com.github.auties00.cobalt.model.business.acs;
     exports com.github.auties00.cobalt.model.business.promotion;
+    exports com.github.auties00.cobalt.model.cloud;
 }

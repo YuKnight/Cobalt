@@ -20,7 +20,7 @@ import com.github.auties00.cobalt.model.message.text.CommentMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.time.Instant;
@@ -67,7 +67,7 @@ final class MessagePreparer {
      * Supplies self-JID resolution, newsletter lookups, chat metadata, and
      * parent-message resolution during addon promotion.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Constructs a {@link MessagePreparer} bound to the supplied store.
@@ -75,12 +75,12 @@ final class MessagePreparer {
      * <p>Constructed once by {@link MessageSendingService}; embedders should not
      * instantiate directly.
      *
-     * @param store the {@link WhatsAppStore} providing JID and metadata lookups
+     * @param store the {@link LinkedWhatsAppStore} providing JID and metadata lookups
      * @throws NullPointerException if {@code store} is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebE2EProtoGenerator", exports = "getProtobufMessage",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    MessagePreparer(WhatsAppStore store) {
+    MessagePreparer(LinkedWhatsAppStore store) {
         this.store = Objects.requireNonNull(store, "store");
     }
 

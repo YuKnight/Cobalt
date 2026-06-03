@@ -27,7 +27,7 @@ import com.github.auties00.cobalt.model.message.system.DeviceSentMessage;
 import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -91,7 +91,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleMsg", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    ChatMessageReceiver(WhatsAppStore store, MessageDecryption decryption) {
+    ChatMessageReceiver(LinkedWhatsAppStore store, MessageDecryption decryption) {
         super(store);
         this.decryption = Objects.requireNonNull(decryption, "decryption");
     }

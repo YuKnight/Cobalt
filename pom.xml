@@ -142,7 +142,6 @@
                             <detectJavaApiLink>false</detectJavaApiLink>
                             <detectOfflineLinks>false</detectOfflineLinks>
                             <additionalOptions>
-                                <additionalOption>--enable-preview</additionalOption>
                                 <additionalOption>--add-modules jdk.incubator.vector</additionalOption>
                                 <additionalOption>-Xmaxerrs 100000</additionalOption>
                                 <additionalOption>-Xmaxwarns 100000</additionalOption>

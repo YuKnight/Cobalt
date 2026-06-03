@@ -181,11 +181,14 @@ public final class WaRelayConnector {
                 .build();
 
         // Edgeray media edges (domain_name like "edgeray-mxp1-1.wt.whatsapp.com") do NOT answer a raw
-        // UDP Allocate: their UDP port expects a DTLS ClientHello and silently drops STUN. Group calls
-        // route through these edges, so the Allocate (and all media) must be tunnelled through the
-        // pre-negotiated DataChannel that RelayChannelDriver stands up (DTLS -> SCTP -> DataChannel).
-        // Plain TURN relays continue on the raw-UDP path below.
-        if (te2.domainName() != null && te2.domainName().contains("edgeray")) {
+        // UDP Allocate on their te2 address: that UDP port expects a DTLS ClientHello and silently drops
+        // STUN. So when targeting the te2 endpoint itself (no relaylatency override), tunnel the Allocate
+        // through the pre-negotiated DataChannel that RelayChannelDriver stands up (DTLS -> SCTP ->
+        // DataChannel). But the SAME relay also publishes a plain-TURN access point as the
+        // <relaylatency><te> endpoint (a different IP of the same relay_name), which DOES answer raw-UDP
+        // STUN and bridges to the peer by call-id; when connectAny passes that endpoint as overrideRemote
+        // we take the raw-UDP path below against it, which is the path that produced audible media.
+        if (overrideRemote == null && te2.domainName() != null && te2.domainName().contains("edgeray")) {
             return connectViaDataChannel(te2, relayToken, callInfo, address, relayPort, callKey, remote);
         }
 

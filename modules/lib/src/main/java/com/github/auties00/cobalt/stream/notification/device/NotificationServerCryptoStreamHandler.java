@@ -4,16 +4,15 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.DeviceIdentityChangedListener;
-import com.github.auties00.cobalt.client.listener.RegistrationCodeListener;
-import com.github.auties00.cobalt.client.listener.WhatsAppListener;
+import com.github.auties00.cobalt.listener.linked.LinkedDeviceIdentityChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedRegistrationCodeListener;
+import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.model.media.MediaRetryNotificationSpec;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.WaOldCodeEventBuilder;
@@ -36,7 +35,7 @@ import java.util.function.Consumer;
  * {@code mediaretry} (re-uploaded CDN URL delivery), {@code server} (log upload and AB prop sync
  * requests), and {@code registration} (device-switch OTP). Most branches trigger a side-effect on
  * the local crypto or AB state: pre-key low uploads more pre-keys to the server, identity change
- * wipes the Signal session and fires {@link DeviceIdentityChangedListener#onDeviceIdentityChanged}, media
+ * wipes the Signal session and fires {@link LinkedDeviceIdentityChangedListener#onDeviceIdentityChanged}, media
  * retry decrypts the new direct path and writes it onto the message, server runs the matching
  * maintenance task, and registration delivers the device-switch OTP to listeners. Every supported
  * stanza is acknowledged even when its branch throws; unsupported types return without
@@ -237,7 +236,7 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
      * {@code display_name} attribute, when non-blank, updates the contact's chosen name. The handler
      * then marks the identity change, cleans up the Signal session, clears the sender-key
      * distribution for the participant, marks the user for key rotation, and fires
-     * {@link DeviceIdentityChangedListener#onDeviceIdentityChanged} so the embedder can drive the
+     * {@link LinkedDeviceIdentityChangedListener#onDeviceIdentityChanged} so the embedder can drive the
      * equivalent UI.
      *
      * @param node the {@code <notification type="encrypt"/>} stanza with an {@code <identity/>} child
@@ -277,7 +276,7 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
         whatsapp.store().signalStore().cleanupSignalSessions(deviceJid);
         whatsapp.store().signalStore().clearSenderKeyDistributionForParticipant(deviceJid);
         whatsapp.store().signalStore().markKeyRotation(userJid);
-        fireListeners(DeviceIdentityChangedListener.class, listener -> listener.onDeviceIdentityChanged(whatsapp, userJid, Set.of(deviceJid)));
+        fireListeners(LinkedDeviceIdentityChangedListener.class, listener -> listener.onDeviceIdentityChanged(whatsapp, userJid, Set.of(deviceJid)));
     }
 
     /**
@@ -370,11 +369,11 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
      * <p>Returns early when the stanza lacks a {@code <wa_old_registration>} child, and drops the
      * notification when the code or expiry is missing or the OTP has already expired against the
      * current epoch second. A numeric code is delivered via
-     * {@link RegistrationCodeListener#onRegistrationCode}; the WAM event is committed afterward with
+     * {@link LinkedRegistrationCodeListener#onRegistrationCode}; the WAM event is committed afterward with
      * the local device id.
      *
      * @implNote This implementation parses the numeric OTP and debug-logs non-numeric values because
-     * the {@link RegistrationCodeListener#onRegistrationCode} callback requires a {@code long}, whereas
+     * the {@link LinkedRegistrationCodeListener#onRegistrationCode} callback requires a {@code long}, whereas
      * WA Web passes the raw string through.
      *
      * @param node the {@code <notification type="registration"/>} stanza
@@ -397,7 +396,7 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
 
         try {
             var numericCode = Long.parseLong(code);
-            fireListeners(RegistrationCodeListener.class, listener -> listener.onRegistrationCode(whatsapp, numericCode));
+            fireListeners(LinkedRegistrationCodeListener.class, listener -> listener.onRegistrationCode(whatsapp, numericCode));
         } catch (NumberFormatException exception) {
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Ignoring non-numeric device-switch code {0}",

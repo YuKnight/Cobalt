@@ -33,11 +33,11 @@ import java.util.UUID;
  * the WhatsApp-specific extensions to that contract.
  *
  * @apiNote
- * Embedders reach this through {@link WhatsAppStore#signalStore()} and rarely
+ * Embedders reach this through {@link LinkedWhatsAppStore#signalStore()} and rarely
  * call it directly; the surrounding client consumes it during connect, pairing
  * and message encryption/decryption.
  *
- * @see WhatsAppStore
+ * @see LinkedWhatsAppStore
  * @see SignalProtocolStore
  */
 @WhatsAppWebModule(moduleName = "WAWebSignalStorage")

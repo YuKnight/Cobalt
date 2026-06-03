@@ -15,7 +15,7 @@ import com.github.auties00.cobalt.model.message.MessageContainerSpec;
 import com.github.auties00.cobalt.model.message.system.DeviceSentMessage;
 import com.github.auties00.cobalt.model.message.system.DeviceSentMessageBuilder;
 import com.github.auties00.cobalt.model.message.group.SenderKeyDistributionMessageBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.util.*;
 
@@ -49,18 +49,18 @@ public final class SenderKeyDistribution {
     /**
      * Resolves the self {@link Jid} and records the identity range after distribution.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Constructs a sender-key distribution service bound to the given dependencies.
      *
-     * <p>The three collaborators must share the same {@link WhatsAppStore} so that the post-send
+     * <p>The three collaborators must share the same {@link LinkedWhatsAppStore} so that the post-send
      * {@link com.github.auties00.cobalt.store.SignalStore#updateIdentityRange(Collection)} call and the per-recipient
      * {@link DeviceService#computeIcdc(Jid)} lookups observe consistent state.
      *
      * @param encryption    the {@link MessageEncryption} service for per-device encryption
      * @param deviceService the {@link DeviceService} for ICDC metadata
-     * @param store         the {@link WhatsAppStore} for the self {@link Jid} and identity range
+     * @param store         the {@link LinkedWhatsAppStore} for the self {@link Jid} and identity range
      * @throws NullPointerException if any argument is {@code null}
      */
     @WhatsAppWebExport(moduleName = "WAWebGetGroupKeyDistributionMsg", exports = "getKeyDistributionMsg",
@@ -68,7 +68,7 @@ public final class SenderKeyDistribution {
     public SenderKeyDistribution(
             MessageEncryption encryption,
             DeviceService deviceService,
-            WhatsAppStore store
+            LinkedWhatsAppStore store
     ) {
         this.encryption = Objects.requireNonNull(encryption, "encryption");
         this.deviceService = Objects.requireNonNull(deviceService, "deviceService");

@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.LocaleChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedLocaleChangedListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -27,7 +28,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * This implementation persists the locale into
  * {@link com.github.auties00.cobalt.store.AccountStore#setLocale(String)} and
  * notifies every registered
- * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onLocaleChanged(LinkedWhatsAppClient, String, String)}
+ * {@link LinkedWhatsAppClientListener#onLocaleChanged(LinkedWhatsAppClient, String, String)}
  * on its own virtual thread, since Cobalt has no UI layer to delegate to.
  */
 @WhatsAppWebModule(moduleName = "WAWebLocaleSettingSync")
@@ -100,7 +101,7 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
         var oldLocale = client.store().accountStore().locale().orElse(null);
         client.store().accountStore().setLocale(newLocale);
         for (var listener : client.store().listeners()) {
-            if (listener instanceof LocaleChangedListener typed) {
+            if (listener instanceof LinkedLocaleChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onLocaleChanged(client, oldLocale, newLocale));
             }
         }

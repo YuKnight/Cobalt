@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentityB
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 
 import java.io.BufferedReader;
@@ -32,7 +32,7 @@ import java.util.Optional;
  * and {@code .expected.json} oracle outputs returned as raw {@link JSONObject} so individual
  * tests can pull only the fields they care about. The class also builds in-memory temporary
  * stores via {@link #temporaryStore(Jid, Jid)} for any message-package class that needs a
- * {@link WhatsAppStore}.
+ * {@link LinkedWhatsAppStore}.
  */
 public final class MessageFixtures {
     private static final String FIXTURE_ROOT = "fixtures/message";
@@ -221,7 +221,7 @@ public final class MessageFixtures {
 
     /**
      * Creates an in-memory temporary store seeded with the given self-PN and self-LID and a
-     * stub signed-device-identity, for use as the {@link WhatsAppStore} dependency of any
+     * stub signed-device-identity, for use as the {@link LinkedWhatsAppStore} dependency of any
      * message-package class. The store is preconfigured with offline-resume state COMPLETE so
      * tests that block on offline-delivery-end do not stall on the 5-minute latch, and with a
      * stub signed device identity so PKMSG-bearing fanouts ship a {@code <device-identity>}
@@ -235,7 +235,7 @@ public final class MessageFixtures {
      * @throws UncheckedIOException if the underlying factory cannot create
      *                              the store
      */
-    public static WhatsAppStore temporaryStore(Jid selfPn, Jid selfLid) {
+    public static LinkedWhatsAppStore temporaryStore(Jid selfPn, Jid selfLid) {
         Objects.requireNonNull(selfPn, "selfPn");
         try {
             var store = WhatsAppStoreFactory.temporary()

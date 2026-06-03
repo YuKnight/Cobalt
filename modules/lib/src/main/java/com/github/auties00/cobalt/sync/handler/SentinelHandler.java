@@ -18,7 +18,7 @@ import java.util.logging.Logger;
  * <p>The sync dispatcher hands an incoming sentinel mutation here after the
  * primary device rotates its sync key so the companion drops the matching local
  * app-state-sync key from
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} and forces a re-keyed
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} and forces a re-keyed
  * patch to be requested on the next sync.
  */
 @WhatsAppWebModule(moduleName = "WAWebSentinelMutationSync")

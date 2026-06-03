@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentOpenedSta
 import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentOpenedStatusActionBuilder;
 import com.github.auties00.cobalt.model.sync.action.contact.PinActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.ChatAssignmentOpenedStatusMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +47,7 @@ class ChatAssignmentOpenedStatusHandlerTest {
     private static final Jid CHAT_JID = Jid.of("12345@s.whatsapp.net");
     private static final String AGENT_ID = "agent-1";
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient client;
     private ChatAssignmentOpenedStatusHandler handler;
     private ChatAssignmentOpenedStatusMutationFactory factory;

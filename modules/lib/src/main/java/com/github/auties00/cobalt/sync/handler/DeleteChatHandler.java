@@ -83,7 +83,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
      * This implementation parses the mutation index, validates the embedded
      * {@link Jid} and the {@link DeleteChatAction#messageRange()} payload,
      * and then removes the entire chat from
-     * {@link com.github.auties00.cobalt.store.WhatsAppStore} when the chat is
+     * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} when the chat is
      * present. WA Web's {@code $DeleteChatSync$p_1} compares the incoming
      * range against the local chat's current range and emits either a
      * partial {@code queryAndRemoveMessagesInMessageRange} or a full

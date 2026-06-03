@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.client;
 
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
+
 /**
  * Names the reason a {@link LinkedWhatsAppClient} session was torn down.
  *
  * @apiNote
- * Receivers of {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onDisconnected(LinkedWhatsAppClient, WhatsAppClientDisconnectReason)}
+ * Receivers of {@link LinkedWhatsAppClientListener#onDisconnected(LinkedWhatsAppClient, WhatsAppClientDisconnectReason)}
  * read this value to decide whether to retry, prompt the user to
  * re-authenticate, or surface a permanent failure. The mapping is fixed:
  * {@link WhatsAppClientErrorHandler.Result#DISCONNECT} produces
@@ -14,7 +16,7 @@ package com.github.auties00.cobalt.client;
  * produces {@link #BANNED}.
  *
  * @see LinkedWhatsAppClient#disconnect(WhatsAppClientDisconnectReason)
- * @see com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onDisconnected(LinkedWhatsAppClient, WhatsAppClientDisconnectReason)
+ * @see LinkedWhatsAppClientListener#onDisconnected(LinkedWhatsAppClient, WhatsAppClientDisconnectReason)
  * @see WhatsAppClientErrorHandler
  */
 public enum WhatsAppClientDisconnectReason {

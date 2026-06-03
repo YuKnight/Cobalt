@@ -95,7 +95,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
      * {@link MuteAction#muteEndTimestamp()} alongside
      * {@link MuteAction#muted()} {@code == true} is rejected as
      * {@link MutationApplicationResult#malformed()}, the resolved chat must
-     * exist in {@link com.github.auties00.cobalt.store.WhatsAppStore}
+     * exist in {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore}
      * (otherwise {@link MutationApplicationResult#orphan(String, String)} with
      * {@code modelType="Chat"}), and the timestamp is clamped so an already
      * elapsed future expiry collapses to {@code 0} before being applied via

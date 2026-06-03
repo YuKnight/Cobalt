@@ -8,12 +8,14 @@
 // a wasm function index to a Ghidra Address. API targets plugin v2.x; adjust if
 // a future plugin release changes these signatures.
 // @category Decompiler
+import ghidra.app.cmd.disassemble.DisassembleCommand;
 import ghidra.app.decompiler.DecompInterface;
 import ghidra.app.decompiler.DecompileOptions;
 import ghidra.app.decompiler.DecompileResults;
 import ghidra.app.decompiler.DecompiledFunction;
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
+import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.listing.Function;
 
 import java.io.FileWriter;
@@ -21,6 +23,7 @@ import java.io.PrintWriter;
 
 import wasm.WasmLoader;
 import wasm.analysis.WasmAnalysis;
+import wasm.analysis.WasmFunctionAnalysis;
 
 public class DecompileWasmFuncToJson extends GhidraScript {
 
@@ -44,6 +47,15 @@ public class DecompileWasmFuncToJson extends GhidraScript {
         if (func != null) {
             name = func.getName();
             signature = func.getSignature().getPrototypeString();
+            if (currentProgram.getListing().getInstructionAt(addr) == null) {
+                WasmFunctionAnalysis fa = WasmAnalysis.getState(currentProgram).getFunctionAnalysis(addr);
+                if (fa != null) {
+                    fa.applyContext(currentProgram, funcIndex);
+                }
+                AddressSet body = new AddressSet(addr, func.getBody().getMaxAddress());
+                DisassembleCommand dis = new DisassembleCommand(addr, body, true);
+                dis.applyTo(currentProgram, monitor);
+            }
             DecompInterface decompiler = new DecompInterface();
             decompiler.setOptions(new DecompileOptions());
             decompiler.openProgram(currentProgram);

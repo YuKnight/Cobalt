@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.message.MessageFixtures;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessageBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -117,7 +117,7 @@ class TextPipelineTest {
         assertNotNull(NEWSLETTER);
     }
 
-    private static WhatsAppStore store(boolean disableLinkPreviews) {
+    private static LinkedWhatsAppStore store(boolean disableLinkPreviews) {
         var store = MessageFixtures.temporaryStore(SELF, null);
         store.settingsStore().setDisableLinkPreviews(disableLinkPreviews);
         return store;

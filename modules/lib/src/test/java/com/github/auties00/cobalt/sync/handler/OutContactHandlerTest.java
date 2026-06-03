@@ -15,7 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.contact.OutContactActionBuil
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +46,7 @@ class OutContactHandlerTest {
     private static final Jid PEER = Jid.of("12025550100@s.whatsapp.net");
     private static final Jid GROUP = Jid.of("99001112224@g.us");
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestABPropsService props;
     private LinkedWhatsAppClient client;
     private OutContactHandler handler;

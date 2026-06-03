@@ -16,7 +16,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * {@link PrivateProcessingSettingAction.PrivateProcessingStatus#UNDEFINED},
  * {@link PrivateProcessingSettingAction.PrivateProcessingStatus#ENABLED},
  * {@link PrivateProcessingSettingAction.PrivateProcessingStatus#DISABLED}) on
- * {@link com.github.auties00.cobalt.store.WhatsAppStore} so the
+ * {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} so the
  * private-processing toggle stays consistent across paired devices. Only
  * {@link SyncdOperation#SET} is accepted; any other operation is reported as
  * {@link MutationApplicationResult#unsupported()} and a missing or unparseable
@@ -84,7 +84,7 @@ public final class PrivateProcessingSettingHandler implements WebAppStateActionH
      * {@link PrivateProcessingSettingAction#privateProcessingStatus()} is
      * rejected as {@link MutationApplicationResult#malformed()}; on success the
      * resolved enum is written via
-     * {@code WhatsAppStore.setPrivateProcessingStatus}.
+     * {@code LinkedWhatsAppStore.setPrivateProcessingStatus}.
      */
     @Override
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {

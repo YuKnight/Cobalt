@@ -108,8 +108,8 @@ public final class SrtpEndpoint implements AutoCloseable {
      * @param inboundKey   the inbound 16-byte master key
      * @param inboundSalt  the inbound 14-byte master salt
      */
-    private SrtpEndpoint(byte[] outboundKey, byte[] outboundSalt,
-                         byte[] inboundKey, byte[] inboundSalt) {
+    SrtpEndpoint(byte[] outboundKey, byte[] outboundSalt,
+                 byte[] inboundKey, byte[] inboundSalt) {
         this.outbound = new SrtpDirection(outboundKey, outboundSalt);
         this.inbound = new SrtpDirection(inboundKey, inboundSalt);
     }
@@ -151,30 +151,39 @@ public final class SrtpEndpoint implements AutoCloseable {
     }
 
     /**
-     * Builds an endpoint that protects the relayed media RTP on the hop-by-hop client-to-relay leg,
-     * keyed from the 30-byte hop-by-hop key the relay hands out in the {@code <hbh_key>} element.
+     * Builds an endpoint that protects the relayed media RTP on the hop-by-hop leg between this
+     * client and the WhatsApp edge relay, keyed from the 30-byte hop-by-hop key the relay hands out
+     * in the {@code <hbh_key>} element.
      *
-     * <p>The hop-by-hop media key is non-directional: the {@code hbh srtp} label in the WhatsApp key
-     * schedule produces a single {@code AES_CM_128_HMAC_SHA1_80} master key and salt that the client
-     * applies to both the uplink it sends and the downlink it receives on this leg (the directions
-     * are kept distinct by SSRC, not by separate keys). Both endpoint directions are therefore keyed
-     * from the same {@link HbhKeyDerivation.Group#SRTP} keymat. Unlike
-     * {@link #fromDtlsKeyingMaterial(byte[], SrtpRole)}, no DTLS role is needed because the keying is
-     * symmetric.
+     * <p>The relay re-encrypts media as it forwards, so the two legs carry different keys: the uplink
+     * this client sends to the relay is protected with the
+     * {@link HbhKeyDerivation.Group#UPLINK_SRTCP} master and the downlink it receives from the relay
+     * with the {@link HbhKeyDerivation.Group#DOWNLINK_SRTCP} master. Each 30-byte keymat is an
+     * {@code AES_CM_128_HMAC_SHA1_80} master key and salt that {@link SrtpDirection} expands into the
+     * full RFC 3711 session key set, so the same master protects both the media SRTP and the SRTCP of
+     * its leg. Unlike {@link #fromDtlsKeyingMaterial(byte[], SrtpRole)}, no DTLS role is needed
+     * because the leg assignment is fixed by the uplink and downlink labels rather than by the
+     * handshake role.
      *
      * @param hopByHopKey the 30-byte hop-by-hop key decoded from the relay block {@code <hbh_key>}
-     * @return a fresh endpoint keyed on the hop-by-hop media SRTP keymat
+     * @return a fresh endpoint keyed on the uplink and downlink hop-by-hop media masters
      * @throws NullPointerException       if {@code hopByHopKey} is {@code null}
      * @throws IllegalArgumentException   if {@code hopByHopKey} is not exactly
      *                                    {@link HbhKeyDerivation#HBH_KEY_LENGTH} bytes long
      * @throws com.github.auties00.cobalt.exception.WhatsAppCallException.Srtp if the key schedule fails
+     * @implNote This implementation maps the uplink leg to the outbound direction and the downlink
+     *           leg to the inbound direction. The hop-by-hop key feeds no separate {@code hbh srtp}
+     *           derivation: on a relayed 1:1 call the native call engine derives only the
+     *           {@code hbh srtcp}, {@code uplink hbh srtcp}, and {@code downlink hbh srtcp} masters,
+     *           protects media through {@code srtp_protect}, and never applies the SFrame transform.
      */
     public static SrtpEndpoint fromHopByHopKey(byte[] hopByHopKey) {
         Objects.requireNonNull(hopByHopKey, "hopByHopKey cannot be null");
-        var keymat = HbhKeyDerivation.deriveKeymat(hopByHopKey, HbhKeyDerivation.Group.SRTP);
-        var masterKey = HbhKeyDerivation.masterKey(keymat);
-        var masterSalt = HbhKeyDerivation.masterSalt(keymat);
-        return new SrtpEndpoint(masterKey, masterSalt, masterKey.clone(), masterSalt.clone());
+        var uplinkKeymat = HbhKeyDerivation.deriveKeymat(hopByHopKey, HbhKeyDerivation.Group.UPLINK_SRTCP);
+        var downlinkKeymat = HbhKeyDerivation.deriveKeymat(hopByHopKey, HbhKeyDerivation.Group.DOWNLINK_SRTCP);
+        return new SrtpEndpoint(
+                HbhKeyDerivation.masterKey(uplinkKeymat), HbhKeyDerivation.masterSalt(uplinkKeymat),
+                HbhKeyDerivation.masterKey(downlinkKeymat), HbhKeyDerivation.masterSalt(downlinkKeymat));
     }
 
     /**

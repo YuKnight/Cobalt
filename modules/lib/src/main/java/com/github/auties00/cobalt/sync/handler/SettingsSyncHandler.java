@@ -415,7 +415,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     /**
      * Writes the resolved setting value into the local store.
      *
-     * <p>Only keys with a backing {@link com.github.auties00.cobalt.store.WhatsAppStore}
+     * <p>Only keys with a backing {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore}
      * field produce an observable side-effect; every other key resolves to a
      * successful no-op so the WA-side action state stays consistent. Per-chat
      * overrides (any scope other than {@link #APP_SCOPE}) are likewise a no-op.

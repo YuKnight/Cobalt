@@ -18,7 +18,7 @@ import com.github.auties00.cobalt.model.privacy.StatusPrivacySettingBuilder;
 import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.LiveWamService;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.libsignal.SignalSessionCipher;
@@ -144,7 +144,7 @@ class StatusMessageSenderTest {
     // Runs a status send after the given store seeding and returns the audience the sender handed
     // to getStatusFanout. AUDIENCE_DEVICE is pre-marked so the send takes the steady-state branch
     // and never reaches the per-device sender-key crypto.
-    private static Collection<Jid> captureStatusAudience(Consumer<WhatsAppStore> seed) {
+    private static Collection<Jid> captureStatusAudience(Consumer<LinkedWhatsAppStore> seed) {
         var senderStore = MessageFixtures.temporaryStore(SELF_PN, SELF_LID);
         senderStore.signalStore().markSenderKeyDistributed(STATUS, AUDIENCE_DEVICE);
         seed.accept(senderStore);
@@ -164,7 +164,7 @@ class StatusMessageSenderTest {
 
     // The returned ack carries only the t attribute, which AckParser reads as
     // a success result with no error code.
-    private static TestWhatsAppClient clientWithCapture(WhatsAppStore store, AtomicReference<Node> capturedStanza) {
+    private static TestWhatsAppClient clientWithCapture(LinkedWhatsAppStore store, AtomicReference<Node> capturedStanza) {
         return TestWhatsAppClient.create()
                 .withStore(store)
                 .withAbPropsService(TestABPropsService.builder().build())
@@ -177,7 +177,7 @@ class StatusMessageSenderTest {
                 });
     }
 
-    private static StatusMessageSender statusMessageSender(TestWhatsAppClient client, WhatsAppStore store, StubDeviceService deviceService) {
+    private static StatusMessageSender statusMessageSender(TestWhatsAppClient client, LinkedWhatsAppStore store, StubDeviceService deviceService) {
         var ab = client.abPropsService();
         var encryption = new MessageEncryption(store,
                 new SignalSessionCipher(store.signalStore()),

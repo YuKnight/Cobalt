@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * <p>This handler persists one of
  * {@link NotificationActivitySettingAction.NotificationActivitySetting}'s
- * values on {@link com.github.auties00.cobalt.store.WhatsAppStore} so the
+ * values on {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore} so the
  * notification activity preference fans out across linked devices. Only
  * {@link SyncdOperation#SET} is accepted; any other operation is reported as
  * {@link MutationApplicationResult#unsupported()} and a missing or wrong-typed

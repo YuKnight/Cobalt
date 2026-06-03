@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.model.sync.SyncActionState;
 import com.github.auties00.cobalt.model.sync.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.AiThreadDeleteMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +40,7 @@ class AiThreadDeleteHandlerTest {
     private static final String THREAD_ID = "thread-123";
     private static final String STORE_KEY = BOT_JID_STRING + "|" + THREAD_ID;
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient client;
 
     @BeforeEach

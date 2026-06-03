@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.call.internal.signaling;
 
 import com.github.auties00.cobalt.call.CallState;
-import com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener;
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;

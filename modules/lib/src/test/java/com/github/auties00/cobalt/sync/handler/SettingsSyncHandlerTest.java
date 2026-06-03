@@ -15,7 +15,7 @@ import com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction;
 import com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,12 +30,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Verifies {@link SettingsSyncHandler}: applying an incoming settings-sync
- * mutation and asserting the {@link WhatsAppStore} side-effect, across the
+ * mutation and asserting the {@link LinkedWhatsAppStore} side-effect, across the
  * {@code settings_sync_enabled} primary-feature plus AB-prop gate, the
  * platform filter, the setting-key decode, and the batch dedup outcomes.
  * The fixture pre-opens both gates so gating-agnostic tests reach the
  * validation pipeline; gating tests disable one or both flags on their
- * local {@link WhatsAppStore} or {@link TestABPropsService} copy.
+ * local {@link LinkedWhatsAppStore} or {@link TestABPropsService} copy.
  */
 @DisplayName("SettingsSyncHandler")
 class SettingsSyncHandlerTest {
@@ -48,7 +48,7 @@ class SettingsSyncHandlerTest {
     private static final int KEY_DISABLE_LINK_PREVIEWS_INDEX = SettingsSyncAction.SettingKey.DISABLE_LINK_PREVIEWS.index();
     private static final int KEY_UNKNOWN_INDEX = SettingsSyncAction.SettingKey.SETTING_KEY_UNKNOWN.index();
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestABPropsService props;
     private LinkedWhatsAppClient client;
     private SettingsSyncHandler handler;

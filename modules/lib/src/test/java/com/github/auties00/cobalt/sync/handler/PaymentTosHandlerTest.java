@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.model.sync.action.payment.PaymentTosActionBuil
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.TestABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.PaymentTosMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Covers {@link PaymentTosHandler}: the SMB platform gate, the
  * {@link ABProp#PAYMENTS_BR_PIX_ON_WEB} AB-prop gate, the {@link SyncdOperation#SET} path
- * that persists the {@link PaymentTosAction} via {@code WhatsAppStore.setPaymentTos}, the
+ * that persists the {@link PaymentTosAction} via {@code LinkedWhatsAppStore.setPaymentTos}, the
  * malformed-value classification when the payload is missing, the
  * {@link SyncActionState#UNSUPPORTED} classification for non-{@code SET} operations and
  * gate failures, and the {@link PaymentTosMutationFactory} pending-mutation builder. Each
@@ -41,7 +41,7 @@ class PaymentTosHandlerTest {
     private static final Jid SELF_PN = Jid.of("19250000001@s.whatsapp.net");
     private static final Jid SELF_LID = Jid.of("83116928594000@lid");
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient testClient;
     private TestABPropsService props;
     private PaymentTosHandler handler;

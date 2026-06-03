@@ -7,7 +7,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.util.Objects;
 
@@ -61,7 +61,7 @@ public final class LiveMessageReceivingService implements MessageReceivingServic
     /**
      * Constructs the receiving service and assembles the internal receiver graph.
      *
-     * <p>The same {@link WhatsAppStore} used by the rest of the client must be passed so
+     * <p>The same {@link LinkedWhatsAppStore} used by the rest of the client must be passed so
      * the receivers see consistent self-JID and Signal-session state.
      *
      * @implNote
@@ -76,7 +76,7 @@ public final class LiveMessageReceivingService implements MessageReceivingServic
     @WhatsAppWebExport(moduleName = "WAWebCommsHandleMessagingStanza", exports = "handleMessagingStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public LiveMessageReceivingService(
-            WhatsAppStore store,
+            LinkedWhatsAppStore store,
             MessageDecryption decryption
     ) {
         this.chatReceiver = new ChatMessageReceiver(store, decryption);

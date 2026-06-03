@@ -36,7 +36,7 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote
  * This implementation registers each mapping eagerly via
- * {@code WhatsAppStore.registerLidMapping(pnJid, lidJid)} as the mutations
+ * {@code LinkedWhatsAppStore.registerLidMapping(pnJid, lidJid)} as the mutations
  * arrive, rather than batching them and calling
  * {@code WAWebDBCreateLidPnMappings.createLidPnMappings} once at the end of the
  * batch as WA Web does; the typed Cobalt store is the sole source of truth so
@@ -99,7 +99,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
      * (mirroring WA Web's {@code isWidlike} guards); then the index JID must be
      * a LID ({@link Jid#hasLidServer()}, mirroring WA Web's
      * {@code createUserLidOrThrow}). On success the bidirectional pair is
-     * registered eagerly via {@code WhatsAppStore.registerLidMapping}; the WA
+     * registered eagerly via {@code LinkedWhatsAppStore.registerLidMapping}; the WA
      * Web batch flush, the per-batch {@code WARN} counters, and the
      * frontend-only {@code bulkUpdatePhoneNumberJids} dispatch are not
      * replicated.

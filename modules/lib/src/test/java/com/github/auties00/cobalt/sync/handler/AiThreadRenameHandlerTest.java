@@ -14,7 +14,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.bot.AiThreadRenameAction;
 import com.github.auties00.cobalt.model.sync.action.bot.AiThreadRenameActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.factory.AiThreadRenameMutationFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,7 +42,7 @@ class AiThreadRenameHandlerTest {
     private static final String STORE_KEY = BOT_JID_STRING + "|" + THREAD_ID;
     private static final String INDEX = "[\"ai_thread_rename\",\"" + BOT_JID_STRING + "\",\"" + THREAD_ID + "\"]";
 
-    private WhatsAppStore store;
+    private LinkedWhatsAppStore store;
     private TestWhatsAppClient client;
 
     @BeforeEach

@@ -1,11 +1,12 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
+import com.github.auties00.cobalt.client.LinkedWhatsAppClientListener;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.listener.MessageStatusListener;
-import com.github.auties00.cobalt.client.listener.NewMessageListener;
+import com.github.auties00.cobalt.listener.linked.LinkedMessageStatusListener;
+import com.github.auties00.cobalt.listener.linked.LinkedNewMessageListener;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo.StubType;
@@ -19,7 +20,6 @@ import com.github.auties00.cobalt.model.payment.OrphanPaymentNotificationBuilder
 import com.github.auties00.cobalt.model.payment.PaymentInfo;
 import com.github.auties00.cobalt.model.payment.PaymentInfoBuilder;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.node.NodeBuilder;
 import com.github.auties00.cobalt.stream.message.PaymentMessageStatus;
 import com.github.auties00.cobalt.stream.message.PaymentMessageTransactionType;
 import com.github.auties00.cobalt.util.RandomIdUtils;
@@ -102,7 +102,7 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
 
     /**
      * Materialises an account-setup invite as a local stub message in the inviter's chat and fires
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onNewMessage(LinkedWhatsAppClient, MessageInfo)} for
+     * {@link LinkedWhatsAppClientListener#onNewMessage(LinkedWhatsAppClient, MessageInfo)} for
      * listeners.
      *
      * <p>Only invites whose {@code type} is {@code account-set-up} produce a stub; other invite types are logged and
@@ -161,7 +161,7 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
         chat.addMessage(info);
 
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof NewMessageListener typed) {
+            if (listener instanceof LinkedNewMessageListener typed) {
                 Thread.startVirtualThread(() -> typed.onNewMessage(whatsapp, info));
             }
         }
@@ -221,7 +221,7 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
     /**
      * Writes transaction fields onto the resolved chat message, propagates the status onto the originating payment
      * request when one exists, and fires
-     * {@link com.github.auties00.cobalt.client.listener.LinkedWhatsAppClientListener#onMessageStatus(LinkedWhatsAppClient, MessageInfo)} for
+     * {@link LinkedWhatsAppClientListener#onMessageStatus(LinkedWhatsAppClient, MessageInfo)} for
      * listeners.
      *
      * <p>When this transaction fulfils a payment request, the originating request message is located by key and then by
@@ -266,14 +266,14 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
                     paymentInfo.txnStatus().orElse(PaymentInfo.TxnStatus.UNKNOWN)));
             requestChat.setPaymentInfo(requestPaymentInfo);
             for (var listener : whatsapp.store().listeners()) {
-                if (listener instanceof MessageStatusListener typed) {
+                if (listener instanceof LinkedMessageStatusListener typed) {
                     Thread.startVirtualThread(() -> typed.onMessageStatus(whatsapp, requestChat));
                 }
             }
         });
 
         for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof MessageStatusListener typed) {
+            if (listener instanceof LinkedMessageStatusListener typed) {
                 Thread.startVirtualThread(() -> typed.onMessageStatus(whatsapp, chatMessageInfo));
             }
         }

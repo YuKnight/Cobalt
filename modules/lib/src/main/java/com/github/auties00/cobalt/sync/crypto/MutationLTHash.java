@@ -5,7 +5,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.SyncActionEntry;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import javax.crypto.KDF;
 import javax.crypto.spec.HKDFParameterSpec;
@@ -287,7 +287,7 @@ public final class MutationLTHash {
      * @return the verdict and the diagnostic hash pair
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdAntiTamperingLtHash", exports = "checkLtHash", adaptation = WhatsAppAdaptation.ADAPTED)
-    public static LtHashCheckResult checkLtHash(WhatsAppStore store, SyncPatchType collection, Integer maxMutations, String context) {
+    public static LtHashCheckResult checkLtHash(LinkedWhatsAppStore store, SyncPatchType collection, Integer maxMutations, String context) {
         var collectionsData = new ArrayList<CollectionCheckData>();
         if (collection == null) {
             for (var patchType : SyncPatchType.values()) {
@@ -363,7 +363,7 @@ public final class MutationLTHash {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdAntiTamperingLtHash", exports = "reportCollectionInconsistency", adaptation = WhatsAppAdaptation.ADAPTED)
     public static Boolean reportCollectionInconsistency(
-            WhatsAppStore store,
+            LinkedWhatsAppStore store,
             SyncPatchType collection,
             String diagnosticContext,
             String checkContext,

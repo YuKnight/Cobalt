@@ -181,7 +181,7 @@ export async function enrichDiffExcerpts(
             beforeSource = await sourceLoader.loadSource(diff.fromSnapshotId, beforeRecord.sourcePath);
           }
           before = beforeSource.slice(bRange.startByte, Math.min(bRange.endByte, bRange.startByte + EXCERPT_MAX));
-        } catch { /* ignore */ }
+        } catch {  }
       }
 
       if (aRange && afterRecord) {
@@ -190,7 +190,7 @@ export async function enrichDiffExcerpts(
             afterSource = await sourceLoader.loadSource(diff.toSnapshotId, afterRecord.sourcePath);
           }
           after = afterSource.slice(aRange.startByte, Math.min(aRange.endByte, aRange.startByte + EXCERPT_MAX));
-        } catch { /* ignore */ }
+        } catch {  }
       }
 
       if (before != null || after != null) {

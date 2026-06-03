@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.time.Instant;
 
@@ -45,7 +45,7 @@ final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageI
      */
     @WhatsAppWebExport(moduleName = "WAWebHandleNewsletterMsg", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    NewsletterMessageReceiver(WhatsAppStore store) {
+    NewsletterMessageReceiver(LinkedWhatsAppStore store) {
         super(store);
     }
 

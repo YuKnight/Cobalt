@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.model.device.info.DeviceList;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.store.WhatsAppStore;
+import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -71,7 +71,7 @@ public final class IcdcComputer {
     /**
      * Holds the store providing device lists, identity keys, and session state.
      */
-    private final WhatsAppStore store;
+    private final LinkedWhatsAppStore store;
 
     /**
      * Holds the AB props service used to read feature flags and the hash-length
@@ -95,7 +95,7 @@ public final class IcdcComputer {
     @WhatsAppWebExport(moduleName = "WAWebIdentityIcdcApi",
             exports = {"getICDCMeta", "getICDCMetaFromDeviceRecord"},
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public IcdcComputer(WhatsAppStore store, ABPropsService abPropsService) {
+    public IcdcComputer(LinkedWhatsAppStore store, ABPropsService abPropsService) {
         this.store = Objects.requireNonNull(store, "store");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
     }
@@ -216,7 +216,7 @@ public final class IcdcComputer {
      *
      * <p>This method is package-private and static so that the test class can
      * exercise its pure-function contract (determinism, order-independence,
-     * truncation, distinctness) without setting up a {@link WhatsAppStore}.
+     * truncation, distinctness) without setting up a {@link LinkedWhatsAppStore}.
      *
      * @implNote This implementation sorts the keys lexicographically using
      * unsigned-byte comparison ({@link #compareKeyBytes(byte[], byte[])}),

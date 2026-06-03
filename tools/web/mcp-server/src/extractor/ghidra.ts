@@ -44,41 +44,39 @@ export interface GhidraOutput {
 export async function findGhidraInstallation(
   explicitPath?: string
 ): Promise<string> {
-  // 1. Explicit path
+
   if (explicitPath) {
     const headless = analyzeHeadlessPath(explicitPath);
     if (await fileExists(headless)) return explicitPath;
     throw new Error(`Ghidra not found at: ${explicitPath}`);
   }
 
-  // 2. GHIDRA_INSTALL_DIR env var
   const envPath = process.env.GHIDRA_INSTALL_DIR;
   if (envPath) {
     const headless = analyzeHeadlessPath(envPath);
     if (await fileExists(headless)) return envPath;
   }
 
-  // 3. Common locations
   const candidates = [
-    // macOS Homebrew
+
     "/opt/homebrew/Caskroom/ghidra",
-    // Linux common
+
     "/opt/ghidra",
     "/usr/share/ghidra",
-    // Home directory
+
     join(process.env.HOME ?? "", "ghidra"),
   ];
 
   for (const candidate of candidates) {
     const headless = analyzeHeadlessPath(candidate);
     if (await fileExists(headless)) return candidate;
-    // Homebrew installs in versioned subdirs
+
     try {
       const { readdir } = await import("node:fs/promises");
       const entries = await readdir(candidate);
       for (const entry of entries) {
         const subPath = join(candidate, entry);
-        // Look for ghidra_*_PUBLIC dirs
+
         const nested = await readdir(subPath).catch(() => []);
         for (const n of nested) {
           if (n.startsWith("ghidra_")) {
@@ -88,16 +86,15 @@ export async function findGhidraInstallation(
         }
       }
     } catch {
-      // Directory doesn't exist
+
     }
   }
 
-  // 4. Try PATH (analyzeHeadless might be on the system path)
   try {
     await execFileAsync("analyzeHeadless", ["--help"]);
-    return ""; // Empty path means it's on PATH
+    return "";
   } catch {
-    // Not on PATH
+
   }
 
   throw new Error(
@@ -149,7 +146,7 @@ export async function decompileBinary(
     });
 
     if (stderr) {
-      // Ghidra writes progress to stderr — extract key messages
+
       const lines = stderr.split("\n");
       for (const line of lines) {
         if (
@@ -192,19 +189,6 @@ export interface WasmDecompileResult {
   code: string;
 }
 
-/**
- * Decompiles a single WASM function to C pseudocode via Ghidra headless and the
- * nneonneo ghidra-wasm-plugin. The WasmLoader auto-detects the {@code \0asm}
- * magic and binds language {@code Wasm:LE:32:default}, so no {@code -processor}
- * is passed (unlike {@link decompileBinary}, which targets ARM64 native binaries
- * and is left unchanged). Requires the plugin to be installed in the Ghidra
- * Extensions directory; if Ghidra or the plugin is absent this rejects, and the
- * caller should fall back to WAT.
- *
- * @param wasmPath path to the {@code .wasm} file
- * @param funcIndex the WASM function index to decompile
- * @param options Ghidra discovery and resource options
- */
 export async function decompileWasmFunction(
   wasmPath: string,
   funcIndex: number,
@@ -222,7 +206,7 @@ export async function decompileWasmFunction(
     "WasmProj",
     "-import",
     wasmPath,
-    // No -processor: the WasmLoader binds Wasm:LE:32:default automatically.
+
     "-scriptPath",
     SCRIPTS_DIR,
     "-postScript",
@@ -278,11 +262,7 @@ function execFileAsync(
   args: string[],
   options?: { timeout?: number; maxBuffer?: number }
 ): Promise<{ stdout: string; stderr: string }> {
-  // Node 24 refuses to execFile a .bat/.cmd directly on Windows (the
-  // CVE-2024-27980 shell requirement -> spawn EINVAL). Route the batch launcher
-  // through the shell with every token double-quoted so space-containing paths
-  // (e.g. "New folder", the temp project dir) survive. POSIX is unchanged: the
-  // launcher there is a plain script that execs fine without a shell.
+
   const isWindowsBatch = process.platform === "win32" && /\.(bat|cmd)$/i.test(command);
   const spawnCommand = isWindowsBatch ? `"${command}"` : command;
   const spawnArgs = isWindowsBatch ? args.map((arg) => `"${arg}"`) : args;
