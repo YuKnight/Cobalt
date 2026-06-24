@@ -186,7 +186,7 @@ class TimeFormatHandlerTest {
             assertEquals(ts, pending.mutation().timestamp());
             assertEquals(TimeFormatAction.ACTION_VERSION, pending.mutation().actionVersion());
             assertEquals("[\"time_format\"]", pending.mutation().index());
-            var action = (TimeFormatAction) pending.mutation().value().action().orElseThrow();
+            var action = (TimeFormatAction) pending.mutation().value().flatMap(sav -> sav.action()).orElseThrow();
             assertTrue(action.isTwentyFourHourFormatEnabled());
         }
 

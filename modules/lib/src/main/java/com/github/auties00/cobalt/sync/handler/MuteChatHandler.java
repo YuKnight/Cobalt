@@ -118,7 +118,7 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
         }
 
         try {
-            if (!(mutation.value().action().orElse(null) instanceof MuteAction action)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MuteAction action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

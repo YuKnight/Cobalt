@@ -110,7 +110,7 @@ public final class CsTokenStanza {
             return null;
         }
 
-        var salt = store.notificationContentTokenSalt().orElse(null);
+        var salt = store.accountStore().notificationContentTokenSalt().orElse(null);
         if (salt == null) {
             LOGGER.log(System.Logger.Level.WARNING, "[nct-cstoken] no salt available in store");
             return null;

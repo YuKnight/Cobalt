@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.message;
 
 import com.github.auties00.cobalt.ack.AckResult;
-import com.github.auties00.cobalt.ack.CallAck;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppMessageException;
 import com.github.auties00.cobalt.message.receive.MessageReceivingService;
@@ -114,52 +113,27 @@ public interface MessageService {
     MessageInfo process(Node node);
 
     /**
-     * Builds and sends an outbound {@code <call><offer>} stanza to the peer's devices.
+     * Resolves the LID addressing a one-to-one call offer to {@code peer} must use.
      *
-     * <p>Owns the addressing-mode resolution (LID where the local user has migrated, PN
-     * otherwise), the per-device list sync, the {@code ensureSessions} prekey fetch, the
-     * per-device Signal envelope of the call-key plaintext, and the ADV-signed device-identity
-     * attachment. Returns the parsed {@link CallAck} so the call layer can read the
-     * {@link CallAck#relay() relay block} and drive the media plane on success, or surface the
-     * {@link AckResult#error() error code} on rejection.
+     * <p>WhatsApp addresses call signaling by LID: the offer's {@code <call to>} and per-device
+     * {@code <destination>} fanout carry the peer's LID, not its phone number. This resolves the peer's
+     * phone number to its LID (querying the server through the USync LID protocol via
+     * {@link com.github.auties00.cobalt.device.DeviceService#queryUserLid(Jid)} when no mapping is
+     * cached), synchronises the peer's device list in that LID addressing mode, and returns the peer LID
+     * user JID together with one LID device JID per device.
      *
      * @implSpec
-     * Implementations must resolve both self and peer to the call's canonical addressing mode
-     * before building the wire stanza; the WhatsApp server rejects mixed-addressing offers with
-     * {@code error="439"}.
+     * Implementations must resolve the peer to LID before synchronising its device list, must address
+     * the returned device JIDs in LID, and must throw rather than return a phone-number-addressed
+     * result when no LID can be resolved; WhatsApp Web aborts the call instead of sending a phone-number
+     * offer the server rejects with {@code error="439"}.
      *
-     * @param peer    the peer user JID (PN or LID; will be resolved to the canonical mode)
-     * @param callId  the call identifier
-     * @param callKey the per-call shared key bytes to encrypt to every peer device
-     * @param video   whether the call offers video
-     * @return the parsed call ACK
-     * @throws NullPointerException  if {@code peer}, {@code callId}, or {@code callKey} is
-     *                               {@code null}
-     * @throws IllegalStateException if the client is not logged in, or if no trusted-contact token
-     *                               is available for the peer
+     * @param peer the peer user JID being called, in phone-number or LID form
+     * @return the resolved LID addressing for the peer
+     * @throws NullPointerException  if {@code peer} is {@code null}
+     * @throws IllegalStateException if the peer has no resolvable LID
      */
-    CallAck sendCall(Jid peer, String callId, byte[] callKey, boolean video);
-
-    /**
-     * Sends a group-call offer to the group-call JID and returns the parsed ACK.
-     *
-     * <p>A group call offer differs from a 1:1 offer: it targets {@code <group-user>@call} (the WA
-     * call domain) rather than a device JID, carries the group's {@code g.us} JID as the
-     * {@code group-jid} attribute and a {@code <group_info>} child listing the participants, and
-     * encrypts the call key to every device of every participant in the {@code <destination>} fanout.
-     * The server fans the offer out to the group's members.
-     *
-     * @param group        the group JID (a {@code g.us} JID)
-     * @param participants the participant user JIDs to invite
-     * @param callId       the call identifier
-     * @param callKey      the per-call shared key bytes to encrypt to every participant device
-     * @param video        whether the call offers video
-     * @return the parsed call ACK
-     * @throws NullPointerException  if any argument is {@code null}
-     * @throws IllegalStateException if the client is not logged in
-     */
-    CallAck sendGroupCall(Jid group, java.util.Collection<Jid> participants, String callId,
-                          byte[] callKey, boolean video);
+    CallPeerAddressing resolveCallPeerAddressing(Jid peer);
 
     /**
      * Decrypts a Signal-encrypted call payload into its plaintext bytes.
@@ -192,4 +166,17 @@ public interface MessageService {
      * @see MessageReceivingService#clearPendingMessages()
      */
     void clearPendingMessages();
+
+    /**
+     * Carries the LID addressing for a one-to-one call peer.
+     *
+     * <p>Produced by {@link #resolveCallPeerAddressing(Jid)} and consumed by the call-placement path to
+     * address the outbound offer: {@link #peer()} is the peer's LID user JID written onto the
+     * {@code <call to>} envelope, and {@link #peerDevices()} are the per-device LID JIDs the offer fans
+     * the call key out to.
+     *
+     * @param peer        the peer's LID user JID; never {@code null}
+     * @param peerDevices the peer's per-device LID JIDs; never {@code null}, never empty
+     */
+    record CallPeerAddressing(Jid peer, java.util.List<Jid> peerDevices) {}
 }

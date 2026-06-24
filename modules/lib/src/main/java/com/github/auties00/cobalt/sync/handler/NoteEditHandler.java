@@ -128,7 +128,7 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof NoteEditAction action)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof NoteEditAction action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

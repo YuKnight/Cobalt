@@ -260,6 +260,11 @@ public final class StubDeviceService implements DeviceService {
     }
 
     @Override
+    public Optional<Jid> queryUserLid(Jid userPn) {
+        return Optional.empty();
+    }
+
+    @Override
     public Optional<DeviceList> getDeviceRecord(Jid userJid) {
         throw unsupported("getDeviceRecord");
     }

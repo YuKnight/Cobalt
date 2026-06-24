@@ -147,7 +147,8 @@ public final class WebAppStateHandlerRegistry {
         registerHandler(new ExternalWebBetaHandler(abPropsService));
         registerHandler(new SettingsSyncHandler(abPropsService));
         registerHandler(new NctSaltSyncHandler());
-        registerHandler(new CallLogHandler());
+        registerHandler(new Calls2CallLogHandler());
+        registerHandler(new Calls2DeleteIndividualCallLogHandler());
         registerHandler(new SubscriptionHandler());
         registerHandler(new OutContactHandler(abPropsService));
     }

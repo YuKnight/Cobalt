@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.client.cloud;
 
 import com.github.auties00.cobalt.client.WhatsAppClientBuilder;
-import com.github.auties00.cobalt.client.WhatsAppClientErrorHandler;
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator;
 import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
@@ -83,11 +82,6 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
         HttpClient httpClient;
 
         /**
-         * The error handler installed on the future client, or {@code null} to use the default.
-         */
-        WhatsAppClientErrorHandler errorHandler;
-
-        /**
          * Package-private constructor used by the concrete stages.
          */
         Transport() {
@@ -129,18 +123,6 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
         }
 
         /**
-         * Sets the error handler that decides how the future client reacts to failures.
-         *
-         * @param errorHandler the error handler, or {@code null} to use the default
-         *                     terminal-printing handler
-         * @return this builder, for chaining
-         */
-        public T errorHandler(WhatsAppClientErrorHandler errorHandler) {
-            this.errorHandler = errorHandler;
-            return self();
-        }
-
-        /**
          * Builds the configured Cloud client around the given store.
          *
          * @param store the store backing the client
@@ -148,9 +130,8 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
          * @throws IllegalArgumentException if a SOCKS proxy was supplied
          */
         final CloudWhatsAppClient build(CloudWhatsAppStore store) {
-            var resolvedErrorHandler = Objects.requireNonNullElseGet(errorHandler, WhatsAppClientErrorHandler::toTerminal);
             var resolvedHttpClient = httpClient != null ? httpClient : buildHttpClient();
-            return new LiveCloudWhatsAppClient(store, resolvedErrorHandler, resolvedHttpClient);
+            return new LiveCloudWhatsAppClient(store, resolvedHttpClient);
         }
 
         /**
@@ -219,6 +200,12 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
         String appSecret;
 
         /**
+         * The Meta app id used by the Resumable Upload API, or {@code null} when resumable uploads
+         * are unused.
+         */
+        String appId;
+
+        /**
          * Constructs the stage around the required credentials.
          *
          * @param accessToken   the system-user access token
@@ -241,9 +228,9 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
             this.businessId = source.businessId;
             this.apiVersion = source.apiVersion;
             this.appSecret = source.appSecret;
+            this.appId = source.appId;
             this.proxy = source.proxy;
             this.httpClient = source.httpClient;
-            this.errorHandler = source.errorHandler;
         }
 
         /**
@@ -302,6 +289,20 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
         }
 
         /**
+         * Sets the Meta app id used by the Resumable Upload API.
+         *
+         * <p>The Resumable Upload API creates an upload session under the {@code /{APP_ID}/uploads}
+         * edge, so it is required only for resumable media uploads and is otherwise optional.
+         *
+         * @param appId the Meta app id, or {@code null} to leave it unset
+         * @return this builder, for chaining
+         */
+        public Options appId(String appId) {
+            this.appId = appId;
+            return this;
+        }
+
+        /**
          * Configures the built-in webhook receiver and moves to the webhook sub-stage.
          *
          * <p>The verify token is echoed during the subscription handshake and the port is where the
@@ -350,6 +351,7 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
                     .webhookBindAddress(webhookBindAddress)
                     .webhookPort(webhookPort == 0 ? null : webhookPort)
                     .webhookPath(webhookPath)
+                    .appId(appId)
                     .build();
         }
     }

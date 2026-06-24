@@ -10,18 +10,24 @@ import com.github.auties00.cobalt.model.cloud.CloudCallEvent;
  *
  * <p>{@link CloudWhatsAppClientListener} extends this interface and supplies an empty default
  * implementation, so the event can also be observed in isolation as a lambda. The event is raised for
- * each Calling API event delivered through the {@code calls} webhook change field (an inbound SDP
- * offer, a connect, or a terminate).
+ * each inbound signaling event delivered through the {@code calls} webhook change field, either a
+ * {@link CloudCallEvent.Connect} carrying an SDP offer or a {@link CloudCallEvent.Terminate} carrying
+ * the final disposition. Business-initiated call status transitions reach
+ * {@link com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient#addCallStatusListener
+ * CloudCallStatusListener} and consumer permission replies reach
+ * {@link com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient#addCallPermissionListener
+ * CloudCallPermissionListener} instead.
  *
  * @see CloudWhatsAppClientListener
  */
 @FunctionalInterface
 public non-sealed interface CloudCallListener extends CloudListener {
     /**
-     * Notifies the listener of a Calling API event.
+     * Notifies the listener of an inbound call signaling event.
      *
      * @param whatsapp the client emitting the event
-     * @param event    the call event
+     * @param event    the signaling event, a {@link CloudCallEvent.Connect} or a
+     *                 {@link CloudCallEvent.Terminate}
      */
-    void onCall(CloudWhatsAppClient whatsapp, CloudCallEvent event);
+    void onCall(CloudWhatsAppClient whatsapp, CloudCallEvent.Signaling event);
 }

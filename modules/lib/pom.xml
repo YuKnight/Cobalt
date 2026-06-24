@@ -197,12 +197,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>com.github.auties00</groupId>
-            <artifactId>protobuf-serialization-plugin</artifactId>
-            <version>${protoc.version}</version>
-        </dependency>
-
         <!-- Generate and print QR code (Web API) -->
         <dependency>
             <groupId>com.google.zxing</groupId>
@@ -228,11 +222,6 @@
         </dependency>
 
         <!-- BouncyCastle -->
-        <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcpkix-jdk18on</artifactId>
-            <version>${bouncycastle.version}</version>
-        </dependency>
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk18on</artifactId>
@@ -272,7 +261,7 @@
             <version>${apk.parser.version}</version>
         </dependency>
 
-        <!-- Generate messageContainer previews -->
+        <!-- Generate message previews -->
         <dependency>
             <groupId>com.github.auties00</groupId>
             <artifactId>link-preview</artifactId>
@@ -331,6 +320,13 @@
             <groupId>org.openjdk.jmh</groupId>
             <artifactId>jmh-generator-annprocess</artifactId>
             <version>${jmh.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

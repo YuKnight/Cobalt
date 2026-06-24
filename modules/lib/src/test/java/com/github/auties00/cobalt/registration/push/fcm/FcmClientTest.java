@@ -1,13 +1,12 @@
 package com.github.auties00.cobalt.registration.push.fcm;
 
+import com.github.auties00.cobalt.Faker;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
-import com.github.auties00.cobalt.Faker;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.registration.MobileClientRegistration;
-import com.github.auties00.cobalt.registration.push.apns.ApnsClient;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +39,7 @@ class FcmClientTest {
         Throwable lastFailure = null;
         for (var attempt = 1; attempt <= maxAttempts; attempt++) {
             var phoneNumber = Faker.randomItalianMobile();
-            try (var pushClient = ApnsClient.newSession()) {
+            try (var pushClient = FcmClient.newSession()) {
                 pushClient.authenticate(device);
 
                 var store = WhatsAppStoreFactory.temporary()

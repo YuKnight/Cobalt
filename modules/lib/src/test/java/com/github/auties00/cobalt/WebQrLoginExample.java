@@ -1,5 +1,5 @@
-import com.github.auties00.cobalt.call.stream.AudioInputStream;
-import com.github.auties00.cobalt.call.stream.AudioOutputStream;
+import com.github.auties00.cobalt.calls2.stream.AudioInput;
+import com.github.auties00.cobalt.calls2.stream.AudioOutput;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
@@ -23,10 +23,9 @@ void main() throws IOException {
             .historySetting(WhatsAppWebClientHistory.standard(false))
             .unregistered(19153544650L, LinkedWhatsAppClientVerificationHandler.Web.PairingCode.toTerminal())
             .addLoggedInListener(client -> {
-                var api = (LinkedWhatsAppClient) client;
-                System.out.printf("Connected: %s%n", api.store().settingsStore().privacySettings());
+                System.out.printf("Connected: %s%n", client.store().settingsStore().privacySettings());
                 var peer = Jid.of("393668765864@s.whatsapp.net");
-                var call = api.startCall(peer, AudioOutputStream.buffered(), AudioInputStream.buffered());
+                var call = client.startCall(peer, AudioOutput.buffered(), AudioInput.buffered());
                 System.out.println("Call started: " + call.callId());
             })
             .addWebAppPrimaryFeaturesListener((_, features) -> System.out.printf("Received features: %s%n", features))

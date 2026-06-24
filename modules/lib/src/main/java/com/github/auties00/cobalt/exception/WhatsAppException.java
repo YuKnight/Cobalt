@@ -1,24 +1,29 @@
 package com.github.auties00.cobalt.exception;
 
-import com.github.auties00.cobalt.client.WhatsAppClientErrorHandler;
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 
 /**
  * Sealed root of every exception thrown by Cobalt while talking to WhatsApp.
- *
+ * <p>
  * Each concrete subtype names a single failure mode (a session conflict, a
  * media download failure, an account device verification mismatch, and so
- * on) and reports through {@link #isFatal()} whether that failure
- * invalidates the current session. The permits list is closed, so a
+ * on) and reports through {@link #toErrorResult()} the
+ * {@link WhatsAppLinkedClientErrorResult} that mirrors WhatsApp Web's native
+ * reaction to that failure. The permits list is closed, so a
  * {@code switch} over a {@code WhatsAppException} can be exhaustive.
- *
+ * <p>
  * Cobalt does not pin a recovery action to any exception. When a subtype
- * is thrown, the configurable {@link WhatsAppClientErrorHandler} maps it
- * to a {@link WhatsAppClientErrorHandler.Result}: discard the event,
- * disconnect, reconnect, log out, or treat the account as banned.
+ * is thrown, the configurable {@link WhatsAppLinkedClientErrorHandler} decides
+ * the recovery: the bundled factories log the exception and return its
+ * {@link #toErrorResult()}, while a custom handler may pattern-match the
+ * concrete subtype and choose differently among discarding the event,
+ * disconnecting, reconnecting, logging out, or treating the account as
+ * banned.
  *
  * @apiNote
  * Most embedders observe these exceptions through the configured
- * {@link WhatsAppClientErrorHandler} rather than through {@code try}/{@code catch}
+ * {@link WhatsAppLinkedClientErrorHandler} rather than through {@code try}/{@code catch}
  * blocks around individual calls; pattern-match on the concrete subtype
  * there to react to a specific failure mode.
  *
@@ -29,8 +34,8 @@ import com.github.auties00.cobalt.client.WhatsAppClientErrorHandler;
  * subtype and lets the user-configurable error handler decide the
  * recovery policy.
  *
- * @see #isFatal()
- * @see WhatsAppClientErrorHandler
+ * @see #toErrorResult()
+ * @see WhatsAppLinkedClientErrorHandler
  */
 public abstract sealed class WhatsAppException extends RuntimeException
         permits WhatsAppABPropTypeMismatchException, WhatsAppAdvCheckException, WhatsAppAdvValidationException, WhatsAppCallException, WhatsAppCloudException, WhatsAppFacebookGraphQlException, WhatsAppConnectionException, WhatsAppCorruptedStoreException, WhatsAppDeviceSyncException, WhatsAppHistorySyncException, WhatsAppLidMigrationException, WhatsAppMalformedJidException, WhatsAppMediaException, WhatsAppMessageException, WhatsAppOwnDeviceListExpiredException, WhatsAppPrivateStatsTokenIssuerException, WhatsAppReconnectionException, WhatsAppRegistrationException, WhatsAppWebGraphQlException, WhatsAppServerRuntimeException, WhatsAppSessionException, WhatsAppStreamException, WhatsAppWebAppStateSyncException {
@@ -71,33 +76,39 @@ public abstract sealed class WhatsAppException extends RuntimeException
     }
 
     /**
-     * Returns whether the failure invalidates the current WhatsApp session.
+     * Returns the recovery action that mirrors WhatsApp Web's native
+     * reaction to this failure.
      *
-     * A fatal failure means the encrypted Noise channel can no longer be
-     * trusted to exchange messages correctly and the client must be torn
-     * down before any retry. A non-fatal failure is scoped to a single
-     * operation (a single message, media transfer, or sync request) and
-     * the rest of the session can keep running.
+     * Each concrete subtype maps its single failure mode to the
+     * {@link WhatsAppLinkedClientErrorResult} WhatsApp Web would apply: swallow
+     * the event and keep the session running
+     * ({@link WhatsAppLinkedClientErrorResult#DISCARD}), tear the session down
+     * ({@link WhatsAppLinkedClientErrorResult#DISCONNECT}), drop and immediately
+     * re-establish the connection
+     * ({@link WhatsAppLinkedClientErrorResult#RECONNECT}), log the device out
+     * ({@link WhatsAppLinkedClientErrorResult#LOG_OUT}), or treat the account as
+     * banned ({@link WhatsAppLinkedClientErrorResult#BAN}).
      *
      * @apiNote
-     * The configured {@link WhatsAppClientErrorHandler} consults this value
-     * when choosing between
-     * {@link WhatsAppClientErrorHandler.Result#DISCARD},
-     * {@link WhatsAppClientErrorHandler.Result#DISCONNECT},
-     * {@link WhatsAppClientErrorHandler.Result#RECONNECT}, and
-     * {@link WhatsAppClientErrorHandler.Result#LOG_OUT}.
+     * This is the default action the bundled
+     * {@link WhatsAppLinkedClientErrorHandler} factories
+     * ({@link WhatsAppLinkedClientErrorHandler#toTerminal()},
+     * {@link WhatsAppLinkedClientErrorHandler#toFile()}) return after logging the
+     * exception; a custom handler may inspect the concrete subtype and
+     * decide differently.
      *
      * @implSpec
-     * Every concrete subtype declares a constant or per-instance answer.
-     * Subtypes whose failure mode is structurally non-recoverable (Signal
-     * MAC mismatch on the wire, account banned, server logout, ADV
-     * validation failure, LID migration failure, corrupted store) must
-     * return {@code true}; subtypes whose failure mode is local to a
-     * single operation (media transfer, single message, single AB prop
-     * lookup) must return {@code false}.
+     * Every concrete subtype returns a constant or per-instance result. A
+     * subtype whose failure is local to a single operation (one message,
+     * one media transfer, one AB-prop lookup, one sync collection) returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}; a subtype that leaves the
+     * encrypted Noise channel unusable returns one of the session-control
+     * results ({@link WhatsAppLinkedClientErrorResult#DISCONNECT},
+     * {@link WhatsAppLinkedClientErrorResult#RECONNECT},
+     * {@link WhatsAppLinkedClientErrorResult#LOG_OUT}, or
+     * {@link WhatsAppLinkedClientErrorResult#BAN}).
      *
-     * @return {@code true} if the current session can no longer be used,
-     *         {@code false} if the failure is local to one operation
+     * @return the recovery action for this failure, never {@code null}
      */
-    public abstract boolean isFatal();
+    public abstract WhatsAppLinkedClientErrorResult toErrorResult();
 }

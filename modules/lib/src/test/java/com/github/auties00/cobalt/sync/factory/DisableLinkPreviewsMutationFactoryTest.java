@@ -26,7 +26,7 @@ class DisableLinkPreviewsMutationFactoryTest {
         var expected = SyncFixtures.decodeOracleBytes(oracle, "encoded");
 
         var pending = new DisableLinkPreviewsMutationFactory().getDisableLinkPreviewsMutation(Instant.ofEpochSecond(1_700_000_000L), true);
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

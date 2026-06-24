@@ -110,7 +110,7 @@ final class NotificationPrivacyStreamHandler extends SocketStreamHandler.Concurr
             return;
         }
 
-        whatsapp.store().waitForOfflineDeliveryEnd();
+        whatsapp.store().connectionStore().waitForOfflineDeliveryEnd();
 
         for (var tokenNode : tokensNode.getChildren("token")) {
             var type = tokenNode.getAttributeAsString("type", "");

@@ -281,7 +281,7 @@ class ClearChatHandlerTest {
             var resolution = new ClearChatHandler().resolveConflicts(local, remote);
             assertEquals(ConflictResolutionState.SKIP_REMOTE_DROP_LOCAL, resolution.state());
             assertNotNull(resolution.mergedMutation());
-            assertTrue(resolution.mergedMutation().value().action().filter(a -> a instanceof ClearChatAction).isPresent());
+            assertTrue(resolution.mergedMutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof ClearChatAction).isPresent());
         }
     }
 
@@ -301,7 +301,7 @@ class ClearChatHandlerTest {
             assertEquals(
                     JSON.toJSONString(List.of("clearChat", PEER.toString(), "1", "0")),
                     trusted.index());
-            assertTrue(trusted.value().action().filter(a -> a instanceof ClearChatAction).map(a -> (ClearChatAction) a).orElseThrow().messageRange().isPresent());
+            assertTrue(trusted.value().flatMap(sav -> sav.action()).filter(a -> a instanceof ClearChatAction).map(a -> (ClearChatAction) a).orElseThrow().messageRange().isPresent());
         }
     }
 

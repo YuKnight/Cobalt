@@ -103,7 +103,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
                 continue;
             }
 
-            var action = mutation.value().action().orElse(null);
+            var action = mutation.value().flatMap(sav -> sav.action()).orElse(null);
             if (!(action instanceof PrimaryFeatureAction)) {
                 results.add(SyncdIndexUtils.malformedActionValue(collectionName().name()));
                 continue;
@@ -115,7 +115,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
             results.add(MutationApplicationResult.success());
         }
         if (latest != null) {
-            var pfa = (PrimaryFeatureAction) latest.value().action().orElseThrow();
+            var pfa = (PrimaryFeatureAction) latest.value().flatMap(sav -> sav.action()).orElseThrow();
             client.store().syncStore().setPrimaryFeatures(pfa.flags());
         }
 
@@ -142,7 +142,7 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrimaryFeatureAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrimaryFeatureAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

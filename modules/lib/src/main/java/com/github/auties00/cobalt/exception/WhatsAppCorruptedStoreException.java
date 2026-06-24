@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 /**
  * Thrown when the persisted Cobalt store cannot be loaded because its
  * bytes are corrupt.
@@ -11,10 +13,10 @@ package com.github.auties00.cobalt.exception;
  * silently continuing with cryptographic material that cannot be trusted.
  *
  * @apiNote
- * This is always fatal: the store holds the keys needed to resume the
- * session, so there is no usable identity to recover. The configured error
- * handler typically logs the device out so the application can drive a
- * fresh pairing.
+ * {@link #toErrorResult()} reports {@link WhatsAppLinkedClientErrorResult#DISCONNECT}:
+ * the store holds the keys needed to resume the session, so there is no usable
+ * identity to recover. The configured error handler typically logs the device
+ * out so the application can drive a fresh pairing.
  *
  * @implNote
  * Cobalt collapses WA Web's multi-IndexedDB schema into a single store, so
@@ -34,11 +36,12 @@ public final class WhatsAppCorruptedStoreException extends WhatsAppException {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code true}: a corrupted store
-     * cannot yield usable keys, so the session cannot resume.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCONNECT}: a corrupted store yields
+     * no usable keys, so the session cannot resume.
      */
     @Override
-    public boolean isFatal() {
-        return true;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCONNECT;
     }
 }

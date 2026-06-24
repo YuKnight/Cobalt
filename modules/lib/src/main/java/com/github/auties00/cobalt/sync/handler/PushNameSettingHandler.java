@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedNameChangedListener;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
@@ -113,7 +114,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
      * emitted on success. The WA Web {@code syncdCritical} coordination and the
      * trace logging are dropped. WA Web's outer try/catch is not mirrored:
      * Cobalt lets exceptions propagate so the configured
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientErrorHandler}
+     * {@link WhatsAppLinkedClientErrorHandler}
      * decides recovery.
      */
     @Override
@@ -123,7 +124,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        var resolvedName = mutation.value().action()
+        var resolvedName = mutation.value().flatMap(sav -> sav.action())
                 .filter(PushNameSetting.class::isInstance)
                 .map(PushNameSetting.class::cast)
                 .flatMap(PushNameSetting::name)

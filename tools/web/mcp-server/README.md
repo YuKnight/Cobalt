@@ -118,6 +118,8 @@ GHIDRA_INSTALL_DIR=/path/to/ghidra gradle buildExtension
 
 The plugin is optional: every other WASM tool (and `format=wat`) works without it; only `format=ghidra` requires it. When Ghidra or the plugin is missing, `format=ghidra` returns a clear error rather than failing.
 
+`format=ghidra` imports and auto-analyzes the entire WASM module before decompiling, which takes minutes for the large (multi-MB) voip/media modules. That cost is paid once per call, so `functionIndex` accepts an array of indices that are decompiled in a single batch; prefer one call with many indices over many single-index calls. The server removes its own HTTP request timeouts for these long runs, but the MCP client still enforces its own per-call timeout: raise it (Claude Code reads `MCP_TOOL_TIMEOUT`, in milliseconds, from the environment) before invoking `format=ghidra` on a large module, e.g. `MCP_TOOL_TIMEOUT=600000`.
+
 ### Claude Code
 
 **CLI:**

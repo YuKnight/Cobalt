@@ -380,7 +380,7 @@ class QuickReplyHandlerTest {
             assertEquals(ts, inner.timestamp());
             assertEquals(JSON.toJSONString(List.of(handler.actionName(), "qr-9")), inner.index());
 
-            var roundtrip = inner.value().action().filter(a -> a instanceof QuickReplyAction).map(a -> (QuickReplyAction) a).orElseThrow();
+            var roundtrip = inner.value().flatMap(sav -> sav.action()).filter(a -> a instanceof QuickReplyAction).map(a -> (QuickReplyAction) a).orElseThrow();
             assertEquals("/hello", roundtrip.shortcut().orElseThrow());
             assertEquals("Hi", roundtrip.message().orElseThrow());
             assertEquals(List.of("k1", "k2"), roundtrip.keywords());
@@ -404,7 +404,7 @@ class QuickReplyHandlerTest {
             assertEquals(ts, inner.timestamp());
             assertEquals(JSON.toJSONString(List.of(handler.actionName(), "qr-del")), inner.index());
 
-            var roundtrip = inner.value().action().filter(a -> a instanceof QuickReplyAction).map(a -> (QuickReplyAction) a).orElseThrow();
+            var roundtrip = inner.value().flatMap(sav -> sav.action()).filter(a -> a instanceof QuickReplyAction).map(a -> (QuickReplyAction) a).orElseThrow();
             assertTrue(roundtrip.deleted(), "delete mutation must carry deleted=true");
         }
     }

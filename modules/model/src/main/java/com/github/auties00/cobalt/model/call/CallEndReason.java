@@ -47,7 +47,56 @@ public enum CallEndReason {
     /**
      * Indicates the call was accepted on another device of the same account.
      */
-    ACCEPTED_ELSEWHERE("accepted_elsewhere");
+    ACCEPTED_ELSEWHERE("accepted_elsewhere"),
+
+    /**
+     * Indicates call setup never completed; the transport or media bring-up failed before the call
+     * could connect.
+     */
+    SETUP_FAILED("setup_failed"),
+
+    /**
+     * Indicates the call was torn down because no media could be transmitted to the peer within the
+     * allotted window.
+     */
+    MEDIA_TX_TIMEOUT("media_tx_timeout"),
+
+    /**
+     * Indicates the call was torn down because no media was received from the peer within the
+     * allotted window.
+     */
+    MEDIA_RX_TIMEOUT("media_rx_timeout"),
+
+    /**
+     * Indicates the call could not bind to a relay endpoint, leaving no usable transport path.
+     */
+    RELAY_BIND_FAILED("relay_bind_failed"),
+
+    /**
+     * Indicates the call was rejected on another device of the same account.
+     */
+    REJECTED_ELSEWHERE("rejected_elsewhere"),
+
+    /**
+     * Indicates the call moved to another device of the same account (a device switch).
+     */
+    DEVICE_SWITCH("device_switch"),
+
+    /**
+     * Indicates the callee declined the call.
+     */
+    REJECTED("rejected"),
+
+    /**
+     * Indicates the call ended because the peer offered to upgrade it to an audio/video call but the
+     * local side does not support the upgrade.
+     */
+    AV_UPGRADABLE("av-upgradable"),
+
+    /**
+     * Indicates the call ended in favour of an audio/video upgrade negotiated with the peer.
+     */
+    AV_UPGRADE("av-upgrade");
 
     /**
      * Holds the literal placed on the {@code reason} attribute for this reason.

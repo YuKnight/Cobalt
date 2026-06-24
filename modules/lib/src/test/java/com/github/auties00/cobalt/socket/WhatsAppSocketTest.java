@@ -87,7 +87,7 @@ class WhatsAppSocketTest {
     void testWebHttpProxy() throws Exception {
         proxyServer = ProxyServer.http();
         var store = createWebStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store);
         assertHandshakeSucceeds();
     }
@@ -96,7 +96,7 @@ class WhatsAppSocketTest {
     void testWebHttpsProxy() throws Exception {
         proxyServer = ProxyServer.https();
         var store = createWebStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store, trustAllSslContextFactory());
         assertHandshakeSucceeds();
     }
@@ -113,7 +113,7 @@ class WhatsAppSocketTest {
     void testMobileHttpProxy() throws Exception {
         proxyServer = ProxyServer.http();
         var store = createMobileStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store);
         assertHandshakeSucceeds();
     }
@@ -122,7 +122,7 @@ class WhatsAppSocketTest {
     void testMobileHttpsProxy() throws Exception {
         proxyServer = ProxyServer.https();
         var store = createMobileStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store, trustAllSslContextFactory());
         assertHandshakeSucceeds();
     }
@@ -131,7 +131,7 @@ class WhatsAppSocketTest {
     void testWebSocks4Proxy() throws Exception {
         proxyServer = ProxyServer.socks4();
         var store = createWebStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store);
         assertHandshakeSucceeds();
     }
@@ -140,7 +140,7 @@ class WhatsAppSocketTest {
     void testWebSocks5Proxy() throws Exception {
         proxyServer = ProxyServer.socks5();
         var store = createWebStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store);
         assertHandshakeSucceeds();
     }
@@ -170,7 +170,7 @@ class WhatsAppSocketTest {
     void testDesktopHttpProxy() throws Exception {
         proxyServer = ProxyServer.http();
         var store = createDesktopStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store);
         assertHandshakeSucceeds();
     }
@@ -179,7 +179,7 @@ class WhatsAppSocketTest {
     void testDesktopHttpsProxy() throws Exception {
         proxyServer = ProxyServer.https();
         var store = createDesktopStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store, trustAllSslContextFactory());
         assertHandshakeSucceeds();
     }
@@ -188,7 +188,7 @@ class WhatsAppSocketTest {
     void testDesktopSocks4Proxy() throws Exception {
         proxyServer = ProxyServer.socks4();
         var store = createDesktopStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store);
         assertHandshakeSucceeds();
     }
@@ -197,7 +197,7 @@ class WhatsAppSocketTest {
     void testDesktopSocks5Proxy() throws Exception {
         proxyServer = ProxyServer.socks5();
         var store = createDesktopStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store);
         assertHandshakeSucceeds();
     }
@@ -206,7 +206,7 @@ class WhatsAppSocketTest {
     void testMobileSocks4Proxy() throws Exception {
         proxyServer = ProxyServer.socks4();
         var store = createMobileStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store);
         assertHandshakeSucceeds();
     }
@@ -215,7 +215,7 @@ class WhatsAppSocketTest {
     void testMobileSocks5Proxy() throws Exception {
         proxyServer = ProxyServer.socks5();
         var store = createMobileStore();
-        store.setProxy(proxyServer.toProxy());
+        store.connectionStore().setProxy(proxyServer.toProxy());
         client = WhatsAppSocketClient.newCipheredSocketClient(store);
         assertHandshakeSucceeds();
     }

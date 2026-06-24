@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.exception;
 
-import java.util.Objects;
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
+import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
+
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -11,21 +14,25 @@ import java.util.OptionalInt;
  * receives inbound traffic through a webhook the integrator hosts. Each layer has its own failure
  * mode, enumerated by the nested subtypes: the graph endpoint rejected a request with a structured
  * error envelope ({@link CloudApiException}), the configured access token is missing, invalid, or
- * expired so no request can succeed ({@link CloudAuthException}), or an inbound webhook delivery
- * failed its signature check or could not be parsed ({@link CloudWebhookException}).
+ * expired so no request can succeed ({@link CloudAuthException}), an inbound webhook delivery failed
+ * its signature check or could not be parsed ({@link CloudWebhookException}), or an operation requires
+ * a newer Cloud API version than the client is configured to target
+ * ({@link CloudUnsupportedVersionException}).
  *
  * @apiNote
  * Embedders typically observe these through the configured
- * {@link com.github.auties00.cobalt.client.WhatsAppClientErrorHandler} rather than around individual
+ * {@link WhatsAppLinkedClientErrorHandler} rather than around individual
  * calls; pattern-match the concrete subtype to react to a specific failure mode.
  *
  * @see CloudApiException
  * @see CloudAuthException
  * @see CloudWebhookException
+ * @see CloudUnsupportedVersionException
  */
 public sealed abstract class WhatsAppCloudException extends WhatsAppException
         permits WhatsAppCloudException.CloudApiException,
                 WhatsAppCloudException.CloudAuthException,
+                WhatsAppCloudException.CloudUnsupportedVersionException,
                 WhatsAppCloudException.CloudWebhookException {
 
     /**
@@ -45,6 +52,19 @@ public sealed abstract class WhatsAppCloudException extends WhatsAppException
      */
     protected WhatsAppCloudException(String message, Throwable cause) {
         super(message, cause);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote
+     * This implementation returns {@link WhatsAppLinkedClientErrorResult#DISCARD}: a single Cloud failure
+     * leaves the access token and the rest of the Cloud session usable. {@link CloudAuthException}
+     * overrides this because a credential failure makes the whole session unusable.
+     */
+    @Override
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 
     /**
@@ -152,19 +172,6 @@ public sealed abstract class WhatsAppCloudException extends WhatsAppException
         public Optional<String> fbtraceId() {
             return Optional.ofNullable(fbtraceId);
         }
-
-        /**
-         * {@inheritDoc}
-         *
-         * @implNote
-         * This implementation returns {@code false}: a single rejected request leaves the access
-         * token and the rest of the Cloud session usable. Token-level failures surface as
-         * {@link CloudAuthException} instead.
-         */
-        @Override
-        public boolean isFatal() {
-            return false;
-        }
     }
 
     /**
@@ -199,12 +206,13 @@ public sealed abstract class WhatsAppCloudException extends WhatsAppException
          * {@inheritDoc}
          *
          * @implNote
-         * This implementation returns {@code true}: with no valid access token the Cloud client
-         * cannot send or receive anything, so the session is invalid until re-credentialed.
+         * This implementation returns {@link WhatsAppLinkedClientErrorResult#DISCONNECT}: with no valid
+         * access token the Cloud client cannot send or receive anything, so the session is unusable
+         * until it is re-credentialed.
          */
         @Override
-        public boolean isFatal() {
-            return true;
+        public WhatsAppLinkedClientErrorResult toErrorResult() {
+            return WhatsAppLinkedClientErrorResult.DISCONNECT;
         }
     }
 
@@ -234,17 +242,75 @@ public sealed abstract class WhatsAppCloudException extends WhatsAppException
         public CloudWebhookException(String message, Throwable cause) {
             super(message, cause);
         }
+    }
+
+    /**
+     * Thrown when an operation requires a newer Cloud API version than the one the client is configured
+     * to target.
+     *
+     * <p>Some Cloud API operations were introduced in a specific Graph API version and cannot be served
+     * by an older versioned graph base. When the client targets a version older than an operation's
+     * minimum, the call is rejected locally with this exception before any request is sent, carrying the
+     * rejected operation's name together with the required and configured versions. The failure is scoped
+     * to the single call; every operation available at the configured version stays usable.
+     */
+    public static final class CloudUnsupportedVersionException extends WhatsAppCloudException {
+        /**
+         * The name of the operation that was rejected.
+         */
+        private final String operation;
 
         /**
-         * {@inheritDoc}
-         *
-         * @implNote
-         * This implementation returns {@code false}: a rejected or malformed delivery is discarded
-         * and the webhook receiver keeps running for subsequent deliveries.
+         * The minimum version the operation requires.
          */
-        @Override
-        public boolean isFatal() {
-            return false;
+        private final CloudApiVersion requiredVersion;
+
+        /**
+         * The version the client is configured to target.
+         */
+        private final CloudApiVersion configuredVersion;
+
+        /**
+         * Constructs a new unsupported-version exception.
+         *
+         * @param operation         the name of the rejected operation
+         * @param requiredVersion   the minimum version the operation requires
+         * @param configuredVersion the version the client is configured to target
+         */
+        public CloudUnsupportedVersionException(String operation, CloudApiVersion requiredVersion,
+                                                CloudApiVersion configuredVersion) {
+            super("operation '" + operation + "' requires Cloud API version " + requiredVersion.version()
+                    + " but the client is configured for " + configuredVersion.version());
+            this.operation = operation;
+            this.requiredVersion = requiredVersion;
+            this.configuredVersion = configuredVersion;
+        }
+
+        /**
+         * Returns the name of the operation that was rejected.
+         *
+         * @return the operation name
+         */
+        public String operation() {
+            return operation;
+        }
+
+        /**
+         * Returns the minimum version the operation requires.
+         *
+         * @return the required version
+         */
+        public CloudApiVersion requiredVersion() {
+            return requiredVersion;
+        }
+
+        /**
+         * Returns the version the client is configured to target.
+         *
+         * @return the configured version
+         */
+        public CloudApiVersion configuredVersion() {
+            return configuredVersion;
         }
     }
 }

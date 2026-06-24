@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.ack;
 
-import com.github.auties00.cobalt.call.signaling.CallRelay;
+import com.github.auties00.cobalt.calls2.signaling.RelayInfo;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -85,7 +85,7 @@ public final class AckParser {
             case NOTIFICATION -> new NotificationAck(id, timestamp, type, from, participant,
                     recipient, error);
             case CALL -> {
-                var relay = ack.getChild("relay").flatMap(CallRelay::parse).orElse(null);
+                var relay = ack.getChild(RelayInfo.ELEMENT).flatMap(RelayInfo::of).orElse(null);
                 yield new CallAck(id, timestamp, type, from, participant, recipient, error, relay);
             }
             case null, default -> {

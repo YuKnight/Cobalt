@@ -120,7 +120,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
             return MutationApplicationResult.malformed();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastAssociationAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof BusinessBroadcastAssociationAction action)) {
             return MutationApplicationResult.malformed();
         }
 

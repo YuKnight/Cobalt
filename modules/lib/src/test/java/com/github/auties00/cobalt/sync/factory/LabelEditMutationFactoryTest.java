@@ -37,7 +37,7 @@ class LabelEditMutationFactoryTest {
         var pending = factory.getLabelMutation(
                 "42", "Customers", 5, false, 0, true,
                 LabelEditAction.ListType.NONE, Instant.ofEpochSecond(1_700_000_000L));
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

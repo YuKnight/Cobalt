@@ -144,7 +144,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
         return switch (mutation.operation()) {
             case SET -> {
-                if (!(mutation.value().action().orElse(null) instanceof LidContactAction action)) {
+                if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LidContactAction action)) {
                     yield SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 

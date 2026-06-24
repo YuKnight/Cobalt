@@ -232,7 +232,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.malformed();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof SettingsSyncAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof SettingsSyncAction action)) {
             return MutationApplicationResult.malformed();
         }
 

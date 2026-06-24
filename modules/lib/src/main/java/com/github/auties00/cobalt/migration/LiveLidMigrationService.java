@@ -881,7 +881,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
         }
 
         LOGGER.log(System.Logger.Level.INFO, "Starting LID migration execution, waiting for offline delivery");
-        store.waitForOfflineDeliveryEnd();
+        store.connectionStore().waitForOfflineDeliveryEnd();
         LOGGER.log(System.Logger.Level.INFO, "Offline delivery complete, proceeding with migration");
 
         try {
@@ -1317,7 +1317,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
     @WhatsAppWebExport(moduleName = "WAWebLid1X1ThreadAccountMigrations", exports = "H",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isPairingTimestampAtOrBefore(Instant messageTimestamp) {
-        var pairingTs = store.pairingTimestamp().orElse(null);
+        var pairingTs = store.accountStore().pairingTimestamp().orElse(null);
         if (pairingTs == null) {
             return false;
         }

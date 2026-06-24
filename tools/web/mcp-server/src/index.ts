@@ -172,6 +172,15 @@ async function mainHttp(): Promise<void> {
         res.end(JSON.stringify({ error: "Not found" }));
     });
 
+    // A single Ghidra-backed decompile (get_native_module_wat format=ghidra) can
+    // run for minutes while it imports and auto-analyzes a multi-MB WASM module.
+    // Node's default request/socket timeouts (requestTimeout 300000, headersTimeout
+    // 60000) would sever the connection mid-analysis, so disable them; the MCP
+    // client still bounds the call with its own MCP_TOOL_TIMEOUT.
+    httpServer.requestTimeout = 0;
+    httpServer.headersTimeout = 0;
+    httpServer.timeout = 0;
+
     httpServer.listen(port, () => {
         serverLog.info(`MCP HTTP server listening on http://localhost:${port}/mcp`);
         serverLog.info(`Health check: http://localhost:${port}/health`);

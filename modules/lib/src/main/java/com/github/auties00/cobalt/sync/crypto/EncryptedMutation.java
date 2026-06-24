@@ -92,7 +92,7 @@ public record EncryptedMutation(
         var padding = MutationKeys.generatePadding(indexBytes.length, 0);
         var actionData = new SyncActionDataBuilder()
                 .index(indexBytes)
-                .value(mutation.value())
+                .value(mutation.value().orElse(null))
                 .padding(padding)
                 .version(mutation.actionVersion())
                 .build();

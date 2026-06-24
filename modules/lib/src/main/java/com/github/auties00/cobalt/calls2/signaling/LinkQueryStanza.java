@@ -1,0 +1,155 @@
+package com.github.auties00.cobalt.calls2.signaling;
+
+import com.github.auties00.cobalt.model.call.CallLinkMedia;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Represents a {@code <link_query>} signal: a request to resolve an existing call-link token.
+ *
+ * <p>A link-query request asks the relay to expand a call-link {@link #token() token} into its metadata
+ * before the local user joins or edits it. It pins the {@link #media() media kind} the caller intends to
+ * use so the relay can confirm it matches the link's configuration, and optionally carries an
+ * {@link #action() action} selecting a passive preview versus an edit lookup, plus the
+ * {@link #linkCreator() creator} and {@link #linkCreatorPn() creator phone-number} hints when known.
+ * The relay answers on a {@link LinkQueryAck}, which surfaces the resolved link metadata.
+ *
+ * <p>Like the other call-link control requests, {@code link_query} carries no universal
+ * {@code call-id}/{@code call-creator} header: it is addressed to the {@code call} service rather than
+ * to a peer.
+ *
+ * <p>On the wire the element is {@code <link_query token="..." media="<type>" action="preview"
+ * link_creator="..." link_creator_pn="..."/>}.
+ *
+ * @implNote This implementation models the {@code <link_query>} element built by
+ * {@code serialize_link_query} in the wa-voip WASM module {@code ff-tScznZ8P}
+ * ({@code protocol/xmpp/stanzas/call_link.cc}, message type {@code 31}); the matching ack is parsed by
+ * {@code LinkQueryAck} in {@code call_link.cc}. The {@code action} attribute reuses the shared
+ * {@code action} data offset ({@code 0x56cc3}) carrying the {@code preview} or {@code link_edit} verb.
+ *
+ * @param token         the call-link token to resolve; never {@code null}
+ * @param media         the media kind the caller intends to use; never {@code null}
+ * @param action        the query action verb ({@code preview}/{@code link_edit}), if present
+ * @param linkCreator   the link creator's device JID hint, if known
+ * @param linkCreatorPn the link creator's phone-number JID hint, if known
+ * @see Calls2SignalingType#LINK_QUERY
+ * @see LinkQueryAck
+ */
+public record LinkQueryStanza(String token,
+                              CallLinkMedia media,
+                              Optional<String> action,
+                              Optional<Jid> linkCreator,
+                              Optional<Jid> linkCreatorPn) implements CallMessage {
+    /**
+     * The wire element tag for a link-query signal.
+     */
+    public static final String ELEMENT = "link_query";
+
+    /**
+     * The wire attribute naming the call-link token.
+     */
+    private static final String TOKEN_ATTRIBUTE = "token";
+
+    /**
+     * The wire attribute naming the media kind.
+     */
+    private static final String MEDIA_ATTRIBUTE = "media";
+
+    /**
+     * The wire attribute naming the query action verb.
+     */
+    private static final String ACTION_ATTRIBUTE = "action";
+
+    /**
+     * The wire attribute naming the link creator's device JID hint.
+     */
+    private static final String LINK_CREATOR_ATTRIBUTE = "link_creator";
+
+    /**
+     * The wire attribute naming the link creator's phone-number JID hint.
+     */
+    private static final String LINK_CREATOR_PN_ATTRIBUTE = "link_creator_pn";
+
+    /**
+     * Validates the record components.
+     *
+     * @throws NullPointerException if any component is {@code null}
+     */
+    public LinkQueryStanza {
+        Objects.requireNonNull(token, "token cannot be null");
+        Objects.requireNonNull(media, "media cannot be null");
+        Objects.requireNonNull(action, "action cannot be null");
+        Objects.requireNonNull(linkCreator, "linkCreator cannot be null");
+        Objects.requireNonNull(linkCreatorPn, "linkCreatorPn cannot be null");
+    }
+
+    /**
+     * Returns a link-query signal carrying only the token and the intended media kind.
+     *
+     * <p>The action and creator hints are left absent, producing the passive resolve a joiner issues
+     * when it follows a call-link URL.
+     *
+     * @param token the call-link token to resolve
+     * @param media the media kind the caller intends to use
+     * @return the link-query signal
+     * @throws NullPointerException if {@code token} or {@code media} is {@code null}
+     */
+    public static LinkQueryStanza of(String token, CallLinkMedia media) {
+        return new LinkQueryStanza(token, media, Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @return {@link Calls2SignalingType#LINK_QUERY}
+     */
+    @Override
+    public Calls2SignalingType type() {
+        return Calls2SignalingType.LINK_QUERY;
+    }
+
+    /**
+     * Builds the {@code <link_query token media action link_creator link_creator_pn/>} action node.
+     *
+     * <p>The {@code action}, {@code link_creator}, and {@code link_creator_pn} attributes are omitted
+     * when their backing components are absent.
+     *
+     * @return the link-query action node
+     */
+    @Override
+    public Node toNode() {
+        return new NodeBuilder()
+                .description(ELEMENT)
+                .attribute(TOKEN_ATTRIBUTE, token)
+                .attribute(MEDIA_ATTRIBUTE, media.wireValue())
+                .attribute(ACTION_ATTRIBUTE, action.orElse(null), action.isPresent())
+                .attribute(LINK_CREATOR_ATTRIBUTE, linkCreator.orElse(null), linkCreator.isPresent())
+                .attribute(LINK_CREATOR_PN_ATTRIBUTE, linkCreatorPn.orElse(null), linkCreatorPn.isPresent())
+                .build();
+    }
+
+    /**
+     * Decodes a {@code <link_query>} action node into a {@link LinkQueryStanza}.
+     *
+     * @param node the {@code <link_query>} node
+     * @return the decoded link-query signal
+     * @throws NullPointerException   if {@code node} is {@code null}
+     * @throws NoSuchElementException if the required {@code token} attribute is absent or the
+     *                                {@code media} attribute is absent or unrecognized
+     */
+    public static LinkQueryStanza of(Node node) {
+        Objects.requireNonNull(node, "node cannot be null");
+        var token = node.getRequiredAttributeAsString(TOKEN_ATTRIBUTE);
+        var media = CallLinkMedia.ofWire(node.getAttributeAsString(MEDIA_ATTRIBUTE).orElse(null))
+                .orElseThrow(() -> new NoSuchElementException("link_query is missing a recognized media attribute"));
+        var action = node.getAttributeAsString(ACTION_ATTRIBUTE);
+        var linkCreator = node.getAttributeAsJid(LINK_CREATOR_ATTRIBUTE);
+        var linkCreatorPn = node.getAttributeAsJid(LINK_CREATOR_PN_ATTRIBUTE);
+        return new LinkQueryStanza(token, media, action, linkCreator, linkCreatorPn);
+    }
+}

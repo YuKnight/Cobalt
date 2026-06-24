@@ -357,7 +357,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
         var from = rawFrom.toUserJid();
 
         var store = whatsapp.store();
-        if (!store.isResumeFromRestartComplete()) {
+        if (!store.connectionStore().isResumeFromRestartComplete()) {
             var notificationId = node.getAttributeAsString("id", null);
             if (notificationId == null) {
                 store.syncStore().addPendingDeviceSync(PendingDeviceSync.of(List.of(from), UsyncContext.NOTIFICATION.wireValue()));

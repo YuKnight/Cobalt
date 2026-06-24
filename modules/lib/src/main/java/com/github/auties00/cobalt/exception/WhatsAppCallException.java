@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.exception;
 
-import com.github.auties00.cobalt.call.video.vpx.bindings.LibVpx;
+import com.github.auties00.cobalt.calls2.media.audio.opus.bindings.CobaltOpus;
+import com.github.auties00.cobalt.calls2.media.video.vpx.bindings.CobaltVpx;
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 
 import java.lang.foreign.MemorySegment;
 
@@ -21,19 +23,21 @@ import java.lang.foreign.MemorySegment;
  *
  * @apiNote
  * Catch this base type to react to every call-layer failure mode at once.
- * Because every subtype is non-fatal, the configured error handler can
- * retry, fall back to a different transport, or surface the failure to the
- * user without tearing the messaging session down.
+ * Because every subtype returns {@link WhatsAppLinkedClientErrorResult#DISCARD}
+ * from {@link #toErrorResult()}, the configured error handler can retry,
+ * fall back to a different transport, or surface the failure to the user
+ * without tearing the messaging session down.
  *
  * @implNote
- * This implementation always reports the failure as non-fatal: a failed
- * call, a corrupt frame, or a stuck handshake is scoped to a single call.
- * The call subsystem is Cobalt-native; WA Web routes the equivalent
- * failures through its WASM-loaded {@code libwebrtc} build rather than
- * through a public exception hierarchy.
+ * This implementation always returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}: call failures are isolated to a
+ * single call and never tear the messaging session down. The call subsystem
+ * is Cobalt-native; WA Web routes the equivalent failures through its
+ * WASM-loaded {@code libwebrtc} build rather than through a public exception
+ * hierarchy.
  *
  * @see Opus
- * @see SpeexDsp
+ * @see AudioProcessing
  * @see Rtp
  * @see Srtp
  * @see DtlsHandshake
@@ -42,11 +46,12 @@ import java.lang.foreign.MemorySegment;
  * @see Sctp
  * @see H264
  * @see Vpx
+ * @see Av1
  */
 public sealed abstract class WhatsAppCallException
         extends WhatsAppException
         permits WhatsAppCallException.Opus,
-                WhatsAppCallException.SpeexDsp,
+                WhatsAppCallException.AudioProcessing,
                 WhatsAppCallException.Rtp,
                 WhatsAppCallException.Srtp,
                 WhatsAppCallException.DtlsHandshake,
@@ -54,7 +59,8 @@ public sealed abstract class WhatsAppCallException
                 WhatsAppCallException.DataChannel,
                 WhatsAppCallException.Sctp,
                 WhatsAppCallException.H264,
-                WhatsAppCallException.Vpx {
+                WhatsAppCallException.Vpx,
+                WhatsAppCallException.Av1 {
 
     /**
      * Constructs a new call exception with the specified detail message.
@@ -79,13 +85,13 @@ public sealed abstract class WhatsAppCallException
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: call failures are
-     * isolated from the main messaging channel and never tear the session
-     * down.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: call failures are isolated
+     * to a single call and never tear the messaging session down.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 
     /**
@@ -138,20 +144,22 @@ public sealed abstract class WhatsAppCallException
         }
 
         /**
-         * Reads libopus's static error string for the given error code.
+         * Reads the shim's static error string for the given error code.
          *
          * @implNote
-         * This implementation reinterprets the returned pointer for the
-         * full address space and returns the literal {@code "unknown"} if
-         * the lookup throws or yields {@link MemorySegment#NULL}, so
-         * exception construction can never itself fail.
+         * This implementation calls {@link CobaltOpus#cobalt_opus_strerror},
+         * which forwards to libopus's own {@code opus_strerror}. It reinterprets
+         * the returned pointer for the full address space and returns the
+         * literal {@code "unknown"} if the lookup throws or yields
+         * {@link MemorySegment#NULL}, so exception construction can never itself
+         * fail.
          *
          * @param errCode the libopus error code
          * @return the error string, or {@code "unknown"} if the lookup fails
          */
         private static String opusErrString(int errCode) {
             try {
-                var ptr = com.github.auties00.cobalt.call.audio.opus.bindings.Opus.opus_strerror(errCode);
+                var ptr = CobaltOpus.cobalt_opus_strerror(errCode);
                 if (ptr.equals(MemorySegment.NULL)) {
                     return "unknown";
                 }
@@ -163,31 +171,32 @@ public sealed abstract class WhatsAppCallException
     }
 
     /**
-     * Thrown when a libspeexdsp call fails or returns an error code.
+     * Thrown when the WebRTC Audio Processing Module call-capture conditioner fails or returns an error
+     * code.
      *
-     * Wraps the {@link Throwable}s thrown by Foreign Function and Memory
-     * downcalls so callers do not have to catch {@link Throwable}
-     * themselves. The libspeexdsp surface Cobalt uses today is
-     * acoustic-echo cancellation and noise suppression on the capture
-     * path.
+     * Wraps the {@link Throwable}s thrown by the Foreign Function and Memory downcalls into the
+     * {@code cobalt_webrtc_apm_*} shim so callers do not have to catch {@link Throwable} themselves. The
+     * WebRTC APM surface Cobalt uses is the live-capture echo canceller (AEC3), the noise suppressor with
+     * the ML denoiser, and the gain controller, the conditioning WhatsApp applies through
+     * {@code wa_mobile_audio_processing.cc}.
      */
-    public static final class SpeexDsp extends WhatsAppCallException {
+    public static final class AudioProcessing extends WhatsAppCallException {
         /**
-         * Constructs a new SpeexDSP exception with the specified message.
+         * Constructs a new WebRTC audio-processing exception with the specified message.
          *
          * @param message the detail message describing the failure
          */
-        public SpeexDsp(String message) {
+        public AudioProcessing(String message) {
             super(message);
         }
 
         /**
-         * Constructs a new SpeexDSP exception with the specified message and cause.
+         * Constructs a new WebRTC audio-processing exception with the specified message and cause.
          *
          * @param message the detail message describing the failure
          * @param cause   the underlying cause
          */
-        public SpeexDsp(String message, Throwable cause) {
+        public AudioProcessing(String message, Throwable cause) {
             super(message, cause);
         }
     }
@@ -367,9 +376,10 @@ public sealed abstract class WhatsAppCallException
     /**
      * Thrown when an openh264 operation fails.
      *
-     * Reports a non-zero return code from a vtable method
-     * ({@code Initialize}, {@code EncodeFrame}, {@code DecodeFrame2}) or a
-     * Java-side invariant violation (closed codec, wrong frame size).
+     * <p>Reports a non-zero status from the portable {@code cobalt_h264_*} shim that drives the OpenH264
+     * encoder and decoder (a shim-level error such as a bad argument or a create failure, or a forwarded
+     * OpenH264 vtable-method failure from create, encode, or decode) or a Java-side invariant violation
+     * (closed codec, wrong frame size).
      */
     public static final class H264 extends WhatsAppCallException {
         /**
@@ -389,6 +399,53 @@ public sealed abstract class WhatsAppCallException
          */
         public H264(String message, Throwable cause) {
             super(message, cause);
+        }
+    }
+
+    /**
+     * Thrown when an AV1 decode or encode operation fails.
+     *
+     * Reports a non-zero status from the AV1 native path: the dav1d decoder
+     * (via the {@code CobaltDav1d} shim) or the rav1e encoder (via the
+     * {@code CobaltRav1e} shim), or a Java-side invariant violation such as a
+     * closed codec or an unsupported pixel layout.
+     */
+    public static final class Av1 extends WhatsAppCallException {
+        /**
+         * Constructs a new AV1 exception with the specified message.
+         *
+         * @param message the detail message describing the failure
+         */
+        public Av1(String message) {
+            super(message);
+        }
+
+        /**
+         * Constructs a new AV1 exception with the specified message and cause.
+         *
+         * @param message the detail message describing the failure
+         * @param cause   the underlying cause
+         */
+        public Av1(String message, Throwable cause) {
+            super(message, cause);
+        }
+
+        /**
+         * Builds an exception whose message embeds a non-zero AV1 shim status
+         * code.
+         *
+         * @apiNote
+         * Use at native call sites where a dav1d or rav1e shim status needs to
+         * be turned into a thrown exception; the shim status codes are stable
+         * small integers documented on the {@code COBALT_DAV1D_*} and
+         * {@code COBALT_RAV1E_*} constants.
+         *
+         * @param prefix human-readable context (e.g. "cobalt_dav1d_send_data")
+         * @param status the shim status code
+         * @return a new exception ready to throw
+         */
+        public static Av1 fromErr(String prefix, int status) {
+            return new Av1(prefix + " (status " + status + ")");
         }
     }
 
@@ -441,20 +498,21 @@ public sealed abstract class WhatsAppCallException
         }
 
         /**
-         * Reads libvpx's static error string for the given error code.
+         * Reads the shim's static error string for the given status code.
          *
          * @implNote
-         * This implementation reinterprets the returned pointer for the
-         * full address space and returns the literal {@code "unknown"} if
-         * the lookup throws or yields {@link MemorySegment#NULL}, so
+         * This implementation calls {@link CobaltVpx#cobalt_vpx_strerror}, which returns libvpx's own
+         * description for a positive {@code vpx_codec_err_t} and a fixed shim string for the negative
+         * shim-level codes. It reinterprets the returned pointer for the full address space and returns
+         * the literal {@code "unknown"} if the lookup throws or yields {@link MemorySegment#NULL}, so
          * exception construction can never itself fail.
          *
-         * @param errCode the {@code vpx_codec_err_t} value
+         * @param errCode the status code returned by a {@code cobalt_vpx_*} call
          * @return the error string, or {@code "unknown"} if the lookup fails
          */
         private static String vpxErrString(int errCode) {
             try {
-                var ptr = LibVpx.vpx_codec_err_to_string(errCode);
+                var ptr = CobaltVpx.cobalt_vpx_strerror(errCode);
                 if (ptr.equals(MemorySegment.NULL)) {
                     return "unknown";
                 }

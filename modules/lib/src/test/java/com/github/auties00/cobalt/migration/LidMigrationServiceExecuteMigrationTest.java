@@ -220,7 +220,7 @@ class LidMigrationServiceExecuteMigrationTest {
         // Build with the COMPLETE pre-set (default), then reset to INIT to demonstrate the gate.
         // We run executeMigration on a virtual thread and assert it remains stuck until we flip the state.
         var h = build(defaultProps());
-        h.client.store().setOfflineResumeState(
+        h.client.store().connectionStore().setOfflineResumeState(
                 LinkedWhatsAppClientOfflineResumeState.INIT);
 
         h.service.initialize();
@@ -241,7 +241,7 @@ class LidMigrationServiceExecuteMigrationTest {
         assertFalse(done.get(), "worker is blocked in waitForOfflineDeliveryEnd");
 
         // Flip the gate; the worker proceeds and completes.
-        h.client.store().setOfflineResumeState(
+        h.client.store().connectionStore().setOfflineResumeState(
                 LinkedWhatsAppClientOfflineResumeState.COMPLETE);
 
         var deadline = System.currentTimeMillis() + 5_000;

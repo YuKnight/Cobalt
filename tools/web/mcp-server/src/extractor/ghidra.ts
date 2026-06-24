@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, readFile, mkdtemp, rm } from "node:fs/promises";
+import { access, readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ const log = createLogger("ghidra");
 const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS_DIR = join(CURRENT_DIR, "..", "..", "scripts");
 const GHIDRA_SCRIPT_NAME = "DecompileToJson.java";
+const GHIDRA_WASM_SCRIPT_NAME = "DecompileWasmFuncsToJson.java";
 
 const DEFAULT_ANALYSIS_TIMEOUT_SEC = 1800;
 const DEFAULT_MAX_CPU = 4;
@@ -189,16 +190,20 @@ export interface WasmDecompileResult {
   code: string;
 }
 
-export async function decompileWasmFunction(
+export async function decompileWasmFunctions(
   wasmPath: string,
-  funcIndex: number,
+  funcIndices: number[],
   options: GhidraOptions = {}
-): Promise<WasmDecompileResult> {
+): Promise<WasmDecompileResult[]> {
+  if (funcIndices.length === 0) return [];
+
   const ghidraDir = await findGhidraInstallation(options.ghidraPath);
   const headless = ghidraDir ? analyzeHeadlessPath(ghidraDir) : "analyzeHeadless";
 
   const projectDir = await mkdtemp(join(tmpdir(), "ghidra-wasm-"));
-  const outputPath = join(projectDir, "func.json");
+  const outputPath = join(projectDir, "funcs.json");
+  const indicesPath = join(projectDir, "indices.txt");
+  await writeFile(indicesPath, funcIndices.join("\n"));
   const timeoutSec = options.analysisTimeoutSec ?? DEFAULT_ANALYSIS_TIMEOUT_SEC;
 
   const args = [
@@ -210,17 +215,24 @@ export async function decompileWasmFunction(
     "-scriptPath",
     SCRIPTS_DIR,
     "-postScript",
-    "DecompileWasmFuncToJson.java",
-    String(funcIndex),
+    GHIDRA_WASM_SCRIPT_NAME,
+    indicesPath,
     outputPath,
     "-analysisTimeoutPerFile",
     String(timeoutSec),
-    "-max-cpu",
-    String(options.maxCpu ?? DEFAULT_MAX_CPU),
     "-deleteProject",
   ];
 
-  log.info(`running headless wasm decompile on ${wasmPath} funcIndex=${funcIndex}`);
+  // Importing and auto-analyzing a multi-MB WASM module dominates the runtime of
+  // a single-function decompile, so the post-script handles a whole batch in one
+  // invocation to pay that cost once. Ghidra defaults to all available cores;
+  // only throttle when a caller explicitly asks, since -max-cpu slows the
+  // already-dominant analysis pass.
+  if (options.maxCpu != null) {
+    args.push("-max-cpu", String(options.maxCpu));
+  }
+
+  log.info(`running headless wasm decompile on ${wasmPath} funcIndices=[${funcIndices.join(",")}]`);
   try {
     await execFileAsync(headless, args, { timeout: timeoutSec * 1000 * 2, maxBuffer: 50 * 1024 * 1024 });
   } catch (error) {
@@ -238,7 +250,7 @@ export async function decompileWasmFunction(
 
   const raw = await readFile(outputPath, "utf8");
   await rm(projectDir, { recursive: true, force: true }).catch(() => {});
-  return JSON.parse(raw) as WasmDecompileResult;
+  return JSON.parse(raw) as WasmDecompileResult[];
 }
 
 function analyzeHeadlessPath(ghidraDir: string): string {

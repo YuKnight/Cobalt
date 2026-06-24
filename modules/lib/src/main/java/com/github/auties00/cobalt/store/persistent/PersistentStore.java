@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.store.ProtobufContactStore;
 import com.github.auties00.cobalt.store.ProtobufSettingsStore;
 import com.github.auties00.cobalt.store.ProtobufSignalStore;
 import com.github.auties00.cobalt.store.ProtobufSyncStore;
+import com.github.auties00.cobalt.store.ProtobufWamStore;
 import com.github.auties00.cobalt.store.ProtobufWebSessionStore;
 import com.github.auties00.cobalt.store.ProtobufWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
@@ -19,7 +20,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.concurrent.ConcurrentMap;
 
 import static java.lang.System.Logger.Level.WARNING;
 
@@ -83,14 +83,12 @@ final class PersistentStore extends ProtobufWhatsAppStore {
      * @param syncStore             the sync sub-store
      * @param settingsStore         the settings sub-store
      * @param directory             the session directory
-     * @param companionMmsAuthNonce the MMS auth nonce, or {@code null}
-     * @param shareableChatLinkKey  the shareable-chat-link key, or {@code null}
-     * @param wamSequenceNumbersMap the WAM sequence-number map, or {@code null}
      * @param webSessionStore       the web-GraphQL credential sub-store, or {@code null} for an empty one
+     * @param wamStore              the WAM telemetry sub-store, or {@code null} for an empty one
      * @param chatStore             the persistent chat sub-store, or {@code null} for an empty one
      */
-    PersistentStore(ProtobufSignalStore signalStore, ProtobufAccountStore accountStore, ProtobufContactStore contactStore, ProtobufSyncStore syncStore, ProtobufSettingsStore settingsStore, Path directory, String companionMmsAuthNonce, byte[] shareableChatLinkKey, ConcurrentMap<Integer, Integer> wamSequenceNumbersMap, ProtobufWebSessionStore webSessionStore, PersistentChatStore chatStore) {
-        super(signalStore, accountStore, contactStore, syncStore, settingsStore, directory, companionMmsAuthNonce, shareableChatLinkKey, wamSequenceNumbersMap, webSessionStore);
+    PersistentStore(ProtobufSignalStore signalStore, ProtobufAccountStore accountStore, ProtobufContactStore contactStore, ProtobufSyncStore syncStore, ProtobufSettingsStore settingsStore, Path directory, ProtobufWebSessionStore webSessionStore, ProtobufWamStore wamStore, PersistentChatStore chatStore) {
+        super(signalStore, accountStore, contactStore, syncStore, settingsStore, directory, webSessionStore, wamStore);
         this.chatStore = chatStore != null ? chatStore : new PersistentChatStore(null, null, null, null);
         this.chatStore.bindContacts(contactStore());
     }
@@ -98,11 +96,6 @@ final class PersistentStore extends ProtobufWhatsAppStore {
     @Override
     public PersistentChatStore chatStore() {
         return chatStore;
-    }
-
-    @Override
-    protected ConcurrentMap<Integer, Integer> wamSequenceNumbersMap() {
-        return super.wamSequenceNumbersMap();
     }
 
     /**

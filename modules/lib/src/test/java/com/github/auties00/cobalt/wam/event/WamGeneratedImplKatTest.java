@@ -40,9 +40,7 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
  * cover WIDE_ID / weight permutations that no shipping Cobalt event
  * happens to exercise.
  *
- * <p>Vectors live in {@code fixtures/wam/wam-events-multi-field.json};
- * see {@code src/test/resources/fixtures/wam/README.md} for the re-capture
- * procedure.
+ * <p>Vectors live in {@code fixtures/wam/wam-events-multi-field.json}
  */
 @DisplayName("WAM generated *Impl encode KAT")
 class WamGeneratedImplKatTest {

@@ -43,7 +43,7 @@ class ChatAssignmentOpenedStatusMutationFactoryTest {
 
         var pending = factory.createChatOpenedMutation(
                 CHAT_JID, AGENT_ID, true, Instant.ofEpochSecond(1_700_000_000L));
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

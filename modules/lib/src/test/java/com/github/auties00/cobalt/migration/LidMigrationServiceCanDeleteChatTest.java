@@ -142,7 +142,7 @@ class LidMigrationServiceCanDeleteChatTest {
         var h = build();
         var pairing = Instant.parse("2026-01-01T00:00:00Z");
         var oldest = Instant.parse("2026-01-02T00:00:00Z");
-        h.client.store().setPairingTimestamp(pairing);
+        h.client.store().accountStore().setPairingTimestamp(pairing);
 
         var chat = newChat(h);
         chat.addMessage(stubMessage(ChatMessageInfo.StubType.E2E_ENCRYPTED, oldest.plusSeconds(60)));
@@ -158,7 +158,7 @@ class LidMigrationServiceCanDeleteChatTest {
         var h = build();
         var oldest = Instant.parse("2026-01-01T00:00:00Z");
         var pairing = Instant.parse("2026-01-02T00:00:00Z");
-        h.client.store().setPairingTimestamp(pairing);
+        h.client.store().accountStore().setPairingTimestamp(pairing);
 
         var chat = newChat(h);
         chat.addMessage(broadcastMessage(oldest));

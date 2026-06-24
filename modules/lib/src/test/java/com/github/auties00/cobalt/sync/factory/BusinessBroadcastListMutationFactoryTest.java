@@ -49,7 +49,7 @@ class BusinessBroadcastListMutationFactoryTest {
         var pending = factory.getBroadcastListMutation(
                 "list-oracle", List.of(sampleParticipant()), "Oracle",
                 Instant.ofEpochSecond(1_700_000_000L));
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

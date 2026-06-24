@@ -169,7 +169,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof PinAction action)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PinAction action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

@@ -896,10 +896,10 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         }
 
         historySync.companionMmsAuthNonce()
-                .ifPresent(store::setCompanionMmsAuthNonce);
+                .ifPresent(store.accountStore()::setCompanionMmsAuthNonce);
 
         historySync.shareableChatLinkKey()
-                .ifPresent(store::setShareableChatLinkKey);
+                .ifPresent(store.accountStore()::setShareableChatLinkKey);
 
         for (var pastParticipants : historySync.pastParticipants()) {
             var groupJid = pastParticipants.groupJid().orElse(null);

@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 /**
  * Sealed root for failures encountered while refreshing the WhatsApp Web
  * WhatsApp Web GraphQL session credentials.
@@ -16,9 +18,10 @@ package com.github.auties00.cobalt.exception;
  * absent ({@link SessionUnseeded}).
  *
  * @apiNote
- * Every subtype reports {@link #isFatal()} as {@code false}: a relay
- * refresh failure scopes to the business-catalog/order surface and does
- * not invalidate the underlying Noise messaging channel. Pattern-match
+ * Every subtype returns {@link WhatsAppLinkedClientErrorResult#DISCARD} from
+ * {@link #toErrorResult()}: a relay refresh failure scopes to the
+ * business-catalog/order surface and does not invalidate the underlying
+ * Noise messaging channel. Pattern-match
  * the concrete subtype to decide whether to retry the refresh
  * ({@link LsdFetchFailed}, {@link ExchangeFailed}) or to abandon the
  * refresh and require a fresh pairing ({@link SessionUnseeded}).
@@ -56,13 +59,14 @@ public sealed abstract class WhatsAppWebGraphQlException
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: a relay credential
-     * refresh failure scopes to the catalog and order surfaces and
-     * leaves the encrypted messaging channel intact.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: a credential refresh failure
+     * scopes to the catalog and order surfaces and leaves the encrypted
+     * messaging channel intact.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 
     /**

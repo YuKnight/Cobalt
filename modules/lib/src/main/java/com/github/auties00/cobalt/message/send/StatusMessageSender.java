@@ -150,7 +150,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         var allDevices = revokeResult.devices();
 
         var messageId = messageInfo.key().id().orElseThrow();
-        store.createOrMergeReceiptRecords(messageId, allDevices);
+        store.chatStore().createOrMergeReceiptRecords(messageId, allDevices);
 
         var skDistribDevices = new ArrayList<Jid>();
         var skExistingDevices = new ArrayList<Jid>();
@@ -358,7 +358,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         }
 
         var originalRecipients = originalKey.id()
-                .map(store::findReceiptRecords)
+                .map(store.chatStore()::findReceiptRecords)
                 .orElse(Set.of());
         if (originalRecipients.isEmpty()) {
             return new RevokeResolution(false, currentAudience);

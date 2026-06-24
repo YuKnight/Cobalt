@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -96,7 +97,7 @@ public interface WebAppStateActionHandler {
      * components, {@link MutationApplicationResult#orphan()} for mutations referencing an unknown
      * entity, and {@link MutationApplicationResult#success()} after the local store has been
      * updated. Exceptions thrown from this method propagate to the configured
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientErrorHandler} rather than being mapped
+     * {@link WhatsAppLinkedClientErrorHandler} rather than being mapped
      * to a sentinel {@link MutationApplicationResult} as WA Web does.
      *
      * @param client   the {@link LinkedWhatsAppClient} whose store the mutation should be applied to

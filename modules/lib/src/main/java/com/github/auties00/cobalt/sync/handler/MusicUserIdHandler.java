@@ -94,7 +94,7 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof MusicUserIdAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MusicUserIdAction action)) {
             return MutationApplicationResult.malformed();
         }
 

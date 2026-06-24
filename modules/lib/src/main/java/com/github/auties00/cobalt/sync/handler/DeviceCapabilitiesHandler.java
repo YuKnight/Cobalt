@@ -161,7 +161,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
 
         var indexArray = JSON.parseArray(mutation.index());
         var deviceJidString = indexArray.size() > JID_INDEX ? indexArray.getString(JID_INDEX) : null;
-        var capabilities = mutation.value().action().orElse(null) instanceof DeviceCapabilities entry
+        var capabilities = mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof DeviceCapabilities entry
                 ? entry
                 : null;
         if (capabilities == null || deviceJidString == null || deviceJidString.isBlank()) {
@@ -180,7 +180,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
         if (deviceJid.device() == PRIMARY_DEVICE) {
             client.store().contactStore().setPrimaryDeviceCapabilities(capabilities);
             capabilities.userHasAvatar()
-                    .ifPresent(avatar -> client.store().setHasAvatar(avatar.userHasAvatar()));
+                    .ifPresent(avatar -> client.store().accountStore().setHasAvatar(avatar.userHasAvatar()));
             capabilities.lidMigration()
                     .flatMap(DeviceCapabilities.LIDMigration::chatDbMigrationTimestamp)
                     .ifPresent(timestamp -> {

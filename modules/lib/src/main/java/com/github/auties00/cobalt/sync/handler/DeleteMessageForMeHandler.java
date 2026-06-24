@@ -164,11 +164,11 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteMessageForMeSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.DIRECT)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localDeleteMedia = localMutation.value().action()
+        var localDeleteMedia = localMutation.value().flatMap(sav -> sav.action())
                 .filter(a -> a instanceof DeleteMessageForMeAction)
                 .map(a -> ((DeleteMessageForMeAction) a).deleteMedia())
                 .orElse(false);
-        var remoteDeleteMedia = remoteMutation.value().action()
+        var remoteDeleteMedia = remoteMutation.value().flatMap(sav -> sav.action())
                 .filter(a -> a instanceof DeleteMessageForMeAction)
                 .map(a -> ((DeleteMessageForMeAction) a).deleteMedia())
                 .orElse(false);

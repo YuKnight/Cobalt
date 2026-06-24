@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 
 /**
@@ -15,13 +16,16 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
  * missing, or a triggered resync fails.
  *
  * @apiNote
- * The failure is confined to background bookkeeping; message sending and
+ * The failure is confined to background bookkeeping;
+ * {@link #toErrorResult()} returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD} so message sending and
  * receiving continue, and the next scheduled run can recover. A caught
  * instance can be logged or used to trigger an early retry.
  *
  * @implNote
- * This implementation is non-fatal: the next scheduled run can recover
- * and message traffic in the meantime is unaffected.
+ * This implementation has {@link #toErrorResult()} return
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}: the next scheduled run can
+ * recover and message traffic in the meantime is unaffected.
  */
 @WhatsAppWebModule(moduleName = "WAWebAdvDeviceInfoCheckJob")
 public final class WhatsAppAdvCheckException extends WhatsAppException {
@@ -65,12 +69,14 @@ public final class WhatsAppAdvCheckException extends WhatsAppException {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: the periodic ADV
-     * check runs in the background and a single failure does not affect
-     * message sending or receiving.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: the periodic ADV
+     * maintenance job runs in the background, so a single failure does not
+     * affect message sending or receiving and the next scheduled run can
+     * recover.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 }

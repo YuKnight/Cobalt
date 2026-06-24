@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 
 /**
@@ -16,7 +17,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
  *
  * @apiNote
  * Raised only on the WAM telemetry path, which most embedders do not run.
- * {@link #isFatal()} reports {@code false}, so a configured
+ * {@link #toErrorResult()} returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}, so a configured
  * {@code WhatsAppClientErrorHandler} can leave the session running and
  * the upload can be retried independently.
  */
@@ -46,11 +48,12 @@ public final class WhatsAppPrivateStatsTokenIssuerException extends WhatsAppExce
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: token issuance
-     * is scoped to a single upload.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: token issuance is scoped
+     * to a single telemetry upload, which can be retried independently.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 }

@@ -84,7 +84,7 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof TimeFormatAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof TimeFormatAction action)) {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 

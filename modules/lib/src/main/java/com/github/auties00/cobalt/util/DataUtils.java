@@ -544,10 +544,6 @@ public final class DataUtils {
      * Writes {@code value} to {@code bytes} at {@code offset} using
      * {@code order}.
      *
-     * <p>Encodes an eight-byte field in wire formats where the byte order varies
-     * per protocol; {@link GcmUtils#createNonce(long)} is the canonical caller
-     * for AES-GCM IV derivation.
-     *
      * @param bytes  the destination array
      * @param offset the byte offset at which to start writing
      * @param value  the value to encode

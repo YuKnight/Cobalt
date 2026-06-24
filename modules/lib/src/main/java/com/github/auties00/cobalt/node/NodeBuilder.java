@@ -215,25 +215,46 @@ public final class NodeBuilder {
     }
 
     /**
-     * Adds a boolean attribute.
+     * Adds a boolean attribute serialised under the
+     * {@link NodeBooleanFormat#LENIENT} format.
      *
-     * <p>The value is serialised as {@code "true"} or {@code "false"}; the
-     * WhatsApp wire protocol carries booleans as strings rather than as a
-     * dedicated wire shape.
+     * <p>The lenient format encodes through the {@code "true"}/{@code "false"}
+     * pair, so this overload preserves the historical wire shape. Use
+     * {@link #attribute(String, boolean, NodeBooleanFormat)} for a stanza family
+     * that carries booleans as {@code "1"}/{@code "0"}.
      *
      * @param key   the attribute key
      * @param value the boolean value
      * @return this builder
      */
     public NodeBuilder attribute(String key, boolean value) {
-        this.attributes.put(key, new NodeAttribute.TextAttribute(Boolean.toString(value)));
+        return attribute(key, value, NodeBooleanFormat.LENIENT);
+    }
+
+    /**
+     * Adds a boolean attribute serialised under the supplied
+     * {@link NodeBooleanFormat}.
+     *
+     * <p>The value is encoded through {@link NodeBooleanFormat#encode(boolean)};
+     * the WhatsApp wire protocol carries booleans as strings whose literal form
+     * differs by stanza family, so the format selects which convention to emit.
+     *
+     * @param key    the attribute key
+     * @param value  the boolean value
+     * @param format the format used to encode the value
+     * @return this builder
+     * @throws NullPointerException if {@code format} is {@code null}
+     */
+    public NodeBuilder attribute(String key, boolean value, NodeBooleanFormat format) {
+        Objects.requireNonNull(format, "format cannot be null");
+        this.attributes.put(key, new NodeAttribute.TextAttribute(format.encode(value)));
         return this;
     }
 
     /**
-     * Adds a boolean attribute when the condition is {@code true}.
-     *
-     * <p>The value is serialised as {@code "true"} or {@code "false"}.
+     * Adds a boolean attribute serialised under the
+     * {@link NodeBooleanFormat#LENIENT} format when the condition is
+     * {@code true}.
      *
      * @param key       the attribute key
      * @param value     the boolean value
@@ -241,8 +262,24 @@ public final class NodeBuilder {
      * @return this builder
      */
     public NodeBuilder attribute(String key, boolean value, boolean condition) {
+        return attribute(key, value, condition, NodeBooleanFormat.LENIENT);
+    }
+
+    /**
+     * Adds a boolean attribute serialised under the supplied
+     * {@link NodeBooleanFormat} when the condition is {@code true}.
+     *
+     * @param key       the attribute key
+     * @param value     the boolean value
+     * @param condition guard that must hold for the attribute to be written
+     * @param format    the format used to encode the value
+     * @return this builder
+     * @throws NullPointerException if {@code format} is {@code null}
+     */
+    public NodeBuilder attribute(String key, boolean value, boolean condition, NodeBooleanFormat format) {
+        Objects.requireNonNull(format, "format cannot be null");
         if(condition) {
-            this.attributes.put(key, new NodeAttribute.TextAttribute(Boolean.toString(value)));
+            this.attributes.put(key, new NodeAttribute.TextAttribute(format.encode(value)));
         }
         return this;
     }
@@ -372,17 +409,37 @@ public final class NodeBuilder {
     }
 
     /**
-     * Sets the node content to a boolean value, clearing any previously set
+     * Sets the node content to a boolean value serialised under the
+     * {@link NodeBooleanFormat#LENIENT} format, clearing any previously set
      * content slot.
      *
-     * <p>The value is serialised as {@code "true"} or {@code "false"}; the
-     * WhatsApp wire protocol has no dedicated boolean shape.
+     * <p>The lenient format encodes through the {@code "true"}/{@code "false"}
+     * pair. Use {@link #content(boolean, NodeBooleanFormat)} for a stanza family
+     * that carries booleans as {@code "1"}/{@code "0"}.
      *
      * @param value the boolean content
      * @return this builder
      */
     public NodeBuilder content(boolean value) {
-        this.textContent = Objects.toString(value);
+        return content(value, NodeBooleanFormat.LENIENT);
+    }
+
+    /**
+     * Sets the node content to a boolean value serialised under the supplied
+     * {@link NodeBooleanFormat}, clearing any previously set content slot.
+     *
+     * <p>The value is encoded through {@link NodeBooleanFormat#encode(boolean)};
+     * the WhatsApp wire protocol has no dedicated boolean shape, so the format
+     * selects which literal convention to emit.
+     *
+     * @param value  the boolean content
+     * @param format the format used to encode the value
+     * @return this builder
+     * @throws NullPointerException if {@code format} is {@code null}
+     */
+    public NodeBuilder content(boolean value, NodeBooleanFormat format) {
+        Objects.requireNonNull(format, "format cannot be null");
+        this.textContent = format.encode(value);
         this.jidContent = null;
         this.bytesContent = null;
         this.childrenContent = null;

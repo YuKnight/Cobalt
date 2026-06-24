@@ -99,7 +99,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
-                if (!(mutation.value().action().orElse(null) instanceof CtwaPerCustomerDataSharingAction action)) {
+                if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof CtwaPerCustomerDataSharingAction action)) {
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 

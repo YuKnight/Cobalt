@@ -109,7 +109,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() == SyncdOperation.REMOVE) {
             LOGGER.fine("[nct-salt-sync] Removing stored NCT salt");
-            client.store().setNotificationContentTokenSalt(null);
+            client.store().accountStore().setNotificationContentTokenSalt(null);
             return MutationApplicationResult.success();
         }
 
@@ -118,7 +118,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        var salt = mutation.value().action()
+        var salt = mutation.value().flatMap(sav -> sav.action())
                 .filter(NctSaltSyncAction.class::isInstance)
                 .map(NctSaltSyncAction.class::cast)
                 .flatMap(NctSaltSyncAction::salt)
@@ -128,7 +128,7 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
-        client.store().setNotificationContentTokenSalt(salt);
+        client.store().accountStore().setNotificationContentTokenSalt(salt);
         LOGGER.fine("[nct-salt-sync] Stored NCT salt");
         return MutationApplicationResult.success();
     }

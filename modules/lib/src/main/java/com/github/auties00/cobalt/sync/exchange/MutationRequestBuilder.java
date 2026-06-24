@@ -14,21 +14,17 @@ import com.github.auties00.cobalt.model.media.ExternalBlobReferenceBuilder;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyData;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKeyId;
+import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.model.signal.KeyIdBuilder;
+import com.github.auties00.cobalt.model.sync.SyncActionEntry;
 import com.github.auties00.cobalt.model.sync.SyncCollectionMetadata;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
-import com.github.auties00.cobalt.model.sync.SyncActionEntry;
-import com.github.auties00.cobalt.node.Node;
-import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.data.*;
+import com.github.auties00.cobalt.node.Node;
 import com.github.auties00.cobalt.node.NodeBuilder;
-import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
-import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import com.github.auties00.cobalt.sync.crypto.EncryptedMutation;
-import com.github.auties00.cobalt.sync.crypto.MutationIntegrityVerifier;
-import com.github.auties00.cobalt.sync.crypto.MutationKeys;
-import com.github.auties00.cobalt.sync.crypto.MutationLTHash;
+import com.github.auties00.cobalt.sync.SyncPendingMutation;
+import com.github.auties00.cobalt.sync.crypto.*;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MediaUpload2EventBuilder;
@@ -37,7 +33,6 @@ import com.github.auties00.cobalt.wam.type.MediaUploadModeType;
 import com.github.auties00.cobalt.wam.type.MediaUploadResultType;
 import com.github.auties00.cobalt.wam.type.UploadOriginType;
 
-import java.io.ByteArrayInputStream;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
@@ -331,7 +326,7 @@ public final class MutationRequestBuilder {
                         encrypted.keyId(),
                         encrypted.operation(),
                         source.index(),
-                        source.value(),
+                        source.value().orElse(null),
                         source.actionVersion()
                 ));
                 index++;

@@ -75,7 +75,7 @@ class MissingSyncKeyRequestServiceTest {
         @Test
         @DisplayName("empty collection is a no-op (no scheduler/store side effect)")
         void emptyIsNoOp() {
-            store.setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
+            store.connectionStore().setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
             assertDoesNotThrow(() -> requestService.requestMissingKeys(List.of()));
             assertTrue(store.syncStore().missingSyncKeys().isEmpty(),
                     "empty input must not track anything in the missing-key store");
@@ -95,7 +95,7 @@ class MissingSyncKeyRequestServiceTest {
         @Test
         @DisplayName("every id already tracked -> handleMissingKeys returns before sending")
         void allAlreadyTrackedShortCircuits() {
-            store.setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
+            store.connectionStore().setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
             var keyId = new byte[]{1, 2, 3, 4, 5, 6};
             store.syncStore().addMissingSyncKey(new MissingDeviceSyncKeyBuilder()
                     .keyId(keyId)

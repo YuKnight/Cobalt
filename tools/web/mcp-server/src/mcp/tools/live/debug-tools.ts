@@ -46,26 +46,33 @@ export function registerLiveDebugTools(server: McpServer, context: LiveToolsCont
 
   server.tool(
     "web_live_debug_eval",
-    "Evaluates JavaScript in a session's live runtime. Can mutate app state.",
+    "Evaluates JavaScript in a session's live runtime and returns the result. Can mutate app state. `target` selects where it runs: 'page' (default; the main page) returns a single result; 'workers' (every worker/shared_worker/service_worker target), 'all' (page + every auto-attached child target), an exact TargetInfo.type (e.g. 'service_worker', 'iframe'), or a specific sessionId return an array of per-target { sessionId, type, url, value | error }. Worker-only globals (e.g. a buffer accumulated by a web_live_debug_set_init_script hook) are only visible with a worker/all target, not 'page'.",
     {
       sessionId: sessionIdSchema,
       expression: z.string(),
       awaitPromise: z.boolean().optional().default(true),
+      target: z
+        .string()
+        .optional()
+        .default("page")
+        .describe("Where to evaluate: 'page' (default), 'workers', 'all', a TargetInfo.type, or a sessionId."),
     },
     async ({
       sessionId,
       expression,
       awaitPromise,
+      target,
     }: {
       sessionId: string;
       expression: string;
       awaitPromise: boolean;
+      target: string;
     }) => {
       requireReady();
-      log.info(`web_live_debug_eval: id=${sessionId} expr="${expression.slice(0, 100)}${expression.length > 100 ? "..." : ""}"`);
+      log.info(`web_live_debug_eval: id=${sessionId} target=${target} expr="${expression.slice(0, 100)}${expression.length > 100 ? "..." : ""}"`);
       try {
         const session = requireSession(sessionId);
-        const result = await session.evaluate(expression, awaitPromise);
+        const result = await session.evaluate(expression, awaitPromise, target);
         return {
           content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
         };
@@ -163,7 +170,7 @@ export function registerLiveDebugTools(server: McpServer, context: LiveToolsCont
 
   server.tool(
     "web_live_debug_set_wasm_breakpoints",
-    "Sets a breakpoint at EACH byteOffset in `byteOffsets` (pass a single-element array for one breakpoint), all bound by module URL across the page + the whole pthread worker pool (now and respawned later). byteOffset is MODULE-ABSOLUTE: the function's bodyOffset from get_native_module_metadata used DIRECTLY (do NOT add codeOffset) plus any intra-function instruction offset. With a `logExpression` the breakpoint becomes a non-suspending LOGPOINT: the registry wraps the expression in a condition that console.logs its value (tagged by breakpointId) and returns false, so execution never stalls - even when the expression reads `$stack`, the wasm operand stack (e.g. '$stack[$stack.length-1]' reads a call_indirect's dispatched table index). Retrieve buffered values via web_live_debug_get_logpoint_captures (each tagged by breakpointId; map back to a site via the returned {byteOffset, breakpointId}). Without a logExpression each breakpoint suspends on hit. Remove via web_live_debug_remove_breakpoint per breakpointId.",
+    "Sets a breakpoint at EACH byteOffset in `byteOffsets` (pass a single-element array for one breakpoint), all bound by module URL across the page + the whole pthread worker pool (now and respawned later). byteOffset is MODULE-ABSOLUTE: the function's bodyOffset from get_native_module_metadata used DIRECTLY (do NOT add codeOffset) plus any intra-function instruction offset. With a `logExpression` the breakpoint becomes a non-suspending LOGPOINT: the registry wraps the expression in a condition that console.logs its value (tagged by breakpointId) and returns false, so execution never stalls. A logExpression that reads the operand stack (`$stack`) CANNOT be non-suspending (V8 cannot expose $stack to a condition): it suspends on each hit to read the stack and then resumes, returning a `warning` - prefer targeting an instruction where the value is in a local (`$var0`, `$var1`, ...). Retrieve buffered values via web_live_debug_get_logpoint_captures (each tagged by breakpointId; map back to a site via the returned {byteOffset, breakpointId}). Without a logExpression each breakpoint suspends on hit. `target` scopes binding ('workers' | 'all' | 'page' | a CDP target type); `block` forces/keeps a hit paused. The result reports `boundByType`/`resolvedLocations` so you can see which targets (page vs each worker) resolved the breakpoint, plus any `bindErrors`. A binding that fails because a target was busy or not yet attached is retried when the module next parses there. Remove via web_live_debug_remove_breakpoint per breakpointId.",
     {
       sessionId: sessionIdSchema,
       url: z.string().describe("The WASM module URL (the 'url' field from web_live_debug_list_scripts)."),
@@ -171,29 +178,58 @@ export function registerLiveDebugTools(server: McpServer, context: LiveToolsCont
       logExpression: z
         .string()
         .optional()
-        .describe("If set, evaluated on each hit and its value buffered (non-suspending). May read $stack."),
+        .describe("If set, evaluated on each hit and its value buffered. Reads of locals ($var0, ...) are non-suspending; a read of $stack forces a suspend-to-read (returns a warning)."),
+      target: z
+        .string()
+        .optional()
+        .describe("Scope binding: 'workers' (worker/shared_worker/service_worker), 'all'/unset (every target), 'page', or an exact CDP target type."),
+      block: z
+        .boolean()
+        .optional()
+        .describe("Force a hit to stay paused (true) or resume after capture (false). Default: non-logpoints pause, logpoints resume."),
     },
     async ({
       sessionId,
       url,
       byteOffsets,
       logExpression,
+      target,
+      block,
     }: {
       sessionId: string;
       url: string;
       byteOffsets: number[];
       logExpression?: string;
+      target?: string;
+      block?: boolean;
     }) => {
       requireReady();
-      log.info(`web_live_debug_set_wasm_breakpoints: id=${sessionId} url="${url}" count=${byteOffsets.length}`);
+      log.info(
+        `web_live_debug_set_wasm_breakpoints: id=${sessionId} url="${url}" count=${byteOffsets.length} target=${target ?? "all"}`
+      );
       try {
         const session = requireSession(sessionId);
-        const breakpoints: Array<{ byteOffset: number; breakpointId?: string; error?: string }> = [];
+        const breakpoints: Array<Record<string, unknown>> = [];
         let ok = 0;
         for (const byteOffset of byteOffsets) {
           try {
-            const result = await session.setWasmBreakpoint(url, byteOffset, logExpression);
-            breakpoints.push({ byteOffset, breakpointId: result.breakpointId });
+            const result = await session.setWasmBreakpoint(url, byteOffset, logExpression, target, block);
+            const bound = result.perTarget.filter((t) => t.bound);
+            const boundByType: Record<string, number> = {};
+            for (const t of bound) boundByType[t.type || "?"] = (boundByType[t.type || "?"] ?? 0) + 1;
+            const bindErrors = result.perTarget
+              .filter((t) => t.error)
+              .slice(0, 8)
+              .map((t) => ({ type: t.type, error: t.error }));
+            breakpoints.push({
+              byteOffset,
+              breakpointId: result.breakpointId,
+              boundTargets: bound.length,
+              boundByType,
+              resolvedLocations: result.locations.length,
+              ...(bindErrors.length ? { bindErrors } : {}),
+              ...(result.warning ? { warning: result.warning } : {}),
+            });
             ok++;
           } catch (e) {
             breakpoints.push({ byteOffset, error: e instanceof Error ? e.message : String(e) });
@@ -300,6 +336,30 @@ export function registerLiveDebugTools(server: McpServer, context: LiveToolsCont
         const session = requireSession(sessionId);
         const result = await session.evaluateOnCallFrame(callFrameId, expression);
         return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+      } catch (error) {
+        return {
+          content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "web_live_debug_set_init_script",
+    "Sets a JavaScript init script that runs in matching targets BEFORE their own code executes (omit script to clear). `target` selects where: 'workers' (default; worker + shared_worker + service_worker, injected via Runtime.evaluate while the target is paused at waitForDebugger), 'all' (every auto-attached child target), an exact TargetInfo.type, or 'page'/'all' (additionally registers a Playwright page init script applied on the next page load). Use this to install an instrumentation hook (e.g. wrapping the WebTransport constructor to capture datagrams into globalThis.__wtcap) in the worker that performs network I/O, which a media-side wasm breakpoint cannot reach. Targets spawned AFTER this call receive it at creation; read accumulated state back with web_live_debug_eval(target:'workers'|'all').",
+    {
+      sessionId: sessionIdSchema,
+      script: z.string().optional().describe("JS source to run in each matching target before its own code; omit to clear."),
+      target: z.string().optional().default("workers").describe("'workers' (default), 'all', a TargetInfo.type, or 'page'."),
+    },
+    async ({ sessionId, script, target }: { sessionId: string; script?: string; target: string }) => {
+      requireReady();
+      log.info(`web_live_debug_set_init_script: id=${sessionId} target=${target} len=${script?.length ?? 0}`);
+      try {
+        const session = requireSession(sessionId);
+        await session.setInitScript(script ?? null, target);
+        return { content: [{ type: "text" as const, text: JSON.stringify({ set: script != null, target, length: script?.length ?? 0 }, null, 2) }] };
       } catch (error) {
         return {
           content: [{ type: "text" as const, text: error instanceof Error ? error.message : String(error) }],

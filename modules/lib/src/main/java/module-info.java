@@ -19,7 +19,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
  *       callback interfaces for incoming messages, presence, calls, and other asynchronous notifications.</li>
  *   <li>Session and entity persistence through {@link com.github.auties00.cobalt.store.LinkedWhatsAppStore},
  *       which holds chats, contacts, messages, and the Signal protocol material for a session.</li>
- *   <li>The {@code call} packages, which expose voice and video calling together with audio and video
+ *   <li>The {@code calls2} packages, which expose voice and video calling together with audio and video
  *       frame sources, sinks, and filters.</li>
  *   <li>The {@code node} packages, which expose the stanza model used to build and read IQ, MEX, SMAX,
  *       and USync protocol nodes.</li>
@@ -82,13 +82,12 @@ module com.github.auties00.cobalt {
     requires net.dongliu.apkparser;
     requires com.google.i18n.phonenumbers.libphonenumber;
 
-    // Calls, DTLS-SRTP handshake (BouncyCastle TLS + PKIX)
+    // Calls, DTLS-SRTP handshake (BouncyCastle TLS)
     requires org.bouncycastle.provider;
     requires org.bouncycastle.tls;
-    requires org.bouncycastle.pkix;
 
     // Calls
-    exports com.github.auties00.cobalt.call.stream;
+    exports com.github.auties00.cobalt.calls2.stream;
 
     // Client API
     exports com.github.auties00.cobalt.client;

@@ -272,7 +272,7 @@ class AiThreadRenameHandlerTest {
             assertEquals(SyncdOperation.SET, mutation.operation());
             assertEquals(AiThreadRenameAction.ACTION_VERSION, mutation.actionVersion());
             assertEquals(INDEX, mutation.index());
-            var action = mutation.value().action().filter(a -> a instanceof AiThreadRenameAction).map(a -> (AiThreadRenameAction) a).orElseThrow();
+            var action = mutation.value().flatMap(sav -> sav.action()).filter(a -> a instanceof AiThreadRenameAction).map(a -> (AiThreadRenameAction) a).orElseThrow();
             assertEquals("My Title", action.newTitle().orElseThrow());
         }
 

@@ -222,7 +222,7 @@ void main() throws Exception {
 Prefer a pairing code over a QR? Swap the terminal:
 
 ```java
-.unregistered(393331234567L, PairingCode.toTerminal())   // phone with country code, no + or spaces
+.unregistered(<your_phone_number>, PairingCode.toTerminal())   // phone with country code, no + or spaces
 ```
 
 ### Cloud API

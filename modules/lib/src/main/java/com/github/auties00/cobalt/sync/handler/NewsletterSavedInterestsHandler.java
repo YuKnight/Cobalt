@@ -91,7 +91,7 @@ public final class NewsletterSavedInterestsHandler implements WebAppStateActionH
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof NewsletterSavedInterestsAction action)
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof NewsletterSavedInterestsAction action)
                 || action.newsletterSavedInterests().isEmpty()) {
             return MutationApplicationResult.malformed();
         }

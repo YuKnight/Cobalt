@@ -1762,7 +1762,7 @@ public abstract class WamService {
             var next = current + 1;
             return next > MAX_SEQUENCE_NUMBER ? 1 : next;
         });
-        client.store().putWamSequenceNumber(channel, counter.get());
+        client.store().wamStore().putSequenceNumber(channel, counter.get());
         return oldValue;
     }
 
@@ -1780,7 +1780,7 @@ public abstract class WamService {
     private void primeSequenceNumbers() {
         var store = client.store();
         for (var channel : WamChannel.values()) {
-            var stored = store.findWamSequenceNumber(channel);
+            var stored = store.wamStore().findSequenceNumber(channel);
             if (stored.isPresent()) {
                 sequenceNumbers.get(channel).set(stored.getAsInt());
             }
@@ -1821,7 +1821,7 @@ public abstract class WamService {
             return null;
         }
         var saveKey = generateSaveKey();
-        try (var encoder = WamEventEncoder.toBufferedStream(client.store().openWamPendingBufferWriter(saveKey))) {
+        try (var encoder = WamEventEncoder.toBufferedStream(client.store().wamStore().openPendingBufferWriter(saveKey))) {
             for (var i = from; i < to; i++) {
                 var pe = events.get(i);
                 WamGlobalEncoder.writeCommitTime(pe.commitTimeSeconds(), encoder);
@@ -1852,7 +1852,7 @@ public abstract class WamService {
             return;
         }
         try {
-            client.store().removeWamPendingBuffer(saveKey);
+            client.store().wamStore().removePendingBuffer(saveKey);
         } catch (IOException error) {
             LOGGER.warning("Failed to remove persisted WAM buffer " + saveKey + ": " + error.getMessage());
         }
@@ -1878,10 +1878,10 @@ public abstract class WamService {
      * persisted store from being recovered.
      */
     private void restorePendingBuffers() {
-        var keys = client.store().wamPendingBufferKeys();
+        var keys = client.store().wamStore().pendingBufferKeys();
         for (var saveKey : keys) {
             try {
-                var stream = client.store().openWamPendingBufferReader(saveKey);
+                var stream = client.store().wamStore().openPendingBufferReader(saveKey);
                 if (stream.isEmpty()) {
                     continue;
                 }
@@ -1906,7 +1906,7 @@ public abstract class WamService {
                         });
                     }
                 }
-                client.store().removeWamPendingBuffer(saveKey);
+                client.store().wamStore().removePendingBuffer(saveKey);
             } catch (Exception error) {
                 LOGGER.warning("Failed to restore persisted WAM buffer " + saveKey + ": " + error.getMessage());
             }

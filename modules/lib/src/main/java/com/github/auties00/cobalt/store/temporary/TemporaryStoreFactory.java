@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.store.ProtobufContactStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufSettingsStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufSignalStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufSyncStoreBuilder;
+import com.github.auties00.cobalt.store.ProtobufWamStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufWebSessionStoreBuilder;
 import com.github.auties00.cobalt.store.ProtobufWhatsAppStore;
 import com.github.auties00.cobalt.store.LinkedWhatsAppStore;
@@ -181,8 +182,9 @@ public final class TemporaryStoreFactory implements WhatsAppStoreFactory {
                 new ProtobufContactStoreBuilder().build(),
                 new ProtobufSyncStoreBuilder().build(),
                 new ProtobufSettingsStoreBuilder().build(),
-                null, null, null, null,
+                null,
                 new ProtobufWebSessionStoreBuilder().build(),
+                new ProtobufWamStoreBuilder().build(),
                 new TemporaryChatStore(null, null));
     }
 }

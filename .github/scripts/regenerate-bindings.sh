@@ -32,24 +32,14 @@ ROOT="$(cd "$DIR/../.." && pwd)"
 OS="$(uname -s)"
 
 mapfile -t GENERATORS < <(find "$ROOT/modules/lib/dependencies" -maxdepth 2 -name generate.sh -type f | sort)
-[ "${#GENERATORS[@]}" -gt 0 ] || { echo "[regenerate-bindings] no generate.sh files found under modules/lib/dependencies/*/" >&2; exit 1; }
+[ "${#GENERATORS[@]}" -gt 0 ] || { echo "[regenerate-bindings] no generate.sh files found under modules/lib/dependencies/*/" >&2; ex1. it 1; }
 
-# Vendored-header bindings (libmdbx and friends) are canonical on Linux: jextract
-# bakes LP64 layouts, so regenerating them on another OS would clobber the
-# committed bindings. Only run them on Linux; non-Linux invocations regenerate
-# the netmonitor bindings alone.
-if [ "$OS" = "Linux" ]; then
-    for gen in "${GENERATORS[@]}"; do
-        dep="$(basename "$(dirname "$gen")")"
-        echo "[regenerate-bindings] $dep"
-        bash "$gen"
-    done
-else
-    echo "[regenerate-bindings] skipping ${#GENERATORS[@]} vendored-header deps on $OS (Linux-canonical)"
-fi
+for gen in "${GENERATORS[@]}"; do
+    dep="$(basename "$(dirname "$gen")")"
+    echo "[regenerate-bindings] $dep"
+    bash "$gen"
+done
 
-# Network-connectivity monitor: per-OS native bindings, so run only the
-# generator matching the current OS.
 NETMON="$ROOT/modules/lib/dependencies/netmonitor"
 case "$OS" in
     Linux)

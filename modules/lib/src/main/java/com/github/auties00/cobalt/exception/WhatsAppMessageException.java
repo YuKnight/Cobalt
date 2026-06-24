@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.util.List;
@@ -23,15 +24,16 @@ import java.util.Optional;
  * failures.
  *
  * @apiNote
- * Raised for a single message; {@link #isFatal()} reports {@code false}
- * for every subtype, so a configured {@code WhatsAppClientErrorHandler}
- * can leave the session running while it sends a retry receipt (for
- * receives), retries the send, or surfaces the failure to the caller.
+ * Raised for a single message; {@link #toErrorResult()} returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD} for every subtype, so a
+ * configured {@code WhatsAppClientErrorHandler} can leave the session
+ * running while it sends a retry receipt (for receives), retries the send,
+ * or surfaces the failure to the caller.
  *
  * @implNote
- * This implementation classifies every message failure as non-fatal at
- * the session level so that one failed message never brings the
- * connection down.
+ * This implementation returns {@link WhatsAppLinkedClientErrorResult#DISCARD} for
+ * every message failure: a per-message failure emits a retry receipt or a
+ * NACK without tearing the session down.
  *
  * @see Receive
  * @see Send
@@ -71,12 +73,13 @@ public sealed class WhatsAppMessageException extends WhatsAppException
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: per-message
-     * failures never tear the session down.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: a per-message failure emits
+     * a retry receipt or a NACK without tearing the session down.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 
     /**

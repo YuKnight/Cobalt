@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 import java.util.Objects;
 
 /**
@@ -24,8 +26,9 @@ import java.util.Objects;
  * logging it and falling back.
  *
  * @implNote
- * This implementation is non-fatal: an AB prop lookup miss never
- * invalidates the Noise session.
+ * This implementation has {@link #toErrorResult()} return
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}: an AB prop lookup miss never
+ * invalidates the Noise session, so the session keeps running.
  */
 public final class WhatsAppABPropTypeMismatchException extends WhatsAppException {
 
@@ -97,12 +100,13 @@ public final class WhatsAppABPropTypeMismatchException extends WhatsAppException
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: an AB prop type
-     * mismatch is local to a single configuration lookup and the caller
-     * can fall back to a default value.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: an AB-prop lookup miss is
+     * local to one configuration read and the caller falls back to a
+     * default value.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 }

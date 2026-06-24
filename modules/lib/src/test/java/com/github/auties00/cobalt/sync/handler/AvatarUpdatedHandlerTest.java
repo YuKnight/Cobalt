@@ -161,13 +161,13 @@ class AvatarUpdatedHandlerTest {
         void skipsPrePairingMutations() {
             enableAvatars();
             var pairingTs = Instant.ofEpochSecond(1_700_000_100L);
-            store.setPairingTimestamp(pairingTs);
+            store.accountStore().setPairingTimestamp(pairingTs);
             // Mutation older than pairing timestamp - must be skipped
             var result = handler.applyMutation(testClient,
                     setMutation(AvatarUpdatedAction.AvatarEventType.CREATED,
                             Instant.ofEpochSecond(1_700_000_000L)));
             assertEquals(SyncActionState.SKIPPED, result.actionState());
-            assertTrue(store.hasAvatar().isEmpty(),
+            assertTrue(store.accountStore().hasAvatar().isEmpty(),
                     "pre-pairing mutation must not flip hasAvatar");
         }
 
@@ -176,7 +176,7 @@ class AvatarUpdatedHandlerTest {
         void equalTimestampIsSkipped() {
             enableAvatars();
             var ts = Instant.ofEpochSecond(1_700_000_100L);
-            store.setPairingTimestamp(ts);
+            store.accountStore().setPairingTimestamp(ts);
             var result = handler.applyMutation(testClient,
                     setMutation(AvatarUpdatedAction.AvatarEventType.CREATED, ts));
             assertEquals(SyncActionState.SKIPPED, result.actionState());
@@ -194,7 +194,7 @@ class AvatarUpdatedHandlerTest {
                     setMutation(AvatarUpdatedAction.AvatarEventType.CREATED,
                             Instant.ofEpochSecond(1_700_000_000L)));
             assertEquals(MutationApplicationResult.success(), result);
-            assertEquals(true, store.hasAvatar().orElse(false),
+            assertEquals(true, store.accountStore().hasAvatar().orElse(false),
                     "CREATED must set hasAvatar=true");
         }
 
@@ -206,19 +206,19 @@ class AvatarUpdatedHandlerTest {
                     setMutation(AvatarUpdatedAction.AvatarEventType.UPDATED,
                             Instant.ofEpochSecond(1_700_000_000L)));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(true, store.hasAvatar().orElse(false));
+            assertEquals(true, store.accountStore().hasAvatar().orElse(false));
         }
 
         @Test
         @DisplayName("DELETED sets hasAvatar=false")
         void deletedSetsHasAvatarFalse() {
             enableAvatars();
-            store.setHasAvatar(true);
+            store.accountStore().setHasAvatar(true);
             var result = handler.applyMutation(testClient,
                     setMutation(AvatarUpdatedAction.AvatarEventType.DELETED,
                             Instant.ofEpochSecond(1_700_000_000L)));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(false, store.hasAvatar().orElse(true),
+            assertEquals(false, store.accountStore().hasAvatar().orElse(true),
                     "DELETED must clear hasAvatar");
         }
     }

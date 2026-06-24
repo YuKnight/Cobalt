@@ -28,9 +28,9 @@ public final class CloudUserPreferenceUpdate {
     private final String category;
 
     /**
-     * The new preference value, {@code stop} or {@code resume}.
+     * The new preference value.
      */
-    private final String value;
+    private final CloudMarketingPreference value;
 
     /**
      * The instant the preference changed, or {@code null} when not reported.
@@ -48,7 +48,8 @@ public final class CloudUserPreferenceUpdate {
      * @throws NullPointerException if {@code waId}, {@code category}, or {@code value} is
      *                              {@code null}
      */
-    public CloudUserPreferenceUpdate(String waId, String detail, String category, String value, Instant timestamp) {
+    public CloudUserPreferenceUpdate(String waId, String detail, String category, CloudMarketingPreference value,
+                                     Instant timestamp) {
         this.waId = Objects.requireNonNull(waId, "waId must not be null");
         this.detail = detail;
         this.category = Objects.requireNonNull(category, "category must not be null");
@@ -86,19 +87,20 @@ public final class CloudUserPreferenceUpdate {
     /**
      * Returns the new preference value.
      *
-     * @return the value, {@code stop} or {@code resume}
+     * @return the {@link CloudMarketingPreference}
      */
-    public String value() {
+    public CloudMarketingPreference value() {
         return value;
     }
 
     /**
      * Returns whether the user opted out of the category.
      *
-     * @return {@code true} if the preference value is {@code stop}, {@code false} otherwise
+     * @return {@code true} if the preference value is {@link CloudMarketingPreference#STOP},
+     *         {@code false} otherwise
      */
     public boolean isOptOut() {
-        return "stop".equalsIgnoreCase(value);
+        return value == CloudMarketingPreference.STOP;
     }
 
     /**

@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 /**
  * Thrown when a USync device-list query against the WhatsApp servers
  * returns an error.
@@ -15,8 +17,11 @@ package com.github.auties00.cobalt.exception;
  *
  * @apiNote
  * Inspect {@link #isFatal()} to tell a batch-wide rejection from a partial
- * one: a non-fatal instance leaves the rest of the USync response usable,
- * so the send can proceed to the recipients that resolved.
+ * one: a partial instance leaves the rest of the USync response usable, so
+ * the send can proceed to the recipients that resolved. The session-level
+ * recovery is unaffected by that distinction: {@link #toErrorResult()}
+ * returns {@link WhatsAppLinkedClientErrorResult#DISCARD} for both, since a USync
+ * failure never tears the session down.
  */
 public final class WhatsAppDeviceSyncException extends WhatsAppException {
     /**
@@ -61,16 +66,34 @@ public final class WhatsAppDeviceSyncException extends WhatsAppException {
     }
 
     /**
+     * Returns whether the USync server response marked this failure as
+     * batch-wide.
+     *
+     * <p>A batch-wide rejection blocks the entire send, while a partial
+     * failure leaves the rest of the USync response usable so the send can
+     * proceed to the recipients that resolved. This classification is
+     * independent of {@link #toErrorResult()}, which returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD} either way because a USync
+     * device-list failure never tears the session down.
+     *
+     * @return {@code true} for a batch-wide rejection, {@code false} when
+     *         only a subset of devices failed
+     */
+    public boolean isFatal() {
+        return fatal;
+    }
+
+    /**
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation returns the {@code fatal} flag captured at
-     * construction time: {@code true} for batch-wide rejections and
-     * {@code false} when only a subset of devices failed so the rest of
-     * the response can still be used.
+     * This implementation returns {@link WhatsAppLinkedClientErrorResult#DISCARD}:
+     * a USync device-list error is a per-request failure that leaves the
+     * session running, whether it is batch-wide or partial (see
+     * {@link #isFatal()}).
      */
     @Override
-    public boolean isFatal() {
-        return fatal;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 }

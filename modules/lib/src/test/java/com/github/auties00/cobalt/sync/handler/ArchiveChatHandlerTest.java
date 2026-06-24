@@ -295,7 +295,7 @@ class ArchiveChatHandlerTest {
             assertEquals(ConflictResolutionState.SKIP_REMOTE_DROP_LOCAL, resolution.state());
             assertNotNull(resolution.mergedMutation(), "non-enclosing ranges must yield a merged mutation");
             // Newer mutation (remote) wins for archived flag.
-            var mergedAction = resolution.mergedMutation().value().action().filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow();
+            var mergedAction = resolution.mergedMutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow();
             assertTrue(mergedAction.archived(),
                     "merged action carries the archived flag from the newer (remote) mutation");
         }
@@ -357,7 +357,7 @@ class ArchiveChatHandlerTest {
             assertEquals(3, trusted.actionVersion());
             assertEquals(ts, trusted.timestamp());
             assertEquals(JSON.toJSONString(List.of("archive", PEER.toString())), trusted.index());
-            var archiveAction = trusted.value().action().filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow();
+            var archiveAction = trusted.value().flatMap(sav -> sav.action()).filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow();
             assertTrue(archiveAction.archived());
             assertTrue(archiveAction.messageRange().isPresent());
         }
@@ -371,9 +371,9 @@ class ArchiveChatHandlerTest {
             var mutations = new ArchiveChatMutationFactory(new PinChatMutationFactory()).getMutationsForArchive(ts, true, PEER, range);
 
             assertEquals(2, mutations.size(), "archiving must also queue an unpin mutation");
-            var first = mutations.get(0).mutation().value().action().filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow();
+            var first = mutations.get(0).mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow();
             assertTrue(first.archived());
-            var second = mutations.get(1).mutation().value().action().filter(a -> a instanceof PinAction).map(a -> (PinAction) a).orElseThrow();
+            var second = mutations.get(1).mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof PinAction).map(a -> (PinAction) a).orElseThrow();
             assertFalse(second.pinned(),
                     "the secondary mutation is an unpin (pinned=false), mirroring WA Web's getMutationsForArchive");
         }
@@ -386,7 +386,7 @@ class ArchiveChatHandlerTest {
 
             var mutations = new ArchiveChatMutationFactory(new PinChatMutationFactory()).getMutationsForArchive(ts, false, PEER, range);
             assertEquals(1, mutations.size(), "unarchive only emits the archive mutation");
-            var only = mutations.get(0).mutation().value().action().filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow();
+            var only = mutations.get(0).mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow();
             assertFalse(only.archived());
         }
     }

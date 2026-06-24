@@ -449,10 +449,10 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
             domain = null;
         }
         if (domain == null) {
-            domain = whatsapp.store().routingDomain().orElse(DEFAULT_ROUTING_DOMAIN);
+            domain = whatsapp.store().connectionStore().routingDomain().orElse(DEFAULT_ROUTING_DOMAIN);
         }
-        whatsapp.store().setRoutingInfo(edgeRouting);
-        whatsapp.store().setRoutingDomain(domain);
+        whatsapp.store().connectionStore().setRoutingInfo(edgeRouting);
+        whatsapp.store().connectionStore().setRoutingDomain(domain);
         LOGGER.log(System.Logger.Level.DEBUG,
                 "handleInfoBulletin setting and domain: {0} and edgeRouting: {1} bytes",
                 domain, edgeRouting == null ? 0 : edgeRouting.length);
@@ -501,7 +501,7 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
         }
 
         var store = whatsapp.store();
-        var current = store.offlineResumeState();
+        var current = store.connectionStore().offlineResumeState();
         if (current == LinkedWhatsAppClientOfflineResumeState.COMPLETE) {
             return;
         }
@@ -514,12 +514,12 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                         "doPendingDeviceSync failed during open-tab resume completion: {0}",
                         throwable.getMessage());
             }
-            store.setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
+            store.connectionStore().setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
             firstOfflinePreviewMillis = 0L;
             return;
         }
 
-        store.setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
+        store.connectionStore().setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
         firstOfflinePreviewMillis = 0L;
         Thread.startVirtualThread(() -> {
             try {
@@ -576,15 +576,15 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                 previewNode.getAttributeAsInt("call", 0));
 
         var store = whatsapp.store();
-        if (store.isResumeFromRestartComplete()) {
-            store.setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.RESUME_WITH_OPEN_TAB);
+        if (store.connectionStore().isResumeFromRestartComplete()) {
+            store.connectionStore().setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.RESUME_WITH_OPEN_TAB);
             return;
         }
 
-        var current = store.offlineResumeState();
+        var current = store.connectionStore().offlineResumeState();
         if (current == LinkedWhatsAppClientOfflineResumeState.INIT) {
             firstOfflinePreviewMillis = System.currentTimeMillis();
-            store.setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.RESUME_ON_RESTART);
+            store.connectionStore().setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.RESUME_ON_RESTART);
             return;
         }
 
@@ -712,13 +712,13 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                 .map(InfoBulletinStreamHandler::castToUnixTime)
                 .orElse(null);
         if (newExpiration == null) {
-            whatsapp.store().setClientExpiration(null);
+            whatsapp.store().accountStore().setClientExpiration(null);
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Cleared client expiration override");
             return;
         }
 
-        var existingExpiration = whatsapp.store().clientExpiration().orElse(null);
+        var existingExpiration = whatsapp.store().accountStore().clientExpiration().orElse(null);
 
         if (existingExpiration != null && newExpiration >= existingExpiration.getEpochSecond()) {
             LOGGER.log(System.Logger.Level.DEBUG,
@@ -733,7 +733,7 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                 ? minFloor
                 : Instant.ofEpochSecond(newExpiration);
 
-        whatsapp.store().setClientExpiration(clampedExpiration);
+        whatsapp.store().accountStore().setClientExpiration(clampedExpiration);
         LOGGER.log(System.Logger.Level.DEBUG,
                 "Received client expiration bulletin, clamped to {0}", clampedExpiration);
     }

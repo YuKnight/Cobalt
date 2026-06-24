@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
@@ -25,9 +27,10 @@ import java.util.Optional;
  * ({@link SessionUnseeded}).
  *
  * @apiNote
- * Every subtype reports {@link #isFatal()} as {@code false}: a refresh
- * failure scopes to the Facebook GraphQL credential slot and does not invalidate
- * the underlying Noise messaging channel. Pattern-match the concrete
+ * Every subtype returns {@link WhatsAppLinkedClientErrorResult#DISCARD} from
+ * {@link #toErrorResult()}: a refresh failure scopes to the Facebook GraphQL
+ * credential slot and does not invalidate the underlying Noise messaging
+ * channel. Pattern-match the concrete
  * subtype to decide whether to surface a recovery UI
  * ({@link SilentNonceRecoveryRequired#emailMask()}), retry with backoff
  * ({@link SilentNonceServerError}, {@link SilentNonceTimeout}), or
@@ -73,13 +76,14 @@ public sealed abstract class WhatsAppFacebookGraphQlException
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: a Facebook GraphQL credential
-     * refresh failure scopes to the click-to-WhatsApp ads surface and
-     * leaves the encrypted messaging channel intact.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: a credential refresh failure
+     * scopes to the click-to-WhatsApp ads surface and leaves the encrypted
+     * messaging channel intact.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 
     /**

@@ -185,7 +185,7 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
         var allDevices = deviceService.getBroadcastFanout(broadcastJid, recipients);
         var phash = deviceService.computeGroupPhash(allDevices, selfLidOrPn(), false, false);
 
-        store.createOrMergeReceiptRecords(messageId, allDevices);
+        store.chatStore().createOrMergeReceiptRecords(messageId, allDevices);
 
         var skDistribDevices = new ArrayList<Jid>();
         var skExistingDevices = new ArrayList<Jid>();

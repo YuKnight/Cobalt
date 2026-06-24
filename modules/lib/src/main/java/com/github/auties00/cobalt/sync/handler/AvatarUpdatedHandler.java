@@ -99,7 +99,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof AvatarUpdatedAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof AvatarUpdatedAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
         var eventType = action.eventType().orElse(null);
@@ -107,14 +107,14 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        var pairingTimestamp = client.store().pairingTimestamp().orElse(null);
+        var pairingTimestamp = client.store().accountStore().pairingTimestamp().orElse(null);
         if (pairingTimestamp != null && !mutation.timestamp().isAfter(pairingTimestamp)) {
             return MutationApplicationResult.skipped();
         }
 
         switch (eventType) {
-            case CREATED, UPDATED -> client.store().setHasAvatar(true);
-            case DELETED -> client.store().setHasAvatar(false);
+            case CREATED, UPDATED -> client.store().accountStore().setHasAvatar(true);
+            case DELETED -> client.store().accountStore().setHasAvatar(false);
         }
 
         client.store().settingsStore().removeAllRecentAvatarStickers();

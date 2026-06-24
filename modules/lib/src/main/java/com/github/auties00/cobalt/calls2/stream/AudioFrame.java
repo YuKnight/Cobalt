@@ -1,0 +1,47 @@
+package com.github.auties00.cobalt.calls2.stream;
+
+import java.util.Objects;
+
+/**
+ * Holds one frame of mono PCM audio in the format the WhatsApp call media stack operates on.
+ *
+ * <p>The payload is signed 16-bit PCM sampled at 16 kHz, single channel. The sample rate and channel
+ * count are not carried per frame: the public call API is fixed to 16 kHz mono to match the WhatsApp
+ * audio codec configuration, so a frame describes only its samples and the instant at which they are
+ * presented. A frame's duration is implied by its sample count, since at 16 kHz one millisecond is
+ * sixteen samples; the engine drains frames at a fixed cadence (a 10 ms or 20 ms block), so a source
+ * that produces a different chunk size is rechunked by the engine rather than rejected here.
+ *
+ * <p>A producer that captures at a different rate, such as the 48 kHz an operating system microphone
+ * commonly delivers, downsamples to 16 kHz mono before publishing a frame to an {@link AudioOutput};
+ * likewise a sink draining an {@link AudioInput} that renders at another rate resamples on its side.
+ * The sample buffer is referenced as supplied and never copied, so a caller transfers ownership and
+ * must not mutate the array after constructing the frame.
+ *
+ * @apiNote The call API does not negotiate alternate audio formats; a source or sink operating at a
+ * native rate other than 16 kHz mono is responsible for resampling, and a mismatched rate is
+ * reproduced at the wrong pitch rather than corrected.
+ * @implNote This implementation fixes the public audio format at 16 kHz mono 16-bit PCM to match the
+ * wa-voip capture pump, whose skew logging is denominated "ms at 16k" and whose reader loop
+ * (WasmAudioReaderThread::loop, drivers/WasmAudioReaderThread.cpp fn11899) forwards one
+ * framesPerChunk block per tick at a 16000 Hz reference rate; the per-frame duration is therefore
+ * left implicit in the sample count rather than carried on the wire.
+ * @param pcm   the signed 16-bit PCM samples, one channel; never {@code null}
+ * @param ptsMicros the presentation timestamp in microseconds, monotonically non-decreasing within
+ *                  a single call
+ */
+public record AudioFrame(short[] pcm, long ptsMicros) {
+    /**
+     * Validates the frame, rejecting a {@code null} sample buffer.
+     *
+     * <p>The buffer reference is retained as supplied; the array is neither copied nor defensively
+     * cloned, so the caller must not mutate it after construction. No constraint is placed on the
+     * sample count: an empty buffer is a legal zero-length frame, and any positive length is accepted
+     * because the engine rechunks to its fixed block size.
+     *
+     * @throws NullPointerException if {@code pcm} is {@code null}
+     */
+    public AudioFrame {
+        Objects.requireNonNull(pcm, "pcm cannot be null");
+    }
+}

@@ -92,7 +92,7 @@ public final class PrivateProcessingSettingHandler implements WebAppStateActionH
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrivateProcessingSettingAction action)
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrivateProcessingSettingAction action)
                 || action.privateProcessingStatus().isEmpty()) {
             return MutationApplicationResult.malformed();
         }

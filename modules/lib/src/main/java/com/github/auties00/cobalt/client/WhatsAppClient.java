@@ -50,8 +50,12 @@ import java.util.Optional;
  * ({@link WhatsAppClientBuilder#cloudApi()}). Because the type is sealed, a {@code switch} over a
  * {@code WhatsAppClient} is exhaustive with {@link LinkedWhatsAppClient} and
  * {@link CloudWhatsAppClient} as the only cases.
+ *
+ * @param <SELF> the concrete client flavour, bound to itself ({@link LinkedWhatsAppClient} or
+ *               {@link CloudWhatsAppClient}) so that lifecycle methods return, and the shared
+ *               listener callbacks receive, the exact flavour rather than this root type
  */
-public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsAppClient {
+public sealed interface WhatsAppClient<SELF extends WhatsAppClient<SELF>> permits LinkedWhatsAppClient, CloudWhatsAppClient {
     /**
      * Returns the entry point for assembling a configured {@link WhatsAppClient} of either flavour.
      *
@@ -76,7 +80,7 @@ public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsA
      * @return {@code this}, narrowed to the concrete flavour, for fluent chaining
      * @throws IllegalStateException if the client is already connected
      */
-    WhatsAppClient connect();
+    SELF connect();
 
     /**
      * Tears the client down, releasing the socket or stopping the webhook receiver.
@@ -95,7 +99,7 @@ public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsA
      *
      * @return {@code this}, narrowed to the concrete flavour, for fluent chaining
      */
-    WhatsAppClient reconnect();
+    SELF reconnect();
 
     /**
      * Returns whether the client is currently live.
@@ -115,7 +119,7 @@ public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsA
      *
      * @return {@code this}, narrowed to the concrete flavour, for fluent chaining
      */
-    WhatsAppClient waitForDisconnection();
+    SELF waitForDisconnection();
 
     /**
      * Sends a message to a recipient and returns the key that identifies it.
@@ -240,7 +244,7 @@ public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsA
      * @param listener the listener
      * @return {@code this}, narrowed to the concrete flavour, for fluent chaining
      */
-    WhatsAppClient addNewMessageListener(NewMessageListener listener);
+    SELF addNewMessageListener(NewMessageListener<? super SELF> listener);
 
     /**
      * Registers a listener for message status transitions.
@@ -248,7 +252,7 @@ public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsA
      * @param listener the listener
      * @return {@code this}, narrowed to the concrete flavour, for fluent chaining
      */
-    WhatsAppClient addMessageStatusListener(MessageStatusListener listener);
+    SELF addMessageStatusListener(MessageStatusListener<? super SELF> listener);
 
     /**
      * Registers a listener for message deletions.
@@ -256,7 +260,7 @@ public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsA
      * @param listener the listener
      * @return {@code this}, narrowed to the concrete flavour, for fluent chaining
      */
-    WhatsAppClient addMessageDeletedListener(MessageDeletedListener listener);
+    SELF addMessageDeletedListener(MessageDeletedListener<? super SELF> listener);
 
     /**
      * Registers a listener invoked once the client is connected and authenticated.
@@ -264,7 +268,7 @@ public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsA
      * @param listener the listener
      * @return {@code this}, narrowed to the concrete flavour, for fluent chaining
      */
-    WhatsAppClient addLoggedInListener(LoggedInListener listener);
+    SELF addLoggedInListener(LoggedInListener<? super SELF> listener);
 
     /**
      * Registers a listener invoked when the client disconnects.
@@ -272,7 +276,7 @@ public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsA
      * @param listener the listener
      * @return {@code this}, narrowed to the concrete flavour, for fluent chaining
      */
-    WhatsAppClient addDisconnectedListener(DisconnectedListener listener);
+    SELF addDisconnectedListener(DisconnectedListener<? super SELF> listener);
 
     /**
      * Unregisters a previously registered listener.
@@ -282,5 +286,5 @@ public sealed interface WhatsAppClient permits LinkedWhatsAppClient, CloudWhatsA
      * @param listener the listener to remove
      * @return {@code this}, narrowed to the concrete flavour, for fluent chaining
      */
-    WhatsAppClient removeListener(WhatsAppListener listener);
+    SELF removeListener(WhatsAppListener listener);
 }

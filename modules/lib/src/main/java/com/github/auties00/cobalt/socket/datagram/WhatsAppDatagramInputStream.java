@@ -1,16 +1,15 @@
 package com.github.auties00.cobalt.socket.datagram;
 
-import com.github.auties00.cobalt.util.GcmUtils;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import com.github.auties00.cobalt.util.AesGcmStreamCipher;
+import com.github.auties00.cobalt.util.DataUtils;
 
-import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.ShortBufferException;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteOrder;
 import java.security.GeneralSecurityException;
-import java.security.Provider;
 import java.util.Objects;
 
 /**
@@ -18,13 +17,13 @@ import java.util.Objects;
  *
  * <p>The wire is a sequence of {@code int24}-prefixed datagrams. Each datagram is its own AES-GCM ciphertext: the
  * cipher is re-initialised with a fresh nonce at every datagram boundary, the ciphertext bytes are fed through
- * {@link Cipher#update}, and {@link Cipher#doFinal} verifies the authentication tag at the end of each datagram.
- * Datagram boundaries are invisible to the consumer: {@link #read()} yields plaintext bytes continuously across
- * datagram boundaries and signals {@code -1} when the underlying stream ends, whether at an exact datagram boundary
- * or partway through a datagram whose declared length is never fully delivered. A datagram left incomplete by an end
- * of stream is discarded rather than reported as an error, mirroring the way WA Web's {@code WAFrameSocket} abandons
- * a buffered partial frame when the transport closes; the WhatsApp server routinely ends a stream by starting a final
- * datagram it never finishes and then closing the socket.
+ * {@link AesGcmStreamCipher#update}, and {@link AesGcmStreamCipher#doFinal} verifies the authentication tag at the end
+ * of each datagram. Datagram boundaries are invisible to the consumer: {@link #read()} yields plaintext bytes
+ * continuously across datagram boundaries and signals {@code -1} when the underlying stream ends, whether at an exact
+ * datagram boundary or partway through a datagram whose declared length is never fully delivered. A datagram left
+ * incomplete by an end of stream is discarded rather than reported as an error, mirroring the way WA Web's
+ * {@code WAFrameSocket} abandons a buffered partial frame when the transport closes; the WhatsApp server routinely ends
+ * a stream by starting a final datagram it never finishes and then closing the socket.
  *
  * <p>This continuous mode is the natural fit for the post-handshake reader thread, which decodes one
  * {@link com.github.auties00.cobalt.node.Node} per datagram via {@link com.github.auties00.cobalt.node.binary.NodeReader}:
@@ -36,9 +35,8 @@ import java.util.Objects;
  * length of the next datagram so a bounded view can be assembled around the continuous {@link #read()}.
  *
  * <p>The stream owns two fixed-size buffers and nothing else: an 8 KiB {@link #ibuffer} for one batched read from the
- * underlying stream, and an 8 KiB plus tag-margin {@link #plaintextChunk} that captures the plaintext released by one
- * round of {@link Cipher#update} plus any trailing bytes that {@link Cipher#doFinal} emits for the last partial AES
- * block of the datagram. Neither buffer grows with the datagram size.
+ * underlying stream, and an 8 KiB {@link #plaintextChunk} that captures the plaintext released by one round of
+ * {@link AesGcmStreamCipher#update}. Neither buffer grows with the datagram size.
  *
  * <p>Before the Noise handshake completes the stream is in pre-handshake mode: {@code int24}-framed bytes are still
  * consumed from the underlying stream, but no cipher is applied and the bytes are copied through {@link #ibuffer} into
@@ -48,14 +46,15 @@ import java.util.Objects;
  * <p>Instances are not thread-safe; one input stream is intended to be owned by a single reader thread.
  *
  * @implNote
- * This implementation sources the AES-GCM cipher from the BouncyCastle JCE provider rather than the JDK's default
- * SunJCE because BouncyCastle's {@code GCMBlockCipher} streams plaintext out of {@link Cipher#update} block by block
- * (deferring only the tag check to {@link Cipher#doFinal}), whereas SunJCE buffers the entire ciphertext internally and
- * releases the full plaintext only at {@code doFinal}. Streaming lets the output buffer stay at a fixed 8 KiB
- * regardless of how large a single datagram is. The state machine keys off {@link #textRemaining}: a value of
- * {@link #NO_ACTIVE_DATAGRAM} means no active datagram and the next call must read the next {@code int24} length; a
- * positive value means more ciphertext must be fed through {@link Cipher#update}; zero is the transient state just
- * before {@link Cipher#doFinal} fires and is then reset to {@link #NO_ACTIVE_DATAGRAM}.
+ * This implementation drives an {@link AesGcmStreamCipher}, a streaming AES-GCM built on the JDK's own AES primitives,
+ * rather than {@code javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")}. The packaged JDK GCM buffers the entire
+ * ciphertext and releases its plaintext only at {@code doFinal}, whereas {@link AesGcmStreamCipher#update} streams
+ * plaintext block by block (deferring only the tag check to {@link AesGcmStreamCipher#doFinal}), which lets the output
+ * buffer stay at a fixed 8 KiB regardless of how large a single datagram is. The state machine keys off
+ * {@link #textRemaining}: a value of {@link #NO_ACTIVE_DATAGRAM} means no active datagram and the next call must read
+ * the next {@code int24} length; a positive value means more ciphertext must be fed through
+ * {@link AesGcmStreamCipher#update}; zero is the transient state just before {@link AesGcmStreamCipher#doFinal} fires
+ * and is then reset to {@link #NO_ACTIVE_DATAGRAM}.
  */
 public final class WhatsAppDatagramInputStream extends FilterInputStream {
 
@@ -91,48 +90,31 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
     private static final int INPUT_BUFFER_SIZE = 8192;
 
     /**
-     * Holds the headroom appended to {@link #plaintextChunk} to absorb the worst-case overshoot from BouncyCastle's
-     * AES-GCM {@link Cipher#update} plus the trailing partial-block bytes that {@link Cipher#doFinal} releases.
-     *
-     * @implNote
-     * This implementation bounds the {@code update} overshoot at {@code GCM_TAG_BYTE_SIZE - 1 = 15} bytes (small
-     * unaligned input chunks straddling an AES block boundary) plus another 15 bytes for the {@code doFinal} tail,
-     * rounded up to {@code 2 * GCM_TAG_BYTE_SIZE = 32} for headroom.
-     */
-    private static final int PLAINTEXT_CHUNK_OVERFLOW = 2 * GCM_TAG_BYTE_SIZE;
-
-    /**
      * Holds the sentinel value for {@link #textRemaining} meaning no datagram is currently in flight and the next call
      * must read the next {@code int24} length prefix.
      */
     private static final int NO_ACTIVE_DATAGRAM = -1;
 
     /**
-     * Holds the shared BouncyCastle JCE provider instance handed to every {@link Cipher#getInstance(String, Provider)}
-     * call.
-     *
-     * @implNote
-     * This implementation holds the provider here so the JVM never needs to register BouncyCastle globally, isolating
-     * the dependency to this stream and avoiding pulling in BouncyCastle's other providers system-wide.
-     */
-    private static final Provider BOUNCY_CASTLE = new BouncyCastleProvider();
-
-    /**
      * Holds the fixed-size buffer used by {@link #produceMoreData()} to read one chunk from the underlying stream
-     * before handing it to {@link Cipher#update}.
+     * before handing it to {@link AesGcmStreamCipher#update}.
      */
     private final byte[] ibuffer = new byte[INPUT_BUFFER_SIZE];
 
     /**
-     * Holds the fixed-size buffer that captures the plaintext emitted by one {@link Cipher#update} call (sized to
-     * absorb the up-to-15-byte BouncyCastle excess) plus any trailing bytes released by {@link Cipher#doFinal} at the
-     * end of the datagram.
+     * Holds the fixed-size buffer that captures the plaintext emitted by one {@link AesGcmStreamCipher#update} call.
      *
      * <p>The buffer is drained incrementally into the caller's destination by
      * {@link #drainPlaintextChunk(byte[], int, int)} across successive {@link #read(byte[], int, int)} calls so the
      * consumer receives bytes without seeing datagram boundaries.
+     *
+     * @implNote
+     * This implementation sizes the buffer at exactly {@value #INPUT_BUFFER_SIZE} bytes because the streaming cipher
+     * never releases more plaintext than the ciphertext fed in (decryption holds the trailing tag back rather than
+     * overshooting), so one {@code update} over an {@link #ibuffer}-sized read can never overflow it and
+     * {@code doFinal} releases no further plaintext.
      */
-    private final byte[] plaintextChunk = new byte[INPUT_BUFFER_SIZE + PLAINTEXT_CHUNK_OVERFLOW];
+    private final byte[] plaintextChunk = new byte[INPUT_BUFFER_SIZE];
 
     /**
      * Holds the read cursor in {@link #plaintextChunk}; bytes from {@code plaintextChunkStart} (inclusive) to
@@ -156,11 +138,11 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
      * Holds the AES-GCM cipher, re-initialised on every datagram boundary with a fresh nonce derived from
      * {@link #readCounter}.
      */
-    private final Cipher cipher;
+    private final AesGcmStreamCipher cipher;
 
     /**
-     * Holds the number of ciphertext bytes still to be fed through {@link Cipher#update} for the current datagram, or
-     * {@link #NO_ACTIVE_DATAGRAM} when the next call must read the length prefix.
+     * Holds the number of ciphertext bytes still to be fed through {@link AesGcmStreamCipher#update} for the current
+     * datagram, or {@link #NO_ACTIVE_DATAGRAM} when the next call must read the length prefix.
      */
     private int textRemaining = NO_ACTIVE_DATAGRAM;
 
@@ -194,13 +176,13 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
      * transport-layer {@link InputStream} before running the Noise handshake on top.
      *
      * @param in the underlying byte stream
-     * @throws IOException          if BouncyCastle cannot instantiate the AES-GCM cipher
+     * @throws IOException          if the platform cannot provide the AES-GCM cipher
      * @throws NullPointerException if {@code in} is {@code null}
      */
     public WhatsAppDatagramInputStream(InputStream in) throws IOException {
         super(Objects.requireNonNull(in, "in"));
         try {
-            this.cipher = Cipher.getInstance("AES/GCM/NoPadding", BOUNCY_CASTLE);
+            this.cipher = new AesGcmStreamCipher();
         } catch (GeneralSecurityException exception) {
             throw new IOException("Failed to initialise AES-GCM cipher", exception);
         }
@@ -319,15 +301,17 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
     /**
      * Advances the cipher state machine by one wire chunk.
      *
-     * <p>Starts a new datagram if needed, then either pumps one chunk of ciphertext through {@link Cipher#update} or
-     * finalises the current datagram with {@link Cipher#doFinal}, in both cases appending the resulting plaintext to
-     * {@link #plaintextChunk}. If the underlying stream ends while the current datagram is still expecting ciphertext,
-     * the incomplete datagram is discarded and a clean end-of-stream is reported rather than failing.
+     * <p>Starts a new datagram if needed, then either pumps one chunk of ciphertext through
+     * {@link AesGcmStreamCipher#update} or finalises the current datagram with {@link AesGcmStreamCipher#doFinal}, in
+     * both cases appending the resulting plaintext to {@link #plaintextChunk}. If the underlying stream ends while the
+     * current datagram is still expecting ciphertext, the incomplete datagram is discarded and a clean end-of-stream is
+     * reported rather than failing.
      *
      * @implNote
-     * This implementation may return {@code true} with the chunk still empty: BouncyCastle's {@code update} can hold
-     * back the tail of a partial AES block until the next call, and the {@code read} loop handles this by re-invoking
-     * until the chunk is non-empty or end-of-stream is observed.
+     * This implementation may return {@code true} with the chunk still empty: the decryption holds back a trailing
+     * tag-sized window of input, so until more than a tag's worth of ciphertext has arrived no plaintext is released
+     * (and a short partial read can leave a round entirely within that window). The {@code read} loop handles this by
+     * re-invoking until the chunk is non-empty or end-of-stream is observed.
      *
      * <p>Discarding a trailing datagram whose declared length is never fully delivered mirrors WA Web's
      * {@code WAFrameSocket.convertBufferedToFrames}, which only emits a frame once its full {@code int24}-declared
@@ -400,9 +384,8 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
      *
      * <p>In pre-handshake mode no cipher operation occurs; the datagram bytes are copied through {@link #ibuffer} into
      * {@link #plaintextChunk} verbatim by {@link #decryptChunk(int)} and the plaintext length equals the wire length.
-     * In post-handshake mode the cipher is initialised with a fresh nonce and the plaintext length is what
-     * {@link Cipher#getOutputSize(int)} reports for the ciphertext about to be processed (wire length minus the
-     * {@value #GCM_TAG_BYTE_SIZE}-byte GCM tag).
+     * In post-handshake mode the cipher is initialised with a fresh nonce and the plaintext length is the wire length
+     * minus the {@value #GCM_TAG_BYTE_SIZE}-byte GCM tag.
      *
      * @param length the wire byte count read from the {@code int24} prefix
      * @return the plaintext byte count for this datagram
@@ -422,22 +405,23 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
         }
         if (key != null) {
             try {
-                cipher.init(Cipher.DECRYPT_MODE, key, GcmUtils.createNonce(readCounter++));
+                var nonce = new byte[12];
+                DataUtils.putLong(nonce, 4, readCounter++, ByteOrder.BIG_ENDIAN);
+                cipher.init(false, key, nonce);
             } catch (GeneralSecurityException exception) {
                 throw new IOException("Failed to initialise AES-GCM cipher", exception);
             }
         }
         textRemaining = length;
-        return key == null ? length : cipher.getOutputSize(length);
+        return key == null ? length : length - GCM_TAG_BYTE_SIZE;
     }
 
     /**
-     * Feeds {@code n} bytes from {@link #ibuffer} through {@link Cipher#update}, or copies them verbatim in
+     * Feeds {@code n} bytes from {@link #ibuffer} through {@link AesGcmStreamCipher#update}, or copies them verbatim in
      * pre-handshake mode, appending the result to {@link #plaintextChunk}.
      *
      * @param n the number of bytes in {@link #ibuffer} to process
-     * @throws IOException if the cipher operation fails or BouncyCastle releases more bytes than the plaintext chunk
-     *                     buffer can hold
+     * @throws IOException if the cipher operation fails or releases more bytes than the plaintext chunk buffer can hold
      */
     private void decryptChunk(int n) throws IOException {
         var key = readKey;
@@ -455,8 +439,8 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
     }
 
     /**
-     * Calls {@link Cipher#doFinal} to release the trailing plaintext for the current datagram, verifies the GCM tag and
-     * appends the resulting bytes to {@link #plaintextChunk}.
+     * Calls {@link AesGcmStreamCipher#doFinal} to verify the GCM tag for the current datagram and append any trailing
+     * plaintext to {@link #plaintextChunk}.
      *
      * <p>In pre-handshake mode this method only resets {@link #textRemaining} to {@link #NO_ACTIVE_DATAGRAM}.
      *

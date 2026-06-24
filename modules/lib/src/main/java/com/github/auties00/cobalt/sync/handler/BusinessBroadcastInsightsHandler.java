@@ -98,7 +98,7 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
             }
 
             if (mutation.operation() == SyncdOperation.SET) {
-                if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastInsightsAction action)) {
+                if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof BusinessBroadcastInsightsAction action)) {
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 

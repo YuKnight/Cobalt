@@ -108,7 +108,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
                 continue;
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof FavoritesAction)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof FavoritesAction)) {
                 malformedCount++;
                 results.add(SyncdIndexUtils.malformedActionValue(collectionName().name()));
                 continue;
@@ -152,7 +152,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof FavoritesAction)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof FavoritesAction)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
@@ -179,7 +179,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private void applyLatestMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        var action = (FavoritesAction) mutation.value().action().orElseThrow();
+        var action = (FavoritesAction) mutation.value().flatMap(sav -> sav.action()).orElseThrow();
         var favorites = new ArrayList<Jid>();
         for (var favorite : action.favorites()) {
             var rawId = favorite.id().orElse(null);

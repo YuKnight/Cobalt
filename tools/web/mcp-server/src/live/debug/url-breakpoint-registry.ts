@@ -1,4 +1,5 @@
 import type {
+  BindTargetResult,
   BreakpointLocation,
   CdpScope,
   DebuggerSetBreakpointByUrlResponse,
@@ -7,6 +8,7 @@ import type {
   RuntimeGetPropertiesResponse,
   RuntimePropertyDescriptor,
   RuntimeRemoteObject,
+  UrlBreakpointAddResult,
   UrlBreakpointSpec,
 } from "../../types/live/debug.js";
 import { createLogger } from "../../utils/logger.js";
@@ -26,6 +28,8 @@ export type CdpSend = (
 ) => Promise<unknown>;
 
 export type SessionLister = () => Iterable<string>;
+
+export type TargetInfoResolver = (sessionId: string) => { type: string; url: string } | undefined;
 
 export interface LogpointFrame {
   callFrameId: string;
@@ -60,11 +64,14 @@ interface BoundLocation {
   v8BySession: Map<string, string>;
 
   locations: BreakpointLocation[];
+
+  targetTypes: ReadonlySet<string> | null;
 }
 
 export class UrlBreakpointRegistry {
   private readonly send: CdpSend;
   private readonly sessions: SessionLister;
+  private readonly targetInfo?: TargetInfoResolver;
   private readonly breakpoints = new Map<string, UrlBreakpoint>();
   private readonly locations = new Map<string, BoundLocation>();
 
@@ -74,28 +81,39 @@ export class UrlBreakpointRegistry {
   private inFlightCaptures = 0;
   private nextId = 0;
 
-  constructor(send: CdpSend, sessions: SessionLister) {
+  constructor(send: CdpSend, sessions: SessionLister, targetInfo?: TargetInfoResolver) {
     this.send = send;
     this.sessions = sessions;
+    this.targetInfo = targetInfo;
   }
 
-  async add(spec: UrlBreakpointSpec): Promise<{ id: string; locations: BreakpointLocation[] }> {
+  async add(spec: UrlBreakpointSpec): Promise<UrlBreakpointAddResult> {
     const id = `wbp_${++this.nextId}`;
 
     // A logExpression installs a non-suspending capture condition (captureCondition console.logs the value
     // and returns false). V8 exposes locals ($var0...) inside a breakpoint condition but NOT the operand
     // stack $stack (verified: re/calls/runtime/test-stack-condition.mjs -> hasStack=false), so a $stack
-    // expression (e.g. reading a call_indirect's dispatched table index) MUST take the suspending path and
-    // be read from the paused frame. Keep the guard.
+    // expression MUST take the suspending path and be read from the paused frame.
     const nonPausing = spec.logExpression != null && !spec.logExpression.includes("$stack");
     const v8Condition = nonPausing
       ? UrlBreakpointRegistry.captureCondition(id, spec.logExpression as string)
       : spec.condition;
+    // A logExpression signals logpoint intent, so do not freeze on hit by default: a non-pausing capture
+    // never suspends, and a $stack capture suspends only long enough to read the operand stack and then
+    // resumes. A breakpoint with no logExpression is a real breakpoint and stays paused.
+    const block = spec.block ?? (spec.logExpression != null ? false : true);
+    const warning =
+      spec.logExpression != null && spec.logExpression.includes("$stack")
+        ? "logExpression reads the operand stack ($stack), which V8 cannot expose to a non-pausing " +
+          "condition, so this breakpoint suspends the target on each hit to read the stack and then resumes " +
+          "(unless block is set). For a purely non-pausing logpoint, target an instruction where the value " +
+          "is in a local and read $var0, $var1, ... instead; or pass block to control the pause."
+        : undefined;
     const locationKey = UrlBreakpointRegistry.locationKey(spec.url, spec.byteOffset, v8Condition);
     const breakpoint: UrlBreakpoint = {
       ...spec,
       id,
-      block: spec.block ?? true,
+      block,
       nonPausing,
       locationKey,
     };
@@ -103,10 +121,14 @@ export class UrlBreakpointRegistry {
 
     let location = this.locations.get(locationKey);
     if (location) {
-
       location.refIds.add(id);
+      // Reusing a shared location: widen its type filter to the union (an unfiltered spec wins).
+      if (location.targetTypes != null) {
+        location.targetTypes =
+          spec.targetTypes == null ? null : new Set([...location.targetTypes, ...spec.targetTypes]);
+      }
       log.info(`url-breakpoint: ${id} reuses location ${locationKey} (${location.refIds.size} sharing)`);
-      return { id, locations: location.locations };
+      return { id, locations: location.locations, perTarget: this.reportLocation(location), warning };
     }
 
     location = {
@@ -117,15 +139,34 @@ export class UrlBreakpointRegistry {
       refIds: new Set([id]),
       v8BySession: new Map(),
       locations: [],
+      targetTypes: spec.targetTypes ?? null,
     };
     this.locations.set(locationKey, location);
-    let sessionCount = 0;
+    const perTarget: BindTargetResult[] = [];
     for (const sessionId of this.sessions()) {
-      await this.bindLocation(location, sessionId);
-      sessionCount++;
+      perTarget.push(await this.bindLocation(location, sessionId));
     }
-    log.info(`url-breakpoint: ${id} bound across ${sessionCount} sessions, ${location.locations.length} locations`);
-    return { id, locations: location.locations };
+    const boundCount = perTarget.filter((t) => t.bound).length;
+    log.info(
+      `url-breakpoint: ${id} bound in ${boundCount}/${perTarget.length} targets, ${location.locations.length} resolved locations`
+    );
+    return { id, locations: location.locations, perTarget, warning };
+  }
+
+  /** Builds a per-target binding report for an already-bound location (used on the shared-reuse path). */
+  private reportLocation(location: BoundLocation): BindTargetResult[] {
+    const report: BindTargetResult[] = [];
+    for (const sessionId of this.sessions()) {
+      const info = this.targetInfo?.(sessionId);
+      report.push({
+        sessionId,
+        type: info?.type ?? "",
+        url: info?.url ?? "",
+        bound: location.v8BySession.has(sessionId),
+        locations: location.locations,
+      });
+    }
+    return report;
   }
 
   async remove(id: string): Promise<void> {
@@ -213,25 +254,61 @@ export class UrlBreakpointRegistry {
     this.captures.length = 0;
   }
 
-  private async bindLocation(location: BoundLocation, sessionId: string): Promise<void> {
-    if (location.v8BySession.has(sessionId)) return;
-    const response = (await this.send(
-      "Debugger.setBreakpointByUrl",
-      {
-        urlRegex: location.urlRegex,
-        lineNumber: 0,
-        columnNumber: location.byteOffset,
-        condition: location.condition,
-      },
-      sessionId
-    ).catch((e) => {
-      log.debug(`url-breakpoint: setBreakpointByUrl failed in ${sessionId}: ${String(e)}`);
-      return undefined;
-    })) as DebuggerSetBreakpointByUrlResponse | undefined;
-    if (!response?.breakpointId) return;
+  private async bindLocation(location: BoundLocation, sessionId: string): Promise<BindTargetResult> {
+    const info = this.targetInfo?.(sessionId);
+    const type = info?.type ?? "";
+    const url = info?.url ?? "";
+    // Honour the optional target-type filter (null = bind every target).
+    if (location.targetTypes && !location.targetTypes.has(type)) {
+      return { sessionId, type, url, bound: false, locations: [] };
+    }
+    if (location.v8BySession.has(sessionId)) {
+      return { sessionId, type, url, bound: true, locations: location.locations };
+    }
+    let response: DebuggerSetBreakpointByUrlResponse | undefined;
+    let error: string | undefined;
+    try {
+      response = (await this.send(
+        "Debugger.setBreakpointByUrl",
+        {
+          urlRegex: location.urlRegex,
+          lineNumber: 0,
+          columnNumber: location.byteOffset,
+          condition: location.condition,
+        },
+        sessionId
+      )) as DebuggerSetBreakpointByUrlResponse | undefined;
+    } catch (e) {
+      error = String(e);
+      log.debug(`url-breakpoint: setBreakpointByUrl failed in ${sessionId}: ${error}`);
+    }
+    if (!response?.breakpointId) {
+      return { sessionId, type, url, bound: false, locations: [], error: error ?? "no breakpointId returned" };
+    }
     location.v8BySession.set(sessionId, response.breakpointId);
     this.v8ToLocation.set(response.breakpointId, location.key);
-    if (response.locations) location.locations.push(...response.locations);
+    const resolved = response.locations ?? [];
+    if (resolved.length) location.locations.push(...resolved);
+    return { sessionId, type, url, bound: true, locations: resolved };
+  }
+
+  /**
+   * Re-attempts binding any not-yet-bound location whose URL matches a freshly parsed script in the given
+   * session. Recovers locations whose initial setBreakpointByUrl failed because the target was busy or not
+   * yet attached when the breakpoint was added (e.g. a pthread worker that only yields to CDP at spawn).
+   */
+  async onScriptParsed(sessionId: string, url: string): Promise<void> {
+    if (!url) return;
+    for (const location of this.locations.values()) {
+      if (location.v8BySession.has(sessionId)) continue;
+      let matches = false;
+      try {
+        matches = new RegExp(location.urlRegex).test(url);
+      } catch {
+        matches = false;
+      }
+      if (matches) await this.bindLocation(location, sessionId);
+    }
   }
 
   private async runCaptures(

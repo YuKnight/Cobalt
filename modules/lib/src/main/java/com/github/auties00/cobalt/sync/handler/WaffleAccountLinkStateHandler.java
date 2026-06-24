@@ -130,7 +130,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
                 continue;
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof WaffleAccountLinkStateAction action)
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof WaffleAccountLinkStateAction action)
                     || action.linkState().isEmpty()) {
                 results.add(SyncdIndexUtils.malformedActionValue(collectionName().name()));
                 continue;
@@ -142,7 +142,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
             results.add(MutationApplicationResult.success());
         }
         if (latest != null) {
-            var action = (WaffleAccountLinkStateAction) latest.value().action().orElseThrow();
+            var action = (WaffleAccountLinkStateAction) latest.value().flatMap(sav -> sav.action()).orElseThrow();
             var linkState = action.linkState().orElseThrow();
             client.store().accountStore().setLinkedMetaAccountState(linkState);
             client.store().accountStore().setLinkedMetaAccountStateTimestamp(latest.timestamp());
@@ -173,7 +173,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof WaffleAccountLinkStateAction action)
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof WaffleAccountLinkStateAction action)
                 || action.linkState().isEmpty()) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }

@@ -11,14 +11,17 @@ import com.github.auties00.cobalt.model.message.MessageInfo;
  * decoded from a webhook delivery whose change field is {@code messages}. The flavour aggregators
  * extend this interface and supply an empty default implementation, so the event can also be
  * observed in isolation as a lambda.
+ *
+ * @param <C> the client flavour this listener is registered on; the callback receives that exact
+ *            flavour, or {@link WhatsAppClient}{@code <?>} for a listener registered on both
  */
 @FunctionalInterface
-public non-sealed interface NewMessageListener extends WhatsAppListener {
+public non-sealed interface NewMessageListener<C extends WhatsAppClient<?>> extends WhatsAppListener {
     /**
      * Notifies the listener that a new message has been received.
      *
      * @param whatsapp the client emitting the event
      * @param info     the message that was received
      */
-    void onNewMessage(WhatsAppClient whatsapp, MessageInfo info);
+    void onNewMessage(C whatsapp, MessageInfo info);
 }

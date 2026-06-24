@@ -1,7 +1,7 @@
 {
   "version": "0.1.0",
-  "commitSha": "e1b9ee41cf1d782a29594836d5d3b2c46fb431a6",
+  "commitSha": "e7c0f5ed85f9b274dc90a9cd32693bd7cabdebdc",
   "binaries": {
-    "cobalt-native/windows-x86_64": { "sha256": "7ba52c470ada86cfa66cd93b7cf1c2a1dcab522c337719a4672354f09e94c826", "size": 8895488, "path": "modules/lib/natives/bin/windows-x86_64/cobalt-native.dll" }
+    "cobalt-native/windows-x86_64": { "sha256": "375179ab60522085878271b1ccaae6df7a0c684e2b88c9ebdd8c60acddab580f", "size": 16623104, "path": "modules/lib/natives/bin/windows-x86_64/cobalt-native.dll" }
   }
 }

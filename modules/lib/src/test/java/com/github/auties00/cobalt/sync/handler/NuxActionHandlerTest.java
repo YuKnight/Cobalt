@@ -192,7 +192,7 @@ class NuxActionHandlerTest {
             assertEquals(ts, pending.mutation().timestamp());
             assertEquals(NuxAction.ACTION_VERSION, pending.mutation().actionVersion());
             assertEquals("[\"nux\",\"" + HINT_KEY + "\"]", pending.mutation().index());
-            var action = (NuxAction) pending.mutation().value().action().orElseThrow();
+            var action = (NuxAction) pending.mutation().value().flatMap(sav -> sav.action()).orElseThrow();
             assertTrue(action.acknowledged());
         }
 
@@ -220,7 +220,7 @@ class NuxActionHandlerTest {
             var pending = new NuxActionMutationFactory().getNuxMutation(HINT_KEY, Instant.now(), true);
 
             assertEquals(SyncdOperation.SET, pending.mutation().operation());
-            var action = (NuxAction) pending.mutation().value().action().orElseThrow();
+            var action = (NuxAction) pending.mutation().value().flatMap(sav -> sav.action()).orElseThrow();
             assertTrue(action.acknowledged());
         }
 
@@ -230,7 +230,7 @@ class NuxActionHandlerTest {
             var pending = new NuxActionMutationFactory().getNuxMutation(HINT_KEY, Instant.now(), false);
 
             assertEquals(SyncdOperation.SET, pending.mutation().operation());
-            var action = (NuxAction) pending.mutation().value().action().orElseThrow();
+            var action = (NuxAction) pending.mutation().value().flatMap(sav -> sav.action()).orElseThrow();
             assertFalse(action.acknowledged());
         }
     }

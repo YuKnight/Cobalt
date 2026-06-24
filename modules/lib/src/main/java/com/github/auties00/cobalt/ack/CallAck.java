@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.ack;
 
-import com.github.auties00.cobalt.call.signaling.CallRelay;
+import com.github.auties00.cobalt.calls2.signaling.RelayInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.time.Instant;
@@ -12,12 +12,18 @@ import java.util.OptionalInt;
  *
  * <p>Call ACKs confirm that the server processed an outbound call-signaling stanza. On a
  * {@code type="offer"} ACK the body always contains one {@code <relay>} child; on success it is
- * fully populated with the {@link CallRelay#tokens() tokens}, {@link CallRelay#authTokens() auth
- * tokens}, {@link CallRelay#endpoints() te2 endpoints}, {@link CallRelay#callKey() call key},
- * and {@link CallRelay#hbhKey() hop-by-hop key} the call layer drives the media-plane handshake
+ * fully populated with the {@link RelayInfo#tokens() tokens}, {@link RelayInfo#authTokens() auth
+ * tokens}, {@link RelayInfo#endpoints() endpoints}, {@link RelayInfo#keyValue() call key},
+ * and {@link RelayInfo#hbhKeyValue() hop-by-hop key} the call layer drives the media-plane handshake
  * against, and on a NACK it carries only the denormalised {@code call-creator} / {@code call-id}
  * attributes. Other call-class ACK types ({@code accept}, {@code reject}, etc.) typically carry
  * no relay block.
+ *
+ * <p>The relay block is parsed into the calls2 {@link RelayInfo} model. That model carries the relay
+ * authentication credentials as the list of {@code <auth_token id>} children through
+ * {@link RelayInfo#authTokens()}, each referenced by a {@code <te2>} endpoint's {@code auth_token_id},
+ * and it exposes the raw call-key and hop-by-hop key bytes through {@link RelayInfo#keyValue()} and
+ * {@link RelayInfo#hbhKeyValue()}.
  */
 public final class CallAck implements AckResult {
     private final String id;
@@ -27,13 +33,13 @@ public final class CallAck implements AckResult {
     private final Jid participant;
     private final Jid recipient;
     private final Integer error;
-    private final CallRelay relay;
+    private final RelayInfo relay;
 
     /**
      * Constructs a call ack snapshot. Package-private; the only caller is {@link AckParser}.
      */
     CallAck(String id, Instant timestamp, String type, Jid from, Jid participant, Jid recipient,
-            Integer error, CallRelay relay) {
+            Integer error, RelayInfo relay) {
         this.id = id;
         this.timestamp = timestamp;
         this.type = type;
@@ -89,7 +95,7 @@ public final class CallAck implements AckResult {
      *
      * @return the relay block, or {@link Optional#empty()} when none was present
      */
-    public Optional<CallRelay> relay() {
+    public Optional<RelayInfo> relay() {
         return Optional.ofNullable(relay);
     }
 

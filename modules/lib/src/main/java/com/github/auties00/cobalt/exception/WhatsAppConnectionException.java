@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 /**
  * Thrown when Cobalt cannot establish the initial connection to the
  * WhatsApp servers.
@@ -11,14 +13,15 @@ package com.github.auties00.cobalt.exception;
  * complete after a previously successful session was lost.
  *
  * @apiNote
- * This is always fatal: there is no live session to recover, so the
- * configured error handler cannot reconnect on the existing one. Embedders
- * typically respond by surfacing the failure to the user or scheduling a
- * fresh connection attempt.
+ * {@link #toErrorResult()} reports {@link WhatsAppLinkedClientErrorResult#DISCONNECT}:
+ * there is no live session to recover, so the configured error handler cannot
+ * reconnect on the existing one. Embedders typically respond by surfacing the
+ * failure to the user or scheduling a fresh connection attempt.
  *
  * @implNote
- * This implementation always reports the failure as fatal because there is
- * no live session to recover.
+ * This implementation always classifies the failure as
+ * {@link WhatsAppLinkedClientErrorResult#DISCONNECT} because there is no live
+ * session to recover.
  *
  * @see WhatsAppReconnectionException
  * @see WhatsAppSessionException.Closed
@@ -48,11 +51,13 @@ public final class WhatsAppConnectionException extends WhatsAppException {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code true}: no session has
-     * been established at the point a connection exception is thrown.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCONNECT}: no session has been
+     * established when a connection exception is thrown, so there is nothing
+     * to reconnect and the failure is surfaced to the caller.
      */
     @Override
-    public boolean isFatal() {
-        return true;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCONNECT;
     }
 }

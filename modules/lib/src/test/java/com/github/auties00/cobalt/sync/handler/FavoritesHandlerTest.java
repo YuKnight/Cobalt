@@ -223,7 +223,7 @@ class FavoritesHandlerTest {
             assertEquals(SyncdOperation.SET, pending.mutation().operation());
             assertEquals(ts, pending.mutation().timestamp());
             assertEquals("[\"favorites\"]", pending.mutation().index());
-            var action = (FavoritesAction) pending.mutation().value().action().orElseThrow();
+            var action = (FavoritesAction) pending.mutation().value().flatMap(sav -> sav.action()).orElseThrow();
             assertEquals(2, action.favorites().size());
             assertEquals(FAVORITE_A.toString(), action.favorites().get(0).id().orElseThrow());
             assertEquals(FAVORITE_B.toString(), action.favorites().get(1).id().orElseThrow());

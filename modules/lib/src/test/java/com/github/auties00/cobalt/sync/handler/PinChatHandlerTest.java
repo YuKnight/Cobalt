@@ -321,7 +321,7 @@ class PinChatHandlerTest {
             assertEquals(5, trusted.actionVersion());
             assertEquals(ts, trusted.timestamp());
             assertEquals(JSON.toJSONString(List.of("pin_v1", PEER.toString())), trusted.index());
-            assertTrue(trusted.value().action().filter(a -> a instanceof PinAction).map(a -> (PinAction) a).orElseThrow().pinned());
+            assertTrue(trusted.value().flatMap(sav -> sav.action()).filter(a -> a instanceof PinAction).map(a -> (PinAction) a).orElseThrow().pinned());
         }
 
         @Test
@@ -331,7 +331,7 @@ class PinChatHandlerTest {
             var mutations = PinChatHandler.getMutationsForPin(ts, true, PEER);
             assertEquals(1, mutations.size(),
                     "the unarchive is delegated to the caller; only the pin mutation is emitted here");
-            assertTrue(mutations.get(0).mutation().value().action().filter(a -> a instanceof PinAction).map(a -> (PinAction) a).orElseThrow().pinned());
+            assertTrue(mutations.get(0).mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof PinAction).map(a -> (PinAction) a).orElseThrow().pinned());
         }
     }
 

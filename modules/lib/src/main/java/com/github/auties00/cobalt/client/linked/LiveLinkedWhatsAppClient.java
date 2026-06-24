@@ -1,13 +1,11 @@
 package com.github.auties00.cobalt.client.linked;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
-import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.listener.MessageDeletedListener;
 import com.github.auties00.cobalt.listener.MessageStatusListener;
 import com.github.auties00.cobalt.listener.DisconnectedListener;
 import com.github.auties00.cobalt.listener.LoggedInListener;
 import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
-import com.github.auties00.cobalt.client.WhatsAppClientErrorHandler;
 import com.github.auties00.cobalt.listener.linked.*;
 import com.github.auties00.cobalt.listener.linked.internal.InternalLinkedListener;
 import com.github.auties00.cobalt.listener.linked.internal.LinkedTrustedContactTokenListener;
@@ -18,7 +16,10 @@ import com.github.auties00.cobalt.sync.LiveWebAppStateService;
 import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 import com.github.auties00.cobalt.migration.LiveInactiveGroupLidMigrationService;
 import com.github.auties00.cobalt.pairing.LiveCompanionPairingService;
-import com.github.auties00.cobalt.call.LiveCallService;
+import com.github.auties00.cobalt.calls2.Calls2Service;
+import com.github.auties00.cobalt.calls2.LiveCalls2Service;
+import com.github.auties00.cobalt.calls2.core.Calls2EngineAssembler;
+import com.github.auties00.cobalt.calls2.sync.Calls2CallLogSync;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
@@ -26,12 +27,12 @@ import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.call.CallService;
-import com.github.auties00.cobalt.call.stream.AudioInputStream;
-import com.github.auties00.cobalt.call.stream.AudioOutputStream;
-import com.github.auties00.cobalt.call.stream.VideoInputStream;
-import com.github.auties00.cobalt.call.stream.VideoOutputStream;
-import com.github.auties00.cobalt.call.signaling.CallStanza;
+import com.github.auties00.cobalt.calls2.stream.AudioInput;
+import com.github.auties00.cobalt.calls2.stream.AudioOutput;
+import com.github.auties00.cobalt.calls2.stream.BufferedVideoInput;
+import com.github.auties00.cobalt.calls2.stream.BufferedVideoOutput;
+import com.github.auties00.cobalt.calls2.stream.VideoInput;
+import com.github.auties00.cobalt.calls2.stream.VideoOutput;
 import com.github.auties00.cobalt.device.LiveDeviceService;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.exception.*;
@@ -328,6 +329,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -350,12 +352,12 @@ import java.util.stream.Stream;
  *
  * <p>Every method that performs I/O runs on a virtual thread and blocks
  * the caller until a response is available. Errors are funneled through
- * the configured {@link WhatsAppClientErrorHandler} so recovery policy is
+ * the configured {@link WhatsAppLinkedClientErrorHandler} so recovery policy is
  * pluggable rather than hardcoded.
  *
  * @see LinkedWhatsAppClientBuilder
  * @see LinkedWhatsAppClientListener
- * @see WhatsAppClientErrorHandler
+ * @see WhatsAppLinkedClientErrorHandler
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @WhatsAppWebModule(moduleName = "WAWebSocketModel")
@@ -430,12 +432,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     /**
      * The call engine
      */
-    private final CallService callService;
+    private final Calls2Service calls2Service;
     /**
      * The strategy that decides how the client should react to errors
      * raised by any subsystem.
      */
-    private final WhatsAppClientErrorHandler errorHandler;
+    private final WhatsAppLinkedClientErrorHandler errorHandler;
     /**
      * The media-transcoder service that prepares outgoing media for
      * upload to the WhatsApp CDN; bound to this client and consulted
@@ -635,6 +637,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private final CallLogMutationFactory callLogMutationFactory;
     /**
+     * The calls2 outbound call-log sync, recording each ended call into the runtime call-history table and
+     * pushing the {@code call_log} app-state mutation, bound onto the engine's lifecycle controller so a
+     * call end is logged and replicated.
+     */
+    private final Calls2CallLogSync calls2CallLogSync;
+    /**
      * Factory that builds outgoing NUX (onboarding-hint) sync mutations.
      */
     private final NuxActionMutationFactory nuxActionMutationFactory;
@@ -703,32 +711,49 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private Thread shutdownHook;
     /**
-     * Reentrance guard set while {@link #disconnect(WhatsAppClientDisconnectReason, boolean)} is executing.
+     * Reentrance guard set while {@link #disconnect(WhatsAppClientDisconnectReason, boolean)} is
+     * executing, so the teardown body in {@link #disconnect0} runs single-threaded.
+     *
+     * <p>This is a critical-section lock, deliberately kept separate from the lifecycle
+     * {@link #state}: a terminal teardown and a reconnect teardown must never run their
+     * socket-close, store-write and service-reset steps concurrently, which a {@link #state} CAS
+     * alone would not prevent (a terminal disconnect can supersede an in-flight reconnect
+     * teardown, and both bodies would otherwise race).
      */
     private final AtomicBoolean disconnecting;
     /**
-     * Set once the session has been terminally closed (logged out, banned, or
-     * explicitly disconnected), and cleared when {@link #connect()} or
-     * {@link #reconnect()} starts a fresh lifecycle.
+     * The lifecycle state of the client's single connection.
      *
-     * <p>While set, the automatic reconnect entry points become no-ops (the
-     * reader-loop {@code onClose} callback, the {@code RECONNECTING} branch of
-     * {@link #disconnect0}, and {@link #handleFailure} for any late error such
-     * as a reader-loop EOF) and {@link #sendNode(NodeBuilder, Function)} fails
-     * fast with {@link WhatsAppSessionException.Closed} instead of writing to a
-     * dead stream. This is what stops a terminal {@code stream:error}
-     * (device removed) or {@code failure reason="401"} from looping forever
-     * through reconnect attempts that each get re-rejected by the server.
+     * <p>One atomic {@link ConnectionState} replaces the former {@code terminated} and
+     * {@code reconnecting} booleans so the two can never disagree. The transitions are:
+     * <ul>
+     *   <li>{@link ConnectionState#ACTIVE} on construction and on every fresh lifecycle
+     *       ({@link #connect()}, {@link #reconnect()}) and successful (re)connect
+     *       ({@link #onSocketOpened()}).</li>
+     *   <li>{@link ConnectionState#RECONNECTING} when the first {@code RECONNECTING}
+     *       {@link #disconnect0} wins a CAS from {@code ACTIVE}; the redundant second reconnect
+     *       driver for the same drop loses that CAS and is coalesced, so one drop yields one
+     *       reconnect instead of two logins that the server would reject as
+     *       {@code <conflict type="replaced"/>}.</li>
+     *   <li>{@link ConnectionState#TERMINATED} on a logout, ban, or explicit disconnect.</li>
+     * </ul>
      *
-     * @implNote Cobalt has no equivalent of WA Web's {@code MainSocketLoop}, so
-     * the "end the loop, never retry" effect of {@code WAComms.stopComms}
-     * (which {@code WAWebHandleStreamError} invokes for {@code device_removed},
-     * {@code replaced}, and code {@code 516}, and {@code WAWebHandleFailure}
-     * for reason {@code 401}/{@code 403}/{@code 406} without ever calling
-     * {@code startBackend}) is expressed as this flag guarding the reconnect
-     * and send entry points.
+     * <p>While {@code TERMINATED} the automatic reconnect entry points (the reader-loop
+     * {@code onClose} callback, the {@code RECONNECTING} branch of {@link #disconnect0}, and
+     * {@link #handleFailure} for any late error such as a reader-loop EOF) become no-ops and
+     * {@link #sendNode(NodeBuilder, Function)} fails fast with {@link WhatsAppSessionException.Closed}
+     * instead of writing to a dead stream. This is what stops a terminal {@code stream:error}
+     * (device removed) or {@code failure reason="401"} from looping forever through reconnect
+     * attempts that each get re-rejected by the server.
+     *
+     * @implNote Cobalt has no equivalent of WA Web's {@code MainSocketLoop}, so the "end the loop,
+     * never retry" effect of {@code WAComms.stopComms} (which {@code WAWebHandleStreamError} invokes
+     * for {@code device_removed}, {@code replaced}, and code {@code 516}, and
+     * {@code WAWebHandleFailure} for reason {@code 401}/{@code 403}/{@code 406} without ever calling
+     * {@code startBackend}) is expressed as the {@code TERMINATED} state guarding the reconnect and
+     * send entry points.
      */
-    private final AtomicBoolean terminated;
+    private final AtomicReference<ConnectionState> state;
     /**
      * Observes OS network connectivity so reconnection can park while the host
      * is offline and fire the instant it returns.
@@ -739,8 +764,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     private final NetworkConnectivityMonitor connectivityMonitor;
     /**
      * Drives reconnection with capped exponential backoff on a dedicated
-     * thread, gated by {@link #terminated} so it idles after a terminal
-     * disconnect and resumes on the next connect.
+     * thread, gated by the {@link ConnectionState#TERMINATED} state so it idles
+     * after a terminal disconnect and resumes on the next connect.
      */
     private final ReconnectSupervisor reconnectSupervisor;
     /**
@@ -808,7 +833,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      *                                   is required but missing, or
      *                                   present when it should not be
      */
-    LiveLinkedWhatsAppClient(LinkedWhatsAppStore store, LinkedWhatsAppClientVerificationHandler.Web webVerificationHandler, WhatsAppClientErrorHandler errorHandler) {
+    LiveLinkedWhatsAppClient(LinkedWhatsAppStore store, LinkedWhatsAppClientVerificationHandler.Web webVerificationHandler, WhatsAppLinkedClientErrorHandler errorHandler) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.errorHandler = Objects.requireNonNull(errorHandler, "errorHandler cannot be null");
         if ((store.accountStore().clientType() == LinkedWhatsAppClientType.WEB) == (webVerificationHandler == null)) {
@@ -877,13 +902,19 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         this.usyncBackoff = new UsyncBackoff();
         this.pendingSocketRequests = new ConcurrentHashMap<>();
         this.companionPairingService = new LiveCompanionPairingService(this, webVerificationHandler);
-        this.callService = new LiveCallService(this, wamService, messageService);
+        var calls2EventBus = new com.github.auties00.cobalt.calls2.core.LiveCallEventBus(this);
+        var calls2Engine = Calls2EngineAssembler.assemble(this, messageEncryption, messageService, deviceService, store, abPropsService, calls2EventBus);
+        this.calls2CallLogSync = new Calls2CallLogSync(this, callLogMutationFactory, webAppStateService);
+        calls2Engine.bindCallLogSink(calls2CallLogSync::recordEndOfCall);
+        var liveCalls2Service = new LiveCalls2Service(this, wamService, messageService, calls2Engine, calls2EventBus);
+        this.calls2Service = liveCalls2Service;
+        calls2Engine.bindResultSink(liveCalls2Service::recordCallResult);
         var ackSender = new AckSender(this);
-        this.nodeStreamService = new LiveNodeStreamService(this, callService, webVerificationHandler, lidMigrationService, inactiveGroupLidMigrationService, messageService, abPropsService, deviceService, wamService, snapshotRecoveryService, webAppStateService, companionPairingService, ackSender, mediaConnectionService);
+        this.nodeStreamService = new LiveNodeStreamService(this, calls2Service, webVerificationHandler, lidMigrationService, inactiveGroupLidMigrationService, messageService, abPropsService, deviceService, wamService, snapshotRecoveryService, webAppStateService, companionPairingService, ackSender, mediaConnectionService);
         this.disconnecting = new AtomicBoolean();
-        this.terminated = new AtomicBoolean();
+        this.state = new AtomicReference<>(ConnectionState.ACTIVE);
         this.connectivityMonitor = NetworkConnectivityMonitors.systemDefault();
-        this.reconnectSupervisor = new ReconnectSupervisor(this::reconnectAttempt, this::isConnected, terminated::get, connectivityMonitor, new Random());
+        this.reconnectSupervisor = new ReconnectSupervisor(this::reconnectAttempt, this::isConnected, () -> state.get() == ConnectionState.TERMINATED, connectivityMonitor, new Random());
         this.keepAliveService = new LiveKeepAliveService(this::sendPing, () -> disconnect(WhatsAppClientDisconnectReason.RECONNECTING));
         this.facebookGraphQlRefreshLock = new ReentrantLock();
         this.webGraphQlRefreshLock = new ReentrantLock();
@@ -901,7 +932,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     /** {@inheritDoc} */
     @Override
     public LinkedWhatsAppClient connect() {
-        terminated.set(false);
+        state.set(ConnectionState.ACTIVE);
         connect(null);
         return this;
     }
@@ -969,7 +1000,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
                 @Override
                 public void onClose() {
-                    if (terminated.get()) {
+                    if (state.get() == ConnectionState.TERMINATED) {
                         return;
                     }
                     disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
@@ -1009,14 +1040,19 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     /**
-     * Starts the per-connection keepalive after a successful open.
+     * Returns the connection to {@link ConnectionState#ACTIVE} and starts the
+     * per-connection keepalive after a successful open.
      *
-     * <p>Skips starting once the session is terminated so a supervisor attempt
-     * that succeeds just as a terminal disconnect arrives does not leave a
-     * keepalive pinging a session that is going away.
+     * <p>Leaving {@link ConnectionState#RECONNECTING} first lets a genuine later drop drive a
+     * fresh reconnect. Starting the keepalive is skipped once the session is
+     * {@link ConnectionState#TERMINATED} so a supervisor attempt that succeeds just as a terminal
+     * disconnect arrives does not leave a keepalive pinging a session that is going away.
      */
     private void onSocketOpened() {
-        if (terminated.get()) {
+        // The reconnect cycle (if any) re-established the transport: leave RECONNECTING so a
+        // genuine later drop can drive a fresh reconnect, without clobbering a terminal state.
+        state.compareAndSet(ConnectionState.RECONNECTING, ConnectionState.ACTIVE);
+        if (state.get() == ConnectionState.TERMINATED) {
             return;
         }
         keepAliveService.start();
@@ -1150,11 +1186,22 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      *                              removed as part of this disconnect
      */
     private void disconnect0(WhatsAppClientDisconnectReason reason, boolean canRemoveShutdownHook) {
-        // A terminal disconnect (logout/ban/disconnect) that already ran wins over any
-        // later reconnect request, so a reader-loop EOF or onClose racing in behind it
-        // cannot resurrect a session the server has torn down.
-        if (reason == WhatsAppClientDisconnectReason.RECONNECTING && terminated.get()) {
-            return;
+        if (reason == WhatsAppClientDisconnectReason.RECONNECTING) {
+            // A terminal disconnect (logout/ban/disconnect) that already ran wins over any
+            // later reconnect request, so a reader-loop EOF or onClose racing in behind it
+            // cannot resurrect a session the server has torn down.
+            if (state.get() == ConnectionState.TERMINATED) {
+                return;
+            }
+            // Coalesce the two reconnect drivers for a single server close (the 515 routed
+            // through handleFailure and the reader-loop onClose). Whichever loses this CAS
+            // returns; without it the slower driver would run a second teardown after the
+            // supervisor opened the replacement socket, dropping it and forcing a second login
+            // the server rejects as a conflict=replaced. Cleared in onSocketOpened once the
+            // reconnect transport is up.
+            if (!state.compareAndSet(ConnectionState.ACTIVE, ConnectionState.RECONNECTING)) {
+                return;
+            }
         }
 
         // Flush pending sentinel mutations before disconnecting so key expiration is
@@ -1169,7 +1216,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         wamService.close();
 
         if (reason != WhatsAppClientDisconnectReason.RECONNECTING) {
-            terminated.set(true);
+            state.set(ConnectionState.TERMINATED);
         }
 
         if (socketClient != null) {
@@ -1200,7 +1247,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
         // Stop the per-connection keepalive; a successful (re)connect starts a fresh one. The
         // connectivity monitor and reconnect supervisor are shared for the client's lifetime: a
-        // terminal disconnect leaves them idle (the supervisor is gated by the terminated flag)
+        // terminal disconnect leaves them idle (the supervisor is gated by the TERMINATED state)
         // rather than tearing them down, so a later connect can resume reconnection.
         keepAliveService.stop();
 
@@ -1215,7 +1262,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             }
         }
 
-        if (reason == WhatsAppClientDisconnectReason.RECONNECTING && !terminated.get()) {
+        if (reason == WhatsAppClientDisconnectReason.RECONNECTING && state.get() != ConnectionState.TERMINATED) {
             reconnectSupervisor.requestReconnect();
         }
     }
@@ -1276,7 +1323,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         // late ack/receipt fired from a handler still draining after logout fails fast instead
         // of dereferencing the cleared socket.
         var client = socketClient;
-        if (terminated.get() || client == null) {
+        if (state.get() == ConnectionState.TERMINATED || client == null) {
             throw new WhatsAppSessionException.Closed();
         }
         try {
@@ -1330,7 +1377,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var outgoingId = outgoing.getRequiredAttribute("id")
                 .toString();
         var client = socketClient;
-        if (terminated.get() || client == null) {
+        if (state.get() == ConnectionState.TERMINATED || client == null) {
             throw new WhatsAppSessionException.Closed();
         }
         try {
@@ -1651,7 +1698,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     /** {@inheritDoc} */
     @Override
     public LinkedWhatsAppClient reconnect() {
-        terminated.set(false);
+        // Reset to ACTIVE so this explicit cycle is neither blocked by a terminal state nor
+        // coalesced into an in-flight reconnect.
+        state.set(ConnectionState.ACTIVE);
         disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
         return this;
     }
@@ -1722,7 +1771,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             }
         }
         var snapshot = List.copyOf(result);
-        store.setLinkedDevices(snapshot);
+        store.accountStore().setLinkedDevices(snapshot);
         for (var listener : store.listeners()) {
             if (listener instanceof LinkedDevicesListener typed) {
                 typed.onLinkedDevices(this, snapshot);
@@ -1746,7 +1795,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var future = new CompletableFuture<Void>();
         var listener = new LinkedWhatsAppClientListener() {
             @Override
-            public void onDisconnected(WhatsAppClient whatsapp, WhatsAppClientDisconnectReason reason) {
+            public void onDisconnected(LinkedWhatsAppClient whatsapp, WhatsAppClientDisconnectReason reason) {
                 if (reason != WhatsAppClientDisconnectReason.RECONNECTING) {
                     future.complete(null);
                 }
@@ -1764,17 +1813,17 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         // Once the session is terminally closed, late failures (a reader-loop EOF observed
         // while the server tears the stream down, an in-flight stanza timing out) are noise:
         // acting on them would re-enter the reconnect loop the terminal disconnect just left.
-        if (terminated.get()) {
+        if (state.get() == ConnectionState.TERMINATED) {
             return;
         }
         // A server-issued logout or ban ends the connection at the protocol level: reconnecting
         // is futile because the credentials are gone. Mark the session terminal synchronously,
         // before the pluggable handler runs (its logging of a stack-trace warning is slow), so a
-        // reader-loop onClose racing in behind the trailing xmlstreamend observes the flag and
+        // reader-loop onClose racing in behind the trailing xmlstreamend observes the state and
         // does not fire a competing RECONNECTING disconnect that would drop this teardown.
         if (exception instanceof WhatsAppSessionException.LoggedOut
                 || exception instanceof WhatsAppSessionException.Banned) {
-            terminated.set(true);
+            state.set(ConnectionState.TERMINATED);
         }
         if (exception instanceof WhatsAppWebAppStateSyncException syncdException) {
             emitSyncdFatalErrorMetric(syncdException);
@@ -1782,17 +1831,17 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var result = errorHandler.handleError(this, exception);
         switch (result) {
             // Mark terminal before disconnecting so a concurrent reader-loop onClose
-            // sees the flag and does not reconnect ahead of this teardown.
+            // sees the state and does not reconnect ahead of this teardown.
             case BAN -> {
-                terminated.set(true);
+                state.set(ConnectionState.TERMINATED);
                 disconnect(WhatsAppClientDisconnectReason.BANNED);
             }
             case LOG_OUT -> {
-                terminated.set(true);
+                state.set(ConnectionState.TERMINATED);
                 disconnect(WhatsAppClientDisconnectReason.LOGGED_OUT);
             }
             case DISCONNECT -> {
-                terminated.set(true);
+                state.set(ConnectionState.TERMINATED);
                 disconnect(WhatsAppClientDisconnectReason.DISCONNECTED);
             }
             case RECONNECT -> disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
@@ -3163,14 +3212,35 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .build();
     }
 
+    /**
+     * Rejects any call operation on a client that is not a {@link LinkedWhatsAppClientType#WEB} client.
+     *
+     * <p>The calls2 engine reimplements the WhatsApp Web call transport exactly: an
+     * {@code RTCPeerConnection}-style stack (ICE, DTLS, a single SCTP data channel that carries all media
+     * and control). Only the web client runs that transport; the mobile and desktop flavours use a
+     * different native transport that calls2 deliberately does not model. Call entry points invoke this
+     * guard first so a non-web client fails fast and clearly rather than later during transport bring-up.
+     *
+     * @throws UnsupportedOperationException if this client's {@link LinkedWhatsAppClientType} is not
+     *                                       {@link LinkedWhatsAppClientType#WEB}
+     */
+    private void requireWebClient() {
+        var clientType = store.accountStore().clientType();
+        if (clientType != LinkedWhatsAppClientType.WEB) {
+            throw new UnsupportedOperationException(
+                    "Calls are only supported on WEB clients (current: " + clientType + ")");
+        }
+    }
+
     /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipFunctions", exports = "offerCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebOutgoingCall", exports = "sendOfferStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Call startCall(JidProvider targetProvider, AudioOutputStream audioOut, AudioInputStream audioIn,
-                          VideoOutputStream videoOut, VideoInputStream videoIn) {
+    public Call startCall(JidProvider targetProvider, AudioOutput audioOut, AudioInput audioIn,
+                          VideoOutput videoOut, VideoInput videoIn) {
+        requireWebClient();
         var target = Objects.requireNonNull(targetProvider, "target cannot be null").toJid();
         if (target.hasGroupOrCommunityServer()) {
             Objects.requireNonNull(audioOut, "audioOut cannot be null");
@@ -3193,15 +3263,15 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             if (participants.isEmpty()) {
                 throw new IllegalArgumentException("Group " + target + " has no member other than this account to call");
             }
-            return callService.placeGroupCall(participants, target, audioOut, audioIn, videoOut, videoIn);
+            return calls2Service.placeGroupCall(participants, target, audioOut, audioIn, videoOut, videoIn);
         } else {
-            return callService.placeCall(target, audioOut, audioIn, videoOut, videoIn);
+            return calls2Service.placeCall(target, audioOut, audioIn, videoOut, videoIn);
         }
     }
 
     /** {@inheritDoc} */
     @Override
-    public Call startCall(JidProvider targetProvider, AudioOutputStream audioOut, AudioInputStream audioIn) {
+    public Call startCall(JidProvider targetProvider, AudioOutput audioOut, AudioInput audioIn) {
         return startCall(targetProvider, audioOut, audioIn, null, null);
     }
 
@@ -3209,15 +3279,16 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipFunctions", exports = "acceptCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Call acceptCall(IncomingCall offer, AudioOutputStream audioOut, AudioInputStream audioIn,
-                           VideoOutputStream videoOut, VideoInputStream videoIn) {
+    public Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn,
+                           VideoOutput videoOut, VideoInput videoIn) {
+        requireWebClient();
         Objects.requireNonNull(offer, "offer cannot be null");
-        return callService.accept(offer, audioOut, audioIn, videoOut, videoIn);
+        return calls2Service.accept(offer, audioOut, audioIn, videoOut, videoIn);
     }
 
     /** {@inheritDoc} */
     @Override
-    public Call acceptCall(IncomingCall offer, AudioOutputStream audioOut, AudioInputStream audioIn) {
+    public Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn) {
         return acceptCall(offer, audioOut, audioIn, null, null);
     }
 
@@ -3228,7 +3299,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void rejectCall(IncomingCall offer, CallEndReason reason) {
         Objects.requireNonNull(offer, "offer cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
-        callService.reject(offer, reason);
+        calls2Service.reject(offer, reason);
     }
 
     /** {@inheritDoc} */
@@ -3240,12 +3311,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void terminateCall(String callId, CallEndReason reason) {
         Objects.requireNonNull(callId, "callId cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
-        var target = store.chatStore().findCallById(callId)
-                .orElseThrow(() -> new NoSuchElementException("No call with id " + callId))
-                .chatJid();
-        var selfJid = store.accountStore().jid()
-                .orElseThrow(() -> new IllegalStateException("Not logged in"));
-        sendNodeWithNoResponse(CallStanza.terminate(target, selfJid, callId, reason).build());
+        if (store.chatStore().findCallById(callId).isEmpty()) {
+            throw new NoSuchElementException("No call with id " + callId);
+        }
+        calls2Service.terminate(callId, reason);
     }
 
     /** {@inheritDoc} */
@@ -3253,7 +3322,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void terminateCall(Call call, CallEndReason reason) {
         Objects.requireNonNull(call, "call cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
-        callService.terminate(call.callId(), reason);
+        calls2Service.terminate(call.callId(), reason);
     }
 
     /** {@inheritDoc} */
@@ -3262,17 +3331,17 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void preacceptCall(String callId) {
         Objects.requireNonNull(callId, "callId cannot be null");
-        var caller = store.chatStore().findCallById(callId)
-                .orElseThrow(() -> new NoSuchElementException("No call with id " + callId))
-                .peer();
-        sendNodeWithNoResponse(CallStanza.preaccept(caller, callId).build());
+        if (store.chatStore().findCallById(callId).isEmpty()) {
+            throw new NoSuchElementException("No call with id " + callId);
+        }
+        calls2Service.preaccept(callId);
     }
 
     /** {@inheritDoc} */
     @Override
     public void preacceptCall(IncomingCall call) {
         Objects.requireNonNull(call, "call cannot be null");
-        sendNodeWithNoResponse(CallStanza.preaccept(call.peer(), call.callId()).build());
+        calls2Service.preaccept(call.callId());
     }
 
     /** {@inheritDoc} */
@@ -3302,17 +3371,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @param muted  {@code true} to announce a mute, {@code false} to announce an unmute
      * @throws NullPointerException            if {@code callId} is {@code null}
      * @throws NoSuchElementException          if no call with the given id is cached in the store
-     * @throws IllegalStateException           if this client is not logged in
      * @throws WhatsAppSessionException.Closed if the socket has been closed
      */
     private void setCallMute(String callId, boolean muted) {
         Objects.requireNonNull(callId, "callId cannot be null");
-        var target = store.chatStore().findCallById(callId)
-                .orElseThrow(() -> new NoSuchElementException("No call with id " + callId))
-                .chatJid();
-        var selfJid = store.accountStore().jid()
-                .orElseThrow(() -> new IllegalStateException("Not logged in"));
-        sendNodeWithNoResponse(CallStanza.mute(target, selfJid, callId, muted).build());
+        var call = store.chatStore().findCallById(callId)
+                .orElseThrow(() -> new NoSuchElementException("No call with id " + callId));
+        calls2Service.sendMute(call.peer(), call.peer(), callId, muted);
     }
 
     /** {@inheritDoc} */
@@ -3339,7 +3404,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private void setCallMute(Call call, boolean muted) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.sendMute(call.peer(), call.creator(), call.callId(), muted);
+        calls2Service.sendMute(call.peer(), call.creator(), call.callId(), muted);
     }
 
     /** {@inheritDoc} */
@@ -3368,44 +3433,44 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private void setCallVideo(Call call, boolean videoEnabled) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.sendVideoState(call.peer(), call.creator(), call.callId(), videoEnabled);
+        calls2Service.sendVideoState(call.peer(), call.creator(), call.callId(), videoEnabled);
     }
 
     /** {@inheritDoc} */
     @Override
     public void requestCallVideoUpgrade(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.sendVideoUpgradeRequest(call.peer(), call.creator(), call.callId());
-        callService.startLocalVideo(call.callId());
+        calls2Service.sendVideoUpgradeRequest(call.peer(), call.creator(), call.callId());
+        calls2Service.startLocalVideo(call.callId());
     }
 
     /** {@inheritDoc} */
     @Override
     public void acceptCallVideoUpgrade(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.sendVideoState(call.peer(), call.creator(), call.callId(), true);
-        callService.startLocalVideo(call.callId());
+        calls2Service.sendVideoState(call.peer(), call.creator(), call.callId(), true);
+        calls2Service.startLocalVideo(call.callId());
     }
 
     /** {@inheritDoc} */
     @Override
     public void rejectCallVideoUpgrade(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.sendVideoUpgradeReject(call.peer(), call.creator(), call.callId());
+        calls2Service.sendVideoUpgradeReject(call.peer(), call.creator(), call.callId());
     }
 
     /** {@inheritDoc} */
     @Override
     public void startCallScreenShare(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.startScreenShare(call.callId());
+        calls2Service.startScreenShare(call.callId());
     }
 
     /** {@inheritDoc} */
     @Override
     public void stopCallScreenShare(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.stopScreenShare(call.callId());
+        calls2Service.stopScreenShare(call.callId());
     }
 
     /** {@inheritDoc} */
@@ -3413,7 +3478,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void sendCallReaction(Call call, String emoji) {
         Objects.requireNonNull(call, "call cannot be null");
         Objects.requireNonNull(emoji, "emoji cannot be null");
-        callService.sendInteraction(call.peer(), call.creator(), call.callId(),
+        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.Reaction(emoji));
     }
 
@@ -3421,7 +3486,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public void raiseCallHand(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.sendInteraction(call.peer(), call.creator(), call.callId(),
+        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.RaiseHand());
     }
 
@@ -3429,7 +3494,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public void lowerCallHand(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.sendInteraction(call.peer(), call.creator(), call.callId(),
+        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.LowerHand());
     }
 
@@ -3438,7 +3503,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void requestCallPeerMute(Call call, JidProvider participant) {
         Objects.requireNonNull(call, "call cannot be null");
         Objects.requireNonNull(participant, "participant cannot be null");
-        callService.sendInteraction(call.peer(), call.creator(), call.callId(),
+        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.PeerMuteRequest(participant.toJid().toString(), Optional.empty()));
     }
 
@@ -3446,7 +3511,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public void requestCallKeyFrame(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        callService.sendInteraction(call.peer(), call.creator(), call.callId(),
+        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.KeyFrameRequest());
     }
 
@@ -3463,9 +3528,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!group.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community JID");
         }
-        var selfJid = store.accountStore().jid()
-                .orElseThrow(() -> new IllegalStateException("Not logged in"));
-        sendNodeWithNoResponse(CallStanza.groupUpdate(group, selfJid, callId, true, participants).build());
+        calls2Service.sendGroupParticipants(callId, group, callCreatorSelfJid(), toCallParticipantLids(participants), true);
     }
 
     /** {@inheritDoc} */
@@ -3476,9 +3539,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!call.peer().hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community JID");
         }
-        var selfJid = store.accountStore().jid()
-                .orElseThrow(() -> new IllegalStateException("Not logged in"));
-        sendNodeWithNoResponse(CallStanza.groupUpdate(call.peer(), selfJid, call.callId(), true, participants).build());
+        calls2Service.sendGroupParticipants(call.callId(), call.peer(), callCreatorSelfJid(), toCallParticipantLids(participants), true);
     }
 
     /** {@inheritDoc} */
@@ -3494,9 +3555,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!group.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community JID");
         }
-        var selfJid = store.accountStore().jid()
-                .orElseThrow(() -> new IllegalStateException("Not logged in"));
-        sendNodeWithNoResponse(CallStanza.groupUpdate(group, selfJid, callId, false, participants).build());
+        calls2Service.sendGroupParticipants(callId, group, callCreatorSelfJid(), toCallParticipantLids(participants), false);
     }
 
     /** {@inheritDoc} */
@@ -3507,9 +3566,55 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!call.peer().hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community JID");
         }
-        var selfJid = store.accountStore().jid()
+        calls2Service.sendGroupParticipants(call.callId(), call.peer(), callCreatorSelfJid(), toCallParticipantLids(participants), false);
+    }
+
+    /**
+     * Returns the local self device JID in the LID addressing mode call signaling requires.
+     *
+     * <p>WhatsApp stamps a call's {@code call-creator} (including on a {@code <group_update>}) with the
+     * local LID carrying the current device suffix, not the phone number. This returns the account LID
+     * promoted to the phone-number JID's device, falling back to the phone-number JID only for an
+     * account that has no LID assigned.
+     *
+     * @return the local self JID, LID-addressed when a LID is available
+     * @throws IllegalStateException if the client is not logged in
+     */
+    private Jid callCreatorSelfJid() {
+        var selfPn = store.accountStore().jid()
                 .orElseThrow(() -> new IllegalStateException("Not logged in"));
-        sendNodeWithNoResponse(CallStanza.groupUpdate(call.peer(), selfJid, call.callId(), false, participants).build());
+        return store.accountStore().lid()
+                .map(Jid::toUserJid)
+                .map(lid -> selfPn.hasDevice() ? lid.withDevice(selfPn.device()) : lid)
+                .orElse(selfPn);
+    }
+
+    /**
+     * Resolves the given call participants to their LID user JIDs for a {@code <group_update>} roster.
+     *
+     * <p>Each participant is resolved to its LID through the cached PN-to-LID mapping, then through a
+     * focused USync LID query when no mapping is cached, mirroring the one-to-one offer resolution; a
+     * participant already on the LID server is returned device-stripped, and a participant with no
+     * resolvable LID falls back to its phone-number user JID rather than being dropped from the roster.
+     *
+     * @param participants the participant JIDs supplied by the caller
+     * @return the participants resolved to LID user JIDs where possible
+     */
+    private List<Jid> toCallParticipantLids(List<Jid> participants) {
+        return participants.stream()
+                .map(participant -> {
+                    if (participant.hasLidServer()) {
+                        return participant.toUserJid();
+                    }
+                    var cached = lidMigrationService.toLid(participant);
+                    if (cached != null) {
+                        return cached.toUserJid();
+                    }
+                    return deviceService.queryUserLid(participant.toUserJid())
+                            .map(Jid::toUserJid)
+                            .orElse(participant.toUserJid());
+                })
+                .toList();
     }
 
     /** {@inheritDoc} */
@@ -3682,6 +3787,41 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     /**
+     * The lifecycle state of the client's single connection, held atomically in
+     * {@link LiveLinkedWhatsAppClient#state}.
+     *
+     * <p>A session is exactly one of these at any instant, so the former {@code terminated} and
+     * {@code reconnecting} booleans can never disagree. The reentrance critical section that
+     * serialises the teardown body is a separate concern guarded by
+     * {@link LiveLinkedWhatsAppClient#disconnecting}.
+     */
+    private enum ConnectionState {
+        /**
+         * The normal live state: connected, connecting, or idle before the first
+         * {@link LiveLinkedWhatsAppClient#connect()}. Both fresh-lifecycle entry points
+         * ({@link LiveLinkedWhatsAppClient#connect()} and {@link LiveLinkedWhatsAppClient#reconnect()})
+         * reset to this value, and a successful (re)connect returns to it in
+         * {@link LiveLinkedWhatsAppClient#onSocketOpened()}.
+         */
+        ACTIVE,
+        /**
+         * A reconnect cycle is in flight after a transient drop. Entered by the first
+         * {@code RECONNECTING} {@link LiveLinkedWhatsAppClient#disconnect0} winning a CAS from
+         * {@link #ACTIVE}; any further reconnect driver for the same drop loses that CAS and is
+         * coalesced away. Left for {@link #ACTIVE} once the supervisor re-establishes the transport.
+         */
+        RECONNECTING,
+        /**
+         * The session is terminally closed (logged out, banned, or explicitly disconnected). While
+         * set, the automatic reconnect entry points become no-ops and
+         * {@link LiveLinkedWhatsAppClient#sendNode(NodeBuilder, Function)} fails fast with
+         * {@link WhatsAppSessionException.Closed}; only {@link LiveLinkedWhatsAppClient#connect()} or
+         * {@link LiveLinkedWhatsAppClient#reconnect()} revive the client.
+         */
+        TERMINATED
+    }
+
+    /**
      * Pairs an outstanding trusted-contact token vouch with the reciprocal token the privacy-token
      * notification later delivers, exposing a blocking await over the asynchronous delivery.
      *
@@ -3776,18 +3916,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public Optional<Call> joinCallLink(String token, CallLinkMedia media) {
         Objects.requireNonNull(token, "token cannot be null");
         Objects.requireNonNull(media, "media cannot be null");
-        var resolved = queryCallLink(token, media, "preview").orElse(null);
-        if (resolved == null) {
-            return Optional.empty();
-        }
-        var creator = resolved.creator().orElse(null);
-        if (creator == null) {
-            return Optional.empty();
-        }
         var call = switch (media) {
-            case AUDIO -> startCall(creator, AudioOutputStream.buffered(), AudioInputStream.buffered());
-            case VIDEO -> startCall(creator, AudioOutputStream.buffered(), AudioInputStream.buffered(),
-                    VideoOutputStream.buffered(), VideoInputStream.buffered());
+            case AUDIO -> calls2Service.joinCallLink(token, media,
+                    AudioOutput.buffered(), AudioInput.buffered(), null, null);
+            case VIDEO -> calls2Service.joinCallLink(token, media,
+                    AudioOutput.buffered(), AudioInput.buffered(),
+                    BufferedVideoOutput.buffered(), BufferedVideoInput.buffered());
         };
         return Optional.of(call);
     }
@@ -9751,14 +9885,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMexUsersGetUsername",
             exports = "mexUsersGetUsername", adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<UserUsername> queryUserUsername(JidProvider userJidProvider) {
+    public Optional<Username> queryUserUsername(JidProvider userJidProvider) {
         var userJid = Objects.requireNonNull(userJidProvider, "userJid cannot be null").toJid();
         var input = serializeUsyncMexInput(userJid);
         return executeUsyncMex(null, null, Boolean.TRUE, input)
                 .flatMap(response -> response.items().stream().findFirst())
                 .flatMap(UsyncMexResponse.Item::usernameInfo)
                 .filter(info -> info.username().filter(s -> !s.isEmpty()).isPresent())
-                .map(info -> new UserUsername(
+                .map(info -> new Username(
                         info.username().orElse(null),
                         info.state().orElse(null),
                         info.timestamp().orElse(null),
@@ -12707,7 +12841,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         return this;
     }
 
-    public LinkedWhatsAppClient addLoggedInListener(LoggedInListener listener) {
+    public LinkedWhatsAppClient addLoggedInListener(LoggedInListener<? super LinkedWhatsAppClient> listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         store.addListener(listener);
         return this;
@@ -12725,7 +12859,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         return this;
     }
 
-    public LinkedWhatsAppClient addDisconnectedListener(DisconnectedListener listener) {
+    public LinkedWhatsAppClient addDisconnectedListener(DisconnectedListener<? super LinkedWhatsAppClient> listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         store.addListener(listener);
         return this;
@@ -12785,13 +12919,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         return this;
     }
 
-    public LinkedWhatsAppClient addNewMessageListener(NewMessageListener listener) {
+    public LinkedWhatsAppClient addNewMessageListener(NewMessageListener<? super LinkedWhatsAppClient> listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         store.addListener(listener);
         return this;
     }
 
-    public LinkedWhatsAppClient addMessageDeletedListener(MessageDeletedListener listener) {
+    public LinkedWhatsAppClient addMessageDeletedListener(MessageDeletedListener<? super LinkedWhatsAppClient> listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         store.addListener(listener);
         return this;
@@ -12815,7 +12949,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         return this;
     }
 
-    public LinkedWhatsAppClient addMessageStatusListener(MessageStatusListener listener) {
+    public LinkedWhatsAppClient addMessageStatusListener(MessageStatusListener<? super LinkedWhatsAppClient> listener) {
         Objects.requireNonNull(listener, "listener cannot be null");
         store.addListener(listener);
         return this;

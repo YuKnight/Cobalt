@@ -27,7 +27,7 @@ class PushNameSettingMutationFactoryTest {
         var expected = SyncFixtures.decodeOracleBytes(oracle, "encoded");
 
         var pending = new PushNameSettingMutationFactory().getPushnameMutation(Instant.ofEpochSecond(1_700_000_000L), "Maria");
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

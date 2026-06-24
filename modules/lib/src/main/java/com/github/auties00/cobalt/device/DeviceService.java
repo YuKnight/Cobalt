@@ -355,6 +355,27 @@ public interface DeviceService {
     List<DeviceList> syncAndGetDeviceList(Collection<Jid> userJids);
 
     /**
+     * Resolves the long-identifier (LID) for the given phone-number user, querying the server when the
+     * mapping is not already cached.
+     *
+     * <p>Returns the cached phone-number-to-LID mapping when one is present; otherwise issues a focused
+     * USync LID-protocol query (mirroring WA Web's {@code USyncLidProtocol}), records every mapping the
+     * server returns, and returns the freshly learned LID. The input device suffix is ignored; the
+     * returned LID is a device-stripped user JID. Used by the call-placement path, which addresses call
+     * signaling by LID and must learn a peer's LID before sending an offer.
+     *
+     * @implSpec
+     * Implementations must consult the cached mapping before any server round-trip, must persist every
+     * learned mapping so subsequent lookups resolve from cache, and must return an empty result rather
+     * than throwing when the server assigns no LID or the query fails.
+     *
+     * @param userPn the phone-number user JID whose LID must be resolved
+     * @return the resolved LID user JID, or {@link Optional#empty()} when none is known or assigned
+     * @throws NullPointerException if {@code userPn} is {@code null}
+     */
+    Optional<Jid> queryUserLid(Jid userPn);
+
+    /**
      * Returns the cached device record for the given user JID without a server round-trip.
      *
      * <p>This is used when the caller already knows the cache is fresh (during message encoding,

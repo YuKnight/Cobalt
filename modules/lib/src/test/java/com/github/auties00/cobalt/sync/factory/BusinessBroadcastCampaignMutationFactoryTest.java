@@ -56,7 +56,7 @@ class BusinessBroadcastCampaignMutationFactoryTest {
 
         var pending = factory.getCampaignMutation("camp-oracle", sampleAction(),
                 Instant.ofEpochSecond(1_700_000_000L));
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

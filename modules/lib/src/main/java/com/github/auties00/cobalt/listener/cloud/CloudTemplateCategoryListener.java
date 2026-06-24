@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.listener.cloud;
 
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClientListener;
-import com.github.auties00.cobalt.model.cloud.CloudTemplateCategoryUpdate;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateCategoryUpdate;
 
 /**
  * A functional interface for the {@link CloudWhatsAppClientListener#onTemplateCategory onTemplateCategory} event.

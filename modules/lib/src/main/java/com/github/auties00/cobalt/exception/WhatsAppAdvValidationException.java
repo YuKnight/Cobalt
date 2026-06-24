@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.util.Objects;
@@ -20,13 +21,15 @@ import java.util.Objects;
  * @apiNote
  * Catch this base type to react to every ADV failure mode at once; switch
  * on the concrete subtype when distinct recovery is needed per failure.
- * Because every subtype is fatal, the configured error handler typically
- * tears the affected peer relationship down rather than retrying.
+ * Every subtype keeps the affected peer relationship rejected, but
+ * {@link #toErrorResult()} returns {@link WhatsAppLinkedClientErrorResult#DISCARD}
+ * so the messaging session keeps running.
  *
  * @implNote
- * This implementation always reports the failure as fatal: accepting an
- * unverified device would allow a third party to inject itself into the
- * end-to-end-encrypted exchange.
+ * This implementation always returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}: an ADV validation failure tears
+ * down only the affected peer relationship; it is a per-request failure in
+ * WhatsApp Web that leaves the messaging session running.
  *
  * @see MissingDeviceIdentity
  * @see EmptyDeviceIdentity
@@ -86,13 +89,14 @@ public sealed abstract class WhatsAppAdvValidationException extends WhatsAppExce
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code true}: every ADV
-     * validation failure leaves the peer on the other end untrusted as a
-     * party in the end-to-end-encrypted exchange.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: an ADV validation failure
+     * tears down only the affected peer relationship; it is a per-request
+     * failure in WhatsApp Web that leaves the messaging session running.
      */
     @Override
-    public boolean isFatal() {
-        return true;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 
     /**

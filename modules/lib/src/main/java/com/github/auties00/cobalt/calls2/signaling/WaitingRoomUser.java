@@ -1,0 +1,166 @@
+package com.github.auties00.cobalt.calls2.signaling;
+
+import com.github.auties00.cobalt.calls2.core.participant.CallParticipantAccountKind;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Represents one {@code <user>} entry inside a waiting-room action element.
+ *
+ * <p>Every waiting-room operation that carries participants ({@code admit}, {@code deny}, {@code update},
+ * and the participant list echoed on the {@code leave} and {@code toggle} acks) nests zero or more
+ * {@code <user>} children describing the parties the operation targets. Each entry pins a participant by
+ * its user {@link #jid() JID} and decorates it with the same optional vocabulary the group-call
+ * {@code <user>} node uses: the participant's {@link #userPn() phone-number JID}, the
+ * {@link #username() display username}, the {@link #admin() admin flag}, the {@link #guestName() guest
+ * display name}, and the {@link #accountKind() account kind}. The JID is the only required component;
+ * every decoration is optional and absent unless the relay supplied it.
+ *
+ * <p>This record is the building block the waiting-room request and ack stanzas compose; it owns the
+ * {@code <user>} element grammar so each stanza applies it identically rather than repeating the
+ * attribute literals.
+ *
+ * <p>On the wire the element is {@code <user jid="..." user_pn="..." username="..." is_admin="1"
+ * guest_name="..." account_kind="guest"/>}.
+ *
+ * @implNote This implementation models the waiting-room {@code <user>} element of the wa-voip WASM
+ * module {@code ff-tScznZ8P}, parsed by {@code fill_user_info_from_user_node} (fn11612) in
+ * {@code protocol/xmpp/shared_elements/group.cc} and reused by the waiting-room serializers in
+ * {@code stanzas/waiting_room.cc}. The recovered attribute data offsets are {@code jid} ({@code 0x87ad0}),
+ * {@code user_pn} ({@code 0x552f0}), {@code username} ({@code 0x79d43}), {@code is_admin} ({@code 0x58d7b}),
+ * {@code guest_name} ({@code 0x79d93}), and {@code account_kind} ({@code 0x827d2}). The boolean
+ * {@code is_admin} flag serializes as the {@code '1'}/{@code '0'} literals ({@code 0xca53c}/{@code 0xcb520})
+ * the module uses for every boolean attribute, and the account-kind token is resolved through the
+ * {@code wa_call_cstr_to_account_kind} mapping ported by {@link CallParticipantAccountKind}.
+ *
+ * @param jid         the participant's user JID; never {@code null}
+ * @param userPn      the participant's phone-number JID, if present
+ * @param username    the participant's display username, if present
+ * @param admin       whether the participant is flagged as a waiting-room admin
+ * @param guestName   the participant's guest display name, if present
+ * @param accountKind the participant's account kind, present only when the relay supplied an
+ *                    {@code account_kind} token
+ * @see CallParticipantAccountKind
+ */
+public record WaitingRoomUser(Jid jid,
+                              Optional<Jid> userPn,
+                              Optional<String> username,
+                              boolean admin,
+                              Optional<String> guestName,
+                              Optional<CallParticipantAccountKind> accountKind) {
+    /**
+     * The wire element tag for a waiting-room user entry.
+     */
+    public static final String ELEMENT = "user";
+
+    /**
+     * The wire attribute naming the participant's user JID.
+     */
+    private static final String JID_ATTRIBUTE = "jid";
+
+    /**
+     * The wire attribute naming the participant's phone-number JID.
+     */
+    private static final String USER_PN_ATTRIBUTE = "user_pn";
+
+    /**
+     * The wire attribute naming the participant's display username.
+     */
+    private static final String USERNAME_ATTRIBUTE = "username";
+
+    /**
+     * The wire attribute naming the waiting-room admin flag.
+     */
+    private static final String IS_ADMIN_ATTRIBUTE = "is_admin";
+
+    /**
+     * The wire attribute naming the participant's guest display name.
+     */
+    private static final String GUEST_NAME_ATTRIBUTE = "guest_name";
+
+    /**
+     * The wire attribute naming the participant's account kind.
+     */
+    private static final String ACCOUNT_KIND_ATTRIBUTE = "account_kind";
+
+    /**
+     * Validates the record components.
+     *
+     * @throws NullPointerException if {@code jid}, {@code userPn}, {@code username}, {@code guestName},
+     *                              or {@code accountKind} is {@code null}
+     */
+    public WaitingRoomUser {
+        Objects.requireNonNull(jid, "jid cannot be null");
+        Objects.requireNonNull(userPn, "userPn cannot be null");
+        Objects.requireNonNull(username, "username cannot be null");
+        Objects.requireNonNull(guestName, "guestName cannot be null");
+        Objects.requireNonNull(accountKind, "accountKind cannot be null");
+    }
+
+    /**
+     * Returns a waiting-room user entry that pins a participant by JID alone.
+     *
+     * <p>The decoration attributes are left absent; this is the shape an {@code admit} or {@code deny}
+     * request uses when it only needs to identify the participant to act on.
+     *
+     * @param jid the participant's user JID
+     * @return the user entry
+     * @throws NullPointerException if {@code jid} is {@code null}
+     */
+    public static WaitingRoomUser of(Jid jid) {
+        return new WaitingRoomUser(jid, Optional.empty(), Optional.empty(), false, Optional.empty(),
+                Optional.empty());
+    }
+
+    /**
+     * Builds the {@code <user jid user_pn username is_admin guest_name account_kind/>} node.
+     *
+     * <p>Each optional attribute is omitted when its backing component is absent; the {@code is_admin}
+     * flag is written only when {@link #admin()} is {@code true}, and {@code account_kind} is written
+     * using the kind's wire token only when an account kind is present.
+     *
+     * @return the user entry node
+     */
+    public Node toNode() {
+        return new NodeBuilder()
+                .description(ELEMENT)
+                .attribute(JID_ATTRIBUTE, jid)
+                .attribute(USER_PN_ATTRIBUTE, userPn.orElse(null), userPn.isPresent())
+                .attribute(USERNAME_ATTRIBUTE, username.orElse(null), username.isPresent())
+                .attribute(IS_ADMIN_ATTRIBUTE, "1", admin)
+                .attribute(GUEST_NAME_ATTRIBUTE, guestName.orElse(null), guestName.isPresent())
+                .attribute(ACCOUNT_KIND_ATTRIBUTE, accountKind.map(CallParticipantAccountKind::token).orElse(null),
+                        accountKind.isPresent())
+                .build();
+    }
+
+    /**
+     * Decodes a waiting-room {@code <user>} node into a {@link WaitingRoomUser}.
+     *
+     * <p>An absent {@code is_admin} attribute classifies to {@code false}; an absent {@code account_kind}
+     * attribute yields an empty {@link #accountKind()} rather than defaulting to
+     * {@link CallParticipantAccountKind#REGULAR}, so a re-emitted entry omits the attribute exactly as
+     * it arrived.
+     *
+     * @param node the {@code <user>} node
+     * @return the decoded user entry
+     * @throws NullPointerException   if {@code node} is {@code null}
+     * @throws NoSuchElementException if the required {@code jid} attribute is absent
+     */
+    public static WaitingRoomUser of(Node node) {
+        Objects.requireNonNull(node, "node cannot be null");
+        var jid = node.getRequiredAttributeAsJid(JID_ATTRIBUTE);
+        var userPn = node.getAttributeAsJid(USER_PN_ATTRIBUTE);
+        var username = node.getAttributeAsString(USERNAME_ATTRIBUTE);
+        var admin = "1".equals(node.getAttributeAsString(IS_ADMIN_ATTRIBUTE).orElse("0"));
+        var guestName = node.getAttributeAsString(GUEST_NAME_ATTRIBUTE);
+        var accountKind = node.getAttributeAsString(ACCOUNT_KIND_ATTRIBUTE)
+                .map(CallParticipantAccountKind::ofToken);
+        return new WaitingRoomUser(jid, userPn, username, admin, guestName, accountKind);
+    }
+}

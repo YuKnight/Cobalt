@@ -2,11 +2,25 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButton;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonCopyCodeBuilder;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonFlowBuilder;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonOtpBuilder;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonPhoneNumberBuilder;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonQuickReplyBuilder;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonUrlBuilder;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponent;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentBodyBuilder;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentFooterBuilder;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentHeaderBuilder;
+import com.github.auties00.cobalt.model.cloud.template.CloudOtpType;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateHeaderFormat;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.commerce.ButtonsMessage;
 import com.github.auties00.cobalt.model.message.contact.ContactMessage;
 import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessage;
+import com.github.auties00.cobalt.model.message.interactive.InteractiveMessage;
 import com.github.auties00.cobalt.model.message.interactive.TemplateButton;
 import com.github.auties00.cobalt.model.message.interactive.TemplateMessage;
 import com.github.auties00.cobalt.model.message.list.ListMessage;
@@ -27,7 +41,8 @@ import java.util.List;
  *
  * <p>The encoder switches over the active message variant returned by {@link MessageContainer#content()}
  * and produces the matching Cloud JSON shape: text, media (image, video, audio, document, sticker),
- * location, contacts, reaction, interactive (reply buttons and lists), and template messages. Media is
+ * location, contacts, reaction, interactive (reply buttons, lists, native-flow call-to-action and flow,
+ * location and address requests), and template messages. Media is
  * referenced by a hosted link when the message carries an {@code http(s)} URL and by media id
  * otherwise, so an upload id placed in the message's media-url field is sent as {@code {"id": ...}}.
  *
@@ -126,6 +141,10 @@ public final class CloudMessageEncoder {
             case ListMessage list -> {
                 root.put("type", "interactive");
                 root.put("interactive", listNode(list));
+            }
+            case InteractiveMessage interactive -> {
+                root.put("type", "interactive");
+                root.put("interactive", interactiveNode(interactive));
             }
             default -> throw new IllegalArgumentException(
                     "message type has no Cloud API representation: " + container.content().getClass().getSimpleName());
@@ -492,6 +511,189 @@ public final class CloudMessageEncoder {
     }
 
     /**
+     * Builds a Cloud {@code interactive} node from an interactive message.
+     *
+     * <p>The native flow content variant maps onto one of the Cloud native-flow shapes
+     * ({@code cta_url}, {@code flow}, {@code location_request_message} or {@code address_message}),
+     * selected from the first native-flow button name. Any other content variant has no Cloud
+     * representation.
+     *
+     * @param interactive the interactive message
+     * @return the Cloud {@code interactive} node
+     * @throws IllegalArgumentException if the content variant has no Cloud API representation
+     */
+    private static JSONObject interactiveNode(InteractiveMessage interactive) {
+        var content = interactive.content().orElse(null);
+        if (content instanceof InteractiveMessage.NativeFlowMessage flow) {
+            return nativeFlowNode(interactive, flow);
+        }
+        throw new IllegalArgumentException(
+                "interactive content has no Cloud API representation: "
+                        + (content == null ? "empty" : content.getClass().getSimpleName()));
+    }
+
+    /**
+     * Builds a Cloud {@code interactive} node from an interactive native flow message.
+     *
+     * <p>The single native-flow button name selects the Cloud shape. {@code cta_url} yields a
+     * call-to-action URL message; {@code send_location} a location request; {@code address_message} an
+     * address request; any other name whose button parameters carry a {@code flow_id}, or one of the
+     * known flow-family names, yields a {@code flow} message.
+     *
+     * @param parent the interactive message carrying the sections and native flow content
+     * @param flow   the native flow content variant
+     * @return the Cloud {@code interactive} node
+     * @throws IllegalArgumentException if the button name has no Cloud API representation
+     */
+    private static JSONObject nativeFlowNode(InteractiveMessage parent, InteractiveMessage.NativeFlowMessage flow) {
+        var button = flow.buttons().isEmpty() ? null : flow.buttons().getFirst();
+        var name = button == null ? "" : button.name().orElse("");
+        var node = new JSONObject();
+        switch (name) {
+            case "cta_url" -> {
+                node.put("type", "cta_url");
+                applyInteractiveSections(node, parent);
+                node.put("action", ctaUrlAction(button));
+            }
+            case "send_location" -> {
+                node.put("type", "location_request_message");
+                parent.body().flatMap(InteractiveMessage.Body::text).ifPresent(text -> node.put("body", textNode(text)));
+                var action = new JSONObject();
+                action.put("name", "send_location");
+                node.put("action", action);
+            }
+            case "address_message" -> {
+                node.put("type", "address_message");
+                parent.body().flatMap(InteractiveMessage.Body::text).ifPresent(text -> node.put("body", textNode(text)));
+                var action = new JSONObject();
+                action.put("name", "address_message");
+                button.buttonParamsJson()
+                        .map(JSONObject::parseObject)
+                        .ifPresent(params -> action.put("parameters", params));
+                node.put("action", action);
+            }
+            case "review_and_pay", "flow", "single_select", "open_webview" -> {
+                node.put("type", "flow");
+                applyInteractiveSections(node, parent);
+                node.put("action", flowAction(button));
+            }
+            default -> {
+                if (!isFlowButton(button)) {
+                    throw new IllegalArgumentException(
+                            "native flow button has no Cloud API representation: " + name);
+                }
+                node.put("type", "flow");
+                applyInteractiveSections(node, parent);
+                node.put("action", flowAction(button));
+            }
+        }
+        return node;
+    }
+
+    /**
+     * Writes the optional header, body and footer sections of an interactive message.
+     *
+     * <p>A media header (image, video or document) is preferred over a text header when the header
+     * carries a downloadable media reference; otherwise the header title is written as a text header.
+     *
+     * @param node   the interactive node being assembled
+     * @param parent the interactive message carrying the sections
+     */
+    private static void applyInteractiveSections(JSONObject node, InteractiveMessage parent) {
+        parent.body().flatMap(InteractiveMessage.Body::text).ifPresent(text -> node.put("body", textNode(text)));
+        parent.footer().flatMap(InteractiveMessage.Footer::text).ifPresent(text -> node.put("footer", textNode(text)));
+        var header = parent.header().orElse(null);
+        if (header == null) {
+            return;
+        }
+        var media = header.media().orElse(null);
+        switch (media) {
+            case ImageMessage image -> node.put("header", interactiveMediaHeader("image", image.mediaUrl().orElse(null)));
+            case VideoMessage video -> node.put("header", interactiveMediaHeader("video", video.mediaUrl().orElse(null)));
+            case DocumentMessage document -> node.put("header", interactiveMediaHeader("document", document.mediaUrl().orElse(null)));
+            case null, default -> header.title().ifPresent(title -> node.put("header", headerTextNode(title)));
+        }
+    }
+
+    /**
+     * Builds an interactive media header referencing the asset by hosted link or media id.
+     *
+     * @param type the header media type, for example {@code "image"}
+     * @param ref  the media reference (a link or a media id), or {@code null}
+     * @return the header node
+     */
+    private static JSONObject interactiveMediaHeader(String type, String ref) {
+        var node = new JSONObject();
+        node.put("type", type);
+        node.put(type, mediaParam(ref));
+        return node;
+    }
+
+    /**
+     * Builds the {@code cta_url} action from a native flow button.
+     *
+     * @param button the native flow button named {@code cta_url}
+     * @return the Cloud {@code action} node
+     */
+    private static JSONObject ctaUrlAction(InteractiveMessage.NativeFlowMessage.NativeFlowButton button) {
+        var action = new JSONObject();
+        action.put("name", "cta_url");
+        var params = button.buttonParamsJson()
+                .map(JSONObject::parseObject)
+                .orElseGet(JSONObject::new);
+        var parameters = new JSONObject();
+        var display = params.getString("display_text");
+        var url = params.getString("url");
+        if (display != null) {
+            parameters.put("display_text", display);
+        }
+        if (url != null) {
+            parameters.put("url", url);
+        }
+        action.put("parameters", parameters);
+        return action;
+    }
+
+    /**
+     * Builds the {@code flow} action from a native flow button.
+     *
+     * <p>The button parameters already match the Cloud flow {@code action.parameters} object
+     * ({@code flow_message_version} defaulting to {@code "3"}, {@code flow_token}, {@code flow_id},
+     * {@code flow_cta}, {@code flow_action}, {@code flow_action_payload}, {@code mode}), so they are
+     * re-parsed and emitted verbatim, defaulting {@code flow_message_version} to {@code "3"}. An optional
+     * {@code flow_metadata} member is uncommon and is passed through unchanged when present.
+     *
+     * @param button the native flow button carrying the flow parameters
+     * @return the Cloud {@code action} node
+     */
+    private static JSONObject flowAction(InteractiveMessage.NativeFlowMessage.NativeFlowButton button) {
+        var action = new JSONObject();
+        action.put("name", "flow");
+        var params = button == null
+                ? new JSONObject()
+                : button.buttonParamsJson().map(JSONObject::parseObject).orElseGet(JSONObject::new);
+        params.putIfAbsent("flow_message_version", "3");
+        action.put("parameters", params);
+        return action;
+    }
+
+    /**
+     * Returns whether a native flow button carries a flow id in its parameters.
+     *
+     * @param button the native flow button, or {@code null}
+     * @return {@code true} if the button parameters contain a {@code flow_id}
+     */
+    private static boolean isFlowButton(InteractiveMessage.NativeFlowMessage.NativeFlowButton button) {
+        if (button == null) {
+            return false;
+        }
+        return button.buttonParamsJson()
+                .map(JSONObject::parseObject)
+                .map(params -> params.containsKey("flow_id"))
+                .orElse(false);
+    }
+
+    /**
      * Builds an interactive {@code text} body or footer node.
      *
      * @param text the text content
@@ -514,5 +716,231 @@ public final class CloudMessageEncoder {
         node.put("type", "text");
         node.put("text", text);
         return node;
+    }
+
+    /**
+     * Encodes a list of typed template components into the Cloud {@code message_templates} request shape.
+     *
+     * <p>Each {@link CloudTemplateComponent} becomes one object in the returned array, carrying the
+     * uppercase {@code type} discriminator the Cloud API expects ({@code HEADER}, {@code BODY},
+     * {@code FOOTER}, {@code BUTTONS}, {@code CAROUSEL}) and the variant-specific fields. The array is
+     * empty when {@code components} is empty.
+     *
+     * @param components the typed template components to encode
+     * @return the assembled {@code components} array
+     */
+    public static JSONArray encodeTemplateComponents(List<CloudTemplateComponent> components) {
+        var array = new JSONArray();
+        for (var component : components) {
+            array.add(encodeTemplateComponent(component));
+        }
+        return array;
+    }
+
+    /**
+     * Encodes one typed template component into its Cloud {@code components} entry.
+     *
+     * @param component the component to encode
+     * @return the component object
+     */
+    private static JSONObject encodeTemplateComponent(CloudTemplateComponent component) {
+        var node = new JSONObject();
+        switch (component) {
+            case CloudTemplateComponent.Header header -> {
+                node.put("type", "HEADER");
+                node.put("format", header.format().name());
+                header.text().ifPresent(value -> node.put("text", value));
+                header.example().ifPresent(value -> node.put("example", value));
+            }
+            case CloudTemplateComponent.Body body -> {
+                node.put("type", "BODY");
+                node.put("text", body.text());
+                body.example().ifPresent(value -> node.put("example", value));
+            }
+            case CloudTemplateComponent.Footer footer -> {
+                node.put("type", "FOOTER");
+                node.put("text", footer.text());
+            }
+            case CloudTemplateComponent.Buttons buttons -> {
+                node.put("type", "BUTTONS");
+                var array = new JSONArray();
+                for (var button : buttons.buttons()) {
+                    array.add(encodeTemplateButton(button));
+                }
+                node.put("buttons", array);
+            }
+            case CloudTemplateComponent.Carousel carousel -> {
+                node.put("type", "CAROUSEL");
+                var cards = new JSONArray();
+                for (var card : carousel.cards()) {
+                    var cardNode = new JSONObject();
+                    cardNode.put("components", encodeTemplateComponents(card.components()));
+                    cards.add(cardNode);
+                }
+                node.put("cards", cards);
+            }
+        }
+        return node;
+    }
+
+    /**
+     * Encodes one typed template button into its Cloud {@code buttons} entry.
+     *
+     * @param button the button to encode
+     * @return the button object
+     */
+    private static JSONObject encodeTemplateButton(CloudTemplateButton button) {
+        var node = new JSONObject();
+        switch (button) {
+            case CloudTemplateButton.QuickReply quickReply -> {
+                node.put("type", "QUICK_REPLY");
+                node.put("text", quickReply.text());
+            }
+            case CloudTemplateButton.Url url -> {
+                node.put("type", "URL");
+                node.put("text", url.text());
+                node.put("url", url.url());
+            }
+            case CloudTemplateButton.PhoneNumber phoneNumber -> {
+                node.put("type", "PHONE_NUMBER");
+                node.put("text", phoneNumber.text());
+                node.put("phone_number", phoneNumber.phoneNumber());
+            }
+            case CloudTemplateButton.CopyCode copyCode -> {
+                node.put("type", "COPY_CODE");
+                copyCode.example().ifPresent(value -> node.put("example", value));
+            }
+            case CloudTemplateButton.Otp otp -> {
+                node.put("type", "OTP");
+                otp.otpType().ifPresent(value -> node.put("otp_type", value.token()));
+                otp.text().ifPresent(value -> node.put("text", value));
+            }
+            case CloudTemplateButton.Flow flow -> {
+                node.put("type", "FLOW");
+                node.put("text", flow.text());
+                flow.flowId().ifPresent(value -> node.put("flow_id", value));
+                flow.flowAction().ifPresent(value -> node.put("flow_action", value));
+                flow.navigateScreen().ifPresent(value -> node.put("navigate_screen", value));
+            }
+        }
+        return node;
+    }
+
+    /**
+     * Decodes a Cloud {@code components} array into a list of typed template components.
+     *
+     * <p>Each array entry is mapped to the {@link CloudTemplateComponent} variant selected by its
+     * {@code type} discriminator; an entry carrying an unrecognised or absent {@code type} is skipped. The
+     * returned list is empty when {@code components} is {@code null} or empty.
+     *
+     * @param components the Cloud {@code components} array, or {@code null}
+     * @return the decoded typed components, empty when none were present
+     */
+    public static List<CloudTemplateComponent> decodeTemplateComponents(JSONArray components) {
+        if (components == null) {
+            return List.of();
+        }
+        var result = new java.util.ArrayList<CloudTemplateComponent>();
+        for (var index = 0; index < components.size(); index++) {
+            var component = decodeTemplateComponent(components.getJSONObject(index));
+            if (component != null) {
+                result.add(component);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Decodes one Cloud {@code components} entry into its typed component variant.
+     *
+     * @param node the component object
+     * @return the decoded component, or {@code null} when the {@code type} is unrecognised or absent
+     */
+    private static CloudTemplateComponent decodeTemplateComponent(JSONObject node) {
+        var type = node.getString("type");
+        if (type == null) {
+            return null;
+        }
+        return switch (type.toUpperCase(java.util.Locale.ROOT)) {
+            case "HEADER" -> new CloudTemplateComponentHeaderBuilder()
+                    .format(CloudTemplateHeaderFormat.of(node.getString("format")))
+                    .text(node.getString("text"))
+                    .example(node.getString("example"))
+                    .build();
+            case "BODY" -> new CloudTemplateComponentBodyBuilder()
+                    .text(node.getString("text"))
+                    .example(node.getString("example"))
+                    .build();
+            case "FOOTER" -> new CloudTemplateComponentFooterBuilder()
+                    .text(node.getString("text"))
+                    .build();
+            case "BUTTONS" -> {
+                var buttons = new java.util.ArrayList<CloudTemplateButton>();
+                var array = node.getJSONArray("buttons");
+                if (array != null) {
+                    for (var index = 0; index < array.size(); index++) {
+                        var button = decodeTemplateButton(array.getJSONObject(index));
+                        if (button != null) {
+                            buttons.add(button);
+                        }
+                    }
+                }
+                yield new CloudTemplateComponent.Buttons(buttons);
+            }
+            case "CAROUSEL" -> {
+                var cards = new java.util.ArrayList<CloudTemplateComponent.Carousel.Card>();
+                var array = node.getJSONArray("cards");
+                if (array != null) {
+                    for (var index = 0; index < array.size(); index++) {
+                        var cardComponents = decodeTemplateComponents(array.getJSONObject(index).getJSONArray("components"));
+                        cards.add(new CloudTemplateComponent.Carousel.Card(cardComponents));
+                    }
+                }
+                yield new CloudTemplateComponent.Carousel(cards);
+            }
+            default -> null;
+        };
+    }
+
+    /**
+     * Decodes one Cloud {@code buttons} entry into its typed button variant.
+     *
+     * @param node the button object
+     * @return the decoded button, or {@code null} when the {@code type} is unrecognised or absent
+     */
+    private static CloudTemplateButton decodeTemplateButton(JSONObject node) {
+        var type = node.getString("type");
+        if (type == null) {
+            return null;
+        }
+        return switch (type.toUpperCase(java.util.Locale.ROOT)) {
+            case "QUICK_REPLY" -> new CloudTemplateButtonQuickReplyBuilder()
+                    .text(node.getString("text"))
+                    .build();
+            case "URL" -> new CloudTemplateButtonUrlBuilder()
+                    .text(node.getString("text"))
+                    .url(node.getString("url"))
+                    .build();
+            case "PHONE_NUMBER" -> new CloudTemplateButtonPhoneNumberBuilder()
+                    .text(node.getString("text"))
+                    .phoneNumber(node.getString("phone_number"))
+                    .build();
+            case "COPY_CODE" -> new CloudTemplateButtonCopyCodeBuilder()
+                    .example(node.getString("example"))
+                    .build();
+            case "OTP" -> new CloudTemplateButtonOtpBuilder()
+                    .otpType(node.getString("otp_type") == null
+                            ? null
+                            : CloudOtpType.of(node.getString("otp_type")))
+                    .text(node.getString("text"))
+                    .build();
+            case "FLOW" -> new CloudTemplateButtonFlowBuilder()
+                    .text(node.getString("text"))
+                    .flowId(node.getString("flow_id"))
+                    .flowAction(node.getString("flow_action"))
+                    .navigateScreen(node.getString("navigate_screen"))
+                    .build();
+            default -> null;
+        };
     }
 }

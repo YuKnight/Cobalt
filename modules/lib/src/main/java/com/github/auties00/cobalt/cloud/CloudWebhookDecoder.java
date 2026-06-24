@@ -4,13 +4,30 @@ import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.cloud.CloudAccountUpdate;
+import com.github.auties00.cobalt.model.cloud.CloudAppStateSyncAction;
+import com.github.auties00.cobalt.model.cloud.CloudAppStateSyncContact;
 import com.github.auties00.cobalt.model.cloud.CloudBusinessCapabilityUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudFlowStatusUpdate;
+import com.github.auties00.cobalt.model.cloud.CloudCallDirection;
+import com.github.auties00.cobalt.model.cloud.CloudCallEvent;
+import com.github.auties00.cobalt.model.cloud.CloudCallHours;
+import com.github.auties00.cobalt.model.cloud.CloudCallPermissionResponse;
+import com.github.auties00.cobalt.model.cloud.CloudCallSettings;
+import com.github.auties00.cobalt.model.cloud.CloudCallStatus;
+import com.github.auties00.cobalt.model.cloud.CloudMarketingPreference;
+import com.github.auties00.cobalt.model.cloud.flow.CloudFlowStatusUpdate;
 import com.github.auties00.cobalt.model.cloud.CloudHistorySync;
-import com.github.auties00.cobalt.model.cloud.CloudPhoneNumberUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudTemplateCategoryUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudTemplateQualityUpdate;
-import com.github.auties00.cobalt.model.cloud.CloudTemplateStatusUpdate;
+import com.github.auties00.cobalt.model.cloud.CloudMessagePricing;
+import com.github.auties00.cobalt.model.cloud.CloudCallSession;
+import com.github.auties00.cobalt.model.cloud.commerce.CloudPaymentConfiguration;
+import com.github.auties00.cobalt.model.cloud.phone.CloudMessagingLimitTier;
+import com.github.auties00.cobalt.model.cloud.phone.CloudPhoneNumberUpdate;
+import com.github.auties00.cobalt.model.cloud.CloudSecurityUpdate;
+import com.github.auties00.cobalt.model.cloud.CloudSystemUpdate;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateCategoryUpdate;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateComponentsUpdate;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplatePauseUpdate;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateQualityUpdate;
+import com.github.auties00.cobalt.model.cloud.template.CloudTemplateStatusUpdate;
 import com.github.auties00.cobalt.model.cloud.CloudUserPreferenceUpdate;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidServer;
@@ -20,6 +37,15 @@ import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.model.message.commerce.ButtonsResponseMessage;
 import com.github.auties00.cobalt.model.message.commerce.ButtonsResponseMessageBuilder;
+import com.github.auties00.cobalt.model.message.commerce.OrderMessage;
+import com.github.auties00.cobalt.model.message.commerce.OrderMessageBuilder;
+import com.github.auties00.cobalt.model.message.contact.ContactMessage;
+import com.github.auties00.cobalt.model.message.contact.ContactMessageBuilder;
+import com.github.auties00.cobalt.model.message.contact.ContactsArrayMessageBuilder;
+import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessage;
+import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessageBodyBuilder;
+import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessageBuilder;
+import com.github.auties00.cobalt.model.message.interactive.InteractiveResponseMessageNativeFlowResponseMessageBuilder;
 import com.github.auties00.cobalt.model.message.list.ListResponseMessage;
 import com.github.auties00.cobalt.model.message.list.ListResponseMessageBuilder;
 import com.github.auties00.cobalt.model.message.list.ListResponseMessageSingleSelectReplyBuilder;
@@ -46,7 +72,9 @@ import java.util.Map;
  * {@link ChatMessageInfo} instances for inbound messages and {@link StatusUpdate} records for outbound
  * delivery receipts, mapping the Cloud status strings onto the shared {@link MessageStatus} model.
  * Inbound media is referenced by its Cloud media id, stored in the media message's
- * url field so a later download resolves it through the media edge.
+ * url field so a later download resolves it through the media edge. Beyond text, media, location,
+ * reaction and reply types it also decodes native-flow replies ({@code nfm_reply}), shared contact
+ * cards and catalog orders; genuinely unmapped types fall back to {@link MessageContainer#empty()}.
  */
 public final class CloudWebhookDecoder {
     /**
@@ -62,8 +90,10 @@ public final class CloudWebhookDecoder {
      * @param info    the message descriptor carrying the key and the mapped {@link MessageStatus}
      * @param deleted whether the entry reported a {@code deleted} status rather than a delivery
      *                transition
+     * @param pricing the billing information carried by the entry, or {@code null} when the entry had
+     *                no {@code pricing} object
      */
-    public record StatusUpdate(ChatMessageInfo info, boolean deleted) {
+    public record StatusUpdate(ChatMessageInfo info, boolean deleted, CloudMessagePricing pricing) {
     }
 
     /**
@@ -73,7 +103,34 @@ public final class CloudWebhookDecoder {
      * @return the decoded inbound messages, empty when the change carried none
      */
     public static List<ChatMessageInfo> decodeMessages(JSONObject value) {
-        var messages = value.getJSONArray("messages");
+        return decodeMessageArray(value, "messages");
+    }
+
+    /**
+     * Decodes the echoed messages of an {@code smb_message_echoes} change value.
+     *
+     * <p>WhatsApp Coexistence delivers a business's own outbound messages, including those sent from the
+     * companion phone app, under the {@code message_echoes} array rather than the {@code messages} array
+     * used by ordinary inbound deliveries; the per-message objects share the same shape, so the same
+     * decode applies.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded echoed messages, empty when the change carried none
+     */
+    public static List<ChatMessageInfo> decodeMessageEchoes(JSONObject value) {
+        return decodeMessageArray(value, "message_echoes");
+    }
+
+    /**
+     * Decodes the per-message objects of a named array within a webhook change value.
+     *
+     * @param value    the webhook change {@code value}
+     * @param arrayKey the array member key, {@code messages} for inbound deliveries or
+     *                 {@code message_echoes} for business message echoes
+     * @return the decoded messages, empty when the array was absent or empty
+     */
+    private static List<ChatMessageInfo> decodeMessageArray(JSONObject value, String arrayKey) {
+        var messages = value.getJSONArray(arrayKey);
         if (messages == null || messages.isEmpty()) {
             return List.of();
         }
@@ -81,13 +138,35 @@ public final class CloudWebhookDecoder {
         var result = new ArrayList<ChatMessageInfo>();
         for (var index = 0; index < messages.size(); index++) {
             var message = messages.getJSONObject(index);
+            if (isCallPermissionReply(message)) {
+                continue;
+            }
             result.add(decodeMessage(message, pushNames));
         }
         return result;
     }
 
     /**
+     * Returns whether an inbound message is a call-permission reply, which is surfaced as a
+     * {@link CloudCallEvent} through {@link #decodeCallPermissionReplies(JSONObject)} rather than as a
+     * chat message.
+     *
+     * @param message the inbound message object
+     * @return {@code true} when the message is an interactive {@code call_permission_reply}
+     */
+    private static boolean isCallPermissionReply(JSONObject message) {
+        var interactive = message.getJSONObject("interactive");
+        return interactive != null && "call_permission_reply".equals(interactive.getString("type"));
+    }
+
+    /**
      * Decodes the outbound status transitions of a webhook change value.
+     *
+     * <p>Each {@code statuses[]} entry carries the message id, the recipient, the status, and the
+     * timestamp. The optional {@code pricing} member (present for {@code sent} and {@code delivered},
+     * absent for {@code read} and {@code failed} and on some transitions in newer API versions) is
+     * captured into {@link StatusUpdate#pricing()} when present, leaving it {@code null} otherwise.
+     * The optional {@code conversation} member is not read, so its omission is decode-safe.
      *
      * @param value the webhook change {@code value}
      * @return the decoded status updates, empty when the change carried none
@@ -117,9 +196,40 @@ public final class CloudWebhookDecoder {
             if (timestamp != null) {
                 builder.timestamp(Instant.ofEpochSecond(timestamp));
             }
-            result.add(new StatusUpdate(builder.build(), deleted));
+            result.add(new StatusUpdate(builder.build(), deleted, decodeStatusPricing(status)));
         }
         return result;
+    }
+
+    /**
+     * Decodes the {@code pricing} object of a {@code statuses[]} entry into a {@link CloudMessagePricing}.
+     *
+     * <p>The {@code pricing_model} and {@code category} members are required; an entry whose
+     * {@code pricing} object lacks either is treated as carrying no pricing and yields {@code null}.
+     * The {@code billable} member defaults to {@code true} when absent, matching the platform default
+     * for the regular pricing type. The pricing type rides the {@code type} member, falling back to
+     * the legacy {@code pricing_type} member.
+     *
+     * @param status the {@code statuses[]} entry object
+     * @return the decoded pricing, or {@code null} when the entry carried no usable {@code pricing}
+     *         object
+     */
+    private static CloudMessagePricing decodeStatusPricing(JSONObject status) {
+        var pricing = status.getJSONObject("pricing");
+        if (pricing == null) {
+            return null;
+        }
+        var pricingModel = pricing.getString("pricing_model");
+        var category = pricing.getString("category");
+        if (pricingModel == null || category == null) {
+            return null;
+        }
+        var billable = pricing.getBoolean("billable");
+        var pricingType = pricing.getString("type");
+        if (pricingType == null) {
+            pricingType = pricing.getString("pricing_type");
+        }
+        return new CloudMessagePricing(billable == null || billable, pricingModel, pricingType, category);
     }
 
     /**
@@ -161,6 +271,24 @@ public final class CloudWebhookDecoder {
                 value.getString("message_template_language"),
                 value.getString("reason"),
                 disableDate);
+    }
+
+    /**
+     * Decodes a {@code message_template_pause} or {@code message_template_unpause} change value.
+     *
+     * <p>The id, name, language, and reason members are required; the optional {@code pause_date} member
+     * carries epoch seconds and is read only when present.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded pause or unpause notification
+     */
+    public static CloudTemplatePauseUpdate decodeTemplatePause(JSONObject value) {
+        return new CloudTemplatePauseUpdate(
+                idString(value, "message_template_id"),
+                stringOrUnknown(value, "message_template_name"),
+                stringOrUnknown(value, "message_template_language"),
+                stringOrUnknown(value, "reason"),
+                epochInstant(value.getLong("pause_date")));
     }
 
     /**
@@ -215,10 +343,11 @@ public final class CloudWebhookDecoder {
      * @return the decoded quality transition
      */
     public static CloudPhoneNumberUpdate decodePhoneNumberQuality(JSONObject value) {
+        var currentLimit = value.getString("current_limit");
         return new CloudPhoneNumberUpdate.Quality(
                 stringOrUnknown(value, "display_phone_number"),
                 stringOrUnknown(value, "event"),
-                value.getString("current_limit"));
+                currentLimit == null ? null : CloudMessagingLimitTier.of(currentLimit));
     }
 
     /**
@@ -298,7 +427,7 @@ public final class CloudWebhookDecoder {
                     waId,
                     entry.getString("detail"),
                     stringOrUnknown(entry, "category"),
-                    stringOrUnknown(entry, "value"),
+                    CloudMarketingPreference.of(entry.getString("value")),
                     epochInstant(entry.getLong("timestamp"))));
         }
         return result;
@@ -311,12 +440,80 @@ public final class CloudWebhookDecoder {
      * @return the decoded flow event
      */
     public static CloudFlowStatusUpdate decodeFlowStatus(JSONObject value) {
-        return new CloudFlowStatusUpdate(
+        var event = stringOrUnknown(value, "event");
+        var flowId = idString(value, "flow_id");
+        var message = value.getString("message");
+        var oldStatus = value.getString("old_status");
+        var newStatus = value.getString("new_status");
+        if (oldStatus != null || newStatus != null) {
+            return new CloudFlowStatusUpdate.StatusChange(event, flowId, message, oldStatus, newStatus);
+        }
+        return new CloudFlowStatusUpdate.EndpointHealth(event, flowId, message);
+    }
+
+    /**
+     * Decodes a {@code message_template_components_update} change value.
+     *
+     * <p>The body text rides the {@code message_template_element} member; the optional text header
+     * title, footer, and buttons are read only when the corresponding members are present. Each button
+     * carries its type and label, and, depending on the type, a URL or a phone number.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded template components
+     */
+    public static CloudTemplateComponentsUpdate decodeTemplateComponents(JSONObject value) {
+        var buttons = new ArrayList<CloudTemplateComponentsUpdate.Button>();
+        var buttonArray = value.getJSONArray("message_template_buttons");
+        if (buttonArray != null) {
+            for (var index = 0; index < buttonArray.size(); index++) {
+                var button = buttonArray.getJSONObject(index);
+                buttons.add(CloudTemplateComponentsUpdate.Button.of(
+                        stringOrUnknown(button, "message_template_button_type"),
+                        stringOrUnknown(button, "message_template_button_text"),
+                        button.getString("message_template_button_url"),
+                        button.getString("message_template_button_phone_number")));
+            }
+        }
+        return new CloudTemplateComponentsUpdate(
+                idString(value, "message_template_id"),
+                stringOrUnknown(value, "message_template_name"),
+                stringOrUnknown(value, "message_template_language"),
+                stringOrUnknown(value, "message_template_element"),
+                value.getString("message_template_title"),
+                value.getString("message_template_footer"),
+                buttons);
+    }
+
+    /**
+     * Decodes a {@code security} change value.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded security event
+     */
+    public static CloudSecurityUpdate decodeSecurity(JSONObject value) {
+        return new CloudSecurityUpdate(
+                stringOrUnknown(value, "display_phone_number"),
                 stringOrUnknown(value, "event"),
-                idString(value, "flow_id"),
-                value.getString("message"),
-                value.getString("old_status"),
-                value.getString("new_status"));
+                value.getString("requester"));
+    }
+
+    /**
+     * Decodes a {@code payment_configuration_update} change value.
+     *
+     * <p>The {@code created_timestamp} and {@code updated_timestamp} members carry epoch seconds and
+     * are projected onto {@link Instant} through {@link #epochInstant(Long)}.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded payment configuration change
+     */
+    public static CloudPaymentConfiguration decodePaymentConfiguration(JSONObject value) {
+        return new CloudPaymentConfiguration(
+                stringOrUnknown(value, "configuration_name"),
+                value.getString("provider_name"),
+                value.getString("provider_mid"),
+                value.getString("status"),
+                epochInstant(value.getLong("created_timestamp")),
+                epochInstant(value.getLong("updated_timestamp")));
     }
 
     /**
@@ -364,6 +561,377 @@ public final class CloudWebhookDecoder {
     }
 
     /**
+     * Decodes the contact entries of an {@code smb_app_state_sync} change value.
+     *
+     * <p>WhatsApp Coexistence delivers the business app's current and changed contacts shortly after
+     * onboarding succeeds. Each {@code state_sync[]} entry typed {@code contact} is projected onto a
+     * {@link CloudAppStateSyncContact}.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded contact sync entries, empty when the change carried none
+     */
+    public static List<CloudAppStateSyncContact> decodeAppStateSync(JSONObject value) {
+        var entries = value.getJSONArray("state_sync");
+        if (entries == null || entries.isEmpty()) {
+            return List.of();
+        }
+        var result = new ArrayList<CloudAppStateSyncContact>();
+        for (var index = 0; index < entries.size(); index++) {
+            var entry = entries.getJSONObject(index);
+            var contact = entry.getJSONObject("contact");
+            var metadata = entry.getJSONObject("metadata");
+            result.add(new CloudAppStateSyncContact(
+                    stringOrUnknown(entry, "type"),
+                    CloudAppStateSyncAction.of(entry.getString("action")),
+                    contact == null ? null : contact.getString("full_name"),
+                    contact == null ? null : contact.getString("first_name"),
+                    contact == null ? null : contact.getString("phone_number"),
+                    metadata == null ? null : epochInstant(callTimestamp(metadata))));
+        }
+        return result;
+    }
+
+    /**
+     * Decodes an {@code account_settings_update} change value into the Calling configuration it carries.
+     *
+     * <p>The change reports the current phone-number settings under {@code phone_number_settings}; the
+     * only modelled section is its {@code calling} object, which is projected onto a
+     * {@link CloudCallSettings} carrying the master status, the in-app call-icon visibility, the
+     * callback-permission status, the business-hours configuration, and the SIP bridge.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded Calling configuration, or {@code null} when the change carried no
+     *         {@code calling} object
+     */
+    public static CloudCallSettings decodeAccountSettings(JSONObject value) {
+        var settings = value.getJSONObject("phone_number_settings");
+        var calling = settings == null ? null : settings.getJSONObject("calling");
+        if (calling == null) {
+            return null;
+        }
+        CloudCallSettings.CallIcons callIcons = null;
+        var iconsNode = calling.getJSONObject("call_icons");
+        if (iconsNode != null) {
+            var countries = new ArrayList<String>();
+            var countryArray = iconsNode.getJSONArray("restrict_to_user_countries");
+            if (countryArray != null) {
+                for (var index = 0; index < countryArray.size(); index++) {
+                    countries.add(countryArray.getString(index));
+                }
+            }
+            callIcons = new CloudCallSettings.CallIcons(countries);
+        }
+        return new CloudCallSettings(
+                calling.getString("status"),
+                calling.getString("call_icon_visibility"),
+                callIcons,
+                calling.getString("callback_permission_status"),
+                calling.getString("srtp_key_exchange_protocol"),
+                parseCallHours(calling.getJSONObject("call_hours")),
+                parseSip(calling.getJSONObject("sip")));
+    }
+
+    /**
+     * Parses a {@code call_hours} object into a {@link CloudCallHours}.
+     *
+     * @param hours the {@code call_hours} object, or {@code null}
+     * @return the parsed business-hours configuration, or {@code null} when the input is {@code null}
+     */
+    private static CloudCallHours parseCallHours(JSONObject hours) {
+        if (hours == null) {
+            return null;
+        }
+        var weekly = new ArrayList<CloudCallHours.WeeklyOperatingHours>();
+        var weeklyArray = hours.getJSONArray("weekly_operating_hours");
+        if (weeklyArray != null) {
+            for (var index = 0; index < weeklyArray.size(); index++) {
+                var slot = weeklyArray.getJSONObject(index);
+                weekly.add(new CloudCallHours.WeeklyOperatingHours(
+                        slot.getString("day_of_week"),
+                        slot.getString("open_time"),
+                        slot.getString("close_time")));
+            }
+        }
+        var holidays = new ArrayList<CloudCallHours.HolidaySchedule>();
+        var holidayArray = hours.getJSONArray("holiday_schedule");
+        if (holidayArray != null) {
+            for (var index = 0; index < holidayArray.size(); index++) {
+                var slot = holidayArray.getJSONObject(index);
+                holidays.add(new CloudCallHours.HolidaySchedule(
+                        slot.getString("date"),
+                        slot.getString("start_time"),
+                        slot.getString("end_time")));
+            }
+        }
+        return new CloudCallHours(hours.getString("status"), hours.getString("timezone_id"), weekly, holidays);
+    }
+
+    /**
+     * Parses a {@code sip} object into a {@link CloudCallSettings.Sip}.
+     *
+     * @param sip the {@code sip} object, or {@code null}
+     * @return the parsed SIP configuration, or {@code null} when the input is {@code null}
+     */
+    private static CloudCallSettings.Sip parseSip(JSONObject sip) {
+        if (sip == null) {
+            return null;
+        }
+        var servers = new ArrayList<CloudCallSettings.SipServer>();
+        var serverArray = sip.getJSONArray("servers");
+        if (serverArray != null) {
+            for (var index = 0; index < serverArray.size(); index++) {
+                var server = serverArray.getJSONObject(index);
+                var port = server.containsKey("port") ? server.getInteger("port") : null;
+                var appId = server.containsKey("app_id") ? server.getInteger("app_id") : null;
+                var params = new java.util.LinkedHashMap<String, String>();
+                var paramsNode = server.getJSONObject("request_uri_user_params");
+                if (paramsNode != null) {
+                    for (var key : paramsNode.keySet()) {
+                        params.put(key, paramsNode.getString(key));
+                    }
+                }
+                servers.add(new CloudCallSettings.SipServer(
+                        server.getString("hostname"), port, server.getString("sip_user_password"),
+                        params, appId));
+            }
+        }
+        return new CloudCallSettings.Sip(sip.getString("status"), servers);
+    }
+
+    /**
+     * Decodes the system notifications carried as {@code system}-typed inbound messages in a
+     * {@code messages} change value.
+     *
+     * <p>A consumer changing their phone number or their account identity arrives as an inbound message
+     * whose {@code type} is {@code system}. Each matching message is projected onto the appropriate
+     * {@link CloudSystemUpdate} variant: a {@code customer_changed_number} transition onto a
+     * {@link CloudSystemUpdate.NumberChanged} (the new phone number is read from {@code system.new_wa_id}
+     * or, in the legacy string form, from {@code system.wa_id}) and a {@code customer_identity_changed}
+     * transition onto a {@link CloudSystemUpdate.IdentityChanged}. The polymorphic {@code system.type}
+     * member is normalized to a single token through {@link #normalizeSystemType(JSONObject)}; any other
+     * token is skipped to keep the variant set closed.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded system updates, empty when the change carried none
+     */
+    public static List<CloudSystemUpdate> decodeSystemUpdates(JSONObject value) {
+        var messages = value.getJSONArray("messages");
+        if (messages == null || messages.isEmpty()) {
+            return List.of();
+        }
+        var result = new ArrayList<CloudSystemUpdate>();
+        for (var index = 0; index < messages.size(); index++) {
+            var message = messages.getJSONObject(index);
+            if (!"system".equals(message.getString("type"))) {
+                continue;
+            }
+            var system = message.getJSONObject("system");
+            if (system == null) {
+                continue;
+            }
+            var from = message.getString("from");
+            if (from == null) {
+                continue;
+            }
+            var body = system.getString("body");
+            var customer = system.getString("customer");
+            var timestamp = epochInstant(message.getLong("timestamp"));
+            switch (normalizeSystemType(system)) {
+                case "customer_changed_number" -> {
+                    var newWaId = system.getString("new_wa_id");
+                    if (newWaId == null) {
+                        newWaId = system.getString("wa_id");
+                    }
+                    if (newWaId != null) {
+                        result.add(new CloudSystemUpdate.NumberChanged(from, body, customer, timestamp, newWaId));
+                    }
+                }
+                case "customer_identity_changed" -> {
+                    var identity = system.getString("identity");
+                    if (identity != null) {
+                        result.add(new CloudSystemUpdate.IdentityChanged(from, body, customer, timestamp, identity));
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Normalizes the polymorphic {@code system.type} member onto a single canonical string.
+     *
+     * <p>The member appears either as a string ({@code customer_changed_number},
+     * {@code customer_identity_changed}, or the legacy {@code user_changed_number}) or as an object of
+     * booleans across documentation versions; both forms are mapped to one of
+     * {@code customer_changed_number} or {@code customer_identity_changed}, falling back to
+     * {@code UNKNOWN}.
+     *
+     * @param system the {@code system} object
+     * @return the canonical type string
+     */
+    private static String normalizeSystemType(JSONObject system) {
+        var raw = system.get("type");
+        if (raw instanceof String value) {
+            return switch (value) {
+                case "user_changed_number", "customer_changed_number" -> "customer_changed_number";
+                case "user_identity_changed", "customer_identity_changed" -> "customer_identity_changed";
+                default -> value;
+            };
+        }
+        var object = system.getJSONObject("type");
+        if (object != null) {
+            if (Boolean.TRUE.equals(object.getBoolean("customer_changed_number"))) {
+                return "customer_changed_number";
+            }
+            if (Boolean.TRUE.equals(object.getBoolean("customer_identity_changed"))) {
+                return "customer_identity_changed";
+            }
+        }
+        return "UNKNOWN";
+    }
+
+    /**
+     * Decodes the inbound signaling events of a {@code calls} change value.
+     *
+     * <p>Each {@code calls[]} entry carries a {@code connect} (with an SDP offer in its {@code session}
+     * object) or a {@code terminate} (with the final status, duration, and the start and end
+     * timestamps). A {@code connect} is projected onto a {@link CloudCallEvent.Connect} and any other
+     * entry is treated as a {@code terminate} and projected onto a {@link CloudCallEvent.Terminate}.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded signaling events, empty when the change carried none
+     */
+    public static List<CloudCallEvent.Signaling> decodeCalls(JSONObject value) {
+        var calls = value.getJSONArray("calls");
+        if (calls == null || calls.isEmpty()) {
+            return List.of();
+        }
+        var result = new ArrayList<CloudCallEvent.Signaling>();
+        for (var index = 0; index < calls.size(); index++) {
+            var call = calls.getJSONObject(index);
+            if ("connect".equals(call.getString("event"))) {
+                var session = call.getJSONObject("session");
+                var callSession = session == null ? null
+                        : new CloudCallSession(CloudCallSession.Type.of(session.getString("sdp_type")), session.getString("sdp"));
+                result.add(new CloudCallEvent.Connect(
+                        call.getString("id"),
+                        call.getString("from"),
+                        call.getString("to"),
+                        callDirection(call),
+                        callSession,
+                        epochInstant(callTimestamp(call))));
+            } else {
+                result.add(new CloudCallEvent.Terminate(
+                        call.getString("id"),
+                        call.getString("from"),
+                        call.getString("to"),
+                        callDirection(call),
+                        call.getString("status"),
+                        call.getInteger("duration"),
+                        epochInstant(call.getLong("start_time")),
+                        epochInstant(call.getLong("end_time")),
+                        epochInstant(callTimestamp(call))));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Decodes the business-initiated call status transitions of a {@code calls} change value.
+     *
+     * <p>A business-initiated call reports its lifecycle ({@code RINGING}, {@code ACCEPTED},
+     * {@code REJECTED}) through the {@code calls} field inside a {@code statuses[]} array, each entry
+     * typed {@code call}. This is the status-update twin of {@link #decodeCalls(JSONObject)}, which reads
+     * the {@code calls[]} array carrying the inbound SDP offer and the terminate disposition. Entries
+     * whose {@code type} is not {@code call} (ordinary message statuses riding the same array) are
+     * ignored. The callee phone number is the only party present and is mapped to
+     * {@link CloudCallEvent#from()}.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded call status transitions, empty when the change carried none
+     */
+    public static List<CloudCallEvent.Status> decodeCallStatuses(JSONObject value) {
+        var statuses = value.getJSONArray("statuses");
+        if (statuses == null || statuses.isEmpty()) {
+            return List.of();
+        }
+        var result = new ArrayList<CloudCallEvent.Status>();
+        for (var index = 0; index < statuses.size(); index++) {
+            var status = statuses.getJSONObject(index);
+            if (!"call".equals(status.getString("type"))) {
+                continue;
+            }
+            result.add(new CloudCallEvent.Status(
+                    status.getString("id"),
+                    status.getString("recipient_id"),
+                    CloudCallStatus.of(status.getString("status")),
+                    CloudCallDirection.BUSINESS_INITIATED,
+                    epochInstant(callTimestamp(status))));
+        }
+        return result;
+    }
+
+    /**
+     * Decodes the call-permission replies carried as interactive messages in a {@code messages} change
+     * value.
+     *
+     * <p>A consumer's accept or reject of a permission request arrives as an interactive message whose
+     * {@code interactive.type} is {@code call_permission_reply}. Each matching message is projected onto
+     * a {@link CloudCallEvent.PermissionReply} carrying the response, its source, and the granted
+     * permission's expiration rather than an SDP description.
+     *
+     * @param value the webhook change {@code value}
+     * @return the decoded permission replies, empty when the change carried none
+     */
+    public static List<CloudCallEvent.PermissionReply> decodeCallPermissionReplies(JSONObject value) {
+        var messages = value.getJSONArray("messages");
+        if (messages == null || messages.isEmpty()) {
+            return List.of();
+        }
+        var result = new ArrayList<CloudCallEvent.PermissionReply>();
+        for (var index = 0; index < messages.size(); index++) {
+            var message = messages.getJSONObject(index);
+            var interactive = message.getJSONObject("interactive");
+            if (interactive == null || !"call_permission_reply".equals(interactive.getString("type"))) {
+                continue;
+            }
+            var reply = interactive.getJSONObject("call_permission_reply");
+            if (reply == null) {
+                continue;
+            }
+            result.add(new CloudCallEvent.PermissionReply(
+                    message.getString("id"),
+                    message.getString("from"),
+                    CloudCallPermissionResponse.of(reply.getString("response")),
+                    reply.getString("response_source"),
+                    epochInstant(reply.getLong("expiration_timestamp")),
+                    epochInstant(message.getLong("timestamp"))));
+        }
+        return result;
+    }
+
+    /**
+     * Reads the {@code timestamp} member of a calling event, which the wire carries as a string of epoch
+     * seconds.
+     *
+     * @param call the call object
+     * @return the epoch seconds, or {@code null} when absent or unparseable
+     */
+    private static Long callTimestamp(JSONObject call) {
+        var raw = call.get("timestamp");
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(String.valueOf(raw));
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    /**
      * Reads a string member, substituting {@code UNKNOWN} when absent.
      *
      * @param value the change value
@@ -373,6 +941,18 @@ public final class CloudWebhookDecoder {
     private static String stringOrUnknown(JSONObject value, String key) {
         var member = value.getString(key);
         return member == null ? "UNKNOWN" : member;
+    }
+
+    /**
+     * Reads the {@code direction} member of a call entry into a {@link CloudCallDirection}, preserving
+     * absence as {@code null} so the model exposes it as an empty optional.
+     *
+     * @param call the call entry
+     * @return the decoded direction, or {@code null} when the entry carried none
+     */
+    private static CloudCallDirection callDirection(JSONObject call) {
+        var direction = call.getString("direction");
+        return direction == null ? null : CloudCallDirection.of(direction);
     }
 
     /**
@@ -400,29 +980,39 @@ public final class CloudWebhookDecoder {
     /**
      * Decodes a single inbound message into a {@link ChatMessageInfo}.
      *
+     * <p>When the consumer hides their number, the phone-scoped {@code from} is omitted and only the
+     * business-scoped user id ({@code from_user_id}, the BSUID) is present; in that case the BSUID is
+     * used as the sender identity so the message key never carries a {@code null} JID. When neither is
+     * present the key carries no sender JID at all.
+     *
      * @param message   the inbound message object
-     * @param pushNames the profile names indexed by sender wa_id
+     * @param pushNames the profile names indexed by sender wa_id, falling back to the BSUID key
      * @return the decoded message
      */
     private static ChatMessageInfo decodeMessage(JSONObject message, Map<String, String> pushNames) {
         var from = message.getString("from");
-        var senderJid = userJid(from);
-        var key = new MessageKeyBuilder()
+        var fromUserId = message.getString("from_user_id");
+        var identity = from != null ? from : fromUserId;
+        var senderJid = optionalUserJid(identity);
+        var keyBuilder = new MessageKeyBuilder()
                 .id(message.getString("id"))
-                .parentJid(senderJid)
-                .fromMe(false)
-                .build();
+                .fromMe(false);
+        if (senderJid != null) {
+            keyBuilder.parentJid(senderJid);
+        }
         var container = decodeContent(message);
         var builder = new ChatMessageInfoBuilder()
-                .key(key)
+                .key(keyBuilder.build())
                 .message(container)
-                .senderJid(senderJid)
                 .status(MessageStatus.DELIVERED);
+        if (senderJid != null) {
+            builder.senderJid(senderJid);
+        }
         var timestamp = message.getLong("timestamp");
         if (timestamp != null) {
             builder.timestamp(Instant.ofEpochSecond(timestamp));
         }
-        var pushName = pushNames.get(from);
+        var pushName = pushNames.get(identity);
         if (pushName != null) {
             builder.pushName(pushName);
         }
@@ -471,7 +1061,33 @@ public final class CloudWebhookDecoder {
             case "reaction" -> decodeReaction(message);
             case "interactive" -> decodeInteractiveReply(message);
             case "button" -> decodeButtonReply(message);
+            case "contacts" -> decodeContacts(message);
+            case "order" -> decodeOrder(message);
+            // TODO: unmapped inbound content type; the message is delivered with an empty container so
+            //       the dispatcher can route the type to the error listener for observability. Add the
+            //       missing content decode (and its mapped type below) when the type is modelled.
             default -> MessageContainer.empty();
+        };
+    }
+
+    /**
+     * Returns whether an inbound message {@code type} has a content decode in {@link #decodeContent}.
+     *
+     * <p>The dispatcher consults this to detect a message whose content type fell through to the empty
+     * fallback, so the unmapped type can be surfaced rather than silently delivered as an empty message.
+     *
+     * @param type the inbound message {@code type} member, or {@code null}
+     * @return {@code true} when {@code type} is decoded, {@code false} when it falls through to the empty
+     *         fallback
+     */
+    public static boolean isMappedContentType(String type) {
+        if (type == null) {
+            return false;
+        }
+        return switch (type) {
+            case "text", "image", "video", "audio", "document", "sticker", "location", "reaction",
+                 "interactive", "button", "contacts", "order", "system" -> true;
+            default -> false;
         };
     }
 
@@ -559,8 +1175,158 @@ public final class CloudWebhookDecoder {
                         .listType(ListResponseMessage.ListType.SINGLE_SELECT)
                         .build());
             }
+            var nfmReply = interactive.getJSONObject("nfm_reply");
+            if (nfmReply != null) {
+                var flow = new InteractiveResponseMessageNativeFlowResponseMessageBuilder()
+                        .name(nfmReply.getString("name"))
+                        .paramsJson(nfmReply.getString("response_json"))
+                        .build();
+                var responseBuilder = new InteractiveResponseMessageBuilder()
+                        .nativeFlowResponseMessage(flow);
+                var summary = nfmReply.getString("body");
+                if (summary != null) {
+                    responseBuilder.body(new InteractiveResponseMessageBodyBuilder()
+                            .text(summary)
+                            .format(InteractiveResponseMessage.Body.TemplateFormat.DEFAULT)
+                            .build());
+                }
+                return MessageContainer.of(responseBuilder.build());
+            }
         }
         return MessageContainer.empty();
+    }
+
+    /**
+     * Decodes an inbound contacts message into a contacts-array message.
+     *
+     * <p>Each structured Cloud contact is rebuilt into a vCard-backed {@link ContactMessage}, the
+     * inverse of {@link CloudMessageEncoder} contact encoding. The array display name is the
+     * comma-joined formatted names of the contained contacts.
+     *
+     * @param message the inbound message object
+     * @return the decoded container
+     */
+    private static MessageContainer decodeContacts(JSONObject message) {
+        var contacts = message.getJSONArray("contacts");
+        if (contacts == null || contacts.isEmpty()) {
+            return MessageContainer.empty();
+        }
+        var entries = new ArrayList<ContactMessage>();
+        var displayNames = new ArrayList<String>();
+        for (var index = 0; index < contacts.size(); index++) {
+            var contact = contacts.getJSONObject(index);
+            var name = contact.getJSONObject("name");
+            var formatted = name == null ? null : name.getString("formatted_name");
+            if (formatted != null) {
+                displayNames.add(formatted);
+            }
+            entries.add(new ContactMessageBuilder()
+                    .displayName(formatted)
+                    .vcard(vcardFromCloudContact(contact, formatted))
+                    .build());
+        }
+        return MessageContainer.of(new ContactsArrayMessageBuilder()
+                .displayName(String.join(", ", displayNames))
+                .contacts(entries)
+                .build());
+    }
+
+    /**
+     * Builds a vCard string from a Cloud structured contact object.
+     *
+     * <p>The formatted name becomes the {@code FN} line, each phone becomes a {@code TEL} line carrying
+     * the contact type and the {@code wa_id} as parameters when present, and the company becomes an
+     * {@code X-WA-BIZ-NAME} line.
+     *
+     * @param contact   the structured Cloud contact
+     * @param formatted the formatted display name, or {@code null}
+     * @return a vCard 3.0 string
+     */
+    private static String vcardFromCloudContact(JSONObject contact, String formatted) {
+        var vcard = new StringBuilder("BEGIN:VCARD\r\nVERSION:3.0\r\n");
+        if (formatted != null) {
+            vcard.append("FN:").append(formatted).append("\r\n");
+        }
+        var phones = contact.getJSONArray("phones");
+        if (phones != null) {
+            for (var index = 0; index < phones.size(); index++) {
+                var phone = phones.getJSONObject(index);
+                var number = phone.getString("phone");
+                if (number == null) {
+                    continue;
+                }
+                var type = phone.getString("type");
+                var waId = phone.getString("wa_id");
+                vcard.append("TEL");
+                if (type != null) {
+                    vcard.append(";type=").append(type);
+                }
+                if (waId != null) {
+                    vcard.append(";waid=").append(waId);
+                }
+                vcard.append(':').append(number).append("\r\n");
+            }
+        }
+        var org = contact.getJSONObject("org");
+        if (org != null) {
+            var company = org.getString("company");
+            if (company != null) {
+                vcard.append("X-WA-BIZ-NAME:").append(company).append("\r\n");
+            }
+        }
+        return vcard.append("END:VCARD\r\n").toString();
+    }
+
+    /**
+     * Decodes an inbound catalog order message into an order message.
+     *
+     * <p>The mapping is partial: the order note, item count, currency and a derived total survive,
+     * while the catalog id and per-line item details have no field on {@link OrderMessage} and are
+     * dropped. The status defaults to {@link OrderMessage.OrderStatus#INQUIRY} and the surface to
+     * {@link OrderMessage.OrderSurface#CATALOG}.
+     *
+     * @param message the inbound message object
+     * @return the decoded container
+     */
+    private static MessageContainer decodeOrder(JSONObject message) {
+        var order = message.getJSONObject("order");
+        var builder = new OrderMessageBuilder()
+                .status(OrderMessage.OrderStatus.INQUIRY)
+                .surface(OrderMessage.OrderSurface.CATALOG);
+        if (order != null) {
+            builder.message(order.getString("text"));
+            var items = order.getJSONArray("product_items");
+            if (items != null) {
+                builder.itemCount(items.size());
+                long total1000 = 0;
+                String currency = null;
+                for (var index = 0; index < items.size(); index++) {
+                    var item = items.getJSONObject(index);
+                    var price = item.getDouble("item_price");
+                    var quantity = item.getInteger("quantity");
+                    if (price != null) {
+                        // TODO: unverified - item_price is in major currency units; the *1000 scaling to
+                        //       the thousandths contract could not be confirmed against a Meta source.
+                        total1000 += Math.round(price * (quantity == null ? 1 : quantity) * 1000);
+                    }
+                    if (currency == null) {
+                        currency = item.getString("currency");
+                    }
+                }
+                builder.totalAmount1000(total1000);
+                builder.totalCurrencyCode(currency);
+            }
+            // TODO: order.catalog_id and per-item product_retailer_id/quantity/item_price have no
+            //       OrderMessage field; a Cloud-only order model would be needed to carry them.
+        }
+        var context = message.getJSONObject("context");
+        if (context != null) {
+            var sourceId = context.getString("id");
+            if (sourceId != null) {
+                builder.orderRequestMessageId(new MessageKeyBuilder().id(sourceId).fromMe(true).build());
+            }
+        }
+        return MessageContainer.of(builder.build());
     }
 
     /**
@@ -617,10 +1383,14 @@ public final class CloudWebhookDecoder {
     }
 
     /**
-     * Indexes the inbound profile names by sender wa_id.
+     * Indexes the inbound profile names by sender identity.
+     *
+     * <p>The profile name is keyed by {@code wa_id} when present, and additionally by the
+     * business-scoped {@code user_id} (the BSUID) so a hidden-number message that carries only the
+     * BSUID still resolves a push name.
      *
      * @param value the webhook change {@code value}
-     * @return a map of wa_id to profile name
+     * @return a map of sender identity to profile name
      */
     private static Map<String, String> pushNamesByWaId(JSONObject value) {
         var result = new HashMap<String, String>();
@@ -630,10 +1400,18 @@ public final class CloudWebhookDecoder {
         }
         for (var index = 0; index < contacts.size(); index++) {
             var contact = contacts.getJSONObject(index);
-            var waId = contact.getString("wa_id");
             var profile = contact.getJSONObject("profile");
-            if (waId != null && profile != null) {
-                result.put(waId, profile.getString("name"));
+            if (profile == null) {
+                continue;
+            }
+            var name = profile.getString("name");
+            var waId = contact.getString("wa_id");
+            if (waId != null) {
+                result.put(waId, name);
+            }
+            var userId = contact.getString("user_id");
+            if (userId != null) {
+                result.put(userId, name);
             }
         }
         return result;
@@ -647,5 +1425,27 @@ public final class CloudWebhookDecoder {
      */
     private static Jid userJid(String phoneNumber) {
         return Jid.of(phoneNumber, JidServer.user());
+    }
+
+    /**
+     * Builds a user JID from a sender identity, tolerating a non-parseable business-scoped user id.
+     *
+     * <p>A phone-scoped {@code wa_id}/{@code from} parses cleanly as a {@code user} JID. A hidden-number
+     * sender carries only the business-scoped user id (BSUID), whose opaque form is not a phone number
+     * and need not parse as a JID; in that case no JID is built so the key carries no sender JID rather
+     * than crashing or fabricating a {@code null}-bearing one.
+     *
+     * @param identity the sender identity, or {@code null}
+     * @return the user JID, or {@code null} when the identity is absent or not a parseable JID
+     */
+    private static Jid optionalUserJid(String identity) {
+        if (identity == null) {
+            return null;
+        }
+        try {
+            return userJid(identity);
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 }

@@ -123,7 +123,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof ClearChatAction clearChatAction)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ClearChatAction clearChatAction)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
@@ -170,11 +170,11 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.ADAPTED)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localAction = localMutation.value().action()
+        var localAction = localMutation.value().flatMap(sav -> sav.action())
                 .filter(a -> a instanceof ClearChatAction)
                 .map(a -> (ClearChatAction) a)
                 .orElse(null);
-        var remoteAction = remoteMutation.value().action()
+        var remoteAction = remoteMutation.value().flatMap(sav -> sav.action())
                 .filter(a -> a instanceof ClearChatAction)
                 .map(a -> (ClearChatAction) a)
                 .orElse(null);

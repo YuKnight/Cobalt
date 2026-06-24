@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -86,7 +87,7 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
      *
      * @implNote
      * This implementation lets exceptions propagate so the configured
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientErrorHandler}
+     * {@link WhatsAppLinkedClientErrorHandler}
      * decides recovery, where WA Web sibling handlers wrap the body in a
      * try/catch returning a failed sentinel.
      */
@@ -96,7 +97,7 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof NotificationActivitySettingAction action)
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof NotificationActivitySettingAction action)
                 || action.notificationActivitySetting().isEmpty()) {
             return MutationApplicationResult.malformed();
         }

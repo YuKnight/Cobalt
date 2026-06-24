@@ -88,7 +88,7 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof DetectedOutcomesStatusAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof DetectedOutcomesStatusAction action)) {
             return MutationApplicationResult.malformed();
         }
 

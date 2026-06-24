@@ -102,7 +102,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof ExternalWebBetaAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ExternalWebBetaAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

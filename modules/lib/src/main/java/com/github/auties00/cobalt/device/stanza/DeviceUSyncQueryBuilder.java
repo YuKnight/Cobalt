@@ -34,6 +34,7 @@ import java.util.*;
 @WhatsAppWebModule(moduleName = "WAWebUsync")
 @WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
 @WhatsAppWebModule(moduleName = "WAWebUsyncUsername")
+@WhatsAppWebModule(moduleName = "WAWebUsyncLid")
 public final class DeviceUSyncQueryBuilder {
 
     /**
@@ -145,6 +146,70 @@ public final class DeviceUSyncQueryBuilder {
             }
             return batches;
         }
+    }
+
+    /**
+     * Builds a USync IQ that resolves the long-identifier (LID) for a single phone-number user.
+     *
+     * <p>The query carries only the LID protocol ({@code <query><lid/></query>}) for one
+     * {@code <user jid="...">} entry, mirroring WA Web's {@code USyncLidProtocol}: the server answers
+     * with a {@code <lid val="...@lid"/>} child under the matching {@code <user>} when a LID is assigned
+     * to the number. The {@code context} value is written verbatim onto the {@code <usync>} element and
+     * must be a valid USync context wire literal; the call path uses {@code "voip"}. The device suffix
+     * of {@code userJid} is stripped before it is written into the {@code jid} attribute.
+     *
+     * @implNote
+     * This implementation issues a focused LID-only query rather than bundling the LID protocol into the
+     * device-protocol sweep the way WA Web's contact sync does, because Cobalt resolves a peer LID
+     * on demand at call placement and caches the result; the bundled form is not needed for the device
+     * list itself.
+     *
+     * @param userJid the phone-number user JID whose LID must be resolved
+     * @param context the {@code context} attribute written onto the {@code <usync>} element
+     * @return the IQ {@link NodeBuilder} ready for dispatch
+     * @throws NullPointerException if {@code userJid} or {@code context} is {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncLid",
+            exports = "USyncLidProtocol",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public static NodeBuilder buildLidQuery(Jid userJid, String context) {
+        Objects.requireNonNull(userJid, "userJid cannot be null");
+        Objects.requireNonNull(context, "context cannot be null");
+
+        var sessionId = RandomIdUtils.newId();
+
+        var userNode = new NodeBuilder()
+                .description("user")
+                .attribute("jid", userJid.toUserJid())
+                .build();
+        var listNode = new NodeBuilder()
+                .description("list")
+                .content(userNode)
+                .build();
+        var lidNode = new NodeBuilder()
+                .description("lid")
+                .build();
+        var queryNode = new NodeBuilder()
+                .description("query")
+                .content(lidNode)
+                .build();
+
+        var usyncNode = new NodeBuilder()
+                .description("usync")
+                .attribute("sid", sessionId)
+                .attribute("index", "0")
+                .attribute("last", "true")
+                .attribute("mode", "query")
+                .attribute("context", context)
+                .content(queryNode, listNode)
+                .build();
+
+        return new NodeBuilder()
+                .description("iq")
+                .attribute("to", JidServer.user())
+                .attribute("xmlns", "usync")
+                .attribute("type", "get")
+                .content(usyncNode);
     }
 
     /**

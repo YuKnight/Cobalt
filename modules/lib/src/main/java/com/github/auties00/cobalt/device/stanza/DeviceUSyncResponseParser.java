@@ -40,6 +40,7 @@ import java.util.stream.Stream;
 @WhatsAppWebModule(moduleName = "WAWebUsyncDevice")
 @WhatsAppWebModule(moduleName = "WAWebHandleAdvForUsyncApi")
 @WhatsAppWebModule(moduleName = "WAWebUsyncUsername")
+@WhatsAppWebModule(moduleName = "WAWebUsyncLid")
 public final class DeviceUSyncResponseParser {
     /**
      * Holds the logger used to trace per-user and protocol-level parse warnings.
@@ -131,6 +132,75 @@ public final class DeviceUSyncResponseParser {
                 .flatMap(userNode -> parseUserDevices(userNode, usernameMap));
         return Stream.concat(protocolErrorStream, userResults)
                 .toList();
+    }
+
+    /**
+     * Collects the phone-number-to-LID mappings carried by a USync LID-protocol response.
+     *
+     * <p>Walks every {@code <user>} entry under the {@code <usync><list>} envelope, reading the queried
+     * phone-number JID from the {@code jid} attribute and the assigned LID from the {@code <lid val>}
+     * child, mirroring WA Web's {@code WAWebUsyncLid.lidParser}. Entries whose {@code <lid>} child is
+     * absent, carries an {@code <error/>}, or lacks a {@code val} attribute are skipped, so the returned
+     * map holds one entry only for users the server actually resolved. The map is keyed by the
+     * device-stripped phone-number JID and valued by the device-stripped LID.
+     *
+     * @implNote
+     * This implementation reuses the same {@code <usync><list><user>} walk as {@link #parse(Node)} and
+     * {@link #parseUsernameMap(Node)} so a LID query can be parsed without the device-protocol
+     * machinery; it is consumed by the call-placement LID resolution in
+     * {@link com.github.auties00.cobalt.device.DeviceService#queryUserLid(Jid)}.
+     *
+     * @param responseNode the {@code <iq>} response received from the socket
+     * @return the phone-number-to-LID map, or an empty map when no LID entries are present
+     * @throws NullPointerException if {@code responseNode} is {@code null}
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncLid",
+            exports = "lidParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    public Map<Jid, Jid> parseLidMappings(Node responseNode) {
+        Objects.requireNonNull(responseNode, "responseNode cannot be null");
+        return responseNode.streamChild("usync")
+                .flatMap(usync -> usync.streamChild("list"))
+                .flatMap(list -> list.streamChildren("user"))
+                .flatMap(this::parseLidEntry)
+                .collect(Collectors.toUnmodifiableMap(LidEntry::phoneJid, LidEntry::lid, (first, _) -> first));
+    }
+
+    /**
+     * Extracts a {@code (phoneJid, lid)} pair from a single {@code <user><lid val="..."/></user>} entry.
+     *
+     * <p>This is the inner worker for {@link #parseLidMappings(Node)}; it emits nothing when the
+     * {@code jid} attribute is missing, the {@code <lid>} child is absent or carries an {@code <error/>},
+     * or the {@code val} attribute is missing or not a valid LID JID.
+     *
+     * @param userNode the {@code <user>} entry
+     * @return a stream carrying the parsed entry, or empty when the LID could not be read
+     */
+    @WhatsAppWebExport(moduleName = "WAWebUsyncLid",
+            exports = "lidParser",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private Stream<LidEntry> parseLidEntry(Node userNode) {
+        var jid = userNode.getAttributeAsJid("jid");
+        if (jid.isEmpty()) {
+            return Stream.empty();
+        }
+
+        var lidNode = userNode.getChild("lid");
+        if (lidNode.isEmpty()) {
+            return Stream.empty();
+        }
+
+        var node = lidNode.get();
+        if (node.getChild("error").isPresent()) {
+            return Stream.empty();
+        }
+
+        var lid = node.getAttributeAsJid("val");
+        if (lid.isEmpty()) {
+            return Stream.empty();
+        }
+
+        return Stream.of(new LidEntry(jid.get().toUserJid(), lid.get().toUserJid()));
     }
 
     /**
@@ -517,4 +587,15 @@ public final class DeviceUSyncResponseParser {
      * @param username the username string
      */
     private record UsernameEntry(Jid userJid, String username) {}
+
+    /**
+     * Carries a parsed {@code (phoneJid, lid)} pair.
+     *
+     * <p>This is the value type of the {@link Stream} produced by {@link #parseLidEntry(Node)} before
+     * being collected into the phone-number-to-LID map.
+     *
+     * @param phoneJid the queried phone-number user JID
+     * @param lid      the assigned LID user JID
+     */
+    private record LidEntry(Jid phoneJid, Jid lid) {}
 }

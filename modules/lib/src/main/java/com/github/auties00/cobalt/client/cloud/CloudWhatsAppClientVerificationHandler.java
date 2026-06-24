@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.client.cloud;
 
-import com.github.auties00.cobalt.model.cloud.CloudVerificationMethod;
+import com.github.auties00.cobalt.model.cloud.phone.CloudVerificationMethod;
 
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -10,7 +10,7 @@ import java.util.function.Supplier;
  * {@link CloudWhatsAppClient}.
  *
  * <p>Verifying a phone number for Cloud API use is a two-step exchange: the client requests a
- * one-time code over a delivery channel ({@link #requestMethod()}), the user receives it on the
+ * one-time code over a delivery channel ({@link #method()}), the user receives it on the
  * phone number being verified, and the client submits it back ({@link #verificationCode()}). This
  * is the Cloud counterpart of the Linked
  * {@link com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler.Mobile}
@@ -18,7 +18,7 @@ import java.util.function.Supplier;
  *
  * @apiNote
  * Wire an implementation into
- * {@link CloudWhatsAppClient#verifyPhoneNumber(String, CloudWhatsAppClientVerificationHandler)},
+ * {@link CloudWhatsAppClient#verifyPhoneNumber(CloudWhatsAppClientVerificationHandler, java.util.Locale)},
  * or use the {@link #sms(Supplier)} and {@link #call(Supplier)} factories when the only decision
  * left to make is how the user supplies the received code.
  */
@@ -28,7 +28,7 @@ public interface CloudWhatsAppClientVerificationHandler {
      *
      * @return the delivery channel
      */
-    CloudVerificationMethod requestMethod();
+    CloudVerificationMethod method();
 
     /**
      * Returns the verification code supplied by the user.
@@ -51,7 +51,23 @@ public interface CloudWhatsAppClientVerificationHandler {
      */
     static CloudWhatsAppClientVerificationHandler sms(Supplier<String> supplier) {
         Objects.requireNonNull(supplier, "supplier cannot be null");
-        return of(CloudVerificationMethod.SMS, supplier);
+        Objects.requireNonNull(CloudVerificationMethod.SMS, "method cannot be null");
+        Objects.requireNonNull(supplier, "supplier cannot be null");
+        return new CloudWhatsAppClientVerificationHandler() {
+            @Override
+            public CloudVerificationMethod method() {
+                return CloudVerificationMethod.SMS;
+            }
+
+            @Override
+            public String verificationCode() {
+                var value = supplier.get();
+                if (value == null) {
+                    throw new IllegalArgumentException("Cannot send verification code: no value");
+                }
+                return value;
+            }
+        };
     }
 
     /**
@@ -65,26 +81,12 @@ public interface CloudWhatsAppClientVerificationHandler {
      */
     static CloudWhatsAppClientVerificationHandler call(Supplier<String> supplier) {
         Objects.requireNonNull(supplier, "supplier cannot be null");
-        return of(CloudVerificationMethod.VOICE, supplier);
-    }
-
-    /**
-     * Returns a verification handler for the given delivery channel that reads the verification
-     * code from the supplied supplier.
-     *
-     * @param method   the delivery channel to request
-     * @param supplier the supplier that produces the verification code once the user has received
-     *                 it
-     * @return the verification handler
-     * @throws NullPointerException if {@code method} or {@code supplier} is {@code null}
-     */
-    static CloudWhatsAppClientVerificationHandler of(CloudVerificationMethod method, Supplier<String> supplier) {
-        Objects.requireNonNull(method, "method cannot be null");
+        Objects.requireNonNull(CloudVerificationMethod.VOICE, "method cannot be null");
         Objects.requireNonNull(supplier, "supplier cannot be null");
         return new CloudWhatsAppClientVerificationHandler() {
             @Override
-            public CloudVerificationMethod requestMethod() {
-                return method;
+            public CloudVerificationMethod method() {
+                return CloudVerificationMethod.VOICE;
             }
 
             @Override

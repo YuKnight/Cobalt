@@ -176,7 +176,7 @@ class EncryptedMutationTest {
                 assertEquals(3, dec.actionVersion());
 
                 // The decrypted action value must carry the same payload
-                var roundtrip = dec.value().action().filter(action -> action instanceof ArchiveChatAction).map(action -> (ArchiveChatAction) action).orElseThrow();
+                var roundtrip = dec.value().flatMap(sav -> sav.action()).filter(action -> action instanceof ArchiveChatAction).map(action -> (ArchiveChatAction) action).orElseThrow();
                 assertTrue(roundtrip.archived(), "archived flag must round-trip");
             }
         }
@@ -285,7 +285,7 @@ class EncryptedMutationTest {
             try (var keys = MutationKeys.ofSyncKey(syncKey)) {
                 var dec = DecryptedMutation.Untrusted.of(
                         encryptedValue, indexMac, keys, operation, keyId);
-                assertNotNull(dec.value(), "decrypted SyncActionValue must be non-null");
+                assertTrue(dec.value().isPresent(), "decrypted SyncActionValue must be present");
             }
         }
 

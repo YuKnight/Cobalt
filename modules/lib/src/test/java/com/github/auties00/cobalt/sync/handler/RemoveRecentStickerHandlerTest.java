@@ -285,7 +285,7 @@ class RemoveRecentStickerHandlerTest {
             var before = Instant.now();
             var pending = new RemoveRecentStickerMutationFactory().getRemoveRecentStickerMutation(STICKER_HASH);
             var after = Instant.now();
-            var action = pending.mutation().value().action().filter(a -> a instanceof RemoveRecentStickerAction).map(a -> (RemoveRecentStickerAction) a).orElseThrow();
+            var action = pending.mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof RemoveRecentStickerAction).map(a -> (RemoveRecentStickerAction) a).orElseThrow();
             var lastTs = action.lastStickerSentTs().orElseThrow();
             assertFalse(lastTs.isBefore(before.minusSeconds(1)),
                     "lastStickerSentTs must reflect the build instant");

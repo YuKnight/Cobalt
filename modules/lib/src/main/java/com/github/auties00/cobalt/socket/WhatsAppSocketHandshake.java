@@ -7,16 +7,18 @@ import com.github.auties00.cobalt.model.device.pairing.HandshakeMessage;
 import com.github.auties00.cobalt.model.device.pairing.HandshakeMessageSpec;
 import com.github.auties00.cobalt.socket.datagram.WhatsAppDatagramInputStream;
 import com.github.auties00.cobalt.socket.datagram.WhatsAppDatagramOutputStream;
-import com.github.auties00.cobalt.util.GcmUtils;
+import com.github.auties00.cobalt.util.DataUtils;
 import it.auties.protobuf.stream.ProtobufInputStream;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import javax.crypto.*;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.HKDFParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.DestroyFailedException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.Objects;
@@ -335,10 +337,12 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
      */
     @WhatsAppWebExport(moduleName = "WANoiseHandshake", exports = "NoiseHandshake", adaptation = WhatsAppAdaptation.DIRECT)
     byte[] cipher(byte[] text, boolean encrypt) throws IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, InvalidKeyException {
+        var nonce = new byte[12];
+        DataUtils.putLong(nonce, 4, counter++, ByteOrder.BIG_ENDIAN);
         cipher.init(
                 encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE,
                 cryptoKey,
-                GcmUtils.createNonce(counter++)
+                new GCMParameterSpec(128, nonce)
         );
         cipher.updateAAD(hash);
         var result = cipher.doFinal(text);

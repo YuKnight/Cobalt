@@ -102,4 +102,12 @@ module com.github.auties00.cobalt.model {
     exports com.github.auties00.cobalt.model.business.acs;
     exports com.github.auties00.cobalt.model.business.promotion;
     exports com.github.auties00.cobalt.model.cloud;
+    exports com.github.auties00.cobalt.model.cloud.template;
+    exports com.github.auties00.cobalt.model.cloud.template.library;
+    exports com.github.auties00.cobalt.model.cloud.analytics;
+    exports com.github.auties00.cobalt.model.cloud.flow;
+    exports com.github.auties00.cobalt.model.cloud.phone;
+    exports com.github.auties00.cobalt.model.cloud.signup;
+    exports com.github.auties00.cobalt.model.cloud.commerce;
+    exports com.github.auties00.cobalt.model.cloud.waba;
 }

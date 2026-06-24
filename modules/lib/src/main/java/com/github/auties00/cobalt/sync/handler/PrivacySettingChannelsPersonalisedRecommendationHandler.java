@@ -105,7 +105,7 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingChannelsPersonalisedRecommendationAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrivacySettingChannelsPersonalisedRecommendationAction action)) {
             return MutationApplicationResult.malformed();
         }
 

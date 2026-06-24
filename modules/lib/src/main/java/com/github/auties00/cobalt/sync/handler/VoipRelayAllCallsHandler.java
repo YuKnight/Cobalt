@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -76,7 +77,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
      * persist call but still reports success) is relaxed to a direct write of {@code false}. The
      * warning counters and the outer try/catch-to-failed wrapper are dropped per Cobalt's pluggable
      * error model: thrown exceptions surface to the configured
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientErrorHandler}.
+     * {@link WhatsAppLinkedClientErrorHandler}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
@@ -85,7 +86,7 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingRelayAllCalls action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrivacySettingRelayAllCalls action)) {
             return MutationApplicationResult.malformed();
         }
 

@@ -13,6 +13,7 @@ import com.github.auties00.cobalt.model.privacy.StatusPrivacySetting;
 import com.github.auties00.cobalt.model.setting.AppTheme;
 import com.github.auties00.cobalt.model.setting.ChatLockSettings;
 import com.github.auties00.cobalt.model.setting.privacy.OptOutEntry;
+import com.github.auties00.cobalt.model.sync.action.chat.UsernameChatStartModeAction;
 import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeight;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingAction;
 import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
@@ -373,6 +374,11 @@ public final class ProtobufSettingsStore implements SettingsStore {
      * The notification-activity setting; not persisted.
      */
     private NotificationActivitySettingAction.NotificationActivitySetting notificationActivitySetting;
+
+    /**
+     * The username chat-start mode setting; not persisted.
+     */
+    private UsernameChatStartModeAction.ChatStartMode usernameChatStartMode;
 
     /**
      * Constructs a settings sub-store, defaulting the ephemeral timer and the sticker/label/quick-reply maps.
@@ -1229,6 +1235,17 @@ public final class ProtobufSettingsStore implements SettingsStore {
     }
 
     @Override
+    public Optional<UsernameChatStartModeAction.ChatStartMode> usernameChatStartMode() {
+        return Optional.ofNullable(usernameChatStartMode);
+    }
+
+    @Override
+    public SettingsStore setUsernameChatStartMode(UsernameChatStartModeAction.ChatStartMode mode) {
+        this.usernameChatStartMode = mode;
+        return this;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -1291,7 +1308,8 @@ public final class ProtobufSettingsStore implements SettingsStore {
                && Objects.equals(statusPostOptInNotificationPreferencesEnabled, that.statusPostOptInNotificationPreferencesEnabled)
                && Objects.equals(channelsPersonalisedRecommendationOptOut, that.channelsPersonalisedRecommendationOptOut)
                && Objects.equals(privateProcessingStatus, that.privateProcessingStatus)
-               && Objects.equals(notificationActivitySetting, that.notificationActivitySetting);
+               && Objects.equals(notificationActivitySetting, that.notificationActivitySetting)
+               && usernameChatStartMode == that.usernameChatStartMode;
     }
 
     @Override
@@ -1310,6 +1328,6 @@ public final class ProtobufSettingsStore implements SettingsStore {
                 contactBlacklistHashes, contactBlacklistEntries, onboardingHintStates,
                 newsletterSubscriptionUserIdentifier, newsletterSavedInterests,
                 statusPostOptInNotificationPreferencesEnabled, channelsPersonalisedRecommendationOptOut,
-                privateProcessingStatus, notificationActivitySetting);
+                privateProcessingStatus, notificationActivitySetting, usernameChatStartMode);
     }
 }

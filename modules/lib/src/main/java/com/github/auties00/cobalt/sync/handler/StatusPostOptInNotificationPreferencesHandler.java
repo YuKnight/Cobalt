@@ -94,7 +94,7 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof StatusPostOptInNotificationPreferencesAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof StatusPostOptInNotificationPreferencesAction action)) {
             return MutationApplicationResult.malformed();
         }
 

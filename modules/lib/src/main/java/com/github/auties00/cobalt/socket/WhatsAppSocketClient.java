@@ -1143,7 +1143,7 @@ public sealed abstract class WhatsAppSocketClient {
      * @return the proxy or {@code null} if none is configured
      */
     final WhatsAppClientProxy proxy() {
-        return store.proxy().orElse(null);
+        return store.connectionStore().proxy().orElse(null);
     }
 
     /**

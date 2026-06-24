@@ -1,0 +1,81 @@
+package com.github.auties00.cobalt.calls2.signaling;
+
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+
+import java.util.Optional;
+
+/**
+ * Represents the {@code <encopt>} encryption-options child of an offer, accept, or preaccept.
+ *
+ * <p>The encryption-options element selects the key-generation scheme for the call's media keys. Its
+ * single {@code keygen} attribute names the scheme version; the value {@code 2} is the standard
+ * key-generation version every observed revision uses, matching the
+ * {@code keygen_ver MUST == 2} requirement of the end-to-end key derivation chain. This record models
+ * the element as it appears on the wire.
+ *
+ * <p>On the wire the element is {@code <encopt keygen="N"/>}.
+ *
+ * @implNote This implementation models the {@code <encopt>} element (token {@code encopt}, data
+ * offset {@code 0x19ea6}) emitted alongside the call-key fanout in the wa-voip WASM module
+ * {@code ff-tScznZ8P}. The {@code keygen} value {@code 2} corresponds to the supported key-generation
+ * version the participant crypto chain validates ({@code keygen_ver} must equal {@code 2}).
+ *
+ * @param keygen the key-generation scheme version
+ * @see Calls2SignalingType#OFFER
+ */
+public record CallEncOptions(int keygen) {
+    /**
+     * The wire element tag for the encryption-options child.
+     */
+    public static final String ELEMENT = "encopt";
+
+    /**
+     * The wire attribute naming the key-generation scheme version.
+     */
+    private static final String KEYGEN_ATTRIBUTE = "keygen";
+
+    /**
+     * The standard key-generation scheme version, matching the supported {@code keygen_ver}.
+     */
+    public static final int DEFAULT_KEYGEN = 2;
+
+    /**
+     * Returns the encryption options carrying the {@linkplain #DEFAULT_KEYGEN standard} key-generation
+     * version.
+     *
+     * @return the default encryption options
+     */
+    public static CallEncOptions standard() {
+        return new CallEncOptions(DEFAULT_KEYGEN);
+    }
+
+    /**
+     * Builds the {@code <encopt keygen="N"/>} node for these options.
+     *
+     * @return the encryption-options node
+     */
+    public Node toNode() {
+        return new NodeBuilder()
+                .description(ELEMENT)
+                .attribute(KEYGEN_ATTRIBUTE, keygen)
+                .build();
+    }
+
+    /**
+     * Decodes an {@code <encopt>} node into a {@link CallEncOptions}.
+     *
+     * <p>A node that is not an {@code <encopt>} element yields an empty result so callers iterating a
+     * mixed child list can skip it. An {@code <encopt>} with no {@code keygen} attribute decodes to
+     * the {@linkplain #DEFAULT_KEYGEN standard} version.
+     *
+     * @param node the {@code <encopt>} node
+     * @return the decoded options, or an empty result when the node is not an {@code <encopt>} element
+     */
+    public static Optional<CallEncOptions> of(Node node) {
+        if (node == null || !node.hasDescription(ELEMENT)) {
+            return Optional.empty();
+        }
+        return Optional.of(new CallEncOptions(node.getAttributeAsInt(KEYGEN_ATTRIBUTE, DEFAULT_KEYGEN)));
+    }
+}

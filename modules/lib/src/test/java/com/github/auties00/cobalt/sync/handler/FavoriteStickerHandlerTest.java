@@ -328,7 +328,7 @@ class FavoriteStickerHandlerTest {
             assertEquals(StickerAction.ACTION_VERSION, mutation.actionVersion());
             assertEquals("[\"favoriteSticker\",\"" + STICKER_HASH + "\"]", mutation.index(),
                     "index must be [\"favoriteSticker\", stickerHash]");
-            var action = mutation.value().action().filter(a -> a instanceof StickerAction).map(a -> (StickerAction) a).orElseThrow(
+            var action = mutation.value().flatMap(sav -> sav.action()).filter(a -> a instanceof StickerAction).map(a -> (StickerAction) a).orElseThrow(
                     () -> new AssertionError("stickerAction sub-message must be populated"));
             assertTrue(action.isFavorite(),
                     "isFavorite must propagate from the builder argument");
@@ -338,7 +338,7 @@ class FavoriteStickerHandlerTest {
         @DisplayName("favorite=false produces a SET pending mutation with isFavorite=false")
         void buildsUnfavorite() {
             var pending = new FavoriteStickerMutationFactory().getFavoriteStickerMutation(STICKER_HASH, false);
-            var action = pending.mutation().value().action().filter(a -> a instanceof StickerAction).map(a -> (StickerAction) a).orElseThrow();
+            var action = pending.mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof StickerAction).map(a -> (StickerAction) a).orElseThrow();
             assertEquals(false, action.isFavorite(),
                     "isFavorite must propagate from the builder argument");
         }

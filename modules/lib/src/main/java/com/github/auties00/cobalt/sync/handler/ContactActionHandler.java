@@ -155,7 +155,7 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
 
         switch (mutation.operation()) {
             case SET -> {
-                if (!(mutation.value().action().orElse(null) instanceof ContactAction action)) {
+                if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ContactAction action)) {
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 

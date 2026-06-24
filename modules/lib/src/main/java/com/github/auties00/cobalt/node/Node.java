@@ -139,20 +139,42 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the supplied attribute parsed as a boolean.
+     * Returns the value of the supplied attribute parsed as a boolean under the
+     * {@link NodeBooleanFormat#LENIENT} format.
      *
-     * <p>Delegates to {@link Boolean#parseBoolean(String)} over the
-     * attribute's textual view; the WhatsApp wire protocol carries booleans as
-     * the literal strings {@code "true"} and {@code "false"}.
+     * <p>Convenience for {@link #getAttributeAsBool(String, NodeBooleanFormat)}
+     * with the lenient format, which reads both the {@code "true"}/{@code "false"}
+     * and the {@code "1"}/{@code "0"} wire conventions. Pass an explicit format
+     * when a stanza family must reject one of those conventions.
      *
      * @param key the attribute key
      * @return an {@link Optional} that holds the parsed boolean, or empty when
      *         the attribute is absent
      */
     default Optional<Boolean> getAttributeAsBool(String key) {
+        return getAttributeAsBool(key, NodeBooleanFormat.LENIENT);
+    }
+
+    /**
+     * Returns the value of the supplied attribute parsed as a boolean under the
+     * supplied {@link NodeBooleanFormat}.
+     *
+     * <p>Decodes the attribute's textual view through
+     * {@link NodeBooleanFormat#decode(String)}; the WhatsApp wire protocol
+     * carries booleans as strings and the literal denoting truth differs by
+     * stanza family, so the format selects which convention applies.
+     *
+     * @param key    the attribute key
+     * @param format the format used to decode the textual view
+     * @return an {@link Optional} that holds the parsed boolean, or empty when
+     *         the attribute is absent
+     * @throws NullPointerException if {@code format} is {@code null}
+     */
+    default Optional<Boolean> getAttributeAsBool(String key, NodeBooleanFormat format) {
+        Objects.requireNonNull(format, "format cannot be null");
         return getAttribute(key)
                 .map(NodeAttribute::toString)
-                .map(Boolean::parseBoolean);
+                .map(format::decode);
     }
 
     /**
@@ -169,15 +191,31 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the supplied attribute parsed as a boolean, falling
-     * back to {@code defaultValue} when absent.
+     * Returns the value of the supplied attribute parsed as a boolean under the
+     * {@link NodeBooleanFormat#LENIENT} format, falling back to
+     * {@code defaultValue} when absent.
      *
      * @param key          the attribute key
      * @param defaultValue the fallback returned when the attribute is absent
      * @return the parsed boolean or the fallback
      */
     default boolean getAttributeAsBool(String key, boolean defaultValue) {
-        return getAttributeAsBool(key)
+        return getAttributeAsBool(key, defaultValue, NodeBooleanFormat.LENIENT);
+    }
+
+    /**
+     * Returns the value of the supplied attribute parsed as a boolean under the
+     * supplied {@link NodeBooleanFormat}, falling back to {@code defaultValue}
+     * when absent.
+     *
+     * @param key          the attribute key
+     * @param defaultValue the fallback returned when the attribute is absent
+     * @param format       the format used to decode the textual view
+     * @return the parsed boolean or the fallback
+     * @throws NullPointerException if {@code format} is {@code null}
+     */
+    default boolean getAttributeAsBool(String key, boolean defaultValue, NodeBooleanFormat format) {
+        return getAttributeAsBool(key, format)
                 .orElse(defaultValue);
     }
 
@@ -432,15 +470,31 @@ public sealed interface Node {
 
     /**
      * Returns a single-element stream that yields the attribute parsed as a
-     * boolean, or an empty stream when absent.
+     * boolean under the {@link NodeBooleanFormat#LENIENT} format, or an empty
+     * stream when absent.
      *
      * @param key the attribute key
      * @return a {@link Stream} that yields the boolean value or nothing
      */
     default Stream<Boolean> streamAttributeAsBool(String key) {
+        return streamAttributeAsBool(key, NodeBooleanFormat.LENIENT);
+    }
+
+    /**
+     * Returns a single-element stream that yields the attribute parsed as a
+     * boolean under the supplied {@link NodeBooleanFormat}, or an empty stream
+     * when absent.
+     *
+     * @param key    the attribute key
+     * @param format the format used to decode the textual view
+     * @return a {@link Stream} that yields the boolean value or nothing
+     * @throws NullPointerException if {@code format} is {@code null}
+     */
+    default Stream<Boolean> streamAttributeAsBool(String key, NodeBooleanFormat format) {
+        Objects.requireNonNull(format, "format cannot be null");
         return streamAttribute(key)
                 .map(NodeAttribute::toString)
-                .map(Boolean::parseBoolean);
+                .map(format::decode);
     }
 
     /**
@@ -559,17 +613,32 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the value of the supplied attribute parsed as a boolean,
-     * throwing when absent.
+     * Returns the value of the supplied attribute parsed as a boolean under the
+     * {@link NodeBooleanFormat#LENIENT} format, throwing when absent.
      *
      * @param key the attribute key
      * @return the parsed boolean
      * @throws NoSuchElementException if the attribute is absent
      */
     default boolean getRequiredAttributeAsBool(String key) {
+        return getRequiredAttributeAsBool(key, NodeBooleanFormat.LENIENT);
+    }
+
+    /**
+     * Returns the value of the supplied attribute parsed as a boolean under the
+     * supplied {@link NodeBooleanFormat}, throwing when absent.
+     *
+     * @param key    the attribute key
+     * @param format the format used to decode the textual view
+     * @return the parsed boolean
+     * @throws NoSuchElementException if the attribute is absent
+     * @throws NullPointerException   if {@code format} is {@code null}
+     */
+    default boolean getRequiredAttributeAsBool(String key, NodeBooleanFormat format) {
+        Objects.requireNonNull(format, "format cannot be null");
         var result = getRequiredAttribute(key)
                 .toString();
-        return Boolean.parseBoolean(result);
+        return format.decode(result);
     }
 
     /**
@@ -793,8 +862,9 @@ public sealed interface Node {
     }
 
     /**
-     * Returns whether this node carries an attribute with the supplied key
-     * that parses to the supplied boolean.
+     * Returns whether this node carries an attribute with the supplied key that
+     * parses to the supplied boolean under the {@link NodeBooleanFormat#LENIENT}
+     * format.
      *
      * @param key   the attribute key
      * @param value the expected boolean value
@@ -803,14 +873,31 @@ public sealed interface Node {
      * @throws NullPointerException if {@code key} is {@code null}
      */
     default boolean hasAttribute(String key, boolean value) {
+        return hasAttribute(key, value, NodeBooleanFormat.LENIENT);
+    }
+
+    /**
+     * Returns whether this node carries an attribute with the supplied key that
+     * parses to the supplied boolean under the supplied {@link NodeBooleanFormat}.
+     *
+     * @param key    the attribute key
+     * @param value  the expected boolean value
+     * @param format the format used to decode the textual view
+     * @return {@code true} when the attribute exists and parses to
+     *         {@code value}
+     * @throws NullPointerException if {@code key} or {@code format} is
+     *                              {@code null}
+     */
+    default boolean hasAttribute(String key, boolean value, NodeBooleanFormat format) {
         Objects.requireNonNull(key, "key cannot be null");
+        Objects.requireNonNull(format, "format cannot be null");
         var attribute = attributes().get(key);
         if(attribute == null) {
             return false;
         }
 
         var attributeValue = attribute.toString();
-        return Boolean.parseBoolean(attributeValue) == value;
+        return format.decode(attributeValue) == value;
     }
 
     /**
@@ -957,27 +1044,60 @@ public sealed interface Node {
     }
 
     /**
-     * Returns the content of this node parsed as a boolean when applicable.
+     * Returns the content of this node parsed as a boolean under the
+     * {@link NodeBooleanFormat#LENIENT} format when applicable.
      *
-     * <p>Delegates to {@link #toContentString()} and then to
-     * {@link Boolean#parseBoolean(String)}.
+     * <p>Convenience for {@link #toContentBool(NodeBooleanFormat)} with the
+     * lenient format.
      *
      * @return an {@link Optional} that holds the parsed boolean, or empty when
      *         no conversion is possible
      */
     default Optional<Boolean> toContentBool() {
+        return toContentBool(NodeBooleanFormat.LENIENT);
+    }
+
+    /**
+     * Returns the content of this node parsed as a boolean under the supplied
+     * {@link NodeBooleanFormat} when applicable.
+     *
+     * <p>Delegates to {@link #toContentString()} and then to
+     * {@link NodeBooleanFormat#decode(String)}.
+     *
+     * @param format the format used to decode the content's textual view
+     * @return an {@link Optional} that holds the parsed boolean, or empty when
+     *         no conversion is possible
+     * @throws NullPointerException if {@code format} is {@code null}
+     */
+    default Optional<Boolean> toContentBool(NodeBooleanFormat format) {
+        Objects.requireNonNull(format, "format cannot be null");
         return toContentString()
-                .map(Boolean::parseBoolean);
+                .map(format::decode);
     }
 
     /**
      * Returns a single-element stream that yields the content parsed as a
-     * boolean, or an empty stream when no conversion is possible.
+     * boolean under the {@link NodeBooleanFormat#LENIENT} format, or an empty
+     * stream when no conversion is possible.
      *
      * @return a {@link Stream} that yields the parsed boolean or nothing
      */
     default Stream<Boolean> streamContentBool() {
         return toContentBool()
+                .stream();
+    }
+
+    /**
+     * Returns a single-element stream that yields the content parsed as a
+     * boolean under the supplied {@link NodeBooleanFormat}, or an empty stream
+     * when no conversion is possible.
+     *
+     * @param format the format used to decode the content's textual view
+     * @return a {@link Stream} that yields the parsed boolean or nothing
+     * @throws NullPointerException if {@code format} is {@code null}
+     */
+    default Stream<Boolean> streamContentBool(NodeBooleanFormat format) {
+        return toContentBool(format)
                 .stream();
     }
 

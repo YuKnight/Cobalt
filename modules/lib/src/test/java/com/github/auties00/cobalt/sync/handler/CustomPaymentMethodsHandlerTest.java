@@ -339,7 +339,7 @@ class CustomPaymentMethodsHandlerTest {
             assertEquals(SyncdOperation.SET, mutation.operation());
             assertEquals(CustomPaymentMethodsAction.ACTION_VERSION, mutation.actionVersion());
             assertEquals("[\"custom_payment_methods\"]", mutation.index());
-            var roundtrip = mutation.value().action().filter(a -> a instanceof CustomPaymentMethodsAction).map(a -> (CustomPaymentMethodsAction) a).orElseThrow();
+            var roundtrip = mutation.value().flatMap(sav -> sav.action()).filter(a -> a instanceof CustomPaymentMethodsAction).map(a -> (CustomPaymentMethodsAction) a).orElseThrow();
             assertEquals(1, roundtrip.customPaymentMethods().size());
         }
 

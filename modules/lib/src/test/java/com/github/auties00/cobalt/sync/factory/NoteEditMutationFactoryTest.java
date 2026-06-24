@@ -42,7 +42,7 @@ class NoteEditMutationFactoryTest {
         var pending = factory.getNoteEditMutation(
                 "note-oracle", CHAT_JID, "body", false,
                 Instant.ofEpochSecond(oracle.getLong("timestampSeconds")));
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

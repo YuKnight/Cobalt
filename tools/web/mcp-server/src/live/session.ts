@@ -42,6 +42,7 @@ import type {
   DebugScriptInfo,
   EvaluateResult,
   SetBreakpointResult,
+  SetWasmBreakpointResult,
 } from "../types/live/debug.js";
 import type {
   NetworkCaptureQuery,
@@ -518,6 +519,14 @@ export class LiveWebSession {
         "--use-fake-device-for-media-stream",
         "--use-fake-ui-for-media-stream",
       ];
+      const fakeVideoFile = process.env.WA_FAKE_VIDEO_FILE?.trim();
+      if (fakeVideoFile) {
+        cdpArgs.push(`--use-file-for-fake-video-capture=${fakeVideoFile}`);
+      }
+      const fakeAudioFile = process.env.WA_FAKE_AUDIO_FILE?.trim();
+      if (fakeAudioFile) {
+        cdpArgs.push(`--use-file-for-fake-audio-capture=${fakeAudioFile}`);
+      }
       if (this.userDataDir) {
         if (!existsSync(this.userDataDir)) {
           mkdirSync(this.userDataDir, { recursive: true });
@@ -868,8 +877,8 @@ export class LiveWebSession {
     return this.debuggerBridge.listScripts(filter, limit);
   }
 
-  async evaluate(expression: string, awaitPromise: boolean = true): Promise<EvaluateResult> {
-    return this.debuggerBridge.evaluate(expression, awaitPromise);
+  async evaluate(expression: string, awaitPromise: boolean = true, target: string = "page") {
+    return this.debuggerBridge.evaluate(expression, awaitPromise, target);
   }
 
   getCdpPort(): number | null {
@@ -929,13 +938,19 @@ export class LiveWebSession {
   async setWasmBreakpoint(
     url: string,
     byteOffset: number,
-    logExpression?: string
-  ): Promise<SetBreakpointResult> {
-    return this.debuggerBridge.setWasmBreakpoint(url, byteOffset, logExpression);
+    logExpression?: string,
+    target?: string,
+    block?: boolean
+  ): Promise<SetWasmBreakpointResult> {
+    return this.debuggerBridge.setWasmBreakpoint(url, byteOffset, logExpression, target, block);
   }
 
   getLogpointCaptures(options: { id?: string; clear?: boolean } = {}) {
     return this.debuggerBridge.getLogpointCaptures(options);
+  }
+
+  async setInitScript(script: string | null, target: string = "workers"): Promise<void> {
+    return this.debuggerBridge.setInitScript(script, target);
   }
 
   async readWasmMemory(callFrameId: string, addr: number, len: number) {

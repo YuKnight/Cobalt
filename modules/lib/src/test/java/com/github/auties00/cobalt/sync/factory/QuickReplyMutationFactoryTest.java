@@ -38,7 +38,7 @@ class QuickReplyMutationFactoryTest {
         var pending = factory.getQuickReplyAddOrEditMutation(
                 "qr-oracle", "/hello", "Hi", 1, List.of("k1"),
                 Instant.ofEpochSecond(1_700_000_000L));
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

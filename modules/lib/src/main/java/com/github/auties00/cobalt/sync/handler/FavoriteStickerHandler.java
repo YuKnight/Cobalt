@@ -112,7 +112,7 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof StickerAction action)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof StickerAction action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
             if (!client.store().syncStore().primaryFeatures().contains(FAVORITE_STICKER_FEATURE)) {

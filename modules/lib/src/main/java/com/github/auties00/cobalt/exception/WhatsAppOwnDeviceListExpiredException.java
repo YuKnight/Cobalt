@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 /**
  * Thrown when the cached list of devices linked to this account has
  * become too stale to be used for routing messages.
@@ -14,9 +16,9 @@ package com.github.auties00.cobalt.exception;
  *
  * @apiNote
  * Raised before a send when the local device list is too old to trust;
- * {@link #isFatal()} reports {@code true}, so a configured
- * {@code WhatsAppClientErrorHandler} typically refreshes the list and
- * reconnects, or logs the device out, rather than discarding the event.
+ * {@link #toErrorResult()} reports {@link WhatsAppLinkedClientErrorResult#LOG_OUT},
+ * so a configured {@code WhatsAppClientErrorHandler} typically refreshes the
+ * list and re-pairs the device, rather than discarding the event.
  *
  * @see WhatsAppAdvCheckException
  */
@@ -32,12 +34,14 @@ public final class WhatsAppOwnDeviceListExpiredException extends WhatsAppExcepti
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code true}: the local device
-     * list is required to route outgoing messages and cannot be trusted
-     * while expired.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#LOG_OUT}: an expired own-device list
+     * forces a fresh pairing, matching WhatsApp Web's ADV check, which logs
+     * the device out once the list crosses the server-enforced staleness
+     * threshold.
      */
     @Override
-    public boolean isFatal() {
-        return true;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.LOG_OUT;
     }
 }

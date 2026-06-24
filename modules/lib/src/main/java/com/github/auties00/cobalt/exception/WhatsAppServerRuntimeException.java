@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 /**
  * Thrown for server-driven runtime conditions that do not fit any of the
  * more specific exception types.
@@ -10,9 +12,10 @@ package com.github.auties00.cobalt.exception;
  * without losing the server's detail message.
  *
  * @apiNote
- * Raised for observational server conditions; {@link #isFatal()} reports
- * {@code false}, so a configured {@code WhatsAppClientErrorHandler} can
- * log the event or run custom telemetry and leave the session running.
+ * Raised for observational server conditions; {@link #toErrorResult()}
+ * returns {@link WhatsAppLinkedClientErrorResult#DISCARD}, so a configured
+ * {@code WhatsAppClientErrorHandler} can log the event or run custom
+ * telemetry and leave the session running.
  */
 public final class WhatsAppServerRuntimeException extends WhatsAppException {
     /**
@@ -39,11 +42,12 @@ public final class WhatsAppServerRuntimeException extends WhatsAppException {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: server runtime
-     * exceptions are observational and never tear the session down.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: server runtime conditions
+     * are observational and never tear the session down.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 }

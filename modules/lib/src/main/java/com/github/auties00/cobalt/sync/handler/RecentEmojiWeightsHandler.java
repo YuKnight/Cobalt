@@ -101,7 +101,7 @@ public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof RecentEmojiWeightsAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof RecentEmojiWeightsAction action)) {
             return MutationApplicationResult.malformed();
         }
 

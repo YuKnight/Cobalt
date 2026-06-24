@@ -111,7 +111,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof MarketingMessageAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MarketingMessageAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

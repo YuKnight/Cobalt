@@ -1,18 +1,13 @@
 package com.github.auties00.cobalt.client.linked;
-import com.github.auties00.cobalt.listener.MessageDeletedListener;
-import com.github.auties00.cobalt.listener.MessageStatusListener;
-import com.github.auties00.cobalt.listener.DisconnectedListener;
-import com.github.auties00.cobalt.listener.LoggedInListener;
 import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
-import com.github.auties00.cobalt.client.WhatsAppClientErrorHandler;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.call.stream.AudioInputStream;
-import com.github.auties00.cobalt.call.stream.AudioOutputStream;
-import com.github.auties00.cobalt.call.stream.VideoInputStream;
-import com.github.auties00.cobalt.call.stream.VideoOutputStream;
+import com.github.auties00.cobalt.calls2.stream.AudioInput;
+import com.github.auties00.cobalt.calls2.stream.AudioOutput;
+import com.github.auties00.cobalt.calls2.stream.VideoInput;
+import com.github.auties00.cobalt.calls2.stream.VideoOutput;
 import com.github.auties00.cobalt.model.call.Call;
 import com.github.auties00.cobalt.model.call.CallEndReason;
 import com.github.auties00.cobalt.model.call.CallInteraction;
@@ -142,7 +137,7 @@ import java.util.function.Function;
  * through the {@code client.test} package without standing up a real socket.
  *
  * <p>Lifecycle: callers obtain a builder via {@link #builder()}, configure
- * the store and the {@link WhatsAppClientErrorHandler}, call {@link #connect()}
+ * the store and the {@link WhatsAppLinkedClientErrorHandler}, call {@link #connect()}
  * to bring the socket up, drive feature operations on this interface, and
  * shut down with {@link #disconnect()}, {@link #reconnect()}, or
  * {@link #logout()}. {@link #waitForDisconnection()} blocks the caller until
@@ -155,7 +150,7 @@ import java.util.function.Function;
  * notes (WA-source mappings, timing, adaptation comments) remain on the impl
  * via {@code com.github.auties00.cobalt.meta.*} annotations and {@code @implNote}.
  */
-public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
+public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWhatsAppClient> {
     /**
      * Returns the entry point for assembling a configured
      * {@link LinkedWhatsAppClient}.
@@ -730,13 +725,13 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
 
     /**
      * Routes a session-fatal failure through the configured
-     * {@link WhatsAppClientErrorHandler} and applies its decision.
+     * {@link WhatsAppLinkedClientErrorHandler} and applies its decision.
      *
      * @apiNote
      * The central choke point for every error that bubbles out of the
      * socket layer, a sync round trip, or any other in-flight
      * operation. The handler's returned
-     * {@link WhatsAppClientErrorHandler.Result} is mapped to a
+     * {@link WhatsAppLinkedClientErrorResult} is mapped to a
      * concrete session-control action: discard, disconnect, reconnect,
      * log out, or ban. App-state fatal failures are additionally
      * mirrored to the telemetry pipeline so dashboards can correlate
@@ -1271,8 +1266,8 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * caller never enumerates them, and the offer is addressed at the group rather than at a peer.
      *
      * <p>The call is a video call when {@code videoOut} is non-{@code null} and audio-only otherwise.
-     * The two output streams supply the local audio and video the call transmits, and the two input
-     * streams receive the remote audio and video; the streams are owned by the call engine and ended
+     * The two outbound sources supply the local audio and video the call transmits, and the two inbound
+     * sinks receive the remote audio and video; the streams are owned by the call engine and ended
      * automatically when the call ends, so the application never closes them.
      *
      * @apiNote
@@ -1281,19 +1276,21 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * list inlined (group), registers the resulting {@link Call} in the in-flight call store, and
      * returns it to the caller so further signalling (mute, video state, termination) can be driven
      * through the session handle. Supply the streams with the stream factories such as
-     * {@link AudioOutputStream#fromMicrophone()} and {@link AudioInputStream#toSpeaker()}, or pump frames
+     * {@link AudioOutput#fromMicrophone()} and {@link AudioInput#toSpeaker()}, or pump frames
      * yourself for a call-to-call bridge or a bot. For an audio-only call prefer the
-     * {@link #startCall(JidProvider, AudioOutputStream, AudioInputStream)} overload.
+     * {@link #startCall(JidProvider, AudioOutput, AudioInput)} overload.
      *
      * @param target   the JID of the callee (a user JID for a one-to-one call) or of the group or
      *                 community to call (a group or community JID for a group call)
-     * @param audioOut the stream the engine drains local audio from for transmission; never {@code null}
-     * @param audioIn  the stream the engine fills with received remote audio; never {@code null}
-     * @param videoOut the stream the engine drains local video from for transmission, or {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @param videoOut the source the engine drains local video from for transmission, or {@code null}
      *                 for an audio-only call
-     * @param videoIn  the stream the engine fills with received remote video, or {@code null} for an
+     * @param videoIn  the sink the engine fills with received remote video, or {@code null} for an
      *                 audio-only call
      * @return the live {@link Call} session bound to the negotiated call id
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only
+     *                                         supported on the WhatsApp Web flavour
      * @throws NullPointerException            if {@code target}, {@code audioOut}, or {@code audioIn} is
      *                                         {@code null}
      * @throws IllegalArgumentException        if {@code target} is a group or community JID whose
@@ -1301,28 +1298,28 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      *                                         than this account to call
      * @throws IllegalStateException           if this client is not logged in
      * @throws WhatsAppSessionException.Closed if the socket has been closed
-     * @see #startCall(JidProvider, AudioOutputStream, AudioInputStream)
+     * @see #startCall(JidProvider, AudioOutput, AudioInput)
      * @see #queryGroupInfo(JidProvider)
      * @see #addCallParticipants(Call, Collection)
      * @see #removeCallParticipants(Call, Collection)
-     * @see #acceptCall(IncomingCall, AudioOutputStream, AudioInputStream, VideoOutputStream, VideoInputStream)
+     * @see #acceptCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)
      * @see #terminateCall(Call, CallEndReason)
      */
-    Call startCall(JidProvider target, AudioOutputStream audioOut, AudioInputStream audioIn,
-                   VideoOutputStream videoOut, VideoInputStream videoIn);
+    Call startCall(JidProvider target, AudioOutput audioOut, AudioInput audioIn,
+                   VideoOutput videoOut, VideoInput videoIn);
 
     /**
      * Places an audio-only call to {@code target} carrying the supplied audio streams and returns a
      * live session, routing to a one-to-one or a group call based on {@code target}.
      *
      * @apiNote
-     * Convenience for {@link #startCall(JidProvider, AudioOutputStream, AudioInputStream, VideoOutputStream, VideoInputStream)}
+     * Convenience for {@link #startCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)}
      * with no video; the answered leg can still be upgraded to video later.
      *
      * @param target   the JID of the callee (a user JID) or of the group or community to call (a group
      *                 or community JID)
-     * @param audioOut the stream the engine drains local audio from for transmission; never {@code null}
-     * @param audioIn  the stream the engine fills with received remote audio; never {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
      * @return the live {@link Call} session bound to the negotiated call id
      * @throws NullPointerException            if {@code target}, {@code audioOut}, or {@code audioIn} is
      *                                         {@code null}
@@ -1332,15 +1329,15 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * @throws IllegalStateException           if this client is not logged in
      * @throws WhatsAppSessionException.Closed if the socket has been closed
      */
-    Call startCall(JidProvider target, AudioOutputStream audioOut, AudioInputStream audioIn);
+    Call startCall(JidProvider target, AudioOutput audioOut, AudioInput audioIn);
 
     /**
      * Accepts a pending {@link IncomingCall} offer with the supplied media streams and returns a live
      * session.
      *
      * <p>The answered leg is a video call when {@code videoOut} is non-{@code null} and audio-only
-     * otherwise. The two output streams supply the local audio and video the call transmits, and the two
-     * input streams receive the remote audio and video; the streams are owned by the call engine and
+     * otherwise. The two outbound sources supply the local audio and video the call transmits, and the two
+     * inbound sinks receive the remote audio and video; the streams are owned by the call engine and
      * ended automatically when the call ends, so the application never closes them.
      *
      * @apiNote
@@ -1349,44 +1346,46 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * the connecting state until transport setup completes. Passing {@code null} {@code videoOut}
      * answers an offered video call as audio-only; an audio-only offer cannot be upgraded to video here,
      * so for that place a fresh video call through
-     * {@link #startCall(JidProvider, AudioOutputStream, AudioInputStream, VideoOutputStream, VideoInputStream)}.
-     * For an audio-only answer prefer the {@link #acceptCall(IncomingCall, AudioOutputStream, AudioInputStream)}
+     * {@link #startCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)}.
+     * For an audio-only answer prefer the {@link #acceptCall(IncomingCall, AudioOutput, AudioInput)}
      * overload.
      *
      * @param offer    the incoming offer to accept; never {@code null}
-     * @param audioOut the stream the engine drains local audio from for transmission; never {@code null}
-     * @param audioIn  the stream the engine fills with received remote audio; never {@code null}
-     * @param videoOut the stream the engine drains local video from for transmission, or {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @param videoOut the source the engine drains local video from for transmission, or {@code null}
      *                 to answer audio-only
-     * @param videoIn  the stream the engine fills with received remote video, or {@code null} to answer
+     * @param videoIn  the sink the engine fills with received remote video, or {@code null} to answer
      *                 audio-only
      * @return the live {@link Call} session for the accepted call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only
+     *                                         supported on the WhatsApp Web flavour
      * @throws NullPointerException            if {@code offer}, {@code audioOut}, or {@code audioIn} is
      *                                         {@code null}
      * @throws IllegalStateException           if the offer has already been responded to
      * @throws WhatsAppSessionException.Closed if the socket has been closed
      */
-    Call acceptCall(IncomingCall offer, AudioOutputStream audioOut, AudioInputStream audioIn,
-                    VideoOutputStream videoOut, VideoInputStream videoIn);
+    Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn,
+                    VideoOutput videoOut, VideoInput videoIn);
 
     /**
      * Accepts a pending {@link IncomingCall} offer as audio-only with the supplied audio streams and
      * returns a live session.
      *
      * @apiNote
-     * Convenience for {@link #acceptCall(IncomingCall, AudioOutputStream, AudioInputStream, VideoOutputStream, VideoInputStream)}
+     * Convenience for {@link #acceptCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)}
      * with no video, answering even an offered video call audio-only.
      *
      * @param offer    the incoming offer to accept; never {@code null}
-     * @param audioOut the stream the engine drains local audio from for transmission; never {@code null}
-     * @param audioIn  the stream the engine fills with received remote audio; never {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
      * @return the live {@link Call} session for the accepted call
      * @throws NullPointerException            if {@code offer}, {@code audioOut}, or {@code audioIn} is
      *                                         {@code null}
      * @throws IllegalStateException           if the offer has already been responded to
      * @throws WhatsAppSessionException.Closed if the socket has been closed
      */
-    Call acceptCall(IncomingCall offer, AudioOutputStream audioOut, AudioInputStream audioIn);
+    Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn);
 
     /**
      * Rejects a pending {@link IncomingCall} offer with the supplied end-call reason.
@@ -1434,8 +1433,8 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * @apiNote
      * Use this when the caller already holds the live
      * {@link Call} handle returned by
-     * {@link #startCall(JidProvider, AudioOutputStream, AudioInputStream)} or
-     * {@link #acceptCall(IncomingCall, AudioOutputStream, AudioInputStream)}, so the store
+     * {@link #startCall(JidProvider, AudioOutput, AudioInput)} or
+     * {@link #acceptCall(IncomingCall, AudioOutput, AudioInput)}, so the store
      * lookup performed by {@link #terminateCall(String, CallEndReason)}
      * is unnecessary.
      *
@@ -1525,8 +1524,8 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * @apiNote
      * Use this when the caller already holds the live
      * {@link Call} handle returned by
-     * {@link #startCall(JidProvider, AudioOutputStream, AudioInputStream)} or
-     * {@link #acceptCall(IncomingCall, AudioOutputStream, AudioInputStream)}, so the store
+     * {@link #startCall(JidProvider, AudioOutput, AudioInput)} or
+     * {@link #acceptCall(IncomingCall, AudioOutput, AudioInput)}, so the store
      * lookup performed by {@link #muteCall(String)} is
      * unnecessary.
      *
@@ -1545,8 +1544,8 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * @apiNote
      * Use this when the caller already holds the live
      * {@link Call} handle returned by
-     * {@link #startCall(JidProvider, AudioOutputStream, AudioInputStream)} or
-     * {@link #acceptCall(IncomingCall, AudioOutputStream, AudioInputStream)}, so the store
+     * {@link #startCall(JidProvider, AudioOutput, AudioInput)} or
+     * {@link #acceptCall(IncomingCall, AudioOutput, AudioInput)}, so the store
      * lookup performed by {@link #unmuteCall(String)} is
      * unnecessary.
      *
@@ -1785,7 +1784,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * @apiNote
      * Use this when the caller already holds the live
      * {@link Call} handle returned by
-     * {@link #startCall(JidProvider, AudioOutputStream, AudioInputStream)}, so
+     * {@link #startCall(JidProvider, AudioOutput, AudioInput)}, so
      * the store lookup performed by
      * {@link #addCallParticipants(String, Collection)} is
      * unnecessary.
@@ -1826,7 +1825,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * @apiNote
      * Use this when the caller already holds the live
      * {@link Call} handle returned by
-     * {@link #startCall(JidProvider, AudioOutputStream, AudioInputStream)}, so
+     * {@link #startCall(JidProvider, AudioOutput, AudioInput)}, so
      * the store lookup performed by
      * {@link #removeCallParticipants(String, Collection)} is
      * unnecessary.
@@ -1910,7 +1909,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * chat message carrying the chosen title, future timestamp, and
      * audio-vs-video flag that other participants can opt into. The
      * actual call is placed later via
-     * {@link #startCall(JidProvider, AudioOutputStream, AudioInputStream)}; the
+     * {@link #startCall(JidProvider, AudioOutput, AudioInput)}; the
      * announcement is purely an in-chat coordination message.
      *
      * @param chat        the chat to post the announcement in; never {@code null}
@@ -4765,7 +4764,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * @return the base-64 encoded public key when the server published
      *         one; {@link Optional#empty()} when the server returned an
      *         error (an installed
-     *         {@link WhatsAppClientErrorHandler} can recover the
+     *         {@link WhatsAppLinkedClientErrorHandler} can recover the
      *         underlying error code for richer diagnostics)
      * @throws WhatsAppSessionException.Closed if the socket is no longer
      *                                         open
@@ -5073,7 +5072,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      * @apiNote
      * WhatsApp lets users claim a global username distinct from their
      * phone-number identifier; once claimed, the username is reachable
-     * for any user JID. The returned {@link UserUsername} carries the
+     * for any user JID. The returned {@link Username} carries the
      * claimed name together with its registration state, the instant it
      * was registered, the recovery PIN bound to it, and the lookup
      * status reported for this user.
@@ -5086,7 +5085,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
      *                                         {@code null}
      * @throws WhatsAppSessionException.Closed if the socket is no longer open
      */
-    Optional<UserUsername> queryUserUsername(JidProvider userJid);
+    Optional<Username> queryUserUsername(JidProvider userJid);
 
     /**
      * Sets the account-wide default disappearing-message timer for all
@@ -8855,13 +8854,9 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
 
     LinkedWhatsAppClient addNodeSentListener(LinkedNodeSentListener listener);
 
-    LinkedWhatsAppClient addLoggedInListener(LoggedInListener listener);
-
     LinkedWhatsAppClient addCallListener(LinkedCallListener listener);
 
     LinkedWhatsAppClient addWebHistorySyncPastParticipantsListener(LinkedWebHistorySyncPastParticipantsListener listener);
-
-    LinkedWhatsAppClient addDisconnectedListener(DisconnectedListener listener);
 
     LinkedWhatsAppClient addWebAppPrimaryFeaturesListener(LinkedWebAppPrimaryFeaturesListener listener);
 
@@ -8881,17 +8876,11 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient {
 
     LinkedWhatsAppClient addAboutChangedListener(LinkedAboutChangedListener listener);
 
-    LinkedWhatsAppClient addNewMessageListener(NewMessageListener listener);
-
-    LinkedWhatsAppClient addMessageDeletedListener(MessageDeletedListener listener);
-
     LinkedWhatsAppClient addPrivacySettingChangedListener(LinkedPrivacySettingChangedListener listener);
 
     LinkedWhatsAppClient addWebHistorySyncProgressListener(LinkedWebHistorySyncProgressListener listener);
 
     LinkedWhatsAppClient addProfilePictureChangedListener(LinkedProfilePictureChangedListener listener);
-
-    LinkedWhatsAppClient addMessageStatusListener(MessageStatusListener listener);
 
     LinkedWhatsAppClient addNameChangedListener(LinkedNameChangedListener listener);
 

@@ -1,5 +1,4 @@
 package com.github.auties00.cobalt.client.linked;
-import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.listener.MessageDeletedListener;
 import com.github.auties00.cobalt.listener.MessageStatusListener;
 import com.github.auties00.cobalt.listener.DisconnectedListener;
@@ -66,8 +65,8 @@ import java.util.Set;
  */
 public non-sealed interface LinkedWhatsAppClientListener extends LinkedListener, LinkedNodeSentListener,
         LinkedNodeReceivedListener,
-        LoggedInListener,
-        DisconnectedListener,
+        LoggedInListener<LinkedWhatsAppClient>,
+        DisconnectedListener<LinkedWhatsAppClient>,
         LinkedWebAppStateActionListener,
         LinkedWebAppPrimaryFeaturesListener,
         LinkedContactsListener,
@@ -78,9 +77,9 @@ public non-sealed interface LinkedWhatsAppClientListener extends LinkedListener,
         LinkedWebHistorySyncMessagesListener,
         LinkedWebHistorySyncPastParticipantsListener,
         LinkedWebHistorySyncProgressListener,
-        NewMessageListener,
-        MessageDeletedListener,
-        MessageStatusListener,
+        NewMessageListener<LinkedWhatsAppClient>,
+        MessageDeletedListener<LinkedWhatsAppClient>,
+        MessageStatusListener<LinkedWhatsAppClient>,
         LinkedStatusListener,
         LinkedNewStatusListener,
         LinkedMessageReplyListener,
@@ -127,11 +126,11 @@ public non-sealed interface LinkedWhatsAppClientListener extends LinkedListener,
     }
 
     @Override
-    default void onLoggedIn(WhatsAppClient whatsapp) {
+    default void onLoggedIn(LinkedWhatsAppClient whatsapp) {
     }
 
     @Override
-    default void onDisconnected(WhatsAppClient whatsapp, WhatsAppClientDisconnectReason reason) {
+    default void onDisconnected(LinkedWhatsAppClient whatsapp, WhatsAppClientDisconnectReason reason) {
     }
 
     @Override
@@ -175,15 +174,15 @@ public non-sealed interface LinkedWhatsAppClientListener extends LinkedListener,
     }
 
     @Override
-    default void onNewMessage(WhatsAppClient whatsapp, MessageInfo info) {
+    default void onNewMessage(LinkedWhatsAppClient whatsapp, MessageInfo info) {
     }
 
     @Override
-    default void onMessageDeleted(WhatsAppClient whatsapp, MessageInfo info, boolean everyone) {
+    default void onMessageDeleted(LinkedWhatsAppClient whatsapp, MessageInfo info, boolean everyone) {
     }
 
     @Override
-    default void onMessageStatus(WhatsAppClient whatsapp, MessageInfo info) {
+    default void onMessageStatus(LinkedWhatsAppClient whatsapp, MessageInfo info) {
     }
 
     @Override

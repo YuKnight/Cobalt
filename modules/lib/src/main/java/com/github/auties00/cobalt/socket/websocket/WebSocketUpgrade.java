@@ -681,6 +681,6 @@ public final class WebSocketUpgrade {
      * @return the line content as a string
      */
     private static String previewLine(byte[] buffer, int start, int end) {
-        return new String(buffer, start, Math.min(end - start, 120), StandardCharsets.US_ASCII);
+        return new String(buffer, start, end - start, StandardCharsets.US_ASCII);
     }
 }

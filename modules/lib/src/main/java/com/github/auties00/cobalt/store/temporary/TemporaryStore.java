@@ -5,12 +5,12 @@ import com.github.auties00.cobalt.store.ProtobufContactStore;
 import com.github.auties00.cobalt.store.ProtobufSettingsStore;
 import com.github.auties00.cobalt.store.ProtobufSignalStore;
 import com.github.auties00.cobalt.store.ProtobufSyncStore;
+import com.github.auties00.cobalt.store.ProtobufWamStore;
 import com.github.auties00.cobalt.store.ProtobufWebSessionStore;
 import com.github.auties00.cobalt.store.ProtobufWhatsAppStore;
 import com.github.auties00.cobalt.store.WhatsAppStoreFactory;
 
 import java.nio.file.Path;
-import java.util.concurrent.ConcurrentMap;
 
 /**
  * The {@link ProtobufWhatsAppStore} that holds the entire session state in RAM and never touches disk.
@@ -41,14 +41,12 @@ final class TemporaryStore extends ProtobufWhatsAppStore {
      * @param syncStore             the sync sub-store
      * @param settingsStore         the settings sub-store
      * @param directory             the session directory path; unused for the transient variant
-     * @param companionMmsAuthNonce the MMS auth nonce, or {@code null}
-     * @param shareableChatLinkKey  the shareable-chat-link key, or {@code null}
-     * @param wamSequenceNumbersMap the WAM sequence-number map, or {@code null}
      * @param webSessionStore       the web-GraphQL credential sub-store, or {@code null} for an empty one
+     * @param wamStore              the WAM telemetry sub-store, or {@code null} for an empty one
      * @param chatStore             the in-memory chat sub-store
      */
-    TemporaryStore(ProtobufSignalStore signalStore, ProtobufAccountStore accountStore, ProtobufContactStore contactStore, ProtobufSyncStore syncStore, ProtobufSettingsStore settingsStore, Path directory, String companionMmsAuthNonce, byte[] shareableChatLinkKey, ConcurrentMap<Integer, Integer> wamSequenceNumbersMap, ProtobufWebSessionStore webSessionStore, TemporaryChatStore chatStore) {
-        super(signalStore, accountStore, contactStore, syncStore, settingsStore, directory, companionMmsAuthNonce, shareableChatLinkKey, wamSequenceNumbersMap, webSessionStore);
+    TemporaryStore(ProtobufSignalStore signalStore, ProtobufAccountStore accountStore, ProtobufContactStore contactStore, ProtobufSyncStore syncStore, ProtobufSettingsStore settingsStore, Path directory, ProtobufWebSessionStore webSessionStore, ProtobufWamStore wamStore, TemporaryChatStore chatStore) {
+        super(signalStore, accountStore, contactStore, syncStore, settingsStore, directory, webSessionStore, wamStore);
         this.chatStore = chatStore;
         this.chatStore.bindContacts(contactStore());
     }

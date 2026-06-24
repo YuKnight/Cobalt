@@ -19,6 +19,8 @@ import it.auties.protobuf.model.ProtobufType;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -206,6 +208,18 @@ public final class ProtobufAccountStore implements AccountStore {
     private LinkedPrimaryPlatform primaryPlatform;
 
     /**
+     * The companion-side authentication nonce for the MMS history-sync blob release.
+     */
+    @ProtobufProperty(index = 27, type = ProtobufType.STRING)
+    private String companionMmsAuthNonce;
+
+    /**
+     * The per-account key protecting the opaque chat identifier in shareable chat links.
+     */
+    @ProtobufProperty(index = 28, type = ProtobufType.BYTES)
+    private byte[] shareableChatLinkKey;
+
+    /**
      * The monitor guarding the lazy initialisation of {@link #clientVersion}; not persisted.
      */
     private final Object clientVersionLock;
@@ -219,6 +233,31 @@ public final class ProtobufAccountStore implements AccountStore {
      * The timestamp of the most recent {@link #linkedMetaAccountState} transition; not persisted.
      */
     private volatile Instant linkedMetaAccountStateTimestamp;
+
+    /**
+     * The companion device pairing expiration deadline; not persisted.
+     */
+    private Instant clientExpiration;
+
+    /**
+     * The list of linked companion devices; not persisted.
+     */
+    private volatile List<Jid> linkedDevices;
+
+    /**
+     * The timestamp of when this device paired with the primary; not persisted.
+     */
+    private volatile Instant pairingTimestamp;
+
+    /**
+     * Whether the account has a profile avatar; not persisted.
+     */
+    private Boolean hasAvatar;
+
+    /**
+     * The salt for notification-content-token hashing; not persisted.
+     */
+    private byte[] notificationContentTokenSalt;
 
     /**
      * Constructs an account sub-store, defaulting the initialization timestamp, release channel and
@@ -250,8 +289,10 @@ public final class ProtobufAccountStore implements AccountStore {
      * @param companionVersion        the observed companion version, or {@code null}
      * @param lastAdvCheckTime        the last ADV check time, or {@code null}
      * @param primaryPlatform         the linked-primary platform, or {@code null}
+     * @param companionMmsAuthNonce   the MMS auth nonce, or {@code null}
+     * @param shareableChatLinkKey    the shareable-chat-link key, or {@code null}
      */
-    ProtobufAccountStore(UUID uuid, Long phoneNumber, LinkedWhatsAppClientType clientType, Instant initializationTimeStamp, LinkedWhatsAppClientDevice device, ClientReleaseChannel releaseChannel, boolean online, String locale, String name, String verifiedName, URI profilePicture, ContactTextStatus selfTextStatus, Jid jid, Jid lid, String businessAddress, Double businessLongitude, Double businessLatitude, String businessDescription, List<URI> businessWebsites, String businessEmail, List<BusinessCategory> businessCategories, boolean registered, ClientAppVersion clientVersion, ClientAppVersion companionVersion, Instant lastAdvCheckTime, LinkedPrimaryPlatform primaryPlatform) {
+    ProtobufAccountStore(UUID uuid, Long phoneNumber, LinkedWhatsAppClientType clientType, Instant initializationTimeStamp, LinkedWhatsAppClientDevice device, ClientReleaseChannel releaseChannel, boolean online, String locale, String name, String verifiedName, URI profilePicture, ContactTextStatus selfTextStatus, Jid jid, Jid lid, String businessAddress, Double businessLongitude, Double businessLatitude, String businessDescription, List<URI> businessWebsites, String businessEmail, List<BusinessCategory> businessCategories, boolean registered, ClientAppVersion clientVersion, ClientAppVersion companionVersion, Instant lastAdvCheckTime, LinkedPrimaryPlatform primaryPlatform, String companionMmsAuthNonce, byte[] shareableChatLinkKey) {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber;
         this.clientType = Objects.requireNonNull(clientType, "clientType cannot be null");
@@ -278,6 +319,8 @@ public final class ProtobufAccountStore implements AccountStore {
         this.companionVersion = companionVersion;
         this.lastAdvCheckTime = lastAdvCheckTime;
         this.primaryPlatform = primaryPlatform;
+        this.companionMmsAuthNonce = companionMmsAuthNonce;
+        this.shareableChatLinkKey = shareableChatLinkKey;
         this.clientVersionLock = new Object();
     }
 
@@ -586,6 +629,84 @@ public final class ProtobufAccountStore implements AccountStore {
     }
 
     @Override
+    public Optional<Instant> clientExpiration() {
+        return Optional.ofNullable(clientExpiration);
+    }
+
+    @Override
+    public AccountStore setClientExpiration(Instant clientExpiration) {
+        this.clientExpiration = clientExpiration;
+        return this;
+    }
+
+    @Override
+    public List<Jid> linkedDevices() {
+        var current = linkedDevices;
+        return current == null ? List.of() : List.copyOf(current);
+    }
+
+    @Override
+    public AccountStore setLinkedDevices(Collection<Jid> linkedDevices) {
+        this.linkedDevices = linkedDevices == null ? null : List.copyOf(linkedDevices);
+        return this;
+    }
+
+    @Override
+    public Optional<Instant> pairingTimestamp() {
+        return Optional.ofNullable(pairingTimestamp);
+    }
+
+    @Override
+    public AccountStore setPairingTimestamp(Instant pairingTimestamp) {
+        this.pairingTimestamp = pairingTimestamp;
+        return this;
+    }
+
+    @Override
+    public Optional<Boolean> hasAvatar() {
+        return Optional.ofNullable(hasAvatar);
+    }
+
+    @Override
+    public AccountStore setHasAvatar(Boolean hasAvatar) {
+        this.hasAvatar = hasAvatar;
+        return this;
+    }
+
+    @Override
+    public Optional<byte[]> notificationContentTokenSalt() {
+        return Optional.ofNullable(notificationContentTokenSalt);
+    }
+
+    @Override
+    public AccountStore setNotificationContentTokenSalt(byte[] salt) {
+        this.notificationContentTokenSalt = salt;
+        return this;
+    }
+
+    @Override
+    public Optional<String> companionMmsAuthNonce() {
+        return Optional.ofNullable(companionMmsAuthNonce);
+    }
+
+    @Override
+    public AccountStore setCompanionMmsAuthNonce(String nonce) {
+        this.companionMmsAuthNonce = nonce;
+        return this;
+    }
+
+    @Override
+    public Optional<byte[]> shareableChatLinkKey() {
+        return Optional.ofNullable(shareableChatLinkKey);
+    }
+
+    @Override
+    public AccountStore setShareableChatLinkKey(byte[] key) {
+        this.shareableChatLinkKey = key;
+        return this;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -619,6 +740,8 @@ public final class ProtobufAccountStore implements AccountStore {
                && Objects.equals(companionVersion, that.companionVersion)
                && Objects.equals(lastAdvCheckTime, that.lastAdvCheckTime)
                && Objects.equals(primaryPlatform, that.primaryPlatform)
+               && Objects.equals(companionMmsAuthNonce, that.companionMmsAuthNonce)
+               && Arrays.equals(shareableChatLinkKey, that.shareableChatLinkKey)
                && Objects.equals(linkedMetaAccountState, that.linkedMetaAccountState)
                && Objects.equals(linkedMetaAccountStateTimestamp, that.linkedMetaAccountStateTimestamp);
     }
@@ -629,6 +752,7 @@ public final class ProtobufAccountStore implements AccountStore {
                 online, locale, name, verifiedName, profilePicture, selfTextStatus, jid, lid,
                 businessAddress, businessLongitude, businessLatitude, businessDescription, businessWebsites,
                 businessEmail, businessCategories, registered, clientVersion, companionVersion, lastAdvCheckTime,
-                primaryPlatform, linkedMetaAccountState, linkedMetaAccountStateTimestamp);
+                primaryPlatform, companionMmsAuthNonce, Arrays.hashCode(shareableChatLinkKey),
+                linkedMetaAccountState, linkedMetaAccountStateTimestamp);
     }
 }

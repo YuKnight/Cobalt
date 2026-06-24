@@ -101,7 +101,7 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof ChatLockSettings settings)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ChatLockSettings settings)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
@@ -143,7 +143,7 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
                 continue;
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof ChatLockSettings settings)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ChatLockSettings settings)) {
                 results.add(SyncdIndexUtils.malformedActionValue(collectionName().name()));
                 continue;
             }

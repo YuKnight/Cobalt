@@ -1,0 +1,274 @@
+package com.github.auties00.cobalt.calls2.media.audio;
+
+import com.github.auties00.cobalt.calls2.platform.AudioWriterPump;
+import com.github.auties00.cobalt.calls2.stream.AudioFrame;
+
+import java.util.Objects;
+
+/**
+ * Drives the audio receive path: it feeds received packets into the NetEq jitter buffer and, on each
+ * playback pull, asks the buffer to render one frame and delivers the rendered samples.
+ *
+ * <p>This is the receiver half of the audio media engine and the producer the playback pump pulls from,
+ * which it satisfies by implementing {@link AudioWriterPump.AudioBlockSource}. Two flows meet here. On
+ * receipt, a demultiplexed and (on the group path) SFrame-opened audio payload is inserted into the
+ * {@link NetEqAudioSource} through {@link #receivePacket(int, long, byte[])}, which buffers it and tracks its
+ * arrival timing. On playback, the writer pump calls {@link #pull(short[], int)} once per render period; the
+ * receiver pulls one rendered frame from the NetEq buffer through {@link NetEqAudioSource#getAudio()} and
+ * copies it into the pump's scratch array, recording the frame's voice-activity verdict
+ * ({@link NetEqAudioSource#lastFrameVoiceActive()}) for level metering and mixing.
+ *
+ * <p>The NetEq jitter buffer the receiver delegates to owns every render decision: it asks its decision logic
+ * for the next operation, decodes the scheduled packet through its codec seam, reconstructs a lost packet
+ * from the in-band forward-error-correction copy carried in the following packet or conceals it through the
+ * codec's packet-loss-concealment or the built-in expander, time-stretches the decoded audio to drain or fill
+ * the buffer, and serves comfort noise or silence for a gap. The receiver adds no render logic of its own; it
+ * is a thin adapter that copies the served frame into the pump's array. A codec packet that decodes to more
+ * than one frame (the sixty millisecond MLow packet decodes to three frames, nine hundred and sixty samples,
+ * in a single decode) is served one frame per pull by the NetEq buffer's output history, so the receiver
+ * holds no remainder buffer.
+ *
+ * <p>The jitter buffer get period is fixed at twenty milliseconds, so one pull renders one twenty millisecond
+ * frame, which at the call's sixteen kilohertz mono format is three hundred and twenty samples. The receiver
+ * copies up to the pump's capacity into its array; a pull for fewer than a whole frame therefore returns a
+ * truncated frame rather than splitting the decode, and the pump sizes its request to a whole frame in
+ * practice.
+ *
+ * <p>The two flows run on different threads: {@link #receivePacket(int, long, byte[])} on the transport
+ * receive path and {@link #pull(short[], int)} on the playback pump's virtual thread. The NetEq buffer the
+ * receiver delegates to owns the concurrency between insert and pull, mirroring the WebRTC NetEq design where
+ * the insert and the get-audio entry points are separately locked; this receiver adds no lock of its own and
+ * keeps only single-writer scratch state on the pull thread.
+ *
+ * @implNote This implementation ports {@code get_frame_neteq} of the wa-voip WASM module {@code ff-tScznZ8P}
+ * ({@code rev-media-audio}): NetEq pulls a twenty millisecond frame ({@code mvp->jb.neteq_use_20ms_get_period})
+ * and the receiver delivers it into the playback pump's scratch array. The decode, the in-band
+ * forward-error-correction recovery ({@code opus_codec_recover_normal}, fn6272), the codec packet-loss
+ * concealment, the time-stretch, and the voice-activity flag ({@code wa_opus_check_vad_flags_wrapper},
+ * fn6250) all run inside the NetEq buffer behind the {@link NetEqAudioSource} seam, so this class is pure
+ * orchestration of the per-pull get-then-copy cycle; the native get period of twenty milliseconds is kept as
+ * {@link #GET_PERIOD_MILLIS} and the rendered frame is delivered per the demand-driven render contract of
+ * {@link AudioWriterPump.AudioBlockSource}. The multi-frame MLow remainder the receiver once held is now
+ * served from the NetEq buffer's own decoded-PCM output history (the {@code SyncBuffer}), so the receiver no
+ * longer keeps a parallel decoded-remainder FIFO.
+ */
+public final class AudioDecoderReceiver implements AudioWriterPump.AudioBlockSource {
+    /**
+     * The jitter-buffer get period, in milliseconds.
+     *
+     * <p>One playback pull renders one frame of this duration; the native engine fixes it at twenty
+     * milliseconds ({@code neteq_use_20ms_get_period}).
+     */
+    public static final int GET_PERIOD_MILLIS = 20;
+
+    /**
+     * The call audio sample rate, in hertz.
+     *
+     * <p>Fixed at sixteen kilohertz mono to match the public call audio format; combined with the get
+     * period it sets the rendered frame's sample count.
+     */
+    public static final int SAMPLE_RATE_HZ = 16_000;
+
+    /**
+     * The number of samples in one rendered frame.
+     *
+     * <p>The get period times the sample rate: twenty milliseconds at sixteen kilohertz is three hundred
+     * and twenty samples. Every decode, conceal, or comfort-noise frame produces exactly this many
+     * samples.
+     */
+    public static final int FRAME_SAMPLES = SAMPLE_RATE_HZ / 1000 * GET_PERIOD_MILLIS;
+
+    /**
+     * One decoded packet's samples and the voice-activity verdict the codec read from it.
+     *
+     * <p>The {@link #samples()} array holds a whole number of {@link #FRAME_SAMPLES}-sized frames: one frame
+     * for a 20 ms Opus packet, three for a 60 ms MLow packet. The {@link #voiceActive()} flag is the
+     * receive-side voice-activity verdict the codec derives from the packet that produced these samples, so a
+     * comfort-noise or inactive packet reports inactive even when it decodes to non-silent PCM; the one
+     * verdict covers every frame the packet decoded to.
+     *
+     * @param samples     the decoded samples, a positive multiple of {@link #FRAME_SAMPLES} long; never
+     *                    {@code null}
+     * @param voiceActive whether the decoded packet was judged to carry active speech
+     */
+    public record DecodedFrame(short[] samples, boolean voiceActive) {
+        /**
+         * Validates the decoded frame, rejecting a {@code null} sample array.
+         *
+         * @throws NullPointerException if {@code samples} is {@code null}
+         */
+        public DecodedFrame {
+            Objects.requireNonNull(samples, "samples cannot be null");
+        }
+    }
+
+    /**
+     * Decodes or conceals one audio frame through the codec, the seam the NetEq jitter buffer renders each
+     * frame through.
+     *
+     * <p>Implemented over the codec unit's libopus or MLow binding and bound into the NetEq jitter buffer at
+     * wiring time. The buffer calls {@link #decode(byte[], int, boolean)} for a normal decode or an in-band
+     * forward-error-correction reconstruction and {@link #conceal(int)} for a codec packet-loss-concealment
+     * frame; the receiver never calls this seam directly, since the buffer owns the per-frame decision.
+     */
+    public interface FrameDecoder {
+        /**
+         * Decodes one packet into one or more frames and reports its voice-activity verdict.
+         *
+         * @implSpec Implementations must return a whole number of {@code frameSamples}-sized frames: exactly
+         * {@code frameSamples} samples for a packet that spans one get period (the 20 ms Opus packet), or a
+         * positive integer multiple of {@code frameSamples} for a packet that spans several (the 60 ms MLow
+         * packet decodes to three frames, {@code 3 * frameSamples} samples, in one decode). The NetEq buffer
+         * pushes the whole decode into its output history and serves one frame per pull, so a multi-frame
+         * decode must not be split across calls. Implementations must set the returned frame's
+         * {@link DecodedFrame#voiceActive()} from the decoded packet's own voice-activity classification (the
+         * Opus per-SILK-frame VAD flags, or the MLow TOC voice-activity bit), never a fixed value; the one
+         * verdict covers every frame the packet decodes to. A forward-error-correction reconstruction of a
+         * previous frame does not carry the next packet's verdict.
+         *
+         * @param payload      the codec packet to decode; never {@code null}
+         * @param frameSamples the number of samples in one get-period frame
+         * @param fec          whether to reconstruct the previous frame from this packet's in-band copy
+         * @return the decoded frame carrying the samples and the packet's voice-activity verdict; never
+         * {@code null}
+         */
+        DecodedFrame decode(byte[] payload, int frameSamples, boolean fec);
+
+        /**
+         * Produces one concealment frame with no input packet.
+         *
+         * @param frameSamples the number of samples the concealment frame must hold
+         * @return the concealed samples, {@code frameSamples} long; never {@code null}
+         */
+        short[] conceal(int frameSamples);
+    }
+
+    /**
+     * The NetEq jitter buffer the receiver inserts packets into and pulls rendered frames from.
+     *
+     * <p>Implemented by the dsp unit's NetEq port: it buffers inserted packets, schedules their playout
+     * against measured arrival timing, and on each pull renders exactly one get-period frame, decoding through
+     * its own {@link FrameDecoder} codec seam and running the full WSOLA time-stretch and concealment over its
+     * decoded-PCM history. The receiver treats it as the authority on what to render and never reorders
+     * packets or runs codec logic itself.
+     */
+    public interface NetEqAudioSource {
+        /**
+         * Inserts one received audio packet into the jitter buffer.
+         *
+         * @param rtpSequence  the packet's 16-bit RTP sequence number
+         * @param rtpTimestamp the packet's RTP timestamp
+         * @param payload      the decoded-transport audio payload to buffer; never {@code null}
+         */
+        void insert(int rtpSequence, long rtpTimestamp, byte[] payload);
+
+        /**
+         * Renders and returns the next get-period audio frame.
+         *
+         * @implSpec Implementations must ask the decision logic for an operation, render exactly one
+         * get-period frame by decoding the scheduled packet, reconstructing a lost frame from the following
+         * packet's in-band forward-error-correction, concealing through the codec or the built-in expander,
+         * time-stretching the decoded audio, or generating comfort noise, and return the frame with a
+         * presentation timestamp. A codec packet that decodes to several get-period frames must be served one
+         * frame per call from the buffer's output history.
+         *
+         * @return the rendered audio frame; never {@code null}
+         */
+        AudioFrame getAudio();
+
+        /**
+         * Returns whether the most recently rendered frame was judged voice-active.
+         *
+         * @implSpec Implementations must report the voice-activity verdict of the packet the last
+         * {@link #getAudio()} frame was decoded from, reporting inactive for a concealment,
+         * forward-error-correction, comfort-noise, or silence frame, and reporting one multi-frame packet's
+         * single verdict for every get-period frame served from it.
+         *
+         * @return {@code true} if the last rendered frame carried active speech
+         */
+        boolean lastFrameVoiceActive();
+    }
+
+    /**
+     * The NetEq jitter buffer the receiver inserts into and pulls rendered frames from.
+     */
+    private final NetEqAudioSource netEq;
+
+    /**
+     * Whether the last rendered frame was judged voice-active.
+     *
+     * <p>Set on each pull from the NetEq buffer's verdict (a concealment or silence frame is inactive) and
+     * read by {@link #lastFrameVoiceActive()} for level metering and mixing. Written only on the pull thread.
+     */
+    private boolean lastFrameVoiceActive;
+
+    /**
+     * Constructs an audio decoder-receiver wrapping the NetEq jitter buffer.
+     *
+     * @param netEq the NetEq jitter buffer to insert into and pull rendered frames from; never {@code null}
+     * @throws NullPointerException if {@code netEq} is {@code null}
+     */
+    public AudioDecoderReceiver(NetEqAudioSource netEq) {
+        this.netEq = Objects.requireNonNull(netEq, "netEq cannot be null");
+        this.lastFrameVoiceActive = false;
+    }
+
+    /**
+     * Inserts one received audio packet into the jitter buffer.
+     *
+     * <p>The payload is the audio bytes after transport demultiplexing and, on the group path, SFrame
+     * opening, so the jitter buffer and codec see plain codec packets regardless of the confidentiality
+     * path. Called on the transport receive thread; the buffering and any reordering are the jitter
+     * buffer's responsibility.
+     *
+     * @param rtpSequence  the packet's 16-bit RTP sequence number
+     * @param rtpTimestamp the packet's RTP timestamp
+     * @param payload      the decoded-transport audio payload; never {@code null}
+     * @throws NullPointerException if {@code payload} is {@code null}
+     */
+    public void receivePacket(int rtpSequence, long rtpTimestamp, byte[] payload) {
+        Objects.requireNonNull(payload, "payload cannot be null");
+        netEq.insert(rtpSequence, rtpTimestamp, payload);
+    }
+
+    /**
+     * Returns whether the most recently rendered frame was voice-active.
+     *
+     * <p>Reflects the NetEq buffer's voice-activity verdict for the last {@link #pull(short[], int)}; a
+     * concealment or silence frame is reported inactive. Used for audio-level metering and mixing
+     * downstream.
+     *
+     * @return {@code true} if the last rendered frame carried active speech
+     */
+    public boolean lastFrameVoiceActive() {
+        return lastFrameVoiceActive;
+    }
+
+    /**
+     * Renders one frame by pulling it from the NetEq jitter buffer and copies it into the pump's array.
+     *
+     * <p>Pulls one rendered get-period frame from the NetEq buffer through
+     * {@link NetEqAudioSource#getAudio()}; the buffer decides the operation, decodes or conceals, and
+     * time-stretches, so this method runs no codec logic. The rendered frame is copied into {@code block} up
+     * to {@code length} and the count copied is returned; a {@code length} shorter than a whole frame
+     * truncates the handed-out samples rather than splitting the decode. The voice-activity verdict the buffer
+     * reports is recorded for {@link #lastFrameVoiceActive()}; a multi-frame MLow packet's three frames each
+     * carry that packet's single verdict because the buffer holds it across the served frames.
+     *
+     * @param block  the scratch array to fill with rendered samples; writable only during this call
+     * @param length the maximum number of samples to write
+     * @return the number of samples written, in {@code [0, length]}
+     */
+    @Override
+    public int pull(short[] block, int length) {
+        if (length <= 0) {
+            return 0;
+        }
+        var frame = netEq.getAudio();
+        lastFrameVoiceActive = netEq.lastFrameVoiceActive();
+        var pcm = frame.pcm();
+        var copied = Math.min(length, Math.min(FRAME_SAMPLES, pcm.length));
+        System.arraycopy(pcm, 0, block, 0, copied);
+        return copied;
+    }
+}

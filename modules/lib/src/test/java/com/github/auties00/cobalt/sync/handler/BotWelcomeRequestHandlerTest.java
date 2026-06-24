@@ -187,7 +187,7 @@ class BotWelcomeRequestHandlerTest {
             assertEquals(SyncdOperation.SET, pending.mutation().operation());
             assertEquals(BotWelcomeRequestAction.ACTION_VERSION, pending.mutation().actionVersion());
             assertEquals("[\"bot_welcome_request\",\"" + BOT_JID + "\"]", pending.mutation().index());
-            var action = (BotWelcomeRequestAction) pending.mutation().value().action().orElseThrow();
+            var action = (BotWelcomeRequestAction) pending.mutation().value().flatMap(sav -> sav.action()).orElseThrow();
             assertTrue(action.isSent());
         }
     }

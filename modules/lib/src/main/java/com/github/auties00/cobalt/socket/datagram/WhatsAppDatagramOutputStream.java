@@ -1,17 +1,16 @@
 package com.github.auties00.cobalt.socket.datagram;
 
 import com.github.auties00.cobalt.socket.websocket.WebSocketFrameOutputStream;
-import com.github.auties00.cobalt.util.GcmUtils;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import com.github.auties00.cobalt.util.AesGcmStreamCipher;
+import com.github.auties00.cobalt.util.DataUtils;
 
-import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.ShortBufferException;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteOrder;
 import java.security.GeneralSecurityException;
-import java.security.Provider;
 import java.util.Objects;
 
 /**
@@ -25,13 +24,13 @@ import java.util.Objects;
  *       one-shot prologue), initialises the AES-GCM cipher (post-handshake) and writes the prologue and {@code int24}
  *       length prefix straight to the downstream.</li>
  *   <li>{@link #write(byte[], int, int)} and {@link #write(int)} stream the declared plaintext through
- *       {@link Cipher#update}; the resulting ciphertext is forwarded to the downstream as it is produced.</li>
- *   <li>{@link #flush()} calls {@link Cipher#doFinal} to release the final partial-block ciphertext and the
- *       {@value #GCM_TAG_BYTE_SIZE}-byte GCM tag, then flushes the downstream.</li>
+ *       {@link AesGcmStreamCipher#update}; the resulting ciphertext is forwarded to the downstream as it is produced.</li>
+ *   <li>{@link #flush()} calls {@link AesGcmStreamCipher#doFinal} to release the {@value #GCM_TAG_BYTE_SIZE}-byte GCM
+ *       tag, then flushes the downstream.</li>
  * </ol>
  *
- * <p>The stream owns one fixed-size scratch buffer (8 KiB plus a 32-byte tag-margin) that captures the ciphertext
- * produced by one round of {@link Cipher#update} plus the trailing bytes that {@link Cipher#doFinal} emits. Neither the
+ * <p>The stream owns one fixed-size 8 KiB scratch buffer that captures the ciphertext produced by one round of
+ * {@link AesGcmStreamCipher#update} or the authentication tag released by {@link AesGcmStreamCipher#doFinal}. Neither the
  * plaintext nor the ciphertext is ever copied into a buffer sized by the datagram.
  *
  * <p>Before the Noise handshake completes the stream is in pre-handshake mode: writes are forwarded verbatim and the
@@ -48,12 +47,12 @@ import java.util.Objects;
  * write lock.
  *
  * @implNote
- * This implementation sources the AES-GCM cipher from the BouncyCastle JCE provider rather than the JDK's default
- * SunJCE because BouncyCastle's {@code GCMBlockCipher} streams ciphertext out of {@link Cipher#update} block by block
- * (appending only the tag at {@link Cipher#doFinal}), whereas SunJCE buffers the entire plaintext internally and
- * releases the full ciphertext only at {@code doFinal}. Streaming lets the output buffer stay at a fixed 8 KiB
- * regardless of how large a single datagram is. The state machine keys off {@link #textRemaining}:
- * {@link #NO_ACTIVE_DATAGRAM} means no datagram is in flight and the caller must call
+ * This implementation drives an {@link AesGcmStreamCipher}, a streaming AES-GCM built on the JDK's own AES primitives,
+ * rather than {@code javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")}. The packaged JDK GCM buffers the entire
+ * message and releases its output only at {@code doFinal}, whereas {@link AesGcmStreamCipher#update} emits ciphertext
+ * block by block (appending only the tag at {@link AesGcmStreamCipher#doFinal}), which lets the output buffer stay at a
+ * fixed {@value #CIPHERTEXT_CHUNK_SIZE} bytes regardless of how large a single datagram is. The state machine keys off
+ * {@link #textRemaining}: {@link #NO_ACTIVE_DATAGRAM} means no datagram is in flight and the caller must call
  * {@link #beginDatagram(byte[], int)} next; a non-negative value is the count of plaintext bytes still expected before
  * the matching {@link #flush()} call.
  */
@@ -75,22 +74,10 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
     private static final int MAX_DATAGRAM_LENGTH = 0xFF_FFFF;
 
     /**
-     * Holds the size of the fixed ciphertext scratch buffer; one round of {@link Cipher#update} processes at most this
-     * many plaintext bytes.
+     * Holds the size of the fixed ciphertext scratch buffer; one round of {@link AesGcmStreamCipher#update} processes at
+     * most this many plaintext bytes.
      */
     private static final int CIPHERTEXT_CHUNK_SIZE = 8192;
-
-    /**
-     * Holds the headroom appended to {@link #ciphertextChunk} to absorb the worst-case overshoot from BouncyCastle's
-     * AES-GCM {@link Cipher#update} plus the trailing partial-block bytes and the {@value #GCM_TAG_BYTE_SIZE}-byte tag
-     * that {@link Cipher#doFinal} releases.
-     *
-     * @implNote
-     * This implementation bounds the {@code update} overshoot at {@code GCM_TAG_BYTE_SIZE - 1 = 15} bytes (small
-     * unaligned input chunks straddling an AES block boundary) plus another {@code GCM_TAG_BYTE_SIZE = 16} bytes for the
-     * {@code doFinal} tail plus tag, rounded up to {@code 2 * GCM_TAG_BYTE_SIZE = 32} for headroom.
-     */
-    private static final int CIPHERTEXT_CHUNK_OVERFLOW = 2 * GCM_TAG_BYTE_SIZE;
 
     /**
      * Holds the sentinel value for {@link #textRemaining} meaning no datagram is currently in flight and the next call
@@ -99,21 +86,16 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
     private static final int NO_ACTIVE_DATAGRAM = -1;
 
     /**
-     * Holds the shared BouncyCastle JCE provider instance handed to every {@link Cipher#getInstance(String, Provider)}
-     * call.
+     * Holds the fixed-size scratch buffer that captures the ciphertext emitted by one {@link AesGcmStreamCipher#update}
+     * call, or the authentication tag emitted by {@link AesGcmStreamCipher#doFinal} at the end of the datagram.
      *
      * @implNote
-     * This implementation holds the provider here so the JVM never needs to register BouncyCastle globally, isolating
-     * the dependency to this stream and avoiding pulling in BouncyCastle's other providers system-wide.
+     * This implementation sizes the buffer at exactly {@value #CIPHERTEXT_CHUNK_SIZE} bytes because the streaming cipher
+     * emits one ciphertext byte per plaintext byte from {@code update} (so a single bounded round never exceeds the
+     * chunk size) and only the {@value #GCM_TAG_BYTE_SIZE}-byte tag from {@code doFinal}; no provider overshoot has to be
+     * absorbed.
      */
-    private static final Provider BOUNCY_CASTLE = new BouncyCastleProvider();
-
-    /**
-     * Holds the fixed-size scratch buffer that captures the ciphertext emitted by one {@link Cipher#update} call (sized
-     * to absorb the up-to-15-byte BouncyCastle excess) plus any trailing bytes released by {@link Cipher#doFinal} at
-     * the end of the datagram.
-     */
-    private final byte[] ciphertextChunk = new byte[CIPHERTEXT_CHUNK_SIZE + CIPHERTEXT_CHUNK_OVERFLOW];
+    private final byte[] ciphertextChunk = new byte[CIPHERTEXT_CHUNK_SIZE];
 
     /**
      * Holds the reusable single-byte buffer used by {@link #write(int)} to delegate to the bulk-write code path without
@@ -131,7 +113,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
      * Holds the AES-GCM cipher, re-initialised on every {@link #beginDatagram(byte[], int)} call (in post-handshake
      * mode) with a fresh nonce derived from {@link #writeCounter}.
      */
-    private final Cipher cipher;
+    private final AesGcmStreamCipher cipher;
 
     /**
      * Holds the current AES-GCM write key, or {@code null} before the Noise handshake completes while the stream is in
@@ -163,13 +145,13 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
      * transport-layer {@link OutputStream} before running the Noise handshake on top.
      *
      * @param out the underlying byte stream
-     * @throws IOException          if BouncyCastle cannot instantiate the AES-GCM cipher
+     * @throws IOException          if the platform cannot provide the AES-GCM cipher
      * @throws NullPointerException if {@code out} is {@code null}
      */
     public WhatsAppDatagramOutputStream(OutputStream out) throws IOException {
         super(Objects.requireNonNull(out, "out"));
         try {
-            this.cipher = Cipher.getInstance("AES/GCM/NoPadding", BOUNCY_CASTLE);
+            this.cipher = new AesGcmStreamCipher();
         } catch (GeneralSecurityException exception) {
             throw new IOException("Failed to initialise AES-GCM cipher", exception);
         }
@@ -210,8 +192,9 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
      * byte count ({@code plaintextSize + 16} post-handshake or {@code plaintextSize} pre-handshake), validates the
      * {@code int24} bound, and forwards a single {@link WebSocketFrameOutputStream#beginFrame(int)} call to a WebSocket
      * downstream so the whole datagram lands in one WebSocket binary frame. The prologue and the three-byte length
-     * prefix are then written straight to the downstream so the payload bytes can stream through {@link Cipher#update}
-     * into the fixed-size {@link #ciphertextChunk} and onto the wire without an intermediate per-datagram buffer.
+     * prefix are then written straight to the downstream so the payload bytes can stream through
+     * {@link AesGcmStreamCipher#update} into the fixed-size {@link #ciphertextChunk} and onto the wire without an
+     * intermediate per-datagram buffer.
      *
      * @param prologue      optional one-shot prologue bytes written to the wire before the length prefix, or
      *                      {@code null} for none
@@ -237,7 +220,13 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
         } else {
             wireLen = plaintextSize + GCM_TAG_BYTE_SIZE;
             try {
-                cipher.init(Cipher.ENCRYPT_MODE, key, GcmUtils.createNonce(writeCounter++));
+                var nonce = new byte[12];
+                DataUtils.putLong(nonce, 4, writeCounter++, ByteOrder.BIG_ENDIAN);
+                cipher.init(
+                        true,
+                        key,
+                        nonce
+                );
             } catch (GeneralSecurityException exception) {
                 throw new IOException("Failed to initialise AES-GCM cipher", exception);
             }
@@ -280,7 +269,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation feeds the caller's bytes through {@link Cipher#update} in
+     * This implementation feeds the caller's bytes through {@link AesGcmStreamCipher#update} in
      * {@link #CIPHERTEXT_CHUNK_SIZE}-bounded passes (in post-handshake mode) or forwards them verbatim (in
      * pre-handshake mode). The produced ciphertext is written to the downstream as it leaves the cipher, so neither
      * plaintext nor ciphertext is ever copied into a buffer sized by the datagram. Writing more bytes than declared by
@@ -323,8 +312,8 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation finalises the current datagram (in post-handshake mode it calls {@link Cipher#doFinal} to
-     * emit the final partial-block ciphertext and the {@value #GCM_TAG_BYTE_SIZE}-byte GCM tag) and flushes the
+     * This implementation finalises the current datagram (in post-handshake mode it calls
+     * {@link AesGcmStreamCipher#doFinal} to emit the {@value #GCM_TAG_BYTE_SIZE}-byte GCM tag) and flushes the
      * downstream. A flush issued with no datagram in flight is forwarded straight to the downstream so a stray
      * {@code flush} from a higher-level decorator does not emit a malformed datagram on the wire. A flush issued before
      * all declared plaintext bytes have been written is rejected.

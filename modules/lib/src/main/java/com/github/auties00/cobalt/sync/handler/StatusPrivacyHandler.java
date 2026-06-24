@@ -159,7 +159,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
      */
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     private MutationApplicationResult applySetMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
-        if (!(mutation.value().action().orElse(null) instanceof StatusPrivacyAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof StatusPrivacyAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

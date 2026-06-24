@@ -244,7 +244,7 @@ public final class MessageFixtures {
             if (selfLid != null) {
                 store.accountStore().setLid(selfLid);
             }
-            store.setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
+            store.connectionStore().setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
             store.signalStore().setSignedDeviceIdentity(new ADVSignedDeviceIdentityBuilder()
                     .details(new byte[]{0})
                     .accountSignatureKey(new byte[32])

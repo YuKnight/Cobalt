@@ -122,7 +122,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
         }
 
         try {
-            if (!(mutation.value().action().orElse(null) instanceof UnarchiveChatsSetting setting)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof UnarchiveChatsSetting setting)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

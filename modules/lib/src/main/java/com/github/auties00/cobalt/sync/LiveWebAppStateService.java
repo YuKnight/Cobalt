@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.sync.key.LiveMissingSyncKeyRequestService;
 import com.github.auties00.cobalt.sync.key.LiveSyncKeyRotationService;
 
@@ -1369,11 +1370,6 @@ public final class LiveWebAppStateService implements WebAppStateService {
         var patchesPresent = !syncResponse.patches().isEmpty();
         var recoveredFromSnapshot = false;
         if (syncResponse.snapshotReference().isPresent()) {
-            if (syncResponse.version() <= 0) {
-                throw new WhatsAppWebAppStateSyncException.UnexpectedError(
-                        "Snapshot missing required version in " + collectionName, null);
-            }
-
             store.syncStore().clearSyncActionEntries(collectionName);
 
             var snapshot = coordinator.runWithMonitorReleased(() -> downloadAndDecodeSnapshot(syncResponse.snapshotReference().get()));
@@ -1391,7 +1387,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
 
             emitSyncdMutationWamEvents(
                     collectionName,
-                    syncResponse.version(),
+                    snapshotProtoVersion,
                     MutationDirectionType.INCOMING,
                     MutationBundleType.SNAPSHOT,
                     untrusted,
@@ -1406,16 +1402,16 @@ public final class LiveWebAppStateService implements WebAppStateService {
             var newHash = computeNewLTHash(collectionName, MutationLTHash.EMPTY_HASH, untrusted);
 
             try {
-                integrityVerifier.verifySnapshotMac(collectionName, syncResponse.version(), snapshot, newHash.newHash());
+                integrityVerifier.verifySnapshotMac(collectionName, snapshotProtoVersion, snapshot, newHash.newHash());
 
-                var versionApplied = updateCollectionState(collectionName, syncResponse.version(), newHash.newHash());
+                var versionApplied = updateCollectionState(collectionName, snapshotProtoVersion, newHash.newHash());
                 if (versionApplied) {
                     applySyncActionEntryUpdates(collectionName, newHash.updates());
                 }
                 if (!untrusted.isEmpty()) {
                     var snapshotTrusted = new ArrayList<DecryptedMutation.Trusted>(untrusted.size());
                     for (var entry : untrusted) {
-                        snapshotTrusted.add(new DecryptedMutation.Trusted(entry.index(), entry.value(), entry.operation(), entry.timestamp(), entry.actionVersion()));
+                        snapshotTrusted.add(new DecryptedMutation.Trusted(entry.index(), entry.value().orElse(null), entry.operation(), entry.timestamp(), entry.actionVersion()));
                     }
                     applyMutations(collectionName, snapshotTrusted);
                 }
@@ -1551,7 +1547,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
             var ordered = deduplicateAndOrder(untrusted);
             var patchTrusted = new ArrayList<DecryptedMutation.Trusted>(ordered.size());
             for (var entry : ordered) {
-                patchTrusted.add(new DecryptedMutation.Trusted(entry.index(), entry.value(), entry.operation(), entry.timestamp(), entry.actionVersion()));
+                patchTrusted.add(new DecryptedMutation.Trusted(entry.index(), entry.value().orElse(null), entry.operation(), entry.timestamp(), entry.actionVersion()));
             }
             if (!patchTrusted.isEmpty()) {
                 applyMutations(collectionName, patchTrusted);
@@ -2747,7 +2743,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
     private void reportDecryptedMutationMessageRanges(SequencedCollection<DecryptedMutation.Untrusted> untrusted) {
         logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.MUTATIONS_DECRYPTED);
         for (var mutation : untrusted) {
-            var messageRange = mutation.value().action()
+            var messageRange = mutation.value().flatMap(sav -> sav.action())
                     .flatMap(action -> switch (action) {
                         case ArchiveChatAction a -> a.messageRange();
                         case MarkChatAsReadAction a -> a.messageRange();
@@ -3181,7 +3177,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         }
         return new OrphanMutationEntryBuilder()
                 .index(mutation.index())
-                .value(mutation.value())
+                .value(mutation.value().orElse(null))
                 .operation(mutation.operation())
                 .timestamp(mutation.timestamp())
                 .actionVersion(mutation.actionVersion())
@@ -3499,7 +3495,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
 
             var actionName = resolveActionNameSafe(remoteMutation);
             var handler = actionName != null ? handlerRegistry.findHandler(actionName).orElse(null) : null;
-            var resolution = handler != null
+            var resolution = handler != null && remoteMutation.operation() == SyncdOperation.SET
                     ? handler.resolveConflicts(localMutation, remoteMutation)
                     : ConflictResolution.of(ConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
 
@@ -3593,7 +3589,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                                 .valueMac(valueMac)
                                 .keyId(mutation.keyId())
                                 .actionIndex(mutation.index())
-                                .actionValue(mutation.value())
+                                .actionValue(mutation.value().orElse(null))
                                 .actionVersion(mutation.actionVersion())
                                 .build(),
                         false
@@ -3706,7 +3702,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      *
      * @implNote
      * This implementation routes the fatal path through Cobalt's pluggable
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientErrorHandler}
+     * {@link WhatsAppLinkedClientErrorHandler}
      * instead of a hardcoded logout, in keeping with the user-configurable
      * recovery model. The server-backoff reset on the retry attempt counter
      * matches the side effect of an {@code ErrorRetry} server reply.

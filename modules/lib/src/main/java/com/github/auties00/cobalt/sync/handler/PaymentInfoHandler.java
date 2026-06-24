@@ -119,7 +119,7 @@ public final class PaymentInfoHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PaymentInfoAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PaymentInfoAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

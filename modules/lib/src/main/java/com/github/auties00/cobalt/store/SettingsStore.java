@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.setting.AppTheme;
 import com.github.auties00.cobalt.model.setting.ChatLockSettings;
 import com.github.auties00.cobalt.model.setting.privacy.OptOutEntry;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.sync.action.chat.UsernameChatStartModeAction;
 import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeight;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingAction;
 import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
@@ -978,4 +979,19 @@ public interface SettingsStore {
      * @return this store instance for method chaining
      */
     SettingsStore setPlaySoundForCallNotification(boolean enabled);
+
+    /**
+     * Returns the username chat-start mode.
+     *
+     * @return the chat-start mode, or empty if unset
+     */
+    Optional<UsernameChatStartModeAction.ChatStartMode> usernameChatStartMode();
+
+    /**
+     * Sets the username chat-start mode.
+     *
+     * @param mode the mode, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    SettingsStore setUsernameChatStartMode(UsernameChatStartModeAction.ChatStartMode mode);
 }

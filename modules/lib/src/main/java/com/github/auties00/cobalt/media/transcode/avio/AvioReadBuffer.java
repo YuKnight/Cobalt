@@ -1,8 +1,8 @@
 package com.github.auties00.cobalt.media.transcode.avio;
 
-import com.github.auties00.cobalt.media.ffmpeg.AVIOContext;
-import com.github.auties00.cobalt.media.ffmpeg.FFmpegError;
-import com.github.auties00.cobalt.media.ffmpeg.Ffmpeg;
+import com.github.auties00.cobalt.util.ffmpeg.AVIOContext;
+import com.github.auties00.cobalt.util.ffmpeg.FFmpegError;
+import com.github.auties00.cobalt.util.ffmpeg.Ffmpeg;
 
 import java.io.IOException;
 import java.lang.foreign.Arena;

@@ -97,11 +97,11 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
-            if (mutation.value() == null) {
+            if (mutation.value().isEmpty()) {
                 return MutationApplicationResult.success();
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof CustomerDataAction)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof CustomerDataAction)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

@@ -160,7 +160,8 @@ public final class ApnsActivationCrypto {
                     FAIRPLAY_PRIVATE_KEY_PRIME_EXPONENT_P,
                     FAIRPLAY_PRIVATE_KEY_PRIME_EXPONENT_Q,
                     FAIRPLAY_PRIVATE_KEY_CRT_EXPONENT);
-            return KeyFactory.getInstance("RSA").generatePrivate(spec);
+            return KeyFactory.getInstance("RSA")
+                    .generatePrivate(spec);
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("FairPlay private key load failed", e);
         }

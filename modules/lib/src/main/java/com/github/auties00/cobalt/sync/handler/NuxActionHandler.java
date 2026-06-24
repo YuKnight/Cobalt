@@ -106,7 +106,7 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
-        var nuxAction = mutation.value().action().orElse(null);
+        var nuxAction = mutation.value().flatMap(sav -> sav.action()).orElse(null);
         var acknowledged = nuxAction instanceof NuxAction action && action.acknowledged();
 
         client.store().settingsStore().putOnboardingHintState(new OnboardingHintStateBuilder().hintId(nuxKey).dismissed(acknowledged).build());

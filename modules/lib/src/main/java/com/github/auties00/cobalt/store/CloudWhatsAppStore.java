@@ -4,9 +4,12 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * The persistent state backing a {@link com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient}.
@@ -83,6 +86,29 @@ public final class CloudWhatsAppStore implements WhatsAppStore {
     String webhookPath;
 
     /**
+     * The Meta app id addressed by the Resumable Upload API, or {@code null} when resumable uploads
+     * are not used.
+     *
+     * <p>The Resumable Upload API creates an upload session under the {@code /{APP_ID}/uploads} edge,
+     * so unlike the phone-number and WABA edges it is keyed by the application rather than a business
+     * asset. It is unset until configured because the other Cloud edges do not need it.
+     */
+    @ProtobufProperty(index = 11, type = ProtobufType.STRING)
+    String appId;
+
+    /**
+     * The id of the last inbound message seen per chat, keyed by the bare chat JID string.
+     *
+     * <p>The Cloud transport marks a chat as read by posting a {@code status: read} update for a message
+     * id rather than for a chat, so {@link com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient#markChatAsRead}
+     * needs the last inbound message id of the chat. Holding the mapping here rather than in client
+     * memory lets it survive a serialise/restore cycle, so a restored client can still mark a chat read
+     * for a message that arrived before the restore.
+     */
+    @ProtobufProperty(index = 12, type = ProtobufType.MAP, mapKeyType = ProtobufType.STRING, mapValueType = ProtobufType.STRING)
+    final ConcurrentMap<String, String> lastInboundMessageIdByChat;
+
+    /**
      * Constructs a new Cloud store.
      *
      * @param accessToken               the system-user access token
@@ -95,10 +121,14 @@ public final class CloudWhatsAppStore implements WhatsAppStore {
      * @param webhookBindAddress        the webhook bind address, or {@code null}
      * @param webhookPort               the webhook port, or {@code null} to disable the receiver
      * @param webhookPath               the webhook URL path
+     * @param appId                     the Meta app id used by the Resumable Upload API, or {@code null}
+     * @param lastInboundMessageIdByChat the last inbound message id per chat, or {@code null} for an
+     *                                   empty map
      */
     CloudWhatsAppStore(String accessToken, String phoneNumberId, String whatsappBusinessAccountId,
                        String businessId, String apiVersion, String appSecret, String webhookVerifyToken,
-                       String webhookBindAddress, Integer webhookPort, String webhookPath) {
+                       String webhookBindAddress, Integer webhookPort, String webhookPath, String appId,
+                       ConcurrentMap<String, String> lastInboundMessageIdByChat) {
         this.accessToken = accessToken;
         this.phoneNumberId = phoneNumberId;
         this.whatsappBusinessAccountId = whatsappBusinessAccountId;
@@ -109,6 +139,8 @@ public final class CloudWhatsAppStore implements WhatsAppStore {
         this.webhookBindAddress = webhookBindAddress;
         this.webhookPort = webhookPort;
         this.webhookPath = webhookPath;
+        this.appId = appId;
+        this.lastInboundMessageIdByChat = Objects.requireNonNullElseGet(lastInboundMessageIdByChat, ConcurrentHashMap::new);
     }
 
     /**
@@ -202,6 +234,55 @@ public final class CloudWhatsAppStore implements WhatsAppStore {
     }
 
     /**
+     * Returns the Meta app id used by the Resumable Upload API.
+     *
+     * @return an {@link Optional} carrying the app id, or empty when resumable uploads are not used
+     */
+    public Optional<String> appId() {
+        return Optional.ofNullable(appId);
+    }
+
+    /**
+     * Returns the live, mutable mapping of bare chat JID string to the id of the last inbound message
+     * seen in that chat.
+     *
+     * <p>The returned map is the backing {@link ConcurrentMap}, so reads and writes through it are
+     * thread-safe and reflected in the persisted state; prefer {@link #recordLastInboundMessageId(String, String)}
+     * and {@link #lastInboundMessageId(String)} for the common record-and-lookup operations.
+     *
+     * @return the last-inbound-message-id map
+     */
+    public Map<String, String> lastInboundMessageIdByChat() {
+        return lastInboundMessageIdByChat;
+    }
+
+    /**
+     * Records the id of the last inbound message seen in a chat, replacing any earlier id.
+     *
+     * @param chatJid   the bare chat JID string
+     * @param messageId the id of the most recent inbound message of the chat
+     * @throws NullPointerException if {@code chatJid} or {@code messageId} is {@code null}
+     */
+    public void recordLastInboundMessageId(String chatJid, String messageId) {
+        Objects.requireNonNull(chatJid, "chatJid must not be null");
+        Objects.requireNonNull(messageId, "messageId must not be null");
+        lastInboundMessageIdByChat.put(chatJid, messageId);
+    }
+
+    /**
+     * Returns the id of the last inbound message seen in a chat.
+     *
+     * @param chatJid the bare chat JID string
+     * @return an {@link Optional} carrying the last inbound message id, or empty when none has been
+     *         recorded for the chat
+     * @throws NullPointerException if {@code chatJid} is {@code null}
+     */
+    public Optional<String> lastInboundMessageId(String chatJid) {
+        Objects.requireNonNull(chatJid, "chatJid must not be null");
+        return Optional.ofNullable(lastInboundMessageIdByChat.get(chatJid));
+    }
+
+    /**
      * Returns whether the built-in webhook receiver is configured.
      *
      * <p>The receiver requires both a port and a verify token; when either is missing the client runs
@@ -231,7 +312,9 @@ public final class CloudWhatsAppStore implements WhatsAppStore {
                 && Objects.equals(webhookVerifyToken, that.webhookVerifyToken)
                 && Objects.equals(webhookBindAddress, that.webhookBindAddress)
                 && Objects.equals(webhookPort, that.webhookPort)
-                && Objects.equals(webhookPath, that.webhookPath);
+                && Objects.equals(webhookPath, that.webhookPath)
+                && Objects.equals(appId, that.appId)
+                && Objects.equals(lastInboundMessageIdByChat, that.lastInboundMessageIdByChat);
     }
 
     /**
@@ -242,6 +325,7 @@ public final class CloudWhatsAppStore implements WhatsAppStore {
     @Override
     public int hashCode() {
         return Objects.hash(accessToken, phoneNumberId, whatsappBusinessAccountId, businessId, apiVersion,
-                appSecret, webhookVerifyToken, webhookBindAddress, webhookPort, webhookPath);
+                appSecret, webhookVerifyToken, webhookBindAddress, webhookPort, webhookPath, appId,
+                lastInboundMessageIdByChat);
     }
 }

@@ -92,7 +92,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof LockChatAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LockChatAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

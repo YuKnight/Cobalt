@@ -93,7 +93,7 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof UGCBotAction action)
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof UGCBotAction action)
                 || action.definition().isEmpty()) {
             return MutationApplicationResult.malformed();
         }

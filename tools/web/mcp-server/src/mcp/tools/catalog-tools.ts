@@ -463,11 +463,11 @@ server.tool(
 
 server.tool(
   "get_native_module_wat",
-  "Returns a WASM function/module as text. format='wat' (default): WAT disassembly via WABT (whole module, or one function with functionIndex). format='ghidra': C pseudocode for one function (requires functionIndex) via Ghidra headless + the ghidra-wasm-plugin; falls back to an error message if Ghidra/plugin is not installed.",
+  "Returns a WASM function/module as text. format='wat' (default): WAT disassembly via WABT (whole module, or one function with functionIndex). format='ghidra': C pseudocode via Ghidra headless + the ghidra-wasm-plugin; requires functionIndex, which may be a single index or an array of indices decompiled in one batch (the whole-module analysis is paid once for the batch, so prefer one call with many indices over many single-index calls). Falls back to an error message if Ghidra/plugin is not installed.",
   {
     name: z.string(),
     platform: platformSchema,
-    functionIndex: z.number().optional(),
+    functionIndex: z.union([z.number(), z.array(z.number())]).optional(),
     format: z.enum(["wat", "ghidra"]).optional().default("wat"),
   },
   async ({
@@ -478,25 +478,32 @@ server.tool(
   }: {
     name: string;
     platform?: SnapshotPlatform;
-    functionIndex?: number;
+    functionIndex?: number | number[];
     format: "wat" | "ghidra";
   }) => {
     try {
       if (format === "ghidra") {
-        if (functionIndex == null) throw new Error("format='ghidra' requires functionIndex (single-function decompile)");
+        if (functionIndex == null) throw new Error("format='ghidra' requires functionIndex (one index or an array of indices)");
+        const indices = Array.isArray(functionIndex) ? functionIndex : [functionIndex];
+        if (indices.length === 0) throw new Error("format='ghidra' requires at least one functionIndex");
         const catalog = requireCatalog(platform);
         const { binary } = await catalog.getNativeModuleBinary(name);
-        const { decompileWasmFunction } = await import("../../extractor/ghidra.js");
-        const tmp = join(tmpdir(), `wasm-ghidra-${name.replace(/[^a-zA-Z0-9_-]/g, "_")}-${functionIndex}.wasm`);
+        const { decompileWasmFunctions } = await import("../../extractor/ghidra.js");
+        const tmp = join(tmpdir(), `wasm-ghidra-${name.replace(/[^a-zA-Z0-9_-]/g, "_")}-${indices[0]}-${indices.length}.wasm`);
         await writeFile(tmp, binary);
         try {
-          const result = await decompileWasmFunction(tmp, functionIndex);
-          return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+          const results = await decompileWasmFunctions(tmp, indices);
+          const payload = Array.isArray(functionIndex) ? results : results[0];
+          return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
         } finally {
           await rm(tmp, { force: true }).catch(() => {});
         }
       }
-      const result = await requireCatalog(platform).getNativeModuleWat(name, functionIndex);
+      if (Array.isArray(functionIndex) && functionIndex.length > 1) {
+        throw new Error("format='wat' supports only a single functionIndex; use format='ghidra' to decompile a batch");
+      }
+      const watIndex = Array.isArray(functionIndex) ? functionIndex[0] : functionIndex;
+      const result = await requireCatalog(platform).getNativeModuleWat(name, watIndex);
       return {
         content: [{ type: "text" as const, text: result }],
       };

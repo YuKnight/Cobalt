@@ -358,16 +358,14 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
         }
 
         /**
-         * Returns a verification handler that defers the choice of
-         * delivery channel to the WhatsApp server and reads the
-         * verification code from the supplied supplier.
+         * Returns a verification handler that doesn't request a new
+         * verification code.
          *
          * @apiNote
-         * Use when the calling application has no preference; the
-         * server picks the channel based on its own heuristics.
+         * Use when the calling application is already in possession of a verification
+         * code and doesn't need a new one
          *
-         * @param supplier the supplier that produces the verification
-         *                 code once the user has received it
+         * @param supplier the supplier that produces the verification code
          * @return the verification handler
          * @throws NullPointerException if {@code supplier} is
          *                              {@code null}

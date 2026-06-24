@@ -12,6 +12,9 @@ export const NOTIF_ALLOW_IDS = [
 ];
 export const NOTIF_DENY_IDS = ["permission_deny_button"];
 
+export const NOTIF_PRIMER_IDS = ["notification_primer_description"];
+export const NOTIF_PRIMER_CONTINUE_IDS = ["primary_button"];
+
 export const PHONE_COUNTRY_IDS = ["registration_country", "country_code_field"];
 export const PHONE_CC_INPUT_IDS = ["registration_cc", "cc", "country_code"];
 export const PHONE_NUMBER_INPUT_IDS = [

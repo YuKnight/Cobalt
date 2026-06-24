@@ -144,21 +144,10 @@ public final class StreamErrorStreamHandler extends SocketStreamHandler.Concurre
      */
     private void handleCode(int code) {
         LOGGER.log(System.Logger.Level.WARNING, "Received stream:error code={0}", code);
-        if (code >= 500 && code < 600) {
-            if (code == STREAM_ERROR_RESTART_LOGIN) {
-                whatsapp.handleFailure(new WhatsAppSessionException.Reconnect("Server requested reconnect"));
-                return;
-            }
-
-            if (code == STREAM_ERROR_LOGOUT) {
-                whatsapp.handleFailure(new WhatsAppSessionException.LoggedOut("Server requested logout"));
-                return;
-            }
-
-            whatsapp.handleFailure(new WhatsAppSessionException.Closed("Server stream error " + code));
-            return;
+        switch (code) {
+            case STREAM_ERROR_RESTART_LOGIN -> whatsapp.handleFailure(new WhatsAppSessionException.Reconnect("Server requested reconnect"));
+            case STREAM_ERROR_LOGOUT -> whatsapp.handleFailure(new WhatsAppSessionException.LoggedOut("Server requested logout"));
+            default ->  whatsapp.handleFailure(new WhatsAppSessionException.Closed("Server stream error " + code));
         }
-
-        whatsapp.handleFailure(new WhatsAppSessionException.Closed("Server stream error code " + code));
     }
 }

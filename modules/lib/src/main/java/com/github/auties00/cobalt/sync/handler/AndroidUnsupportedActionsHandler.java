@@ -86,7 +86,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
                 return MutationApplicationResult.unsupported();
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof AndroidUnsupportedActions action)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof AndroidUnsupportedActions action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

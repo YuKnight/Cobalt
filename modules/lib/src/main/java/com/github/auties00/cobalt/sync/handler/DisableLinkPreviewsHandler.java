@@ -94,7 +94,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
                 continue;
             }
 
-            if (mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action) {
+            if (mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action) {
                 lastValid = action.isPreviewsDisabled();
                 results.add(MutationApplicationResult.success());
             } else {
@@ -129,7 +129,7 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action)) {
             return MutationApplicationResult.malformed();
         }
 

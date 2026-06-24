@@ -97,7 +97,7 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
                 return MutationApplicationResult.unsupported();
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof ChatAssignmentAction action)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ChatAssignmentAction action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

@@ -44,7 +44,7 @@ class ContactActionMutationFactoryTest {
         var pending = factory.getContactSyncMutation(
                 CONTACT_PN, "Maria", "Maria Garcia", false, CONTACT_LID, true, "maria",
                 Instant.ofEpochSecond(oracle.getLong("timestampSeconds")));
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

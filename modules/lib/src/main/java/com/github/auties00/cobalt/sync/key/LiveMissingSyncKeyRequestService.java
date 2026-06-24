@@ -247,7 +247,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
         }
 
         var requestedKeyIds = coordinator.runLocked(() -> {
-            if (!store.isResumeFromRestartComplete()) {
+            if (!store.connectionStore().isResumeFromRestartComplete()) {
                 LOGGER.log(System.Logger.Level.DEBUG, "syncd: _handleMissingKeys: skip, resume in progress");
                 return List.<byte[]>of();
             }

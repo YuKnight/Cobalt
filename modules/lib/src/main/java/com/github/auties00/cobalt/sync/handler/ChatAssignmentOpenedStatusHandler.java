@@ -113,7 +113,7 @@ public final class ChatAssignmentOpenedStatusHandler implements WebAppStateActio
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof ChatAssignmentOpenedStatusAction action)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ChatAssignmentOpenedStatusAction action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

@@ -9,6 +9,7 @@ import type {
   PausedState,
   SessionTarget,
   TargetInfo,
+  UrlBreakpointAddResult,
   UrlBreakpointSpec,
 } from "../../types/live/debug.js";
 import { createLogger } from "../../utils/logger.js";
@@ -42,13 +43,19 @@ export class CdpMux {
 
   private readonly breakpoints: UrlBreakpointRegistry;
   private lastPaused: TrackedPause | null = null;
+  private initScript: string | null = null;
+  private initScriptTypes: Set<string> | null = null;
   private readonly getPort: () => number | null;
 
   constructor(getPort: () => number | null) {
     this.getPort = getPort;
     this.breakpoints = new UrlBreakpointRegistry(
       (method, params, sessionId) => this.rawSend(method, params, sessionId),
-      () => this.sessions
+      () => this.sessions,
+      (sessionId) => {
+        const t = this.sessionTargets.get(sessionId);
+        return t ? { type: t.type, url: t.url } : undefined;
+      }
     );
   }
 
@@ -198,6 +205,16 @@ export class CdpMux {
       sessionId
     ).catch(() => undefined);
     await this.breakpoints.bindSession(sessionId);
+    // Inject the configured init script while the target is still paused at waitForDebugger, so the hook
+    // runs in this target's realm before any of its own code (e.g. before a WebTransport is constructed).
+    // Honour the type filter so it only lands in the requested target types (e.g. workers only).
+    if (this.initScript && (this.initScriptTypes === null || this.initScriptTypes.has(type))) {
+      await this.rawSend(
+        "Runtime.evaluate",
+        { expression: this.initScript, includeCommandLineAPI: false, returnByValue: true },
+        sessionId
+      ).catch(() => undefined);
+    }
     await this.rawSend("Runtime.runIfWaitingForDebugger", {}, sessionId).catch(() => undefined);
   }
 
@@ -231,7 +248,7 @@ export class CdpMux {
     }
   }
 
-  async addUrlBreakpoint(spec: UrlBreakpointSpec): Promise<{ id: string; locations: BreakpointLocation[] }> {
+  async addUrlBreakpoint(spec: UrlBreakpointSpec): Promise<UrlBreakpointAddResult> {
     return this.breakpoints.add(spec);
   }
 
@@ -247,12 +264,61 @@ export class CdpMux {
     }));
   }
 
+  setInitScript(script: string | null, types: string[] | null = null): void {
+    this.initScript = script;
+    this.initScriptTypes = types && types.length ? new Set(types) : null;
+  }
+
+  /**
+   * Evaluates an expression in each attached child-target session matching {@code selector} and returns one
+   * result per target. {@code selector} is "all" (every non-page/non-browser target), "workers" (worker +
+   * shared_worker + service_worker), an exact {@code TargetInfo.type} (e.g. "service_worker", "iframe"), or a
+   * specific sessionId. The page target is never matched here; the caller evaluates the page over its own
+   * Playwright CDP session.
+   */
+  async evalOnTargets(
+    expression: string,
+    selector: string,
+    awaitPromise: boolean = true
+  ): Promise<Array<{ sessionId: string; type: string; url: string; value?: unknown; error?: string }>> {
+    await this.ensure();
+    await this.reconcileTargets();
+    const matches = (type: string, sessionId: string): boolean => {
+      if (this.sessionTargets.has(selector)) return sessionId === selector;
+      if (selector === "all") return type !== "page" && type !== "browser";
+      if (selector === "workers") return type === "worker" || type === "shared_worker" || type === "service_worker";
+      return type === selector;
+    };
+    // Evaluate every matching target in parallel, each behind its own timeout, so a single unresponsive or
+    // terminating worker yields an error entry instead of blocking the whole call (and dropping the transport).
+    const targets = [...this.sessionTargets.entries()].filter(([sid, t]) => matches(t.type, sid));
+    const evalOne = async (sessionId: string, t: { type: string; url: string }) => {
+      try {
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("eval timeout (target unresponsive)")), 4000)
+        );
+        const r = (await Promise.race([
+          this.rawSend("Runtime.evaluate", { expression, returnByValue: true, awaitPromise }, sessionId),
+          timeout,
+        ])) as { result?: { value?: unknown }; exceptionDetails?: { text?: string } };
+        if (r.exceptionDetails) return { sessionId, type: t.type, url: t.url, error: r.exceptionDetails.text ?? "eval error" };
+        return { sessionId, type: t.type, url: t.url, value: r.result?.value };
+      } catch (err) {
+        return { sessionId, type: t.type, url: t.url, error: err instanceof Error ? err.message : String(err) };
+      }
+    };
+    return Promise.all(targets.map(([sid, t]) => evalOne(sid, t)));
+  }
+
   private onScriptParsed(e: Record<string, unknown>, sessionId: string): void {
     const scriptId = e.scriptId as string | undefined;
     if (!scriptId) return;
+    const url = (e.url as string) ?? "";
+    // Late-bind any not-yet-bound url breakpoint now that a matching script (re)appeared in this target.
+    void this.breakpoints.onScriptParsed(sessionId, url).catch(() => undefined);
     this.scripts.set(scriptId, {
       scriptId,
-      url: (e.url as string) ?? "",
+      url,
       startLine: (e.startLine as number) ?? 0,
       startColumn: (e.startColumn as number) ?? 0,
       endLine: (e.endLine as number) ?? 0,

@@ -150,7 +150,7 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof PrimaryVersionAction action) || action.version().isEmpty()) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrimaryVersionAction action) || action.version().isEmpty()) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

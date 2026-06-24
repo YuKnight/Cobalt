@@ -26,7 +26,7 @@ class LocaleSettingMutationFactoryTest {
         var expected = SyncFixtures.decodeOracleBytes(oracle, "encoded");
 
         var pending = new LocaleSettingMutationFactory().getLocaleMutation(Instant.ofEpochSecond(1_700_000_000L), "en_US");
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

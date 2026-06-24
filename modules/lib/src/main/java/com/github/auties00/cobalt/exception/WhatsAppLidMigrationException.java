@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -19,13 +20,15 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
  * {@code WhatsAppLidMigrationException} can be exhaustive.
  *
  * @apiNote
- * Every subtype is fatal: the device's view of contacts and groups can no
+ * Every subtype reports {@link WhatsAppLinkedClientErrorResult#LOG_OUT} from
+ * {@link #toErrorResult()}: the device's view of contacts and groups can no
  * longer be trusted to address messages correctly, so the configured error
  * handler is expected to log the device out and drive a fresh pairing.
  *
  * @implNote
- * This implementation always reports the failure as fatal because the
- * partially migrated identifier mapping cannot be reconciled in place.
+ * This implementation always classifies the failure as
+ * {@link WhatsAppLinkedClientErrorResult#LOG_OUT} because the partially migrated
+ * identifier mapping cannot be reconciled in place.
  *
  * @see SplitThreadMismatch
  * @see PrimaryMappingsObsolete
@@ -77,13 +80,14 @@ public sealed abstract class WhatsAppLidMigrationException
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code true}: any LID migration
-     * failure leaves the device with an untrustworthy mapping between
-     * phone numbers and LIDs.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#LOG_OUT}: a partially migrated
+     * identifier mapping cannot be reconciled in place, so WhatsApp Web maps
+     * every {@code LogoutReason.LidMigration*} value to a forced logout.
      */
     @Override
-    public boolean isFatal() {
-        return true;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.LOG_OUT;
     }
 
     /**

@@ -287,7 +287,7 @@ class BusinessBroadcastListHandlerTest {
             assertEquals(ts, inner.timestamp());
             assertEquals(JSON.toJSONString(List.of(handler.actionName(), "list-build")), inner.index());
 
-            var roundtrip = inner.value().action().filter(a -> a instanceof BusinessBroadcastListAction).map(a -> (BusinessBroadcastListAction) a).orElseThrow();
+            var roundtrip = inner.value().flatMap(sav -> sav.action()).filter(a -> a instanceof BusinessBroadcastListAction).map(a -> (BusinessBroadcastListAction) a).orElseThrow();
             assertEquals("Friends", roundtrip.listName().orElseThrow());
             assertEquals(1, roundtrip.participants().size());
         }
@@ -297,7 +297,7 @@ class BusinessBroadcastListHandlerTest {
         void defaultsAudienceExpressionToNull() {
             var pending = factory.getBroadcastListMutation(
                     "list-noaud", List.of(), "Empty", Instant.now());
-            var roundtrip = pending.mutation().value().action().filter(a -> a instanceof BusinessBroadcastListAction).map(a -> (BusinessBroadcastListAction) a).orElseThrow();
+            var roundtrip = pending.mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof BusinessBroadcastListAction).map(a -> (BusinessBroadcastListAction) a).orElseThrow();
             assertTrue(roundtrip.audienceExpression().isEmpty(),
                     "the no-audience overload must omit the audience expression");
         }

@@ -72,7 +72,7 @@ class DecryptedMutationTest {
                 assertEquals(Instant.ofEpochSecond(1700000000L), dec.timestamp());
                 assertEquals(3, dec.actionVersion());
                 assertArrayEquals(KEY_ID, dec.keyId());
-                assertNotNull(dec.value());
+                assertTrue(dec.value().isPresent());
                 assertEquals(32, dec.indexMac().length);
                 assertEquals(32, dec.valueMac().length);
             }
@@ -253,7 +253,7 @@ class DecryptedMutationTest {
             assertEquals(SyncdOperation.SET, trusted.operation());
             assertEquals(Instant.ofEpochSecond(1700000000L), trusted.timestamp());
             assertEquals(3, trusted.actionVersion());
-            assertEquals(value, trusted.value());
+            assertEquals(value, trusted.value().orElseThrow());
         }
 
         @Test

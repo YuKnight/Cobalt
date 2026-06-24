@@ -104,7 +104,7 @@ public final class BusinessBroadcastCampaignHandler implements WebAppStateAction
             }
 
             if (mutation.operation() == SyncdOperation.SET) {
-                if (!(mutation.value().action().orElse(null) instanceof BusinessBroadcastCampaignAction action)) {
+                if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof BusinessBroadcastCampaignAction action)) {
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 

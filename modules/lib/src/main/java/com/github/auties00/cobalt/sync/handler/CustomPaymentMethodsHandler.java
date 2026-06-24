@@ -111,7 +111,7 @@ public final class CustomPaymentMethodsHandler implements WebAppStateActionHandl
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof CustomPaymentMethodsAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof CustomPaymentMethodsAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

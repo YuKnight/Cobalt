@@ -1,23 +1,13 @@
 #!/usr/bin/env bash
 #
-# Regenerates Java FFM bindings for the FFmpeg subset the toolkit
-# uses (libavformat / libavcodec / libavdevice / libavutil /
-# libswscale / libswresample). Output lands in
-# modules/lib/src/main/java/com/github/auties00/cobalt/
-# calls/toolkit/ffmpeg/bindings/Ffmpeg.java.
+# Regenerates Java FFM bindings for the FFmpeg subset the toolkit uses (package
+# media.ffmpeg). One umbrella header (ffmpeg_umbrella.h) drives a single jextract
+# pass so cross-library type dependencies resolve in one compilation unit;
+# per-library invocations fail when a struct field's type is not in the include
+# set. Re-run whenever the FFmpeg headers under headers/ change.
 #
-# One umbrella header (ffmpeg_umbrella.h) drives a single jextract
-# pass so cross-library type dependencies (AVStream → AVRational →
-# AVPacket → AVCodec → ...) all resolve in one compilation unit.
-# Per-library invocations were tried first and break on those
-# transitive references — jextract fails the whole binding when a
-# struct field's type isn't in the include set.
-#
-# Prerequisites: a JEXTRACT_HOME env var pointing at a jextract 22+
-# install, OR jextract on PATH. Download from
-# https://jdk.java.net/jextract/ if absent.
-#
-# Re-run this whenever the FFmpeg headers under headers/ change.
+# Prerequisites: JEXTRACT_HOME pointing at a jextract 22+ install, or jextract on
+# PATH. Download from https://jdk.java.net/jextract/ if absent.
 
 set -euo pipefail
 

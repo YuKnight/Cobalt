@@ -83,6 +83,11 @@ public abstract class ProtobufChatStore implements ChatStore {
     private final ConcurrentMap<String, ChatMessageInfo> peerMessages;
 
     /**
+     * The pending receipt-record recipients per sent message id; not persisted.
+     */
+    private final ConcurrentMap<String, Set<Jid>> pendingMessageRecipients;
+
+    /**
      * The chat JIDs whose UTM tracking message has been read; not persisted.
      */
     private final Set<Jid> utmReadChatIds;
@@ -110,6 +115,7 @@ public abstract class ProtobufChatStore implements ChatStore {
         this.chatMetadata = new ConcurrentHashMap<>();
         this.callLogStates = new ConcurrentHashMap<>();
         this.peerMessages = new ConcurrentHashMap<>();
+        this.pendingMessageRecipients = new ConcurrentHashMap<>();
         this.utmReadChatIds = ConcurrentHashMap.newKeySet();
         this.newsletterPinStates = new ConcurrentHashMap<>();
     }
@@ -281,6 +287,32 @@ public abstract class ProtobufChatStore implements ChatStore {
     @Override
     public void removePeerMessage(String id) {
         peerMessages.remove(id);
+    }
+
+    @Override
+    public Set<Jid> findReceiptRecords(String messageId) {
+        if (messageId == null) {
+            return Set.of();
+        }
+        var recipients = pendingMessageRecipients.get(messageId);
+        return recipients != null ? Set.copyOf(recipients) : Set.of();
+    }
+
+    @Override
+    public void createOrMergeReceiptRecords(String messageId, Collection<Jid> recipientJids) {
+        if (messageId == null || recipientJids == null || recipientJids.isEmpty()) {
+            return;
+        }
+        pendingMessageRecipients.compute(messageId, (k, existing) -> {
+            var set = existing != null ? existing : ConcurrentHashMap.<Jid>newKeySet();
+            set.addAll(recipientJids);
+            return set;
+        });
+    }
+
+    @Override
+    public void removeReceiptRecords(String messageId) {
+        pendingMessageRecipients.remove(messageId);
     }
 
     @Override

@@ -2863,7 +2863,7 @@ public final class LiveDeviceService implements DeviceService {
     private void triggerUsyncForCoexDeviceAdd(Node deviceListNode, Jid userJid) {
         var isHostedDevice = deviceListNode != null && hasHostedDevice(deviceListNode);
 
-        if (store.isResumeFromRestartComplete()) {
+        if (store.connectionStore().isResumeFromRestartComplete()) {
             getDeviceLists(List.of(userJid), UsyncContext.NOTIFICATION.wireValue(), null, false);
             LOGGER.log(System.Logger.Level.DEBUG,
                     "Triggered immediate USync for device notification from {0}", userJid);
@@ -2951,6 +2951,42 @@ public final class LiveDeviceService implements DeviceService {
     public List<DeviceList> syncAndGetDeviceList(Collection<Jid> userJids) {
         getDeviceLists(userJids, UsyncContext.INTERACTIVE.wireValue(), null, false);
         return getDeviceIds(userJids, false);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote
+     * This implementation issues a single focused USync LID-protocol IQ built by
+     * {@link DeviceUSyncQueryBuilder#buildLidQuery(Jid, String)} on the {@link UsyncContext#VOIP}
+     * context, parses the {@code <lid val>} children via
+     * {@link DeviceUSyncResponseParser#parseLidMappings(Node)}, and writes each learned pair through
+     * {@link com.github.auties00.cobalt.store.ContactStore#registerLidMapping(Jid, Jid)} so the call
+     * path and every later lookup resolve from cache. A transport failure is swallowed and reported as
+     * an empty result, matching the abort-without-PN-fallback contract of the call placement path.
+     */
+    @Override
+    public Optional<Jid> queryUserLid(Jid userPn) {
+        Objects.requireNonNull(userPn, "userPn cannot be null");
+        var user = userPn.toUserJid();
+
+        var cached = store.contactStore().findLidByPhone(user);
+        if (cached.isPresent()) {
+            return cached;
+        }
+
+        Node response;
+        try {
+            var query = DeviceUSyncQueryBuilder.buildLidQuery(user, UsyncContext.VOIP.wireValue());
+            response = client.sendNode(query);
+        } catch (RuntimeException throwable) {
+            LOGGER.log(System.Logger.Level.WARNING, "queryUserLid: cannot resolve LID for " + user, throwable);
+            return Optional.empty();
+        }
+
+        var mappings = usyncResponseParser.parseLidMappings(response);
+        mappings.forEach(store.contactStore()::registerLidMapping);
+        return store.contactStore().findLidByPhone(user);
     }
 
     /**
@@ -3696,7 +3732,7 @@ public final class LiveDeviceService implements DeviceService {
 
                 store.contactStore().addDeviceList(createDeletedDeviceList(relevantJid, true));
 
-                if (store.isResumeFromRestartComplete()) {
+                if (store.connectionStore().isResumeFromRestartComplete()) {
                     Thread.startVirtualThread(() -> {
                         try {
                             getDeviceLists(List.of(relevantJid), UsyncContext.NOTIFICATION.wireValue(), null, false);

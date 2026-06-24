@@ -1,0 +1,112 @@
+package com.github.auties00.cobalt.calls2.media.audio.mlow.entropy;
+
+/**
+ * Symbol-level entropy decode helpers layered over {@link MlowRangeDecoder}, the port of
+ * {@code smpl_entropy_wrapper.c}.
+ *
+ * <p>The MLow native decoder never calls the raw range-coder primitives directly from its parameter
+ * codecs; it goes through two thin helpers that pair a {@code decode} with the matching {@code update}.
+ * {@link #decodeUpdate(MlowRangeDecoder, int[])} resolves a symbol against a cumulative
+ * (non-inverse) frequency table; {@link #decodeUniform(MlowRangeDecoder, int)} draws one value from a
+ * flat distribution. Both are pure functions of the decoder state plus the supplied table, so this class
+ * is a stateless utility with a private constructor.
+ *
+ * <p>These two helpers, together with {@link MlowRangeDecoder#decodeBits(int)} for raw bits, are the
+ * complete entropy surface the rest of the MLow decode pipeline builds on.
+ *
+ * @implNote This implementation ports {@code smpl_ec_decode_update} and {@code smpl_ec_decode_uniform}
+ * from {@code smpl_entropy_wrapper.c}. The cumulative tables MLow passes are NOT zero-based: every span
+ * is taken relative to {@code cmf[0]}, so the helper subtracts {@code cmf[0]} from each frequency and
+ * passes the adjusted total {@code cmf[len - 1] - cmf[0]} to the range coder. The symbol search is the
+ * reference linear scan, which the MLow tables are sized for (a handful of entries each).
+ */
+public final class MlowEntropyWrapper {
+    /**
+     * Prevents instantiation of this stateless helper.
+     */
+    private MlowEntropyWrapper() {
+        throw new AssertionError("no instances");
+    }
+
+    /**
+     * Decodes one symbol against a cumulative frequency table, {@code smpl_ec_decode_update}.
+     *
+     * <p>The table {@code cmf} is a monotonically non-decreasing cumulative-frequency array that may be
+     * biased by a nonzero base; all spans are measured relative to {@code cmf[0]}. The helper decodes a
+     * cumulative value over the adjusted total {@code cmf[len - 1] - cmf[0]}, re-adds {@code cmf[0]} to
+     * place it on the table's own scale, linearly scans for the symbol whose half-open span
+     * {@code [cmf[s], cmf[s + 1])} contains it, then advances the decoder past that span. The relative
+     * bounds {@code cmf[s] - cmf[0]} and {@code cmf[s + 1] - cmf[0]} and the adjusted total are what reach
+     * {@link MlowRangeDecoder#update(long, long, long)}.
+     *
+     * @param decoder the range decoder to advance
+     * @param cmf     the cumulative frequency table; at least two entries, non-decreasing
+     * @return the decoded symbol index in {@code [0, cmf.length - 1)}
+     */
+    public static int decodeUpdate(MlowRangeDecoder decoder, int[] cmf) {
+        int last = cmf.length - 1;
+        long base = cmf[0] & 0xFFFFFFFFL;
+        long total = (cmf[last] & 0xFFFFFFFFL) - base;
+        long cmfLow = decoder.decode(total) + base;
+        int s = 0;
+        for (; s < last; s++) {
+            if (Long.compareUnsigned(cmfLow, cmf[s + 1] & 0xFFFFFFFFL) < 0) {
+                break;
+            }
+        }
+        decoder.update((cmf[s] & 0xFFFFFFFFL) - base, (cmf[s + 1] & 0xFFFFFFFFL) - base, total);
+        return s;
+    }
+
+    /**
+     * Decodes one value from a uniform distribution over {@code [0, n)}, {@code smpl_ec_decode_uniform}.
+     *
+     * <p>Every value in {@code [0, n)} has equal probability, so the cumulative value returned by
+     * {@link MlowRangeDecoder#decode(long)} is itself the decoded symbol; the helper advances the decoder
+     * past the unit-width span {@code [cmfLow, cmfLow + 1)} out of total {@code n}.
+     *
+     * @param decoder the range decoder to advance
+     * @param n       the number of equiprobable values; must be at least 1
+     * @return the decoded value in {@code [0, n)}
+     */
+    public static int decodeUniform(MlowRangeDecoder decoder, int n) {
+        long cmfLow = decoder.decode(n);
+        decoder.update(cmfLow, cmfLow + 1, n);
+        return (int) cmfLow;
+    }
+
+    /**
+     * Encodes one symbol against a cumulative frequency table, the encode-side mirror of
+     * {@link #decodeUpdate(MlowRangeDecoder, int[])}.
+     *
+     * <p>The table {@code cmf} is a monotonically non-decreasing cumulative-frequency array that may be
+     * biased by a nonzero base; all spans are measured relative to {@code cmf[0]}. The helper encodes symbol
+     * {@code s} with the relative span {@code [cmf[s] - cmf[0], cmf[s + 1] - cmf[0])} out of the adjusted
+     * total {@code cmf[len - 1] - cmf[0]}, the same bounds the decoder resolves {@code s} from.
+     *
+     * @param encoder the range encoder to advance
+     * @param cmf     the cumulative frequency table; at least two entries, non-decreasing
+     * @param s       the symbol index to encode, in {@code [0, cmf.length - 1)}
+     */
+    public static void encodeUpdate(MlowRangeEncoder encoder, int[] cmf, int s) {
+        int last = cmf.length - 1;
+        long base = cmf[0] & 0xFFFFFFFFL;
+        long total = (cmf[last] & 0xFFFFFFFFL) - base;
+        encoder.encode((cmf[s] & 0xFFFFFFFFL) - base, (cmf[s + 1] & 0xFFFFFFFFL) - base, total);
+    }
+
+    /**
+     * Encodes one value into a uniform distribution over {@code [0, n)}, the encode-side mirror of
+     * {@link #decodeUniform(MlowRangeDecoder, int)}.
+     *
+     * <p>Every value in {@code [0, n)} is equiprobable, so {@code v} is encoded with the unit-width span
+     * {@code [v, v + 1)} out of total {@code n}.
+     *
+     * @param encoder the range encoder to advance
+     * @param n       the number of equiprobable values; must be at least 1
+     * @param v       the value to encode, in {@code [0, n)}
+     */
+    public static void encodeUniform(MlowRangeEncoder encoder, int n, int v) {
+        encoder.encode(v, v + 1, n);
+    }
+}

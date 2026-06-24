@@ -117,7 +117,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof LabelAssociationAction action)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LabelAssociationAction action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 

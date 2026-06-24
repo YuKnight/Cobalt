@@ -13,6 +13,7 @@ import com.github.auties00.cobalt.model.sync.action.device.WaffleAccountLinkStat
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -440,4 +441,109 @@ public interface AccountStore {
      * @return this store instance for method chaining
      */
     AccountStore setLinkedMetaAccountStateTimestamp(Instant timestamp);
+
+    /**
+     * Returns the companion pairing expiration deadline.
+     *
+     * @return the expiration deadline, or empty if none is set
+     */
+    Optional<Instant> clientExpiration();
+
+    /**
+     * Sets the companion pairing expiration deadline.
+     *
+     * @param clientExpiration the deadline, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    AccountStore setClientExpiration(Instant clientExpiration);
+
+    /**
+     * Returns the linked companion devices.
+     *
+     * @return an unmodifiable copy of the linked-device JIDs
+     */
+    List<Jid> linkedDevices();
+
+    /**
+     * Replaces the linked-device list.
+     *
+     * @param linkedDevices the linked-device JIDs, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    AccountStore setLinkedDevices(Collection<Jid> linkedDevices);
+
+    /**
+     * Returns the timestamp of when this device paired with the primary.
+     *
+     * @return the pairing timestamp, or empty if not set
+     */
+    Optional<Instant> pairingTimestamp();
+
+    /**
+     * Sets the pairing timestamp.
+     *
+     * @param pairingTimestamp the timestamp, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    AccountStore setPairingTimestamp(Instant pairingTimestamp);
+
+    /**
+     * Returns whether the account has a profile avatar.
+     *
+     * @return the avatar flag, or empty if unknown
+     */
+    Optional<Boolean> hasAvatar();
+
+    /**
+     * Sets the profile-avatar flag.
+     *
+     * @param hasAvatar the flag, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    AccountStore setHasAvatar(Boolean hasAvatar);
+
+    /**
+     * Returns the notification-content-token salt.
+     *
+     * @return the salt, or empty if none is set
+     */
+    Optional<byte[]> notificationContentTokenSalt();
+
+    /**
+     * Sets the notification-content-token salt.
+     *
+     * @param salt the salt, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    AccountStore setNotificationContentTokenSalt(byte[] salt);
+
+    /**
+     * Returns the companion MMS authentication nonce.
+     *
+     * @return the nonce, or empty if none is set
+     */
+    Optional<String> companionMmsAuthNonce();
+
+    /**
+     * Sets the companion MMS authentication nonce.
+     *
+     * @param nonce the nonce, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    AccountStore setCompanionMmsAuthNonce(String nonce);
+
+    /**
+     * Returns the shareable-chat-link key.
+     *
+     * @return the key, or empty if none is set
+     */
+    Optional<byte[]> shareableChatLinkKey();
+
+    /**
+     * Sets the shareable-chat-link key.
+     *
+     * @param key the key, or {@code null} to clear
+     * @return this store instance for method chaining
+     */
+    AccountStore setShareableChatLinkKey(byte[] key);
 }

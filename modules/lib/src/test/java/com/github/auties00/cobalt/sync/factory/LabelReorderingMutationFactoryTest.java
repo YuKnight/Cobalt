@@ -34,7 +34,7 @@ class LabelReorderingMutationFactoryTest {
         var expected = SyncFixtures.decodeOracleBytes(oracle, "encoded");
 
         var pending = factory.getReorderLabelsMutation(List.of(1, 2, 3), Instant.ofEpochSecond(1_700_000_000L));
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

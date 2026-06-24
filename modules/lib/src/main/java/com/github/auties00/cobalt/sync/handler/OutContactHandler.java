@@ -165,7 +165,7 @@ public final class OutContactHandler implements WebAppStateActionHandler {
 
         return switch (mutation.operation()) {
             case SET -> {
-                if (!(mutation.value().action().orElse(null) instanceof OutContactAction action)) {
+                if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof OutContactAction action)) {
                     yield SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 

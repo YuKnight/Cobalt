@@ -196,7 +196,7 @@ class CtwaPerCustomerDataSharingHandlerTest {
             assertEquals(CtwaPerCustomerDataSharingAction.ACTION_VERSION, pending.mutation().actionVersion());
             assertEquals("[\"ctwaPerCustomerDataSharing\",\"" + CUSTOMER_LID_JID + "\"]",
                     pending.mutation().index());
-            var action = (CtwaPerCustomerDataSharingAction) pending.mutation().value().action().orElseThrow();
+            var action = (CtwaPerCustomerDataSharingAction) pending.mutation().value().flatMap(sav -> sav.action()).orElseThrow();
             assertTrue(action.isCtwaPerCustomerDataSharingEnabled());
         }
     }

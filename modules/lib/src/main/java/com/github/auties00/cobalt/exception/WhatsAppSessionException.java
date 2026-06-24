@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 /**
  * Sealed root for failures that invalidate the active WhatsApp session
  * as a whole.
@@ -16,15 +18,20 @@ package com.github.auties00.cobalt.exception;
  * immediate reconnect ({@link Reconnect}).
  *
  * @apiNote
- * Raised when the encrypted channel can no longer be used;
- * {@link #isFatal()} reports {@code true} for every subtype, so a
- * configured {@code WhatsAppClientErrorHandler} reconnects, treats the
- * account as locked out, or notifies the user rather than discarding the
- * event.
+ * Raised when the encrypted channel can no longer be used; every subtype
+ * returns a session-control {@link WhatsAppLinkedClientErrorResult} from
+ * {@link #toErrorResult()} rather than
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}, so a configured
+ * {@code WhatsAppClientErrorHandler} reconnects ({@link BadMac},
+ * {@link Closed}, {@link Reconnect}), disconnects ({@link Conflict}), logs
+ * the device out ({@link LoggedOut}), or treats the account as banned
+ * ({@link Banned}).
  *
  * @implNote
- * This implementation classifies every session-level subtype as fatal
- * because each one leaves the Noise channel in an unusable state.
+ * This implementation maps each session-level subtype to its own
+ * session-control result; none map to
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD} because each one leaves the
+ * Noise channel in an unusable state.
  *
  * @see BadMac
  * @see Closed
@@ -59,18 +66,6 @@ public sealed abstract class WhatsAppSessionException
      */
     protected WhatsAppSessionException(String message, Throwable cause) {
         super(message, cause);
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote
-     * This implementation always returns {@code true}: every concrete
-     * session exception terminates the active channel.
-     */
-    @Override
-    public boolean isFatal() {
-        return true;
     }
 
     /**
@@ -109,6 +104,20 @@ public sealed abstract class WhatsAppSessionException
         public BadMac(String message, Throwable cause) {
             super(message, cause);
         }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation returns
+         * {@link WhatsAppLinkedClientErrorResult#RECONNECT}: a Noise MAC drift
+         * clears once the connection is re-opened with fresh cipher state,
+         * collapsing to WhatsApp Web's {@code CLOSE_SOCKET} resolution.
+         */
+        @Override
+        public WhatsAppLinkedClientErrorResult toErrorResult() {
+            return WhatsAppLinkedClientErrorResult.RECONNECT;
+        }
     }
 
     /**
@@ -144,6 +153,20 @@ public sealed abstract class WhatsAppSessionException
          */
         public Closed(String message, Throwable cause) {
             super(message, cause);
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation returns
+         * {@link WhatsAppLinkedClientErrorResult#RECONNECT}: the reader loop
+         * re-opens the closed connection with fresh Noise state rather than
+         * abandoning the session.
+         */
+        @Override
+        public WhatsAppLinkedClientErrorResult toErrorResult() {
+            return WhatsAppLinkedClientErrorResult.RECONNECT;
         }
     }
 
@@ -181,6 +204,20 @@ public sealed abstract class WhatsAppSessionException
          */
         public Conflict(String message, Throwable cause) {
             super(message, cause);
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation returns
+         * {@link WhatsAppLinkedClientErrorResult#DISCONNECT}: a {@code replaced}
+         * conflict means another device took the slot, so WhatsApp Web stops
+         * the socket without resuming the connection loop.
+         */
+        @Override
+        public WhatsAppLinkedClientErrorResult toErrorResult() {
+            return WhatsAppLinkedClientErrorResult.DISCONNECT;
         }
     }
 
@@ -225,6 +262,20 @@ public sealed abstract class WhatsAppSessionException
         public LoggedOut(String message, Throwable cause) {
             super(message, cause);
         }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation returns
+         * {@link WhatsAppLinkedClientErrorResult#LOG_OUT}: the server revoked the
+         * session, so the stored credentials are cleared before the device
+         * can pair again.
+         */
+        @Override
+        public WhatsAppLinkedClientErrorResult toErrorResult() {
+            return WhatsAppLinkedClientErrorResult.LOG_OUT;
+        }
     }
 
     /**
@@ -264,6 +315,19 @@ public sealed abstract class WhatsAppSessionException
          */
         public Banned(String message, Throwable cause) {
             super(message, cause);
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation returns {@link WhatsAppLinkedClientErrorResult#BAN}:
+         * a banned account cannot reconnect until the ban is lifted, so the
+         * session store is deleted rather than retried.
+         */
+        @Override
+        public WhatsAppLinkedClientErrorResult toErrorResult() {
+            return WhatsAppLinkedClientErrorResult.BAN;
         }
     }
 
@@ -306,6 +370,21 @@ public sealed abstract class WhatsAppSessionException
          */
         public Reconnect(String message, Throwable cause) {
             super(message, cause);
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation returns
+         * {@link WhatsAppLinkedClientErrorResult#RECONNECT}: the credentials remain
+         * valid, so the client drops the channel and immediately
+         * re-establishes it, matching WhatsApp Web's stream code {@code 515}
+         * path.
+         */
+        @Override
+        public WhatsAppLinkedClientErrorResult toErrorResult() {
+            return WhatsAppLinkedClientErrorResult.RECONNECT;
         }
     }
 }

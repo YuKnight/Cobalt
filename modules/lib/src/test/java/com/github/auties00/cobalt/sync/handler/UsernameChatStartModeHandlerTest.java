@@ -90,27 +90,27 @@ class UsernameChatStartModeHandlerTest {
         @Test
         @DisplayName("SET with LID persists LID on the store")
         void setLid() {
-            assertTrue(store.usernameChatStartMode().isEmpty(), "precondition: mode is unset");
+            assertTrue(store.settingsStore().usernameChatStartMode().isEmpty(), "precondition: mode is unset");
             var action = new UsernameChatStartModeActionBuilder()
                     .chatStartMode(ChatStartMode.LID).build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(ChatStartMode.LID, store.usernameChatStartMode().orElseThrow());
+            assertEquals(ChatStartMode.LID, store.settingsStore().usernameChatStartMode().orElseThrow());
         }
 
         @Test
         @DisplayName("SET with PN overwrites the prior preference")
         void setPnOverwrites() {
-            store.setUsernameChatStartMode(ChatStartMode.LID);
+            store.settingsStore().setUsernameChatStartMode(ChatStartMode.LID);
             var action = new UsernameChatStartModeActionBuilder()
                     .chatStartMode(ChatStartMode.PN).build();
 
             var result = handler.applyMutation(client, build(action, SyncdOperation.SET, Instant.now()));
 
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertEquals(ChatStartMode.PN, store.usernameChatStartMode().orElseThrow());
+            assertEquals(ChatStartMode.PN, store.settingsStore().usernameChatStartMode().orElseThrow());
         }
     }
 
@@ -154,7 +154,7 @@ class UsernameChatStartModeHandlerTest {
             var result = handler.applyMutation(client, build(action, SyncdOperation.REMOVE, Instant.now()));
 
             assertEquals(SyncActionState.UNSUPPORTED, result.actionState());
-            assertTrue(store.usernameChatStartMode().isEmpty());
+            assertTrue(store.settingsStore().usernameChatStartMode().isEmpty());
         }
     }
 

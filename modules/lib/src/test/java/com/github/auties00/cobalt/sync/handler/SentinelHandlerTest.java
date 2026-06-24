@@ -211,7 +211,7 @@ class SentinelHandlerTest {
             for (var m : pending) {
                 assertEquals(SyncdOperation.SET, m.mutation().operation());
                 assertEquals(KeyExpirationAction.ACTION_VERSION, m.mutation().actionVersion());
-                var action = (KeyExpirationAction) m.mutation().value().action().orElseThrow();
+                var action = (KeyExpirationAction) m.mutation().value().flatMap(sav -> sav.action()).orElseThrow();
                 assertEquals(12, action.expiredKeyEpoch().orElseThrow(),
                         "every sentinel mutation must carry the newest key's epoch");
             }

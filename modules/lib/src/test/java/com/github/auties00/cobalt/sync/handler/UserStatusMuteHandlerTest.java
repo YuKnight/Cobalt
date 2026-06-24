@@ -247,7 +247,7 @@ class UserStatusMuteHandlerTest {
             assertEquals(ts, pending.mutation().timestamp());
             assertEquals(UserStatusMuteAction.ACTION_VERSION, pending.mutation().actionVersion());
             assertEquals("[\"userStatusMute\",\"" + CONTACT + "\"]", pending.mutation().index());
-            var action = (UserStatusMuteAction) pending.mutation().value().action().orElseThrow();
+            var action = (UserStatusMuteAction) pending.mutation().value().flatMap(sav -> sav.action()).orElseThrow();
             assertTrue(action.muted(), "the action carries the muted=true flag verbatim");
         }
     }

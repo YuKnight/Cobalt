@@ -293,7 +293,7 @@ class MarkChatAsReadHandlerTest {
             var resolution = new MarkChatAsReadHandler().resolveConflicts(local, remote);
             assertEquals(ConflictResolutionState.SKIP_REMOTE_DROP_LOCAL, resolution.state());
             assertNotNull(resolution.mergedMutation());
-            var merged = resolution.mergedMutation().value().action().filter(a -> a instanceof MarkChatAsReadAction).map(a -> (MarkChatAsReadAction) a).orElseThrow();
+            var merged = resolution.mergedMutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof MarkChatAsReadAction).map(a -> (MarkChatAsReadAction) a).orElseThrow();
             assertTrue(merged.read(),
                     "merged action carries the read flag from the newer (remote) mutation");
         }
@@ -314,7 +314,7 @@ class MarkChatAsReadHandlerTest {
             assertEquals(SyncdOperation.SET, trusted.operation());
             assertEquals(3, trusted.actionVersion());
             assertEquals(JSON.toJSONString(List.of("markChatAsRead", PEER.toString())), trusted.index());
-            assertTrue(trusted.value().action().filter(a -> a instanceof MarkChatAsReadAction).map(a -> (MarkChatAsReadAction) a).orElseThrow().read());
+            assertTrue(trusted.value().flatMap(sav -> sav.action()).filter(a -> a instanceof MarkChatAsReadAction).map(a -> (MarkChatAsReadAction) a).orElseThrow().read());
         }
     }
 

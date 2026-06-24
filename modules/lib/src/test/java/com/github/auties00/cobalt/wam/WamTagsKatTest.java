@@ -32,8 +32,7 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
  * negated value (see {@link WamEventEncoder#writeEventMarker(int, int, boolean)},
  * which negates internally). Vectors live in
  * {@code fixtures/wam/wam-tags-roundtrip.json}, pinned to snapshot revision
- * {@code 1039260921}; the recapture procedure lives in
- * {@code src/test/resources/fixtures/wam/README.md}.
+ * {@code 1039260921}
  */
 @DisplayName("WamTags KAT against live WhatsApp Web bundle")
 class WamTagsKatTest {

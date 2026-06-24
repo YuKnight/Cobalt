@@ -257,7 +257,7 @@ class MuteChatHandlerTest {
             assertEquals(SyncdOperation.SET, trusted.operation());
             assertEquals(2, trusted.actionVersion());
             assertEquals(JSON.toJSONString(List.of("mute", PEER.toString())), trusted.index());
-            var mute = trusted.value().action().filter(a -> a instanceof MuteAction).map(a -> (MuteAction) a).orElseThrow();
+            var mute = trusted.value().flatMap(sav -> sav.action()).filter(a -> a instanceof MuteAction).map(a -> (MuteAction) a).orElseThrow();
             assertEquals(false, mute.muted());
         }
 
@@ -266,7 +266,7 @@ class MuteChatHandlerTest {
         void indefiniteMuteUsesSentinel() {
             var pending = factory.generateMuteMutation(client, PEER, -1L, null);
 
-            var mute = pending.mutation().value().action().filter(a -> a instanceof MuteAction).map(a -> (MuteAction) a).orElseThrow();
+            var mute = pending.mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof MuteAction).map(a -> (MuteAction) a).orElseThrow();
             assertTrue(mute.muted());
             assertEquals(Instant.ofEpochMilli(-1L), mute.muteEndTimestamp().orElseThrow(),
                     "the -1 sentinel must be carried through as Instant.ofEpochMilli(-1) so the on-wire int64 stays -1");

@@ -259,7 +259,7 @@ class PaymentTosHandlerTest {
             assertEquals(SyncdOperation.SET, mutation.operation());
             assertEquals(PaymentTosAction.ACTION_VERSION, mutation.actionVersion());
             assertEquals("[\"payment_tos\"]", mutation.index());
-            var roundtrip = mutation.value().action().filter(a -> a instanceof PaymentTosAction).map(a -> (PaymentTosAction) a).orElseThrow();
+            var roundtrip = mutation.value().flatMap(sav -> sav.action()).filter(a -> a instanceof PaymentTosAction).map(a -> (PaymentTosAction) a).orElseThrow();
             assertEquals(PaymentTosAction.PaymentNotice.BR_PAY_PRIVACY_POLICY, roundtrip.paymentNotice());
         }
 

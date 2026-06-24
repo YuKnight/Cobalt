@@ -82,5 +82,4 @@ public sealed interface MediaMessage
      * @return the MIME type, or empty if unknown
      */
     Optional<String> mimetype();
-
 }

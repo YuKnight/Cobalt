@@ -296,7 +296,7 @@ class DeleteMessageForMeHandlerTest {
             assertEquals(
                     JSON.toJSONString(List.of("deleteMessageForMe", PEER.toString(), "id-1", "1", "0")),
                     trusted.index());
-            var action = trusted.value().action().filter(a -> a instanceof DeleteMessageForMeAction).map(a -> (DeleteMessageForMeAction) a).orElseThrow();
+            var action = trusted.value().flatMap(sav -> sav.action()).filter(a -> a instanceof DeleteMessageForMeAction).map(a -> (DeleteMessageForMeAction) a).orElseThrow();
             assertEquals(msgTs, action.messageTimestamp().orElseThrow());
         }
 

@@ -201,4 +201,34 @@ export interface UrlBreakpointSpec {
   condition?: string;
   logExpression?: string;
   block?: boolean;
+  /** Restrict binding to these CDP target types (e.g. "worker"); null/undefined binds every target. */
+  targetTypes?: ReadonlySet<string> | null;
+}
+
+/** Per-target outcome of binding a url breakpoint, so callers can see exactly which targets resolved it. */
+export interface BindTargetResult {
+  sessionId: string;
+  type: string;
+  url: string;
+  bound: boolean;
+  locations: BreakpointLocation[];
+  error?: string;
+}
+
+/** Result of adding a url breakpoint: the registry id, the aggregated resolved locations, the per-target
+ *  binding report, and an optional advisory about the breakpoint's pausing semantics. */
+export interface UrlBreakpointAddResult {
+  id: string;
+  locations: BreakpointLocation[];
+  perTarget: BindTargetResult[];
+  warning?: string;
+}
+
+/** Result returned to the set_wasm_breakpoints caller: the breakpoint id (named breakpointId for the tool),
+ *  the aggregated resolved locations, the per-target binding report, and an optional pausing-semantics warning. */
+export interface SetWasmBreakpointResult {
+  breakpointId: string;
+  locations: BreakpointLocation[];
+  perTarget: BindTargetResult[];
+  warning?: string;
 }

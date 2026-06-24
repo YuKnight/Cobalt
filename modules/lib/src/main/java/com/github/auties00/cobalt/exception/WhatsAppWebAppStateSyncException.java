@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -35,9 +36,13 @@ import java.util.Objects;
  *
  * @apiNote
  * Raised during state synchronization; {@link #isFatal()} reports the
- * classification per subtype so a configured
- * {@code WhatsAppClientErrorHandler} can wipe and resync the affected
- * collection, schedule a retry, or wait for an out-of-band key delivery.
+ * per-subtype classification the app-state pipeline uses to decide whether
+ * to wipe and resync the affected collection, schedule a retry, or wait for
+ * an out-of-band key delivery. The session-level recovery is carried by
+ * {@link #toErrorResult()}, which returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD} for every subtype except
+ * {@link MissingKeyOnAllDevices}, which returns
+ * {@link WhatsAppLinkedClientErrorResult#LOG_OUT}.
  *
  * @implNote
  * This implementation classifies each subtype individually rather than
@@ -106,6 +111,46 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
      */
     protected WhatsAppWebAppStateSyncException(String message, Throwable cause) {
         super(message, cause);
+    }
+
+    /**
+     * Returns whether this sync failure is fatal to the affected
+     * collection.
+     *
+     * <p>A fatal failure means the collection cannot be reconciled in place
+     * and must be wiped and resynced from a fresh snapshot; a non-fatal
+     * failure (a key that may still arrive, a retryable server error, a
+     * conflict) can be recovered without discarding the collection. The
+     * app-state sync pipeline consults this classification when deciding
+     * whether to attempt recovery and whether to emit a fatal-error metric;
+     * it is distinct from {@link #toErrorResult()}, which carries the
+     * session-level recovery action.
+     *
+     * @implSpec
+     * Every concrete subtype returns a constant: integrity failures,
+     * unrecoverable key losses, decryption failures, structural
+     * patch-stream violations, and terminal patches return {@code true};
+     * conflicts, retryable server errors, external download and decode
+     * failures, and a transiently missing key return {@code false}.
+     *
+     * @return {@code true} if the collection must be wiped and resynced,
+     *         {@code false} if the failure is recoverable in place
+     */
+    public abstract boolean isFatal();
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote
+     * This implementation returns {@link WhatsAppLinkedClientErrorResult#DISCARD}:
+     * a sync failure resyncs or retries the affected collection without
+     * tearing the session down. {@link MissingKeyOnAllDevices} overrides
+     * this with {@link WhatsAppLinkedClientErrorResult#LOG_OUT} because an
+     * unrecoverable key with no holder forces a re-pair.
+     */
+    @Override
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 
     /**
@@ -460,6 +505,22 @@ public sealed abstract class WhatsAppWebAppStateSyncException extends WhatsAppEx
         @Override
         public boolean isFatal() {
             return true;
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation returns
+         * {@link WhatsAppLinkedClientErrorResult#LOG_OUT}: with no companion
+         * device holding the key the collection can only be recovered by
+         * re-pairing, matching WhatsApp Web's
+         * {@code SyncdFatalErrorType.MISSING_KEY_ON_ALL_CLIENTS} terminal
+         * state.
+         */
+        @Override
+        public WhatsAppLinkedClientErrorResult toErrorResult() {
+            return WhatsAppLinkedClientErrorResult.LOG_OUT;
         }
     }
 

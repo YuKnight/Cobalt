@@ -121,7 +121,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
-            if (!(mutation.value().action().orElse(null) instanceof DeleteChatAction deleteChatAction)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof DeleteChatAction deleteChatAction)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
@@ -166,11 +166,11 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebDeleteChatSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.ADAPTED)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localAction = localMutation.value().action()
+        var localAction = localMutation.value().flatMap(sav -> sav.action())
                 .filter(a -> a instanceof DeleteChatAction)
                 .map(a -> (DeleteChatAction) a)
                 .orElse(null);
-        var remoteAction = remoteMutation.value().action()
+        var remoteAction = remoteMutation.value().flatMap(sav -> sav.action())
                 .filter(a -> a instanceof DeleteChatAction)
                 .map(a -> (DeleteChatAction) a)
                 .orElse(null);

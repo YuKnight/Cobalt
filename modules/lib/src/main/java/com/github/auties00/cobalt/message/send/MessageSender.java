@@ -235,7 +235,7 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
     @WhatsAppWebExport(moduleName = "WAWebEventsWaitForOfflineDeliveryEnd", exports = "waitForOfflineDeliveryEnd",
             adaptation = WhatsAppAdaptation.DIRECT)
     void waitForOfflineDelivery() {
-        store.waitForOfflineDeliveryEnd();
+        store.connectionStore().waitForOfflineDeliveryEnd();
     }
 
     /**

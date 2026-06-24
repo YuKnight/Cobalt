@@ -7,10 +7,10 @@ import com.github.auties00.cobalt.listener.NewMessageListener;
 
 import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.call.stream.AudioInputStream;
-import com.github.auties00.cobalt.call.stream.AudioOutputStream;
-import com.github.auties00.cobalt.call.stream.VideoInputStream;
-import com.github.auties00.cobalt.call.stream.VideoOutputStream;
+import com.github.auties00.cobalt.calls2.stream.AudioInput;
+import com.github.auties00.cobalt.calls2.stream.AudioOutput;
+import com.github.auties00.cobalt.calls2.stream.VideoInput;
+import com.github.auties00.cobalt.calls2.stream.VideoOutput;
 import com.github.auties00.cobalt.model.call.Call;
 import com.github.auties00.cobalt.model.call.IncomingCall;
 import com.github.auties00.cobalt.model.call.CallEndReason;
@@ -560,24 +560,24 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Call startCall(JidProvider targetProvider, AudioOutputStream audioOut, AudioInputStream audioIn,
-                          VideoOutputStream videoOut, VideoInputStream videoIn) {
+    public Call startCall(JidProvider targetProvider, AudioOutput audioOut, AudioInput audioIn,
+                          VideoOutput videoOut, VideoInput videoIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: startCall(..) is not stubbed");
     }
 
     @Override
-    public Call startCall(JidProvider targetProvider, AudioOutputStream audioOut, AudioInputStream audioIn) {
+    public Call startCall(JidProvider targetProvider, AudioOutput audioOut, AudioInput audioIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: startCall(..) is not stubbed");
     }
 
     @Override
-    public Call acceptCall(IncomingCall offer, AudioOutputStream audioOut, AudioInputStream audioIn,
-                           VideoOutputStream videoOut, VideoInputStream videoIn) {
+    public Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn,
+                           VideoOutput videoOut, VideoInput videoIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: acceptCall(..) is not stubbed");
     }
 
     @Override
-    public Call acceptCall(IncomingCall offer, AudioOutputStream audioOut, AudioInputStream audioIn) {
+    public Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: acceptCall(..) is not stubbed");
     }
 
@@ -1558,7 +1558,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<UserUsername> queryUserUsername(JidProvider userJidProvider) {
+    public Optional<Username> queryUserUsername(JidProvider userJidProvider) {
         throw new UnsupportedOperationException("TestWhatsAppClient: queryUserUsername(..) is not stubbed");
     }
 

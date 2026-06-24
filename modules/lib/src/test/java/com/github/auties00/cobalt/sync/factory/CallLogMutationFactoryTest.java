@@ -33,7 +33,7 @@ class CallLogMutationFactoryTest {
 
         var pending = new CallLogMutationFactory().getCallLogMutation(
                 Instant.ofEpochSecond(1_700_000_000L), PEER, CALL_ID, true, null);
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

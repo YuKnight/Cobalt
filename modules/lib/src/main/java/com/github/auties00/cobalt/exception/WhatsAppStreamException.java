@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.node.Node;
 
 import java.util.Objects;
@@ -16,16 +17,17 @@ import java.util.Objects;
  * never arrives ({@link NodeTimeout}).
  *
  * @apiNote
- * Raised by the node pipeline; {@link #isFatal()} reports {@code true}
- * for every subtype, so a configured {@code WhatsAppClientErrorHandler}
- * cannot meaningfully discard the event and should reconnect to clear the
- * in-flight protocol state.
+ * Raised by the node pipeline; {@link #toErrorResult()} reports
+ * {@link WhatsAppLinkedClientErrorResult#RECONNECT} for every subtype, so a
+ * configured {@code WhatsAppClientErrorHandler} cannot meaningfully discard
+ * the event and instead reconnects to clear the in-flight protocol state.
  *
  * @implNote
- * This implementation classifies every stream fault as fatal because the
- * node pipeline is a shared resource: a single corrupted frame poisons
- * the in-flight protocol state and the connection has to be
- * re-established before traffic can resume.
+ * This implementation classifies every stream fault as
+ * {@link WhatsAppLinkedClientErrorResult#RECONNECT} because the node pipeline is a
+ * shared resource: a single corrupted frame poisons the in-flight protocol
+ * state and the connection has to be re-established before traffic can
+ * resume.
  *
  * @see MalformedNode
  * @see NodeTimeout
@@ -72,12 +74,15 @@ public sealed class WhatsAppStreamException extends WhatsAppException
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code true}: any stream-level
-     * fault leaves the protocol pipeline in an unrecoverable state.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#RECONNECT}: a single corrupted frame
+     * poisons the in-flight protocol state, so the connection is dropped and
+     * re-opened with fresh Noise state, collapsing to WhatsApp Web's
+     * {@code CLOSE_SOCKET} resolution.
      */
     @Override
-    public boolean isFatal() {
-        return true;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.RECONNECT;
     }
 
     /**

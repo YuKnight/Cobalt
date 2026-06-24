@@ -620,7 +620,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
                                     .build());
                         }
                     });
-            store.setPairingTimestamp(Instant.ofEpochSecond(regStartSeconds));
+            store.accountStore().setPairingTimestamp(Instant.ofEpochSecond(regStartSeconds));
             store.accountStore().setRegistered(true);
             store.accountStore().setOnline(true);
             safeSave("pair-success");

@@ -137,6 +137,33 @@ public final class CloudApiClient {
     }
 
     /**
+     * Issues a {@code GET} carrying its credentials in the query string, without the {@code Bearer}
+     * header or the {@code appsecret_proof}.
+     *
+     * <p>Used by the Facebook Login endpoints ({@code oauth/access_token}, {@code debug_token}) whose
+     * authentication (app id, app secret, app access token) is passed as query parameters rather than in
+     * the {@code Authorization} header; {@link #get(String, Map)} cannot serve them because it always
+     * attaches the bearer credential and the proof.
+     *
+     * @param path  the edge path relative to the versioned base, for example {@code "oauth/access_token"}
+     * @param query the query parameters carrying the credentials
+     * @return the parsed JSON response
+     * @throws WhatsAppCloudException if the request fails or the endpoint reports an error
+     */
+    public JSONObject getUnauthenticated(String path, Map<String, String> query) {
+        var encoded = new StringBuilder();
+        for (var entry : query.entrySet()) {
+            appendParam(encoded, entry.getKey(), entry.getValue());
+        }
+        var resolved = baseUri.resolve(path);
+        var uri = encoded.isEmpty() ? resolved : URI.create(resolved + "?" + encoded);
+        var request = HttpRequest.newBuilder(uri)
+                .GET()
+                .build();
+        return send(request, "GET " + path);
+    }
+
+    /**
      * Issues a {@code POST} with a JSON body against the given edge.
      *
      * @param path the edge path relative to the versioned base, for example
@@ -236,6 +263,34 @@ public final class CloudApiClient {
     }
 
     /**
+     * Uploads a single named file part with arbitrary text fields as {@code multipart/form-data}.
+     *
+     * <p>Generalises {@link #uploadMedia} for edges that take their own set of text fields and a
+     * single binary part under a caller-chosen field name, such as the Flow assets edge. The text
+     * fields precede the file part, and the file part advertises the given filename and content type.
+     *
+     * @param path          the edge path relative to the versioned base
+     * @param fields        the text form fields, in iteration order
+     * @param fileFieldName the form field name of the binary part
+     * @param filename      the file name advertised in the binary part
+     * @param contentType   the content type advertised in the binary part
+     * @param data          the raw file bytes
+     * @return the parsed JSON response
+     * @throws WhatsAppCloudException if the request fails or the endpoint reports an error
+     */
+    public JSONObject uploadFormFile(String path, Map<String, String> fields, String fileFieldName,
+                                     String filename, String contentType, byte[] data) {
+        var boundary = "cobalt" + Long.toHexString(data.length) + "x" + Integer.toHexString(filename.hashCode());
+        var body = genericMultipartBody(boundary, fields, fileFieldName, filename, contentType, data);
+        var request = HttpRequest.newBuilder(buildUri(path, Map.of()))
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .POST(HttpRequest.BodyPublishers.ofByteArray(body))
+                .build();
+        return send(request, "POST " + path);
+    }
+
+    /**
      * Downloads the binary content of a media asset from its resolved CDN URL.
      *
      * <p>The URL is the one returned by {@code GET /<MEDIA_ID>}; it is short-lived and still requires
@@ -265,6 +320,108 @@ public final class CloudApiClient {
             Thread.currentThread().interrupt();
             throw new WhatsAppCloudException.CloudApiException("media download interrupted");
         }
+    }
+
+    /**
+     * Creates a resumable upload session and returns its session locator.
+     *
+     * <p>Posts to the application's {@code /{APP_ID}/uploads} edge with the total byte length, MIME
+     * type, and optional advertised file name as query parameters and no body. The Resumable Upload
+     * API is keyed by the Meta app id rather than a phone number or WABA, and it does not accept the
+     * {@code appsecret_proof}, so the URI is assembled directly off the versioned base without the
+     * proof. The response carries the session locator under {@code id} as the literal string
+     * {@code upload:<UPLOAD_SESSION_ID>}; that whole value, prefix included, is reused verbatim as the
+     * path of {@link #uploadToSession(String, long, byte[])} and {@link #queryUploadStatus(String)}.
+     *
+     * @param appId      the Meta app id whose uploads edge creates the session
+     * @param fileLength the total byte length of the file to upload
+     * @param fileType   the MIME type of the file, for example {@code image/jpeg}
+     * @param fileName   the advertised file name, or {@code null} to omit it
+     * @return the session locator, the literal {@code upload:<UPLOAD_SESSION_ID>} string
+     * @throws WhatsAppCloudException if the request fails or the endpoint reports an error
+     */
+    public String createUploadSession(String appId, long fileLength, String fileType, String fileName) {
+        var encoded = new StringBuilder();
+        appendParam(encoded, "file_length", Long.toString(fileLength));
+        appendParam(encoded, "file_type", fileType);
+        if (fileName != null) {
+            appendParam(encoded, "file_name", fileName);
+        }
+        var uri = URI.create(baseUri.resolve(appId + "/uploads") + "?" + encoded);
+        var request = HttpRequest.newBuilder(uri)
+                .header("Authorization", "Bearer " + accessToken)
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        var json = send(request, "POST " + appId + "/uploads");
+        return json.getString("id");
+    }
+
+    /**
+     * Uploads the file bytes to a resumable session and returns the resulting media handle.
+     *
+     * <p>Posts the raw binary bytes to the session locator with no multipart wrapper and no
+     * {@code Content-Type} form header. The Resumable Upload API authenticates this step with the
+     * literal {@code OAuth} scheme rather than {@code Bearer}, carries the byte offset in the
+     * {@code file_offset} header ({@code 0} for a fresh upload, or the value returned by
+     * {@link #queryUploadStatus(String)} when resuming), and does not accept the
+     * {@code appsecret_proof}. The response carries the handle under {@code h}; that handle is the
+     * value fed to a template HEADER component as {@code components[].example.header_handle}.
+     *
+     * @param uploadSessionId the session locator returned by
+     *                        {@link #createUploadSession(String, long, String, String)}, the full
+     *                        {@code upload:<UPLOAD_SESSION_ID>} string
+     * @param fileOffset      the byte offset to upload from, {@code 0} for a fresh upload
+     * @param data            the raw file bytes
+     * @return the media handle usable as a template {@code header_handle}
+     * @throws WhatsAppCloudException if the request fails or the endpoint reports an error
+     */
+    public String uploadToSession(String uploadSessionId, long fileOffset, byte[] data) {
+        var uri = sessionUri(uploadSessionId);
+        var request = HttpRequest.newBuilder(uri)
+                .header("Authorization", "OAuth " + accessToken)
+                .header("file_offset", Long.toString(fileOffset))
+                .POST(HttpRequest.BodyPublishers.ofByteArray(data))
+                .build();
+        var json = send(request, "POST " + uploadSessionId);
+        return json.getString("h");
+    }
+
+    /**
+     * Queries the byte offset already received by a resumable upload session.
+     *
+     * <p>Issues a {@code GET} on the session locator with no body and no query, authenticating with
+     * the literal {@code OAuth} scheme and without the {@code appsecret_proof}. The response carries
+     * the received byte count under {@code file_offset}; resuming an interrupted upload re-posts
+     * {@link #uploadToSession(String, long, byte[])} with the returned value. Graph may serialise
+     * {@code file_offset} as a JSON string, so it is read with a coercing accessor.
+     *
+     * @param uploadSessionId the session locator, the full {@code upload:<UPLOAD_SESSION_ID>} string
+     * @return the byte offset already received by the session
+     * @throws WhatsAppCloudException if the request fails or the endpoint reports an error
+     */
+    public long queryUploadStatus(String uploadSessionId) {
+        var uri = sessionUri(uploadSessionId);
+        var request = HttpRequest.newBuilder(uri)
+                .header("Authorization", "OAuth " + accessToken)
+                .GET()
+                .build();
+        var json = send(request, "GET " + uploadSessionId);
+        return json.getLongValue("file_offset");
+    }
+
+    /**
+     * Builds the absolute request URI for a resumable upload session locator.
+     *
+     * <p>The locator is the literal {@code upload:<UPLOAD_SESSION_ID>} string, whose leading
+     * {@code upload:} would be parsed as a URI scheme by {@link URI#resolve(String)}. The locator is
+     * therefore appended to the absolute base string rather than resolved, so the colon stays inside
+     * the path segment.
+     *
+     * @param uploadSessionId the session locator
+     * @return the absolute request URI
+     */
+    private URI sessionUri(String uploadSessionId) {
+        return URI.create(baseUri + uploadSessionId);
     }
 
     /**
@@ -383,6 +540,45 @@ public final class CloudApiClient {
         pos = DataUtils.append(out, pos, MP_CRLF_DASH);
         pos = DataUtils.append(out, pos, boundaryBytes);
         pos = DataUtils.append(out, pos, MP_CLOSE);
+        return out;
+    }
+
+    /**
+     * Builds a {@code multipart/form-data} body for arbitrary text fields and a single named file
+     * part.
+     *
+     * <p>Emits one part per text field in iteration order, then a final part carrying the binary
+     * file under the given field name with the supplied filename and content type, and closes with
+     * the terminating boundary delimiter.
+     *
+     * @param boundary      the multipart boundary token
+     * @param fields        the text form fields, in iteration order
+     * @param fileFieldName the form field name of the binary part
+     * @param filename      the file name advertised in the binary part
+     * @param contentType   the content type advertised in the binary part
+     * @param data          the raw file bytes
+     * @return the assembled multipart body
+     */
+    private static byte[] genericMultipartBody(String boundary, Map<String, String> fields,
+                                               String fileFieldName, String filename,
+                                               String contentType, byte[] data) {
+        var head = new StringBuilder();
+        for (var entry : fields.entrySet()) {
+            head.append("--").append(boundary).append("\r\n")
+                    .append("Content-Disposition: form-data; name=\"").append(entry.getKey()).append("\"\r\n\r\n")
+                    .append(entry.getValue()).append("\r\n");
+        }
+        head.append("--").append(boundary).append("\r\n")
+                .append("Content-Disposition: form-data; name=\"").append(fileFieldName)
+                .append("\"; filename=\"").append(filename).append("\"\r\n")
+                .append("Content-Type: ").append(contentType).append("\r\n\r\n");
+        var headBytes = head.toString().getBytes(StandardCharsets.UTF_8);
+        var tailBytes = ("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8);
+        var out = new byte[headBytes.length + data.length + tailBytes.length];
+        var pos = 0;
+        pos = DataUtils.append(out, pos, headBytes);
+        pos = DataUtils.append(out, pos, data);
+        DataUtils.append(out, pos, tailBytes);
         return out;
     }
 

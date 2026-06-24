@@ -1493,7 +1493,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
             return new ReceiptUpdate(List.of(), List.of());
         }
 
-        var current = new LinkedHashSet<>(whatsapp.store().findReceiptRecords(messageId));
+        var current = new LinkedHashSet<>(whatsapp.store().chatStore().findReceiptRecords(messageId));
         if (current.isEmpty()) {
             return new ReceiptUpdate(List.of(), List.of());
         }
@@ -1509,9 +1509,9 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
         }
 
         if (!delivered.isEmpty()) {
-            whatsapp.store().removeReceiptRecords(messageId);
+            whatsapp.store().chatStore().removeReceiptRecords(messageId);
             if (!remaining.isEmpty()) {
-                whatsapp.store().createOrMergeReceiptRecords(messageId, remaining);
+                whatsapp.store().chatStore().createOrMergeReceiptRecords(messageId, remaining);
             }
         }
 

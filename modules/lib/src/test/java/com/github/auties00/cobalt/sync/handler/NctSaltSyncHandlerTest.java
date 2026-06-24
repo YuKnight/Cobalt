@@ -89,12 +89,12 @@ class NctSaltSyncHandlerTest {
         @Test
         @DisplayName("SET with a non-null salt writes the bytes into the store and returns SUCCESS")
         void setsSalt() {
-            assertTrue(client.store().notificationContentTokenSalt().isEmpty(), "precondition: no salt stored");
+            assertTrue(client.store().accountStore().notificationContentTokenSalt().isEmpty(), "precondition: no salt stored");
             var salt = new byte[]{1, 2, 3, 4, 5, 6, 7, 8};
             var result = new NctSaltSyncHandler().applyMutation(client,
                     mutation(salt, SyncdOperation.SET, Instant.ofEpochSecond(1_700_000_000L)));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertArrayEquals(salt, client.store().notificationContentTokenSalt().orElseThrow(),
+            assertArrayEquals(salt, client.store().accountStore().notificationContentTokenSalt().orElseThrow(),
                     "WAWebNctSaltSync persists the salt under BACKEND_ONLY_KEYS.NCT_SALT");
         }
     }
@@ -105,11 +105,11 @@ class NctSaltSyncHandlerTest {
         @Test
         @DisplayName("REMOVE wipes the stored salt and returns SUCCESS")
         void removeClearsSalt() {
-            client.store().setNotificationContentTokenSalt(new byte[]{9, 9, 9});
+            client.store().accountStore().setNotificationContentTokenSalt(new byte[]{9, 9, 9});
             var result = new NctSaltSyncHandler().applyMutation(client,
                     mutation(null, SyncdOperation.REMOVE, Instant.now()));
             assertEquals(SyncActionState.SUCCESS, result.actionState());
-            assertTrue(client.store().notificationContentTokenSalt().isEmpty(),
+            assertTrue(client.store().accountStore().notificationContentTokenSalt().isEmpty(),
                     "WA Web: yield userPrefsIdb.remove(NCT_SALT); Cobalt nulls the store field");
         }
     }
@@ -219,7 +219,7 @@ class NctSaltSyncHandlerTest {
             for (var r : results) {
                 assertEquals(SyncActionState.SUCCESS, r.actionState());
             }
-            assertArrayEquals(saltB, client.store().notificationContentTokenSalt().orElseThrow());
+            assertArrayEquals(saltB, client.store().accountStore().notificationContentTokenSalt().orElseThrow());
         }
     }
 

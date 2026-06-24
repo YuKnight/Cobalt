@@ -89,7 +89,7 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof LocaleSetting setting)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LocaleSetting setting)) {
             return MutationApplicationResult.malformed();
         }
 

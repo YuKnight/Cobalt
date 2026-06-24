@@ -120,7 +120,7 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
-        var action = mutation.value().action().orElse(null) instanceof RemoveRecentStickerAction entry ? entry : null;
+        var action = mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof RemoveRecentStickerAction entry ? entry : null;
         var lastStickerSentTs = action == null ? null : action.lastStickerSentTs().orElse(null);
 
         var sticker = client.store().settingsStore().findRecentSticker(stickerHash);

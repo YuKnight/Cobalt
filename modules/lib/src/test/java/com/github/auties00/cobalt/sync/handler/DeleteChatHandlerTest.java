@@ -283,7 +283,7 @@ class DeleteChatHandlerTest {
             var resolution = new DeleteChatHandler().resolveConflicts(local, remote);
             assertEquals(ConflictResolutionState.SKIP_REMOTE_DROP_LOCAL, resolution.state());
             assertNotNull(resolution.mergedMutation());
-            assertTrue(resolution.mergedMutation().value().action().filter(a -> a instanceof DeleteChatAction).isPresent());
+            assertTrue(resolution.mergedMutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof DeleteChatAction).isPresent());
         }
     }
 
@@ -303,7 +303,7 @@ class DeleteChatHandlerTest {
             assertEquals(
                     JSON.toJSONString(List.of("deleteChat", PEER.toString(), "1")),
                     trusted.index());
-            assertTrue(trusted.value().action().filter(a -> a instanceof DeleteChatAction).map(a -> (DeleteChatAction) a).orElseThrow().messageRange().isPresent());
+            assertTrue(trusted.value().flatMap(sav -> sav.action()).filter(a -> a instanceof DeleteChatAction).map(a -> (DeleteChatAction) a).orElseThrow().messageRange().isPresent());
         }
     }
 

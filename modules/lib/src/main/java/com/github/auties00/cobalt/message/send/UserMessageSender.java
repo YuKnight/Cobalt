@@ -187,7 +187,7 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
 
         var fanoutDevices = deviceService.getUserFanout(routedChatJid, null);
 
-        store.createOrMergeReceiptRecords(messageInfo.key().id().orElseThrow(), fanoutDevices);
+        store.chatStore().createOrMergeReceiptRecords(messageInfo.key().id().orElseThrow(), fanoutDevices);
 
         var ack = encryptBuildAndSend(routedChatJid, messageInfo, fanoutDevices, false);
 

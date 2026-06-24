@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Loads the platform-native shared libraries used by Cobalt's call layer
- * (Opus, libvpx, OpenH264, SCTP, SpeexDSP, FFmpeg, etc.).
+ * (Opus, libvpx, OpenH264, SCTP, FFmpeg, etc.).
  *
  * <p>Resolution proceeds in a fixed order until a binary is loaded:
  *

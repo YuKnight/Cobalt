@@ -21,6 +21,8 @@ import {
   DIALOG_BUTTON_POSITIVE,
   EULA_ACCEPT_IDS,
   NOTIF_ALLOW_IDS,
+  NOTIF_PRIMER_CONTINUE_IDS,
+  NOTIF_PRIMER_IDS,
   PERMISSION_CANCEL_IDS,
   PERMISSION_DIALOG_ID,
   PHONE_CC_INPUT_IDS,
@@ -396,7 +398,12 @@ export class WhatsAppRegistrar {
 
     if (hasAnyShortResourceId(nodes, CODE_INPUT_IDS)) return "CodeEntry";
 
-    if (hasAnyShortResourceId(nodes, NOTIF_ALLOW_IDS)) return "NotifPermission";
+    if (
+      hasAnyShortResourceId(nodes, NOTIF_ALLOW_IDS) ||
+      hasAnyShortResourceId(nodes, NOTIF_PRIMER_IDS)
+    ) {
+      return "NotifPermission";
+    }
 
     if (hasAnyShortResourceId(nodes, EULA_ACCEPT_IDS)) return "Eula";
 
@@ -500,12 +507,23 @@ export class WhatsAppRegistrar {
     details: string[]
   ): Promise<void> {
     const allow = findNodeByShortResourceId(nodes, NOTIF_ALLOW_IDS);
-    if (!allow) {
-      throw new Error("NotifPermission: Allow button not found.");
+    if (allow) {
+      const tapped = await this.adb.emuTapNode(serial, allow);
+      if (!tapped) throw new Error("NotifPermission: could not tap Allow.");
+      details.push("Allowed notifications permission.");
+      return;
     }
-    const tapped = await this.adb.emuTapNode(serial, allow);
-    if (!tapped) throw new Error("NotifPermission: could not tap Allow.");
-    details.push("Allowed notifications permission.");
+    const cont =
+      findNodeByShortResourceId(nodes, NOTIF_PRIMER_CONTINUE_IDS) ??
+      this.pickBottomPrimaryButton(nodes);
+    if (!cont) {
+      throw new Error(
+        "NotifPermission: neither the system Allow button nor the primer CONTINUE button was found."
+      );
+    }
+    const tapped = await this.adb.emuTapNode(serial, cont);
+    if (!tapped) throw new Error("NotifPermission: could not tap primer CONTINUE.");
+    details.push("Tapped CONTINUE on the WhatsApp notification primer.");
   }
 
   private async handlePhoneEntry(

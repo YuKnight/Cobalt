@@ -89,7 +89,7 @@ public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHan
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof MaibaAIFeaturesControlAction action)
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MaibaAIFeaturesControlAction action)
                 || action.aiFeatureStatus().isEmpty()) {
             return MutationApplicationResult.malformed();
         }

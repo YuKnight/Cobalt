@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -81,7 +82,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
      * aggregation of the malformed and unsupported counters as telemetry, and
      * drops the outer {@code try/catch} that maps any throw to a sentinel result
      * per Cobalt's error model: thrown exceptions surface to the configured
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientErrorHandler}.
+     * {@link WhatsAppLinkedClientErrorHandler}.
      */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
@@ -90,7 +91,7 @@ public final class SentinelHandler implements WebAppStateActionHandler {
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof KeyExpirationAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof KeyExpirationAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

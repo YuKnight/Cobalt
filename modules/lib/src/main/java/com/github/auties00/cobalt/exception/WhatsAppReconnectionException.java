@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 /**
  * Thrown when an attempt to re-establish a previously open WhatsApp
  * session fails.
@@ -14,10 +16,10 @@ package com.github.auties00.cobalt.exception;
  * @apiNote
  * Raised after a reconnect attempt fails; {@link #attempts()} carries the
  * number of attempts made so far so the caller can bound retries or
- * compute a backoff. {@link #isFatal()} reports {@code true} because no
- * live session remains, but whether a configured
- * {@code WhatsAppClientErrorHandler} schedules a further attempt is its
- * own decision.
+ * compute a backoff. {@link #toErrorResult()} returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD} so the reconnect supervisor
+ * retries on the next backoff tick rather than tearing down a session that
+ * is already gone.
  *
  * @see WhatsAppConnectionException
  */
@@ -69,11 +71,13 @@ public final class WhatsAppReconnectionException extends WhatsAppException {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code true}: a failed
-     * reconnect leaves the client with no live session.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: the reconnect supervisor
+     * retries on the next backoff tick, so the error is swallowed rather
+     * than tearing down a session that is already gone.
      */
     @Override
-    public boolean isFatal() {
-        return true;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 }

@@ -244,7 +244,7 @@ public final class MigrationFixtures {
             if (selfLid != null) {
                 store.accountStore().setLid(selfLid);
             }
-            store.setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
+            store.connectionStore().setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
             return store;
         } catch (IOException e) {
             throw new UncheckedIOException("failed to create temporary store", e);

@@ -287,7 +287,7 @@ class BusinessBroadcastCampaignHandlerTest {
             assertEquals(ts, inner.timestamp());
             assertEquals(JSON.toJSONString(List.of(handler.actionName(), "camp-9")), inner.index());
 
-            var roundtrip = inner.value().action().filter(a -> a instanceof BusinessBroadcastCampaignAction).map(a -> (BusinessBroadcastCampaignAction) a).orElseThrow();
+            var roundtrip = inner.value().flatMap(sav -> sav.action()).filter(a -> a instanceof BusinessBroadcastCampaignAction).map(a -> (BusinessBroadcastCampaignAction) a).orElseThrow();
             assertEquals(BROADCAST_JID, roundtrip.broadcastJid().orElseThrow());
         }
     }

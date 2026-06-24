@@ -104,7 +104,7 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof MerchantPaymentPartnerAction action)) {
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MerchantPaymentPartnerAction action)) {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 

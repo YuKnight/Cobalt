@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 import java.util.Optional;
 
 /**
@@ -18,8 +20,8 @@ import java.util.Optional;
  * a body, {@link #erroneousResponse()} exposes it so the caller can
  * decode the specific reason and any retry hint (typically a
  * {@code retry_after} field for rate-limit driven rejections).
- * {@link #isFatal()} reports {@code true} because authentication never
- * completed and no session can exist yet.
+ * {@link #toErrorResult()} reports {@link WhatsAppLinkedClientErrorResult#DISCONNECT}
+ * because authentication never completed and no session can exist yet.
  */
 public final class WhatsAppRegistrationException extends WhatsAppException {
 
@@ -79,11 +81,13 @@ public final class WhatsAppRegistrationException extends WhatsAppException {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code true}: registration must
-     * complete before a session can exist.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCONNECT}: registration must
+     * complete before any session can exist, so there is no live session to
+     * reconnect.
      */
     @Override
-    public boolean isFatal() {
-        return true;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCONNECT;
     }
 }

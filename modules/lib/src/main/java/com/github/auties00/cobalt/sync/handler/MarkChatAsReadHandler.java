@@ -105,7 +105,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
         }
 
         try {
-            if (!(mutation.value().action().orElse(null) instanceof MarkChatAsReadAction action)) {
+            if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MarkChatAsReadAction action)) {
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
@@ -161,11 +161,11 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebMarkChatAsReadSync", exports = "resolveConflicts", adaptation = WhatsAppAdaptation.ADAPTED)
     public ConflictResolution resolveConflicts(DecryptedMutation.Trusted localMutation, DecryptedMutation.Trusted remoteMutation) {
-        var localAction = localMutation.value().action()
+        var localAction = localMutation.value().flatMap(sav -> sav.action())
                 .filter(a -> a instanceof MarkChatAsReadAction)
                 .map(a -> (MarkChatAsReadAction) a)
                 .orElse(null);
-        var remoteAction = remoteMutation.value().action()
+        var remoteAction = remoteMutation.value().flatMap(sav -> sav.action())
                 .filter(a -> a instanceof MarkChatAsReadAction)
                 .map(a -> (MarkChatAsReadAction) a)
                 .orElse(null);

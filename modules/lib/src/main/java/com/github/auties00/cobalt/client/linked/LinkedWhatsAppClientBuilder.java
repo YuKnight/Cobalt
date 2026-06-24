@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.client.linked;
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
-import com.github.auties00.cobalt.client.WhatsAppClientErrorHandler;
 
 import com.github.auties00.cobalt.registration.MobileClientRegistration;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
@@ -40,7 +39,7 @@ public sealed class LinkedWhatsAppClientBuilder {
     /**
      * The default error handler: prints stack traces to stderr.
      */
-    private static final WhatsAppClientErrorHandler DEFAULT_ERROR_HANDLER = WhatsAppClientErrorHandler.toTerminal();
+    private static final WhatsAppLinkedClientErrorHandler DEFAULT_ERROR_HANDLER = WhatsAppLinkedClientErrorHandler.toTerminal();
     /**
      * The default web verification handler: renders the QR code in the
      * terminal.
@@ -492,7 +491,7 @@ public sealed class LinkedWhatsAppClientBuilder {
         /**
          * The error handler installed on the future client.
          */
-        WhatsAppClientErrorHandler errorHandler;
+        WhatsAppLinkedClientErrorHandler errorHandler;
 
         /**
          * Package-private constructor used by the {@link Client}
@@ -528,7 +527,7 @@ public sealed class LinkedWhatsAppClientBuilder {
          * @return this builder, for chaining
          */
         public Options proxy(WhatsAppClientProxy proxy) {
-            store.setProxy(proxy);
+            store.connectionStore().setProxy(proxy);
             return this;
         }
 
@@ -585,7 +584,7 @@ public sealed class LinkedWhatsAppClientBuilder {
          *                     the default terminal-printing handler
          * @return this builder, for chaining
          */
-        public Options errorHandler(WhatsAppClientErrorHandler errorHandler) {
+        public Options errorHandler(WhatsAppLinkedClientErrorHandler errorHandler) {
             this.errorHandler = errorHandler;
             return this;
         }
@@ -638,7 +637,7 @@ public sealed class LinkedWhatsAppClientBuilder {
              * {@inheritDoc}
              */
             @Override
-            public Web errorHandler(WhatsAppClientErrorHandler errorHandler) {
+            public Web errorHandler(WhatsAppLinkedClientErrorHandler errorHandler) {
                 return (Web) super.errorHandler(errorHandler);
             }
 
@@ -806,7 +805,7 @@ public sealed class LinkedWhatsAppClientBuilder {
              */
             @Override
             public Mobile proxy(WhatsAppClientProxy proxy) {
-                store.setProxy(proxy);
+                store.connectionStore().setProxy(proxy);
                 return this;
             }
 
@@ -1105,7 +1104,7 @@ public sealed class LinkedWhatsAppClientBuilder {
              * {@inheritDoc}
              */
             @Override
-            public Mobile errorHandler(WhatsAppClientErrorHandler errorHandler) {
+            public Mobile errorHandler(WhatsAppLinkedClientErrorHandler errorHandler) {
                 super.errorHandler(errorHandler);
                 return this;
             }
@@ -1336,7 +1335,7 @@ public sealed class LinkedWhatsAppClientBuilder {
         /**
          * The error handler to install on the built client.
          */
-        private WhatsAppClientErrorHandler errorHandler;
+        private WhatsAppLinkedClientErrorHandler errorHandler;
         /**
          * The web verification handler to install on the built client,
          * only honoured when the store's client type is
@@ -1372,7 +1371,7 @@ public sealed class LinkedWhatsAppClientBuilder {
          *                     the default terminal-printing handler
          * @return this builder, for chaining
          */
-        public Custom errorHandler(WhatsAppClientErrorHandler errorHandler) {
+        public Custom errorHandler(WhatsAppLinkedClientErrorHandler errorHandler) {
             this.errorHandler = errorHandler;
             return this;
         }

@@ -20,6 +20,7 @@ import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The conversation state of a WhatsApp client session.
@@ -360,6 +361,29 @@ public interface ChatStore {
      * @param id the message id
      */
     void removePeerMessage(String id);
+
+    /**
+     * Returns the recipient device JIDs recorded for a sent message.
+     *
+     * @param messageId the message id
+     * @return an unmodifiable copy of the recipient set
+     */
+    Set<Jid> findReceiptRecords(String messageId);
+
+    /**
+     * Creates or merges receipt records for a sent message.
+     *
+     * @param messageId     the message id
+     * @param recipientJids the recipient device JIDs
+     */
+    void createOrMergeReceiptRecords(String messageId, Collection<Jid> recipientJids);
+
+    /**
+     * Removes receipt records for a message.
+     *
+     * @param messageId the message id
+     */
+    void removeReceiptRecords(String messageId);
 
     /**
      * Marks a chat's UTM tracking message as read.

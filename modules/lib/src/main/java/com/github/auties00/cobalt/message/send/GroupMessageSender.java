@@ -231,7 +231,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
         var allSkDevices = Stream.concat(skDistribDevices.stream(), skExistingDevices.stream())
                 .toList();
-        store.createOrMergeReceiptRecords(messageInfo.key().id().orElseThrow(), allSkDevices);
+        store.chatStore().createOrMergeReceiptRecords(messageInfo.key().id().orElseThrow(), allSkDevices);
 
         var senderKeyBytes = encryption.getSenderKeyBytes(groupJid, senderJid);
         List<MessageEncryptedPayload> skDistPayloads;
@@ -285,7 +285,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         Node openBotNode = null;
         if (isOpenBotGroup) {
             deviceService.ensureSessions(List.of(Jid.metaAiBotAccount()));
-            store.createOrMergeReceiptRecords(
+            store.chatStore().createOrMergeReceiptRecords(
                     messageInfo.key().id().orElseThrow(), List.of(Jid.metaAiBotAccount()));
             openBotNode = botStanza.buildForGroup(messageInfo, true);
         }
@@ -420,7 +420,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
                 var allSkDevices = Stream.concat(skDistribDevices.stream(), skExistingDevices.stream())
                         .toList();
-                store.createOrMergeReceiptRecords(msgId, allSkDevices);
+                store.chatStore().createOrMergeReceiptRecords(msgId, allSkDevices);
 
                 var allLid = skDistribDevices.stream().allMatch(Jid::hasLidServer);
                 var senderJid = allLid ? selfLidOrPn() : requireSelfJid();

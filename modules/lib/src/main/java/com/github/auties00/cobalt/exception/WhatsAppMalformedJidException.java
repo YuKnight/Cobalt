@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 /**
@@ -15,11 +16,13 @@ import com.github.auties00.cobalt.model.jid.Jid;
  * @apiNote
  * Raised against caller-supplied JID strings; catch it locally to reject
  * bad input without affecting the rest of the operation, since only the
- * offending value is rejected.
+ * offending value is rejected. {@link #toErrorResult()} returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD} so the session keeps running.
  *
  * @implNote
- * This implementation always reports the failure as non-fatal: it
- * invalidates only the operation that produced the bad value.
+ * This implementation has {@link #toErrorResult()} return
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}: it invalidates only the
+ * operation that produced the bad value.
  *
  * @see Jid
  */
@@ -38,11 +41,12 @@ public final class WhatsAppMalformedJidException extends WhatsAppException {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: a JID that fails
-     * to parse only invalidates the specific operation that produced it.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: a JID that fails to parse
+     * only invalidates the operation that produced it.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 }

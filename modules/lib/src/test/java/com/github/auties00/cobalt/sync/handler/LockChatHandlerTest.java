@@ -245,7 +245,7 @@ class LockChatHandlerTest {
             assertEquals(SyncdOperation.SET, trusted.operation());
             assertEquals(7, trusted.actionVersion());
             assertEquals(JSON.toJSONString(List.of("lock", PEER.toString())), trusted.index());
-            assertTrue(trusted.value().action().filter(a -> a instanceof LockChatAction).map(a -> (LockChatAction) a).orElseThrow().locked());
+            assertTrue(trusted.value().flatMap(sav -> sav.action()).filter(a -> a instanceof LockChatAction).map(a -> (LockChatAction) a).orElseThrow().locked());
         }
 
         @Test
@@ -257,9 +257,9 @@ class LockChatHandlerTest {
 
             assertEquals(3, mutations.size(),
                     "locking emits the archive(false) + pin(false) + lock(true) triple");
-            assertFalse(mutations.get(0).mutation().value().action().filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow().archived());
-            assertFalse(mutations.get(1).mutation().value().action().filter(a -> a instanceof PinAction).map(a -> (PinAction) a).orElseThrow().pinned());
-            assertTrue(mutations.get(2).mutation().value().action().filter(a -> a instanceof LockChatAction).map(a -> (LockChatAction) a).orElseThrow().locked());
+            assertFalse(mutations.get(0).mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof ArchiveChatAction).map(a -> (ArchiveChatAction) a).orElseThrow().archived());
+            assertFalse(mutations.get(1).mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof PinAction).map(a -> (PinAction) a).orElseThrow().pinned());
+            assertTrue(mutations.get(2).mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof LockChatAction).map(a -> (LockChatAction) a).orElseThrow().locked());
         }
 
         @Test
@@ -270,7 +270,7 @@ class LockChatHandlerTest {
             var mutations = new LockChatMutationFactory(new ArchiveChatMutationFactory(pinChatMutationFactory), pinChatMutationFactory).getMutationsForLock(ts, false, PEER, null);
 
             assertEquals(1, mutations.size(), "unlocking only emits the lock(false) mutation");
-            assertFalse(mutations.get(0).mutation().value().action().filter(a -> a instanceof LockChatAction).map(a -> (LockChatAction) a).orElseThrow().locked());
+            assertFalse(mutations.get(0).mutation().value().flatMap(sav -> sav.action()).filter(a -> a instanceof LockChatAction).map(a -> (LockChatAction) a).orElseThrow().locked());
         }
     }
 

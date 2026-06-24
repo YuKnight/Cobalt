@@ -110,7 +110,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() == SyncdOperation.SET) {
-                if (!(mutation.value().action().orElse(null) instanceof SubscriptionsSyncV2Action action)) {
+                if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof SubscriptionsSyncV2Action action)) {
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 

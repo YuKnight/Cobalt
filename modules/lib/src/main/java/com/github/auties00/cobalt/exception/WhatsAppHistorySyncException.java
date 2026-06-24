@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+
 /**
  * Thrown when the message history transfer from the primary phone to a
  * newly linked companion device fails.
@@ -12,12 +14,15 @@ package com.github.auties00.cobalt.exception;
  *
  * @apiNote
  * The failure only affects the backfill of past messages on this device;
- * the session keeps receiving new messages, and a partial or missing
- * history can be retried later when the primary phone is online again.
+ * {@link #toErrorResult()} returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD} so the session keeps receiving
+ * new messages, and a partial or missing history can be retried later when
+ * the primary phone is online again.
  *
  * @implNote
- * This implementation always reports the failure as non-fatal: it never
- * affects the active session, only the history backfill.
+ * This implementation has {@link #toErrorResult()} return
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}: it never affects the active
+ * session, only the history backfill.
  */
 public final class WhatsAppHistorySyncException extends WhatsAppException {
 
@@ -60,12 +65,13 @@ public final class WhatsAppHistorySyncException extends WhatsAppException {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: a history sync
-     * failure only affects the population of past messages on this
-     * device, not the active session.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: a history backfill failure
+     * only affects the population of past messages on this device, not the
+     * active session.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 }

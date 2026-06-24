@@ -26,7 +26,7 @@ class VoipRelayAllCallsMutationFactoryTest {
         var expected = SyncFixtures.decodeOracleBytes(oracle, "encoded");
 
         var pending = new VoipRelayAllCallsMutationFactory().getVoipRelayAllCallsMutation(Instant.ofEpochSecond(1_700_000_000L), true);
-        var actual = SyncActionValueSpec.encode(pending.mutation().value());
+        var actual = SyncActionValueSpec.encode(pending.mutation().value().orElseThrow());
 
         assertNotNull(actual);
         assertArrayEquals(expected, actual);

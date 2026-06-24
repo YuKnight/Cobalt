@@ -10,6 +10,7 @@ import type {
   PausedState,
   RuntimeEvaluateResponse,
   SetBreakpointResult,
+  SetWasmBreakpointResult,
   WasmMemoryReadResult,
 } from "../../types/live/debug.js";
 import { createLogger } from "../../utils/logger.js";
@@ -110,14 +111,39 @@ export class LiveCdpDebugger {
       .slice(0, Math.max(1, limit));
   }
 
-  async evaluate(expression: string, awaitPromise: boolean = true): Promise<EvaluateResult> {
+  async evaluate(
+    expression: string,
+    awaitPromise: boolean = true,
+    target: string = "page"
+  ): Promise<EvaluateResult | Array<{ sessionId: string; type: string; url: string; value?: unknown; error?: string }>> {
+    // Non-"page" targets resolve over the auto-attach mux (workers/iframes/service workers by selector).
+    // "all" additionally includes the page, evaluated over its own Playwright CDP session below.
+    if (target !== "page") {
+      await this.mux.ensure();
+      const results = await this.mux.evalOnTargets(expression, target, awaitPromise);
+      if (target === "all") {
+        const pageRes = (await this.evaluate(expression, awaitPromise, "page")) as EvaluateResult;
+        return [
+          {
+            sessionId: "page",
+            type: "page",
+            url: this.requirePage().url(),
+            value: pageRes.value,
+            error: pageRes.exception ?? undefined,
+          },
+          ...results,
+        ];
+      }
+      return results;
+    }
     const cdp = await this.ensureCdp();
+    // Do NOT set replMode: with replMode V8 returns the un-awaited Promise (which serializes to {} under
+    // returnByValue) instead of honoring awaitPromise, so async expressions silently yielded {}.
     const responseRaw = await cdp.send("Runtime.evaluate", {
       expression,
       awaitPromise,
       returnByValue: true,
       generatePreview: true,
-      replMode: true,
     });
     const response = responseRaw as RuntimeEvaluateResponse;
     const result = response.result;
@@ -192,17 +218,32 @@ export class LiveCdpDebugger {
   async setWasmBreakpoint(
     url: string,
     byteOffset: number,
-    logExpression?: string
-  ): Promise<SetBreakpointResult> {
+    logExpression?: string,
+    target?: string,
+    block?: boolean
+  ): Promise<SetWasmBreakpointResult> {
     await this.mux.ensure();
     // Attach every worker currently alive (including nested pthread workers the non-recursive auto-attach
     // raced past) so the breakpoint binds to all instances now; later targets pick it up from the registry.
     await this.mux.reconcileTargets();
-    // With a logExpression the registry installs a non-suspending capture condition (console.log + return
-    // false), so a single expression covers logging without a separate block flag; without one it is a
-    // plain suspending breakpoint.
-    const { id, locations } = await this.mux.addUrlBreakpoint({ url, byteOffset, logExpression });
-    return { breakpointId: id, locations };
+    // Optionally scope binding to a CDP target class (mirrors setInitScript): "workers" -> the worker
+    // targets, "page" -> the page, "all"/unset -> every target.
+    const targetTypes =
+      !target || target === "all"
+        ? null
+        : target === "workers"
+          ? new Set(["worker", "shared_worker", "service_worker"])
+          : new Set([target]);
+    // With a logExpression the registry installs a non-suspending capture (console.log + return false)
+    // unless it reads $stack; block controls whether a suspending hit stays paused.
+    const { id, locations, perTarget, warning } = await this.mux.addUrlBreakpoint({
+      url,
+      byteOffset,
+      logExpression,
+      block,
+      targetTypes,
+    });
+    return { breakpointId: id, locations, perTarget, warning };
   }
 
   /**
@@ -211,6 +252,33 @@ export class LiveCdpDebugger {
    */
   getLogpointCaptures(options: { id?: string; clear?: boolean } = {}) {
     return this.mux.getLogCaptures(options);
+  }
+
+  /**
+   * Sets a JavaScript init script run in matching targets before their own code executes. Pass {@code null} to
+   * clear. {@code target} selects where it lands: "workers" (worker + shared_worker + service_worker, injected
+   * via {@code Runtime.evaluate} while the target is paused at {@code waitForDebugger}), "all" (every
+   * auto-attached child target), or an exact {@code TargetInfo.type}; "page"/"all" additionally registers a
+   * Playwright init script that runs on the next page load. Use this to install an instrumentation hook (e.g.
+   * wrapping the {@code WebTransport} constructor in the pthread worker that performs network I/O) before any
+   * target code runs.
+   */
+  async setInitScript(script: string | null, target: string = "workers"): Promise<void> {
+    await this.mux.ensure();
+    const types =
+      target === "all"
+        ? null
+        : target === "workers"
+          ? ["worker", "shared_worker", "service_worker"]
+          : [target];
+    this.mux.setInitScript(script, types);
+    if (script != null && (target === "page" || target === "all")) {
+      try {
+        await this.requirePage().addInitScript({ content: script });
+      } catch {
+        // page init script is best-effort; the child-target injection above is the primary path
+      }
+    }
   }
 
   async readWasmMemory(callFrameId: string, addr: number, len: number): Promise<WasmMemoryReadResult> {

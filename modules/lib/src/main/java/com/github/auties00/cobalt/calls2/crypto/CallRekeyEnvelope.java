@@ -1,0 +1,222 @@
+package com.github.auties00.cobalt.calls2.crypto;
+
+import com.github.auties00.cobalt.calls2.signaling.CallEncOptions;
+import com.github.auties00.cobalt.message.MessageEncryptionType;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.node.Node;
+import com.github.auties00.cobalt.node.NodeBuilder;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Holds one connected participant device's encrypted slot in a group-call {@code <enc_rekey>} fanout.
+ *
+ * <p>A group rekey re-shares a fresh thirty-two-byte end-to-end call key to every other connected
+ * participant device. Unlike the offer's call-key fanout, a rekey is NOT one stanza carrying a
+ * per-device {@code <destination>} block: each connected participant emits its OWN {@code <enc_rekey>}
+ * stanza, addressed unicast to ONE recipient device, carrying exactly ONE {@code <enc>} child (the
+ * Signal ciphertext of {@code MessageContainer{Call{callKey}}}). This record models one such unicast
+ * slot: the addressed device, the Signal envelope, and whether the envelope bootstraps a new session
+ * (so the sender knows it must attach its {@code <device-identity>}).
+ *
+ * <p>On the wire one such slot becomes the body of a {@code <call to="<recipientDeviceLid>">} stanza:
+ * {@snippet lang="xml" :
+ * <enc_rekey call-id="..." call-creator="..." transaction-id="N">
+ *   <encopt keygen="2"/>
+ *   <enc v="2" type="pkmsg|msg" count="0">CIPHERTEXT</enc>
+ *   <device-identity>ADV ~185 bytes</device-identity>  <!-- only when type="pkmsg" -->
+ * </enc_rekey>
+ * }
+ *
+ * @implNote This implementation models the unicast rekey slot emitted by
+ * {@code make_and_send_rekey_msg} (fn11448) / {@code send_rekey_to_extension} (fn11447) in the wa-voip
+ * WASM module. The {@code <enc_rekey>} body shape is taken byte-for-byte from the live group-call
+ * capture {@code re/calls2-spec/captures/group-rekey.json}: a single {@code <enc>} per stanza (NOT a
+ * per-device fanout), an {@code <encopt keygen="2"/>} sibling matching the offer's keygen version, and
+ * a {@code <device-identity>} attached only on a {@code pkmsg} envelope. The plaintext the
+ * {@code <enc>} encrypts is the SAME {@code MessageContainer{Call{callKey}}} structure as the offer
+ * key (a single thirty-two-byte raw key), confirmed against the live-decrypted sample
+ * {@code 52220a20<32B callKey>...}; the three per-domain {@code RekeyKeyEntry} keys
+ * (audio/video/appdata) are derived LOCALLY from this one key, not transmitted.
+ *
+ * @param recipientDevice the participant device this rekey slot is addressed to; never {@code null}
+ * @param type            the Signal envelope variant of the {@code <enc>} payload; never {@code null}
+ * @param ciphertext      the Signal ciphertext of {@code MessageContainer{Call{callKey}}}; never
+ *                        {@code null}
+ * @param deviceIdentity  the ADV device-identity bytes to attach when {@code type} is
+ *                        {@link MessageEncryptionType#PKMSG}, or {@code null} when none is available
+ * @see CallKeyCryptography
+ */
+public record CallRekeyEnvelope(Jid recipientDevice, MessageEncryptionType type, byte[] ciphertext,
+                                byte[] deviceIdentity) {
+    /**
+     * The wire element tag for a rekey action.
+     *
+     * <p>This is the {@code <enc_rekey>} element name {@link #toNode(String, Jid, int)} stamps, the same
+     * literal {@link com.github.auties00.cobalt.calls2.signaling.RekeyStanza#ELEMENT} carries on the
+     * decode side.
+     */
+    public static final String ELEMENT = "enc_rekey";
+
+    /**
+     * The wire element tag for the Signal-encrypted rekey-key payload.
+     */
+    private static final String ENC_ELEMENT = "enc";
+
+    /**
+     * The wire element tag for the ADV device-identity block.
+     */
+    private static final String DEVICE_IDENTITY_ELEMENT = "device-identity";
+
+    /**
+     * The wire attribute naming the rotation transaction id on an {@code <enc_rekey>} element.
+     */
+    static final String TRANSACTION_ID_ATTRIBUTE = "transaction-id";
+
+    /**
+     * The wire attribute naming the Signal ciphertext version on an {@code <enc>} element.
+     */
+    private static final String VERSION_ATTRIBUTE = "v";
+
+    /**
+     * The wire attribute naming the Signal ciphertext type on an {@code <enc>} element.
+     */
+    private static final String TYPE_ATTRIBUTE = "type";
+
+    /**
+     * The wire attribute naming the Signal retry count on an {@code <enc>} element.
+     */
+    private static final String COUNT_ATTRIBUTE = "count";
+
+    /**
+     * The retry-count value stamped on every call-key {@code <enc>} element.
+     *
+     * <p>The live captures show {@code count="0"} on every offer and rekey {@code <enc>}; the call-key
+     * fanout never re-counts because a failed envelope triggers a fresh offer rather than a retry on the
+     * same {@code <enc>}.
+     */
+    private static final int ENC_COUNT = 0;
+
+    /**
+     * Canonicalizes the record components, defensively copying the binary payloads.
+     *
+     * @throws NullPointerException if {@code recipientDevice}, {@code type}, or {@code ciphertext} is
+     *                              {@code null}
+     */
+    public CallRekeyEnvelope {
+        Objects.requireNonNull(recipientDevice, "recipientDevice cannot be null");
+        Objects.requireNonNull(type, "type cannot be null");
+        Objects.requireNonNull(ciphertext, "ciphertext cannot be null");
+        ciphertext = ciphertext.clone();
+        deviceIdentity = deviceIdentity == null ? null : deviceIdentity.clone();
+    }
+
+    /**
+     * Returns the ADV device-identity bytes, if present.
+     *
+     * <p>The returned array, when present, is a defensive copy. A device identity is attached only to a
+     * {@link MessageEncryptionType#PKMSG} envelope; a {@link MessageEncryptionType#MSG} envelope carries
+     * none.
+     *
+     * @return an {@link Optional} holding a copy of the device-identity bytes, or empty when absent
+     */
+    public Optional<byte[]> deviceIdentityBytes() {
+        return Optional.ofNullable(deviceIdentity)
+                .map(byte[]::clone);
+    }
+
+    /**
+     * Returns the Signal ciphertext backing this rekey slot.
+     *
+     * <p>This accessor overrides the implicit record accessor to return a defensive copy so the stored
+     * array cannot be mutated through the returned reference.
+     *
+     * @return a copy of the Signal ciphertext
+     */
+    @Override
+    public byte[] ciphertext() {
+        return ciphertext.clone();
+    }
+
+    /**
+     * Returns the ADV device-identity bytes backing this rekey slot.
+     *
+     * <p>This accessor overrides the implicit record accessor to return a defensive copy.
+     *
+     * @return a copy of the device-identity bytes, or {@code null} when absent
+     */
+    @Override
+    public byte[] deviceIdentity() {
+        return deviceIdentity == null ? null : deviceIdentity.clone();
+    }
+
+    /**
+     * Builds the {@code <enc_rekey>} action node addressed to this recipient device.
+     *
+     * <p>The common header is stamped first, then the rotation {@code transaction-id} when present, then
+     * the {@code <encopt keygen="2"/>} sibling, the single {@code <enc>} envelope, and finally the
+     * {@code <device-identity>} child when this slot bootstraps a new session and a device identity is
+     * available. The {@code <enc>} carries the Signal ciphertext version
+     * {@value MessageEncryption#CIPHERTEXT_VERSION}, this slot's {@link #type() type}, and the
+     * {@value #ENC_COUNT} retry count.
+     *
+     * @param callId        the call identifier
+     * @param callCreator   the call creator's device JID (this sender's own device JID)
+     * @param transactionId the rotation transaction id, or {@code -1} to omit it
+     * @return the rekey action node
+     * @throws NullPointerException if {@code callId} or {@code callCreator} is {@code null}
+     */
+    public Node toNode(String callId, Jid callCreator, int transactionId) {
+        Objects.requireNonNull(callId, "callId cannot be null");
+        Objects.requireNonNull(callCreator, "callCreator cannot be null");
+        var children = new ArrayList<Node>(3);
+        children.add(CallEncOptions.standard().toNode());
+        children.add(new NodeBuilder()
+                .description(ENC_ELEMENT)
+                .attribute(VERSION_ATTRIBUTE, MessageEncryption.CIPHERTEXT_VERSION)
+                .attribute(TYPE_ATTRIBUTE, type.protocolValue())
+                .attribute(COUNT_ATTRIBUTE, ENC_COUNT)
+                .content(ciphertext)
+                .build());
+        if (type.isPreKeyMessage() && deviceIdentity != null) {
+            children.add(new NodeBuilder()
+                    .description(DEVICE_IDENTITY_ELEMENT)
+                    .content(deviceIdentity)
+                    .build());
+        }
+        return new NodeBuilder()
+                .description(ELEMENT)
+                .attribute(CallKeyCryptography.CALL_ID_ATTRIBUTE, callId)
+                .attribute(CallKeyCryptography.CALL_CREATOR_ATTRIBUTE, callCreator)
+                .attribute(TRANSACTION_ID_ATTRIBUTE, transactionId, transactionId >= 0)
+                .content(children)
+                .build();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj == this || (obj instanceof CallRekeyEnvelope that
+                && this.recipientDevice.equals(that.recipientDevice)
+                && this.type == that.type
+                && Arrays.equals(this.ciphertext, that.ciphertext)
+                && Arrays.equals(this.deviceIdentity, that.deviceIdentity));
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(recipientDevice, type, Arrays.hashCode(ciphertext), Arrays.hashCode(deviceIdentity));
+    }
+
+    @Override
+    public String toString() {
+        return "CallRekeyEnvelope[recipientDevice=" + recipientDevice
+                + ", type=" + type
+                + ", ciphertextLen=" + ciphertext.length
+                + ", deviceIdentityLen=" + (deviceIdentity == null ? -1 : deviceIdentity.length)
+                + ']';
+    }
+}

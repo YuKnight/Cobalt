@@ -1,0 +1,5429 @@
+package com.github.auties00.cobalt.calls2.core;
+
+import com.github.auties00.cobalt.calls2.common.*;
+import com.github.auties00.cobalt.calls2.config.VoipSettings;
+import com.github.auties00.cobalt.calls2.common.CallDeviceJid;
+import com.github.auties00.cobalt.calls2.core.participant.CallE2eKeyDerivation;
+import com.github.auties00.cobalt.calls2.net.transport.E2eMediaSrtp;
+import com.github.auties00.cobalt.calls2.core.participant.CallMembership;
+import com.github.auties00.cobalt.calls2.core.participant.CallSecureSsrcGenerator;
+import com.github.auties00.cobalt.calls2.dsp.*;
+import com.github.auties00.cobalt.calls2.media.audio.*;
+import com.github.auties00.cobalt.calls2.media.sframe.SFrameKeyProvider;
+import com.github.auties00.cobalt.calls2.media.video.EncodedVideoFrame;
+import com.github.auties00.cobalt.calls2.media.video.VideoCodec;
+import com.github.auties00.cobalt.calls2.media.video.VideoCodecParams;
+import com.github.auties00.cobalt.calls2.media.video.VideoCodecRegistry;
+import com.github.auties00.cobalt.calls2.net.bwe.*;
+import com.github.auties00.cobalt.calls2.net.ratecontrol.AudioRateController;
+import com.github.auties00.cobalt.calls2.net.ratecontrol.SctpBufferCongestionController;
+import com.github.auties00.cobalt.calls2.net.ratecontrol.UnifiedAudioQualityControl;
+import com.github.auties00.cobalt.calls2.net.ratecontrol.VideoRateController;
+import com.github.auties00.cobalt.calls2.net.transport.*;
+import com.github.auties00.cobalt.calls2.platform.*;
+import com.github.auties00.cobalt.calls2.platform.VideoCaptureDriver.VideoCaptureCapability;
+import com.github.auties00.cobalt.calls2.platform.VideoCaptureDriver.VideoSink;
+import com.github.auties00.cobalt.calls2.signaling.RelayEndpoint;
+import com.github.auties00.cobalt.calls2.signaling.RelayInfo;
+import com.github.auties00.cobalt.calls2.stream.*;
+import com.github.auties00.cobalt.calls2.util.TimerHeap;
+import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptor;
+import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptorBuilder;
+import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptors;
+import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptorsBuilder;
+import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptions;
+import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptionsBuilder;
+import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptionsEntryBuilder;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.node.Node;
+
+import java.io.IOException;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+
+/**
+ * The live media plane for one call: the running audio and video pipeline that turns a connected call's
+ * relay credentials and call key into flowing media.
+ *
+ * <p>This is the production backing of the {@link Calls2MediaPlane} seam the {@link Calls2LifecycleController}
+ * drives once a call is answered. Its {@link LiveMediaPlane} factory brings up a {@link LiveMediaSession}
+ * by wiring the units the earlier phases built into the full two-way media chain:
+ * <ul>
+ *   <li><b>Outbound audio:</b> the call's application audio capture source (an {@link AudioOutput} the
+ *       embedder supplies, a microphone-bound one capturing from its own device, or, when the call supplied
+ *       none, a platform capture device started through the engine's {@link VoipDriverManager} and bridged
+ *       to the reader pump by a {@link CaptureSourceBridge}) feeds a single-producer
+ *       single-consumer {@link AudioCaptureRing} drained by an {@link AudioReaderPump} into the
+ *       {@link AudioEncoderSender}, which Opus-encodes through an {@link OpusAudioCodec}, packs a
+ *       frames-per-packet group with an {@link OpusRepacketizer}, seals the payload with SFrame on a group
+ *       call (the {@link SFrameKeyProvider} chain) or leaves it for shared-key hop-by-hop SRTP on a
+ *       one-to-one call, RTP-packetizes it, and ships it through the {@link MediaTransport}, which
+ *       hop-by-hop SRTP-protects it and writes it as SCTP DATA on the one SCTP data channel.</li>
+ *   <li><b>Inbound audio:</b> a socket receive loop hands each datagram, with its source address, to the
+ *       {@link MediaTransport}, whose ICE/DTLS/SCTP demultiplex decrypts the data-channel media and hands
+ *       the cleartext RTP back; it is RTP-depacketized, SFrame-opened on a
+ *       group call, inserted into the {@link LiveNetEq} adaptive jitter buffer, and rendered one frame at a
+ *       time by the {@code AudioDecoderReceiver}, delivered either to the call's application audio playback
+ *       sink (an {@link AudioInput} the embedder supplies, a speaker-bound one rendering to its own device)
+ *       by a fixed-cadence render loop, or, when the call supplied none, into an {@link AudioPlaybackRing}
+ *       fed by the demand-driven {@link AudioWriterPump} and drained by a platform playback device started
+ *       through the engine's {@link VoipDriverManager} ({@link LiveAudioPlaybackDriver}).</li>
+ *   <li><b>Video:</b> when the local side participates with video, the negotiated {@link VideoCodec} from
+ *       the {@link VideoCodecRegistry} drives an inbound {@link LiveVideoJitterBuffer} decode-and-render
+ *       loop that delivers each decoded picture to the call's application {@link VideoInput} sink when one
+ *       was supplied (falling back to {@link VoipHostApi#renderVideoFrame}), and an outbound encode loop
+ *       that drains the call's application {@link VideoOutput} capture source, encodes each picture, and
+ *       ships the access unit over the same relay transport; when the call sends video but supplied no
+ *       {@link VideoOutput}, the engine's {@link VoipDriverManager} starts a platform camera capture whose
+ *       frames feed the encode loop through a {@link ManagerVideoSourceBridge}.</li>
+ * </ul>
+ *
+ * <p>The session keys its media from the call key through {@link CallE2eKeyDerivation}: the relay
+ * {@code <hbh_key>} keys the client-to-relay hop-by-hop SRTP, and on a group call the per-participant
+ * SFrame base key keys the end-to-end SFrame layer. Each pipeline runs on its own virtual thread per the
+ * Cobalt threading model; {@link Calls2MediaPlane.Session#close()} stops every pump and thread, closes the codecs, the
+ * transport, and the datagram socket, and is idempotent so a teardown that races the transport's own
+ * close is safe. A bring-up that cannot start the transport, open a codec, or bind the socket surfaces as
+ * a non-fatal {@link WhatsAppCallException.DataChannel}, which the controller isolates to this one call
+ * rather than tearing the session down.
+ *
+ * @apiNote This is an internal engine collaborator, not a public surface; the lifecycle controller is its
+ * only caller and embedders never construct it.
+ * @implNote This implementation wires the host-side reimplementation of the wa-voip media plane reached
+ * from {@code call_accept_impl} (fn10709) and {@code post_process_group_info} (fn10987) in the WASM module
+ * {@code ff-tScznZ8P}: {@code wa_call_start} -> {@code prepare_call_transport} ->
+ * {@code start_transport_media_and_stream}, plus {@code put_frame_imp} on the send side and
+ * {@code get_frame_neteq} on the receive side. The native HTTP {@code start_session_request} bootstrap of
+ * {@code call_http_signaler.cc} is not driven from this media-plane seam: it is a signaling-side transport
+ * step owned by {@code CallTransportController} through {@code CallHttpSignaler}. The media plane runs over
+ * the single {@link LiveRelayTransport}, the {@code RTCPeerConnection}-equivalent that brings the call up
+ * over ICE and DTLS and carries every packet as SCTP DATA on one SCTP data channel
+ * (re/calls2-spec/captures/webrtc-datachannel-transport-2026-06-21.md); the session owns the host UDP
+ * socket that backs that ICE/DTLS transport. The end-to-end ICE/DTLS bring-up needs ICE/DTLS material that
+ * the current signaling drops and that the captures do not yet pin down, recorded as a {@code TODO} at the
+ * transport construction site.
+ */
+final class LiveMediaSession implements Calls2MediaPlane.Session {
+    /**
+     * Logs media-plane bring-up, teardown, and isolated pipeline faults.
+     */
+    private static final System.Logger LOGGER = System.getLogger(LiveMediaSession.class.getName());
+
+    /**
+     * The call audio sample rate, in hertz, fixed at sixteen kilohertz mono to match the public call
+     * audio format and the {@code AudioDecoderReceiver} frame geometry.
+     */
+    private static final int AUDIO_SAMPLE_RATE_HZ = 16_000;
+
+    /**
+     * The number of audio channels, fixed at one (mono) for the call audio format.
+     */
+    private static final int AUDIO_CHANNELS = 1;
+
+    /**
+     * The audio frame duration, in milliseconds, matching the NetEq twenty-millisecond get period and the
+     * default Opus ptime.
+     */
+    private static final int AUDIO_FRAME_MILLIS = 20;
+
+    /**
+     * The number of samples in one captured or rendered audio block: the frame duration times the sample
+     * rate, three hundred and twenty samples for a twenty-millisecond frame at sixteen kilohertz.
+     */
+    private static final int AUDIO_FRAME_SAMPLES = AUDIO_SAMPLE_RATE_HZ / 1000 * AUDIO_FRAME_MILLIS;
+
+    /**
+     * The number of frames packed into one outbound audio RTP packet.
+     *
+     * <p>One frame per packet is the negotiated initial value: the captured {@code <voip_settings>} document
+     * carries {@code options.initial_fpp=1}, so the call starts sending every encoded frame immediately with
+     * no aggregation. The engine can adapt the packing up to the negotiated ceiling
+     * ({@code rc.maxfpp=2}/{@code encode.max_frames_per_packet=3}) at a {@code 60 ms} frame
+     * ({@code encode.frame_ms=60}) under its rate-control rules.
+     *
+     * @implNote This implementation pins the initial frames-per-packet to the capture-confirmed
+     * {@code options.initial_fpp=1} (re/calls2-spec/captures/voip-settings-merged.json), so the initial packing
+     * is faithful. The dynamic adaptation up to {@code rc.maxfpp} is NOT threaded: the per-round fpp the engine
+     * selects is driven by the same {@code rc_dyn} rate-control condition catalogue that gates the
+     * audio-reserve split (see {@code audioShare}), which is owned by the rate-control reader and not yet
+     * reversed (the runtime-computed field offsets, the {@link Calls2RateControlLoop#MIN_BITRATE_BPS} class);
+     * threading it requires that catalogue plus carrying the selected fpp through the capture pump cadence, the
+     * {@link OutboundRtpPacketizer} timestamp increment, and the {@code FramePacker}.
+     */
+    private static final int FRAMES_PER_PACKET = 1;
+
+    /**
+     * The number of 20 ms frames MLow packs into one outbound packet, giving its 60 ms packetization time.
+     *
+     * <p>WhatsApp's MLow path ships a 60 ms packet (three 20 ms internal frames carried in one TOC-led
+     * range-coded bitstream), unlike the 20 ms Opus packet {@link #FRAMES_PER_PACKET} produces. The capture
+     * pump stays on the 20 ms cadence the audio-processing front end requires, so the send path accumulates
+     * this many captured blocks before the single 60 ms MLow encode rather than resizing the pump; the
+     * outbound RTP timestamp then advances by this many frames per MLow packet.
+     */
+    private static final int MLOW_FRAMES_PER_PACKET = 3;
+
+    /**
+     * The number of 20 ms PCM blocks aggregated into one Opus frame, giving WhatsApp's 40 ms Opus frame
+     * duration.
+     *
+     * @implNote This implementation aggregates {@code 2} captured 20 ms blocks into one 40 ms Opus encode so
+     * the wire frame matches the {@code config 10} (SILK wideband 40 ms) Opus the live capture shows the peer
+     * sending (steady-state TOC {@code 0x50}), which the peer's pjmedia jitter buffer is framed for. The
+     * earlier per-20 ms-block encode produced {@code config 9} (SILK wideband 20 ms, TOC {@code 0x48}) frames
+     * the peer received and decrypted but did not render.
+     */
+    private static final int OPUS_FRAME_BLOCKS = 2;
+
+    /**
+     * The dotted path of the per-call voip parameter selecting the MLow audio codec over Opus.
+     *
+     * <p>An integer tunable read through {@link VoipParams#getInteger(VoipParamKey)} and treated as a
+     * boolean: a non-zero value routes the call's audio encode and decode through the MLow low-bitrate
+     * speech codec ({@link MLowAudioCodec} and {@link MLowAudioDecoder}) instead of the default
+     * {@link OpusAudioCodec} and {@link OpusAudioDecoder}. Declared once here so the dotted path the
+     * codec selector resolves is not literal-duplicated across the decoder and encoder construction sites.
+     */
+    private static final String USE_MLOW_CODEC_PARAM = "p->use_mlow_codec";
+
+    /**
+     * The dotted path of the per-call MLow LPC-postfilter gate, the native
+     * {@code p->mlow_enable_lpc_postfilter}.
+     *
+     * <p>The MLow decode postfilter chain always runs its harmonic and high-pass postfilters as the live
+     * decoder's default level lift and harmonic shaping; this integer tunable gates only the additional LPC
+     * postfilter, which the native {@code LPC_postfilter_mode} default and the live client both leave off, so
+     * an absent, zero, or non-integer value leaves the LPC postfilter disabled.
+     */
+    private static final String MLOW_ENABLE_LPC_POSTFILTER_PARAM = "p->mlow_enable_lpc_postfilter";
+
+    /**
+     * The dotted path of the relay DTLS active-mode gate, the native
+     * {@code vp->enable_edgeray_dtls_active_mode}.
+     *
+     * <p>This integer voip-param, not a {@code <relay>} element field, flips the relay leg's DTLS roles: when
+     * it is zero the relay is the DTLS server and the web client is the DTLS client (the common, only-observed
+     * mode), and when it is non-zero the relay is the DTLS client and the web client is the DTLS server. It is
+     * delivered through the {@code <voip_settings>} channel, so it is read from the active voip-param set
+     * rather than from the parsed relay block.
+     */
+    private static final String ENABLE_EDGERAY_DTLS_ACTIVE_MODE_PARAM = "vp->enable_edgeray_dtls_active_mode";
+
+    /**
+     * The wire attribute on a {@code <voip_settings>} node naming the settings bucket it belongs under.
+     */
+    private static final String VOIP_SETTINGS_TYPE_ATTRIBUTE = "type";
+
+    /**
+     * The wire {@code type} value selecting the audio-call voip-settings overlay.
+     */
+    private static final String VOIP_SETTINGS_TYPE_AUDIO = "audio";
+
+    /**
+     * The wire {@code type} value selecting the video-call voip-settings overlay.
+     */
+    private static final String VOIP_SETTINGS_TYPE_VIDEO = "video";
+
+    /**
+     * The wire {@code type} value the default voip-settings bundle carries, and the fallback assumed when a
+     * {@code <voip_settings>} node omits the {@code type} attribute.
+     *
+     * <p>The default bundle maps onto {@link VoipSettingsType#NONE}, the mandatory baseline; the captured
+     * offer-acknowledgement delivers its single bundle with no {@code type} attribute at all, which this
+     * fallback routes to the same baseline.
+     */
+    private static final String VOIP_SETTINGS_TYPE_DEFAULT = "default";
+
+    /**
+     * The capacity, in samples, of the capture and playback rings.
+     *
+     * <p>Sized to comfortably exceed both the block size and the startup seed so the producer side is not
+     * immediately full; the rings round it up to a power of two.
+     */
+    private static final int RING_CAPACITY_SAMPLES = 8 * AUDIO_FRAME_SAMPLES;
+
+    /**
+     * The number of samples the capture ring buffers before the reader pump forwards the first block,
+     * establishing the capture-to-render skew margin.
+     */
+    private static final int CAPTURE_STARTUP_SEED_SAMPLES = 2 * AUDIO_FRAME_SAMPLES;
+
+    /**
+     * The maximum size, in bytes, of an inbound datagram the receive loop reads.
+     */
+    private static final int MAX_DATAGRAM_BYTES = 1500 + 64;
+
+    /**
+     * The fixed RFC 8445 priority of the single relay host candidate the synthesized answer carries.
+     *
+     * @implNote This implementation uses {@code 2122262783}, the value WhatsApp Web injects into the
+     * synthesized relay answer's {@code a=candidate:2 1 udp 2122262783 <ip> <port> typ host} line.
+     */
+    private static final long RELAY_HOST_CANDIDATE_PRIORITY = 2122262783L;
+
+    /**
+     * The RFC 8445 local preference of the local host candidate.
+     *
+     * @implNote This implementation uses the maximum local preference so the single host candidate is the
+     * most preferred local candidate.
+     */
+    private static final int ICE_HOST_LOCAL_PREFERENCE = 65535;
+
+    /**
+     * The ICE component id of the RTP component.
+     */
+    private static final int ICE_RTP_COMPONENT_ID = 1;
+
+    /**
+     * The number of random bytes a generated local ICE ufrag is derived from.
+     *
+     * @implNote This implementation uses {@code 4} bytes, whose base64url encoding exceeds the RFC 8445
+     * four-character ufrag minimum.
+     */
+    private static final int ICE_UFRAG_RANDOM_BYTES = 4;
+
+    /**
+     * The number of random bytes a generated local ICE password is derived from.
+     *
+     * @implNote This implementation uses {@code 18} bytes, whose base64url encoding exceeds the RFC 8445
+     * twenty-two-character password minimum.
+     */
+    private static final int ICE_PASSWORD_RANDOM_BYTES = 18;
+
+    /**
+     * The number of recent outbound audio packets retained for the redundancy schemes.
+     */
+    private static final int PACKET_CACHE_CAPACITY = 256;
+
+    /**
+     * The RTP payload type stamped on outbound audio packets and matched to recognize inbound audio, the
+     * dynamic type the wa-voip audio stream uses on the wire.
+     *
+     * @implNote This implementation uses {@code 120}, the payload type the live WhatsApp Web capture shows on
+     * both directions of a 1:1 audio call (the peer's RTP and the relayed media both carry {@code PT 120}). The
+     * peer's decoder is bound to it, so an outbound packet stamped with any other type is dropped as an unknown
+     * payload and never reaches the peer's jitter buffer; the earlier {@code 111} (a common Opus default) did
+     * not match what WhatsApp negotiates, so the peer received no audio and terminated the call with
+     * {@code reason=timeout}.
+     */
+    private static final int AUDIO_PAYLOAD_TYPE = 120;
+
+    /**
+     * The fixed twelve-byte base RTP header length, with no CSRC list; the four-byte
+     * {@link #RTP_HEADER_EXTENSION_LENGTH} header extension follows it on outbound media packets.
+     */
+    private static final int RTP_HEADER_LENGTH = 12;
+
+    /**
+     * The four-byte length of the empty {@code 0xDEBE} RTP header extension WhatsApp stamps on every outbound
+     * media packet: the two-byte {@code 0xDEBE} profile word followed by a two-byte zero extension-word count.
+     *
+     * @implNote This implementation stamps the extension empty (no audio-level element) because its per-call
+     * extmap id is not recoverable (see {@code sendAudioPacket}); the live capture shows the relay nonetheless
+     * requires the extension bit set and the {@code de be 00 00} header present on every media packet to forward
+     * the stream, so the empty extension is stamped even though it carries no element.
+     */
+    private static final int RTP_HEADER_EXTENSION_LENGTH = 4;
+
+    /**
+     * The trailing room, in bytes, reserved after a cleartext RTP packet for the hop-by-hop SRTP
+     * authentication tag the transport appends in place.
+     *
+     * <p>The relay transport protects an outbound packet in place, writing the SRTP tag immediately after
+     * the cleartext bytes, so any buffer handed to {@link MediaTransport#sendMedia} must carry this much
+     * spare room past its declared length. It matches the trailing allowance the audio and video
+     * packetizers reserve and comfortably covers the {@link SrtpCryptoSuite#AES_CM_128_HMAC_SHA1_80} tag.
+     */
+    private static final int RTP_SRTP_TAG_ROOM = 64;
+
+    /**
+     * The RTP timestamp clock rate of the audio stream, equal to the sample rate.
+     */
+    private static final int AUDIO_RTP_CLOCK_RATE = AUDIO_SAMPLE_RATE_HZ;
+
+    /**
+     * The RTP payload type stamped on outbound video packets, a dynamic type distinct from the audio type
+     * so the inbound demux routes by payload type.
+     */
+    private static final int VIDEO_PAYLOAD_TYPE = 96;
+
+    /**
+     * The RTP timestamp clock rate of the video stream, ninety kilohertz, the standard video RTP clock the
+     * jitter buffer's capture timestamps are denominated in.
+     */
+    private static final int VIDEO_RTP_CLOCK_RATE = 90_000;
+
+    /**
+     * The maximum size, in bytes, of one outbound media datagram the video packetizer fragments an access
+     * unit down to, the {@code options.mtu_size} the call negotiates.
+     *
+     * <p>The outbound video packetizer fragments an H264 access unit into FU-A packets so no single packet
+     * exceeds this transmission unit, and a small picture stays a single-NAL packet. The budget for the
+     * codec payload of one packet is this value minus the twelve-byte RTP header and the hop-by-hop SRTP
+     * tag room, so a fragment plus its headers fits one path datagram.
+     *
+     * @implNote This implementation uses {@code 1200}, the {@code options.mtu_size} value the captured
+     * {@code <voip_settings>} document carries verbatim (re/calls2-spec/captures/voip-settings-merged.json
+     * {@code options.mtu_size}; the same {@code mvp->mtu_size} the native {@link VoipParamKey} models). It is
+     * not read back through {@link VoipParams#getInteger(VoipParamKey)} because the value is nested under the
+     * JSON {@code options} section while the modelled {@code mvp->mtu_size} key resolves at the document root,
+     * so the negotiated leaf lands as an unmodelled value and the captured constant is the faithful budget;
+     * a per-call override is the same dyn-rule-reader deferral the frames-per-packet aggregation carries.
+     */
+    private static final int VIDEO_MTU_BYTES = 1200;
+
+    /**
+     * The default outbound video geometry width, in pixels, until the negotiated capture capability is
+     * threaded through.
+     */
+    private static final int VIDEO_WIDTH = 640;
+
+    /**
+     * The default outbound video geometry height, in pixels, until the negotiated capture capability is
+     * threaded through.
+     */
+    private static final int VIDEO_HEIGHT = 480;
+
+    /**
+     * The default outbound video frame rate, in frames per second.
+     */
+    private static final int VIDEO_FRAME_RATE = 30;
+
+    /**
+     * The default target encoder bitrate, in bits per second, advertised by the driver-manager camera
+     * capture bridge.
+     *
+     * <p>Only the geometry of the bridge source sizes the encoder; the advertised bitrate is a positive
+     * placeholder the rate controller adapts, so this carries the public {@code VideoOutput} default of one
+     * megabit per second rather than a negotiated value.
+     */
+    private static final int VIDEO_DEFAULT_BITRATE_BPS = 1_000_000;
+
+    /**
+     * The placeholder device identifier passed to the driver manager's camera capture when the call sources
+     * outbound video from a platform camera.
+     *
+     * <p>The engine's camera source factory opens the platform default camera regardless of the identifier,
+     * but {@link VoipDriverManager#startVideoCapture} requires a non-{@code null} identifier; this names the
+     * default device explicitly until a device-selection control threads a chosen camera id through.
+     */
+    private static final String MANAGER_CAMERA_DEVICE_ID = "default";
+
+    /**
+     * The video jitter estimator's frame-size rolling-window depth.
+     */
+    private static final int VIDEO_JITTER_WINDOW = 30;
+
+    /**
+     * The render-loop poll interval, in nanoseconds, of the video jitter buffer drain.
+     */
+    private static final long VIDEO_POLL_INTERVAL_NANOS = 5_000_000L;
+
+    /**
+     * Holds the call identifier, used in diagnostics and as the keying context.
+     */
+    private final String callId;
+
+    /**
+     * Holds the media transport this session ships outbound media through, as SCTP DATA on its data
+     * channel, and feeds inbound socket datagrams into.
+     */
+    private final MediaTransport transport;
+
+    /**
+     * Holds the host UDP socket that backs the {@code RTCPeerConnection}-equivalent ICE/DTLS transport,
+     * owning the inbound receive loop; the transport ships its ICE checks and DTLS records out through it.
+     */
+    private final DatagramChannel channel;
+
+    /**
+     * Holds the relay endpoint used as the bootstrap ICE/DTLS destination before a candidate pair is
+     * nominated.
+     */
+    private final SocketAddress relayAddress;
+
+    /**
+     * Holds the audio codec backing the encode and decode seams, or {@code null} when the audio pipeline
+     * could not be opened.
+     *
+     * <p>Either an {@link OpusAudioCodec} (the default) or an {@link MLowAudioCodec}, selected per call by
+     * the {@code p->use_mlow_codec} voip parameter; both are permits of the sealed {@link AudioCodec}
+     * interface, whose {@linkplain AudioCodec#modify(OpusCodecParams) modify} and
+     * {@linkplain AudioCodec#close() close} are the only operations this session drives on it.
+     */
+    private final AudioCodec audioCodec;
+
+    /**
+     * Holds the Opus repacketizer combining a frames-per-packet group, or {@code null} when the audio
+     * pipeline could not be opened or the call selected the {@link MLowAudioCodec}.
+     *
+     * <p>The repacketizer is Opus-specific frames-per-packet packing; MLow self-packs its sixty-millisecond
+     * packet inside the codec, so an MLow call leaves this {@code null} and the encoder-sender passes each
+     * MLow packet through unchanged rather than re-packing it.
+     */
+    private final OpusRepacketizer repacketizer;
+
+    /**
+     * Holds the engine's driver manager, the one-per-engine registry this session routes its platform
+     * audio capture and playback bring-up through.
+     *
+     * <p>The manager owns the audio capture and playback drivers for the engine's lifetime; this session
+     * starts and stops them through the manager rather than holding a driver directly, so a driver is
+     * returned to {@link com.github.auties00.cobalt.calls2.platform.AudioDriverState#INITIALIZED} on this
+     * call's teardown and reused by the next call rather than closed.
+     */
+    private final VoipDriverManager voipDriverManager;
+
+    /**
+     * Tracks whether this call drives its capture through a platform device on the {@link #voipDriverManager}
+     * rather than an application capture source, so {@link #startAudioCapture()} and {@link #close()} drive
+     * the manager only when the call relies on a platform microphone.
+     */
+    private final boolean captureUsesDevice;
+
+    /**
+     * Tracks whether this call drives its playback through a platform device on the {@link #voipDriverManager}
+     * rather than an application playback sink, so {@link #startAudioPlayback()} and {@link #close()} drive
+     * the manager only when the call relies on a platform speaker.
+     */
+    private final boolean playbackUsesDevice;
+
+    /**
+     * Holds the capture reader pump draining the capture ring into the encoder, or {@code null} when the
+     * audio send pipeline is not up.
+     */
+    private final AudioReaderPump readerPump;
+
+    /**
+     * Holds the playback writer pump filling the playback ring from the decoder, or {@code null} when the
+     * audio receive pipeline is not up.
+     */
+    private final AudioWriterPump writerPump;
+
+    /**
+     * Holds the bridge presenting captured device blocks as the reader pump's {@link AudioOutput} source
+     * when the call relies on a platform capture device, or {@code null} when the application supplied its
+     * own capture source.
+     */
+    private final CaptureSourceBridge captureSource;
+
+    /**
+     * Holds the render loop delivering decoded frames to the application playback sink when the call
+     * supplied one, or {@code null} when the call renders to a platform playback device through the writer
+     * pump instead.
+     */
+    private final AudioPlaybackLoop playbackRenderLoop;
+
+    /**
+     * Holds the inbound NetEq jitter buffer the receiver inserts received packets into and pulls render
+     * decisions from, flushed on teardown, or {@code null} when the audio receive pipeline is not up.
+     */
+    private final LiveNetEq netEq;
+
+    /**
+     * Holds the audio decoder the NetEq jitter buffer and the receiver share, closed on teardown, or
+     * {@code null} when the audio receive pipeline is not up.
+     */
+    private final AudioDecoder audioDecoder;
+
+    /**
+     * Holds the live reference to the call's video pipeline, holding {@code null} on an audio-only call,
+     * when the video codec could not be opened, or until a mid-call audio-to-video upgrade builds one.
+     *
+     * <p>This is the single source of truth for the call's video pipeline, shared with the
+     * {@link InboundMediaDemux} and the transport's inbound-RTCP listener so the transport receive thread
+     * reads the pipeline a mid-call upgrade publishes rather than a snapshot taken at bring-up. The encode
+     * loop, the render loop, and the inbound-PLI key-frame path therefore all observe one reference. The
+     * holder is published into by {@link #startLocalVideo()} under the {@link #videoSendStarted} guard and
+     * read everywhere through {@link AtomicReference#get()}, whose volatile semantics safely hand the upgrade's
+     * pipeline to the receive thread.
+     */
+    private final AtomicReference<VideoPipeline> videoPipeline;
+
+    /**
+     * Holds the call's application-data controller driving the in-call reaction, transcription, rekey, and
+     * feedback side-channel over the SCTP data channel, closed on teardown.
+     *
+     * <p>Built by {@link LiveMediaPlane#assemble} with no inbound observers attached and exposed through
+     * {@link #appDataController()} so the lifecycle controller can attach the in-call control units (which
+     * are built later than the media plane) to its observer seams. It owns the {@link AppDataChannel} that
+     * writes app-data as SCTP DATA through the transport's data-channel send seam; closing it cancels its
+     * reaction timers.
+     */
+    private final AppDataController appDataController;
+
+    /**
+     * Holds the call's voip-param manager: the parsed {@code <voip_settings>} bundles stored by settings
+     * type, the selected active set, and the dynamic rate-control updater the rate-control tick reads
+     * through {@link #activeParams()}.
+     *
+     * <p>The manager is populated and its active set selected by {@link LiveMediaPlane#assemble} before the
+     * session is constructed, so it is always non-{@code null}; a bring-up that received no settings bundles
+     * holds an empty manager with no active set.
+     */
+    private final LiveVoipParamManager voipParamManager;
+
+    /**
+     * Holds the call's bandwidth-estimation and rate-control loop: the sender-side estimator, the GoogCC
+     * delay-based estimator, and the audio and video rate controllers, driven per inbound RTCP feedback and
+     * by a periodic fallback tick.
+     *
+     * <p>Built by {@link LiveMediaPlane#assemble} and registered as the transport's inbound-RTCP feedback
+     * listener; the {@link InboundMediaDemux} tees each inbound media packet's arrival timing into its
+     * delay-based estimator. {@link #start()} starts its periodic fallback tick and {@link #close()} stops
+     * it. It is never {@code null}: a relay session always brings up the rate-control loop.
+     */
+    private final Calls2RateControlLoop rateControlLoop;
+
+    /**
+     * Holds the call's SFU subscription publisher: the receive-subscription cache, the hop-by-hop
+     * RTCP-feedback table, and the {@link StreamDescriptors} built from this client's SSRC layout.
+     *
+     * <p>Built by {@link LiveMediaPlane#assemble} from the call's {@link StreamLayout} and the membership
+     * {@linkplain com.github.auties00.cobalt.calls2.core.participant.ParticipantProvider provider}; the
+     * session owns it and {@link #close()} releases it, cancelling its resend timer and clearing its tables.
+     * The {@code 0x0003} subscription resend reaches the wire through the transport's keepalive-thread
+     * subscription hook ({@code LiveRelayTransport.onSubscriptionResend} {@literal ->}
+     * {@code sendSubscriptionEnvelope}), driven by the same resender this publisher was built with; this
+     * publisher is retained for its receive-subscription cache and hop-by-hop RTCP-feedback table, owned and
+     * torn down with the call. It is never {@code null}: a relay session always builds it.
+     */
+    private final SubscriptionPublisher subscriptionPublisher;
+
+    /**
+     * Holds the seam that starts the driver manager's camera capture for a call that sources outbound video
+     * from a platform camera, or {@code null} when the call sends no video or supplied its own video source.
+     *
+     * <p>Bound after construction by {@link LiveMediaPlane#assemble} (the manager and the encode bridge are
+     * built there) and invoked once by {@link #start()} after the video pipeline's encode loop is up, so the
+     * camera begins capturing into a bridge the encoder is already draining. It is the device-start
+     * counterpart for video of {@link #startAudioCapture()} and {@link #startAudioPlayback()}.
+     */
+    private Runnable videoCaptureStarter;
+
+    /**
+     * Holds the seam that builds and publishes the video pipeline on a mid-call audio-to-video upgrade, or
+     * {@code null} on a call brought up with video (whose pipeline already exists) or a session that cannot
+     * raise video.
+     *
+     * <p>Bound after construction by {@link LiveMediaPlane#assemble} only for a call brought up audio-only,
+     * because building the pipeline mid-call needs the relay {@link MediaTransport}, the call's application
+     * streams, the driver manager, and the rate-control loop, all of which the assembler holds. It is run at
+     * most once by {@link #startLocalVideo()} under the {@link #videoSendStarted} guard: it opens the
+     * negotiated video codec, builds the inbound jitter buffer, binds the outbound video RTP sink onto the
+     * live transport, brings the rate-control loop's video controller online, and publishes the pipeline into
+     * {@link #videoPipeline} so the receive thread routes inbound video and arms the encoder on an inbound
+     * picture-loss indication. It returns the built pipeline, or {@code null} when the codec could not be
+     * opened (the call then stays audio-only).
+     */
+    private java.util.function.Supplier<VideoPipeline> videoUpgrade;
+
+    /**
+     * Holds the datagram receive thread feeding inbound socket packets to the transport, or {@code null}
+     * before start.
+     */
+    private Thread receiveThread;
+
+    /**
+     * Tracks whether the session is running, so the pump threads exit on close.
+     */
+    private final AtomicBoolean running;
+
+    /**
+     * Tracks whether the outbound video send path (the encode loop and the platform camera capture, when
+     * device-backed) has been started, so {@link #start()} and {@link #startLocalVideo()} drive it at most
+     * once and a repeated in-call camera turn-on does not double-start the encoder or the camera.
+     *
+     * <p>On a call brought up audio-only it additionally gates the whole mid-call upgrade: the thread that
+     * wins the compare-and-set is the one that builds the video pipeline through {@link #videoUpgrade},
+     * publishes it into {@link #videoPipeline}, and starts both loops, so a concurrent or repeated turn-on
+     * neither builds a second pipeline nor double-publishes.
+     */
+    private final AtomicBoolean videoSendStarted;
+
+    /**
+     * Tracks whether {@link #close()} has run, so a second close is a no-op.
+     */
+    private final AtomicBoolean closed;
+
+    /**
+     * Constructs a media session over its already-built pipeline components.
+     *
+     * <p>This constructor only stores the wired components; {@link LiveMediaPlane#bringUp} builds them and
+     * calls {@link #start()} to launch the pump threads and the device drivers. The audio component
+     * references may be {@code null} when a device or codec could not be opened, in which case the
+     * corresponding pipeline half stays idle while the transport and the other half still run.
+     *
+     * @param callId         the call identifier
+     * @param transport      the media transport
+     * @param channel        the host UDP socket backing the ICE/DTLS transport
+     * @param relayAddress   the relay endpoint used as the bootstrap ICE/DTLS destination
+     * @param audioCodec     the audio codec (Opus or MLow), or {@code null} when the audio pipeline is not up
+     * @param repacketizer   the Opus repacketizer, or {@code null} on an MLow call or when the audio
+     *                       pipeline is not up
+     * @param voipDriverManager the engine's driver manager the platform capture and playback bring-up routes
+     *                          through; never {@code null}
+     * @param captureUsesDevice whether the call drives a platform capture device through the manager rather
+     *                          than an application capture source
+     * @param playbackUsesDevice whether the call drives a platform playback device through the manager rather
+     *                          than an application playback sink
+     * @param readerPump        the capture reader pump, or {@code null} when the send pipeline is not up
+     * @param writerPump        the playback writer pump driving a platform device, or {@code null} when the
+     *                          application sink renders through the render loop or the receive pipeline is
+     *                          not up
+     * @param captureSource     the capture-device-to-{@link AudioOutput} bridge, or {@code null} when the
+     *                          application supplied its own capture source
+     * @param playbackRenderLoop the render loop delivering decoded frames to the application playback sink,
+     *                          or {@code null} when a platform playback device is used
+     * @param netEq             the inbound NetEq jitter buffer, or {@code null} when the receive pipeline is
+     *                          not up
+     * @param audioDecoder      the audio decoder the NetEq and receiver share, or {@code null}
+     * @param videoPipeline     the shared live video-pipeline holder, the same {@link AtomicReference} the
+     *                          assembler handed the demux and the inbound-RTCP listener, holding the built
+     *                          pipeline or {@code null} on an audio-only call
+     * @param voipParamManager  the call's voip-param manager holding the stored bundles and the selected
+     *                          active set; never {@code null}
+     * @param appDataController the call's application-data controller driving the reaction, transcription,
+     *                          rekey, and feedback side-channel; never {@code null}
+     * @param rateControlLoop   the call's bandwidth-estimation and rate-control loop, driven per inbound
+     *                          RTCP feedback and by a periodic fallback tick; never {@code null}
+     * @param subscriptionPublisher the call's SFU subscription publisher owning the receive-subscription
+     *                          cache, the RTCP-feedback table, and this client's stream descriptors; never
+     *                          {@code null}
+     */
+    private LiveMediaSession(String callId, MediaTransport transport,
+                             DatagramChannel channel, SocketAddress relayAddress,
+                             AudioCodec audioCodec, OpusRepacketizer repacketizer,
+                             VoipDriverManager voipDriverManager, boolean captureUsesDevice,
+                             boolean playbackUsesDevice,
+                             AudioReaderPump readerPump, AudioWriterPump writerPump,
+                             CaptureSourceBridge captureSource, AudioPlaybackLoop playbackRenderLoop,
+                             LiveNetEq netEq, AudioDecoder audioDecoder,
+                             AtomicReference<VideoPipeline> videoPipeline, LiveVoipParamManager voipParamManager,
+                             AppDataController appDataController, Calls2RateControlLoop rateControlLoop,
+                             SubscriptionPublisher subscriptionPublisher) {
+        this.callId = callId;
+        this.transport = transport;
+        this.channel = channel;
+        this.relayAddress = relayAddress;
+        this.audioCodec = audioCodec;
+        this.repacketizer = repacketizer;
+        this.voipDriverManager = voipDriverManager;
+        this.captureUsesDevice = captureUsesDevice;
+        this.playbackUsesDevice = playbackUsesDevice;
+        this.readerPump = readerPump;
+        this.writerPump = writerPump;
+        this.captureSource = captureSource;
+        this.playbackRenderLoop = playbackRenderLoop;
+        this.netEq = netEq;
+        this.audioDecoder = audioDecoder;
+        this.videoPipeline = videoPipeline;
+        this.voipParamManager = voipParamManager;
+        this.appDataController = appDataController;
+        this.rateControlLoop = rateControlLoop;
+        this.subscriptionPublisher = subscriptionPublisher;
+        this.running = new AtomicBoolean();
+        this.videoSendStarted = new AtomicBoolean();
+        this.closed = new AtomicBoolean();
+    }
+
+    /**
+     * Returns a snapshot copy of the call's currently active voip-param set.
+     *
+     * <p>The active set is the bundle the bring-up selected for the call's media mode, with any later
+     * participant-count and dynamic rate-control overrides applied. The later rate-control tick reads this
+     * accessor each round to source its bandwidth bounds and congestion masks from the negotiated
+     * parameters, falling back to compiled-in defaults when the set is absent. A call that received no
+     * {@code <voip_settings>} bundles, or whose default bundle was missing, has no active set and yields
+     * {@link Optional#empty()}.
+     *
+     * @return a copy of the active voip-param set, or {@link Optional#empty()} when none is selected
+     */
+    Optional<VoipParams> activeParams() {
+        return voipParamManager.activeParams();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote This implementation always carries an app-data controller because the relay transport this
+     * session brings up always opens the relay app-data RTP stream, so the returned {@link Optional} is
+     * never empty for a live relay session.
+     */
+    @Override
+    public Optional<AppDataController> appDataController() {
+        return Optional.of(appDataController);
+    }
+
+    /**
+     * Launches the session's transport, pump threads, and device drivers.
+     *
+     * <p>Starts the media transport (which begins its ICE and DTLS bring-up) and the inbound socket receive
+     * loop, then the capture and playback pumps and their device drivers and, when present, the video
+     * pipeline; when the call sources outbound video from a platform camera, the camera capture is started
+     * last, after the encode loop is up, so the camera feeds a bridge the encoder is already draining. A
+     * device-start failure is logged and isolated so the rest of the plane still runs; a transport-start
+     * failure propagates so the bring-up fails as a whole.
+     *
+     * <p>The rate-control loop's periodic fallback tick is also started here; the per-feedback tick is
+     * already armed before start through the transport's inbound-RTCP listener the bring-up registered.
+     *
+     * @throws WhatsAppCallException if the transport cannot be started
+     */
+    private void start() {
+        running.set(true);
+        transport.start();
+
+        receiveThread = Thread.ofVirtual().name("calls2-media-ingress-" + callId).start(this::receiveLoop);
+
+        startAudioPlayback();
+        startAudioCapture();
+        var pipeline = videoPipeline.get();
+        if (pipeline != null) {
+            pipeline.start();
+            startVideoSend();
+        }
+        rateControlLoop.start();
+    }
+
+    /**
+     * Starts the outbound video send path once: the encode loop and, when the call sources video from a
+     * platform camera, the camera capture.
+     *
+     * <p>Shared by {@link #start()} (the eager start for a call brought up with video, so its picture flows
+     * from connection) and {@link #startLocalVideo()} (the in-call camera turn-on). The
+     * {@link #videoSendStarted} guard makes it idempotent so a call already sending video, or a repeated
+     * turn-on, neither re-launches the encode loop nor double-starts the camera. The inbound video render loop
+     * is started separately in {@link VideoPipeline#start()} so a video call always renders the peer's picture
+     * regardless of whether the local side is sending. A {@code null} {@link #videoPipeline} (an audio-only
+     * call) has no encode loop to start, so this is a no-op for it.
+     */
+    private void startVideoSend() {
+        var pipeline = videoPipeline.get();
+        if (pipeline == null) {
+            return;
+        }
+        if (!videoSendStarted.compareAndSet(false, true)) {
+            return;
+        }
+        beginOutboundVideo(pipeline);
+    }
+
+    /**
+     * Starts the outbound encode loop and, when device-backed, the platform camera capture for an already
+     * built and published pipeline.
+     *
+     * <p>Shared by the eager {@link #startVideoSend()} and the in-call upgrade in {@link #startLocalVideo()};
+     * both hold the {@link #videoSendStarted} one-shot guard before calling it, so this performs no further
+     * gating. The camera capture is started after the encode loop so the camera feeds a bridge the encoder is
+     * already draining, matching the bring-up order.
+     *
+     * @param pipeline the built, published video pipeline whose encode loop is started; never {@code null}
+     */
+    private void beginOutboundVideo(VideoPipeline pipeline) {
+        pipeline.startEncode();
+        if (videoCaptureStarter != null) {
+            videoCaptureStarter.run();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote This implementation reproduces the media-plane half of the native audio-to-video upgrade
+     * ({@code call_video_request_upgrade}, fn1118, whose 1:1 path runs {@code do_video_upgrade}, fn11393, then
+     * {@code recreate_and_connect_video_stream}, fn6326): a call placed or accepted with video already has its
+     * pipeline and camera started at bring-up, so the {@link #videoSendStarted} guard makes an in-call camera
+     * turn-on a no-op for it; a call brought up audio-only builds its video pipeline here, the first time the
+     * camera turns on. The build mirrors fn6326: it opens the negotiated {@link VideoCodec}, builds the inbound
+     * {@link LiveVideoJitterBuffer}, binds the outbound video RTP sink onto the live {@link MediaTransport},
+     * brings the rate-control loop's video controller online (fn6326 builds {@code wa_vid_quality_manager},
+     * fn4210, in the same transaction), then publishes the pipeline into {@link #videoPipeline} so the
+     * transport receive thread routes inbound video and arms the encoder on an inbound picture-loss indication,
+     * and finally starts the inbound render loop and the outbound encode loop. The
+     * {@code video_state}/{@code video} signaling announce (fn11440, type 15) is the other half and is driven
+     * by {@link Calls2LifecycleController#startLocalVideo(String)} under the call lock, not from this
+     * media-plane seam.
+     *
+     * <p>Three native sub-behaviours are deliberately not reproduced and are tracked as honest gaps below:
+     * the audio stream is not destroyed and recreated, the new video stream draws a fresh local SSRC rather
+     * than the participant-setup-allocated one, and no SFU stream-subscription update is sent.
+     *
+     * @implSpec The publication is volatile (the {@link #videoPipeline} holder is an {@link AtomicReference}),
+     * and the build is gated one-shot by {@link #videoSendStarted}, so a concurrent transport receive thread
+     * either sees no pipeline (and routes the packet as audio, the audio-only behaviour) or sees the fully
+     * built pipeline; it never observes a half-constructed one. A repeated turn-on, or a turn-on on a call
+     * already sending video, is a no-op.
+     */
+    @Override
+    public void startLocalVideo() {
+        if (videoPipeline.get() != null) {
+            startVideoSend();
+            return;
+        }
+        if (videoUpgrade == null) {
+            return;
+        }
+        // The one-shot guard gates the whole upgrade: only the winner builds, publishes, and starts the
+        // pipeline. A loser (a concurrent or repeated turn-on) returns without touching the holder.
+        if (!videoSendStarted.compareAndSet(false, true)) {
+            return;
+        }
+        // The seam opens the codec, builds the jitter buffer, binds the transport video sink, and brings the
+        // rate-control video controller online; it returns null when the codec could not be opened, in which
+        // case the call stays audio-only (the guard is already spent, so the failed upgrade is terminal,
+        // matching a video-from-start call whose codec failed to open at bring-up).
+        var pipeline = videoUpgrade.get();
+        if (pipeline == null) {
+            return;
+        }
+        // Publish before starting either loop so the receive thread sees the pipeline as soon as it can route
+        // a packet to it. The render loop renders the peer's picture; the encode loop and camera capture raise
+        // the local track.
+        videoPipeline.set(pipeline);
+        pipeline.start();
+        beginOutboundVideo(pipeline);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote This implementation forwards an outbound key-frame request to the video pipeline's
+     * {@link VideoPipeline#requestKeyFrame()} passthrough, which arms the encoder so its next encode produces
+     * an intra frame; the request is one-shot and consumed by the encode loop's next pass. A session that
+     * brought up no video pipeline (an audio-only call) has no encoder to arm, so this is a no-op for it.
+     */
+    @Override
+    public void requestKeyFrame() {
+        var pipeline = videoPipeline.get();
+        if (pipeline != null) {
+            pipeline.requestKeyFrame();
+        }
+    }
+
+    /**
+     * Binds the seam {@link #startVideoSend()} runs to start the driver manager's camera capture.
+     *
+     * <p>The manager and the encode bridge are built by {@link LiveMediaPlane#assemble} after this session,
+     * so the camera-capture start cannot be passed to the constructor; the plane binds it here before
+     * {@link #start()}, the same post-construction wiring the video pipeline's frame sink uses. It is bound
+     * only when the call sources outbound video from a platform camera (a video call that supplied no
+     * application video source whose codec opened). It is run once, when {@link #startVideoSend()} first starts
+     * the outbound video send path (eagerly from {@link #start()} for a video call, or from
+     * {@link #startLocalVideo()} for an in-call camera turn-on).
+     *
+     * @param videoCaptureStarter the seam that starts the manager's camera capture; never {@code null}
+     */
+    private void bindVideoCaptureStarter(Runnable videoCaptureStarter) {
+        this.videoCaptureStarter = videoCaptureStarter;
+    }
+
+    /**
+     * Binds the seam {@link #startLocalVideo()} runs to build the video pipeline on a mid-call upgrade.
+     *
+     * <p>The seam needs the live transport, the application streams, and the rate-control loop, all built by
+     * {@link LiveMediaPlane#assemble} around this session, so it cannot be passed to the constructor; the
+     * plane binds it here before {@link #start()}, the same post-construction wiring the camera-capture
+     * starter uses. It is bound only on a call brought up audio-only (a call already carrying video has its
+     * pipeline and needs none). It is run at most once, by {@link #startLocalVideo()} under the
+     * {@link #videoSendStarted} guard, the first time the camera turns on.
+     *
+     * @param videoUpgrade the seam that builds and returns the upgrade video pipeline, or returns
+     *                     {@code null} when the codec could not be opened; never {@code null}
+     */
+    private void bindVideoUpgrade(java.util.function.Supplier<VideoPipeline> videoUpgrade) {
+        this.videoUpgrade = videoUpgrade;
+    }
+
+    /**
+     * Starts the audio receive pipeline: either the application render loop or a platform playback device
+     * fed by the writer pump.
+     *
+     * <p>When the call supplied an application playback sink the render loop is started and the platform
+     * device is not opened; otherwise the platform playback device and its demand-driven writer pump are
+     * started. A start failure is logged and isolated so the send path and the transport still run; the call
+     * then carries outbound audio without local playback.
+     */
+    private void startAudioPlayback() {
+        if (playbackRenderLoop != null) {
+            playbackRenderLoop.start();
+            return;
+        }
+        if (!playbackUsesDevice || writerPump == null) {
+            return;
+        }
+        try {
+            // The native WebAudio playback ring is float32 at 16 kHz mono in 320-sample (20 ms) chunks: the
+            // AudioWorklet in WAWebVoipAudioPlaybackSharedBufferWorklet views the SharedArrayBuffer as a
+            // Float32Array, the WasmAudioWriterThread loop (fn11896) strides the ring by 4 bytes per sample
+            // (its 0x280 = 2*320 prebuffer threshold pins the 320-sample chunk), and getCaptureParams defaults
+            // {sampleRate:16000, framesPerChunk:320}. The rate and chunk are passed faithfully here
+            // (AUDIO_SAMPLE_RATE_HZ, AUDIO_FRAME_SAMPLES). The bits_per_sample the WASM hands the worklet is
+            // ignored by the ring (the ring is always float32), so it is not a startPlayback argument.
+            // TODO: render the playback device boundary as float32 to match the native ring. Cobalt's audio
+            //  pipeline (AudioPlaybackRing, AudioWriterPump, the decoder pull) is int16 (short[]) end-to-end,
+            //  and startPlayback carries no element-type argument, so the int16->float32 conversion belongs to
+            //  the not-yet-implemented FFM playback driver rather than this call site; until that driver lands
+            //  the element-type mismatch is confined to the (unimplemented) device boundary, not the relay
+            //  media path.
+            voipDriverManager.startPlayback(null, AUDIO_SAMPLE_RATE_HZ, AUDIO_FRAME_SAMPLES, AUDIO_CHANNELS);
+            writerPump.start();
+        } catch (RuntimeException exception) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "calls2 playback start failed for call {0}: {1}", callId, exception.getMessage());
+        }
+    }
+
+    /**
+     * Starts the audio send pipeline: the reader pump draining the capture source, and the platform capture
+     * device behind it when one was opened.
+     *
+     * <p>When the call supplied an application capture source the reader pump drains it directly with no
+     * platform device to initialize; otherwise the platform capture device is started and the reader pump
+     * drains its bridge. A start failure is logged and isolated so the receive path and the transport still
+     * run; the call then carries inbound audio without local capture.
+     */
+    private void startAudioCapture() {
+        if (readerPump == null) {
+            return;
+        }
+        if (!captureUsesDevice) {
+            readerPump.start();
+            return;
+        }
+        try {
+            // The native WebAudio capture ring is float32 at 16 kHz mono in 320-sample (20 ms) chunks: the
+            // AudioWorklet in WAWebVoipAudioCaptureSharedBufferWorklet views the SharedArrayBuffer as a
+            // Float32Array, the WasmAudioReaderThread loop (fn11899) strides the ring by 4 bytes per sample,
+            // and getCaptureParams defaults {sampleRate:16000, framesPerChunk:320} (Firefox, which will not
+            // honor a 16 kHz AudioContext, resamples 48 kHz -> 16 kHz in the worklet before writing the ring,
+            // so the ring is 16 kHz float32 on every browser). The rate and chunk are passed faithfully here
+            // (AUDIO_SAMPLE_RATE_HZ, AUDIO_FRAME_SAMPLES); the bits_per_sample the WASM hands the worklet is
+            // ignored by the ring and is not a startAudioCapture argument.
+            // TODO: present the capture device boundary as float32 to match the native ring. Cobalt's audio
+            //  pipeline (AudioCaptureRing, AudioReaderPump, the encoder accept) is int16 (short[]) end-to-end,
+            //  and startAudioCapture carries no element-type argument, so the float32->int16 conversion belongs
+            //  to the not-yet-implemented FFM capture driver rather than this call site; until that driver
+            //  lands the element-type mismatch is confined to the (unimplemented) device boundary, not the
+            //  relay media path.
+            voipDriverManager.startAudioCapture(AudioDeviceType.MICROPHONE, null, AUDIO_SAMPLE_RATE_HZ,
+                    AUDIO_FRAME_SAMPLES, AUDIO_CHANNELS);
+            readerPump.start();
+        } catch (RuntimeException exception) {
+            LOGGER.log(System.Logger.Level.WARNING,
+                    "calls2 capture start failed for call {0}: {1}", callId, exception.getMessage());
+        }
+    }
+
+    /**
+     * Reads inbound datagrams from the host socket and hands each, with its source address, to the
+     * transport until the session stops.
+     *
+     * <p>Each datagram the channel delivers is copied to a fresh array and passed to
+     * {@link MediaTransport#onInboundDatagram(byte[], SocketAddress)} together with the source address the
+     * channel reports, which the transport's ICE/DTLS demultiplex needs to answer a binding request. A
+     * closed channel ends the loop; a transient read error is logged and the loop continues.
+     */
+    private void receiveLoop() {
+        var buffer = ByteBuffer.allocate(MAX_DATAGRAM_BYTES);
+        while (running.get()) {
+            buffer.clear();
+            try {
+                var source = channel.receive(buffer);
+                if (source == null) {
+                    continue;
+                }
+                buffer.flip();
+                var datagram = new byte[buffer.remaining()];
+                buffer.get(datagram);
+                transport.onInboundDatagram(datagram, source);
+            } catch (java.nio.channels.ClosedChannelException exception) {
+                break;
+            } catch (IOException exception) {
+                if (running.get()) {
+                    LOGGER.log(System.Logger.Level.DEBUG,
+                            "calls2 media receive error for call {0}: {1}", callId, exception.getMessage());
+                }
+            }
+        }
+    }
+
+    @Override
+    public void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+        running.set(false);
+        stopQuietly(rateControlLoop::stop);
+        stopQuietly(readerPump == null ? null : readerPump::stop);
+        stopQuietly(!captureUsesDevice ? null
+                : () -> voipDriverManager.stopAudioCapture(AudioDeviceType.MICROPHONE));
+        stopQuietly(captureSource == null ? null : captureSource::shutdown);
+        stopQuietly(playbackRenderLoop == null ? null : playbackRenderLoop::stop);
+        stopQuietly(!playbackUsesDevice ? null : () -> {
+            if (writerPump != null) {
+                writerPump.stop();
+            }
+            voipDriverManager.stopPlayback();
+        });
+        var pipeline = videoPipeline.get();
+        // Stop the manager camera whenever a pipeline exists rather than only when videoUsesDevice was set at
+        // bring-up: a mid-call upgrade may have started a device camera on a call brought up audio-only, and
+        // stopVideoCapture is a documented no-op when no manager camera ran (an app-supplied VideoOutput), so
+        // this safely covers both the bring-up-with-video and the upgraded-mid-call cases.
+        stopQuietly(pipeline == null ? null : voipDriverManager::stopVideoCapture);
+        stopQuietly(pipeline == null ? null : pipeline::close);
+        stopQuietly(appDataController::close);
+        stopQuietly(subscriptionPublisher::close);
+        interruptQuietly(receiveThread);
+        stopQuietly(transport::close);
+        stopQuietly(() -> {
+            if (audioCodec != null) {
+                audioCodec.close();
+            }
+        });
+        stopQuietly(() -> {
+            if (repacketizer != null) {
+                repacketizer.close();
+            }
+        });
+        stopQuietly(netEq == null ? null : netEq::flush);
+        stopQuietly(audioDecoder == null ? null : audioDecoder::close);
+        stopQuietly(() -> {
+            try {
+                channel.close();
+            } catch (IOException exception) {
+                throw new java.io.UncheckedIOException(exception);
+            }
+        });
+    }
+
+    /**
+     * Runs an action, swallowing any {@link RuntimeException} it raises.
+     *
+     * <p>Used on the teardown path so one component's close failure does not prevent the rest of the
+     * session from being released. A {@code null} action is a no-op.
+     *
+     * @param action the teardown action to run, or {@code null}
+     */
+    private static void stopQuietly(Runnable action) {
+        if (action == null) {
+            return;
+        }
+        try {
+            action.run();
+        } catch (RuntimeException exception) {
+            LOGGER.log(System.Logger.Level.DEBUG, "calls2 media teardown step failed", exception);
+        }
+    }
+
+    /**
+     * Interrupts a thread if it is live, ignoring a {@code null} reference.
+     *
+     * @param thread the thread to interrupt, or {@code null}
+     */
+    private static void interruptQuietly(Thread thread) {
+        if (thread != null) {
+            thread.interrupt();
+        }
+    }
+
+    /**
+     * The production {@link Calls2MediaPlane}: brings up a {@link LiveMediaSession} from a call's relay
+     * block and call key, wiring the codec, SFrame, and transport units into the two-way media chain.
+     *
+     * <p>The factory is constructed once per engine and reused for every call. It parses the relay block
+     * for the relay endpoint and the hop-by-hop key, derives the hop-by-hop SRTP context, opens the host
+     * UDP socket that backs the ICE/DTLS transport, builds the audio and (when requested) video pipelines,
+     * and starts them. A bring-up that cannot satisfy a step releases whatever it partially built and
+     * surfaces the failure as a non-fatal {@link WhatsAppCallException.DataChannel}.
+     *
+     * @implNote This implementation reports a media-plane connection to the lifecycle controller through
+     * the {@code connectionSink} when the transport reports its first traffic. The connection sink is bound
+     * after the controller is constructed (the controller and this factory are mutually dependent), so it is
+     * held behind a mutable reference the assembler sets.
+     */
+    static final class LiveMediaPlane implements Calls2MediaPlane {
+        /**
+         * Logs media-plane bring-up faults.
+         */
+        private static final System.Logger LOGGER = System.getLogger(LiveMediaPlane.class.getName());
+
+        /**
+         * Holds the host the brought-up sessions reach for the datagram fallback, the rendered-video sink,
+         * and randomness.
+         */
+        private final VoipHostApi host;
+
+        /**
+         * Holds the local account's own {@code <lid>:<device>@lid} device JID, the keying input for the
+         * deterministic media SSRCs and the per-participant SFrame base key, or {@code null} until the client
+         * is logged in.
+         *
+         * <p>Seeded by the assembler with the LID device form (the account LID user with the device number off
+         * the account JID), the form {@link CallSecureSsrcGenerator} and the SFrame derivation are byte-verified
+         * against; read at each call bring-up so a self JID that became known after assembly is picked up.
+         */
+        private final AtomicReference<Jid> selfJid;
+
+        /**
+         * Holds the sink notified with a call identifier when that call's media plane reaches its first
+         * traffic, bound by the assembler to the controller's media-connected entry point.
+         */
+        private final AtomicReference<Consumer<String>> connectionSink;
+
+        /**
+         * Holds the engine's single driver manager, the one-per-engine registry every brought-up session
+         * routes its platform audio capture and playback and its no-application-source video capture
+         * through.
+         *
+         * <p>The assembler builds and {@linkplain VoipDriverManager#initialize() initializes} the manager
+         * once and shares it across every call this plane brings up, matching the engine's one driver
+         * manager per client; a session opens no device directly.
+         */
+        private final VoipDriverManager voipDriverManager;
+
+        /**
+         * Reads whether the server enables seeding an initial bandwidth estimate when a group call starts.
+         *
+         * <p>Backed by {@link com.github.auties00.cobalt.calls2.config.Calls2FeatureGate#isInitBweForGroupCallEnabled()},
+         * read per bring-up rather than captured at assembly so the value reflects the warmed AB-props cache
+         * by the time a call starts (the engine is assembled at client construction, before the first
+         * AB-props sync) and is not read on a possibly-cold cache during assembly. Threaded into each group
+         * call's {@link Calls2RateControlLoop} so the loop seeds its initial estimate for a group call rather
+         * than ramping from the conservative cold-start band; a one-to-one call ignores it.
+         */
+        private final BooleanSupplier initBweForGroupCallEnabled;
+
+        /**
+         * Constructs a media plane over the given host and the engine's driver manager.
+         *
+         * @param host                       the host for the datagram fallback, video render, and randomness
+         * @param selfJid                    the holder of the local device JID for the per-participant key
+         *                                   derivation
+         * @param connectionSink             the holder of the media-connected sink the controller binds
+         * @param voipDriverManager          the engine's initialized driver manager the brought-up sessions
+         *                                   route their platform capture and playback through
+         * @param initBweForGroupCallEnabled reads whether the server enables seeding an initial group-call
+         *                                   bandwidth estimate, evaluated per bring-up and applied to each
+         *                                   group call's rate-control loop
+         * @throws NullPointerException if any argument is {@code null}
+         */
+        LiveMediaPlane(VoipHostApi host, AtomicReference<Jid> selfJid,
+                       AtomicReference<Consumer<String>> connectionSink, VoipDriverManager voipDriverManager,
+                       BooleanSupplier initBweForGroupCallEnabled) {
+            this.host = Objects.requireNonNull(host, "host cannot be null");
+            this.selfJid = Objects.requireNonNull(selfJid, "selfJid cannot be null");
+            this.connectionSink = Objects.requireNonNull(connectionSink, "connectionSink cannot be null");
+            this.voipDriverManager = Objects.requireNonNull(voipDriverManager, "voipDriverManager cannot be null");
+            this.initBweForGroupCallEnabled = Objects.requireNonNull(initBweForGroupCallEnabled,
+                    "initBweForGroupCallEnabled cannot be null");
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote This implementation parses the relay {@code <te2>} endpoint and the relay
+         * {@code <hbh_key>}, opens the host {@link DatagramChannel} that backs the ICE/DTLS transport, derives
+         * the hop-by-hop SRTP master through {@link CallE2eKeyDerivation#deriveHbhSrtpMaster} and, when the
+         * relay advertises a positive {@code warp_mi_tag_len}, the WARP message-integrity key through the
+         * matching two-step chain {@link CallE2eKeyDerivation#deriveWarpAuthKey}, builds the
+         * {@link LiveRelayTransport} that carries media as SCTP DATA, opens
+         * the Opus codec and the SFrame chain (on a group call), parses the {@code <voip_settings>} bundles into
+         * a {@link LiveVoipParamManager} and selects the active set for the call's media mode, and starts
+         * every pump. The local media SSRC layout is derived deterministically from the self device JID (read
+         * from the {@link #selfJid} holder, the same JID the SFrame key derivation uses) and {@code callId}
+         * through {@link #buildStreamLayout(String, Jid, boolean)} rather than drawn at random; a bring-up
+         * before the self JID is known falls back to a random layout. A relay block missing an endpoint or a
+         * hop-by-hop key, or a socket or codec that cannot be created, surfaces as a
+         * {@link WhatsAppCallException.DataChannel}.
+         */
+        @Override
+        public Session bringUp(String callId, Node relay, List<Node> voipSettings, byte[] callKey,
+                               boolean isCaller, boolean video, int participantCount,
+                               CallMembership membership, Calls2MediaStreams streams, Jid peerDeviceJid) {
+            Objects.requireNonNull(callId, "callId cannot be null");
+            Objects.requireNonNull(relay, "relay cannot be null");
+            Objects.requireNonNull(voipSettings, "voipSettings cannot be null");
+            Objects.requireNonNull(callKey, "callKey cannot be null");
+            Objects.requireNonNull(streams, "streams cannot be null");
+            var relayInfo = RelayInfo.of(relay)
+                    .orElseThrow(() -> new WhatsAppCallException.DataChannel(
+                            "relay block for call " + callId + " is not a <relay> element"));
+
+            // Parse the negotiated <voip_settings> bundles and select the active set up front so the codec
+            // selector can read the per-call p->use_mlow_codec flag before the codec is opened, and so the
+            // relay-connection selection can read the vp->enable_edgeray_dtls_active_mode DTLS-role flag (a
+            // voip-param, not a <relay> element field); the same manager is threaded into assemble so it is
+            // not rebuilt.
+            var voipParamManager = buildVoipParamManager(voipSettings, video, participantCount);
+            var useMlowCodec = useMlowCodec(voipParamManager);
+
+            var relayConnection = selectRelayConnection(relayInfo, edgerayDtlsActiveMode(voipParamManager))
+                    .orElseThrow(() -> new WhatsAppCallException.DataChannel(
+                            "relay block for call " + callId + " carries no usable endpoint"));
+            var relayAddress = relayConnection.address();
+            var hopByHopKey = parseHopByHopKey(relay)
+                    .orElseThrow(() -> new WhatsAppCallException.DataChannel(
+                            "relay block for call " + callId + " carries no hbh_key"));
+
+            DatagramChannel channel = null;
+            LiveHbhSrtpRelay hbhSrtp = null;
+            AudioCodec audioCodec = null;
+            OpusRepacketizer repacketizer = null;
+            try {
+                // The host UDP socket is the RTCPeerConnection-equivalent ICE/DTLS transport socket; it is
+                // left unconnected so the ICE checks and DTLS records can be sent to each candidate
+                // destination rather than to a single fixed relay address.
+                channel = DatagramChannel.open();
+                var hbhKeyHex = new StringBuilder(hopByHopKey.length * 2);
+                for (var b : hopByHopKey) {
+                    hbhKeyHex.append(String.format("%02x", b & 0xFF));
+                }
+                System.getLogger(LiveMediaSession.class.getName()).log(System.Logger.Level.INFO,
+                        "calls2 relay hop-by-hop <hbh_key> ({0} bytes): {1}", hopByHopKey.length, hbhKeyHex);
+                hbhSrtp = LiveHbhSrtpRelay.fromHopByHopKey(hopByHopKey, SrtpCryptoSuite.AES_CM_128_HMAC_SHA1_80);
+
+                // Hop-by-hop WARP message integrity (add_hbh_warp_mi_tag fn5156): the relay turns it on by
+                // advertising a positive warp_mi_tag_len attribute on the <relay> block (relay_ctx+0x2c8
+                // enable, +0x2cc tag length, the same attribute RelayInfo parses). The tag is keyed by the
+                // 'warp auth key' group of wa_sfu_kdf (fn4829): a TWO-STEP chained HKDF over the same relay
+                // hop-by-hop key split the hbh SRTP master derives from ('warp auth salt' -> 'warp auth key',
+                // output 32), NOT a flat single-step HKDF. The key is derived only when the relay enables MI,
+                // and an absent or non-positive length leaves MI off and the key underived.
+                var warpMiTagLength = Math.max(0, relay.getAttributeAsInt("warp_mi_tag_len", 0));
+                var warpAuthKey = warpMiTagLength > 0
+                        ? CallE2eKeyDerivation.deriveWarpAuthKey(hopByHopKey)
+                        : null;
+
+                // Push the raw E2E call key into the membership so every participant's crypto block (SFrame
+                // chain key + SRTP master) is derived per its active device JID, the engine flow
+                // call_update_participant_keys (fn10898) runs on offer-accept. This is the seam the crypto
+                // core exposes (CallMembership.installCallKey, keygen version 2); the lifecycle controller
+                // re-installs the rotated key here again on each enc-rekey. A one-to-one call carries no
+                // membership and a key that is not the full raw length cannot derive, so both are skipped.
+                if (membership != null && callKey.length == CallE2eKeyDerivation.RAW_E2E_KEY_LENGTH) {
+                    membership.installCallKey(callKey, CallE2eKeyDerivation.SUPPORTED_KEYGEN_VER);
+                }
+
+                var sframeProvider = video ? groupSframeProvider(callKey) : null;
+                // MLow self-packs its 60 ms packet, so it needs no Opus repacketizer; the Opus path opens
+                // both the codec and the repacketizer. The repacketizer stays null on the MLow path so no
+                // unused libopus repacketizer state is allocated.
+                if (useMlowCodec) {
+                    audioCodec = new MLowAudioCodec();
+                } else {
+                    audioCodec = new OpusAudioCodec(defaultAudioParams());
+                    repacketizer = new OpusRepacketizer();
+                }
+
+                // The local SSRC layout the encode path stamps and the subscription layer advertises is the
+                // deterministic set call_generate_device_ssrc (fn10901) derives for the self device, keyed by
+                // the call-id and the device JID (the same self JID the SFrame key derivation reads), never
+                // random.
+                var streamLayout = buildStreamLayout(callId, selfJid.get(), video);
+
+                // One-to-one media is end-to-end SRTP the relay forwards opaquely (transport_srtp.cc), keyed
+                // by the per-participant master the call key and device JID derive, NOT the relay hop-by-hop
+                // SRTP (wa_hbh_srtp_relay.cc) a group/SFU leg uses. Build the self (outbound) and peer
+                // (inbound) contexts on a one-to-one call (no membership) with a full raw key and a resolvable
+                // peer device; a group call leaves them null and keeps the hop-by-hop path.
+                E2eMediaSrtp e2eSend = null;
+                E2eMediaSrtp e2eRecv = null;
+                if (membership == null && callKey.length == CallE2eKeyDerivation.RAW_E2E_KEY_LENGTH) {
+                    var localDeviceJid = selfJid.get();
+                    // The E2E recv key is keyed by the peer's DEVICE JID (for example "...:2@lid"), which the
+                    // signaling layer recorded; the relay block's <participant> list carries only the
+                    // user-level (bare) JID, so prefer the signaling device JID and fall back to the relay
+                    // participant (matched by peer_pid) only when the device JID is not yet known.
+                    var resolvedPeer = peerDeviceJid;
+                    if (resolvedPeer == null) {
+                        var peerPid = relayInfo.peerPidValue();
+                        for (var participant : relayInfo.participants()) {
+                            if (peerPid.isPresent()
+                                    ? participant.pid() == peerPid.getAsInt()
+                                    : !participant.jid().equals(localDeviceJid)) {
+                                resolvedPeer = participant.jid();
+                                break;
+                            }
+                        }
+                    }
+                    if (localDeviceJid != null && resolvedPeer != null) {
+                        e2eSend = new E2eMediaSrtp(
+                                CallE2eKeyDerivation.deriveSrtpMaster(callKey, CallDeviceJid.of(localDeviceJid)));
+                        e2eRecv = new E2eMediaSrtp(
+                                CallE2eKeyDerivation.deriveSrtpMaster(callKey, CallDeviceJid.of(resolvedPeer)));
+                        System.getLogger(LiveMediaSession.class.getName()).log(System.Logger.Level.INFO,
+                                "calls2 one-to-one E2E-SRTP engaged: self={0} peer={1}", localDeviceJid, resolvedPeer);
+                    } else {
+                        System.getLogger(LiveMediaSession.class.getName()).log(System.Logger.Level.WARNING,
+                                "calls2 one-to-one E2E-SRTP NOT engaged (self={0} peer={1}); media stays hop-by-hop",
+                                localDeviceJid, resolvedPeer);
+                    }
+                }
+                return assemble(callId, relayConnection, channel, hbhSrtp, warpAuthKey, warpMiTagLength,
+                        audioCodec, repacketizer, sframeProvider, isCaller, video, voipParamManager, participantCount,
+                        streamLayout, membership, streams, useMlowCodec, e2eSend, e2eRecv);
+            } catch (WhatsAppCallException exception) {
+                releaseQuietly(channel, hbhSrtp, audioCodec, repacketizer);
+                throw exception;
+            } catch (IOException exception) {
+                releaseQuietly(channel, hbhSrtp, audioCodec, repacketizer);
+                throw new WhatsAppCallException.DataChannel(
+                        "could not open the transport datagram socket for call " + callId, exception);
+            } catch (RuntimeException exception) {
+                releaseQuietly(channel, hbhSrtp, audioCodec, repacketizer);
+                throw new WhatsAppCallException.DataChannel(
+                        "could not bring up the media plane for call " + callId, exception);
+            } catch (UnsatisfiedLinkError error) {
+                // A host without the bundled native media libraries (libopus, libsrtp, OpenH264) cannot
+                // bring the media plane up; surface it as the non-fatal call exception the controller
+                // isolates rather than letting the Error escape the call-handling thread.
+                releaseQuietly(channel, hbhSrtp, audioCodec, repacketizer);
+                throw new WhatsAppCallException.DataChannel(
+                        "the native media libraries are unavailable for call " + callId, error);
+            }
+        }
+
+        /**
+         * Assembles and starts the session from its already-opened transport and codec components and the
+         * call's application media streams.
+         *
+         * <p>Builds the relay transport with the SFrame-aware media sink, the capture and playback audio
+         * pipelines, the optional video pipeline, the {@link LiveMediaSession}, and starts it. The transport's
+         * first traffic event drives the media-connected notification to the controller. The capture and
+         * playback halves prefer the application streams: when {@code streams} carries an
+         * {@linkplain Calls2MediaStreams#audioCapture() audio capture source}, the reader pump drains it
+         * directly (a microphone-bound source captures from its device behind the same interface), and when it
+         * carries an {@linkplain Calls2MediaStreams#audioPlayback() audio playback sink}, a render loop
+         * delivers each decoded frame to it (a speaker-bound sink renders to its device); only a stream the
+         * call did not supply falls back to a platform device started through the {@link #voipDriverManager}.
+         * Video follows the same rule: a supplied {@linkplain Calls2MediaStreams#videoCapture() video capture
+         * source} drives the encode loop directly, and a video call that supplied none has the
+         * {@link #voipDriverManager} start a platform camera whose frames feed the encode loop through a
+         * {@link ManagerVideoSourceBridge} (a camera the manager cannot start leaves the call receive-only on
+         * video).
+         *
+         * <p>It also brings up the app-data plane (SPEC 14.6): an {@link AppDataChannel} that writes each
+         * serialized app-data payload as SCTP DATA through the transport's data-channel send seam, and an
+         * {@link AppDataController} that demultiplexes inbound app-data to its reaction, transcription, rekey,
+         * and feedback seams. The controller is built with no inbound observers attached; the in-call control
+         * units the lifecycle controller builds later attach themselves to it through
+         * {@link #appDataController()}. Routing inbound app-data from the SCTP data channel into this
+         * controller is a later capture phase that is not wired yet.
+         *
+         * @param callId         the call identifier
+         * @param relayConnection the selected relay endpoint with its ICE credentials and DTLS role, the
+         *                       bootstrap destination the ICE checks and DTLS records are sent to
+         * @param channel        the host UDP socket backing the ICE/DTLS transport
+         * @param hbhSrtp        the hop-by-hop SRTP context
+         * @param warpAuthKey    the hop-by-hop WARP message-integrity key derived for this relay, or
+         *                       {@code null} when the relay advertised no positive {@code warp_mi_tag_len}
+         * @param warpMiTagLength the relay-advertised WARP MI tag length in bytes, or {@code 0} when disabled
+         * @param audioCodec     the audio codec, an {@link OpusAudioCodec} or, when {@code useMlow} is set, an
+         *                       {@link MLowAudioCodec}
+         * @param repacketizer   the Opus repacketizer, or {@code null} when {@code useMlow} is set
+         * @param sframeProvider   the group SFrame chain, or {@code null} on a one-to-one call
+         * @param isCaller         whether the local side placed the call, gating the history-based estimate
+         *                         seed
+         * @param video            whether the video pipeline is brought up
+         * @param voipParamManager the call's voip-param manager, already parsed from the {@code <voip_settings>}
+         *                         bundles and retuned for the participant count, the source of the active set
+         * @param participantCount the call's current membership size, used to seed the initial group-call
+         *                         bandwidth estimate
+         * @param streamLayout     the deterministic local SSRC layout this client transmits on and the
+         *                         subscription layer advertises
+         * @param membership       the call's participant manager on a group call, read for inbound app-data
+         *                         attribution and threaded into the subscription publisher, or {@code null} on
+         *                         a one-to-one call
+         * @param streams          the application capture sources and playback sinks the pipelines drive
+         * @param useMlow          whether the call selected the MLow codec, gating the matching
+         *                         {@link MLowAudioDecoder} and the repacketizer bypass on the send path
+         * @param e2eSend          the end-to-end SRTP context protecting outbound media on a one-to-one call,
+         *                         or {@code null} for a group call whose media is hop-by-hop SRTP
+         * @param e2eRecv          the end-to-end SRTP context unprotecting inbound media on a one-to-one call,
+         *                         or {@code null} for a group call whose media is hop-by-hop SRTP
+         * @return the started media session
+         */
+        private Session assemble(String callId, RelayConnection relayConnection, DatagramChannel channel,
+                                 LiveHbhSrtpRelay hbhSrtp, byte[] warpAuthKey,
+                                 int warpMiTagLength, AudioCodec audioCodec,
+                                 OpusRepacketizer repacketizer, SFrameKeyProvider sframeProvider, boolean isCaller,
+                                 boolean video, LiveVoipParamManager voipParamManager, int participantCount,
+                                 StreamLayout streamLayout, CallMembership membership,
+                                 Calls2MediaStreams streams, boolean useMlow,
+                                 E2eMediaSrtp e2eSend, E2eMediaSrtp e2eRecv) {
+            var relayAddress = relayConnection.address();
+            // Route the decode side through the same codec the encode side selected: an MLow call decodes
+            // through an MLowAudioDecoder, otherwise the default OpusAudioDecoder. LiveNetEq renders each frame
+            // through the AudioDecoderReceiver.FrameDecoder codec seam, so the per-call decoder (with its
+            // postfilter on the MLow path) is wrapped once here and threaded into both the jitter buffer (for
+            // the decode-conceal-time-stretch render) and the receiver (which is a thin getAudio adapter).
+            AudioDecoder audioDecoder = useMlow
+                    ? new MLowAudioDecoder(AUDIO_SAMPLE_RATE_HZ, AUDIO_CHANNELS,
+                    mlowLpcPostfilterEnabled(voipParamManager))
+                    : new OpusAudioDecoder(AUDIO_SAMPLE_RATE_HZ, AUDIO_CHANNELS);
+            var netEq = new LiveNetEq(NetEqConfig.defaults(), audioFrameDecoder(audioDecoder));
+            // When the call sends video but the application supplied no VideoOutput, source the outbound
+            // leg from a platform camera through the driver manager: the manager's camera capture driver
+            // pushes frames into this bridge, which the encode loop drains as its VideoOutput. When the app
+            // did supply a source it is used directly (no double-source). A receive-only video leg (no app
+            // source and a camera the manager cannot start) leaves the bridge unfed and the encode loop idle.
+            var managerVideoBridge = video && streams.videoCapture() == null
+                    ? new ManagerVideoSourceBridge(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FRAME_RATE,
+                    VIDEO_DEFAULT_BITRATE_BPS)
+                    : null;
+            VideoOutput videoCaptureSource = streams.videoCapture() != null
+                    ? streams.videoCapture()
+                    : managerVideoBridge;
+            var videoPipeline = video
+                    ? buildVideoPipeline(callId, videoCaptureSource, streams.videoPlayback())
+                    : null;
+            // The single shared video-pipeline holder: the demux, the inbound-RTCP listener, and the session
+            // all read it rather than a captured snapshot, so a mid-call audio-to-video upgrade that publishes
+            // the pipeline here is seen by the transport receive thread (inbound video routing and the
+            // inbound-PLI key-frame path) and not lost to the null captured at an audio-only bring-up. It
+            // holds the built pipeline now, or null until an upgrade builds one.
+            var videoPipelineRef = new AtomicReference<>(videoPipeline);
+
+            // Bandwidth-estimation and rate-control loop (SPEC 15). The loop holds the WA sender-side AIMD
+            // estimator fused through the combiner and gated by the hold machine (15.2/15.3/15.4), the GoogCC
+            // delay-based estimator (15.1) the inbound demux tees each packet's arrival timing into, and the
+            // audio and (on a video call) video rate controllers that drive OpusAudioCodec.modify and the
+            // video pipeline's encoder. Built before the demux so the demux can tee into its delay-based
+            // estimator, and registered as the transport's inbound-RTCP feedback listener just after the
+            // transport is built so each feedback packet drives one tick. A group call (participantCount > 0;
+            // a one-to-one call tracks no roster and passes 0) seeds its initial estimate rather than ramping
+            // from the conservative cold-start band when ENABLE_INIT_BWE_FOR_GROUP_CALL is on, read from the
+            // feature gate at bring-up.
+            var seedInitialGroupBwe = participantCount > 0 && initBweForGroupCallEnabled.getAsBoolean();
+            var rateControlLoop = new Calls2RateControlLoop(callId, isCaller, video, audioCodec,
+                    defaultAudioParams(), videoPipeline, voipParamManager, seedInitialGroupBwe);
+
+            // App-data plane over the one SCTP data channel (SPEC 14.6): on WhatsApp Web app-data rides the
+            // same data channel as media, written as SCTP DATA, and the controller demultiplexes inbound
+            // app-data to its reaction/transcription/rekey/feedback seams. The outbound sink writes through
+            // the transport's data-channel send seam (transport.sendAppData), reached through a forward
+            // holder set once the transport is built below.
+            var transportHolder = new AtomicReference<LiveRelayTransport>();
+            var appDataControllerHolder = new AtomicReference<AppDataController>();
+            // Inbound app-data attribution: the native app-data path keys each inbound batch by the sending
+            // participant device. A batch whose sender is not resolved falls back to the call JID.
+            var appDataCallFallback = Jid.of(callId + "@call");
+            var inboundAppDataSender = new AtomicReference<>(appDataCallFallback);
+            var appDataChannel = new AppDataChannel(
+                    bytes -> {
+                        var liveTransport = transportHolder.get();
+                        return liveTransport != null && liveTransport.sendAppData(bytes);
+                    },
+                    payloads -> {
+                        var controller = appDataControllerHolder.get();
+                        if (controller != null) {
+                            controller.onReceive(inboundAppDataSender.get(), payloads);
+                        }
+                    });
+            // TODO (Phase 3, capture-gated): route inbound app-data from the SCTP data channel into
+            //  appDataChannel.receivePayloads and resolve its sender into inboundAppDataSender. App-data
+            //  (rekey/reactions/transcription) rides the SCTP data channel (Web-P2P) or relay-RTP app-data
+            //  (SPEC 14.6), demuxed by leading byte; the inbound demux and per-batch sender resolution are
+            //  blocked on a connected-call capture of those frames. (The 0x4000 attribute of the 0x0003
+            //  envelope is NOT app-data: it is a control WARP - seq/downlink-bw/video-encoding/participant-
+            //  report - whose body is hop-by-hop SRTP-sealed; see the SubscriptionEnvelope class javadoc.)
+            //  The outbound app-data send seam (transport.sendAppData) is wired.
+
+            var inboundMedia = new InboundMediaDemux(netEq, videoPipelineRef, sframeProvider,
+                    rateControlLoop);
+
+            // The host UDP socket is the RTCPeerConnection-equivalent ICE/DTLS transport socket: the
+            // transport drives ICE and ships DTLS records over it; the relay endpoint is the bootstrap
+            // destination until ICE nominates a pair.
+            var socketEgress = (LiveRelayTransport.Egress) (payload, destination) -> socketSend(channel,
+                    destination == null ? relayAddress : destination, payload);
+            // The relay path is a locally-synthesized RTCPeerConnection: there is no signaled remote
+            // candidate, ufrag, pwd, or <certificate>. The IceAgent runs as the controlling agent against a
+            // single relay host candidate (foundation 2, component 1, udp, priority 2122262783, typ host),
+            // with remote ufrag = auth_token (or token) and remote pwd = the relay <key> raw bytes, and the
+            // DTLS data channel pins the fixed relay certificate fingerprint rather than expecting a signaled
+            // one (re/calls2-spec/web-transport-construction-RE.md).
+            var iceAgent = new IceAgent(
+                    generateIceUfrag(),
+                    generateIcePassword(),
+                    relayConnection.remoteUfrag(),
+                    relayConnection.remotePassword(),
+                    true);
+            iceAgent.addLocalCandidate(localHostCandidate(channel));
+            iceAgent.appendRemoteCandidates(List.of(relayHostCandidate(relayAddress)));
+            var dataChannel = new RelayDataChannel(
+                    socketEgress,
+                    relayAddress,
+                    relayConnection.activeMode(),
+                    RelayDataChannel.RELAY_CERT_FINGERPRINT_SHA256);
+            // The 0x0003 subscription envelope's outer MESSAGE-INTEGRITY is HMAC-SHA1 keyed by the relay
+            // <key> used verbatim (the same relay STUN-app credential as the relay connectivity ping, confirmed
+            // against the O4cDmmXP6rI wasm, re/calls2-spec/web-transport-crypto-RE.md ADDENDUM), and its 0x0016
+            // XOR-MAPPED-ADDRESS carries the selected relay endpoint's transport address; thread both into the
+            // transport so its rx-subscription resend can assemble and ship the envelope.
+            var relayReflexiveAddress = relayAddress instanceof InetSocketAddress inet ? inet : null;
+            var transport = new LiveRelayTransport(
+                    hbhSrtp,
+                    warpAuthKey,
+                    warpMiTagLength,
+                    relayConnection.remotePassword(),
+                    relayConnection.relayToken(),
+                    relayReflexiveAddress,
+                    inboundMedia::onTransportMedia,
+                    iceAgent,
+                    socketEgress,
+                    dataChannel,
+                    e2eSend,
+                    e2eRecv);
+            transportHolder.set(transport);
+
+            // Per-RTCP rate-control tick (Step 2 -> Step 3): the relay transport unprotects and parses each
+            // inbound RTCP compound packet into an RtcpFeedback and delivers it here, where one feedback
+            // drives one rate-control round. A peer key-frame request (PSFB PLI or FIR) additionally arms the
+            // local video encoder so its next encode emits an intra picture, reproducing the native
+            // process_key_frame_request reaction to an inbound PLI/FIR (fn5534 via the rtcp parse fn4572).
+            // The pipeline is read from the shared holder rather than captured, so after a mid-call upgrade an
+            // inbound PLI arms the freshly built encoder; a call with no video pipeline yet has none to arm.
+            transport.onInboundRtcp(feedback -> {
+                rateControlLoop.onRtcpFeedback(feedback);
+                var pipeline = videoPipelineRef.get();
+                if (feedback.keyFrameRequested() && pipeline != null) {
+                    pipeline.requestKeyFrame();
+                }
+            });
+
+            if (videoPipeline != null && videoCaptureSource != null) {
+                var videoPacketizer = new OutboundVideoRtpPacketizer(streamLayout.videoStream0Ssrc());
+                videoPipeline.bindFrameSink(encoded -> sendVideoPacket(transport, videoPacketizer, encoded));
+            }
+
+            // The SFU subscription publisher (SPEC 14.3): it owns the receive-subscription cache, the 96-slot
+            // hop-by-hop RTCP-feedback table, and the StreamDescriptors build keyed by this client's SSRC
+            // layout, and is threaded the membership provider so the receive-subscription compute
+            // (LiveSubscriptionPublisher.computeRxSubscription, the recoverable roster->subscription map the
+            // transport core implemented) can read the roster (firstConnectedPeer/videoStreamSubscriberCount).
+            // On each resend tick (rx_subscription_timer) the resender rebuilds the fused 0x4024 StreamSubscriptions
+            // matrix from the local send layout (the participant-less self entry) and the membership roster (one
+            // positionally-indexed block of audio + simulcast-video entries per connected peer, each entry's SSRC
+            // the deterministic value CallSecureSsrcGenerator derived per device JID), and ships it inside the
+            // 0x0003 STUN-magic envelope as SCTP DATA on the data channel: the envelope's outer MESSAGE-INTEGRITY
+            // is HMAC-SHA1 keyed by the relay <key> (re/calls2-spec/web-transport-crypto-RE.md ADDENDUM, confirmed
+            // against the O4cDmmXP6rI wasm), and the 0x0016 carries the selected relay endpoint's reflexive
+            // address. The live capture's leading 0x4000 WARP attribute is an optional rate-control report
+            // Cobalt does not emit: its control body is sealed by the relay hop-by-hop SRTP layer (NOT the
+            // SFrame transform, which never engages on the relayed-SFU send path) with a seal that is not
+            // capture-reproducible (see the SubscriptionEnvelope class javadoc).
+            // The subscription resend is driven on the transport's keepalive thread through
+            // LiveRelayTransport.onSubscriptionResend: a live WA-Web 1:1 relay call sends this client's 0x0003
+            // subscription on the data channel at connect and the relay acks it with 0x0103, and the relay
+            // forwards a peer's media only after it has the subscription, so the transport ships it as a
+            // connect-time burst and then on content change. The publisher below is retained for its
+            // receive-subscription cache and hop-by-hop RTCP-feedback table.
+            var subResender = subscriptionResender(transportHolder, buildSelfStreamDescriptors(callId, selfJid.get()));
+            transport.onSubscriptionResend(() -> subResender.accept(null));
+            var subscriptionPublisher = new LiveSubscriptionPublisher(
+                    new TimerHeap(),
+                    System::nanoTime,
+                    subResender,
+                    LiveSubscriptionPublisher.DEFAULT_RESEND_INTERVAL,
+                    membership == null ? null : membership.participantProvider());
+
+            var packetCache = new StreamPacketCache(PACKET_CACHE_CAPACITY);
+            var rtpPacketizer = new OutboundRtpPacketizer(streamLayout.audioSsrc(),
+                    (useMlow ? MLOW_FRAMES_PER_PACKET : OPUS_FRAME_BLOCKS) * AUDIO_FRAME_SAMPLES);
+            // BLOCKED: on a group call, seal the combined payload with the SFrame chain before sending by
+            //  wrapping the self device's sframeProvider (built by groupSframeProvider from the call key, the
+            //  same key now installed into the membership via installCallKey) in an SFrameSecureFrame and
+            //  supplying frame -> secureFrame.seal(frame) here (the symmetric open lands in
+            //  InboundMediaDemux.openSframe). The seal/open transform and the trailer codec already exist
+            //  (com.github.auties00.cobalt.calls2.media.sframe), but the exact SFrame media frame byte layout
+            //  is not confirmed against a live frame: the CTR IV layout within the 16-byte block and the
+            //  counter-mask XOR (Q1) and the ciphertext/tag/trailer ordering (Q2) are static-only, and
+            //  SFrameCipher carries its own unresolved per-key-id counter-mask salt VALUE and chain-key->cipher
+            //  derivation (crypto core deferred; native callbacks absent from this WASM). Per
+            //  re/calls2-spec/captures/sframe-frame-live.json a 2026-06-15 live capture connected a 3-party SFU
+            //  group VIDEO call with video provably encoding at 14 fps and proved raw-CDP worker breakpoints
+            //  reach the voip pthread pool (derive_sframe_key paused), yet wa_sframe_encrypt and its only
+            //  in-WASM video caller wa_video_sframe_encode_cb NEVER fired: in SFU group-call mode the SFrame
+            //  per-frame transform is not engaged on the relayed send path (the keys are derived and rotated,
+            //  but the media rides the relay hop-by-hop SRTP), and a 1:1 call uses no SFrame, so no live SFrame
+            //  media frame is produced by WA Web to read the layout from. Leaving the payload for the
+            //  hop-by-hop-encrypted relay is therefore the FAITHFUL behaviour (it matches WA's relayed-SFU
+            //  path); wiring an unverified layout would make every group-call frame Cobalt sends undecryptable
+            //  by real peers, a worse outcome than the current pass-through.
+            AudioEncoderSender.SFrameTransform sframeSeal = null;
+            // The frames-per-packet packer is Opus-specific: the Opus repacketizer concatenates the buffered
+            // Opus frames into one multi-frame Opus packet. MLow encodes a self-contained packet inside the
+            // codec (its TOC names the frame configuration), so its packet must NOT be re-packed by the Opus
+            // repacketizer (which would reject or corrupt the non-Opus bytes); the MLow packer passes the
+            // single buffered packet through unchanged.
+            //
+            // Frame sizing: MLow ships WhatsApp's 60 ms ptime while Opus ships 20 ms. MLow cannot concatenate
+            // separately-encoded frames (a 60 ms MLow packet is three 20 ms internal frames under one TOC and
+            // one range-coded bitstream), so the whole 960-sample span is encoded in one call: the capture
+            // pump stays on the 20 ms cadence the audio-processing front end needs, and a Pcm60msAggregator
+            // (wired below) joins MLOW_FRAMES_PER_PACKET captured blocks into one 960-sample block before the
+            // sender's single MLow encode; Opus drives the sender directly per 20 ms block. The outbound RTP
+            // timestamp advances by the packet's own sample span (OutboundRtpPacketizer samplesPerPacket: 960
+            // for MLow, 320 for Opus) so the playout clock stays in step. Rendering a 60 ms MLow packet a peer
+            // sends us (NetEq serving its 960 decoded samples across three 20 ms get periods) is the inbound
+            // counterpart and is independent of this send path.
+            AudioEncoderSender.FramePacker framePacker = useMlow
+                    ? frames -> frames.getFirst().payload()
+                    : frames -> repacketizer.combine(frames.stream().map(EncodedAudioFrame::payload).toList());
+            var sender = new AudioEncoderSender(
+                    audioCodec::encode,
+                    framePacker,
+                    sframeSeal,
+                    (payload, extendedSequence, level) -> sendAudioPacket(transport, rtpPacketizer, payload,
+                            extendedSequence, level),
+                    packetCache,
+                    FRAMES_PER_PACKET);
+
+            var capture = openCaptureSource(streams);
+            var captureRing = new AudioCaptureRing(RING_CAPACITY_SAMPLES);
+            // On the MLow path a Pcm60msAggregator joins MLOW_FRAMES_PER_PACKET captured 20 ms blocks into one
+            // 60 ms block before the sender's single MLow encode; Opus drives the sender directly. The pump and
+            // the audio-processing front end stay on the 20 ms cadence either way.
+            AudioReaderPump.AudioBlockSink audioBlockSink = useMlow
+                    ? new Pcm60msAggregator(sender, MLOW_FRAMES_PER_PACKET)
+                    : new Pcm60msAggregator(sender, OPUS_FRAME_BLOCKS);
+            var readerPump = capture.source() == null
+                    ? null
+                    : new AudioReaderPump(capture.source(), captureRing, audioBlockSink, AUDIO_FRAME_SAMPLES,
+                    CAPTURE_STARTUP_SEED_SAMPLES);
+
+            var receiver = new com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver(netEq);
+            var playback = openPlaybackSink(callId, receiver, streams);
+
+            var transportConnected = new AtomicBoolean();
+            transport.onTransportEvent(event -> onTransportEvent(callId, event, transportConnected));
+
+            // No real inbound observers are attached here: the reaction and transcription observers are the
+            // in-call control units the lifecycle controller builds in a later step and attaches through the
+            // controller's attach* seams (reached via Calls2OrchestratedCall.appDataController). The
+            // controller is built with no-op observers and retransmission disabled. It is built last, after
+            // every throwing bring-up step, so a mid-bring-up failure cannot leak its timer scheduler before
+            // the session that owns its close takes ownership; once the session is built, session.close()
+            // closes it (including on the start() failure path below).
+            // Reaction retransmission stays disabled, and that is faithful rather than a placeholder: the
+            // native app-data-controller create (fn11958) arms the type-3 retransmission timer only when the
+            // call-struct flag at call+0x22f72 is set (its interval read from call+0x22f6c), and that flag
+            // has no compiled default and no writer in the shared voip core, so it is zero unless the server
+            // enables it -- and the reaction voip-params are confirmed absent from the 759-key voip_settings
+            // union. (The earlier 0x22f62 citation was an offset mis-read; the gate is 0x22f72.)
+            var appDataController = new AppDataController(appDataChannel, false);
+            appDataControllerHolder.set(appDataController);
+
+            var videoUsesDevice = managerVideoBridge != null && videoPipeline != null;
+            var session = new LiveMediaSession(callId, transport, channel, relayAddress,
+                    audioCodec, repacketizer, voipDriverManager, capture.usesDevice(), playback.usesDevice(),
+                    readerPump, playback.writerPump(),
+                    capture.bridge(), playback.renderLoop(), netEq, audioDecoder, videoPipelineRef, voipParamManager,
+                    appDataController, rateControlLoop, subscriptionPublisher);
+            if (videoUsesDevice) {
+                session.bindVideoCaptureStarter(() -> startManagerVideoCapture(callId, managerVideoBridge));
+            }
+            // A call brought up audio-only gets an upgrade seam so an in-call camera turn-on can build the
+            // video pipeline mid-call; a call already carrying video has its pipeline and needs none. The seam
+            // captures the live transport, the application streams, and the rate-control loop, all of which
+            // only exist here, and is run once by the session under its one-shot video-send guard.
+            if (videoPipeline == null) {
+                session.bindVideoUpgrade(() -> upgradeToVideo(callId, transport, streams, rateControlLoop, session,
+                        streamLayout.videoStream0Ssrc()));
+            }
+            try {
+                session.start();
+            } catch (RuntimeException exception) {
+                session.close();
+                throw exception;
+            }
+            return session;
+        }
+
+        /**
+         * Builds, wires, and brings online the video pipeline for a call upgraded from audio-only to video
+         * mid-call, returning it for the session to publish and start.
+         *
+         * <p>This is the media-plane construction half of an in-call audio-to-video upgrade, run once by
+         * {@link LiveMediaSession#startLocalVideo()} the first time the camera turns on a call brought up
+         * audio-only. It resolves the outbound video source the same way the bring-up does: the application
+         * {@linkplain Calls2MediaStreams#videoCapture() video source} when one was supplied, otherwise a fresh
+         * {@link ManagerVideoSourceBridge} the driver manager's camera capture feeds. It opens the negotiated
+         * video codec and builds the inbound jitter buffer through {@link #buildVideoPipeline}, binds the
+         * outbound video RTP sink onto the live transport (a fresh {@link OutboundVideoRtpPacketizer}), binds
+         * the session's camera-capture starter when the source is the manager bridge, and brings the
+         * rate-control loop's video controller online through {@link Calls2RateControlLoop#enableVideo}. It
+         * returns the built pipeline, or {@code null} when the codec could not be opened, in which case the
+         * call stays audio-only.
+         *
+         * @implNote This implementation reproduces the native upgrade's media construction
+         * ({@code recreate_and_connect_video_stream}, fn6326, reached from {@code do_video_upgrade}, fn11393):
+         * it builds the video stream, encoder, jitter buffer, and rate controller lazily at upgrade rather than
+         * pre-allocating them at the audio call's bring-up, which is how the native engine sequences it (the
+         * video objects are created in fn6326, not at call setup). Three native sub-behaviours are
+         * deliberately not reproduced, each a pre-existing gap rather than new to the upgrade path:
+         * <ul>
+         *   <li>The native upgrade destroys and recreates the audio stream in the same transaction
+         *       ({@code disconnect_and_destroy_audio_stream} fn6362 then {@code create_and_connect_audio_stream}
+         *       fn6359 in fn11393); Cobalt leaves the running audio pipeline untouched, since the relay leg
+         *       carries audio over the same hop-by-hop SRTP context before and after the upgrade and there is
+         *       no audio renegotiation on the wire to mirror.</li>
+         *   <li>The new video stream reuses the participant-setup-allocated first-simulcast-layer video SSRC
+         *       ({@code call_generate_device_ssrc}, fn10901, allocates the video SSRC set even for an audio
+         *       call) the bring-up computed into the call's {@link StreamLayout}, threaded in as
+         *       {@code videoStream0Ssrc}, matching the native engine reusing the pre-allocated video SSRC
+         *       rather than minting a fresh one at upgrade.</li>
+         *   <li>No SFU stream-subscription update is sent ({@code build_and_send_stream_subscription_request},
+         *       fn6406, gated to three-or-more participants in fn6417); the relay 1:1 leg carries the video on
+         *       the tokens already negotiated, and the on-wire subscription publish is unwired for every
+         *       stream, not just this one (the {@code 0x0003} subscription-envelope send seam exists on the
+         *       transport but the publisher is not yet wired to it; see
+         *       {@link SubscriptionPublisher#publishRxSubscription}).</li>
+         * </ul>
+         *
+         * @param callId          the call identifier
+         * @param transport       the live relay transport the outbound video RTP sink is bound onto
+         * @param streams         the call's application media streams, read for the video capture source
+         * @param rateControlLoop the call's rate-control loop whose video controller is brought online
+         * @param session         the session whose camera-capture starter is bound when the source is the
+         *                        manager bridge
+         * @param videoSsrc       the deterministic first-simulcast-layer video SSRC the new packetizer stamps,
+         *                        from the call's {@link StreamLayout}
+         * @return the built video pipeline, or {@code null} when the video codec could not be opened
+         */
+        private VideoPipeline upgradeToVideo(String callId, MediaTransport transport, Calls2MediaStreams streams,
+                                             Calls2RateControlLoop rateControlLoop, LiveMediaSession session,
+                                             int videoSsrc) {
+            var managerVideoBridge = streams.videoCapture() == null
+                    ? new ManagerVideoSourceBridge(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FRAME_RATE,
+                    VIDEO_DEFAULT_BITRATE_BPS)
+                    : null;
+            var videoCaptureSource = streams.videoCapture() != null ? streams.videoCapture() : managerVideoBridge;
+            var pipeline = buildVideoPipeline(callId, videoCaptureSource, streams.videoPlayback());
+            if (pipeline == null) {
+                return null;
+            }
+            if (videoCaptureSource != null) {
+                var videoPacketizer = new OutboundVideoRtpPacketizer(videoSsrc);
+                pipeline.bindFrameSink(encoded -> sendVideoPacket(transport, videoPacketizer, encoded));
+            }
+            if (managerVideoBridge != null) {
+                session.bindVideoCaptureStarter(() -> startManagerVideoCapture(callId, managerVideoBridge));
+            }
+            rateControlLoop.enableVideo(pipeline);
+            return pipeline;
+        }
+
+        /**
+         * Starts the driver manager's camera capture for a video call that supplied no application video
+         * source, forwarding captured frames into the encode bridge.
+         *
+         * <p>Drives the manager's camera capture driver through its
+         * {@link com.github.auties00.cobalt.calls2.platform.VideoCaptureDriver} state machine so each
+         * captured frame is forwarded to {@code bridge}, which the video pipeline's encode loop drains. The
+         * capture geometry is the call's default outbound video geometry, matching the geometry the bridge
+         * advertises and the encoder is sized to. A host without a usable camera fails the start; the failure
+         * is logged and isolated so the call still receives and renders the peer's video and carries audio,
+         * it simply sends no video, the same receive-only outcome as a video call whose codec could not be
+         * opened.
+         *
+         * @param callId the call identifier
+         * @param bridge the bridge the camera driver forwards captured frames into and the encode loop drains
+         */
+        private void startManagerVideoCapture(String callId, ManagerVideoSourceBridge bridge) {
+            try {
+                var capability = new VideoCaptureCapability(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FRAME_RATE);
+                voipDriverManager.startVideoCapture(MANAGER_CAMERA_DEVICE_ID, bridge, capability);
+            } catch (RuntimeException exception) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "calls2 camera capture unavailable for call {0}; sending no video: {1}",
+                        callId, exception.getMessage());
+            }
+        }
+
+        /**
+         * Builds the call's voip-param manager from the negotiated {@code <voip_settings>} bundles and
+         * selects the active set for the call's media mode.
+         *
+         * <p>Each {@code <voip_settings>} node is parsed through
+         * {@link VoipSettings#of(Node, VoipParamJsonDeserializer)} and its non-empty parameter set is stored
+         * under the {@link VoipSettingsType} the node's {@code type} attribute names, so the manager holds
+         * the default, audio, and video bundles the server injected. The active set is then selected for the
+         * call's media mode ({@link VoipSettingsType#VIDEO} for a video call, otherwise
+         * {@link VoipSettingsType#AUDIO}), falling back to the mandatory {@link VoipSettingsType#NONE}
+         * default when the mode-specific bundle is absent. The lifecycle order is store then select then the
+         * participant-count override, matching the engine's
+         * {@code EMPTY -> PARSED -> STORED -> ACTIVE -> OVERRIDDEN_BY_COUNT} sequence; the per-round dynamic
+         * rate-control pass runs later, off the rate-control tick.
+         *
+         * @implNote This implementation maps the wire {@code type} attribute onto {@link VoipSettingsType}
+         * through {@link #voipSettingsType(Node)}: {@code audio} and {@code video} select the matching
+         * overlay and every other value (the captured traffic carries {@code default}, or omits the
+         * attribute entirely on the single bundle the offer acknowledgement delivers) selects
+         * {@link VoipSettingsType#NONE}, the mandatory baseline. The count override is invoked with an empty
+         * override list because the count-dependent values are owned by the rate-control reader and are not
+         * yet reversed; the call is kept to preserve the
+         * {@code store -> select -> count-override -> dyn-tick} order so the override slot is wired when the
+         * values land (re/calls2-spec/SPEC.md sec 9.3 lifecycle; re/calls2-spec/MEDIA-PLANE-PLAN.md Step 1).
+         *
+         * @param voipSettings     the {@code <voip_settings>} bundle nodes, in wire order
+         * @param video            whether the call carries video, selecting the video overlay
+         * @param participantCount the call's current membership size, used for the count override
+         * @return the populated voip-param manager with its active set selected
+         */
+        private LiveVoipParamManager buildVoipParamManager(List<Node> voipSettings, boolean video,
+                                                           int participantCount) {
+            var manager = new LiveVoipParamManager();
+            var deserializer = new VoipParamJsonDeserializer();
+            for (var node : voipSettings) {
+                var settings = VoipSettings.of(node, deserializer);
+                settings.nonEmptyParams()
+                        .ifPresent(params -> manager.store(voipSettingsType(node), params));
+            }
+            manager.selectActive(video ? VoipSettingsType.VIDEO : VoipSettingsType.AUDIO);
+            // TODO: pass the real participant-count override values once the rate-control reader reverses
+            //  override_voip_params_based_on_participant_count (voip_param_internal.cc); the count-dependent
+            //  parameter set keyed on the call size is BLOCKED on that reader, so the override runs empty for
+            //  now to keep the store -> select -> count-override -> dyn-tick lifecycle order intact.
+            manager.overrideForParticipantCount(participantCount, List.of());
+            return manager;
+        }
+
+        /**
+         * Returns whether the call selected the MLow audio codec over the default Opus codec.
+         *
+         * <p>Reads the per-call {@value #USE_MLOW_CODEC_PARAM} integer tunable from the manager's active
+         * voip-param set and treats it as a boolean: a present, non-zero value selects MLow, and an absent,
+         * zero, or non-integer value leaves the call on Opus. A call that negotiated no active set (no
+         * {@code <voip_settings>} bundle, or a missing default bundle) is therefore Opus, the default.
+         *
+         * @param voipParamManager the call's voip-param manager whose active set carries the flag
+         * @return {@code true} when the call routes its audio through {@link MLowAudioCodec} and
+         * {@link MLowAudioDecoder}, {@code false} when it stays on {@link OpusAudioCodec} and
+         * {@link OpusAudioDecoder}
+         */
+        private static boolean useMlowCodec(LiveVoipParamManager voipParamManager) {
+            var key = VoipParamKey.ofDottedPath(USE_MLOW_CODEC_PARAM).orElse(null);
+            var params = voipParamManager.activeParams().orElse(null);
+            if (key == null || params == null) {
+                return false;
+            }
+            return params.getInteger(key).orElse(0L) != 0L;
+        }
+
+        /**
+         * Resolves whether the MLow decode postfilter chain runs its gated LPC postfilter for the call.
+         *
+         * <p>Reads the per-call {@value #MLOW_ENABLE_LPC_POSTFILTER_PARAM} integer tunable from the manager's
+         * active set; a non-zero value enables the LPC postfilter, and an absent, zero, or non-integer value
+         * (including a call that negotiated no active set) leaves it disabled, the native and live-client
+         * default. The harmonic and high-pass postfilters always run regardless of this flag.
+         *
+         * @param voipParamManager the call's voip-param manager whose active set carries the flag
+         * @return {@code true} when the {@link MLowAudioDecoder} runs the LPC postfilter, {@code false}
+         * otherwise
+         */
+        private static boolean mlowLpcPostfilterEnabled(LiveVoipParamManager voipParamManager) {
+            var key = VoipParamKey.ofDottedPath(MLOW_ENABLE_LPC_POSTFILTER_PARAM).orElse(null);
+            var params = voipParamManager.activeParams().orElse(null);
+            if (key == null || params == null) {
+                return false;
+            }
+            return params.getInteger(key).orElse(0L) != 0L;
+        }
+
+        /**
+         * Maps a {@code <voip_settings>} node's wire {@code type} attribute onto the settings bucket it
+         * names.
+         *
+         * <p>A {@code type} of {@code audio} selects {@link VoipSettingsType#AUDIO} and {@code video}
+         * selects {@link VoipSettingsType#VIDEO}; every other value, including the wire {@code default} and
+         * an absent attribute, selects {@link VoipSettingsType#NONE}, the mandatory baseline bundle.
+         *
+         * @param node the {@code <voip_settings>} node whose bucket is resolved
+         * @return the settings type the node belongs under
+         */
+        private VoipSettingsType voipSettingsType(Node node) {
+            var type = node.getAttributeAsString(VOIP_SETTINGS_TYPE_ATTRIBUTE, VOIP_SETTINGS_TYPE_DEFAULT);
+            return switch (type) {
+                case VOIP_SETTINGS_TYPE_AUDIO -> VoipSettingsType.AUDIO;
+                case VOIP_SETTINGS_TYPE_VIDEO -> VoipSettingsType.VIDEO;
+                default -> VoipSettingsType.NONE;
+            };
+        }
+
+        /**
+         * Resolves the audio capture half: the application source when one was supplied, otherwise a platform
+         * capture device routed through the {@link #voipDriverManager} behind a {@link CaptureSourceBridge}.
+         *
+         * <p>An application capture source is drained directly by the reader pump, since a device-backed
+         * source (a microphone) captures from its own device behind the {@link AudioOutput} interface, so the
+         * driver manager is not engaged. When the call supplied no capture source a {@link CaptureSourceBridge}
+         * is installed as the manager's captured-audio sink and the half is marked as device-driven, so
+         * {@link LiveMediaSession#startAudioCapture()} starts the manager's microphone capture; the manager
+         * owns the capture driver for the engine's lifetime, so no per-call driver is opened here. A platform
+         * device that turns out to be unavailable surfaces only when capture is started, where the session
+         * isolates it.
+         *
+         * @param streams the call's application media streams
+         * @return the resolved capture half: the reader-pump source, whether it is device-driven through the
+         *         manager, and the device bridge when device-driven
+         */
+        private AudioCaptureHalf openCaptureSource(Calls2MediaStreams streams) {
+            var appCapture = streams.audioCapture();
+            if (appCapture != null) {
+                return new AudioCaptureHalf(appCapture, false, null);
+            }
+            var bridge = new CaptureSourceBridge();
+            voipDriverManager.onCapturedAudio((samples, deviceType) -> bridge.offer(samples));
+            return new AudioCaptureHalf(bridge, true, bridge);
+        }
+
+        /**
+         * Resolves the audio playback half: a render loop delivering decoded frames to the application sink
+         * when one was supplied, otherwise a platform playback device routed through the
+         * {@link #voipDriverManager} and fed by the demand-driven writer pump.
+         *
+         * <p>An application playback sink receives each decoded frame from a render loop that pulls the
+         * receiver at the jitter-buffer get period, since a device-backed sink (a speaker) renders to its own
+         * device behind the {@link AudioInput} interface, so the driver manager is not engaged. When the call
+         * supplied no playback sink an {@link AudioPlaybackRing} is installed as the manager's rendered-audio
+         * source and fed by an {@link AudioWriterPump}, and the half is marked as device-driven so
+         * {@link LiveMediaSession#startAudioPlayback()} starts the manager's playback; the manager owns the
+         * playback driver for the engine's lifetime, so no per-call driver is opened here. A platform device
+         * that turns out to be unavailable surfaces only when playback is started, where the session isolates
+         * it.
+         *
+         * @param callId   the call identifier
+         * @param receiver the decode-and-conceal receiver the playback half pulls rendered frames from
+         * @param streams  the call's application media streams
+         * @return the resolved playback half: the render loop or, when device-driven, the writer pump and ring
+         */
+        private AudioPlaybackHalf openPlaybackSink(String callId,
+                                                   com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver receiver,
+                                                   Calls2MediaStreams streams) {
+            var appPlayback = streams.audioPlayback();
+            if (appPlayback != null) {
+                var renderLoop = new AudioPlaybackLoop(callId, receiver, appPlayback);
+                return new AudioPlaybackHalf(renderLoop, false, null, null);
+            }
+            var playbackRing = new AudioPlaybackRing(RING_CAPACITY_SAMPLES);
+            var writerPump = new AudioWriterPump(playbackRing, receiver, AUDIO_FRAME_SAMPLES);
+            voipDriverManager.requestAudioDataSource(
+                    (out, frameCount) -> drainPlaybackRing(playbackRing, out, frameCount));
+            return new AudioPlaybackHalf(null, true, writerPump, playbackRing);
+        }
+
+        /**
+         * Reacts to one relay transport event, notifying the controller on the first traffic-bearing
+         * event.
+         *
+         * <p>The relay path is usable from relay creation, so any of relay-create-success or the
+         * downlink/uplink traffic-start events marks the media plane connected; the notification fires
+         * once. A relay-bind failure is logged; the controller observes the failed call through its own
+         * timers.
+         *
+         * <p>The connection notification is dispatched on a fresh virtual thread rather than inline,
+         * because the relay transport emits its first event synchronously inside the bring-up call (which
+         * the controller drives while still applying the call's answer transition under its per-call lock);
+         * deferring the notification lets the controller finish the answer transition to an answerable state
+         * before {@link Calls2LifecycleController#onMediaConnected(String)} runs and advances the call to
+         * {@link Calls2CallState#CALL_ACTIVE}, matching the engine reporting the bidirectional-media state
+         * asynchronously rather than from the bring-up stack.
+         *
+         * @param callId    the call identifier
+         * @param event     the transport event
+         * @param connected the once-only latch guarding the media-connected notification
+         */
+        private void onTransportEvent(String callId, TransportEvent event, AtomicBoolean connected) {
+            switch (event) {
+                case RELAY_CREATE_SUCCESS, RX_TRAFFIC_STARTED, TX_TRAFFIC_START -> {
+                    if (connected.compareAndSet(false, true)) {
+                        var sink = connectionSink.get();
+                        if (sink != null) {
+                            Thread.ofVirtual().name("calls2-media-connected-" + callId)
+                                    .start(() -> sink.accept(callId));
+                        }
+                    }
+                }
+                case RELAY_BINDS_FAILED -> LOGGER.log(System.Logger.Level.WARNING,
+                        "calls2 relay binds failed for call {0}", callId);
+                case RX_TRAFFIC_STOPPED, TX_TRAFFIC_STOPPED, RX_APP_DATA -> {
+                }
+            }
+        }
+
+        /**
+         * Ships one outbound media payload as an RTP packet through the transport.
+         *
+         * <p>Builds the RTP packet (header plus the SFrame-or-cleartext payload) into a buffer with
+         * trailing room for the hop-by-hop SRTP tag, then hands it to {@link MediaTransport#sendMedia}.
+         *
+         * @param transport        the relay transport
+         * @param packetizer       the outbound RTP packetizer holding the SSRC, sequence, and timestamp
+         * @param payload          the media payload to send
+         * @param extendedSequence the packet's extended sequence number
+         * @param level            the audio-level extension the sender measured (computed for level
+         *                         metering; the wire extension is not stamped because its negotiated extmap
+         *                         id is unrecovered, see the blocked marker)
+         */
+        private void sendAudioPacket(MediaTransport transport, OutboundRtpPacketizer packetizer, byte[] payload,
+                                     long extendedSequence, AudioLevelRtpExtension level) {
+            // BLOCKED: stamp the audio-level RTP header extension on the packet. The value octet and framing
+            //  are recovered (audio_level_update_header_ext fn4671 in network/transport/rtp_ext.cc writes one
+            //  byte = (level & 0x7f) | (voiceActive << 7); the same file emits the RFC 8285 one-byte 0xBEDE /
+            //  two-byte 0x100x profiles with the element header (id << 4) | (len - 1), fn4717 line ~1277), and
+            //  AudioLevelRtpExtension already serializes both forms. What is missing is the per-call extmap id:
+            //  the engine registers it at runtime via pjmedia_rtp_ext_register_parser (fn4613, id is a
+            //  parameter, not a compiled-in constant), and it is not on the captured signaling wire (Q8 in
+            //  re/calls2-spec/captures/CAPTURE-FINDINGS.md: RTP rides the worker UDP, invisible to CDP). A
+            //  live media-datagram or SDP-extmap capture is required to recover the id before the extension can
+            //  be emitted faithfully; until then the level is metered but not stamped, which affects only
+            //  mixer/SFU level metering, not interop with the cleartext payload.
+            try {
+                if (extendedSequence <= 2 || extendedSequence == 50 || extendedSequence == 200) {
+                    var opusHex = new StringBuilder();
+                    for (var i = 0; i < payload.length && i < 20; i++) {
+                        opusHex.append(String.format("%02x", payload[i] & 0xFF));
+                    }
+                    LOGGER.log(System.Logger.Level.INFO,
+                            "calls2 outbound audio cleartext opus seq={0} ({1} bytes, first20 TOC): {2}",
+                            extendedSequence, payload.length, opusHex);
+                }
+                var packet = packetizer.packetize(payload, extendedSequence);
+                transport.sendMedia(packet, RTP_HEADER_LENGTH + RTP_HEADER_EXTENSION_LENGTH + payload.length);
+            } catch (RuntimeException exception) {
+                LOGGER.log(System.Logger.Level.DEBUG, "calls2 outbound audio send failed", exception);
+            }
+        }
+
+        /**
+         * Ships one encoded video access unit as one or more video RTP packets through the transport,
+         * fragmenting it to the path transmission unit.
+         *
+         * <p>Splits the access unit into RTP payloads through
+         * {@link H264RtpPacketization#packetizeAccessUnit(byte[], int)} (a single-NAL payload per NAL that
+         * fits {@link #VIDEO_MTU_BYTES}, an FU-A fragment run for a NAL too large), packetizes each through
+         * {@link OutboundVideoRtpPacketizer#packetize(byte[], long, boolean)} sharing the access unit's
+         * ninety-kilohertz timestamp, and ships each through {@link MediaTransport#sendMedia} with the marker
+         * bit set only on the last packet of the picture. An empty access unit (a dropped frame) sends
+         * nothing.
+         *
+         * @implNote This implementation ports the H264 RTP fragmentation of {@code unnamed_function_8681} (the
+         * {@code H264PacketizationMode} writer) onto {@link H264RtpPacketization}: a NAL larger than the
+         * per-packet budget is split into FU-A units and the RTP marker is set on the final packet of the
+         * access unit, the symmetric counterpart of the inbound reassembly in {@link InboundH264Depacketizer}.
+         * The relayed video is NOT additionally sealed per-frame with the end-to-end SFrame transform: the live
+         * capture proved {@code wa_video_sframe_encode_cb} never fires on the SFU-relayed video send path (the
+         * media rides the relay hop-by-hop SRTP), so the fragments are protected only by hop-by-hop SRTP, the
+         * same as a one-to-one video call (re/calls2-spec/captures/sframe-frame-live.json).
+         *
+         * @param transport   the relay transport
+         * @param packetizer  the outbound video RTP packetizer holding the SSRC, sequence, and timestamp
+         * @param frame       the encoded access unit to send
+         */
+        private void sendVideoPacket(MediaTransport transport, OutboundVideoRtpPacketizer packetizer,
+                                     EncodedVideoFrame frame) {
+            try {
+                var payloads = H264RtpPacketization.packetizeAccessUnit(frame.payload(), VIDEO_MTU_BYTES);
+                for (var index = 0; index < payloads.size(); index++) {
+                    var payload = payloads.get(index);
+                    var marker = index == payloads.size() - 1;
+                    var packet = packetizer.packetize(payload, frame.ptsMicros(), marker);
+                    transport.sendMedia(packet, RTP_HEADER_LENGTH + payload.length);
+                }
+            } catch (RuntimeException exception) {
+                LOGGER.log(System.Logger.Level.DEBUG, "calls2 outbound video send failed", exception);
+            }
+        }
+
+        /**
+         * Writes one outbound ICE or DTLS datagram to a destination over the host UDP socket.
+         *
+         * <p>This is the {@link LiveRelayTransport.Egress} the transport ships its STUN connectivity checks
+         * and DTLS records through; the host socket is the {@code RTCPeerConnection}-equivalent ICE/DTLS
+         * transport socket, not a raw media socket. A send failure is best-effort: a dropped datagram is a
+         * routine loss the connectivity-check retransmission or the DTLS retransmission recovers.
+         *
+         * @param channel     the host UDP socket
+         * @param destination the transport address to send to
+         * @param payload     the datagram bytes
+         * @return the number of bytes accepted, or zero on failure
+         */
+        private static int socketSend(DatagramChannel channel, SocketAddress destination, byte[] payload) {
+            try {
+                return channel.send(ByteBuffer.wrap(payload), destination);
+            } catch (IOException exception) {
+                return 0;
+            }
+        }
+
+        /**
+         * Drains rendered samples from the playback ring for the playback driver and raises a demand pulse.
+         *
+         * <p>This is the {@link com.github.auties00.cobalt.calls2.platform.AudioPlaybackDriver.RenderedAudioSource}
+         * the playback driver pulls each time its device needs samples; it copies up to {@code frameCount}
+         * buffered samples out of the ring (a short or zero count when the ring is nearly drained, which the
+         * driver pads with silence) and signals demand so the writer pump tops the ring back up in time.
+         *
+         * @param playbackRing the playback ring the writer pump fills
+         * @param out          the buffer to render samples into
+         * @param frameCount   the maximum number of samples to render
+         * @return the number of samples copied, in {@code [0, frameCount]}
+         */
+        private static int drainPlaybackRing(AudioPlaybackRing playbackRing, short[] out, int frameCount) {
+            var produced = playbackRing.read(out, 0, frameCount);
+            playbackRing.signalDemand();
+            return produced;
+        }
+
+        /**
+         * Builds the video pipeline for a video call, or returns {@code null} when the codec cannot be
+         * opened.
+         *
+         * <p>Opens the negotiated baseline {@link VideoCodec} through the registry and wires a
+         * {@link LiveVideoJitterBuffer} inbound decode-and-render loop that delivers each decoded picture to
+         * the call's {@linkplain Calls2MediaStreams#videoPlayback() application video sink} when one was
+         * supplied, falling back to {@link VoipHostApi#renderVideoFrame} otherwise; the pipeline also drives
+         * the outbound encode leg from {@code videoCaptureSource} when one is present. That source is the
+         * application {@link VideoOutput} when the call supplied one, or the
+         * {@link ManagerVideoSourceBridge} the {@link #voipDriverManager}'s camera capture feeds when it did
+         * not, or {@code null} on a receive-only video leg. The encoder geometry is taken from the source's
+         * advertised {@link VideoOutput#width()} by {@link VideoOutput#height()} at {@link VideoOutput#fps()}
+         * when one is present, so the codec accepts the source's frames without a geometry-mismatch rejection,
+         * and the negotiated default geometry otherwise. A codec the build cannot open (the native binding is
+         * absent) is logged and the call proceeds audio-only.
+         *
+         * @param callId             the call identifier
+         * @param videoCaptureSource the resolved outbound video source the encode loop drains, or
+         *                           {@code null} when the call sends no video
+         * @param videoPlayback      the application video playback sink, or {@code null} to render through the
+         *                           host
+         * @return the built video pipeline, or {@code null} when the codec could not be opened
+         */
+        private VideoPipeline buildVideoPipeline(String callId, VideoOutput videoCaptureSource,
+                                                 VideoInput videoPlayback) {
+            try {
+                var registry = new VideoCodecRegistry();
+                var width = videoCaptureSource != null ? videoCaptureSource.width() : VIDEO_WIDTH;
+                var height = videoCaptureSource != null ? videoCaptureSource.height() : VIDEO_HEIGHT;
+                var frameRate = videoCaptureSource != null ? videoCaptureSource.fps() : VIDEO_FRAME_RATE;
+                var params = VideoCodecParams.forResolution(VideoDecoderCapability.H264, width, height, frameRate);
+                var codec = registry.open(params);
+                var estimator = new VideoJitterEstimator(VIDEO_JITTER_WINDOW);
+                var timing = new VideoTimingController(estimator);
+                var jitterBuffer = new LiveVideoJitterBuffer(estimator, timing,
+                        com.github.auties00.cobalt.calls2.dsp.AvSyncFeedbackSink.noop());
+                return new VideoPipeline(callId, host, codec, params, jitterBuffer, videoCaptureSource,
+                        videoPlayback);
+            } catch (RuntimeException | UnsatisfiedLinkError error) {
+                LOGGER.log(System.Logger.Level.WARNING,
+                        "calls2 video codec unavailable for call {0}; proceeding audio-only: {1}",
+                        callId, error.getMessage());
+                return null;
+            }
+        }
+
+        /**
+         * Builds the group SFrame key provider for a group call, installing the per-participant base key
+         * derived from the call key and the local device JID.
+         *
+         * <p>A one-to-one call relies on shared-key hop-by-hop SRTP and supplies no SFrame provider; this
+         * is called only on a group call. The base key derivation mixes the local device JID, so each
+         * participant device seals under a distinct key. A {@code null} return (the local JID is not yet
+         * known, or the call key is not the full raw length) leaves the call without an SFrame chain; the
+         * provider can be keyed only once both inputs are present.
+         *
+         * @implNote This implementation installs the per-participant base key through
+         * {@link CallE2eKeyDerivation#deriveSframeBaseKey}, whose schedule is verified byte-for-byte against
+         * live WASM memory paused at {@code derive_sframe_key} (group call-id
+         * {@code 008B72960DAE8E158B0D2201B9A6F98A}): for the captured raw key and device JID
+         * {@code 83116928594056:2@lid} the derived base key matched exactly
+         * (re/calls2-spec/captures/group-sframe-frame.json {@code hkdfVerification}), and the same raw key
+         * with a different device JID yields a different base key. The base key is installed under key id
+         * {@code 0}, as {@code generate_sframe_keys_for_participant} (fn10894) does through
+         * {@code sframe_keyprovider_set_chainkey}.
+         *
+         * @param callKey the thirty-two-byte raw end-to-end call key
+         * @return the SFrame key provider with the local base key installed, or {@code null} when the local
+         *         JID is not yet known or the call key is not the full raw length
+         */
+        private SFrameKeyProvider groupSframeProvider(byte[] callKey) {
+            var self = selfJid.get();
+            if (self == null || callKey.length != CallE2eKeyDerivation.RAW_E2E_KEY_LENGTH) {
+                return null;
+            }
+            var baseKey = CallE2eKeyDerivation.deriveSframeBaseKey(callKey, CallDeviceJid.of(self));
+            var provider = new SFrameKeyProvider();
+            provider.setChainKey(baseKey, 0L);
+            return provider;
+        }
+
+        /**
+         * Builds the local SSRC layout this client transmits on and the subscription layer advertises.
+         *
+         * <p>Derives the self device's deterministic media SSRCs from the call-id and the device JID through
+         * {@link CallSecureSsrcGenerator}: the audio main SSRC (media-type {@code 0}) the audio packetizer
+         * stamps, and, on a video call, the two simulcast video-stream primary SSRCs (media-type {@code 2})
+         * the video packetizer stamps, plus the application-data SSRC (media-type {@code 6}) the relay
+         * app-data stream stamps. An audio-only call leaves the video SSRCs {@link StreamLayout#ABSENT_SSRC}
+         * so no video descriptor is advertised, matching the native builder that appends a video descriptor
+         * only when video is active.
+         *
+         * @implNote This implementation reproduces the self-device SSRC set
+         * {@code call_generate_device_ssrc} (fn10901) allocates and {@code append_stream_descriptors} (fn5183)
+         * advertises: the audio triple primary (code {@code 0}), the two simulcast video triple primaries
+         * (code {@code 2}, stream ids {@code 0} and {@code 1}), and the app-data SSRC (code {@code 6},
+         * {@code append_app_data_ssrc_to_stream_descriptor} fn5184). The live-transcription SSRC
+         * ({@code append_live_transcription_ssrc_to_stream_descriptor} fn5185) and the hop-by-hop FEC
+         * transmit and receive SSRCs ({@code append_hbh_fec_ssrc_to_stream_descriptor} fn5186, media-types
+         * {@code 7}/{@code 8}) are left {@link StreamLayout#ABSENT_SSRC} here: the native appends each only
+         * when its feature flag is set (the {@code &DAT_ram_000005bd} live-transcription and
+         * {@code &DAT_ram_00000a89} hop-by-hop-FEC enable bytes in fn5182), and those flag defaults are not
+         * recovered, so advertising the streams unconditionally would over-declare what this client carries.
+         * The uplink-prefetch flag the app-data and video descriptors carry ({@code enable_uplink_prefetch},
+         * logged by fn5184) is runtime-derived and left {@code false}, its capture-consistent default. The
+         * SSRC values themselves are byte-verified against a live call in {@link CallSecureSsrcGenerator} (for
+         * the LID device JID form); the keying JID this method is handed is the own {@code <lid>:<device>@lid}
+         * device JID the {@link #selfJid} holder is seeded with (the assembler's
+         * {@code ownLidDeviceJid}), the same JID the SFrame key derivation reads, so the SSRCs and the SFrame
+         * keys are both derived from the byte-verified device-JID form and match the values a peer
+         * pre-registers. A {@code null} self JID (the holder not yet seeded) yields a random audio and app-data
+         * layout so the call still runs; this is a degenerate edge, not the faithful path, since a random SSRC
+         * will not match the value the peer pre-registers.
+         *
+         * @param callId        the call-id keying the secure-SSRC generation
+         * @param selfDeviceJid the local device's call JID, or {@code null} when the self-JID holder is not
+         *                      yet seeded
+         * @param video         whether the call sends video, so the video simulcast SSRCs are allocated
+         * @return the local SSRC layout
+         */
+        private static StreamLayout buildStreamLayout(String callId, Jid selfDeviceJid, boolean video) {
+            if (selfDeviceJid == null) {
+                // Degenerate edge: without the self device JID the deterministic SSRCs cannot be derived, so a
+                // random audio and app-data layout keeps the call running. Not faithful (a random SSRC will not
+                // match what the peer pre-registers); production always seeds the self JID at assembly.
+                var random = new java.security.SecureRandom();
+                return new StreamLayout(random.nextInt(), StreamLayout.ABSENT_SSRC, StreamLayout.ABSENT_SSRC,
+                        random.nextInt(), StreamLayout.ABSENT_SSRC, StreamLayout.ABSENT_SSRC,
+                        StreamLayout.ABSENT_SSRC, false);
+            }
+            // The keying JID is the self device's "<lid>:<device>@lid" device JID, the form
+            // call_generate_device_ssrc (fn10901) and the SFrame derivation (fn10896) key on and the form
+            // CallSecureSsrcGenerator is byte-verified against: the LiveMediaPlane.selfJid holder is seeded
+            // with the own LID device JID in Calls2EngineAssembler.ownLidDeviceJid (the account LID user with
+            // the device number off the account JID), not the account phone-number JID. The same holder feeds
+            // groupSframeProvider, so the stamped SSRCs and the SFrame base key are both derived from the
+            // byte-verified device-JID form and match the values a peer pre-registers.
+            var device = CallDeviceJid.of(selfDeviceJid);
+            var audioSsrc = CallSecureSsrcGenerator.audioMainSsrc(callId, device);
+            var appDataSsrc = CallSecureSsrcGenerator.appDataSsrc(callId, device);
+            var videoStream0Ssrc = video
+                    ? CallSecureSsrcGenerator.videoTriple(callId, device, 0).primary()
+                    : StreamLayout.ABSENT_SSRC;
+            var videoStream1Ssrc = video
+                    ? CallSecureSsrcGenerator.videoTriple(callId, device, 1).primary()
+                    : StreamLayout.ABSENT_SSRC;
+            return new StreamLayout(audioSsrc, videoStream0Ssrc, videoStream1Ssrc, appDataSsrc,
+                    StreamLayout.ABSENT_SSRC, StreamLayout.ABSENT_SSRC, StreamLayout.ABSENT_SSRC, false);
+        }
+
+        /**
+         * Returns the callback fired on each transport keepalive tick that ships this client's {@code 0x0003}
+         * subscription envelope over the data channel.
+         *
+         * <p>The relay forwards a peer's media to this client only after it has this client's subscription and
+         * stops forwarding within a few seconds once it goes stale, so the transport resends the envelope on its
+         * keepalive cadence ({@code rx_subscription_timer}) through
+         * {@link LiveRelayTransport#onSubscriptionResend(Runnable)}; it is shipped on every relay call
+         * (one-to-one audio included) and is never gated on the receive-subscription feature predicate. The
+         * {@code 0x4024} {@link StunAttributeType#WA_SUBSCRIPTION} attribute carries the fixed
+         * {@link StreamDescriptors} declaring this client's own send streams (the audio plus both simulcast video
+         * layers, each a media/FEC/NACK triple of distinct SSRCs), built once at assembly by
+         * {@link #buildSelfStreamDescriptors(String, Jid)} since the deterministic SSRCs do not change for the
+         * call's lifetime; each tick re-ships that same descriptor set through
+         * {@link LiveRelayTransport#sendSubscriptionEnvelope(StreamDescriptors)}. The descriptors are this
+         * client's own streams only: each endpoint declares its own streams in its own envelope, matching the
+         * live capture, so the call roster is not read here. It is a no-op when the transport is not yet built;
+         * the transport itself drops the send when it holds no relay key or reflexive address or the data channel
+         * is not open. The {@link SubscriptionStunAttribute} the publisher hands this callback is ignored: this
+         * revision ships the {@code 0x4024} descriptor envelope, so the descriptor set is the authoritative
+         * content and the publisher's tick is used only as the resend cadence.
+         *
+         * @param transportHolder the holder of the relay transport the envelope is shipped through, set once the
+         *                        transport is built
+         * @param selfDescriptors this client's own send-stream descriptors carried as the {@code 0x4024}
+         *                        attribute; never {@code null}
+         * @return the resend callback that emits the {@code 0x0003} envelope
+         */
+        private static Consumer<SubscriptionStunAttribute> subscriptionResender(
+                AtomicReference<LiveRelayTransport> transportHolder,
+                StreamDescriptors selfDescriptors) {
+            return _ -> {
+                var transport = transportHolder.get();
+                if (transport == null) {
+                    return;
+                }
+                transport.sendSubscriptionEnvelope(selfDescriptors);
+            };
+        }
+
+        /**
+         * Builds the fused {@code 0x4024} {@link StreamSubscriptions} matrix from the local send layout and the
+         * connected peers' receive SSRCs.
+         *
+         * <p>The matrix is a flat list of {@link StreamSubscriptions.Entry} entries, one per logical stream the
+         * client sends or wishes to receive, in the captured order: the participant-less self block first, then
+         * one block per connected peer in the order {@code peers} supplies. Each block holds the audio entry
+         * (no stream index, the stream-zero default the protobuf omits) followed by the two simulcast video
+         * entries (stream index {@code 1} and {@code 2}) when the call carries video and the stream's SSRC is
+         * present. The self block carries no participant field (it is the local sender, the
+         * {@code 0xf26a1143}-style own WARP SSRC the capture shows first); a peer block carries the peer's
+         * one-based positional index ({@code 1} for {@code peers.get(0)}, {@code 2} for {@code peers.get(1)},
+         * and so on) as its participant field. Every SSRC is carried as an unsigned {@code long} in the
+         * {@code 0..0xFFFFFFFF} range so a high-bit-set SSRC encodes as a five-byte unsigned varint rather than
+         * the ten-byte sign-extended form a negative {@code int} would produce.
+         *
+         * <p>An entry is emitted only when its SSRC is present: the self audio entry is always present (the
+         * layout always carries an audio SSRC), the self video entries are present only when {@code video} is
+         * set and the layout carries the corresponding simulcast SSRC, and a peer's video entries are present
+         * only when {@code video} is set and the peer derived that video stream's SSRC. A peer always
+         * contributes its audio entry, since {@link CallMembership#connectedPeerStreamSubscriptions()} only
+         * returns peers whose audio SSRC is derived.
+         *
+         * @implNote This implementation reproduces the fused matrix the newer wa-voip web revision publishes:
+         * the self block is the local {@link StreamLayout}, and each connected-peer block is that peer's
+         * deterministic per-stream SSRCs (audio main, video stream-0 primary, video stream-1 primary) tagged
+         * with the peer's client-local positional index. The audio entry omitting the stream index and the two
+         * video entries carrying stream {@code 1}/{@code 2} reproduce the capture
+         * (re/calls2-spec/captures/webrtc-datachannel-transport-2026-06-21.md): per participant a stream-less
+         * audio entry plus {@code stream=1} and {@code stream=2} video entries. The participant index being the
+         * positional loop index (self omitted, peers {@code 1..N}) rather than the relay PID is confirmed
+         * against {@code ff-tScznZ8P} fn5182/fn5183 (the {@code param2} loop counter feeding the participant
+         * field, not the participant PID field {@code [0x17a]} the {@code 0x4021} rx-subscription uses).
+         * @param streamLayout the local send SSRC layout the self block is built from; never {@code null}
+         * @param peers        the connected peers' per-stream receive SSRCs in subscription order; never
+         *                     {@code null}
+         * @param video        whether the call carries video, gating the video-stream entries
+         * @return the fused stream-subscription matrix
+         * @throws NullPointerException if {@code streamLayout} or {@code peers} is {@code null}
+         */
+        static StreamSubscriptions buildStreamSubscriptions(StreamLayout streamLayout,
+                                                            List<CallMembership.PeerStreamSsrcs> peers,
+                                                            boolean video) {
+            Objects.requireNonNull(streamLayout, "streamLayout cannot be null");
+            Objects.requireNonNull(peers, "peers cannot be null");
+            // TODO: this builds only the connect-time 0x4024 subscription, which is shipped on every relay call
+            //  (1:1 audio/video included) and is never gated, since the relay forwards media only once it has it.
+            //  The SEPARATE periodic default-stream (video) subscription carrying the leading 0x4000 WARP report
+            //  is not emitted yet (capture-gated: the 0x4000 control body is sealed by the relay hop-by-hop SRTP
+            //  layer and is not capture-reproducible; see the SubscriptionEnvelope class javadoc). When the
+            //  0x4000 emission is added it MUST be gated on WA's default-stream predicate, NOT on this 0x4024:
+            //  video_state == 1 AND connected-non-self-peers >= 3 (schedule_default_stream_subscription, fn6417)
+            //  AND the enable_rx_subscription master voip-param AND connected-participants-incl-self >=
+            //  min_num_participants_to_enable_rx_sub (override_voip_params_based_on_participant_count, fn10606).
+            var entries = new ArrayList<StreamSubscriptions.Entry>();
+            appendStreamSubscriptionBlock(entries, null,
+                    streamLayout.audioSsrc(),
+                    video ? streamLayout.videoStream0Ssrc() : StreamLayout.ABSENT_SSRC,
+                    video ? streamLayout.videoStream1Ssrc() : StreamLayout.ABSENT_SSRC);
+            var participantIndex = 1;
+            for (var peer : peers) {
+                appendStreamSubscriptionBlock(entries, participantIndex,
+                        peer.audioSsrc(),
+                        video ? peer.videoStream0Ssrc() : StreamLayout.ABSENT_SSRC,
+                        video ? peer.videoStream1Ssrc() : StreamLayout.ABSENT_SSRC);
+                participantIndex++;
+            }
+            return new StreamSubscriptionsBuilder()
+                    .entries(entries)
+                    .build();
+        }
+
+        /**
+         * Appends one participant's audio and video stream-subscription entries to the matrix.
+         *
+         * <p>Emits the audio entry (no stream index) when {@code audioSsrc} is present, then the first and
+         * second simulcast video entries (stream index {@code 1} and {@code 2}) when their SSRCs are present.
+         * Each present SSRC is carried as an unsigned {@code long}. An SSRC equal to
+         * {@link StreamLayout#ABSENT_SSRC} contributes no entry, so a participant sending only audio yields a
+         * single audio entry.
+         *
+         * @param into        the accumulator the entries are appended to
+         * @param participant the participant index to tag the entries with, or {@code null} for the self block
+         * @param audioSsrc   the participant's audio main SSRC, or {@link StreamLayout#ABSENT_SSRC} to omit it
+         * @param videoSsrc0  the participant's first simulcast video SSRC, or {@link StreamLayout#ABSENT_SSRC}
+         * @param videoSsrc1  the participant's second simulcast video SSRC, or {@link StreamLayout#ABSENT_SSRC}
+         */
+        private static void appendStreamSubscriptionBlock(List<StreamSubscriptions.Entry> into,
+                                                          Integer participant,
+                                                          int audioSsrc,
+                                                          int videoSsrc0,
+                                                          int videoSsrc1) {
+            appendStreamSubscriptionEntry(into, participant, null, audioSsrc);
+            appendStreamSubscriptionEntry(into, participant, 1, videoSsrc0);
+            appendStreamSubscriptionEntry(into, participant, 2, videoSsrc1);
+        }
+
+        /**
+         * Appends one stream-subscription entry to the matrix when its SSRC is present.
+         *
+         * <p>Builds a {@link StreamSubscriptions.Entry} binding the participant and stream indices to the SSRC
+         * carried as an unsigned {@code long}, and appends it. When {@code ssrc} is
+         * {@link StreamLayout#ABSENT_SSRC} nothing is appended.
+         *
+         * @param into        the accumulator the entry is appended to
+         * @param participant the participant index, or {@code null} for a self entry
+         * @param stream      the one-based stream index, or {@code null} for the audio stream
+         * @param ssrc        the stream SSRC, or {@link StreamLayout#ABSENT_SSRC} to skip
+         */
+        private static void appendStreamSubscriptionEntry(List<StreamSubscriptions.Entry> into,
+                                                          Integer participant,
+                                                          Integer stream,
+                                                          int ssrc) {
+            if (ssrc == StreamLayout.ABSENT_SSRC) {
+                return;
+            }
+            into.add(new StreamSubscriptionsEntryBuilder()
+                    .participant(participant)
+                    .stream(stream)
+                    .ssrc(Integer.toUnsignedLong(ssrc))
+                    .build());
+        }
+
+        /**
+         * Builds the {@code 0x4024} {@link StreamDescriptors} declaring this client's own send streams.
+         *
+         * <p>Emits a media, FEC, and NACK descriptor for the audio stream and for each of the two simulcast
+         * video streams, the nine-descriptor self stream set the live WhatsApp Web capture ships on every relay
+         * call (audio-only included). Each layer's three descriptors carry the three distinct SSRCs
+         * {@link CallSecureSsrcGenerator} derives for that layer (the audio {@code 0}/{@code 1}/{@code 4} code
+         * family and the video {@code 2}/{@code 3}/{@code 5} family), not one SSRC repeated, and the relay reads
+         * them to forward this client's media. The descriptors are this client's own streams only: a peer is not
+         * represented, since each endpoint declares its own streams in its own envelope. When
+         * {@code selfDeviceJid} is {@code null} (the degenerate no-identity bring-up) the descriptor list is
+         * empty.
+         *
+         * @param callId        the call-id string from the offer the deterministic SSRCs are derived under
+         * @param selfDeviceJid this client's own device JID the SSRCs are derived from, or {@code null}
+         * @return the local send-stream descriptors carried as the {@code 0x4024} attribute
+         */
+        static StreamDescriptors buildSelfStreamDescriptors(String callId, Jid selfDeviceJid) {
+            var descriptors = new ArrayList<StreamDescriptor>();
+            if (selfDeviceJid != null) {
+                var device = CallDeviceJid.of(selfDeviceJid);
+                appendSelfMediaTriple(descriptors, StreamDescriptor.StreamLayer.AUDIO,
+                        CallSecureSsrcGenerator.audioTriple(callId, device));
+                appendSelfMediaTriple(descriptors, StreamDescriptor.StreamLayer.VIDEO_STREAM0,
+                        CallSecureSsrcGenerator.videoTriple(callId, device, 0));
+                appendSelfMediaTriple(descriptors, StreamDescriptor.StreamLayer.VIDEO_STREAM1,
+                        CallSecureSsrcGenerator.videoTriple(callId, device, 1));
+            }
+            return new StreamDescriptorsBuilder()
+                    .streamDescriptors(descriptors)
+                    .build();
+        }
+
+        /**
+         * Appends the media, FEC, and NACK descriptors for one send layer from its SSRC triple.
+         *
+         * <p>The layer contributes three descriptors, in media, FEC, NACK order, carrying the triple's distinct
+         * {@code primary}, {@code fec}, and {@code oobNack} SSRCs respectively. Each descriptor binds the layer
+         * through its {@link StreamDescriptor.StreamLayer} field and the companion role through its
+         * {@link StreamDescriptor.PayloadType} field.
+         *
+         * @param into   the accumulator the descriptors are appended to
+         * @param layer  the logical send layer the triple describes
+         * @param triple the layer's {primary, FEC, out-of-band NACK} SSRC triple
+         */
+        private static void appendSelfMediaTriple(List<StreamDescriptor> into,
+                                                  StreamDescriptor.StreamLayer layer,
+                                                  CallSecureSsrcGenerator.SsrcTriple triple) {
+            into.add(new StreamDescriptorBuilder()
+                    .streamLayer(layer)
+                    .payloadType(StreamDescriptor.PayloadType.MEDIA)
+                    .ssrc(triple.primary())
+                    .build());
+            into.add(new StreamDescriptorBuilder()
+                    .streamLayer(layer)
+                    .payloadType(StreamDescriptor.PayloadType.FEC)
+                    .ssrc(triple.fec())
+                    .build());
+            into.add(new StreamDescriptorBuilder()
+                    .streamLayer(layer)
+                    .payloadType(StreamDescriptor.PayloadType.NACK)
+                    .ssrc(triple.oobNack())
+                    .build());
+        }
+
+        /**
+         * Returns the default Opus codec parameters for the call audio format.
+         *
+         * <p>Delegates to {@link OpusCodecParams#forSampleRate(int, int, OpusApplication)}, which seeds the
+         * bitrate triplet and the maximum-bandwidth ceiling from the per-sample-rate {@link OpusDefaultAttr}
+         * table and applies the WhatsApp voice defaults (variable bitrate on, in-band FEC on, discontinuous
+         * transmission on, voice signal, single frame per packet, twenty-millisecond frame), matching the
+         * sixteen-kilohertz mono format the public call audio uses.
+         *
+         * @return the default Opus codec parameters
+         */
+        private static OpusCodecParams defaultAudioParams() {
+            return OpusCodecParams.forSampleRate(AUDIO_SAMPLE_RATE_HZ, AUDIO_CHANNELS, OpusApplication.VOIP);
+        }
+
+        /**
+         * Builds the {@link LiveNetEq} decode-and-conceal codec seam over the call's decoder.
+         *
+         * <p>The {@link LiveNetEq} jitter buffer decodes or conceals one rendered frame per playback pull
+         * through this seam, then time-stretches and serves it; the seam runs on the single playback pump
+         * thread, so the decoder's single-writer contract holds and the encode path (a separate
+         * {@link OpusAudioCodec} on the capture pump thread) never races it.
+         *
+         * <p>A normal decode pairs the decoded samples with the packet's own voice-activity verdict read
+         * through {@link AudioDecoder#packetHasVoiceActivity(byte[])}, which the jitter buffer records and the
+         * receiver reads back for audio-level metering and mixing; a forward-error-correction reconstruction
+         * reports inactive because it carries no packet of its own.
+         *
+         * @param decoder the call's audio decoder the jitter buffer renders through
+         * @return the jitter buffer's decode-and-conceal codec seam
+         */
+        private static com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver.FrameDecoder
+        audioFrameDecoder(AudioDecoder decoder) {
+            return new com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver.FrameDecoder() {
+                @Override
+                public com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver.DecodedFrame
+                decode(byte[] payload, int frameSamples, boolean fec) {
+                    var samples = decoder.decode(payload, frameSamples, fec);
+                    var voiceActive = !fec && decoder.packetHasVoiceActivity(payload);
+                    return new com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver.DecodedFrame(
+                            samples, voiceActive);
+                }
+
+                @Override
+                public short[] conceal(int frameSamples) {
+                    return decoder.conceal(frameSamples);
+                }
+            };
+        }
+
+        /**
+         * Selects the relay endpoint the call's transport brings up against, with its ICE credentials and
+         * DTLS role.
+         *
+         * <p>Only UDP endpoints ({@code protocol == 0}) are usable. When the relay block carries more than
+         * one, the lowest-round-trip-time endpoint wins (the relay-election outcome the {@code <relaylatency>}
+         * exchange computes), using each endpoint's {@code c2r_rtt} when present and its {@code xrtt_ms}
+         * estimate otherwise. The selected endpoint's transport address becomes the bootstrap destination,
+         * its referenced {@code <auth_token>} (or {@code <token>}) becomes the remote ICE ufrag, and the relay
+         * block's raw {@code <key>} becomes the remote ICE password; an empty result means the block carried
+         * no usable endpoint, key, or credential.
+         *
+         * @implNote This implementation reproduces {@code createAnswerSdp} of
+         * {@code WAWebVoipRelayConnectionUtils} restricted to the relay endpoint: the synthesized answer's
+         * remote ufrag is {@code auth_token ?? token}, its remote pwd is the relay {@code <key>}, and the
+         * single host candidate is the elected endpoint's address. The address decode runs through the shared
+         * {@link RelayEndpoint} parser ({@code parse_endpoint_address} fn11623), confirmed by the live
+         * captures (for example {@code 1f0d563f0d96} = {@code 31.13.86.63:3478}). The DTLS active mode is
+         * carried as {@link RelayConnection#activeMode()} from the caller-supplied flag rather than read off
+         * the relay block: {@code enable_edgeray_dtls_active_mode} is a {@code vp->} voip-param (a
+         * {@link VoipParamKey} catalogue entry) delivered through the {@code <voip_settings>} channel, NOT a
+         * {@code <relay>} element attribute or child, so the
+         * {@link RelayInfo} parse cannot surface it; {@link #edgerayDtlsActiveMode(LiveVoipParamManager)}
+         * reads it from the active voip-param set and the bring-up threads it in here. A relay block whose
+         * negotiated voip-params do not set the flag selects {@code false} (the relay is the DTLS server, the
+         * only mode the live captures exercised).
+         *
+         * @param relayInfo  the parsed relay block
+         * @param activeMode whether the negotiated voip-params enabled DTLS active mode (the relay is then the
+         *                   DTLS client and this side is the DTLS server)
+         * @return the selected relay connection, or empty when none can be formed
+         */
+        private static Optional<RelayConnection> selectRelayConnection(RelayInfo relayInfo, boolean activeMode) {
+            var key = relayInfo.key();
+            if (key == null) {
+                return Optional.empty();
+            }
+            RelayEndpoint best = null;
+            var bestRtt = Integer.MAX_VALUE;
+            for (var endpoint : relayInfo.endpoints()) {
+                if (endpoint.protocol() != 0) {
+                    continue;
+                }
+                if (endpoint.address().isEmpty() || endpoint.port().isEmpty()) {
+                    continue;
+                }
+                var rtt = endpoint.c2rRttValue().orElse(endpoint.xrttMs());
+                if (best == null || rtt < bestRtt) {
+                    best = endpoint;
+                    bestRtt = rtt;
+                }
+            }
+            if (best == null) {
+                return Optional.empty();
+            }
+            var address = new InetSocketAddress(best.address().orElseThrow(), best.port().orElseThrow());
+            var remoteUfrag = relayCredential(relayInfo, best);
+            if (remoteUfrag == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new RelayConnection(address, remoteUfrag, key,
+                    relayTokenBytes(relayInfo, best), activeMode));
+        }
+
+        /**
+         * Resolves whether the relay leg runs DTLS in active mode, flipping the relay to the DTLS client role.
+         *
+         * <p>Reads the {@value #ENABLE_EDGERAY_DTLS_ACTIVE_MODE_PARAM} integer tunable from the manager's
+         * active set; a non-zero value enables active mode (the relay is the DTLS client and this side is the
+         * DTLS server), and an absent, zero, or non-integer value (including a call that negotiated no active
+         * set) leaves the relay as the DTLS server, the common and only-observed mode.
+         *
+         * <p>The flag is a {@code vp->} voip-param delivered through the {@code <voip_settings>} channel, not
+         * a field of the {@code <relay>} block: WhatsApp Web's {@code createAnswerSdp} reads
+         * {@code relay.enableEdgerayDtlsActiveMode} off the JS-surfaced relay object, but in the binary wire
+         * stanza the underlying {@code vp->enable_edgeray_dtls_active_mode} arrives as a voip-param rather
+         * than a relay attribute or child, so it is read here from the param manager rather than from
+         * {@link RelayInfo}.
+         *
+         * @param voipParamManager the call's voip-param manager whose active set carries the flag
+         * @return {@code true} when the relay leg runs DTLS active mode, {@code false} otherwise
+         */
+        private static boolean edgerayDtlsActiveMode(LiveVoipParamManager voipParamManager) {
+            var key = VoipParamKey.ofDottedPath(ENABLE_EDGERAY_DTLS_ACTIVE_MODE_PARAM).orElse(null);
+            var params = voipParamManager.activeParams().orElse(null);
+            if (key == null || params == null) {
+                return false;
+            }
+            return params.getInteger(key).orElse(0L) != 0L;
+        }
+
+        /**
+         * Resolves the relay credential bytes an endpoint references into the remote ICE ufrag string.
+         *
+         * <p>The endpoint's {@code auth_token_id} selects an {@code <auth_token>} credential when present,
+         * otherwise its {@code token_id} selects a {@code <token>}; the selected bytes are the remote ufrag.
+         * The raw credential bytes are base64-encoded into the ufrag string: WhatsApp Web's
+         * {@code createAnswerSdp} splices {@code authToken ?? token} verbatim into the synthesized answer's
+         * {@code a=ice-ufrag} (and the browser then carries that string verbatim as the STUN {@code USERNAME}
+         * remote ufrag the relay validates), and {@code parseRelayListUpdateData} surfaces those binary
+         * credentials to JS as their base64 text. The relay block delivers the {@code <auth_token>} and
+         * {@code <token>} as raw bytes, so they are encoded here, whereas the {@code <key>} that keys the
+         * STUN {@code MESSAGE-INTEGRITY} (the ICE password) already arrives as a base64 string and is used
+         * undecoded (see {@link RelayInfo#key()}).
+         *
+         * @implNote This implementation uses standard base64 with padding ({@link Base64#getEncoder()}),
+         * matching the encoding the relay block's {@code <key>} is delivered in and the {@code btoa}-shaped
+         * form the captured relay answer carries (re/calls2-spec/captures/webrtc-datachannel-transport-2026-06-21.md,
+         * the {@code CQMhDi6KCt95...} remote ufrag = base64 of the raw {@code 09 03 21...} auth-token bytes).
+         *
+         * @param relayInfo the parsed relay block
+         * @param endpoint  the selected endpoint
+         * @return the base64 remote ufrag string, or {@code null} when no referenced credential is present
+         */
+        private static String relayCredential(RelayInfo relayInfo, RelayEndpoint endpoint) {
+            var authTokenId = endpoint.authTokenId();
+            if (authTokenId != RelayEndpoint.UNSET_ID) {
+                for (var authToken : relayInfo.authTokens()) {
+                    if (authToken.id() == authTokenId) {
+                        return Base64.getEncoder().encodeToString(authToken.bytes());
+                    }
+                }
+            }
+            var tokenId = endpoint.tokenId();
+            for (var token : relayInfo.tokens()) {
+                if (tokenId == RelayEndpoint.UNSET_ID || token.id() == tokenId) {
+                    return Base64.getEncoder().encodeToString(token.bytes());
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Resolves the relay {@code <token>} bytes an endpoint references, for the leading {@code 0x4000}
+         * RELAY-TOKEN attribute of the {@code 0x0003} subscription envelope.
+         *
+         * <p>The endpoint's {@code token_id} selects a {@code <token>} child; its bytes are carried verbatim,
+         * because the relay binds the credential they reference before verifying the subscription's message
+         * integrity. Unlike the ICE ufrag ({@link #relayCredential(RelayInfo, RelayEndpoint)}, which prefers
+         * an {@code <auth_token>} and base64-encodes it), the RELAY-TOKEN is the raw {@code <token>} bytes.
+         *
+         * @param relayInfo the parsed relay block
+         * @param endpoint  the selected endpoint
+         * @return the raw relay token bytes, or {@code null} when no referenced token is present
+         */
+        private static byte[] relayTokenBytes(RelayInfo relayInfo, RelayEndpoint endpoint) {
+            var tokenId = endpoint.tokenId();
+            for (var token : relayInfo.tokens()) {
+                if (tokenId == RelayEndpoint.UNSET_ID || token.id() == tokenId) {
+                    return token.bytes();
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Builds the single relay host candidate the controlling ICE agent checks against.
+         *
+         * <p>The relay path synthesizes one remote host candidate at the relay address with the fixed
+         * priority {@code 2122262783} the synthesized answer carries.
+         *
+         * @param relayAddress the relay transport address
+         * @return the relay host candidate
+         */
+        private static IceCandidate relayHostCandidate(SocketAddress relayAddress) {
+            return new IceCandidate((InetSocketAddress) relayAddress, IceCandidate.Type.HOST,
+                    IceCandidate.Protocol.UDP, RELAY_HOST_CANDIDATE_PRIORITY);
+        }
+
+        /**
+         * Builds the local host candidate for the bound host UDP socket.
+         *
+         * <p>The candidate's address is the socket's local address; its priority is the RFC 8445 host
+         * priority for component one.
+         *
+         * @param channel the bound host UDP socket
+         * @return the local host candidate
+         * @throws WhatsAppCallException.DataChannel if the socket's local address cannot be read
+         */
+        private static IceCandidate localHostCandidate(DatagramChannel channel) {
+            try {
+                var local = channel.getLocalAddress();
+                var address = local instanceof InetSocketAddress inet
+                        ? inet
+                        : new InetSocketAddress(InetAddress.getLoopbackAddress(), 0);
+                return IceCandidate.of(address, IceCandidate.Type.HOST, IceCandidate.Protocol.UDP,
+                        ICE_HOST_LOCAL_PREFERENCE, ICE_RTP_COMPONENT_ID);
+            } catch (IOException exception) {
+                throw new WhatsAppCallException.DataChannel("could not read the local socket address", exception);
+            }
+        }
+
+        /**
+         * Generates a fresh local ICE username fragment.
+         *
+         * @return a base64url ICE ufrag with at least the RFC 8445 minimum length
+         */
+        private static String generateIceUfrag() {
+            return base64Url(VoipCryptoNative.randomBytes(ICE_UFRAG_RANDOM_BYTES));
+        }
+
+        /**
+         * Generates a fresh local ICE password.
+         *
+         * @return a base64url ICE password with at least the RFC 8445 minimum length, as raw ASCII bytes
+         */
+        private static byte[] generateIcePassword() {
+            return base64Url(VoipCryptoNative.randomBytes(ICE_PASSWORD_RANDOM_BYTES))
+                    .getBytes(StandardCharsets.US_ASCII);
+        }
+
+        /**
+         * Encodes bytes as an unpadded base64url string.
+         *
+         * @param bytes the bytes to encode
+         * @return the unpadded base64url encoding
+         */
+        private static String base64Url(byte[] bytes) {
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        }
+
+        /**
+         * Carries a selected relay endpoint's bootstrap address and synthesized ICE/DTLS parameters.
+         *
+         * @param address        the relay transport address the ICE checks and DTLS records are sent to
+         * @param remoteUfrag    the remote ICE ufrag, the relay {@code auth_token} or {@code token}
+         * @param remotePassword the remote ICE password, the relay {@code <key>} raw bytes
+         * @param relayToken     the relay {@code <token>} bytes carried as the {@code 0x4000} RELAY-TOKEN
+         *                       attribute of the {@code 0x0003} subscription envelope, or {@code null} when the
+         *                       endpoint references no token
+         * @param activeMode     whether the relay enabled DTLS active mode (the relay is then the DTLS
+         *                       client)
+         */
+        private record RelayConnection(SocketAddress address, String remoteUfrag, byte[] remotePassword,
+                                       byte[] relayToken, boolean activeMode) {
+        }
+
+        /**
+         * Parses the relay block's {@code <hbh_key>} into the thirty-byte hop-by-hop key.
+         *
+         * <p>The {@code <hbh_key>} element carries forty base64 ASCII characters that decode to the
+         * thirty-byte hop-by-hop key. A relay block carrying no {@code <hbh_key>}, or one that does not
+         * decode to thirty bytes, yields an empty result.
+         *
+         * @param relay the relay block subtree
+         * @return the thirty-byte hop-by-hop key, or empty when none can be parsed
+         */
+        private static Optional<byte[]> parseHopByHopKey(Node relay) {
+            return relay.getChild("hbh_key")
+                    .flatMap(Node::toContentString)
+                    .flatMap(LiveMediaPlane::decodeHopByHopKey);
+        }
+
+        /**
+         * Base64-decodes a {@code <hbh_key>} value to the thirty-byte hop-by-hop key.
+         *
+         * @param encoded the base64 ASCII {@code <hbh_key>} value
+         * @return the thirty-byte key, or empty when it does not decode to exactly thirty bytes
+         */
+        private static Optional<byte[]> decodeHopByHopKey(String encoded) {
+            try {
+                var decoded = Base64.getDecoder().decode(encoded.trim());
+                if (decoded.length != CallE2eKeyDerivation.HBH_KEY_LENGTH) {
+                    return Optional.empty();
+                }
+                return Optional.of(decoded);
+            } catch (IllegalArgumentException exception) {
+                return Optional.empty();
+            }
+        }
+
+        /**
+         * Releases partially-built bring-up components after a failure, swallowing any close error.
+         *
+         * @param channel      the host UDP socket, or {@code null}
+         * @param hbhSrtp      the hop-by-hop SRTP context, or {@code null}
+         * @param audioCodec   the audio codec (Opus or MLow), or {@code null}
+         * @param repacketizer the Opus repacketizer, or {@code null}
+         */
+        private static void releaseQuietly(DatagramChannel channel,
+                                           LiveHbhSrtpRelay hbhSrtp, AudioCodec audioCodec,
+                                           OpusRepacketizer repacketizer) {
+            stopQuietly(repacketizer == null ? null : repacketizer::close);
+            stopQuietly(audioCodec == null ? null : audioCodec::close);
+            stopQuietly(hbhSrtp == null ? null : hbhSrtp::close);
+            stopQuietly(channel == null ? null : () -> {
+                try {
+                    channel.close();
+                } catch (IOException exception) {
+                    throw new java.io.UncheckedIOException(exception);
+                }
+            });
+        }
+    }
+
+    /**
+     * The resolved audio capture half: the reader-pump source plus whether it is driven by a platform
+     * device through the engine's driver manager.
+     *
+     * <p>When the call supplied an application capture source the {@link #source()} is that source,
+     * {@link #usesDevice()} is {@code false}, and the {@link #bridge()} is {@code null}; when it relies on a
+     * platform device the source is the device {@link #bridge()}, {@link #usesDevice()} is {@code true}, and
+     * the manager's microphone capture is started for it.
+     *
+     * @param source     the {@link AudioOutput} the reader pump drains, or {@code null} when the capture half
+     *                   is idle
+     * @param usesDevice whether the half is driven by a platform capture device through the driver manager
+     *                   rather than an application source
+     * @param bridge     the device-to-{@link AudioOutput} bridge, or {@code null} when the application source
+     *                   is used
+     */
+    private record AudioCaptureHalf(AudioOutput source, boolean usesDevice, CaptureSourceBridge bridge) {
+    }
+
+    /**
+     * The resolved audio playback half: either an application render loop or a platform device, routed
+     * through the engine's driver manager, fed by the demand-driven writer pump.
+     *
+     * <p>When the call supplied an application playback sink the {@link #renderLoop()} delivers decoded
+     * frames to it, {@link #usesDevice()} is {@code false}, and the platform fields are {@code null}; when it
+     * relies on a platform device {@link #usesDevice()} is {@code true}, the {@link #writerPump()} and
+     * {@link #ring()} are its pump and ring, and the manager's playback is started for it.
+     *
+     * @param renderLoop the application playback render loop, or {@code null} when a platform device is used
+     * @param usesDevice whether the half is driven by a platform playback device through the driver manager
+     *                   rather than an application sink
+     * @param writerPump the demand-driven writer pump feeding the platform device, or {@code null} when the
+     *                   application sink is used
+     * @param ring       the playback ring the writer pump fills and the device drains, or {@code null} when
+     *                   the application sink is used
+     */
+    private record AudioPlaybackHalf(AudioPlaybackLoop renderLoop, boolean usesDevice,
+                                     AudioWriterPump writerPump, AudioPlaybackRing ring) {
+    }
+
+    /**
+     * A virtual-thread render loop that pulls decoded frames from the audio receiver at the jitter-buffer
+     * get period and delivers each to an application {@link AudioInput}
+     * playback sink.
+     *
+     * <p>This is the application-stream playback counterpart to the platform writer pump: instead of pacing a
+     * device line through an {@link AudioPlaybackRing}, it renders one frame per get period and offers it to
+     * the application sink, blocking on a steady twenty-millisecond cadence the receiver's decode satisfies.
+     * A speaker-bound sink renders the offered frame to its device, while a programmatic sink (a bot, a
+     * call-to-call bridge) buffers it for the application to read; either way the loop is the single producer
+     * of the sink. The presentation timestamp stamped on each frame advances one get period per pull from a
+     * zero origin, which a consumer that reorders or schedules frames can rely on as monotonically
+     * non-decreasing within the call. The loop runs on its own virtual thread, blocks freely, and exits on
+     * {@link #stop()}.
+     *
+     * @implNote This implementation renders on a fixed twenty-millisecond cadence rather than on a host
+     * demand pulse, because an application sink (unlike a platform AudioWorklet) raises no demand signal; the
+     * receiver's {@link com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver#pull(short[], int)}
+     * is the same per-frame decide-then-render the platform writer pump drives, so the only difference from
+     * the platform path is the pacing source and the delivery target.
+     */
+    private static final class AudioPlaybackLoop {
+        /**
+         * The render cadence, in nanoseconds, equal to the receiver's jitter-buffer get period.
+         */
+        private static final long RENDER_PERIOD_NANOS =
+                com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver.GET_PERIOD_MILLIS * 1_000_000L;
+
+        /**
+         * The number of microseconds in one rendered frame's presentation-timestamp advance.
+         */
+        private static final long FRAME_PTS_MICROS =
+                com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver.GET_PERIOD_MILLIS * 1_000L;
+
+        /**
+         * The call identifier, used in the render thread name and diagnostics.
+         */
+        private final String callId;
+
+        /**
+         * The decode-and-conceal receiver the loop pulls one rendered frame from per cadence tick.
+         */
+        private final com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver receiver;
+
+        /**
+         * The application playback sink each rendered frame is delivered to.
+         */
+        private final AudioInput sink;
+
+        /**
+         * Tracks whether the loop is running, so the render thread exits on {@link #stop()}.
+         */
+        private final AtomicBoolean running;
+
+        /**
+         * The render thread pulling and delivering frames, or {@code null} before {@link #start()}.
+         */
+        private Thread thread;
+
+        /**
+         * Constructs a playback render loop over the receiver and the application sink.
+         *
+         * @param callId   the call identifier
+         * @param receiver the decode-and-conceal receiver to pull rendered frames from
+         * @param sink     the application playback sink to deliver frames to
+         */
+        private AudioPlaybackLoop(String callId,
+                                  com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver receiver,
+                                  AudioInput sink) {
+            this.callId = callId;
+            this.receiver = receiver;
+            this.sink = sink;
+            this.running = new AtomicBoolean();
+        }
+
+        /**
+         * Starts the render loop on a fresh virtual thread.
+         *
+         * <p>Calling this more than once, or after {@link #stop()}, has no effect: only the first start binds
+         * the thread.
+         */
+        private void start() {
+            if (running.compareAndSet(false, true)) {
+                thread = Thread.ofVirtual().name("calls2-audio-render-" + callId).start(this::loop);
+            }
+        }
+
+        /**
+         * Stops the render loop and unblocks its thread.
+         *
+         * <p>Clears the running flag and interrupts the loop thread so a pending render-cadence park returns
+         * promptly and the loop exits. Idempotent.
+         */
+        private void stop() {
+            if (running.compareAndSet(true, false)) {
+                var current = thread;
+                if (current != null) {
+                    current.interrupt();
+                    java.util.concurrent.locks.LockSupport.unpark(current);
+                }
+            }
+        }
+
+        /**
+         * Runs the render loop until the loop is stopped.
+         *
+         * <p>Each tick pulls one frame from the receiver into a scratch array, copies the rendered samples
+         * out, stamps the advancing presentation timestamp, and offers the frame to the application sink, then
+         * parks for the render period. A pull yielding no samples still parks so the loop neither spins nor
+         * starves the sink. An interrupt ends the loop.
+         */
+        private void loop() {
+            var scratch = new short[com.github.auties00.cobalt.calls2.media.audio.AudioDecoderReceiver.FRAME_SAMPLES];
+            var ptsMicros = 0L;
+            while (running.get()) {
+                try {
+                    var produced = receiver.pull(scratch, scratch.length);
+                    if (produced > 0) {
+                        var samples = produced == scratch.length ? scratch.clone() : Arrays.copyOf(scratch, produced);
+                        sink.offer(new AudioFrame(samples, ptsMicros));
+                        ptsMicros += FRAME_PTS_MICROS;
+                    }
+                    java.util.concurrent.locks.LockSupport.parkNanos(RENDER_PERIOD_NANOS);
+                    if (Thread.interrupted()) {
+                        break;
+                    }
+                } catch (RuntimeException exception) {
+                    LOGGER.log(System.Logger.Level.DEBUG,
+                            "calls2 audio render error for call {0}: {1}", callId, exception.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * The RTP packetizer for the outbound audio stream: stamps each payload with a twelve-byte RTP header
+     * carrying the deterministic audio SSRC, the running sequence number, and the running media timestamp.
+     *
+     * <p>The packetizer owns the per-stream RTP state the transport does not: the synchronization source,
+     * the sixteen-bit sequence number, and the media-clock timestamp that advances one frame per packet.
+     * It writes the header followed by the payload into a buffer with trailing room for the hop-by-hop
+     * SRTP authentication tag the transport appends.
+     */
+    private static final class OutboundRtpPacketizer {
+        /**
+         * Holds the synchronization source of the outbound stream, the deterministic audio main SSRC the
+         * peer pre-registers a receive context for.
+         */
+        private final int ssrc;
+
+        /**
+         * Holds the next sixteen-bit RTP sequence number to stamp.
+         */
+        private int sequence;
+
+        /**
+         * Holds the next RTP media-clock timestamp to stamp, advanced by {@link #samplesPerPacket} per packet.
+         */
+        private long timestamp;
+
+        /**
+         * Holds the media-clock sample span of one outbound packet, the amount the timestamp advances per
+         * send: {@code AUDIO_FRAME_SAMPLES} (320, a 20 ms Opus packet) or
+         * {@code MLOW_FRAMES_PER_PACKET * AUDIO_FRAME_SAMPLES} (960, a 60 ms MLow packet), so the peer's
+         * playout clock advances by the audio each packet actually carries.
+         */
+        private final int samplesPerPacket;
+
+        /**
+         * Constructs a packetizer stamping the given audio SSRC with a zeroed sequence and timestamp.
+         *
+         * <p>The SSRC is the self device's deterministic audio main SSRC
+         * ({@link CallSecureSsrcGenerator#audioMainSsrc(String, CallDeviceJid)}, media-type {@code 0}), the
+         * value the peer pre-registers a receive context for, never random.
+         *
+         * @param ssrc             the outbound audio stream SSRC
+         * @param samplesPerPacket the media-clock sample span of one packet, the per-packet timestamp advance
+         */
+        private OutboundRtpPacketizer(int ssrc, int samplesPerPacket) {
+            this.ssrc = ssrc;
+            this.samplesPerPacket = samplesPerPacket;
+            this.sequence = 0;
+            this.timestamp = 0;
+        }
+
+        /**
+         * Packetizes one media payload into an RTP packet buffer with trailing SRTP tag room.
+         *
+         * <p>Builds the sixteen-byte header (version two, no padding, the extension bit set, the dynamic audio
+         * payload type, the running sequence and timestamp, the stream SSRC, and the empty {@code 0xDEBE}
+         * header extension), copies the payload after it, and leaves sixty-four bytes of trailing room for the
+         * transport's hop-by-hop SRTP tag. The sequence advances by one and the timestamp by
+         * {@link #samplesPerPacket}, the packet's own media-clock span.
+         *
+         * @param payload          the media payload to wrap
+         * @param extendedSequence the sender's extended sequence (used only for diagnostics; the wire
+         *                         sequence is the packetizer's own running counter)
+         * @return the RTP packet buffer, sized for the header, the extension, the payload, and the SRTP tag
+         * @implNote This implementation sets the extension bit ({@code 0x90}) and writes the four-byte
+         * {@code de be 00 00} empty header extension (profile {@code 0xDEBE}, zero word count) the live capture
+         * shows on every WhatsApp relayed media packet. The relay forwards a stream's media only when the
+         * extension is present, so the empty extension is stamped even though the per-element audio-level value
+         * is not (its extmap id is unrecovered, see {@code sendAudioPacket}). The end-to-end SRTP transform
+         * encrypts the payload after this header, locating its end from the extension bit, so the extension
+         * rides in the clear ahead of the ciphertext exactly as the captured packets carry it.
+         */
+        private byte[] packetize(byte[] payload, long extendedSequence) {
+            var packet = new byte[RTP_HEADER_LENGTH + RTP_HEADER_EXTENSION_LENGTH + payload.length + 64];
+            packet[0] = (byte) 0x90;
+            // The RTP marker bit flags the first packet of a talkspurt; the live capture sets it on the first
+            // media packet of the stream (and the peer's jitter buffer keys playout start off it). The stream
+            // starts one talkspurt here (a continuous file), so only the first packet carries the marker.
+            packet[1] = (byte) ((sequence == 0 ? 0x80 : 0x00) | (AUDIO_PAYLOAD_TYPE & 0x7F));
+            packet[2] = (byte) ((sequence >>> 8) & 0xFF);
+            packet[3] = (byte) (sequence & 0xFF);
+            packet[4] = (byte) ((timestamp >>> 24) & 0xFF);
+            packet[5] = (byte) ((timestamp >>> 16) & 0xFF);
+            packet[6] = (byte) ((timestamp >>> 8) & 0xFF);
+            packet[7] = (byte) (timestamp & 0xFF);
+            packet[8] = (byte) ((ssrc >>> 24) & 0xFF);
+            packet[9] = (byte) ((ssrc >>> 16) & 0xFF);
+            packet[10] = (byte) ((ssrc >>> 8) & 0xFF);
+            packet[11] = (byte) (ssrc & 0xFF);
+            packet[12] = (byte) 0xDE;
+            packet[13] = (byte) 0xBE;
+            packet[14] = 0;
+            packet[15] = 0;
+            System.arraycopy(payload, 0, packet, RTP_HEADER_LENGTH + RTP_HEADER_EXTENSION_LENGTH, payload.length);
+            sequence = (sequence + 1) & 0xFFFF;
+            timestamp += samplesPerPacket;
+            return packet;
+        }
+    }
+
+    /**
+     * The MLow send-path block aggregator: joins {@code MLOW_FRAMES_PER_PACKET} captured 20 ms blocks into one
+     * 60 ms block so MLow ships WhatsApp's 60 ms ptime while the capture pump keeps the 20 ms cadence the
+     * audio-processing front end needs.
+     *
+     * <p>Unlike Opus, MLow cannot concatenate separately-encoded frames: a 60 ms MLow packet is three 20 ms
+     * internal frames sharing one TOC byte and one range-coded bitstream, so the whole 960-sample span must
+     * be encoded in a single call. This aggregator sits between the {@link AudioReaderPump} and the
+     * {@link AudioEncoderSender}: it copies each captured block into a 960-sample buffer and, each time the
+     * buffer fills, hands the full 60 ms block to the wrapped sink in one
+     * {@link AudioReaderPump.AudioBlockSink#accept(short[], int)} call, which the sender encodes and ships as
+     * one packet through its ordinary single-frame path. The audio-processing front end has already run on the
+     * 20 ms blocks inside the pump, so accumulating here does not disturb it, and the sender keeps its natural
+     * one-block-one-packet contract with no empty-frame signalling. A partial buffer outstanding at call
+     * teardown (fewer than {@code MLOW_FRAMES_PER_PACKET} blocks, the last under 60 ms of audio) is dropped,
+     * since the pump stops without draining it.
+     *
+     * @implNote This implementation copies through its own buffer rather than retaining the pump's reused
+     * block, whose contents are valid only for the duration of one
+     * {@link AudioReaderPump.AudioBlockSink#accept(short[], int)} call. It drains any input longer than the
+     * buffer's remaining room across successive 60 ms emits, so it does not assume
+     * {@code AUDIO_FRAME_SAMPLES}-aligned blocks even though the wired pump delivers them.
+     */
+    private static final class Pcm60msAggregator implements AudioReaderPump.AudioBlockSink {
+        /**
+         * The sink each assembled 60 ms block is handed to, the audio encoder-sender.
+         */
+        private final AudioReaderPump.AudioBlockSink sink;
+
+        /**
+         * The 960-sample (60 ms) buffer captured blocks are copied into before being handed to the sink.
+         */
+        private final short[] buffer;
+
+        /**
+         * The number of valid samples currently held in {@link #buffer}.
+         */
+        private int filled;
+
+        /**
+         * Constructs an aggregator that assembles {@code blockCount} captured 20 ms blocks into one block
+         * before handing it to the given sink (three for MLow's 60 ms packet, two for Opus's 40 ms frame).
+         *
+         * @param sink       the sink each full assembled block is handed to; never {@code null}
+         * @param blockCount the number of {@code AUDIO_FRAME_SAMPLES}-sample 20 ms blocks aggregated into one
+         *                   emitted block
+         */
+        private Pcm60msAggregator(AudioReaderPump.AudioBlockSink sink, int blockCount) {
+            this.sink = Objects.requireNonNull(sink, "sink cannot be null");
+            this.buffer = new short[blockCount * AUDIO_FRAME_SAMPLES];
+            this.filled = 0;
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote This implementation copies the block into the 60 ms buffer and, whenever the buffer fills,
+         * hands it to the wrapped sink and resets; a block carrying more than the remaining room is drained
+         * across successive emits.
+         */
+        @Override
+        public void accept(short[] block, int length) {
+            var offset = 0;
+            while (offset < length) {
+                var take = Math.min(length - offset, buffer.length - filled);
+                System.arraycopy(block, offset, buffer, filled, take);
+                filled += take;
+                offset += take;
+                if (filled == buffer.length) {
+                    sink.accept(buffer, buffer.length);
+                    filled = 0;
+                }
+            }
+        }
+    }
+
+    /**
+     * The H264 RTP payload codec: splits an encoded access unit into the RTP payloads that carry it and
+     * reassembles received RTP payloads back into an access unit, in RFC 6184 single-NAL, STAP-A, and FU-A
+     * forms.
+     *
+     * <p>The outbound side ({@link #packetizeAccessUnit(byte[], int)}) parses the Annex-B access unit the
+     * H264 encoder emits into its NAL units, then emits one RTP payload per NAL that fits the per-packet
+     * budget (a single-NAL packet) and a sequence of fragmentation-unit payloads for a NAL too large to fit
+     * (FU-A), so no payload exceeds the path transmission unit. The inbound side
+     * ({@link InboundH264Depacketizer}) is a per-stream reassembler that recovers each NAL from a single-NAL,
+     * STAP-A aggregation, or FU-A fragment-run payload and concatenates the NAL units of one timestamp into
+     * an Annex-B access unit the decoder accepts, completing the access unit on the RTP marker bit.
+     *
+     * @implNote This implementation ports the H264 RTP payload format the wa-voip WASM module
+     * {@code ff-tScznZ8P} carries: the packetizer {@code unnamed_function_8681} (the
+     * {@code H264PacketizationMode::NonInterleaved}/{@code SingleNalUnit} writer, strings @138007, @931834)
+     * and the depacketizer {@code unnamed_function_8729}. The depacketizer's byte ops are the contract this
+     * codec mirrors: a payload's first byte low five bits select the form ({@code 0x1c} = type 28 FU-A,
+     * {@code 0x18} = type 24 STAP-A, anything else a single NAL); an FU-A payload carries a one-byte indicator
+     * then a one-byte FU header whose top bit is the start bit, second bit the end bit, and low five bits the
+     * original NAL type, and the reassembled NAL header is {@code (indicator & 0xe0) | (fuHeader & 0x1f)}
+     * (fn8729 line 197); a STAP-A payload carries the one-byte aggregation header then, per aggregated NAL, a
+     * two-byte big-endian length prefix and that many NAL bytes (fn8729 lines 341-419,
+     * {@code local_858 = local_9b2 << 8 | local_9b2 >> 8}). The packetizer fragments at the negotiated
+     * {@link #VIDEO_MTU_BYTES} so an FU-A fragment plus its RTP and SRTP overhead fits one datagram, and the
+     * caller sets the RTP marker bit only on the last packet of an access unit (fn8681 sets the
+     * end-of-access-unit flag on the final NAL, line ~458). The decoder geometry is the negotiated default
+     * until the inbound resolution is threaded through, the same missing video capture that would supply it
+     * (re/calls2-spec/captures/CAPTURE-FINDINGS.md Q8: RTP rides the worker UDP, invisible to a page capture;
+     * group video never connected, so no live fragmented-video RTP frame was capturable, and this codec is
+     * validated against the static fn8681/fn8729 byte ops rather than a live frame). STAP-A is parsed on the
+     * inbound side but not emitted on the outbound side: the native packetizer aggregates only the small
+     * parameter-set NALs into STAP-A and the precise aggregation threshold is not recovered, so a small NAL is
+     * sent as a single-NAL packet (the wire-equivalent the depacketizer also accepts) rather than fabricating
+     * an aggregation boundary.
+     */
+    private static final class H264RtpPacketization {
+        /**
+         * The RFC 6184 NAL-unit-type mask, the low five bits of a NAL header or RTP payload header byte.
+         */
+        private static final int NAL_TYPE_MASK = 0x1F;
+
+        /**
+         * The RFC 6184 NAL reference-idc and forbidden-zero mask, the high three bits of a NAL header byte
+         * carried forward from an FU-A indicator into the reassembled NAL header.
+         */
+        private static final int NAL_NRI_MASK = 0xE0;
+
+        /**
+         * The RFC 6184 STAP-A aggregation-packet NAL type, twenty-four.
+         */
+        private static final int NAL_TYPE_STAP_A = 24;
+
+        /**
+         * The RFC 6184 fragmentation-unit-A NAL type, twenty-eight.
+         */
+        private static final int NAL_TYPE_FU_A = 28;
+
+        /**
+         * The FU header start-bit mask, the high bit marking the first fragment of a fragmented NAL.
+         */
+        private static final int FU_START_BIT = 0x80;
+
+        /**
+         * The FU header end-bit mask, the second-highest bit marking the last fragment of a fragmented NAL.
+         */
+        private static final int FU_END_BIT = 0x40;
+
+        /**
+         * The number of bytes the codec payload budget reserves per packet beyond the RTP header: the
+         * hop-by-hop SRTP authentication tag room the transport appends.
+         */
+        private static final int PACKET_OVERHEAD_BYTES = RTP_SRTP_TAG_ROOM;
+
+        /**
+         * Hidden constructor; this is a stateless helper exposing only static members and the inbound
+         * reassembler.
+         */
+        private H264RtpPacketization() {
+            throw new AssertionError("No instances");
+        }
+
+        /**
+         * Splits one Annex-B H264 access unit into the RTP payloads that carry it.
+         *
+         * <p>The access unit is parsed into its NAL units on the Annex-B start codes the encoder emits; each
+         * NAL that fits the per-packet codec budget becomes one single-NAL payload, and each NAL too large is
+         * split into fragmentation-unit-A payloads whose first carries the start bit, whose last carries the
+         * end bit, and whose reassembled NAL type is the original NAL type. An empty or start-code-only access
+         * unit yields no payloads.
+         *
+         * @param accessUnit the Annex-B access unit bytes (NAL units delimited by {@code 00 00 01} or
+         *                   {@code 00 00 00 01} start codes)
+         * @param mtuBytes   the maximum datagram size; the per-packet codec payload budget is this minus the
+         *                   RTP header and the SRTP tag room
+         * @return the RTP payloads carrying the access unit, in send order, never {@code null}
+         */
+        private static List<byte[]> packetizeAccessUnit(byte[] accessUnit, int mtuBytes) {
+            var payloadBudget = mtuBytes - RTP_HEADER_LENGTH - PACKET_OVERHEAD_BYTES;
+            if (payloadBudget < 2) {
+                payloadBudget = 2;
+            }
+            var payloads = new ArrayList<byte[]>();
+            for (var nal : splitAnnexBNalUnits(accessUnit)) {
+                if (nal.length == 0) {
+                    continue;
+                }
+                if (nal.length <= payloadBudget) {
+                    payloads.add(nal);
+                } else {
+                    fragmentNal(nal, payloadBudget, payloads);
+                }
+            }
+            return payloads;
+        }
+
+        /**
+         * Splits an FU-A NAL into fragmentation-unit-A payloads sized to the per-packet budget.
+         *
+         * <p>The NAL's one-byte header is removed and its body is split into chunks each at most
+         * {@code payloadBudget - 2} bytes (the FU-A payload carries a one-byte indicator and a one-byte FU
+         * header before the fragment body). The indicator carries the original NAL's reference-idc and
+         * forbidden-zero bits with the FU-A type; the FU header carries the start bit on the first fragment,
+         * the end bit on the last, and the original NAL type in its low five bits.
+         *
+         * @param nal           the NAL unit including its one-byte header; longer than {@code payloadBudget}
+         * @param payloadBudget the per-packet codec payload budget
+         * @param out           the payload list each fragment is appended to
+         */
+        private static void fragmentNal(byte[] nal, int payloadBudget, List<byte[]> out) {
+            var header = nal[0] & 0xFF;
+            var indicator = (byte) ((header & NAL_NRI_MASK) | NAL_TYPE_FU_A);
+            var nalType = header & NAL_TYPE_MASK;
+            var fragmentBudget = Math.max(1, payloadBudget - 2);
+            var bodyOffset = 1;
+            var bodyLength = nal.length - 1;
+            while (bodyLength > 0) {
+                var chunk = Math.min(fragmentBudget, bodyLength);
+                var first = bodyOffset == 1;
+                var last = bodyLength - chunk == 0;
+                var fuHeader = nalType;
+                if (first) {
+                    fuHeader |= FU_START_BIT;
+                }
+                if (last) {
+                    fuHeader |= FU_END_BIT;
+                }
+                var payload = new byte[2 + chunk];
+                payload[0] = indicator;
+                payload[1] = (byte) fuHeader;
+                System.arraycopy(nal, bodyOffset, payload, 2, chunk);
+                out.add(payload);
+                bodyOffset += chunk;
+                bodyLength -= chunk;
+            }
+        }
+
+        /**
+         * Splits an Annex-B byte stream into its NAL units, dropping the start codes.
+         *
+         * <p>A NAL unit boundary is the three-byte {@code 00 00 01} start-code prefix, which a four-byte
+         * {@code 00 00 00 01} start code carries as its last three bytes; the bytes after one prefix up to the
+         * next prefix (or the end) are one NAL unit, with the extra leading zero of a four-byte code trimmed off
+         * the preceding NAL's tail. A stream with no start code is treated as a single NAL unit so a
+         * length-prefix-free or already-bare access unit is not dropped.
+         *
+         * @param stream the Annex-B (or bare) access-unit bytes
+         * @return the NAL units in order, each with its one-byte NAL header but no start code
+         */
+        private static List<byte[]> splitAnnexBNalUnits(byte[] stream) {
+            var nals = new ArrayList<byte[]>();
+            var firstTriple = findStartCode(stream, 0);
+            if (firstTriple < 0) {
+                if (stream.length > 0) {
+                    nals.add(stream.clone());
+                }
+                return nals;
+            }
+            var nalStart = firstTriple + 3;
+            while (nalStart <= stream.length) {
+                var nextTriple = findStartCode(stream, nalStart);
+                if (nextTriple < 0) {
+                    if (nalStart < stream.length) {
+                        nals.add(Arrays.copyOfRange(stream, nalStart, stream.length));
+                    }
+                    break;
+                }
+                // The NAL ends at the next start-code prefix; a four-byte start code (the triple preceded by an
+                // extra zero) leaves that leading zero out of the NAL's tail.
+                var nalEnd = nextTriple > nalStart && stream[nextTriple - 1] == 0 ? nextTriple - 1 : nextTriple;
+                if (nalEnd > nalStart) {
+                    nals.add(Arrays.copyOfRange(stream, nalStart, nalEnd));
+                }
+                nalStart = nextTriple + 3;
+            }
+            return nals;
+        }
+
+        /**
+         * Returns the index of the next {@code 00 00 01} start-code prefix at or after the given offset, or
+         * {@code -1} when none remains.
+         *
+         * <p>The returned index is the prefix's first {@code 0x00} byte; the NAL unit it delimits begins three
+         * bytes later, and a four-byte {@code 00 00 00 01} start code is the same prefix with one more leading
+         * zero, so the prefix scan locates both forms.
+         *
+         * @param stream the byte stream to scan
+         * @param from   the offset to start scanning from
+         * @return the index of the {@code 00 00 01} prefix's first {@code 0x00} byte, or {@code -1}
+         */
+        private static int findStartCode(byte[] stream, int from) {
+            for (var i = Math.max(0, from); i + 2 < stream.length; i++) {
+                if (stream[i] == 0 && stream[i + 1] == 0 && stream[i + 2] == 1) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /**
+         * Wraps a reassembled list of NAL units into an Annex-B access unit.
+         *
+         * <p>Each NAL unit is prefixed with a four-byte {@code 00 00 00 01} start code, the form the H264
+         * decoder accepts, and the prefixed NAL units are concatenated in order.
+         *
+         * @param nalUnits the NAL units of one access unit, in order
+         * @return the Annex-B access-unit bytes
+         */
+        private static byte[] toAnnexB(List<byte[]> nalUnits) {
+            var size = 0;
+            for (var nal : nalUnits) {
+                size += 4 + nal.length;
+            }
+            var out = new byte[size];
+            var offset = 0;
+            for (var nal : nalUnits) {
+                out[offset + 2] = 0;
+                out[offset + 3] = 1;
+                System.arraycopy(nal, 0, out, offset + 4, nal.length);
+                offset += 4 + nal.length;
+            }
+            return out;
+        }
+    }
+
+    /**
+     * The per-stream inbound H264 RTP reassembler: recovers each NAL unit from a single-NAL, STAP-A, or FU-A
+     * RTP payload and concatenates the NAL units of one access unit, completing it on the RTP marker bit.
+     *
+     * <p>The demux hands this each cleartext video RTP payload (after the RTP header is stripped and the
+     * SFrame layer, when present, is opened) together with the packet's RTP timestamp and marker bit. A
+     * single-NAL payload contributes one NAL, a STAP-A payload contributes the aggregated NALs it carries, and
+     * an FU-A run contributes one NAL reassembled across its start-to-end fragments. The reassembler buffers
+     * the NAL units of the current access unit until the marker bit (the last packet of a picture) or a
+     * timestamp change flushes them as one Annex-B access unit; a fragment lost mid-FU-A drops the partial NAL.
+     *
+     * @implNote This implementation reproduces the inbound side of {@code unnamed_function_8729} of the
+     * wa-voip WASM module {@code ff-tScznZ8P}: the form switch on the payload header's low five bits, the FU-A
+     * fragment accumulation that prepends the reconstructed NAL header {@code (indicator & 0xe0) |
+     * (fuHeader & 0x1f)} (fn8729 line 197) on the start fragment, and the STAP-A split on the two-byte
+     * big-endian length prefixes (fn8729 lines 341-419). The native depacketizer additionally rewrites a
+     * duplicate H264 SPS NAL inside a STAP-A packet ("Keeping the first and rewriting the last", string
+     * @835514) and validates SPS/PPS NAL ordering; those parameter-set rewrites are not reproduced here
+     * because they are an OpenH264-decoder-specific normalisation the Cobalt decoder does not require and the
+     * exact rewrite is obscured in the decompilation, so the aggregated NALs are passed through in wire order.
+     */
+    private static final class InboundH264Depacketizer {
+        /**
+         * The NAL units accumulated for the access unit currently being reassembled, in arrival order.
+         */
+        private final List<byte[]> currentAccessUnit = new ArrayList<>();
+
+        /**
+         * The fragments of the FU-A NAL currently being reassembled, or empty when no FU-A is in progress.
+         */
+        private final List<byte[]> currentFragments = new ArrayList<>();
+
+        /**
+         * The reconstructed NAL header byte of the FU-A NAL in progress, valid only while
+         * {@link #currentFragments} is non-empty.
+         */
+        private int currentFragmentNalHeader;
+
+        /**
+         * The RTP timestamp of the access unit currently being reassembled, or {@code -1} when none is in
+         * progress.
+         */
+        private long currentTimestamp = -1;
+
+        /**
+         * Accepts one cleartext video RTP payload, returning a completed Annex-B access unit when the packet
+         * closes one.
+         *
+         * <p>A timestamp different from the access unit in progress flushes any buffered NAL units first (a
+         * missing marker is tolerated this way), then the payload's form contributes its NAL units to the
+         * current access unit, and the marker bit completes and returns it. A payload that contributes nothing
+         * (an empty payload, an incomplete STAP-A, or an FU-A fragment that does not complete a NAL) returns
+         * {@code null}.
+         *
+         * @param payload   the cleartext RTP payload (the bytes past the twelve-byte RTP header), SFrame
+         *                  opened on a group call
+         * @param timestamp the packet's RTP timestamp, the access-unit grouping key
+         * @param marker    whether the RTP marker bit is set, marking the last packet of the access unit
+         * @return the completed Annex-B access unit, or {@code null} when the packet does not close one
+         */
+        private byte[] accept(byte[] payload, long timestamp, boolean marker) {
+            if (currentTimestamp != -1 && timestamp != currentTimestamp) {
+                currentFragments.clear();
+                currentAccessUnit.clear();
+            }
+            currentTimestamp = timestamp;
+            if (payload.length == 0) {
+                return marker ? completeAccessUnit() : null;
+            }
+            var type = payload[0] & H264RtpPacketization.NAL_TYPE_MASK;
+            if (type == H264RtpPacketization.NAL_TYPE_FU_A) {
+                acceptFragment(payload);
+            } else if (type == H264RtpPacketization.NAL_TYPE_STAP_A) {
+                acceptStapA(payload);
+            } else {
+                currentAccessUnit.add(payload.clone());
+            }
+            return marker ? completeAccessUnit() : null;
+        }
+
+        /**
+         * Accepts one fragmentation-unit-A payload, completing a NAL when the end fragment arrives.
+         *
+         * <p>The start fragment opens the reassembly and records the reconstructed NAL header from the FU-A
+         * indicator's reference bits and the FU header's NAL type; each fragment's body is appended; the end
+         * fragment closes the NAL and adds it to the current access unit. A fragment arriving without a start
+         * fragment in progress is dropped (the start was lost), and a start fragment arriving mid-reassembly
+         * discards the previous partial NAL.
+         *
+         * @param payload the FU-A RTP payload (indicator byte, FU header byte, then the fragment body)
+         */
+        private void acceptFragment(byte[] payload) {
+            if (payload.length < 2) {
+                return;
+            }
+            var indicator = payload[0] & 0xFF;
+            var fuHeader = payload[1] & 0xFF;
+            var start = (fuHeader & H264RtpPacketization.FU_START_BIT) != 0;
+            var end = (fuHeader & H264RtpPacketization.FU_END_BIT) != 0;
+            if (start) {
+                currentFragments.clear();
+                currentFragmentNalHeader = (indicator & H264RtpPacketization.NAL_NRI_MASK)
+                        | (fuHeader & H264RtpPacketization.NAL_TYPE_MASK);
+            } else if (currentFragments.isEmpty()) {
+                return;
+            }
+            currentFragments.add(Arrays.copyOfRange(payload, 2, payload.length));
+            if (end && !currentFragments.isEmpty()) {
+                var size = 1;
+                for (var fragment : currentFragments) {
+                    size += fragment.length;
+                }
+                var nal = new byte[size];
+                nal[0] = (byte) currentFragmentNalHeader;
+                var offset = 1;
+                for (var fragment : currentFragments) {
+                    System.arraycopy(fragment, 0, nal, offset, fragment.length);
+                    offset += fragment.length;
+                }
+                currentFragments.clear();
+                currentAccessUnit.add(nal);
+            }
+        }
+
+        /**
+         * Accepts one STAP-A aggregation payload, adding each aggregated NAL to the current access unit.
+         *
+         * <p>The one-byte aggregation header is skipped, then each aggregated NAL is read as a two-byte
+         * big-endian length prefix followed by that many NAL bytes; a truncated prefix or length ends the
+         * parse.
+         *
+         * @param payload the STAP-A RTP payload (aggregation header, then per-NAL length-prefixed units)
+         */
+        private void acceptStapA(byte[] payload) {
+            var offset = 1;
+            while (offset + 2 <= payload.length) {
+                var nalLength = ((payload[offset] & 0xFF) << 8) | (payload[offset + 1] & 0xFF);
+                offset += 2;
+                if (nalLength == 0 || offset + nalLength > payload.length) {
+                    return;
+                }
+                currentAccessUnit.add(Arrays.copyOfRange(payload, offset, offset + nalLength));
+                offset += nalLength;
+            }
+        }
+
+        /**
+         * Flushes the buffered NAL units into an Annex-B access unit and resets for the next picture.
+         *
+         * <p>Returns {@code null} when no NAL unit was buffered (for example a marker on a packet whose NALs
+         * were all dropped), so the caller inserts nothing.
+         *
+         * @return the completed Annex-B access unit, or {@code null} when nothing was buffered
+         */
+        private byte[] completeAccessUnit() {
+            if (currentAccessUnit.isEmpty()) {
+                currentFragments.clear();
+                currentTimestamp = -1;
+                return null;
+            }
+            var accessUnit = H264RtpPacketization.toAnnexB(currentAccessUnit);
+            currentAccessUnit.clear();
+            currentFragments.clear();
+            currentTimestamp = -1;
+            return accessUnit;
+        }
+    }
+
+    /**
+     * The RTP packetizer for the outbound video stream: stamps each encoded access unit with a twelve-byte
+     * RTP header carrying the deterministic video SSRC, the running sequence number, and the ninety-kilohertz
+     * capture timestamp.
+     *
+     * <p>The packetizer owns the per-stream video RTP state the transport does not: the synchronization
+     * source, the sixteen-bit sequence number, and the ninety-kilohertz media-clock timestamp derived from
+     * each access unit's presentation timestamp. The caller splits each access unit into RTP payloads through
+     * {@link H264RtpPacketization#packetizeAccessUnit(byte[], int)} and packetizes each payload here, sharing
+     * one ninety-kilohertz timestamp across the picture's packets and setting the marker bit only on the last;
+     * each call writes the header followed by the payload bytes into a buffer with trailing room for the
+     * hop-by-hop SRTP authentication tag the transport appends.
+     */
+    private static final class OutboundVideoRtpPacketizer {
+        /**
+         * Holds the synchronization source of the outbound video stream, the deterministic primary SSRC of
+         * the first video simulcast layer the peer pre-registers a receive context for.
+         */
+        private final int ssrc;
+
+        /**
+         * Holds the next sixteen-bit RTP sequence number to stamp.
+         */
+        private int sequence;
+
+        /**
+         * Constructs a video packetizer stamping the given video SSRC with a zeroed sequence.
+         *
+         * <p>The SSRC is the self device's deterministic first-simulcast-layer primary video SSRC
+         * ({@link CallSecureSsrcGenerator#videoTriple(String, CallDeviceJid, int)} stream {@code 0},
+         * media-type {@code 2}), the value the peer pre-registers a receive context for, never random.
+         *
+         * @param ssrc the outbound video stream SSRC
+         */
+        private OutboundVideoRtpPacketizer(int ssrc) {
+            this.ssrc = ssrc;
+            this.sequence = 0;
+        }
+
+        /**
+         * Packetizes one RTP payload of an access unit into a video RTP packet buffer with trailing SRTP tag
+         * room, stamping the marker bit on the last packet of the picture.
+         *
+         * <p>Builds the twelve-byte header (version two, no padding, no extension, the marker bit set only
+         * when {@code marker} is set, the dynamic video payload type, the running sequence, the
+         * ninety-kilohertz timestamp derived from the access unit's microsecond presentation timestamp shared
+         * across the picture's packets, and the stream SSRC), copies the payload after it, and leaves
+         * sixty-four bytes of trailing room for the transport's hop-by-hop SRTP tag. The sequence advances by
+         * one. Every packet of one access unit carries the same timestamp so the depacketizer groups them.
+         *
+         * @param payload   the RTP payload bytes to wrap (a single NAL or one FU-A fragment of the access
+         *                  unit)
+         * @param ptsMicros the access unit's presentation timestamp in microseconds, mapped to the
+         *                  ninety-kilohertz RTP clock
+         * @param marker    whether to set the RTP marker bit, marking the last packet of the access unit
+         * @return the RTP packet buffer, sized for the header, the payload, and the SRTP tag
+         */
+        private byte[] packetize(byte[] payload, long ptsMicros, boolean marker) {
+            var timestamp = ptsMicros * VIDEO_RTP_CLOCK_RATE / 1_000_000L;
+            var packet = new byte[RTP_HEADER_LENGTH + payload.length + 64];
+            packet[0] = (byte) 0x80;
+            packet[1] = (byte) ((marker ? 0x80 : 0x00) | (VIDEO_PAYLOAD_TYPE & 0x7F));
+            packet[2] = (byte) ((sequence >>> 8) & 0xFF);
+            packet[3] = (byte) (sequence & 0xFF);
+            packet[4] = (byte) ((timestamp >>> 24) & 0xFF);
+            packet[5] = (byte) ((timestamp >>> 16) & 0xFF);
+            packet[6] = (byte) ((timestamp >>> 8) & 0xFF);
+            packet[7] = (byte) (timestamp & 0xFF);
+            packet[8] = (byte) ((ssrc >>> 24) & 0xFF);
+            packet[9] = (byte) ((ssrc >>> 16) & 0xFF);
+            packet[10] = (byte) ((ssrc >>> 8) & 0xFF);
+            packet[11] = (byte) (ssrc & 0xFF);
+            System.arraycopy(payload, 0, packet, RTP_HEADER_LENGTH, payload.length);
+            sequence = (sequence + 1) & 0xFFFF;
+            return packet;
+        }
+    }
+
+    /**
+     * The inbound media RTP demultiplexer: routes each cleartext media packet by its RTP payload type to
+     * the audio jitter buffer or the video jitter buffer.
+     *
+     * <p>The transport's media sink hands this the hop-by-hop-decrypted RTP bytes (carried as SCTP DATA on
+     * the data channel and decrypted by the transport); the payload type selects the route. An audio packet
+     * has its header stripped, its body SFrame-opened on a group call, and the recovered codec packet
+     * inserted into NetEq for the writer pump to render. Any other payload type is treated as video and
+     * inserted into the video jitter buffer when one is up. A malformed packet, or one whose SFrame opening
+     * fails, is dropped. Application data does not ride RTP on the web transport: it is carried as its own
+     * SCTP DATA messages and demultiplexed by the transport, so it does not reach this media demux.
+     */
+    private static final class InboundMediaDemux {
+        /**
+         * Holds the NetEq jitter buffer audio packets are inserted into.
+         */
+        private final LiveNetEq netEq;
+
+        /**
+         * Holds the live reference to the call's video pipeline inbound video packets are inserted into,
+         * holding {@code null} until the call carries video.
+         *
+         * <p>This is the session's single video-pipeline holder, shared rather than snapshotted, so the
+         * receive thread reads the pipeline a mid-call audio-to-video upgrade publishes rather than the
+         * {@code null} captured when an audio-only call was brought up. It is read on every inbound media
+         * packet through {@link AtomicReference#get()}, whose volatile semantics safely publish the upgrade's
+         * pipeline to this thread.
+         */
+        private final AtomicReference<VideoPipeline> videoPipeline;
+
+        /**
+         * Holds the group SFrame chain that opens an inbound payload, or {@code null} on a one-to-one
+         * call.
+         */
+        private final SFrameKeyProvider sframeProvider;
+
+        /**
+         * Holds the rate-control loop each inbound media packet's arrival timing is teed into for the GoogCC
+         * delay-based estimate.
+         */
+        private final Calls2RateControlLoop rateControlLoop;
+
+        /**
+         * Reassembles inbound video RTP payloads into Annex-B access units across single-NAL, STAP-A, and FU-A
+         * forms before they are inserted into the video jitter buffer.
+         *
+         * <p>Owned by the demux as per-stream reassembly state and driven only on the single transport receive
+         * thread, so it needs no synchronization. A one-to-one or audio-only call never feeds it; a video call
+         * routes every video packet through it so a picture fragmented across RTP packets is reassembled rather
+         * than truncated to its first packet.
+         */
+        private final InboundH264Depacketizer videoDepacketizer;
+
+        /**
+         * Constructs a demultiplexer over the audio jitter buffer, the optional video pipeline, the optional
+         * SFrame chain, and the rate-control loop.
+         *
+         * @param netEq           the NetEq jitter buffer audio packets are inserted into
+         * @param videoPipeline   the live video-pipeline holder video packets are inserted into, holding
+         *                        {@code null} until the call carries video
+         * @param sframeProvider  the group SFrame chain, or {@code null} on a one-to-one call
+         * @param rateControlLoop the rate-control loop each media packet's arrival timing is teed into
+         */
+        private InboundMediaDemux(LiveNetEq netEq, AtomicReference<VideoPipeline> videoPipeline,
+                                  SFrameKeyProvider sframeProvider,
+                                  Calls2RateControlLoop rateControlLoop) {
+            this.netEq = netEq;
+            this.videoPipeline = videoPipeline;
+            this.sframeProvider = sframeProvider;
+            this.rateControlLoop = rateControlLoop;
+            this.videoDepacketizer = new InboundH264Depacketizer();
+        }
+
+        /**
+         * Accepts one inbound cleartext media RTP packet from the transport media sink and routes it by its
+         * RTP payload type.
+         *
+         * <p>This is the {@link Consumer Consumer&lt;byte[]&gt;} the {@link LiveRelayTransport} media sink
+         * invokes for every hop-by-hop-decrypted media packet. A packet shorter than the twelve-byte RTP
+         * header is dropped; otherwise the payload type selects the route: the audio payload type goes to the
+         * audio pipeline and any other goes to the video pipeline when one is up (falling back to the audio
+         * pipeline before a video pipeline exists). Each media packet's send and arrival timing is teed into
+         * the rate-control loop's GoogCC delay-based estimator before it is decoded.
+         *
+         * @param rtpPacket the inbound cleartext RTP packet bytes
+         */
+        private void onTransportMedia(byte[] rtpPacket) {
+            if (rtpPacket.length < RTP_HEADER_LENGTH) {
+                return;
+            }
+            var payloadType = rtpPacket[1] & 0x7F;
+            // Snapshot the live video pipeline once for this packet so the null check and the insert see the
+            // same reference even if a mid-call upgrade publishes the pipeline between them.
+            var pipeline = videoPipeline.get();
+            if (payloadType == AUDIO_PAYLOAD_TYPE) {
+                teeArrivalTiming(rtpPacket, AUDIO_RTP_CLOCK_RATE);
+                acceptAudio(rtpPacket);
+            } else if (pipeline == null) {
+                teeArrivalTiming(rtpPacket, AUDIO_RTP_CLOCK_RATE);
+                acceptAudio(rtpPacket);
+            } else {
+                teeArrivalTiming(rtpPacket, VIDEO_RTP_CLOCK_RATE);
+                acceptVideo(pipeline, rtpPacket);
+            }
+        }
+
+        /**
+         * Tees one inbound media packet's send and arrival timing into the rate-control loop's GoogCC
+         * delay-based estimator.
+         *
+         * <p>The packet's RTP timestamp (in {@code clockRateHz} units) is converted to a millisecond send
+         * time, the local arrival time is taken from {@link System#nanoTime()} in milliseconds, and the media
+         * payload size (the packet length past the twelve-byte RTP header) is the byte count; the estimator
+         * groups packets by send burst and fits its over-use trendline from these arrival deltas (SPEC 14.2,
+         * 15.1). A failed tee is swallowed so an estimator hiccup never disturbs the decode path.
+         *
+         * @implNote This implementation reproduces the per-packet {@code process_rtp} feed
+         * ({@code bwe/bwe_webrtc_delay_based.cc} fn6197) by converting the wire RTP timestamp to milliseconds
+         * with {@code rtpTimestamp * 1000 / clockRateHz}, the standard RTP-to-wall-clock scaling, rather than
+         * carrying the abstime header-extension send time the engine prefers when present: that extension's
+         * negotiated id is unrecovered (the same blocked extmap-id gap the audio-level extension carries on
+         * the send side), so the media RTP timestamp is the available send-time proxy. The arrival clock is
+         * {@code System.nanoTime()} reduced to milliseconds, the same monotonic source the rest of the media
+         * plane stamps arrivals with.
+         *
+         * @param rtpPacket   the inbound cleartext media RTP packet bytes
+         * @param clockRateHz the stream's RTP timestamp clock rate, in hertz
+         */
+        private void teeArrivalTiming(byte[] rtpPacket, int clockRateHz) {
+            var rtpTimestamp = ((long) (rtpPacket[4] & 0xFF) << 24) | ((long) (rtpPacket[5] & 0xFF) << 16)
+                    | ((long) (rtpPacket[6] & 0xFF) << 8) | (rtpPacket[7] & 0xFF);
+            var sendTimeMs = rtpTimestamp * 1000L / clockRateHz;
+            var arrivalMs = System.nanoTime() / 1_000_000L;
+            var payloadBytes = rtpPacket.length - RTP_HEADER_LENGTH;
+            try {
+                rateControlLoop.onPacketReceived(sendTimeMs, arrivalMs, payloadBytes);
+            } catch (RuntimeException exception) {
+                LOGGER.log(System.Logger.Level.DEBUG, "calls2 inbound rate-control tee failed", exception);
+            }
+        }
+
+        /**
+         * Strips the RTP header, opens the SFrame payload on a group call, and inserts the audio codec
+         * packet into NetEq.
+         *
+         * <p>On a group call the body is SFrame-opened under the chain's current cipher; an opening failure
+         * drops the packet. The recovered codec packet is inserted into NetEq keyed by the wire RTP sequence
+         * and timestamp.
+         *
+         * @param rtpPacket the inbound cleartext audio RTP packet bytes
+         */
+        private void acceptAudio(byte[] rtpPacket) {
+            var sequence = ((rtpPacket[2] & 0xFF) << 8) | (rtpPacket[3] & 0xFF);
+            var timestamp = ((long) (rtpPacket[4] & 0xFF) << 24) | ((long) (rtpPacket[5] & 0xFF) << 16)
+                    | ((long) (rtpPacket[6] & 0xFF) << 8) | (rtpPacket[7] & 0xFF);
+            var body = Arrays.copyOfRange(rtpPacket, RTP_HEADER_LENGTH, rtpPacket.length);
+            var payload = openSframe(body);
+            if (payload == null) {
+                return;
+            }
+            try {
+                netEq.insert(sequence, timestamp, payload);
+            } catch (RuntimeException exception) {
+                LOGGER.log(System.Logger.Level.DEBUG, "calls2 inbound audio insert failed", exception);
+            }
+        }
+
+        /**
+         * Strips the RTP header, reassembles the access unit across its RTP packets, opens the SFrame layer on
+         * a group call, and inserts a completed picture into the video jitter buffer.
+         *
+         * <p>The packet's sequence and timestamp order the frame in the jitter buffer; the marker bit (the
+         * high bit of the second header byte) flags the last packet of a picture. The cleartext payload is fed
+         * to {@link #videoDepacketizer}, which recovers each NAL from its single-NAL, STAP-A, or FU-A form and
+         * concatenates the NAL units of one access unit into an Annex-B picture, completed on the marker bit;
+         * the completed picture is then SFrame-opened (a pass-through on the relayed path). A packet that does
+         * not close an access unit (a non-final fragment) inserts nothing; the completed picture is inserted as
+         * one {@link EncodedVideoFrame}, flagged a key frame when it carries an instantaneous-decoder-refresh or
+         * parameter-set NAL.
+         *
+         * @implNote This implementation feeds the reassembly through {@link InboundH264Depacketizer}, the port
+         * of the inbound side of {@code unnamed_function_8729}, replacing the prior single-packet-equals-one-
+         * picture assumption that truncated a fragmented picture. The decoder geometry stays the negotiated
+         * default ({@link #VIDEO_WIDTH} by {@link #VIDEO_HEIGHT}) rather than the inbound resolution: the per-
+         * stream resolution is carried in the bitstream the decoder re-parses, and the SPS-derived inbound
+         * resolution is not threaded onto the {@link EncodedVideoFrame} here (the same missing video capture
+         * that would supply an on-wire resolution, re/calls2-spec/captures/CAPTURE-FINDINGS.md Q8). The key-
+         * frame flag is derived from the reassembled NAL types ({@code 5} IDR, {@code 7} SPS, {@code 8} PPS),
+         * matching the {@code videoFrameTypeIDR} classification {@link EncodedVideoFrame#keyFrame()} records on
+         * the encode side.
+         *
+         * @param pipeline  the live video pipeline the recovered access unit is inserted into; never
+         *                  {@code null}, snapshotted by {@link #onTransportMedia(byte[])}
+         * @param rtpPacket the inbound cleartext video RTP packet bytes
+         */
+        private void acceptVideo(VideoPipeline pipeline, byte[] rtpPacket) {
+            var sequence = ((rtpPacket[2] & 0xFF) << 8) | (rtpPacket[3] & 0xFF);
+            var marker = (rtpPacket[1] & 0x80) != 0;
+            var timestamp = ((long) (rtpPacket[4] & 0xFF) << 24) | ((long) (rtpPacket[5] & 0xFF) << 16)
+                    | ((long) (rtpPacket[6] & 0xFF) << 8) | (rtpPacket[7] & 0xFF);
+            var body = Arrays.copyOfRange(rtpPacket, RTP_HEADER_LENGTH, rtpPacket.length);
+            // Reassemble the RTP packets into the Annex-B access unit first, then run the (currently
+            // pass-through) SFrame open once per completed picture. openSframe returns its input unchanged on
+            // the relayed path -- the SFrame per-frame transform is proven NOT engaged there -- so this order
+            // has no behavioural effect today; the exact layering of the SFrame frame relative to the H264 RTP
+            // NAL packetization on a topology that DOES engage SFrame is part of the same unrecovered SFrame
+            // wire layout the open is blocked on (see openSframe), so the open is applied per picture as the
+            // least-surprising placeholder rather than per fragment.
+            var accessUnit = videoDepacketizer.accept(body, timestamp, marker);
+            if (accessUnit == null) {
+                return;
+            }
+            accessUnit = openSframe(accessUnit);
+            if (accessUnit == null) {
+                return;
+            }
+            var keyFrame = accessUnitIsKeyFrame(accessUnit);
+            var frame = new EncodedVideoFrame(accessUnit, VideoDecoderCapability.H264, keyFrame, VIDEO_WIDTH,
+                    VIDEO_HEIGHT, timestamp);
+            pipeline.insert(frame, System.nanoTime() / 1_000_000L, timestamp, sequence);
+        }
+
+        /**
+         * Returns whether a reassembled Annex-B access unit carries an independently-decodable picture.
+         *
+         * <p>Scans the access unit's NAL units for an instantaneous-decoder-refresh slice (NAL type
+         * {@code 5}), a sequence parameter set ({@code 7}), or a picture parameter set ({@code 8}); any of
+         * these marks the picture as a key frame the decoder can refresh from.
+         *
+         * @param accessUnit the Annex-B access-unit bytes
+         * @return {@code true} when the access unit carries an IDR slice or a parameter set
+         */
+        private static boolean accessUnitIsKeyFrame(byte[] accessUnit) {
+            for (var nal : H264RtpPacketization.splitAnnexBNalUnits(accessUnit)) {
+                if (nal.length == 0) {
+                    continue;
+                }
+                var type = nal[0] & H264RtpPacketization.NAL_TYPE_MASK;
+                if (type == 5 || type == 7 || type == 8) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Opens a group-call SFrame body, or returns the body unchanged on a one-to-one call.
+         *
+         * <p>A one-to-one call carries no SFrame layer (the relay hop-by-hop SRTP is the only transport
+         * crypto), so the body is the codec payload directly. A group call opens the body under the chain's
+         * cipher; an absent chain key or a tag that does not verify yields {@code null} so the packet is
+         * dropped.
+         *
+         * @param body the RTP payload body
+         * @return the recovered codec payload, or {@code null} when SFrame opening fails
+         */
+        private byte[] openSframe(byte[] body) {
+            if (sframeProvider == null) {
+                return body;
+            }
+            // BLOCKED: open the end-to-end SFrame frame. The integration once the layout is recovered is to
+            //  resolve the sender device JID from the inbound RTP SSRC, look up that peer's SFrameKeyProvider
+            //  from CallMembership.sframeProvidersByDevice() (the per-peer provider seam the crypto core
+            //  exposes; the membership now derives every participant's chain key from the installed call key),
+            //  wrap it in an SFrameSecureFrame, and return secureFrame.open(body), which reads the trailer
+            //  length from the final byte, decodes the LEB128 key id and counter, resolves the cipher,
+            //  enforces the replay window, and verifies the tag before AES-CTR-decrypting. The transform and
+            //  trailer codec already exist (com.github.auties00.cobalt.calls2.media.sframe.SFrameSecureFrame),
+            //  but two pieces remain genuinely unrecovered (crypto core deferred): the per-key-id 12-byte
+            //  counter-mask salt VALUE and the chain-key->cipher-material derivation (ratchet-vs-expand + HKDF
+            //  info label), both native/BoringSSL callbacks NOT present in this WASM. Decisively, per
+            //  re/calls2-spec/captures/sframe-frame-live.json a 2026-06-15 live SFU group VIDEO call (video
+            //  provably encoding at 14 fps, worker breakpoint reach proven by pausing derive_sframe_key)
+            //  showed wa_sframe_decrypt / wa_sframe_encrypt and the video transform callback
+            //  wa_video_sframe_encode_cb are NOT invoked on the relayed media path at all: in SFU group-call
+            //  mode the per-frame SFrame transform is not engaged (the per-participant keys are derived and
+            //  rotated, but the media rides the relay hop-by-hop SRTP layer), and a 1:1 call uses no SFrame.
+            //  So passing the body through is the FAITHFUL behaviour here -- it matches WhatsApp's relayed-SFU
+            //  path -- and wiring an unverified open under the placeholder derivation would diverge from WA and
+            //  would drop every real peer's frame as a tag mismatch. A non-SFU/mesh topology that installs the
+            //  frame handler, or a native-layer capture, is required before the open can be wired.
+            return body;
+        }
+    }
+
+    /**
+     * The bridge presenting a platform capture device's pushed sample blocks as the reader pump's
+     * {@link AudioOutput} source.
+     *
+     * <p>A platform capture driver pushes fixed-size {@code short[]} blocks to a sink as they are captured,
+     * while the {@link AudioReaderPump} pulls {@link AudioFrame}s from an {@link AudioOutput}. This bridge
+     * adapts the push to the pull through a small bounded queue: the driver {@linkplain #offer(short[])
+     * offers} each captured block, and the reader pump {@linkplain #take() takes} it as a frame, blocking
+     * until one is available. The queue prefers freshness, dropping the oldest block when full so capture
+     * never blocks on a slow drain.
+     *
+     * @implNote This implementation is the device-side analogue of the application {@link AudioOutput}
+     * embedder source: the wa-voip {@code WasmVoipAVDriverManager::processAudioCaptureData} routes captured
+     * blocks straight into the engine, which Cobalt models as this device bridge feeding the reader pump,
+     * keeping the application {@link AudioOutput} a separate embedder seam for a programmatic source.
+     */
+    private static final class CaptureSourceBridge implements AudioOutput {
+        /**
+         * Holds the bounded queue of captured blocks the driver offers and the reader pump takes.
+         */
+        private final BlockingQueue<short[]> queue;
+
+        /**
+         * Tracks whether the bridge has been shut down, so a pending take returns {@code null}.
+         */
+        private final AtomicBoolean shutdown;
+
+        /**
+         * Constructs a capture source bridge with a small freshness-preserving queue.
+         */
+        private CaptureSourceBridge() {
+            this.queue = new ArrayBlockingQueue<>(8);
+            this.shutdown = new AtomicBoolean();
+        }
+
+        /**
+         * Offers one captured block from the device driver, dropping the oldest on a full queue.
+         *
+         * <p>Copies the driver's reused block (the driver overwrites it after the call) and enqueues the
+         * copy; when the queue is full the oldest block is discarded so capture never blocks on a slow
+         * reader pump, keeping playout latency bounded.
+         *
+         * @param samples the captured block; copied before enqueueing
+         */
+        private void offer(short[] samples) {
+            if (shutdown.get()) {
+                return;
+            }
+            var copy = samples.clone();
+            if (!queue.offer(copy)) {
+                queue.poll();
+                queue.offer(copy);
+            }
+        }
+
+        @Override
+        public void write(AudioFrame frame) {
+            Objects.requireNonNull(frame, "frame cannot be null");
+            offer(frame.pcm());
+        }
+
+        @Override
+        public AudioFrame take() throws InterruptedException {
+            if (shutdown.get()) {
+                return null;
+            }
+            var block = queue.poll(AUDIO_FRAME_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS);
+            if (block == null) {
+                return shutdown.get() ? null : new AudioFrame(new short[0], 0L);
+            }
+            return new AudioFrame(block, 0L);
+        }
+
+        @Override
+        public void shutdown() {
+            shutdown.set(true);
+            queue.clear();
+        }
+
+        @Override
+        public boolean isLiveCapture() {
+            return true;
+        }
+    }
+
+    /**
+     * The bridge presenting a platform video capture driver's forwarded frames as the video pipeline's
+     * {@link VideoOutput} capture source.
+     *
+     * <p>When a video call supplies no application {@link VideoOutput}, the engine sources outbound video
+     * from a platform camera through the {@link VoipDriverManager}: the manager's
+     * {@link com.github.auties00.cobalt.calls2.platform.VideoCaptureDriver} pumps captured frames to a
+     * {@link VideoSink}, while the {@link VideoPipeline} encode loop pulls frames from a {@link VideoOutput}.
+     * This bridge is both: it is the {@link VideoSink} the driver forwards each captured frame to through
+     * {@link #accept(VideoFrame)}, and the {@link VideoOutput} the encode loop drains through
+     * {@link #take()}. It adapts the driver's push to the encoder's pull through a small freshness-preferring
+     * queue, dropping the oldest frame when full so capture never blocks on a slow encoder, the same policy
+     * the audio {@link CaptureSourceBridge} uses. The advertised {@link #width()} by {@link #height()} at
+     * {@link #fps()} sizes the encoder to the negotiated capture geometry; {@link #write(VideoFrame)} is the
+     * unused application-facing face, since this is a device-backed source the driver fills.
+     *
+     * @implNote This implementation is the video analogue of {@link CaptureSourceBridge}: the engine's
+     * {@code WasmVoipAVDriverManager} routes the camera driver's frames straight into the encoder, which
+     * Cobalt models as this bridge feeding the encode loop, keeping the application {@link VideoOutput} a
+     * separate embedder seam for a programmatic source. The driver's frame-size-change drop already runs in
+     * the driver, so this bridge passes each forwarded frame through unfiltered.
+     */
+    private static final class ManagerVideoSourceBridge implements VideoOutput, VideoSink {
+        /**
+         * The result code returned to the driver when a forwarded frame is queued, matching the engine
+         * convention where the video sink returns {@code 0} on success.
+         */
+        private static final int SINK_OK = 0;
+
+        /**
+         * Holds the bounded queue of forwarded frames the driver offers and the encode loop takes.
+         */
+        private final BlockingQueue<VideoFrame> queue;
+
+        /**
+         * Tracks whether the bridge has been shut down, so a pending take returns {@code null} and further
+         * forwarded frames are dropped.
+         */
+        private final AtomicBoolean shutdown;
+
+        /**
+         * The advertised capture width in pixels the encoder is sized to.
+         */
+        private final int width;
+
+        /**
+         * The advertised capture height in pixels the encoder is sized to.
+         */
+        private final int height;
+
+        /**
+         * The advertised capture frame rate the encoder is paced at.
+         */
+        private final int fps;
+
+        /**
+         * The advertised target encoder bitrate in bits per second.
+         */
+        private final int bitrateBps;
+
+        /**
+         * Constructs a video source bridge advertising the given capture geometry with a small
+         * freshness-preferring queue.
+         *
+         * @param width      the advertised capture width in pixels
+         * @param height     the advertised capture height in pixels
+         * @param fps        the advertised capture frame rate
+         * @param bitrateBps the advertised target encoder bitrate in bits per second
+         */
+        private ManagerVideoSourceBridge(int width, int height, int fps, int bitrateBps) {
+            this.queue = new ArrayBlockingQueue<>(8);
+            this.shutdown = new AtomicBoolean();
+            this.width = width;
+            this.height = height;
+            this.fps = fps;
+            this.bitrateBps = bitrateBps;
+        }
+
+        @Override
+        public int accept(VideoFrame frame) {
+            Objects.requireNonNull(frame, "frame cannot be null");
+            if (shutdown.get()) {
+                return SINK_OK;
+            }
+            if (!queue.offer(frame)) {
+                queue.poll();
+                queue.offer(frame);
+            }
+            return SINK_OK;
+        }
+
+        @Override
+        public void write(VideoFrame frame) {
+            Objects.requireNonNull(frame, "frame cannot be null");
+            accept(frame);
+        }
+
+        @Override
+        public VideoFrame take() throws InterruptedException {
+            if (shutdown.get()) {
+                return null;
+            }
+            return queue.take();
+        }
+
+        @Override
+        public void shutdown() {
+            shutdown.set(true);
+            queue.clear();
+        }
+
+        @Override
+        public int width() {
+            return width;
+        }
+
+        @Override
+        public int height() {
+            return height;
+        }
+
+        @Override
+        public int fps() {
+            return fps;
+        }
+
+        @Override
+        public int bitrateBps() {
+            return bitrateBps;
+        }
+    }
+
+    /**
+     * The video pipeline for a video call: a two-way encode-send and jitter-buffered decode-render path over
+     * the negotiated video codec.
+     *
+     * <p>The pipeline holds the call's {@link VideoCodec} and its inbound {@link VideoJitterBuffer}. The
+     * inbound half runs a render thread that polls the jitter buffer once per tick, decodes each released
+     * access unit, and delivers the decoded picture to the call's
+     * {@linkplain Calls2MediaStreams#videoPlayback() application video sink} when one was supplied, falling
+     * back to {@link VoipHostApi#renderVideoFrame} otherwise. The outbound half, present only when the call
+     * supplied a {@linkplain Calls2MediaStreams#videoCapture() video capture source}, runs an encode thread
+     * that pulls each raw picture from the source, encodes it with the same codec, and ships the access unit
+     * through the transport video RTP send seam. {@link #close()} stops both threads and closes the codec.
+     *
+     * @implNote This implementation wires the application {@link VideoOutput} source straight into the encode
+     * thread, the same programmatic-source path the audio {@link AudioOutput} uses; a camera- or
+     * screen-backed source captures from its own device behind the {@link VideoOutput} interface, so no
+     * separate platform capture driver is opened here. The outbound RTP packetization treats each encoded
+     * access unit as one single-NAL packet, matching the symmetric single-access-unit assumption on the
+     * inbound demux side until the fragmented depacketizer lands.
+     */
+    private static final class VideoPipeline implements AutoCloseable {
+        /**
+         * A send seam shipping one encoded video access unit as a video RTP packet over the transport.
+         *
+         * <p>The encode thread hands each non-empty access unit to an instance of this interface, which the
+         * media plane backs by packetizing the unit and calling the transport's media send.
+         */
+        @FunctionalInterface
+        private interface VideoFrameSink {
+            /**
+             * Ships one encoded video access unit over the transport.
+             *
+             * @param frame the encoded access unit to send; never {@code null} and never empty
+             */
+            void send(EncodedVideoFrame frame);
+        }
+
+        /**
+         * Holds the call identifier, used in the thread names and diagnostics.
+         */
+        private final String callId;
+
+        /**
+         * Holds the host the decoded pictures are rendered through when no application video sink was
+         * supplied.
+         */
+        private final VoipHostApi host;
+
+        /**
+         * Holds the negotiated video codec the pipeline encodes and decodes through.
+         */
+        private final VideoCodec codec;
+
+        /**
+         * Holds the parameter set the codec was opened with, the baseline the rate-control loop re-targets
+         * each round.
+         *
+         * <p>The rate controller mutates only the bitrate, frame rate, and quantizer window through
+         * {@link #modifyCodec(VideoCodecParams)}; this carries the immutable geometry and codec selection the
+         * controller must preserve so a re-target never trips the codec's geometry-change rejection.
+         */
+        private final VideoCodecParams codecParams;
+
+        /**
+         * Holds the inbound video jitter buffer the render loop polls for due frames.
+         */
+        private final VideoJitterBuffer jitterBuffer;
+
+        /**
+         * Holds the application video capture source the encode loop drains, or {@code null} when the call
+         * sends no video.
+         */
+        private final VideoOutput videoCapture;
+
+        /**
+         * Holds the application video playback sink decoded pictures are delivered to, or {@code null} when
+         * the call renders received video through the host.
+         */
+        private final VideoInput videoPlayback;
+
+        /**
+         * Holds the send seam each encoded access unit is shipped through, bound after the transport is
+         * built and before {@link #start()}, or {@code null} when the call sends no video.
+         */
+        private VideoFrameSink frameSink;
+
+        /**
+         * Tracks whether the pipeline is running, so both threads exit on close.
+         */
+        private final AtomicBoolean running;
+
+        /**
+         * Holds the render thread polling the jitter buffer, or {@code null} before start.
+         */
+        private Thread renderThread;
+
+        /**
+         * Holds the encode thread draining the capture source, or {@code null} when the call sends no video
+         * or before start.
+         */
+        private Thread encodeThread;
+
+        /**
+         * Constructs a video pipeline over the codec, jitter buffer, and the call's application video
+         * streams.
+         *
+         * @param callId        the call identifier
+         * @param host          the host decoded pictures are rendered through when no video sink was supplied
+         * @param codec         the negotiated video codec
+         * @param codecParams   the parameter set the codec was opened with, the rate-control re-target baseline
+         * @param jitterBuffer  the inbound video jitter buffer
+         * @param videoCapture  the application video capture source, or {@code null} when the call sends no
+         *                      video
+         * @param videoPlayback the application video playback sink, or {@code null} to render through the host
+         */
+        private VideoPipeline(String callId, VoipHostApi host, VideoCodec codec, VideoCodecParams codecParams,
+                              VideoJitterBuffer jitterBuffer, VideoOutput videoCapture, VideoInput videoPlayback) {
+            this.callId = callId;
+            this.host = host;
+            this.codec = codec;
+            this.codecParams = codecParams;
+            this.jitterBuffer = jitterBuffer;
+            this.videoCapture = videoCapture;
+            this.videoPlayback = videoPlayback;
+            this.running = new AtomicBoolean();
+        }
+
+        /**
+         * Binds the send seam the outbound encode loop ships encoded access units through.
+         *
+         * <p>The seam needs the transport, which is built after the pipeline (the inbound demux holds the
+         * pipeline reference), so the media plane binds it once the transport exists and before
+         * {@link #start()} launches the encode loop.
+         *
+         * @param frameSink the send seam shipping encoded access units over the transport
+         */
+        private void bindFrameSink(VideoFrameSink frameSink) {
+            this.frameSink = frameSink;
+        }
+
+        /**
+         * Starts the inbound render loop.
+         *
+         * <p>The inbound decode-and-render path always starts so a video call renders the peer's picture
+         * regardless of whether the local side sends video; the outbound encode-and-send path is started
+         * separately through {@link #startEncode()} so the media session can drive it from the in-call camera
+         * turn-on rather than unconditionally at bring-up.
+         */
+        private void start() {
+            running.set(true);
+            renderThread = Thread.ofVirtual().name("calls2-video-render-" + callId).start(this::renderLoop);
+        }
+
+        /**
+         * Starts the outbound encode loop once, when the call supplies a video capture source and a bound send
+         * seam.
+         *
+         * <p>Driven by {@link LiveMediaSession#startVideoSend()}, which guards it behind the session's
+         * one-shot video-send flag. A call with no application or device video capture source, or one whose
+         * send seam was never bound, has no outbound encode loop and this is a no-op; a second invocation after
+         * the encode thread is already live is also a no-op, so the session may call it idempotently.
+         */
+        private void startEncode() {
+            if (videoCapture == null || frameSink == null || encodeThread != null) {
+                return;
+            }
+            running.set(true);
+            encodeThread = Thread.ofVirtual().name("calls2-video-encode-" + callId).start(this::encodeLoop);
+        }
+
+        /**
+         * Inserts one received compressed video frame into the jitter buffer.
+         *
+         * <p>Called from the transport receive path with a depacketized access unit; the jitter buffer
+         * orders it by capture timestamp and releases it at its render time. A frame the buffer rejects as
+         * a duplicate is dropped.
+         *
+         * @param frame               the received compressed frame
+         * @param arrivalMs           the local arrival time in milliseconds
+         * @param captureRtpTimestamp the frame's ninety-kilohertz capture RTP timestamp
+         * @param sequenceNumber      the frame's RTP sequence number
+         */
+        private void insert(EncodedVideoFrame frame, long arrivalMs, long captureRtpTimestamp, int sequenceNumber) {
+            jitterBuffer.insert(frame, arrivalMs, captureRtpTimestamp, sequenceNumber);
+        }
+
+        /**
+         * Returns the parameter set the codec was opened with, the rate-control re-target baseline.
+         *
+         * <p>The rate-control loop reads this once to seed its running video parameters and then re-targets
+         * the mutable subset (bitrate, frame rate, quantizer window) through
+         * {@link #modifyCodec(VideoCodecParams)}; the immutable geometry and codec selection it carries fix
+         * what the controller must preserve across a re-target.
+         *
+         * @return the codec's open parameter set
+         */
+        private VideoCodecParams codecParams() {
+            return codecParams;
+        }
+
+        /**
+         * Re-applies the mutable rate-control subset of the given parameters onto the live encoder.
+         *
+         * <p>This is the rate-control loop's seam onto the video encoder: it forwards to
+         * {@link VideoCodec#modify(VideoCodecParams)}, which re-applies the bitrate, frame rate, and the
+         * controls a live encoder accepts without a reopen, leaving the geometry and codec selection
+         * unchanged. It runs on the rate-control thread; the codec is single-writer, but the render and
+         * encode loops invoke {@link VideoCodec#decode(byte[], long)} and
+         * {@link VideoCodec#encode(VideoFrame, boolean)} on their own threads.
+         *
+         * @implNote This implementation serializes encoder reconfiguration against the encode loop by
+         * forwarding directly to the codec, accepting that the live OpenH264/libvpx reconfigure call the
+         * codec issues is itself the single mutation point; the codec's own state guards are relied upon
+         * rather than adding a second lock here, matching the engine driving rate control and encode from the
+         * one media-stream context.
+         *
+         * @param params the parameter set whose mutable fields the encoder adopts; never {@code null}
+         */
+        private void modifyCodec(VideoCodecParams params) {
+            codec.modify(params);
+        }
+
+        /**
+         * Arms the encoder so its next encode produces a key frame.
+         *
+         * <p>This is the rate-control loop's recovery seam: after a loss the receiver could not conceal, or
+         * when the rate controller resets the stream, it forwards to {@link VideoCodec#requestKeyFrame()} so
+         * the next encoded picture is an intra frame the decoder can resynchronize on.
+         *
+         * @implNote This implementation forwards directly to the codec; the request is one-shot and consumed
+         * by the next encode, so a request raised from the rate-control thread takes effect on the encode
+         * loop's next pass without further coordination.
+         */
+        private void requestKeyFrame() {
+            codec.requestKeyFrame();
+        }
+
+        /**
+         * Drains the capture source, encodes each picture, and ships it until the pipeline stops.
+         *
+         * <p>Each turn pulls one raw picture from the application video source with a blocking
+         * {@link VideoOutput#take()}, encodes it through the codec, and ships a non-empty access unit through
+         * the send seam; an empty access unit (a rate-controller frame drop) is sent as nothing. A
+         * {@code null} pull or a cleared running flag ends the loop, and an interrupt during the pull is
+         * treated as a stop.
+         */
+        private void encodeLoop() {
+            while (running.get()) {
+                VideoFrame frame;
+                try {
+                    frame = videoCapture.take();
+                } catch (InterruptedException exception) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                if (frame == null) {
+                    break;
+                }
+                try {
+                    var encoded = codec.encode(frame, false);
+                    if (!encoded.isEmpty()) {
+                        frameSink.send(encoded);
+                    }
+                } catch (RuntimeException exception) {
+                    LOGGER.log(System.Logger.Level.DEBUG, "calls2 video encode error for call {0}: {1}",
+                            callId, exception.getMessage());
+                }
+            }
+        }
+
+        /**
+         * Polls the jitter buffer and renders due frames until the pipeline stops.
+         *
+         * <p>Each turn polls the buffer for a frame due now; a released frame is decoded and, when the
+         * decode yields a displayable picture, delivered to the application video sink or rendered through
+         * the host. A decode that yields no picture (a decoder waiting for a key frame) is skipped. The loop
+         * parks briefly between polls so it does not spin.
+         */
+        private void renderLoop() {
+            while (running.get()) {
+                try {
+                    var now = System.nanoTime() / 1_000_000L;
+                    var released = jitterBuffer.poll(now);
+                    if (released == null) {
+                        java.util.concurrent.locks.LockSupport.parkNanos(VIDEO_POLL_INTERVAL_NANOS);
+                        continue;
+                    }
+                    renderReleased(released);
+                } catch (RuntimeException exception) {
+                    LOGGER.log(System.Logger.Level.DEBUG, "calls2 video render error for call {0}: {1}",
+                            callId, exception.getMessage());
+                }
+            }
+        }
+
+        /**
+         * Decodes one released access unit and delivers the resulting picture to the application sink or the
+         * host.
+         *
+         * <p>Decodes the released frame; a decode that produces no displayable picture is skipped. When the
+         * call supplied an application video sink the decoded {@link VideoFrame}
+         * is offered to it directly; otherwise the decoded planar picture is copied into off-heap plane
+         * segments and handed to {@link VoipHostApi#renderVideoFrame} as a {@link VoipHostApi.RenderedVideoFrame},
+         * whose plane segments are valid only for the duration of the render call.
+         *
+         * @param released the released frame and its render time
+         */
+        private void renderReleased(VideoJitterBuffer.ReleasedFrame released) {
+            var encoded = released.frame();
+            var picture = codec.decode(encoded.payload(), encoded.ptsMicros());
+            if (picture == null) {
+                return;
+            }
+            if (videoPlayback != null) {
+                videoPlayback.offer(picture);
+                return;
+            }
+            try (var arena = Arena.ofConfined()) {
+                var plane = arena.allocate(picture.pixels().length);
+                MemorySegment.copy(picture.pixels(), 0, plane, ValueLayout.JAVA_BYTE, 0, picture.pixels().length);
+                host.renderVideoFrame(new VoipHostApi.RenderedVideoFrame(
+                        null,
+                        picture.width(),
+                        picture.height(),
+                        plane,
+                        MemorySegment.NULL,
+                        0,
+                        VoipHostApi.RenderedVideoFrame.Format.I420,
+                        picture.ptsMicros() / 1_000_000.0,
+                        false));
+            }
+        }
+
+        @Override
+        public void close() {
+            running.set(false);
+            if (renderThread != null) {
+                renderThread.interrupt();
+            }
+            if (encodeThread != null) {
+                encodeThread.interrupt();
+            }
+            try {
+                codec.close();
+            } catch (RuntimeException exception) {
+                LOGGER.log(System.Logger.Level.DEBUG, "calls2 video codec close failed", exception);
+            }
+        }
+    }
+
+    /**
+     * The call's bandwidth-estimation and rate-control loop: it composes the WhatsApp sender-side AIMD
+     * estimator, the GoogCC delay-based estimator, and the audio and (on a video call) video rate
+     * controllers, and drives the encoders from them.
+     *
+     * <p>The loop runs on two cadences. The primary cadence is per inbound RTCP feedback (SPEC 15): the
+     * relay transport unprotects and parses each compound RTCP packet into an {@link RtcpFeedback} and
+     * delivers it to {@link #onRtcpFeedback(RtcpFeedback)}, which advances the
+     * {@link LiveSenderBandwidthEstimator} (WA AIMD fused through the combiner and gated by the hold
+     * machine, SPEC 15.2 / 15.3 / 15.4), splits the combined target between the audio and video streams,
+     * and re-targets the Opus encoder through {@link OpusAudioCodec#modify(OpusCodecParams)} and the video
+     * encoder through {@link VideoPipeline#modifyCodec(VideoCodecParams)}. The secondary cadence is a
+     * periodic fallback tick on its own virtual thread (SPEC 15.4) that applies the matched dynamic
+     * voip-param overrides under the manager's {@link com.github.auties00.cobalt.calls2.common.DynVoipParamUpdater}
+     * round guard and re-evaluates feedback staleness, so a stalled RTCP stream does not leave the encoder
+     * frozen on a target the link can no longer carry. Independently, the inbound media demux tees each
+     * media packet's send and arrival timing into the {@link GccDelayBasedEstimator} through
+     * {@link #onPacketReceived(long, long, int)} so the delay-based over-use trendline (SPEC 15.1) feeds the
+     * combiner.
+     *
+     * <p>The per-feedback tick and the per-packet tee both run on the single transport receive thread (the
+     * relay transport demultiplexes a datagram synchronously on that thread), while the periodic tick runs
+     * on its own thread; all three are serialized behind one {@link ReentrantLock} because the estimator and
+     * rate-control components are single-writer.
+     *
+     * @implNote This implementation uses a {@link NoopMlBweEngine}: ML-BWE is unimplemented (the recovered
+     * design is in re/calls2-spec/ML-BWE-RE.md), so the steering fold-in stays neutral and the sender
+     * estimator, combiner, and rate controllers behave as if no model exists. The cadence is per RTCP
+     * feedback rather
+     * than a fixed wall clock, matching {@code tfrc_update_sender_bwe} running off each received report; the
+     * periodic thread carries only the dynamic-rule pass and the staleness re-evaluation. The bandwidth
+     * bounds are read from the negotiated {@code p->min_bwe} and {@code p->max_bwe} scalars through
+     * {@link LiveMediaSession#activeParams()}, falling back to the compiled
+     * {@link Calls2RateControlLoop#MIN_BITRATE_BPS} / {@link Calls2RateControlLoop#MAX_BITRATE_BPS} when the
+     * {@code voip_settings} document omits them; the seed, the minimum-remote gate, and the congestion-enable
+     * mask remain compiled-in stand-ins (see the constants) (re/calls2-spec/SPEC.md sec 15;
+     * rate_control/wa_rate_control.cc, bwe/tfrc_sender_bwe.cc).
+     */
+    private static final class Calls2RateControlLoop {
+        /**
+         * The compiled fallback lower bound, in bits per second, applied when the negotiated parameter set
+         * does not carry {@code p->min_bwe}.
+         *
+         * <p>The constructor reads {@code p->min_bwe} from {@link LiveMediaSession#activeParams()} and falls
+         * back to this value only when that scalar is absent, mirroring the engine applying its compiled
+         * default when the {@code voip_settings} document omits the override.
+         *
+         * @implNote The recovered compiled default of {@code p->min_bwe} ({@code 100000}, i.e. 100 kbps),
+         * read from the inline default-store {@code local.get <field>; i32.const 100000; i32.store <field>+24}
+         * in the parameter-registration code of the wa-voip WASM module {@code O4cDmmXP6rI}; the captured
+         * {@code voip_settings} document does not negotiate it, so this default governs. Recovered by static
+         * disassembly of the registration block (re/calls2-spec/SPEC.md sec 15.1, bwe/tfrc_sender_bwe.cc).
+         */
+        private static final long MIN_BITRATE_BPS = 100_000;
+
+        /**
+         * The compiled fallback upper bound, in bits per second, applied when the negotiated parameter set
+         * does not carry {@code p->max_bwe}.
+         *
+         * <p>The constructor reads {@code p->max_bwe} from {@link LiveMediaSession#activeParams()} and falls
+         * back to this value only when that scalar is absent.
+         *
+         * @implNote The GoogCC delay-based upper bound. Unlike {@link #MIN_BITRATE_BPS}, {@code p->max_bwe}
+         * has no inline default-store in the registration code (its default is applied through a separate
+         * pass keyed by a runtime-computed struct offset, which static disassembly cannot recover), and the
+         * captured {@code voip_settings} does not negotiate it, so the upstream WebRTC default stands in as
+         * the fallback (re/calls2-spec/SPEC.md sec 15.1).
+         */
+        private static final long MAX_BITRATE_BPS = 8_000_000;
+
+        /**
+         * The compiled-in seed estimate, in bits per second, used when no history seed is available.
+         *
+         * @implNote The GoogCC delay-based start bitrate default, used when {@link BweHistory#seedEstimateKbps()}
+         * yields nothing (the per-call history is not persisted across calls, so a first call has no seed)
+         * (re/calls2-spec/SPEC.md sec 15.1, bwe/tfrc_sender_bwe.cc).
+         */
+        private static final long SEED_BITRATE_BPS = 300_000;
+
+        /**
+         * The per-round {@code min_remote_bitrate_estimate}, in bits per second, supplied to the sender
+         * AIMD each round to seed its latched increase-factor floor.
+         *
+         * <p>SPEC 15.2: the healthy-link increase uses {@code 1.05} while the remote estimate is absent or
+         * below the latched floor and {@code 1.10} at or above it. The latch itself (seed once while still
+         * {@code 0}, then hold) lives in {@link AudioSenderBandwidthEstimator}; this constant is the
+         * per-round input that seeds it.
+         *
+         * @implNote The faithful value is {@code 0}: {@code min_remote_bitrate_estimate} ({@code report+0xb4},
+         * the value {@code update_audio_sender_bwe} fn6186 reads to seed {@code min_remote} at
+         * {@code param1+0x94}) is not a field of a single inbound RTCP packet but the minimum, across all
+         * connected participants, of each participant's reported remote bandwidth estimate: {@code fn4198}
+         * walks the roster through {@code fn10989}/{@code fn10990} and reads each member's remote estimate
+         * through the virtual call {@code fn4318}, taking the running minimum, then passes it as the
+         * thirteenth argument of {@code get_update_rc_data_internal} (fn4199). This rate-control loop is
+         * driven per single {@link RtcpFeedback} and holds no participant roster nor any per-peer remote
+         * estimate, so the roster minimum cannot be computed here; supplying {@code 0} keeps the latch
+         * unseeded, which is exactly the pre-roster state in which the increase factor is {@code 1.05}
+         * whenever the remote estimate is absent. The earlier {@code 200001} was a wrong reuse of the
+         * unrelated remote-PiP-enter threshold (the combiner's REMB gate, itself {@code 200000} in fn4364),
+         * not this field.
+         */
+        // TODO: thread the per-round min_remote_bitrate_estimate (the minimum over all connected
+        //  participants' remote bandwidth estimates, fn4198 walking the roster via fn10989/fn10990 and
+        //  reading each member's estimate via the fn4318 vtable call) into this loop and pass it here in
+        //  place of 0, so the sender AIMD seeds its latched floor from the live roster. BLOCKED: this loop
+        //  is constructed without a CallMembership/participant view and the per-peer remote estimate
+        //  (each member's REMB-equivalent) is not tracked on the relay downlink path, so the roster
+        //  minimum is not available at this layer today.
+        private static final long MIN_REMOTE_BITRATE_BPS = 0;
+
+        /**
+         * The high loss-ratio threshold the sender AIMD treats as congestion, from {@code sbwe_loss_high}.
+         *
+         * <p>SPEC 15.2: {@code sbwe_loss_high=30} percent in the captured blob.
+         */
+        private static final double LOSS_HIGH_THRESHOLD = 0.30;
+
+        /**
+         * The default loss-ratio threshold the congestion detector's normal tier trips on, from
+         * {@code sbwe_loss_low}.
+         *
+         * <p>SPEC 15.2: {@code sbwe_loss_low=10} percent in the captured blob.
+         */
+        private static final double LOSS_LOW_THRESHOLD = 0.10;
+
+        /**
+         * The high-tier round-trip coefficient the congestion detector trips its aggressive flag on.
+         *
+         * @implNote The recovered {@code cc_rtt_heavily_congestion_multiplier} default {@code 2.0}, the
+         * voip-param at param-struct offset {@code +0x454}: {@code get_congestion_signals} (fn4226) sets the
+         * heavily-congested flag when {@code current_rtt >= 2.0 * baseline_rtt}, the same
+         * {@code rtt > coefficient * baseline} form {@link CongestionSignalDetector} applies for its
+         * aggressive tier. The parameter-apply pass {@code reg_param_entry_impl} (fn11831) writes the default
+         * as {@code i32.const 0x40000000; i32.store} at {@code p+0x454}; the key is absent from the captured
+         * {@code voip_settings} blob, so the compiled default governs.
+         */
+        private static final double RTT_HIGH_COEFFICIENT = 2.0;
+
+        /**
+         * The default-tier round-trip coefficient the congestion detector trips its congested flag on.
+         *
+         * @implNote The recovered {@code cc_rtt_approaching_congestion_multiplier} default {@code 0.6}, the
+         * voip-param at param-struct offset {@code +0x450}: {@code get_congestion_signals} (fn4226) sets the
+         * approaching flag when {@code current_rtt >= 0.6 * baseline_rtt}. The parameter-apply pass
+         * {@code reg_param_entry_impl} (fn11831) writes the default as {@code i32.const 0x3F19999A;
+         * i32.store} at {@code p+0x450}; the key is absent from the captured {@code voip_settings} blob, so
+         * the compiled default governs.
+         */
+        private static final double RTT_DEFAULT_COEFFICIENT = 0.6;
+
+        /**
+         * The bitmask of congestion signals the detector evaluates each round, the SPEC 15.4 union.
+         *
+         * @implNote The full enable union of SPEC 15.4: {@code 0x1} round-trip, {@code 0x200} remote loss,
+         * {@code 0x400} local loss, {@code 0x800} remote timing, {@code 0x4000} local timing, {@code 0x8000}
+         * staleness ({@code get_congestion_signals} fn4226). The {@link CongestionSignalDetector#evaluate}
+         * path carries code for the round-trip, remote-loss, local-loss, and staleness bits; the two timing
+         * bits are reserved (no inter-arrival timing input is fused on the per-feedback path), and the
+         * staleness bit only trips when a non-zero feedback age is supplied, which the periodic tick does and
+         * the per-feedback tick (age zero) does not.
+         */
+        private static final long CONGESTION_ENABLE_MASK = CongestionSignalDetector.ENABLE_RTT
+                | CongestionSignalDetector.ENABLE_REMOTE_PLR
+                | CongestionSignalDetector.ENABLE_LOCAL_PLR
+                | 0x0800
+                | 0x4000
+                | CongestionSignalDetector.ENABLE_STALENESS;
+
+        /**
+         * The period, in nanoseconds, of the fallback tick.
+         *
+         * <p>One second; the fallback tick carries only the dynamic-rule pass and the staleness
+         * re-evaluation, so it runs an order of magnitude slower than the per-feedback cadence.
+         */
+        private static final long FALLBACK_TICK_NANOS = 1_000_000_000L;
+
+        /**
+         * The staleness window, in milliseconds, past which the absence of RTCP feedback triggers the
+         * fallback tick to re-run rate control on the last known state.
+         *
+         * @implNote The {@code no RTCP in window} congestion condition of SPEC 15.2; set to the sender AIMD's
+         * recovered no-feedback window so a stalled report stream is treated as a degrading link
+         * (audio_sender_bwe.cc {@code NO_FEEDBACK_CONGESTION_MS}).
+         */
+        private static final long FEEDBACK_STALENESS_MS = 500;
+
+        /**
+         * The SCTP send-buffer occupancy, in bytes, reported to the video rate controller on the relay path.
+         *
+         * <p>Always zero: the relay leg carries no SCTP DataChannel (the SCTP buffer congestion controller's
+         * native input is the Web-P2P data-channel buffer), so its standing-tail and slope tests never fire
+         * and the video target is governed by the combiner and the codec window alone.
+         *
+         * @implNote The {@code SctpAssociation}/{@code SctpEngine} buffer the
+         * {@link SctpBufferCongestionController} reads is the Web-P2P interop path only (SPEC 14.6); on the
+         * relay path there is no such buffer, so a zero occupancy is the faithful input rather than a
+         * fabricated one.
+         */
+        private static final long RELAY_SCTP_BUFFER_OCCUPANCY = 0;
+
+        /**
+         * Logs rate-control faults.
+         */
+        private static final System.Logger LOOP_LOGGER = System.getLogger(Calls2RateControlLoop.class.getName());
+
+        /**
+         * The call identifier, used in the tick thread name and diagnostics.
+         */
+        private final String callId;
+
+        /**
+         * Whether the call carries video, so the video rate controller is driven.
+         *
+         * <p>Set at construction for a call brought up with video, and flipped to {@code true} by
+         * {@link #enableVideo(VideoPipeline)} when an audio-only call raises a local video track mid-call.
+         * It is read and written only under {@link #lock}, the same lock {@link #runTick} holds, so the video
+         * branch sees a consistent {@code (video, videoRc, videoPipeline, videoParams)} tuple.
+         */
+        private boolean video;
+
+        /**
+         * The audio codec the audio rate controller re-targets each round, an {@link OpusAudioCodec} or an
+         * {@link MLowAudioCodec}.
+         *
+         * <p>The loop re-targets it through {@link AudioCodec#modify(OpusCodecParams)}; on the
+         * {@link MLowAudioCodec} that call is a no-op, since MLow runs a locked bitrate profile and carries
+         * its own internal rate control.
+         */
+        private final AudioCodec audioCodec;
+
+        /**
+         * The video pipeline whose encoder the video rate controller re-targets, or {@code null} until the
+         * call carries video.
+         *
+         * <p>Set at construction for a call brought up with video, and bound by
+         * {@link #enableVideo(VideoPipeline)} on a mid-call upgrade; read and written only under {@link #lock}.
+         */
+        private VideoPipeline videoPipeline;
+
+        /**
+         * The call's voip-param manager, read for the active set each round and driven for the periodic
+         * dynamic-rule pass.
+         */
+        private final LiveVoipParamManager voipParamManager;
+
+        /**
+         * The WhatsApp sender-side bandwidth estimator producing the combined, gated target.
+         */
+        private final LiveSenderBandwidthEstimator senderBwe;
+
+        /**
+         * The GoogCC delay-based estimator the per-packet tee feeds, supplying the combiner's link-capacity
+         * input.
+         */
+        private final GccDelayBasedEstimator gcc;
+
+        /**
+         * The audio rate controller turning the audio share of the target into Opus encoder settings.
+         */
+        private final AudioRateController audioRc;
+
+        /**
+         * The video rate controller turning the video share of the target into video encoder settings, or
+         * {@code null} until the call carries video.
+         *
+         * <p>Built at construction on a call brought up with video, and built lazily by
+         * {@link #enableVideo(VideoPipeline)} on a mid-call upgrade; read and written only under {@link #lock}.
+         */
+        private VideoRateController videoRc;
+
+        /**
+         * The machine-learning bandwidth-estimation engine: a {@link LiveMlBweEngine} when the native
+         * {@link ExecuTorch} shim is available, otherwise a {@link NoopMlBweEngine}.
+         *
+         * <p>The engine is selected by {@link #selectMlBweEngine()}: it picks the native-backed engine when
+         * the four {@code ml_shim_*} symbols resolve in {@code cobalt-native}, but constructs it with no model
+         * configuration and a path resolver that provisions nothing, so it loads no model and degrades to the
+         * no-op path until the per-model {@code voip_settings} bitmap, feature count, history depth, threshold,
+         * and {@code .pte} paths are decoded (re/calls2-spec/ML-BWE-RE.md sec 6). With nothing provisioned its
+         * {@link MlBweEngine#infer(MlBweSignals)} returns {@link MlBweOutputs#DISABLED}, identical to the
+         * {@link NoopMlBweEngine}.
+         */
+        private final MlBweEngine mlEngine;
+
+        /**
+         * The configured maximum target bitrate, in bits per second, the negotiated {@code p->max_bwe} or the
+         * compiled {@link #MAX_BITRATE_BPS} fallback, fed into the machine-learning signal set each round.
+         */
+        private final long maxBitrateBps;
+
+        /**
+         * Serializes the per-feedback tick, the per-packet tee, and the periodic tick across their threads.
+         */
+        private final ReentrantLock lock;
+
+        /**
+         * The running Opus parameters the audio rate controller re-targets, seeded from the codec's open
+         * parameters and replaced by each round's result.
+         */
+        private OpusCodecParams audioParams;
+
+        /**
+         * The running video parameters the video rate controller re-targets, seeded from the video pipeline's
+         * open parameters and replaced by each round's result, or {@code null} until the call carries video.
+         *
+         * <p>Seeded at construction on a call brought up with video, and seeded by
+         * {@link #enableVideo(VideoPipeline)} from the upgrade pipeline's open parameters on a mid-call
+         * upgrade; read and written only under {@link #lock}.
+         */
+        private VideoCodecParams videoParams;
+
+        /**
+         * The monotonic timestamp, in milliseconds, of the most recent feedback, or {@code -1} before any
+         * feedback has arrived.
+         */
+        private long lastFeedbackMs;
+
+        /**
+         * The packet-loss ratio from the most recent feedback, carried for the staleness re-run.
+         */
+        private double lastPlr;
+
+        /**
+         * The round-trip time, in nanoseconds, from the most recent feedback, carried for the staleness
+         * re-run, or {@code 0} when none was observed.
+         */
+        private long lastRttNs;
+
+        /**
+         * Tracks whether the periodic tick is running, so its thread exits on {@link #stop()}.
+         */
+        private final AtomicBoolean running;
+
+        /**
+         * The periodic fallback tick thread, or {@code null} before {@link #start()}.
+         */
+        private Thread tickThread;
+
+        /**
+         * Constructs the rate-control loop for one call, seeding the sender estimate from the call's
+         * bandwidth history on the caller side.
+         *
+         * <p>The sender-side estimator is composed from the WA audio AIMD, the combiner (in the captured
+         * {@code sbwe_combine_policy=3} {@link CombineMode#MIN_FLOOR} mode), the hold machine, the
+         * conservative-init clamp, and the congestion detector, bounded by the negotiated {@code p->min_bwe}
+         * and {@code p->max_bwe} (or the compiled {@link #MIN_BITRATE_BPS} / {@link #MAX_BITRATE_BPS} fallback
+         * when the negotiation omits them) and seeded at the history estimate (caller side) or the compiled
+         * {@link #SEED_BITRATE_BPS} (callee side or empty history). The GoogCC delay-based estimator shares
+         * the same bounds and seed. The audio rate controller is always built; the video rate controller is
+         * built only on a video call.
+         *
+         * <p>The conservative-init clamp is enabled by default so a fresh estimate ramps cautiously from the
+         * cold-start band. When {@code seedInitialGroupBwe} is set (a group call with
+         * {@code ENABLE_INIT_BWE_FOR_GROUP_CALL} on) the clamp is disabled so the seeded initial estimate is
+         * used directly rather than held in the cautious band, the group-call initial-BWE seed the flag
+         * selects.
+         *
+         * @implNote This implementation threads {@code ENABLE_INIT_BWE_FOR_GROUP_CALL} into the
+         * {@link ConservativeInitMode} enable flag for a group call: the conservative clamp port
+         * ({@code tfrc_update_conservative_mode_should_stop}, fn4425) reads an enable byte, and seeding an
+         * initial group-call estimate corresponds to leaving that clamp off so the seed is taken as-is rather
+         * than ramped. A one-to-one call ({@code seedInitialGroupBwe} {@code false}) keeps the clamp enabled
+         * (re/calls2-spec/SPEC.md sec 15.1/15.4).
+         *
+         * @param callId             the call identifier
+         * @param isCaller           whether the local side placed the call, gating the history seed
+         * @param video              whether the call carries video
+         * @param audioCodec         the audio codec the audio rate controller re-targets
+         * @param audioParams        the Opus parameters the codec was opened with, the audio re-target
+         *                           baseline
+         * @param videoPipeline      the video pipeline whose encoder is re-targeted, or {@code null} on an
+         *                           audio-only call
+         * @param voipParamManager   the call's voip-param manager
+         * @param seedInitialGroupBwe whether to seed the initial estimate for a group call rather than ramp
+         *                           from the conservative cold-start band, set when this is a group call and
+         *                           {@code ENABLE_INIT_BWE_FOR_GROUP_CALL} is on
+         */
+        private Calls2RateControlLoop(String callId, boolean isCaller, boolean video, AudioCodec audioCodec,
+                                      OpusCodecParams audioParams, VideoPipeline videoPipeline,
+                                      LiveVoipParamManager voipParamManager, boolean seedInitialGroupBwe) {
+            this.callId = callId;
+            this.video = video;
+            this.audioCodec = audioCodec;
+            this.audioParams = audioParams;
+            this.videoPipeline = videoPipeline;
+            this.voipParamManager = voipParamManager;
+            this.videoParams = videoPipeline != null ? videoPipeline.codecParams() : null;
+            this.mlEngine = selectMlBweEngine();
+            this.lock = new ReentrantLock();
+            this.running = new AtomicBoolean();
+            this.lastFeedbackMs = -1;
+            this.lastPlr = 0.0;
+            this.lastRttNs = 0;
+
+            var params = voipParamManager.activeParams();
+            var minBwe = resolveScalar(params, "p->min_bwe", MIN_BITRATE_BPS);
+            var maxBwe = resolveScalar(params, "p->max_bwe", MAX_BITRATE_BPS);
+            this.maxBitrateBps = maxBwe;
+            var seedBps = seedBitrateBps(isCaller);
+            this.senderBwe = new LiveSenderBandwidthEstimator(
+                    new AudioSenderBandwidthEstimator(minBwe, maxBwe, seedBps,
+                            LOSS_HIGH_THRESHOLD),
+                    new BitrateCombiner(CombineMode.MIN_FLOOR),
+                    new BweHoldController(),
+                    new ConservativeInitMode(!seedInitialGroupBwe, minBwe, SEED_BITRATE_BPS),
+                    new CongestionSignalDetector(RTT_HIGH_COEFFICIENT, RTT_DEFAULT_COEFFICIENT,
+                            LOSS_HIGH_THRESHOLD, LOSS_LOW_THRESHOLD),
+                    CONGESTION_ENABLE_MASK,
+                    minBwe, maxBwe, seedBps);
+            this.gcc = new GccDelayBasedEstimator(minBwe, maxBwe, seedBps);
+            this.audioRc = new AudioRateController(
+                    new UnifiedAudioQualityControl(UnifiedAudioQualityControl.Config.defaults()));
+            this.videoRc = video ? new VideoRateController(SctpBufferCongestionController.defaults()) : null;
+        }
+
+        /**
+         * Selects the machine-learning bandwidth-estimation engine for the call, the native-backed one when
+         * its shim resolves and the no-op one otherwise.
+         *
+         * <p>When the {@link ExecuTorch} shim is {@linkplain LiveMlBweEngine#nativeShimAvailable() available} (the four
+         * {@code ml_shim_*} symbols resolve in {@code cobalt-native}) this builds a {@link LiveMlBweEngine},
+         * otherwise a {@link NoopMlBweEngine}. The live engine is built with no per-model configuration and a
+         * resolver that provisions no model path, so it loads no model and behaves exactly like the no-op
+         * engine until the per-model metadata and model paths are decoded; this keeps the engine seam wired
+         * without changing behaviour.
+         *
+         * @implNote This implementation realises the availability guard ML-BWE-RE.md sec 6 specifies: the
+         * native engine is preferred when the shim resolves, but it stays dormant because the per-model
+         * {@code voip_settings} bitmap, feature count, history depth, aggregation mode, and probability
+         * threshold are runtime voip-params not yet decoded (re/calls2-spec/ML-BWE-RE.md sec 3 UNRECOVERED) and
+         * the model {@code .pte} paths are not yet provisioned, so {@link LiveMlBweEngine.ModelConfig} and the
+         * {@link LiveMlBweEngine.ModelPathResolver} carry nothing and the engine loads no model. Populating the
+         * model configuration and paths is the deferred ML-BWE provisioning step; until then both branches
+         * yield {@link MlBweOutputs#DISABLED}.
+         *
+         * @return the machine-learning engine for the call, never {@code null}
+         */
+        private static MlBweEngine selectMlBweEngine() {
+            if (!LiveMlBweEngine.nativeShimAvailable()) {
+                return new NoopMlBweEngine();
+            }
+            // The native shim resolves, but no model is provisioned: the per-model bitmap / feature count /
+            // history depth / threshold are runtime voip-params not yet decoded (ML-BWE-RE.md sec 3) and the
+            // .pte paths are not yet provisioned, so the engine is built empty and degrades to the no-op path.
+            // TODO: decode the per-model voip-param metadata (cc_enable_ml_*_inference gates, the n_features /
+            //  rounds / aggMode / threshold runtime values) and provision the .pte model paths, then pass the
+            //  populated ModelConfig map and a real ModelPathResolver here so the congestion model runs; the
+            //  per-model metadata is BLOCKED on decoding the voip_settings bitmap (ML-BWE-RE.md sec 3, sec 6).
+            return new LiveMlBweEngine(Map.of(), type -> null);
+        }
+
+        /**
+         * Resolves a negotiated integer voip-param scalar, or the compiled fallback when it is absent.
+         *
+         * <p>Looks the dotted path up in the catalogue and reads it from the active negotiated set. An empty
+         * set (settings not yet selected), an unmodelled path, or a path the negotiation omits all yield the
+         * fallback, matching the engine taking its compiled default when the {@code voip_settings} document
+         * does not override the scalar.
+         *
+         * @param params     the active negotiated parameter set, possibly empty before settings arrive
+         * @param dottedPath the parameter's fully-qualified dotted path, such as {@code "p->min_bwe"}
+         * @param fallback   the compiled default applied when the parameter is not negotiated
+         * @return the negotiated value when present, otherwise {@code fallback}
+         */
+        private static long resolveScalar(Optional<VoipParams> params, String dottedPath, long fallback) {
+            if (params.isEmpty()) {
+                return fallback;
+            }
+            var key = VoipParamKey.ofDottedPath(dottedPath);
+            if (key.isEmpty()) {
+                return fallback;
+            }
+            var value = params.get().getInteger(key.get());
+            return value.isPresent() ? value.getAsLong() : fallback;
+        }
+
+        /**
+         * Brings the video rate controller online for a call upgraded from audio-only to video mid-call.
+         *
+         * <p>Builds the {@link VideoRateController} the loop lacked while the call was audio-only, seeds the
+         * running {@link #videoParams} from the freshly built pipeline's opened parameters, binds the pipeline
+         * as the encoder re-target target, and flips the {@link #video} gate so the next {@link #runTick} round
+         * splits the combined target between audio and video and re-targets the video encoder. It is invoked
+         * under no external lock; it takes {@link #lock} itself so the new state is published consistently to a
+         * concurrent feedback or periodic round. It is idempotent: a call already carrying video (the gate
+         * already set) is left untouched, so a repeated upgrade neither rebuilds the controller nor disturbs
+         * the running estimate.
+         *
+         * @implNote This implementation reproduces the video rate controller's creation at the audio-to-video
+         * upgrade rather than at call setup: the native engine builds {@code wa_vid_quality_manager}
+         * ({@code wa_vid_quality_manager_create}, fn4210) inside {@code recreate_and_connect_video_stream}
+         * (fn6326), the same upgrade transaction {@code do_video_upgrade} (fn11393) runs, not at the audio
+         * call's bring-up; an audio-only call therefore has no video rate controller until the camera is turned
+         * on. The combined-target split and the per-encoder re-target are otherwise the same path a
+         * video-from-start call runs.
+         *
+         * @param pipeline the freshly built video pipeline whose encoder the controller re-targets; never
+         *                 {@code null}
+         */
+        private void enableVideo(VideoPipeline pipeline) {
+            lock.lock();
+            try {
+                if (video) {
+                    return;
+                }
+                this.videoRc = new VideoRateController(SctpBufferCongestionController.defaults());
+                this.videoPipeline = pipeline;
+                this.videoParams = pipeline.codecParams();
+                this.video = true;
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * Returns the seed bandwidth estimate, in bits per second, for this call side.
+         *
+         * <p>On the caller side the seed is the mean of the per-call bandwidth history (SPEC 15: the history
+         * seeds a fresh estimate so a reconnect does not restart from the floor); on the callee side, or when
+         * the history is empty, the compiled {@link #SEED_BITRATE_BPS} is used.
+         *
+         * @implNote The {@link BweHistory} is constructed empty here because the cross-call history is not
+         * persisted across calls in Cobalt (the native engine persists it as {@code wa_storage} attributes,
+         * see {@link BweHistory}), so {@link BweHistory#seedEstimateKbps()} yields zero on a first call and
+         * the compiled seed is used; the history seam is wired so a future persisted history feeds straight
+         * in (re/calls2-spec/SPEC.md sec 15.1).
+         *
+         * @param isCaller whether the local side placed the call
+         * @return the seed estimate in bits per second
+         */
+        private static long seedBitrateBps(boolean isCaller) {
+            if (isCaller) {
+                var historySeedKbps = new BweHistory().seedEstimateKbps();
+                if (historySeedKbps > 0) {
+                    return (long) historySeedKbps * 1000;
+                }
+            }
+            return SEED_BITRATE_BPS;
+        }
+
+        /**
+         * Starts the periodic fallback tick on its own virtual thread.
+         *
+         * <p>The per-feedback tick and the per-packet tee are already armed by the bring-up (the transport's
+         * inbound-RTCP listener and the inbound demux tee); this starts only the slower fallback cadence.
+         */
+        private void start() {
+            running.set(true);
+            tickThread = Thread.ofVirtual().name("calls2-rate-control-" + callId).start(this::fallbackLoop);
+        }
+
+        /**
+         * Stops the periodic fallback tick.
+         *
+         * <p>Idempotent: clears the running flag and interrupts the tick thread so the loop exits at its next
+         * park or immediately.
+         */
+        private void stop() {
+            running.set(false);
+            if (tickThread != null) {
+                tickThread.interrupt();
+            }
+        }
+
+        /**
+         * Feeds one inbound media packet's send and arrival timing to the GoogCC delay-based estimator.
+         *
+         * <p>The inbound demux tees every audio and video media packet here; the estimator groups packets by
+         * send burst and fits its over-use trendline from the arrival deltas (SPEC 15.1), and its output is
+         * read as the combiner's link-capacity input on the next feedback tick.
+         *
+         * @param sendTimeMs    the packet's RTP-derived transmit timestamp, in milliseconds
+         * @param arrivalTimeMs the packet's local arrival timestamp, in milliseconds
+         * @param payloadBytes  the packet's media payload size, in bytes
+         */
+        private void onPacketReceived(long sendTimeMs, long arrivalTimeMs, int payloadBytes) {
+            lock.lock();
+            try {
+                gcc.onPacketReceived(sendTimeMs, arrivalTimeMs, payloadBytes);
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * Runs one rate-control round from an inbound RTCP feedback packet.
+         *
+         * <p>This is the primary cadence (SPEC 15): the parsed {@link RtcpFeedback} supplies the loss
+         * fraction, the round-trip time, and the remote receiver estimate (each carrying a non-positive
+         * sentinel when the report omitted it, normalized here to a neutral value); the sender-side estimator
+         * is advanced, its combined gated target is split between the audio and video streams, and the
+         * encoders are re-targeted. The feedback's loss and round-trip are retained so the staleness tick can
+         * re-run on the last known state.
+         *
+         * @param feedback the parsed RTCP feedback for this round; never {@code null}
+         */
+        private void onRtcpFeedback(RtcpFeedback feedback) {
+            lock.lock();
+            try {
+                var plr = feedback.hasLoss() ? Math.clamp(feedback.fractionLost(), 0.0, 1.0) : 0.0;
+                var rttNs = feedback.hasRtt() ? feedback.rttNs() : 0;
+                var remoteBweBps = feedback.hasRemoteBwe() ? feedback.remoteBweBps() : 0;
+                lastPlr = plr;
+                lastRttNs = rttNs;
+                lastFeedbackMs = System.nanoTime() / 1_000_000L;
+                runTick(plr, rttNs, remoteBweBps, lastFeedbackMs);
+            } catch (RuntimeException exception) {
+                LOOP_LOGGER.log(System.Logger.Level.DEBUG,
+                        "calls2 rate-control feedback tick failed for call {0}: {1}", callId,
+                        exception.getMessage());
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * Advances the estimator and re-targets the encoders for one round.
+         *
+         * <p>Reads the GoogCC delay-based estimate as the combiner's link-capacity input, advances the
+         * {@link LiveSenderBandwidthEstimator}, folds in the machine-learning engine's steering when one is
+         * enabled, splits the combined target between the audio and video streams, and applies the audio and
+         * (on a video call) video rate controllers, re-targeting the Opus encoder and the video encoder with
+         * the results. The {@code nowMs} timestamp also serves as the most-recent-feedback time the video
+         * rate controller's SCTP buffer recency gate reads.
+         *
+         * @implNote The machine-learning fold-in calls {@link BitrateCombiner#applyProbingIncrease(long, long)}
+         * with the engine's outputs; the engine is a {@link NoopMlBweEngine} (ML-BWE is unimplemented,
+         * re/calls2-spec/ML-BWE-RE.md), so its {@link MlBweOutputs#DISABLED} outputs are neutral, the increase
+         * is zero, and the pure AIMD plus GoogCC plus combiner path runs unchanged.
+         *
+         * @param plr          the packet-loss ratio for this round, in {@code [0, 1]}
+         * @param rttNs        the round-trip time for this round, in nanoseconds, or {@code 0} when none
+         * @param remoteBweBps the remote receiver estimate for this round, in bits per second, or {@code 0}
+         * @param nowMs        the monotonic timestamp, in milliseconds, of this round, and the most-recent
+         *                     feedback time the video rate controller reads
+         */
+        private void runTick(double plr, long rttNs, long remoteBweBps, long nowMs) {
+            var linkCapacityBps = gcc.currentTargetBps();
+            var target = senderBwe.onFeedback(plr, rttNs, remoteBweBps, MIN_REMOTE_BITRATE_BPS,
+                    linkCapacityBps, nowMs);
+            target = applyMlSteering(target, plr, rttNs, remoteBweBps);
+
+            var rttMs = rttNs > 0 ? rttNs / 1_000_000.0 : 0.0;
+            var audioTarget = audioShare(target);
+            var audioResult = audioRc.apply(audioTarget, plr, rttMs, remoteBweBps, audioParams);
+            audioParams = audioResult.params();
+            audioCodec.modify(audioParams);
+
+            if (video && videoRc != null && videoPipeline != null && videoParams != null) {
+                var videoResult = videoRc.apply(videoShare(target), plr, RELAY_SCTP_BUFFER_OCCUPANCY,
+                        nowMs, videoParams);
+                videoParams = videoResult.params();
+                videoPipeline.modifyCodec(videoParams);
+            }
+        }
+
+        /**
+         * Folds the machine-learning engine's steering into the combined target, or returns it unchanged
+         * when the engine is disabled.
+         *
+         * <p>Builds the round's {@link MlBweSignals} from the measured packet loss, round-trip time, remote and
+         * sender estimates, and the configured maximum bitrate, runs one
+         * {@link MlBweEngine#infer(MlBweSignals)} round, and folds the engine's high-definition target delta
+         * through the combiner's probing increase. When the engine is disabled (the {@link NoopMlBweEngine}, or
+         * a {@link LiveMlBweEngine} with no provisioned model) its {@link MlBweOutputs#DISABLED} outputs carry
+         * no high-definition target, so the additive is zero and the target is returned unchanged.
+         *
+         * @implNote This builds the signal set with {@link MlBweSignals#ofThreaded(double, long, long, long,
+         * long)} from the values the rate loop already measures (the unthreaded measured slots are
+         * sentinel-marked) and routes the engine's high-definition target delta through
+         * {@link BitrateCombiner#applyProbingIncrease(long, long)} (the WASM combiner's active-probing and
+         * machine-learning increase, {@code tfrc_combine_bitrate_estimates} fn4364; SPEC 15.5,
+         * re/calls2-spec/ML-BWE-RE.md sec 6). The recovered congestion verdict
+         * ({@link MlBweOutputs#congestionDetected()}, the fully-recovered {@code fn4443} output the consumer
+         * {@code tfrc_*_congestion_control} fn4417 acts on) is NOT yet folded into the target: that path drives
+         * a {@link MlCongestionPidController} whose proportional, integral, and derivative gains, integral
+         * bounds, target level, and minimum factor are runtime voip-params absent from the captured
+         * {@code voip_settings}, and the fn4417 ramp-down min-time-between thresholds ({@code DAT_504}/
+         * {@code DAT_508}) are runtime-computed compiled defaults not statically recoverable (the same class as
+         * {@link #MIN_BITRATE_BPS}). With the engine disabled the verdict is always {@code false}, so the gap
+         * has no runtime effect today; see the {@code TODO} below.
+         *
+         * @param targetBps    the combined gated target before machine-learning steering, in bits per second
+         * @param plr          the packet-loss ratio for this round, in {@code [0, 1]}
+         * @param rttNs        the round-trip time for this round, in nanoseconds, or {@code 0} when none
+         * @param remoteBweBps the remote receiver estimate for this round, in bits per second, or {@code 0}
+         * @return the target after steering, in bits per second
+         */
+        private long applyMlSteering(long targetBps, double plr, long rttNs, long remoteBweBps) {
+            if (!mlEngine.isEnabled()) {
+                return targetBps;
+            }
+            var signals = MlBweSignals.ofThreaded(plr, rttNs, remoteBweBps, targetBps, maxBitrateBps);
+            var outputs = mlEngine.infer(signals);
+            // TODO: fold the congestion verdict (outputs.congestionDetected()/congestionProbability(), the
+            //  fully-recovered fn4443 output) into the target through MlCongestionPidController.computeFactor
+            //  and the fn4417 BWE-update mask bits (0x800 stop mid-call-probing, 0x1000/0x2000) with the
+            //  min-time-between-ramp-downs guard. BLOCKED: the PID gains (kp/ki/kd), integral bounds, target
+            //  level, and min factor are runtime voip-params absent from the captured voip_settings, and the
+            //  fn4417 ramp-down thresholds DAT_504/DAT_508 are runtime-computed compiled defaults not
+            //  statically recoverable (re/calls2-spec/ML-BWE-RE.md sec 4). The engine is disabled until the ML
+            //  provisioning lands (see selectMlBweEngine), so the verdict is always false and this is inert.
+            var additive = outputs.hdTargetBps() > targetBps ? outputs.hdTargetBps() - targetBps : 0;
+            return senderBwe.combiner().applyProbingIncrease(targetBps, additive);
+        }
+
+        /**
+         * Returns the audio stream's share of the combined target, in bits per second.
+         *
+         * <p>On an audio-only call the audio stream takes the full target. On a video call the audio stream
+         * is reserved up to its codec ceiling so voice keeps priority, and the video stream takes the
+         * remainder; the audio rate controller clamps this to the Opus bitrate window regardless.
+         *
+         * @param targetBps the combined gated target, in bits per second
+         * @return the audio stream's share, in bits per second
+         */
+        // TODO: reserve the dyn-selected audio bitrate for the audio stream (video takes the remainder, down
+        //  to the p->min_vid_stream_reserve_bps_sender floor) instead of reserving the audio codec ceiling.
+        //  The split is simple (audio keeps audio_reserve_bps, video takes the rest) and the matcher is
+        //  first-match-wins over the vid_rc_dyn table (match_bwa_dyn_rules in wa_bwa_rate_control.cc), but
+        //  audio_reserve_bps is dyn-selected: the target-band rules (cond_range_target_bitrate ->
+        //  12500/15000/20000/25000 bps) are evaluable here, yet the higher-priority congestion/latency rules
+        //  (-> 30000/40000) gate on cond_range_short_term_rtt / cond_range_long_term_rtt -- EMA-smoothed RTTs
+        //  whose window sizes (p->plrh_config.rtt_config.short_term_ema_size / long_term_ema_size) are
+        //  compiled defaults absent from the negotiation and not statically recoverable (runtime-computed
+        //  field offsets, see MIN_BITRATE_BPS). Because cond_range_long_term_rtt is not congestion-gated, even
+        //  the common case cannot be cleanly separated, so the codec-ceiling stand-in remains. Unblocked by
+        //  recovering the compiled defaults via WASM execution (SPEC 15, wa_bwa_rate_control.cc).
+        private long audioShare(long targetBps) {
+            if (!video) {
+                return targetBps;
+            }
+            return Math.min(targetBps, audioParams.maxBitrate());
+        }
+
+        /**
+         * Returns the video stream's share of the combined target, in bits per second.
+         *
+         * <p>The remainder of the target after the audio share is reserved, never negative; the video rate
+         * controller clamps it to the video codec window.
+         *
+         * @param targetBps the combined gated target, in bits per second
+         * @return the video stream's share, in bits per second
+         */
+        private long videoShare(long targetBps) {
+            return Math.max(0, targetBps - audioShare(targetBps));
+        }
+
+        /**
+         * Runs the periodic fallback tick until the loop stops.
+         *
+         * <p>Each turn applies the matched dynamic voip-param overrides under the manager's round guard and,
+         * when the RTCP feedback stream has gone stale, re-runs one rate-control round on the last known loss
+         * and round-trip so the encoder is not frozen on a target the link can no longer carry. The loop
+         * parks one {@link #FALLBACK_TICK_NANOS} period between turns and exits on interrupt.
+         */
+        private void fallbackLoop() {
+            while (running.get()) {
+                try {
+                    fallbackTick();
+                } catch (RuntimeException exception) {
+                    LOOP_LOGGER.log(System.Logger.Level.DEBUG,
+                            "calls2 rate-control fallback tick failed for call {0}: {1}", callId,
+                            exception.getMessage());
+                }
+                java.util.concurrent.locks.LockSupport.parkNanos(FALLBACK_TICK_NANOS);
+                if (Thread.interrupted()) {
+                    break;
+                }
+            }
+        }
+
+        /**
+         * Applies one periodic fallback tick: the dynamic-rule pass and the staleness re-evaluation.
+         *
+         * <p>The dynamic-rule pass runs every tick under the manager's
+         * {@link com.github.auties00.cobalt.calls2.common.DynVoipParamUpdater} round guard; the staleness
+         * re-run fires only when feedback has been seen at least once and the last feedback is older than
+         * {@link #FEEDBACK_STALENESS_MS}.
+         *
+         * @implNote The matched dynamic overrides are passed empty because the dynamic-rule condition
+         * catalogue ({@code cond_range_ul_bwe}, {@code cond_is_speaker}, ...) that selects which rules apply
+         * is owned by the rate-control reader and is not yet reversed (SPEC 9.3, MEDIA-PLANE-PLAN Step 1), so
+         * the guarded pass runs with no matched rules; the call is kept so the round guard and the
+         * store/select/count-override/dyn-tick order are exercised and the pass is wired the moment the
+         * catalogue lands. The staleness re-run drives one round with the last feedback's loss and round-trip
+         * and a dropped remote estimate; the {@code no RTCP in window} multiplicative decrease of SPEC 15.2
+         * is approximated this way because {@link LiveSenderBandwidthEstimator#onFeedback} hardcodes the
+         * sender AIMD's no-feedback elapsed input, so the wrapper's staleness branch is not directly
+         * exercised.
+         */
+        // TODO: pass the matched dynamic overrides once the dyn-rule condition catalogue is reversed; the
+        //  guarded pass runs empty for now to preserve the lifecycle order (SPEC 9.3, MEDIA-PLANE-PLAN Step 1).
+        // TODO: drive the exact no-RTCP multiplicative decrease through the sender AIMD's no-feedback elapsed
+        //  input once a feedback-age seam exists on LiveSenderBandwidthEstimator; the staleness re-run
+        //  approximates it on the last known state (audio_sender_bwe.cc NO_FEEDBACK_CONGESTION_MS, SPEC 15.2).
+        private void fallbackTick() {
+            lock.lock();
+            try {
+                voipParamManager.applyDynamicRules(List.of());
+                if (lastFeedbackMs < 0) {
+                    return;
+                }
+                var nowMs = System.nanoTime() / 1_000_000L;
+                if (nowMs - lastFeedbackMs > FEEDBACK_STALENESS_MS) {
+                    runTick(lastPlr, lastRttNs, 0, nowMs);
+                }
+            } finally {
+                lock.unlock();
+            }
+        }
+    }
+}

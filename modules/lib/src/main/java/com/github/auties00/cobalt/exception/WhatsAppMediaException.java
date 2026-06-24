@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.exception;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -25,14 +26,16 @@ import java.util.OptionalInt;
  * @apiNote
  * Inspect {@link #httpStatusCode()} to react differently to a
  * {@link #HTTP_UNAUTHORIZED} (refresh auth), a {@link #HTTP_TOO_LARGE}
- * (give up), or a {@link #HTTP_THROTTLE} (back off). Every subtype is
- * non-fatal, so a failed transfer can be retried or abandoned without
- * tearing the messaging session down.
+ * (give up), or a {@link #HTTP_THROTTLE} (back off). Every subtype returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD} from {@link #toErrorResult()},
+ * so a failed transfer can be retried or abandoned without tearing the
+ * messaging session down.
  *
  * @implNote
- * This implementation always reports the failure as non-fatal: media
- * operations are isolated from the main messaging channel and a failed
- * transfer is local to a single piece of content.
+ * This implementation always returns
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}: media operations are isolated
+ * from the main messaging channel, so a failed transfer is retried or
+ * abandoned without tearing the session down.
  *
  * @see Connection
  * @see Upload
@@ -162,13 +165,14 @@ public sealed class WhatsAppMediaException extends WhatsAppException
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns {@code false}: media operations
-     * are isolated from the main messaging channel and their failures
-     * never tear the session down.
+     * This implementation always returns
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: media operations are
+     * isolated from the main messaging channel, so a failed transfer is
+     * retried or abandoned without tearing the session down.
      */
     @Override
-    public boolean isFatal() {
-        return false;
+    public WhatsAppLinkedClientErrorResult toErrorResult() {
+        return WhatsAppLinkedClientErrorResult.DISCARD;
     }
 
     /**

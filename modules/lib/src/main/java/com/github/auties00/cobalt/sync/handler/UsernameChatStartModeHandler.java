@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.model.sync.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -81,7 +82,7 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
      * This implementation follows the canonical shape used by sibling handlers because WA Web ships
      * no concrete module to mirror. Sibling WA Web handlers wrap their body in a try/catch that maps
      * any throw to a failed result; Cobalt instead lets exceptions propagate to the configured
-     * {@link com.github.auties00.cobalt.client.WhatsAppClientErrorHandler} per the Cobalt error
+     * {@link WhatsAppLinkedClientErrorHandler} per the Cobalt error
      * model.
      */
     @Override
@@ -90,12 +91,12 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
             return MutationApplicationResult.unsupported();
         }
 
-        if (!(mutation.value().action().orElse(null) instanceof UsernameChatStartModeAction action)
+        if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof UsernameChatStartModeAction action)
                 || action.chatStartMode().isEmpty()) {
             return MutationApplicationResult.malformed();
         }
 
-        client.store().setUsernameChatStartMode(action.chatStartMode().get());
+        client.store().settingsStore().setUsernameChatStartMode(action.chatStartMode().get());
 
         return MutationApplicationResult.success();
     }
