@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.reporting.SupportContactFormContextFlow;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -22,10 +23,11 @@ import java.io.UncheckedIOException;
  * {@code xwa_wa_support_contact_form_submit}; the reply is consumed through
  * {@link SupportContactFormSubmitWhatsAppGraphQlResponse}.
  *
- * @implNote This implementation keeps {@code contextFlow} as {@code String}: the sole caller
- * {@code WAWebSendSupportRequestJob} emits the literal {@code "GENERAL"}, but the full value set of
- * the server-side context-flow type is not declared in the bundle of snapshot {@code 1040120866}, so
- * the closed set cannot be confirmed.
+ * @implNote This implementation models {@code contextFlow} as the typed
+ * {@link SupportContactFormContextFlow}: WA Web's sole caller {@code WAWebSendSupportRequestJob} emits
+ * the literal {@code "GENERAL"} ({@link SupportContactFormContextFlow#GENERAL}). The server-side
+ * context-flow type may define further members, but they are not declared in the client bundle, so
+ * only the client-emitted value is modelled.
  *
  * @see SupportContactFormSubmitWhatsAppGraphQlResponse
  */
@@ -64,9 +66,9 @@ public final class SupportContactFormSubmitWhatsAppGraphQlRequest implements Wha
 
     /**
      * The {@code context_flow} field of the {@code input} object naming the originating support flow
-     * (for example {@code "GENERAL"}), or {@code null} to omit it.
+     * (for example {@link SupportContactFormContextFlow#GENERAL}), or {@code null} to omit it.
      */
-    private final String contextFlow;
+    private final SupportContactFormContextFlow contextFlow;
 
     /**
      * Constructs a support-contact-form-submit mutation request.
@@ -78,7 +80,7 @@ public final class SupportContactFormSubmitWhatsAppGraphQlRequest implements Wha
      * @param debugInfoJson the diagnostic blob, or {@code null} to omit the field
      * @param contextFlow   the originating support flow, or {@code null} to omit the field
      */
-    public SupportContactFormSubmitWhatsAppGraphQlRequest(String description, String debugInfoJson, String contextFlow) {
+    public SupportContactFormSubmitWhatsAppGraphQlRequest(String description, String debugInfoJson, SupportContactFormContextFlow contextFlow) {
         this.description = description;
         this.debugInfoJson = debugInfoJson;
         this.contextFlow = contextFlow;
@@ -131,7 +133,7 @@ public final class SupportContactFormSubmitWhatsAppGraphQlRequest implements Wha
             if (contextFlow != null) {
                 writer.writeName("context_flow");
                 writer.writeColon();
-                writer.writeString(contextFlow);
+                writer.writeString(contextFlow.wireValue());
             }
             writer.endObject();
             writer.endObject();
