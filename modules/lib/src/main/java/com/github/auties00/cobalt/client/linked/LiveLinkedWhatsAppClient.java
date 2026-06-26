@@ -17685,7 +17685,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebSupportContactFormSubmitMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<SupportContactFormSubmission> submitSupportContactForm(String description, String diagnosticsJson, String contextFlow) {
+    public Optional<SupportContactFormSubmission> submitSupportContactForm(String description, String diagnosticsJson, SupportContactFormContextFlow contextFlow) {
         var request = new SupportContactFormSubmitWhatsAppGraphQlRequest(description, diagnosticsJson, contextFlow);
         var response = sendGraphQl(request);
         return SupportContactFormSubmitWhatsAppGraphQlResponse.of(response)

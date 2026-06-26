@@ -3345,7 +3345,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<SupportContactFormSubmission> submitSupportContactForm(String description, String diagnosticsJson, String contextFlow) {
+    public Optional<SupportContactFormSubmission> submitSupportContactForm(String description, String diagnosticsJson, SupportContactFormContextFlow contextFlow) {
         throw new UnsupportedOperationException("TestWhatsAppClient: submitSupportContactForm(..) is not stubbed");
     }
 

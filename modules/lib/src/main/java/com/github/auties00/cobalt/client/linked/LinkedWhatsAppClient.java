@@ -11151,13 +11151,13 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @param description     the free-text issue description, or {@code null} to omit it
      * @param diagnosticsJson the JSON-encoded diagnostic bundle collected by the client, or
      *                        {@code null} to omit it
-     * @param contextFlow     the originating support flow (for example {@code "GENERAL"}), or
-     *                        {@code null} to omit it
+     * @param contextFlow     the originating support flow (for example
+     *                        {@link SupportContactFormContextFlow#GENERAL}), or {@code null} to omit it
      * @return the parsed submission outcome, or {@link Optional#empty()} when the server returned
      *         no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<SupportContactFormSubmission> submitSupportContactForm(String description, String diagnosticsJson, String contextFlow);
+    Optional<SupportContactFormSubmission> submitSupportContactForm(String description, String diagnosticsJson, SupportContactFormContextFlow contextFlow);
 
     /**
      * Files an appeal against the suspension of a WhatsApp group.

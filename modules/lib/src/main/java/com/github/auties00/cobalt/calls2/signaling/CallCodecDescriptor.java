@@ -16,8 +16,10 @@ import java.util.OptionalInt;
  * identifier and the {@code rate} sampling clock in hertz. A video format is
  * {@code <video dec="H264" enc="h.264" device_orientation="0" screen_width="0" screen_height="0"/>}:
  * the {@code dec} decode-codec token, the {@code enc} encode-codec name, and the current
- * device-orientation and screen geometry (all zero before the camera starts). The element tag in
- * {@link #element()} distinguishes the two families and is preserved across a round trip.
+ * device-orientation and screen geometry (all zero before the camera starts). The offer carries the
+ * full video form; the preaccept drops {@code enc} and the accept drops {@code enc} and the screen
+ * geometry, so a video descriptor may carry no {@code enc}. The element tag in {@link #element()}
+ * distinguishes the two families and is preserved across a round trip.
  *
  * @implNote This implementation models the flat element the offer serializer emits, recovered from the
  * live captures (every captured offer, accept, and preaccept carries {@code <audio enc rate>} and
@@ -32,7 +34,8 @@ import java.util.OptionalInt;
  * @param element           the wire element tag, {@code audio} for an audio format or {@code video}
  *                          for a video format; never {@code null}
  * @param enc               the codec identifier carried on the {@code enc} attribute, for example
- *                          {@code opus} or {@code h.264}; never {@code null}
+ *                          {@code opus} or {@code h.264}, or {@code null} when the format carries no
+ *                          {@code enc} (the accept and preaccept video forms)
  * @param rate              the audio sampling clock in hertz, or {@code -1} when absent (video)
  * @param dec               the video decode-codec token carried on the {@code dec} attribute, for
  *                          example {@code H264}, or {@code null} when absent (audio)
@@ -86,11 +89,10 @@ public record CallCodecDescriptor(String element, String enc, int rate, String d
     /**
      * Validates the record components.
      *
-     * @throws NullPointerException if {@code element} or {@code enc} is {@code null}
+     * @throws NullPointerException if {@code element} is {@code null}
      */
     public CallCodecDescriptor {
         Objects.requireNonNull(element, "element cannot be null");
-        Objects.requireNonNull(enc, "enc cannot be null");
     }
 
     /**
@@ -102,6 +104,7 @@ public record CallCodecDescriptor(String element, String enc, int rate, String d
      * @throws NullPointerException if {@code enc} is {@code null}
      */
     public static CallCodecDescriptor audio(String enc, int rate) {
+        Objects.requireNonNull(enc, "enc cannot be null");
         return new CallCodecDescriptor(AUDIO_ELEMENT, enc, rate, null, -1, -1, -1);
     }
 
@@ -110,7 +113,8 @@ public record CallCodecDescriptor(String element, String enc, int rate, String d
      * {@code <video dec enc device_orientation screen_width screen_height/>} element.
      *
      * @param dec               the decode-codec token, for example {@code H264}
-     * @param enc               the encode-codec name, for example {@code h.264}
+     * @param enc               the encode-codec name, for example {@code h.264}, or {@code null} when the
+     *                          format carries no {@code enc} (the accept and preaccept video forms)
      * @param deviceOrientation the device-orientation classification
      * @param screenWidth       the screen width in pixels
      * @param screenHeight      the screen height in pixels
@@ -168,8 +172,8 @@ public record CallCodecDescriptor(String element, String enc, int rate, String d
      * Decodes a flat {@code <audio>} or {@code <video>} stanza into a {@link CallCodecDescriptor}.
      *
      * <p>The stanza's tag is retained as the descriptor {@link #element()} so a round trip preserves
-     * whether it was an audio or video format. A stanza without an {@code enc} attribute yields an empty
-     * result so callers iterating a mixed child list can skip it.
+     * whether it was an audio or video format. A stanza without an {@code enc} or {@code dec} attribute
+     * yields an empty result so callers iterating a mixed child list can skip it.
      *
      * @param stanza the codec-format stanza
      * @return the decoded descriptor, or an empty result when the stanza carries no {@code enc}
@@ -179,11 +183,11 @@ public record CallCodecDescriptor(String element, String enc, int rate, String d
     public static Optional<CallCodecDescriptor> of(Stanza stanza) {
         Objects.requireNonNull(stanza, "stanza cannot be null");
         var enc = stanza.getAttributeAsString(ENC_ATTRIBUTE, null);
-        if (enc == null) {
+        var dec = stanza.getAttributeAsString(DEC_ATTRIBUTE, null);
+        if (enc == null && dec == null) {
             return Optional.empty();
         }
         var rate = stanza.getAttributeAsInt(RATE_ATTRIBUTE, -1);
-        var dec = stanza.getAttributeAsString(DEC_ATTRIBUTE, null);
         var deviceOrientation = stanza.getAttributeAsInt(DEVICE_ORIENTATION_ATTRIBUTE, -1);
         var screenWidth = stanza.getAttributeAsInt(SCREEN_WIDTH_ATTRIBUTE, -1);
         var screenHeight = stanza.getAttributeAsInt(SCREEN_HEIGHT_ATTRIBUTE, -1);
