@@ -7,7 +7,7 @@ import java.util.Objects;
 /**
  * Thrown when an A/B configuration property cannot be decoded as the type
  * the caller asked for.
- *
+ * <p>
  * WhatsApp ships A/B test ("AB prop") values from the server to drive
  * feature flags, rate limits, and rollout percentages. Each property is
  * keyed by a numeric configuration code and read from the client by

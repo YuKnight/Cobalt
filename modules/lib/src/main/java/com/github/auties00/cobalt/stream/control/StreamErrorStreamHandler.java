@@ -4,7 +4,6 @@ import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.exception.WhatsAppSessionException;
-import com.github.auties00.cobalt.exception.WhatsAppStreamException;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -17,9 +16,9 @@ import com.github.auties00.cobalt.stream.NodeStreamService;
  * inbound stanza into one of three buckets: a {@code <conflict/>} child (another session took over or the device was
  * removed), a numeric {@code code} attribute (5xx server stream error, with {@code 515} meaning reconnect and
  * {@code 516} meaning logout), or an XML-validity child ({@code <ack/>} or {@code <xml-not-well-formed/>}). Each bucket
- * is dispatched as the matching {@link WhatsAppSessionException} subtype, except the malformed-XML branch which surfaces
- * as a {@link WhatsAppStreamException.MalformedNode} so the error handler can distinguish a server-reported bad-XML
- * close from a generic session close. The dispatched exception is handed to
+ * is dispatched as the matching {@link WhatsAppSessionException} subtype; both XML-validity children surface as
+ * {@link WhatsAppSessionException.Closed} (a server-reported stream error tears the stream down, so the channel is
+ * re-established). The dispatched exception is handed to
  * {@link LinkedWhatsAppClient#handleFailure(com.github.auties00.cobalt.exception.WhatsAppException)}, and the configured error
  * handler decides between {@code DISCARD}, {@code DISCONNECT}, {@code RECONNECT}, {@code LOG_OUT} or {@code BAN}.
  *
@@ -97,7 +96,7 @@ public final class StreamErrorStreamHandler extends SocketStreamHandler.Concurre
         }
 
         if (stanza.hasChild("xml-not-well-formed")) {
-            whatsapp.handleFailure(new WhatsAppStreamException.MalformedNode("Server reported xml-not-well-formed"));
+            whatsapp.handleFailure(new WhatsAppSessionException.Closed("Stream error: xml-not-well-formed"));
             return;
         }
 

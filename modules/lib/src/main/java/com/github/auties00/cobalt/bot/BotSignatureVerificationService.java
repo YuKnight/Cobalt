@@ -25,43 +25,25 @@ import com.github.auties00.cobalt.model.props.ABProp;
  */
 public interface BotSignatureVerificationService {
     /**
-     * The forwarding-verification enforcement level, mirroring WA Web's gating tiers.
-     */
-    enum EnforcementLevel {
-        /**
-         * Verification is disabled; a no-op that reports the message as passed.
-         */
-        NONE,
-        /**
-         * Verification runs and is logged, but a failure is still treated as passed.
-         */
-        LOG_ONLY,
-        /**
-         * Verification runs and a failure is propagated to the caller.
-         */
-        ENFORCE_BLOCKING
-    }
-
-    /**
      * Returns the configured forwarding-verification enforcement level.
      *
      * @implSpec
      * Implementations resolve the level from
      * {@link ABProp#AI_RICH_RESPONSE_FORWARDING_VERIFICATION_ENABLED_V1} and return
-     * {@link EnforcementLevel#NONE} when the prop is unset or holds an unrecognised value.
+     * {@link BotSignatureEnforcementLevel#NONE} when the prop is unset or holds an unrecognised value.
      *
      * @return the resolved enforcement level
      */
-    EnforcementLevel enforcementLevel();
+    BotSignatureEnforcementLevel enforcementLevel();
 
     /**
      * Returns whether forwarding verification is enabled at any tier.
      *
      * @implSpec
      * Implementations return {@code true} when {@link #enforcementLevel()} is not
-     * {@link EnforcementLevel#NONE}.
+     * {@link BotSignatureEnforcementLevel#NONE}.
      *
-     * @return {@code true} when the enforcement level is not {@link EnforcementLevel#NONE}
+     * @return {@code true} when the enforcement level is not {@link BotSignatureEnforcementLevel#NONE}
      */
     boolean isForwardVerificationEnabled();
 
@@ -70,8 +52,8 @@ public interface BotSignatureVerificationService {
      *
      * @implSpec
      * Implementations return {@code true} when the message may be forwarded: when verification passes,
-     * when it is skipped because the enforcement level is {@link EnforcementLevel#NONE}, or when it
-     * fails while the enforcement level is not {@link EnforcementLevel#ENFORCE_BLOCKING}; they return
+     * when it is skipped because the enforcement level is {@link BotSignatureEnforcementLevel#NONE}, or when it
+     * fails while the enforcement level is not {@link BotSignatureEnforcementLevel#ENFORCE_BLOCKING}; they return
      * {@code false} only on a blocking failure. Every terminal outcome commits a
      * {@code CertificateValidationEvent} metric.
      *

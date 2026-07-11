@@ -20,9 +20,10 @@ import java.util.Objects;
  * previously distributed {@code chat.whatsapp.com/<code>} link bound to that receiver. Callers that
  * only need the current code without rotating it use {@link FetchGroupInviteCodeMexRequest} instead.
  *
- * @implNote This implementation omits the WA Web {@code input.server_send_sms} field from the
- * payload; the wire-level GraphQL variables object carries only {@code receiver} and
- * {@code entry_point}, and the relay treats the absent flag as {@code false}.
+ * @implNote This implementation emits the {@code input} object with the three fields WA Web always
+ * sends: {@code receiver}, {@code entry_point} and {@code server_send_sms}. The
+ * {@code server_send_sms} flag is a declared field that WA Web always populates, so it is written
+ * unconditionally as {@code false} rather than omitted.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexCreateInviteCodeJob")
 public final class CreateInviteCodeMexRequest implements MexStanza.Request.Json {
@@ -90,11 +91,11 @@ public final class CreateInviteCodeMexRequest implements MexStanza.Request.Json 
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation streams the {@code input.receiver} and {@code input.entry_point}
-     * GraphQL fields through fastjson2's {@link JSONWriter} and wraps them in the standard MEX IQ
-     * envelope built through {@link MexStanza.Request.Json#createMexNode(String, String)}. The WA
-     * Web {@code input.server_send_sms} field is omitted; the relay treats the absent flag as
-     * {@code false}.
+     * @implNote This implementation streams the {@code input.receiver}, {@code input.entry_point}
+     * and {@code input.server_send_sms} GraphQL fields through fastjson2's {@link JSONWriter} and
+     * wraps them in the standard MEX IQ envelope built through
+     * {@link MexStanza.Request.Json#createMexNode(String, String)}. The {@code server_send_sms} flag
+     * is always emitted as {@code false}, matching WA Web which always populates it.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexCreateInviteCodeJob", exports = "mexCreateInviteCode",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -115,6 +116,9 @@ public final class CreateInviteCodeMexRequest implements MexStanza.Request.Json 
             writer.writeName("entry_point");
             writer.writeColon();
             writer.writeString(entryPoint);
+            writer.writeName("server_send_sms");
+            writer.writeColon();
+            writer.writeBool(false);
             writer.endObject();
 
             writer.endObject();

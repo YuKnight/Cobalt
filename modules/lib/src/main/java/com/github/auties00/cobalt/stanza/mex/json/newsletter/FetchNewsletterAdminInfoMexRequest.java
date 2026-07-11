@@ -74,8 +74,7 @@ public final class FetchNewsletterAdminInfoMexRequest implements MexStanza.Reque
      * {@inheritDoc}
      *
      * <p>Produces the {@code {variables: {newsletter_id: "<id>"}}} payload; the
-     * {@code newsletter_id} entry is omitted when {@link #newsletterId} is {@code null} so the
-     * GraphQL schema never receives an explicit {@code null} variable.
+     * {@code newsletter_id} entry is the sole declared top-level variable and is always emitted.
      *
      * @implNote This implementation writes the GraphQL variables directly through a
      * {@link JSONWriter} and wraps any {@link IOException} from the in-memory writer in an
@@ -93,11 +92,9 @@ public final class FetchNewsletterAdminInfoMexRequest implements MexStanza.Reque
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (newsletterId != null) {
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
-            }
+            writer.writeName("newsletter_id");
+            writer.writeColon();
+            writer.writeString(newsletterId);
             writer.endObject();
             writer.endObject();
 

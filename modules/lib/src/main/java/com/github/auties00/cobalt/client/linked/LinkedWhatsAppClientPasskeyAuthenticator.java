@@ -3,16 +3,21 @@ package com.github.auties00.cobalt.client.linked;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.passkey.StoredPasskeyAuthenticator;
 import com.github.auties00.cobalt.passkey.SystemPasskeyAuthenticator;
-import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.MultiFormatWriter;
+import com.google.zxing.WriterException;
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+import com.github.auties00.qr.QrTerminal;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -28,22 +33,20 @@ import java.util.function.Function;
  * validates against an allow list, so no browser is needed. This interface is the seam through
  * which a holder of the credential, wherever it lives, produces the assertion.
  *
- * <p>Three strategies satisfy the contract:
+ * <p>Two strategies satisfy the contract:
  * <ul>
- *   <li><b>Remote</b> - {@link #remote(Function)} wraps a handler that ships
+ *   <li><b>Relay</b> - {@link #toWebAuthnJson(Function)} wraps a handler that ships
  *       {@link Request#toWebAuthnGetJson()} to a real authenticator the embedder controls (a browser
  *       served from {@code web.whatsapp.com}, the user's phone, a hardware security key), blocks
  *       until the ceremony returns, and rebuilds the result with
  *       {@link Assertion#fromWebAuthnGetJson(String)}; implementing this interface directly does the
  *       same by hand. This is the path for a headless or REST deployment whose credential lives on
  *       another device.</li>
- *   <li><b>Stored</b> - {@link #stored(LinkedWhatsAppStore)} returns a pure-Java authenticator that
- *       signs in process with a credential imported into the store, requiring no external device. The
- *       caller enrolls the passkey out of band, in a provider that exposes the private key, and sets
- *       it on the store; Cobalt never registers it.</li>
- *   <li><b>System</b> - {@link #system()} returns an opt-in desktop bridge that drives the
- *       host platform's native WebAuthn API (Windows Hello, macOS AuthenticationServices, libfido2)
- *       to reach a platform-stored, synced, or phone-hybrid {@code whatsapp.com} passkey.</li>
+ *   <li><b>Hybrid QR</b> - {@link #toQr(Consumer)} returns an opt-in desktop bridge that drives
+ *       Warden's entitlement-free cross-device hybrid transport, handing each ceremony's
+ *       {@code FIDO:/...} QR payload to a consumer to render; the user scans it with the phone that
+ *       holds the {@code whatsapp.com} passkey, which then produces the assertion over an encrypted
+ *       tunnel. {@link #toTerminal()} renders it as a terminal QR for you.</li>
  * </ul>
  *
  * @apiNote Implementations block the calling virtual thread until the ceremony completes; a remote
@@ -71,7 +74,7 @@ public interface LinkedWhatsAppClientPasskeyAuthenticator {
     Assertion assertCredential(Request request);
 
     /**
-     * Returns a remote authenticator that hands each ceremony off to an external WebAuthn
+     * Returns a relay authenticator that hands each ceremony off to an external WebAuthn
      * authenticator as JSON.
      *
      * <p>The returned authenticator serialises every request with {@link Request#toWebAuthnGetJson()},
@@ -79,7 +82,7 @@ public interface LinkedWhatsAppClientPasskeyAuthenticator {
      * result from the {@code PublicKeyCredential} JSON the handler returns with
      * {@link Assertion#fromWebAuthnGetJson(String)}. The handler owns the transport: forwarding the
      * options to a browser served from {@code *.whatsapp.com}, the user's phone, a hardware key, or a
-     * REST endpoint, and blocking until that authenticator answers. This packages the remote strategy
+     * REST endpoint, and blocking until that authenticator answers. This packages the relay strategy
      * so the embedder never touches {@link Request} or {@link Assertion} directly.
      *
      * @apiNote This is the path for a headless or REST deployment whose credential lives on another
@@ -89,52 +92,68 @@ public interface LinkedWhatsAppClientPasskeyAuthenticator {
      *
      * @param ceremony maps the {@code navigator.credentials.get} options JSON to the resulting
      *                 {@code PublicKeyCredential} JSON; never {@code null}
-     * @return a remote authenticator over the given handler
+     * @return a relay authenticator over the given handler
      * @throws NullPointerException if {@code ceremony} is {@code null}
      */
-    static LinkedWhatsAppClientPasskeyAuthenticator remote(Function<String, String> ceremony) {
+    static LinkedWhatsAppClientPasskeyAuthenticator toWebAuthnJson(Function<String, String> ceremony) {
         Objects.requireNonNull(ceremony, "ceremony must not be null");
         return request -> Assertion.fromWebAuthnGetJson(ceremony.apply(request.toWebAuthnGetJson()));
     }
 
     /**
-     * Returns a pure-Java stored-credential authenticator backed by the credential persisted in the given store.
+     * Returns a hybrid-transport authenticator that renders each ceremony's QR code as a scannable
+     * terminal QR on standard output.
      *
-     * <p>The authenticator signs assertions in process from the {@code LocalPasskeyCredential}
-     * imported into the store's Signal sub-store (through
-     * {@link com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore#setPasskeyCredential},
-     * which is what {@link LinkedWhatsAppClientVerificationHandler.Web.Passkey#fromStored} does), so the
-     * credential survives restarts. It needs no external device and works in a fully headless
-     * deployment.
+     * <p>Drives Warden's entitlement-free cross-device hybrid transport, exactly like
+     * {@link #toQr(Consumer)}, and prints each {@code FIDO:/...} QR payload as ASCII art for the user to
+     * scan with the phone that holds the {@code whatsapp.com} passkey. Use {@link #toQr(Consumer)} to
+     * render the QR on a surface of your own instead.
      *
-     * @apiNote Most passkeys are deliberately non-exportable (platform-native and synced passkeys
-     *          never surface their private key), so this strategy fits only credentials enrolled in a
-     *          provider that exposes the key; otherwise implement this interface directly as a remote
-     *          handoff to a device that holds the credential, or use {@link #system()}.
-     *
-     * @param store the store holding the passkey credential; never {@code null}
-     * @return a stored-credential authenticator over the store's credential
-     * @throws NullPointerException if {@code store} is {@code null}
+     * @return a hybrid-transport authenticator that prints its QR code to standard output
+     * @throws UnsupportedOperationException if the host platform has no supported native passkey service
      */
-    static LinkedWhatsAppClientPasskeyAuthenticator stored(LinkedWhatsAppStore store) {
-        return StoredPasskeyAuthenticator.of(store);
+    static LinkedWhatsAppClientPasskeyAuthenticator toTerminal() {
+        return toQr(LinkedWhatsAppClientPasskeyAuthenticator::printQrToTerminal);
     }
 
     /**
-     * Returns an opt-in desktop authenticator that drives the host operating system's native
-     * WebAuthn API.
+     * Returns an opt-in desktop authenticator that drives Warden's cross-device hybrid transport,
+     * handing each ceremony's {@code FIDO:/...} QR payload to the given consumer to render.
      *
-     * <p>The returned authenticator delegates the ceremony to Windows Hello, macOS
-     * AuthenticationServices, or libfido2, which surfaces the platform's credential picker and can
-     * reach a {@code whatsapp.com} passkey that is platform-stored, synced from the user's phone, or
-     * reached through the cross-device hybrid transport. It opens a native prompt, so it suits
-     * desktop applications rather than headless servers.
+     * <p>The user scans the rendered QR with the phone that holds the {@code whatsapp.com} passkey, and
+     * the phone produces the assertion over an encrypted tunnel. The transport is entitlement-free on
+     * every platform, so it suits desktop applications that cannot carry a native WebAuthn entitlement.
+     * Render the QR as an image, a web asset, or any surface of your own; {@link #toTerminal()}
+     * renders it as a terminal QR on standard output.
      *
-     * @return a system-backed authenticator
-     * @throws UnsupportedOperationException if the host platform has no supported native WebAuthn API
+     * @param onQrCode the consumer the {@code FIDO:/...} QR payload is handed to for rendering; never
+     *                 {@code null}
+     * @return a hybrid-transport authenticator over the given QR consumer
+     * @throws NullPointerException          if {@code onQrCode} is {@code null}
+     * @throws UnsupportedOperationException if the host platform has no supported native passkey service
      */
-    static LinkedWhatsAppClientPasskeyAuthenticator system() {
-        return SystemPasskeyAuthenticator.create();
+    static LinkedWhatsAppClientPasskeyAuthenticator toQr(Consumer<String> onQrCode) {
+        return SystemPasskeyAuthenticator.create(onQrCode);
+    }
+
+    /**
+     * Renders a {@code FIDO:/...} hybrid-transport URL as a scannable QR code on standard output.
+     *
+     * <p>Encodes the URL as a level-{@code L} QR matrix and prints it as ASCII art, prefixed with a
+     * short instruction so the user knows to scan it with the phone that holds the passkey.
+     *
+     * @param fidoUrl the {@code FIDO:/...} URL to encode
+     * @throws UnsupportedOperationException if the URL cannot be encoded as a QR code
+     */
+    private static void printQrToTerminal(String fidoUrl) {
+        try {
+            var matrix = new MultiFormatWriter().encode(fidoUrl, BarcodeFormat.QR_CODE, 10, 10,
+                    Map.of(EncodeHintType.MARGIN, 0, EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L));
+            System.out.println("Scan this QR code with the phone that holds your WhatsApp passkey:");
+            QrTerminal.print(matrix, true);
+        } catch (WriterException exception) {
+            throw new UnsupportedOperationException("Cannot render the FIDO QR code", exception);
+        }
     }
 
     /**
@@ -194,7 +213,7 @@ public interface LinkedWhatsAppClientPasskeyAuthenticator {
      *
      * @param relyingPartyId      the relying-party identifier, for example {@code whatsapp.com}
      * @param challenge           the raw server challenge bytes
-     * @param allowedCredentialIds the acceptable credential ids, or an empty list for a discoverable
+     * @param allowedCredentialIds the acceptable credential ids, or an empty array for a discoverable
      *                            (allow-list-less) request
      * @param userVerification    the user-verification preference
      * @param timeout             the ceremony timeout
@@ -202,7 +221,7 @@ public interface LinkedWhatsAppClientPasskeyAuthenticator {
      *                            no PRF is requested
      * @param origin              the origin the assertion's {@code clientDataJSON} must declare
      */
-    record Request(String relyingPartyId, byte[] challenge, List<byte[]> allowedCredentialIds,
+    record Request(String relyingPartyId, byte[] challenge, byte[][] allowedCredentialIds,
                    UserVerification userVerification, Duration timeout, byte[] prfEvalFirst,
                    String origin) {
         /**
@@ -216,8 +235,7 @@ public interface LinkedWhatsAppClientPasskeyAuthenticator {
         public static final String WHATSAPP_RP_ID = "whatsapp.com";
 
         /**
-         * Validates required components and normalises {@code allowedCredentialIds} to an
-         * unmodifiable list.
+         * Validates required components and defensively copies {@code allowedCredentialIds}.
          *
          * @throws NullPointerException if any required component is {@code null}
          */
@@ -228,7 +246,31 @@ public interface LinkedWhatsAppClientPasskeyAuthenticator {
             Objects.requireNonNull(userVerification, "userVerification must not be null");
             Objects.requireNonNull(timeout, "timeout must not be null");
             Objects.requireNonNull(origin, "origin must not be null");
-            allowedCredentialIds = List.copyOf(allowedCredentialIds);
+            allowedCredentialIds = deepCopy(allowedCredentialIds);
+        }
+
+        /**
+         * Returns a deep copy of the acceptable credential ids.
+         *
+         * @return the allow list, empty for a discoverable request; never {@code null}
+         */
+        @Override
+        public byte[][] allowedCredentialIds() {
+            return deepCopy(allowedCredentialIds);
+        }
+
+        /**
+         * Deep-copies an array of credential ids so the request owns immutable state.
+         *
+         * @param ids the ids to copy
+         * @return an independent copy
+         */
+        private static byte[][] deepCopy(byte[][] ids) {
+            var copy = new byte[ids.length][];
+            for (var index = 0; index < ids.length; index++) {
+                copy[index] = ids[index].clone();
+            }
+            return copy;
         }
 
         /**
@@ -275,7 +317,8 @@ public interface LinkedWhatsAppClientPasskeyAuthenticator {
                     prfEvalFirst = decodeBase64Url(first);
                 }
             }
-            return new Request(rpId != null ? rpId : WHATSAPP_RP_ID, challenge, allowList,
+            return new Request(rpId != null ? rpId : WHATSAPP_RP_ID, challenge,
+                    allowList.toArray(new byte[0][]),
                     userVerification, Duration.ofMillis(timeoutMillis), prfEvalFirst, origin);
         }
 
@@ -295,7 +338,7 @@ public interface LinkedWhatsAppClientPasskeyAuthenticator {
             publicKey.put("rpId", relyingPartyId);
             publicKey.put("userVerification", userVerification.wireValue());
             publicKey.put("timeout", timeout.toMillis());
-            if (!allowedCredentialIds.isEmpty()) {
+            if (allowedCredentialIds.length > 0) {
                 var allowCredentials = new JSONArray();
                 for (var id : allowedCredentialIds) {
                     var entry = new JSONObject();

@@ -56,7 +56,7 @@ module com.github.auties00.cobalt {
     // QR related dependencies
     requires com.google.zxing;
     requires com.google.zxing.javase;
-    requires it.auties.qr;
+    requires com.github.auties00.qr;
     requires static java.desktop; // Not necessary if the user doesn't want to open the QR on the Desktop
 
     // Serialization (Protobuf, JSON)
@@ -82,6 +82,9 @@ module com.github.auties00.cobalt {
     // Pure-Java SRTP/SRTCP (external library)
     requires com.github.auties00.srtp;
 
+    // Pure-Java SCTP for WebRTC Data Channels (external library)
+    requires com.github.auties00.sctp;
+
     // PDF rendering (document thumbnails in the upload transcoder)
     requires org.apache.pdfbox;
 
@@ -96,7 +99,7 @@ module com.github.auties00.cobalt {
     requires com.google.i18n.phonenumbers.libphonenumber;
 
     // Calls
-    exports com.github.auties00.cobalt.calls2.stream;
+    exports com.github.auties00.cobalt.calls.stream;
 
     // Client API
     exports com.github.auties00.cobalt.client;

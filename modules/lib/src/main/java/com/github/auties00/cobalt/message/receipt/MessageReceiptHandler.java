@@ -496,14 +496,20 @@ public final class MessageReceiptHandler {
      * <p>
      * The recipient is only meaningful for 1:1-style chat messages sent from the user's own
      * account (echoed from a companion device); group, community, broadcast, and status
-     * receipts return {@code null} so the attribute is dropped.
+     * receipts return {@code null} so the attribute is dropped. For a self-echo the value is
+     * the peer the message was addressed to: the plain {@code recipient} attribute when the
+     * stanza carries one, and the chat JID otherwise.
      *
      * @implNote
-     * This implementation collapses WhatsApp Web's three-way resolution chain
-     * ({@code originalBotRecipient}, then {@code preMatChat}, then {@code chat}) to a single
-     * {@code chat} fallback because Cobalt does not yet model the {@code originalBotRecipient}
-     * or {@code preMatChat} stanza metadata; the collapse is safe for non-bot self-echoes but
-     * loses fidelity on bot replies routed via a different recipient.
+     * This implementation realizes WhatsApp Web's
+     * {@code originalBotRecipient ?? preMatChat ?? chat} resolution as
+     * {@code recipient ?? chatJid}. Both {@code preMatChat} and {@code originalBotRecipient}
+     * preserve the pre-rewrite address across a client-side chat relocation (the LID address
+     * migration for {@code preMatChat}, the FBID and Maiba bot-thread relocations for
+     * {@code originalBotRecipient}); Cobalt applies no such relocation, so
+     * {@link MessageReceiveStanza#chatJid()} already holds that pre-rewrite address and the
+     * plain {@link MessageReceiveStanza#recipient()} attribute supplies the peer for the
+     * self-authored echoes whose {@code from} is the local account.
      *
      * @param stanza the parsed incoming stanza
      * @return the recipient JID, or {@code null} when the receipt should omit the attribute
@@ -527,9 +533,7 @@ public final class MessageReceiptHandler {
             return null;
         }
 
-        // TODO: track WAWebMsgProcessingApiUtils originalBotRecipient and preMatChat
-        //       to mirror the full WA Web recipient chain for companion bot replies.
-        return chatJid;
+        return stanza.recipient().orElse(chatJid);
     }
 
     /**

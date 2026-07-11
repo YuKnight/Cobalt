@@ -47,7 +47,7 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool pkg-config \
-            nasm yasm cmake git python3
+            nasm yasm cmake git python3 lld
 
       - name: Install macOS deps
         if: runner.os == 'macOS'
@@ -72,6 +72,7 @@ jobs:
             mingw-w64-${{ matrix.msys_pkg }}-cmake
             mingw-w64-${{ matrix.msys_pkg }}-nasm
             mingw-w64-${{ matrix.msys_pkg }}-yasm
+            mingw-w64-${{ matrix.msys_pkg }}-lld
 
       - name: Build natives
         shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}

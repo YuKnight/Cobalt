@@ -531,33 +531,34 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
      */
     private void handlePsa(Stanza stanza) {
         var from = stanza.getAttributeAsJid("from").orElse(null);
-        if (from != null && from.equals(Jid.announcementsAccount())) {
-            var firstChild = stanza.getChild().orElse(null);
-            var firstChildTag = firstChild == null ? null : firstChild.description();
-            if ("surfaces".equals(firstChildTag)) {
+        if (from == null || !from.equals(Jid.announcementsAccount())) {
+            LOGGER.log(System.Logger.Level.DEBUG,
+                    "Ignoring psa notification: {0}",
+                    firstChildDescription(stanza));
+        }
+
+        var firstChild = stanza.getChild().orElse(null);
+        var firstChildTag = firstChild == null ? null : firstChild.description();
+        switch (firstChildTag) {
+            case "surfaces" -> {
                 // TODO: implement the quick-promotion surfaces pipeline once Cobalt has the in-app QP model.
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "Ignoring QP surfaces psa notification: {0}",
                         stanza.getAttributeAsString("id", "<missing>"));
-                return;
             }
-            if ("reset_smb_last_qp_prefetch_timestamp".equals(firstChildTag)) {
+            case "reset_smb_last_qp_prefetch_timestamp" -> {
                 // TODO: implement the QP prefetch timestamp reset once Cobalt has the in-app QP model.
                 LOGGER.log(System.Logger.Level.DEBUG,
                         "Ignoring QP prefetch timestamp psa notification: {0}",
                         stanza.getAttributeAsString("id", "<missing>"));
-                return;
             }
-            // TODO: implement the in-app PSA campaign / wa_chat message pipeline.
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring wa_chat/psa notification from PSA_JID: {0}",
-                    firstChildTag);
-            return;
+            case null, default -> {
+                // TODO: implement the in-app PSA campaign / wa_chat message pipeline.
+                LOGGER.log(System.Logger.Level.DEBUG,
+                        "Ignoring wa_chat/psa notification from PSA_JID: {0}",
+                        firstChildTag);
+            }
         }
-
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Ignoring psa notification: {0}",
-                firstChildDescription(stanza));
     }
 
     /**

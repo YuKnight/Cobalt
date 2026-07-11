@@ -16,9 +16,9 @@ import java.io.UncheckedIOException;
  *
  * <p>This query backs the live-validation indicator on the username picker. The candidate name is
  * sent as the {@code input} variable; the relay validates length, charset, and reservation status
- * server-side. The optional {@code source} variable records which surface triggered the check and
- * the optional {@code session_id} variable correlates a sequence of checks within one editing
- * session. The reply is consumed through {@link UsernameAvailabilityMexResponse}.
+ * server-side. The {@code source} variable records which surface triggered the check and defaults to
+ * {@code "USER_INPUT"}, and the {@code session_id} variable correlates a sequence of checks within
+ * one editing session. The reply is consumed through {@link UsernameAvailabilityMexResponse}.
  *
  * @see UsernameAvailabilityMexResponse
  */
@@ -41,19 +41,20 @@ public final class UsernameAvailabilityMexRequest implements MexStanza.Request.J
     public static final String OPERATION_NAME = "mexCheckUsernameAvailabilityQueryJob";
 
     /**
-     * The {@code input} GraphQL variable carrying the candidate username, or {@code null} to omit it.
+     * The {@code input} GraphQL variable carrying the candidate username; a {@code null} value is
+     * emitted as JSON {@code null}.
      */
     private final String input;
 
     /**
-     * The {@code source} GraphQL variable recording the surface that triggered the check, or
-     * {@code null} to omit it.
+     * The {@code source} GraphQL variable recording the surface that triggered the check; a
+     * {@code null} value is emitted as the default {@code "USER_INPUT"}.
      */
     private final String source;
 
     /**
      * The {@code session_id} GraphQL variable correlating a sequence of checks within one editing
-     * session, or {@code null} to omit it.
+     * session; a {@code null} value is emitted as JSON {@code null}.
      */
     private final String sessionId;
 
@@ -61,10 +62,10 @@ public final class UsernameAvailabilityMexRequest implements MexStanza.Request.J
      * Constructs a username-availability check request carrying only the candidate name.
      *
      * <p>The candidate name is forwarded verbatim as the {@code input} variable; the relay validates
-     * length, charset, and reservation status server-side. The {@code source} and {@code session_id}
-     * variables are omitted from the wire payload.
+     * length, charset, and reservation status server-side. The {@code source} variable defaults to
+     * {@code "USER_INPUT"} and the {@code session_id} variable is emitted as JSON {@code null}.
      *
-     * @param input the candidate username, or {@code null} to omit the variable
+     * @param input the candidate username; a {@code null} value is emitted as JSON {@code null}
      */
     public UsernameAvailabilityMexRequest(String input) {
         this(input, null, null);
@@ -77,12 +78,14 @@ public final class UsernameAvailabilityMexRequest implements MexStanza.Request.J
      * <p>The candidate name is forwarded verbatim as the {@code input} variable; the relay validates
      * length, charset, and reservation status server-side. The {@code source} variable records which
      * surface triggered the check and the {@code session_id} variable correlates a sequence of checks
-     * within one editing session. Each variable whose value is {@code null} is omitted from the wire
-     * payload.
+     * within one editing session. All three variables are always materialised on the wire:
+     * {@code input} and {@code session_id} fall back to JSON {@code null} when unset, and
+     * {@code source} falls back to {@code "USER_INPUT"}.
      *
-     * @param input     the candidate username, or {@code null} to omit the variable
-     * @param source    the triggering surface, or {@code null} to omit the variable
-     * @param sessionId the editing-session correlation id, or {@code null} to omit the variable
+     * @param input     the candidate username; a {@code null} value is emitted as JSON {@code null}
+     * @param source    the triggering surface; a {@code null} value is emitted as {@code "USER_INPUT"}
+     * @param sessionId the editing-session correlation id; a {@code null} value is emitted as JSON
+     *                  {@code null}
      */
     public UsernameAvailabilityMexRequest(String input, String source, String sessionId) {
         this.input = input;
@@ -109,10 +112,11 @@ public final class UsernameAvailabilityMexRequest implements MexStanza.Request.J
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"variables": {"input": <input>, "source":
-     * <source>, "session_id": <sessionId>}}}, writing each variable only when its value is non-null
-     * and emitting {@code {"variables": {}}} when all three are {@code null}, then defers envelope
-     * construction to {@link MexStanza.Request.Json#createMexNode(String, String)}.
+     * @implNote This implementation always materialises every declared top-level variable, mirroring
+     * the relay's compiled query: {@code input} and {@code session_id} are emitted with their value
+     * or as JSON {@code null}, and {@code source} defaults to the string {@code "USER_INPUT"} that
+     * the dispatcher hard-codes when unset; envelope construction is delegated to
+     * {@link MexStanza.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexUsernameAvailability", exports = "mexCheckUsernameAvailabilityQueryJob",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -123,23 +127,25 @@ public final class UsernameAvailabilityMexRequest implements MexStanza.Request.J
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
+            writer.writeName("input");
+            writer.writeColon();
             if (input != null) {
-                writer.writeName("input");
-                writer.writeColon();
                 writer.writeString(input);
+            } else {
+                writer.writeNull();
             }
 
-            if (source != null) {
-                writer.writeName("source");
-                writer.writeColon();
-                writer.writeString(source);
-            }
-
+            writer.writeName("session_id");
+            writer.writeColon();
             if (sessionId != null) {
-                writer.writeName("session_id");
-                writer.writeColon();
                 writer.writeString(sessionId);
+            } else {
+                writer.writeNull();
             }
+
+            writer.writeName("source");
+            writer.writeColon();
+            writer.writeString(source != null ? source : "USER_INPUT");
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

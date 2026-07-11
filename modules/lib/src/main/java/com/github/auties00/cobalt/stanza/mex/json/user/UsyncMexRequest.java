@@ -45,22 +45,22 @@ public final class UsyncMexRequest implements MexStanza.Request.Json {
     public static final String OPERATION_NAME = "mexUsyncQuery";
 
     /**
-     * The {@code include_about_status} flag, possibly {@code null}.
+     * The {@code include_about_status} flag; a {@code null} value is emitted as {@code false}.
      */
     private final Boolean includeAboutStatus;
 
     /**
-     * The {@code include_country_code} flag, possibly {@code null}.
+     * The {@code include_country_code} flag; a {@code null} value is emitted as {@code false}.
      */
     private final Boolean includeCountryCode;
 
     /**
-     * The {@code include_username} flag, possibly {@code null}.
+     * The {@code include_username} flag; a {@code null} value is emitted as {@code false}.
      */
     private final Boolean includeUsername;
 
     /**
-     * The {@code input} GraphQL variable carrying the pre-serialised batch, possibly {@code null}.
+     * The {@code input} GraphQL variable carrying the pre-serialised batch.
      */
     private final String input;
 
@@ -73,13 +73,13 @@ public final class UsyncMexRequest implements MexStanza.Request.Json {
      * {@code includeUsername} drives {@link UsyncMexResponse.Item#usernameInfo()}. The toggles are
      * independent and may be combined in a single request to amortise the round-trip cost.
      *
-     * @param includeAboutStatus whether to include the about-status sub-object, or {@code null} to
-     *                           omit the variable
-     * @param includeCountryCode whether to include the country-code field, or {@code null} to omit
-     *                           the variable
-     * @param includeUsername whether to include the username sub-object, or {@code null} to omit
-     *                        the variable
-     * @param input the serialised batch input, or {@code null} to omit the variable
+     * @param includeAboutStatus whether to include the about-status sub-object; {@code null} is
+     *                           emitted as {@code false}
+     * @param includeCountryCode whether to include the country-code field; {@code null} is emitted
+     *                           as {@code false}
+     * @param includeUsername whether to include the username sub-object; {@code null} is emitted as
+     *                        {@code false}
+     * @param input the serialised batch input
      */
     public UsyncMexRequest(Boolean includeAboutStatus, Boolean includeCountryCode, Boolean includeUsername, String input) {
         this.includeAboutStatus = includeAboutStatus;
@@ -107,10 +107,10 @@ public final class UsyncMexRequest implements MexStanza.Request.Json {
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits each non-{@code null} flag and the {@code input} scalar
-     * into the {@code variables} object, then defers envelope construction to
-     * {@link MexStanza.Request.Json#createMexNode(String, String)}; a fully empty request
-     * serialises as {@code {"variables": {}}}.
+     * @implNote This implementation always materialises every declared top-level variable, mirroring
+     * the relay's compiled query: the three {@code include_*} flags default to {@code false} when
+     * {@code null} and {@code input} carries the serialised batch, then defers envelope construction
+     * to {@link MexStanza.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexUsync", exports = "mexUsyncQuery",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -121,26 +121,18 @@ public final class UsyncMexRequest implements MexStanza.Request.Json {
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (includeAboutStatus != null) {
-                writer.writeName("include_about_status");
-                writer.writeColon();
-                writer.writeBool(includeAboutStatus);
-            }
-            if (includeCountryCode != null) {
-                writer.writeName("include_country_code");
-                writer.writeColon();
-                writer.writeBool(includeCountryCode);
-            }
-            if (includeUsername != null) {
-                writer.writeName("include_username");
-                writer.writeColon();
-                writer.writeBool(includeUsername);
-            }
-            if (input != null) {
-                writer.writeName("input");
-                writer.writeColon();
-                writer.writeString(input);
-            }
+            writer.writeName("include_about_status");
+            writer.writeColon();
+            writer.writeBool(includeAboutStatus != null && includeAboutStatus);
+            writer.writeName("include_country_code");
+            writer.writeColon();
+            writer.writeBool(includeCountryCode != null && includeCountryCode);
+            writer.writeName("include_username");
+            writer.writeColon();
+            writer.writeBool(includeUsername != null && includeUsername);
+            writer.writeName("input");
+            writer.writeColon();
+            writer.writeString(input);
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

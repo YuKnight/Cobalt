@@ -246,6 +246,18 @@ public final class ProtobufLinkedWhatsAppAccountStore implements LinkedWhatsAppA
     private Boolean usernameHasRecoveryPin;
 
     /**
+     * Whether the inactive-group LID migration sweep has completed for this account.
+     *
+     * @implNote
+     * This implementation is {@code volatile} because it is written on the migration sweep's scheduled
+     * thread and read on the connection thread that arms the sweep. It backs WhatsApp Web's
+     * {@code UserPrefs.InactiveGroupLidMigrationComplete} entry, so persisting it lets a re-connecting
+     * client skip the sweep once it has run to completion.
+     */
+    @ProtobufProperty(index = 32, type = ProtobufType.BOOL)
+    private volatile boolean inactiveGroupLidMigrationComplete;
+
+    /**
      * The monitor guarding the lazy initialisation of {@link #clientVersion}; not persisted.
      */
     private final Object clientVersionLock;
@@ -320,8 +332,9 @@ public final class ProtobufLinkedWhatsAppAccountStore implements LinkedWhatsAppA
      * @param username                the assigned username, or {@code null}
      * @param usernameState           the username registration state, or {@code null}
      * @param usernameHasRecoveryPin  whether a username recovery PIN is set, or {@code null} when unknown
+     * @param inactiveGroupLidMigrationComplete whether the inactive-group LID migration sweep has completed
      */
-    ProtobufLinkedWhatsAppAccountStore(UUID uuid, Long phoneNumber, LinkedWhatsAppClientType clientType, Instant initializationTimeStamp, LinkedWhatsAppClientDevice device, ClientReleaseChannel releaseChannel, boolean online, String locale, String name, String verifiedName, URI profilePicture, ContactTextStatus selfTextStatus, Jid jid, Jid lid, String businessAddress, Double businessLongitude, Double businessLatitude, String businessDescription, List<URI> businessWebsites, String businessEmail, List<BusinessCategory> businessCategories, boolean registered, ClientAppVersion clientVersion, ClientAppVersion companionVersion, Instant lastAdvCheckTime, LinkedPrimaryPlatform primaryPlatform, String companionMmsAuthNonce, byte[] shareableChatLinkKey, String username, UsernameState usernameState, Boolean usernameHasRecoveryPin) {
+    ProtobufLinkedWhatsAppAccountStore(UUID uuid, Long phoneNumber, LinkedWhatsAppClientType clientType, Instant initializationTimeStamp, LinkedWhatsAppClientDevice device, ClientReleaseChannel releaseChannel, boolean online, String locale, String name, String verifiedName, URI profilePicture, ContactTextStatus selfTextStatus, Jid jid, Jid lid, String businessAddress, Double businessLongitude, Double businessLatitude, String businessDescription, List<URI> businessWebsites, String businessEmail, List<BusinessCategory> businessCategories, boolean registered, ClientAppVersion clientVersion, ClientAppVersion companionVersion, Instant lastAdvCheckTime, LinkedPrimaryPlatform primaryPlatform, String companionMmsAuthNonce, byte[] shareableChatLinkKey, String username, UsernameState usernameState, Boolean usernameHasRecoveryPin, boolean inactiveGroupLidMigrationComplete) {
         this.uuid = Objects.requireNonNull(uuid, "uuid cannot be null");
         this.phoneNumber = phoneNumber;
         this.clientType = Objects.requireNonNull(clientType, "clientType cannot be null");
@@ -353,6 +366,7 @@ public final class ProtobufLinkedWhatsAppAccountStore implements LinkedWhatsAppA
         this.username = username;
         this.usernameState = usernameState;
         this.usernameHasRecoveryPin = usernameHasRecoveryPin;
+        this.inactiveGroupLidMigrationComplete = inactiveGroupLidMigrationComplete;
         this.clientVersionLock = new Object();
     }
 
@@ -772,6 +786,17 @@ public final class ProtobufLinkedWhatsAppAccountStore implements LinkedWhatsAppA
     }
 
     @Override
+    public boolean inactiveGroupLidMigrationComplete() {
+        return inactiveGroupLidMigrationComplete;
+    }
+
+    @Override
+    public LinkedWhatsAppAccountStore setInactiveGroupLidMigrationComplete(boolean inactiveGroupLidMigrationComplete) {
+        this.inactiveGroupLidMigrationComplete = inactiveGroupLidMigrationComplete;
+        return this;
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -781,6 +806,7 @@ public final class ProtobufLinkedWhatsAppAccountStore implements LinkedWhatsAppA
         }
         return online == that.online
                && registered == that.registered
+               && inactiveGroupLidMigrationComplete == that.inactiveGroupLidMigrationComplete
                && Objects.equals(uuid, that.uuid)
                && Objects.equals(phoneNumber, that.phoneNumber)
                && clientType == that.clientType
@@ -821,7 +847,7 @@ public final class ProtobufLinkedWhatsAppAccountStore implements LinkedWhatsAppA
                 businessAddress, businessLongitude, businessLatitude, businessDescription, businessWebsites,
                 businessEmail, businessCategories, registered, clientVersion, companionVersion, lastAdvCheckTime,
                 primaryPlatform, companionMmsAuthNonce, Arrays.hashCode(shareableChatLinkKey),
-                username, usernameState, usernameHasRecoveryPin,
+                username, usernameState, usernameHasRecoveryPin, inactiveGroupLidMigrationComplete,
                 linkedMetaAccountState, linkedMetaAccountStateTimestamp);
     }
 }

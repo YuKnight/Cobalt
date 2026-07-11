@@ -73,7 +73,7 @@
         <curve25519.version>3.0.1</curve25519.version>
         <linkpreview.version>2.3</linkpreview.version>
         <vcard.version>0.12.1</vcard.version>
-        <qr.terminal.version>2.2</qr.terminal.version>
+        <qr.terminal.version>3.0</qr.terminal.version>
         <libphonenumber.version>9.0.4</libphonenumber.version>
         <maven.versions.version>2.15.0</maven.versions.version>
         <sl4j.version>2.0.13</sl4j.version>
@@ -86,8 +86,9 @@
         <pdfbox.version>3.0.5</pdfbox.version>
         <h2.mvstore.version>2.3.232</h2.mvstore.version>
         <vigil.version>1.0.0</vigil.version>
-        <warden.version>1.0.0</warden.version>
+        <warden.version>1.1.0</warden.version>
         <srtp.version>1.0.0</srtp.version>
+        <sctp.version>1.0.0</sctp.version>
     </properties>
 
     <profiles>

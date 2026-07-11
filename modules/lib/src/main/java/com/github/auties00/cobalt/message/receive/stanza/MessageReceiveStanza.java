@@ -188,6 +188,14 @@ public final class MessageReceiveStanza {
     private final Jid senderLid;
 
     /**
+     * The peer JID from the plain {@code recipient} attribute, present on
+     * self-authored 1:1 echoes to name the conversation the message was
+     * addressed to; distinct from the {@code from} attribute, which on such an
+     * echo is the local account.
+     */
+    private final Jid recipient;
+
+    /**
      * The recipient's phone-number JID from the {@code recipient_pn} attribute,
      * present on peer-protocol messages.
      */
@@ -460,6 +468,7 @@ public final class MessageReceiveStanza {
      * @param count                 the count attribute, or {@code null}
      * @param senderPn              the sender phone-number JID, or {@code null}
      * @param senderLid             the sender LID, or {@code null}
+     * @param recipient             the plain recipient JID, or {@code null}
      * @param recipientPn           the recipient phone-number JID, or {@code null}
      * @param recipientLid          the recipient LID, or {@code null}
      * @param peerRecipientPn       the peer recipient phone-number JID, or {@code null}
@@ -524,6 +533,7 @@ public final class MessageReceiveStanza {
             Integer count,
             Jid senderPn,
             Jid senderLid,
+            Jid recipient,
             Jid recipientPn,
             Jid recipientLid,
             Jid peerRecipientPn,
@@ -584,6 +594,7 @@ public final class MessageReceiveStanza {
         this.count = count;
         this.senderPn = senderPn;
         this.senderLid = senderLid;
+        this.recipient = recipient;
         this.recipientPn = recipientPn;
         this.recipientLid = recipientLid;
         this.peerRecipientPn = peerRecipientPn;
@@ -785,6 +796,20 @@ public final class MessageReceiveStanza {
      * @return an {@link Optional} wrapping the sender LID
      */
     public Optional<Jid> senderLid() { return Optional.ofNullable(senderLid); }
+
+    /**
+     * Returns the plain {@code recipient} attribute, when present.
+     *
+     * <p>Carried on self-authored 1:1 echoes (fanned out to the user's own
+     * devices) to name the peer the message was addressed to, distinct from the
+     * {@code from} attribute which on such an echo is the local account. The
+     * receipt pipeline places this value on the {@code recipient} attribute of
+     * delivery and retry receipts; {@link #recipientPn()} and
+     * {@link #recipientLid()} carry the addressing-mode mapping forms.
+     *
+     * @return an {@link Optional} wrapping the recipient JID
+     */
+    public Optional<Jid> recipient() { return Optional.ofNullable(recipient); }
 
     /**
      * Returns the recipient's phone-number JID, when present.

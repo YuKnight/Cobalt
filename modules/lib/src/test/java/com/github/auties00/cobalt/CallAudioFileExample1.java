@@ -1,7 +1,6 @@
-import com.github.auties00.cobalt.calls2.stream.AudioInput;
-import com.github.auties00.cobalt.calls2.stream.AudioOutput;
-import com.github.auties00.cobalt.calls2.stream.VideoInput;
-import com.github.auties00.cobalt.calls2.stream.VideoOutput;
+import com.github.auties00.cobalt.calls.stream.AudioInput;
+import com.github.auties00.cobalt.calls.stream.AudioOutput;
+import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
@@ -15,7 +14,7 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
  * <p>Logs a Web client in with a terminal QR code (reusing a persisted session when one exists), and
  * once connected places an audio-only call to {@code PEER} via the streams-based
  * {@link LinkedWhatsAppClient#startCall(com.github.auties00.cobalt.model.jid.JidProvider, AudioOutput, AudioInput)}
- * overload. The outbound audio is bound to {@link AudioOutput#file(Path)}, so the
+ * overload. The outbound audio is bound to {@link AudioOutput#fromFile(Path)}, so the
  * bundled FFmpeg build decodes and resamples {@code TRACK} to the call's 16 kHz mono Opus profile and
  * ships it to the peer; the inbound audio is buffered and left unread. Passing no video streams keeps the
  * call audio-only. The call ends when the file is exhausted, the peer hangs up, or the program stops.
@@ -25,13 +24,14 @@ void main() throws IOException {
     var peer = Jid.of("19153544650@s.whatsapp.net");
     var audio = Path.of("C:\\Users\\Alessandro Autiero\\Downloads\\Brazy girls.mp3");
     var video = Path.of("C:\\Users\\Alessandro Autiero\\Downloads\\file_example_MP4_1920_18MG.mp4");
-    LinkedWhatsAppClient.builder()
-            .webClient(LinkedWhatsAppStoreFactory.persistent(Path.of(".temp/cobalt-em1-desktop1")))
+    WhatsAppClient.builder()
+            .linkedApi()
+            .webClient(LinkedWhatsAppStoreFactory.persistent())
             .loadLatestOrCreateConnection()
             .device(LinkedWhatsAppClientDevice.web())
-            .releaseChannel(ClientPayload.ClientReleaseChannel.BETA)
             .defaultHistory()
-            .unregistered(LinkedWhatsAppClientVerificationHandler.Web.QrCode.toTerminal())
+            .releaseChannel(ClientPayload.ClientReleaseChannel.BETA)
+            .unregistered(LinkedWhatsAppClientVerificationHandler.Web.Passkey.toTerminal())
             .addChatsListener((client, _) -> {
                 var chat = client.store()
                         .chatStore()
@@ -43,7 +43,7 @@ void main() throws IOException {
                 if(chat != null) {
                     System.out.printf("Calling %s, streaming %s%n", chat, audio.getFileName());
                     var call = client.startCall(chat,
-                            AudioOutput.file(audio), AudioInput.buffered(), VideoOutput.file(video), VideoInput.buffered());
+                            AudioOutput.fromFile(audio), AudioInput.discard());
                     System.out.printf("Called %s: %s%n", peer, call.callId());
                 }
             })

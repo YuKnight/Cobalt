@@ -2296,11 +2296,42 @@ public abstract class WamService {
     public void close() {
         cancelAllScheduled();
         emitForceFlush();
-        flush();
-        // TODO: persist pending buffers and restore on initialize(). WA Web
-        //       writes to IndexedDB every serialize tick; Cobalt currently
-        //       drops anything the final flush cannot ship, losing events
-        //       across restarts.
+        persistPending();
         initialized = false;
+    }
+
+    /**
+     * Persists every channel's pending events to the durable WAM store without shipping them.
+     *
+     * <p>This is the terminal drain {@link #close()} runs in place of a networked {@link #flush()}:
+     * it atomically swaps out each channel's pending list and writes the events through
+     * {@link #persistBuffer(List, int[], int, int)} with no transport round-trip and without removing
+     * the persisted copy, so the next {@link #initialize()} recovers them via
+     * {@link #restorePendingBuffers()} and ships them on a live connection. Shipping is deliberately
+     * not attempted here: {@link #close()} runs inside the client's disconnect path, where awaiting a
+     * {@code w:stats} acknowledgement would block teardown against a closing socket and any events a
+     * bounded wait could not ship would be dropped. Persisting instead mirrors WA Web, which
+     * serialises unshipped buffers to durable storage on unload and ships them the next session rather
+     * than blocking teardown on the network.
+     *
+     * @implNote
+     * This implementation persists each channel's events flat, without the {@link #MAX_BUFFER_SIZE}
+     * batching or private-channel {@code psId} grouping that {@link #flushChannel(WamChannel)} applies
+     * for transmission; those only shape the wire buffers, and {@link #restorePendingBuffers()}
+     * re-injects the events into {@link #pending} so the next flush re-batches and re-groups them
+     * before sending.
+     */
+    private void persistPending() {
+        for (var channel : WamChannel.values()) {
+            var events = swapPending(channel);
+            if (events.isEmpty()) {
+                continue;
+            }
+            var weights = new int[events.size()];
+            for (var i = 0; i < events.size(); i++) {
+                weights[i] = effectiveWeight(events.get(i).event());
+            }
+            persistBuffer(events, weights, 0, events.size());
+        }
     }
 }

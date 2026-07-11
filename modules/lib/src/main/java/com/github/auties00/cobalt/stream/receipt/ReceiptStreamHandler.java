@@ -6,7 +6,7 @@ import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
-import com.github.auties00.cobalt.calls2.signaling.Calls2CallReceiptReceiver;
+import com.github.auties00.cobalt.calls.signaling.receive.CallReceiptReceiver;
 import com.github.auties00.cobalt.wam.WamService;
 
 /**
@@ -16,7 +16,7 @@ import com.github.auties00.cobalt.wam.WamService;
  * <p>WhatsApp multiplexes three disjoint flows onto the {@code <receipt>} tag,
  * and this dispatcher is the single registered consumer for all of them. VoIP
  * signalling receipts whose first child is {@code <offer>}, {@code <accept>}
- * or {@code <reject>} are forwarded to {@link Calls2CallReceiptReceiver}. Every
+ * or {@code <reject>} are forwarded to {@link CallReceiptReceiver}. Every
  * other receipt, both retry receipts (whose stanza {@code type} is
  * {@code "retry"} or {@code "enc_rekey_retry"}) and regular delivery, read or
  * played acknowledgements, is forwarded to
@@ -39,10 +39,10 @@ import com.github.auties00.cobalt.wam.WamService;
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleStanzaUtils")
 public final class ReceiptStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * The {@link Calls2CallReceiptReceiver} that consumes VoIP signalling
+     * The {@link CallReceiptReceiver} that consumes VoIP signalling
      * receipts.
      */
-    private final Calls2CallReceiptReceiver callReceiptHandler;
+    private final CallReceiptReceiver callReceiptHandler;
 
     /**
      * The {@link MessageReceiptStreamHandler} that consumes retry receipts
@@ -70,14 +70,14 @@ public final class ReceiptStreamHandler extends SocketStreamHandler.Concurrent {
      *                       {@code <ack>} stanzas
      */
     public ReceiptStreamHandler(LinkedWhatsAppClient whatsapp, MessageService messageService, WamService wamService, AckSender ackSender) {
-        this.callReceiptHandler = new Calls2CallReceiptReceiver(whatsapp, ackSender);
+        this.callReceiptHandler = new CallReceiptReceiver(whatsapp, ackSender);
         this.messageReceiptHandler = new MessageReceiptStreamHandler(whatsapp, messageService, wamService, ackSender);
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>Forwards VoIP-signalling receipts to {@link Calls2CallReceiptReceiver} and
+     * <p>Forwards VoIP-signalling receipts to {@link CallReceiptReceiver} and
      * everything else, both retry receipts and regular delivery, read or
      * played acknowledgements, to {@link MessageReceiptStreamHandler}.
      *

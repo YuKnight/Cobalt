@@ -15,8 +15,8 @@ import java.io.UncheckedIOException;
  * Builds the MEX IQ stanza that registers or rotates the username recovery PIN.
  *
  * <p>This request backs the username PIN settings screen. The PIN is dispatched as the {@code pin}
- * GraphQL variable; a {@code null} PIN is the clear-PIN intent and omits the variable entirely. The
- * reply is consumed through {@link SetUsernameKeyMexResponse}.
+ * GraphQL variable; a {@code null} PIN is the clear-PIN intent and is emitted as JSON {@code null}.
+ * The reply is consumed through {@link SetUsernameKeyMexResponse}.
  *
  * @see SetUsernameKeyMexResponse
  */
@@ -47,7 +47,8 @@ public final class SetUsernameKeyMexRequest implements MexStanza.Request.Json {
      * Constructs a set-username-key mutation request.
      *
      * <p>The cleartext PIN is forwarded as-is; the relay performs the hashing server-side. Passing
-     * {@code null} omits the variable, which signals the relay to clear any existing PIN.
+     * {@code null} emits the variable as JSON {@code null}, which signals the relay to clear any
+     * existing PIN.
      *
      * @param pin the new recovery PIN, or {@code null} to clear the existing PIN
      */
@@ -74,9 +75,10 @@ public final class SetUsernameKeyMexRequest implements MexStanza.Request.Json {
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"variables": {"pin": <pin>}}}, or
-     * {@code {"variables": {}}} when {@link #pin} is {@code null}, mirroring the relay's reading of
-     * the absent variable as the clear-PIN action; envelope construction is delegated to
+     * @implNote This implementation always materialises the declared {@code pin} variable, emitting
+     * {@code {"variables": {"pin": <pin>}}} or {@code {"variables": {"pin": null}}} when {@link #pin}
+     * is {@code null}, mirroring the relay's reading of a {@code null} PIN as the clear-PIN action;
+     * envelope construction is delegated to
      * {@link MexStanza.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexSetUsernameKeyJob", exports = "mexSetUsernameKeyQueryJob",
@@ -88,10 +90,12 @@ public final class SetUsernameKeyMexRequest implements MexStanza.Request.Json {
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
+            writer.writeName("pin");
+            writer.writeColon();
             if (pin != null) {
-                writer.writeName("pin");
-                writer.writeColon();
                 writer.writeString(pin);
+            } else {
+                writer.writeNull();
             }
             writer.endObject();
             writer.endObject();

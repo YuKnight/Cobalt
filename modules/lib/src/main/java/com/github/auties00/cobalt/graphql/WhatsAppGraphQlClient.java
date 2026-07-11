@@ -143,6 +143,11 @@ public final class WhatsAppGraphQlClient {
                 .header("X-FB-LSD", lsdToken)
                 .header("X-ASBD-ID", X_ASBD_ID)
                 .header("Cookie", sessionCookie)
+                .header("Origin", "https://web.whatsapp.com")
+                .header("Referer", "https://web.whatsapp.com/")
+                .header("Sec-Fetch-Site", "same-origin")
+                .header("Sec-Fetch-Mode", "cors")
+                .header("Sec-Fetch-Dest", "empty")
                 .POST(HttpRequest.BodyPublishers.ofString(encodeBody(request)))
                 .build();
 

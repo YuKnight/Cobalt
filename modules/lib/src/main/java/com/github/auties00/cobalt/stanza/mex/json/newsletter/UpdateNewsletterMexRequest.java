@@ -91,9 +91,9 @@ public final class UpdateNewsletterMexRequest implements MexStanza.Request.Json 
      * Serialises this request into a MEX IQ {@link StanzaBuilder} ready to be dispatched through the
      * WhatsApp relay.
      *
-     * <p>Produces the {@code {variables: {newsletter_id?, updates?: {...}}}} payload consumed by the
-     * persisted-query identified by {@link #QUERY_ID}. Both entries are omitted when {@code null} so
-     * the GraphQL schema never receives explicit {@code null} variables.
+     * <p>Produces the {@code {variables: {newsletter_id, updates: {...}}}} payload consumed by the
+     * persisted-query identified by {@link #QUERY_ID}. Both are declared top-level variables and are
+     * always emitted; only the changed sub-fields inside {@code updates} are conditionally populated.
      *
      * @implNote This implementation writes the GraphQL variables directly through
      * {@link JSONWriter} and delegates IQ envelope construction to
@@ -114,17 +114,12 @@ public final class UpdateNewsletterMexRequest implements MexStanza.Request.Json 
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (newsletterId != null) {
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
-            }
-
-            if (updates != null) {
-                writer.writeName("updates");
-                writer.writeColon();
-                writer.writeAny(updates);
-            }
+            writer.writeName("newsletter_id");
+            writer.writeColon();
+            writer.writeString(newsletterId);
+            writer.writeName("updates");
+            writer.writeColon();
+            writer.writeAny(updates);
             writer.endObject();
             writer.endObject();
 

@@ -1,9 +1,10 @@
-import com.github.auties00.cobalt.calls2.stream.AudioInput;
-import com.github.auties00.cobalt.calls2.stream.AudioOutput;
-import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
+import com.github.auties00.cobalt.calls.stream.AudioInput;
+import com.github.auties00.cobalt.calls.stream.AudioOutput;
+import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
+import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
+import com.github.auties00.cobalt.model.device.pairing.ClientPayload;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
 
@@ -15,17 +16,30 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
  */
 void main() throws IOException {
     System.out.println("Hello World");
-    LinkedWhatsAppClient.builder()
+    WhatsAppClient.builder()
+            .linkedApi()
             .webClient(LinkedWhatsAppStoreFactory.persistent())
-            .createConnection()
+            .loadLatestOrCreateConnection()
             .device(LinkedWhatsAppClientDevice.web())
             .defaultHistory()
-            .unregistered(19153544650L, LinkedWhatsAppClientVerificationHandler.Web.PairingCode.toTerminal())
+            .releaseChannel(ClientPayload.ClientReleaseChannel.BETA)
+            .unregistered(LinkedWhatsAppClientVerificationHandler.Web.Passkey.toTerminal())
             .addLoggedInListener(client -> {
-                System.out.printf("Connected: %s%n", client.store().settingsStore().privacySettings());
-                var peer = Jid.of("393668765864@s.whatsapp.net");
-                var call = client.startCall(peer, AudioOutput.buffered(), AudioInput.buffered());
-                System.out.println("Call started: " + call.callId());
+                try {
+                    System.out.printf("Connected: %s%n", client.store().settingsStore().privacySettings());
+                    var peer = Jid.of("19153544650@s.whatsapp.net");
+                    var audio = Path.of("C:\\Users\\Alessandro Autiero\\Downloads\\Brazy girls.mp3");
+                    var video = Path.of("C:\\Users\\Alessandro Autiero\\Downloads\\file_example_MP4_1920_18MG.mp4");
+                    var path = Files.createTempFile("cobalt-call-inbound-", ".wav");
+                    var path1 = Files.createTempFile("cobalt-call-inbound1-", ".y4m");
+
+                    var call = client.startCall(peer,
+                            AudioOutput.fromFile(audio), AudioInput.toWav(path));
+                    System.out.println("Path: " + path);
+                    System.out.printf("Called %s: %s%n", peer, call.callId());
+                }catch (Throwable throwable) {
+                    throw new RuntimeException(throwable);
+                }
             })
             .addWebAppPrimaryFeaturesListener((_, features) -> System.out.printf("Received features: %s%n", features))
             .addNewMessageListener((_, message) -> System.out.println(message))

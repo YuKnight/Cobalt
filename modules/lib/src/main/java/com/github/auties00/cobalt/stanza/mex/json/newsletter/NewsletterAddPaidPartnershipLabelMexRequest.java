@@ -54,27 +54,12 @@ public final class NewsletterAddPaidPartnershipLabelMexRequest implements MexSta
     private final String messageType;
 
     /**
-     * Constructs a request targeting the given newsletter message without a message-type
-     * discriminator.
-     *
-     * <p>Both arguments help the relay locate the message; the {@code message_type} variable is
-     * omitted from the wire payload. A {@code null} value is preserved (the corresponding variable is
-     * simply omitted) so the relay returns a validation error rather than this request raising
-     * synchronously.
-     *
-     * @param newsletterId the Jid of the newsletter that owns the message
-     * @param serverId     the relay-issued message server-id
-     */
-    public NewsletterAddPaidPartnershipLabelMexRequest(String newsletterId, String serverId) {
-        this(newsletterId, serverId, null);
-    }
-
-    /**
      * Constructs a request targeting the given newsletter message.
      *
-     * <p>All three arguments help the relay locate and classify the message. A {@code null} value is
-     * preserved (the corresponding variable is simply omitted from the wire payload) so the relay
-     * returns a validation error rather than this request raising synchronously.
+     * <p>All three arguments are written as GraphQL variables. The {@code newsletter_id} and
+     * {@code server_id} help the relay locate the message; {@code message_type} classifies it, and is
+     * the discriminator WhatsApp Web sends verbatim ({@code "MESSAGE"} for a posted newsletter
+     * message, {@code "STATUS"} for a newsletter status update).
      *
      * @param newsletterId the Jid of the newsletter that owns the message
      * @param serverId     the relay-issued message server-id
@@ -110,9 +95,10 @@ public final class NewsletterAddPaidPartnershipLabelMexRequest implements MexSta
      * Serialises this request into a MEX IQ {@link StanzaBuilder} ready to be dispatched through the
      * WhatsApp relay.
      *
-     * <p>Produces the {@code {variables: {newsletter_id?, server_id?, message_type?}}} payload
-     * consumed by the persisted-query identified by {@link #QUERY_ID}. Each entry is omitted when
-     * {@code null} so the GraphQL schema never receives explicit {@code null} variables.
+     * <p>Produces the {@code {variables: {newsletter_id, server_id, message_type}}} payload consumed
+     * by the persisted-query identified by {@link #QUERY_ID}. WhatsApp Web always sends all three
+     * declared variables, so {@code message_type} is emitted unconditionally; {@code newsletter_id}
+     * and {@code server_id} are omitted only in the degenerate {@code null} case.
      *
      * @implNote This implementation writes the GraphQL variables directly through
      * {@link JSONWriter} and delegates IQ envelope construction to
@@ -143,11 +129,9 @@ public final class NewsletterAddPaidPartnershipLabelMexRequest implements MexSta
                 writer.writeString(serverId);
             }
 
-            if (messageType != null) {
-                writer.writeName("message_type");
-                writer.writeColon();
-                writer.writeString(messageType);
-            }
+            writer.writeName("message_type");
+            writer.writeColon();
+            writer.writeString(messageType);
             writer.endObject();
             writer.endObject();
 

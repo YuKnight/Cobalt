@@ -83,9 +83,8 @@ public final class JoinNewsletterMexRequest implements MexStanza.Request.Json {
      * WhatsApp relay.
      *
      * <p>Produces the {@code {variables: {newsletter_id: "<id>"}}} payload consumed by the
-     * persisted-query identified by {@link #QUERY_ID}. The {@code newsletter_id} entry is omitted
-     * when {@link #newsletterId} is {@code null} so the GraphQL schema never receives an explicit
-     * {@code null} variable.
+     * persisted-query identified by {@link #QUERY_ID}. The {@code newsletter_id} entry is the sole
+     * declared top-level variable and is always emitted.
      *
      * @implNote This implementation writes the GraphQL variables directly through
      * {@link JSONWriter} and delegates IQ envelope construction to
@@ -104,11 +103,9 @@ public final class JoinNewsletterMexRequest implements MexStanza.Request.Json {
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (newsletterId != null) {
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
-            }
+            writer.writeName("newsletter_id");
+            writer.writeColon();
+            writer.writeString(newsletterId);
             writer.endObject();
             writer.endObject();
 

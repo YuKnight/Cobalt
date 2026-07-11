@@ -11,7 +11,8 @@
 #
 # Set <DEP>_SRC to reuse a local checkout; otherwise the pinned ref is cloned.
 # Required tools: git, python3, autotools, pkg-config, nasm/yasm, cmake, meson,
-# ninja, make, Rust/cargo for rav1e, and the host C/C++ toolchain.
+# ninja, make, Rust/cargo for rav1e, and the host C/C++ toolchain. Optional: lld
+# (used for the final link's identical-code-folding when on PATH).
 
 set -Eeuo pipefail
 trap 'echo "[build-natives] FAILED at ${BASH_SOURCE[0]}:${LINENO}: ${BASH_COMMAND}" >&2' ERR
@@ -47,9 +48,20 @@ JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 # Split sections let the final linker drop unused code.
 SECTIONS_CFLAGS="-O2 -DNDEBUG -ffunction-sections -fdata-sections -fPIC"
 
-# Codec hot paths use -O3. Per-dependency LTO stays off because -Wl,-u and LTO
+# Codec inner loops are hand-written asm, so -O2 matches -O3 throughput without
+# its code-size inflation. Per-dependency LTO stays off because -Wl,-u and LTO
 # archives do not mix reliably; FFmpeg performs its own LTO link.
-CODEC_CFLAGS="-O3 -DNDEBUG -ffunction-sections -fdata-sections -fPIC"
+CODEC_CFLAGS="-O2 -DNDEBUG -ffunction-sections -fdata-sections -fPIC"
+
+# Pure-C deps never throw, so their async unwind tables are dead weight. Kept OFF
+# the C++ libs and the FFI shims, which must stay unwindable.
+C_ONLY_CFLAGS="-fno-asynchronous-unwind-tables"
+
+# C++ that neither throws nor uses RTTI drops exception tables and type_info.
+CXX_LEAN_CFLAGS="-fno-exceptions -fno-rtti"
+
+# Hide webrtc-apm internals so its RTC_EXPORT API cannot leak into the export table.
+CXX_HIDDEN_CFLAGS="-fvisibility=hidden -fvisibility-inlines-hidden"
 
 # MinGW runtime libs are linked statically to avoid extra DLL dependencies.
 MINGW_CFLAGS=""
@@ -57,8 +69,14 @@ if [ "$OS" = windows ]; then
     MINGW_CFLAGS="-static-libgcc"
 fi
 
+# Shims/neutral C: keep unwind (FFI boundary).
 EXTRA_CFLAGS="$SECTIONS_CFLAGS $MINGW_CFLAGS"
+# openh264 (C++ codec): unwind kept.
 CODEC_EXTRA_CFLAGS="$CODEC_CFLAGS $MINGW_CFLAGS"
+# opus, libvpx, dav1d, libwebp (pure-C codecs): no unwind tables.
+C_CODEC_EXTRA_CFLAGS="$CODEC_CFLAGS $C_ONLY_CFLAGS $MINGW_CFLAGS"
+# FFmpeg: no explicit -O so its --enable-small (-Os) wins; no unwind tables.
+FFMPEG_EXTRA_CFLAGS="-DNDEBUG -ffunction-sections -fdata-sections -fPIC $C_ONLY_CFLAGS $MINGW_CFLAGS"
 
 # openh264 is C++; advertise the matching C++ runtime in pkg-config shims.
 case "$OS" in
@@ -132,7 +150,7 @@ build_opus() {
     [ -x "$OPUS_SRC/configure" ] || ( cd "$OPUS_SRC" && autoreconf -isf )
     local b="$BUILD/build-opus"
     rm -rf "$b" && mkdir -p "$b"
-    ( cd "$b" && CFLAGS="${CFLAGS:-} $CODEC_EXTRA_CFLAGS" \
+    ( cd "$b" && CFLAGS="${CFLAGS:-} $C_CODEC_EXTRA_CFLAGS" \
         "$OPUS_SRC/configure" --prefix="$b/inst" \
         --disable-shared --enable-static --with-pic \
         --disable-doc --disable-extra-programs \
@@ -167,7 +185,7 @@ build_openh264() {
     esac
     make -C "$OPENH264_SRC" OS="$make_os" ARCH="$make_arch" clean 2>/dev/null || true
     make -C "$OPENH264_SRC" OS="$make_os" ARCH="$make_arch" BUILDTYPE=Release \
-        CFLAGS="${CFLAGS:-} $CODEC_EXTRA_CFLAGS" \
+        CFLAGS="${CFLAGS:-} $CODEC_EXTRA_CFLAGS $CXX_LEAN_CFLAGS" \
         -j "$JOBS" libopenh264.a
     [ -f "$OPENH264_SRC/libopenh264.a" ] || fail "openh264 static archive not produced"
     # Vendor public API headers used by the shim.
@@ -205,13 +223,13 @@ build_libvpx() {
     local b="$BUILD/build-libvpx"
     rm -rf "$b" && mkdir -p "$b"
     # Bindings cover VP8 and VP9 encode/decode, so enable both families.
-    ( cd "$b" && CFLAGS="${CFLAGS:-} $CODEC_EXTRA_CFLAGS" \
+    ( cd "$b" && CFLAGS="${CFLAGS:-} $C_CODEC_EXTRA_CFLAGS" \
         "$LIBVPX_SRC/configure" \
         --target="$target" --prefix="$b/inst" \
         --disable-shared --enable-static --enable-pic \
         --enable-vp8 --enable-vp8-encoder --enable-vp8-decoder \
         --enable-vp9 --enable-vp9-encoder --enable-vp9-decoder \
-        --enable-runtime-cpu-detect \
+        --enable-runtime-cpu-detect --enable-small \
         --disable-examples --disable-tools --disable-docs --disable-unit-tests )
     make -C "$b" -j "$JOBS"
     make -C "$b" install
@@ -245,7 +263,7 @@ build_av1() {
         -Denable_tools=false \
         -Denable_tests=false \
         -Db_staticpic=true \
-        -Dc_args="${CFLAGS:-} $CODEC_EXTRA_CFLAGS"
+        -Dc_args="${CFLAGS:-} $C_CODEC_EXTRA_CFLAGS"
     ninja -C "$b"
     ninja -C "$b" install
     # Vendor public headers for compiling the shim.
@@ -270,9 +288,17 @@ build_rav1e() {
     ensure_src RAV1E_SRC "$RAV1E_REPO" "$RAV1E_REF" rav1e
     local b="$BUILD/build-rav1e"
     rm -rf "$b"
-    # Install librav1e.a, rav1e.h, and rav1e.pc under $b/inst.
+    # Install librav1e.a, rav1e.h, and rav1e.pc under $b/inst. Override rav1e's
+    # release profile: fat LTO + one codegen unit and no debug info shrink the
+    # archive; panic=abort drops landing pads (panics never cross the FFI). opt-level
+    # stays at the default 3 so the encoder is not slowed.
     ( cd "$RAV1E_SRC" && \
       CARGO_TARGET_DIR="$b/target" \
+      CARGO_PROFILE_RELEASE_LTO=fat \
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
+      CARGO_PROFILE_RELEASE_PANIC=abort \
+      CARGO_PROFILE_RELEASE_DEBUG=false \
+      CARGO_PROFILE_RELEASE_INCREMENTAL=false \
       cargo cinstall --release \
         --library-type=staticlib \
         --prefix="$b/inst" --libdir=lib --includedir=include )
@@ -297,7 +323,7 @@ build_libwebp() {
     [ -x "$LIBWEBP_SRC/configure" ] || ( cd "$LIBWEBP_SRC" && ./autogen.sh )
     local b="$BUILD/build-libwebp"
     rm -rf "$b" && mkdir -p "$b"
-    ( cd "$b" && CFLAGS="${CFLAGS:-} $EXTRA_CFLAGS" \
+    ( cd "$b" && CFLAGS="${CFLAGS:-} $C_CODEC_EXTRA_CFLAGS" \
         "$LIBWEBP_SRC/configure" --prefix="$b/inst" \
         --disable-shared --enable-static --with-pic \
         --disable-libwebpmux --disable-libwebpdemux \
@@ -371,11 +397,11 @@ EOF
     rm -rf "$b" && mkdir -p "$b"
     ( cd "$b" && PKG_CONFIG_LIBDIR="$FFMPEG_PC_DIR" "$FFMPEG_SRC/configure" \
         --prefix="$b/inst" \
-        --extra-cflags="${CFLAGS:-} $EXTRA_CFLAGS" \
+        --extra-cflags="${CFLAGS:-} $FFMPEG_EXTRA_CFLAGS" \
         --disable-everything --disable-programs \
         --disable-doc --disable-htmlpages --disable-manpages --disable-podpages --disable-txtpages \
         --disable-network --enable-static --disable-shared \
-        --enable-pic --enable-lto \
+        --enable-pic --enable-lto --enable-small \
         --disable-iconv \
         --pkg-config-flags=--static \
         --enable-demuxer=mov,matroska,ogg,mp3,wav,flac,mp4,aac,image2,webp_pipe,jpeg_pipe \
@@ -407,6 +433,17 @@ build_webrtc_apm() {
     command -v meson >/dev/null 2>&1 || fail "webrtc-apm needs meson on PATH (pip install meson ninja)"
     command -v ninja >/dev/null 2>&1 || fail "webrtc-apm needs ninja on PATH (pip install meson ninja)"
     ensure_src WEBRTC_APM_SRC "$WEBRTC_APM_REPO" "$WEBRTC_APM_REF" webrtc-apm
+    # RTC_EXPORT -> __declspec(dllexport) leaks the webrtc/rtc API into the export
+    # table (dllexport overrides -fvisibility=hidden), and each export roots dead
+    # code against --gc-sections. Neutralize it so only the .def controls exports.
+    local export_hdr
+    export_hdr=$(find "$WEBRTC_APM_SRC" -name rtc_export.h -type f | head -1)
+    if [ -n "$export_hdr" ]; then
+        sed -i 's/__declspec(dllexport)//g; s/__declspec(dllimport)//g' "$export_hdr"
+        log "neutralized dllexport in $export_hdr"
+    else
+        log "WARN: rtc_export.h not found; relying on -fvisibility=hidden + --exclude-all-symbols"
+    fi
     local b="$BUILD/build-webrtc-apm"
     rm -rf "$b"
     meson setup "$b" "$WEBRTC_APM_SRC" \
@@ -415,7 +452,7 @@ build_webrtc_apm() {
         --default-library=static \
         --buildtype=release \
         -Db_staticpic=true \
-        -Dcpp_args="${CXXFLAGS:-} $EXTRA_CFLAGS -include cstdint -include cstddef"
+        -Dcpp_args="${CXXFLAGS:-} $EXTRA_CFLAGS $CXX_HIDDEN_CFLAGS $CXX_LEAN_CFLAGS -include cstdint -include cstddef"
     ninja -C "$b"
     ninja -C "$b" install
     # Build the C++ wrapper that exports cobalt_webrtc_apm_* symbols.
@@ -467,6 +504,16 @@ write_export_file() {
     esac
 }
 
+# Log an archive's .text total (from size -t) and on-disk size. Pre-gc-sections,
+# so a proxy for each library's contribution, not its exact slice of the DLL.
+log_footprint() {
+    local label="$1" path="$2" text
+    [ -f "$path" ] || return 0
+    text=$(size -t "$path" 2>/dev/null | awk 'END{print $1}')
+    printf '[build-natives] footprint %-18s text=%7d KiB  archive=%7d KiB\n' \
+        "$label" "$(( ${text:-0} / 1024 ))" "$(( $(wc -c < "$path") / 1024 ))"
+}
+
 build_combined() {
     log "combined libcobalt-native"
     local b="$BUILD/build-combined"
@@ -502,6 +549,28 @@ build_combined() {
         libavdevice libavfilter libavformat libavcodec libswscale libswresample libavutil) \
         || fail "pkg-config failed to resolve ffmpeg static closure"
 
+    local footprints=(
+        "ffmpeg-avcodec|$FFMPEG_INST/lib/libavcodec.a"
+        "ffmpeg-avformat|$FFMPEG_INST/lib/libavformat.a"
+        "ffmpeg-avfilter|$FFMPEG_INST/lib/libavfilter.a"
+        "ffmpeg-avutil|$FFMPEG_INST/lib/libavutil.a"
+        "ffmpeg-swscale|$FFMPEG_INST/lib/libswscale.a"
+        "ffmpeg-swresample|$FFMPEG_INST/lib/libswresample.a"
+        "ffmpeg-avdevice|$FFMPEG_INST/lib/libavdevice.a"
+        "opus|$BUILD/build-opus/inst/lib/libopus.a"
+        "libvpx|$BUILD/build-libvpx/inst/lib/libvpx.a"
+        "openh264|${OPENH264_SRC:-}/libopenh264.a"
+        "dav1d|$BUILD/build-dav1d/inst/lib/libdav1d.a"
+        "rav1e|$BUILD/build-rav1e/inst/lib/librav1e.a"
+        "libwebp|$BUILD/build-libwebp/inst/lib/libwebp.a"
+        "webrtc-apm|$apm_archive"
+    )
+    log "per-library footprint (pre-link archive .text):"
+    local fp
+    for fp in "${footprints[@]}"; do
+        log_footprint "${fp%%|*}" "${fp#*|}"
+    done
+
     # Force exported symbols as link roots, then let dead-code stripping prune.
     local uflags
     case "$OS" in
@@ -513,11 +582,23 @@ build_combined() {
     local cxx="${CXX:-c++}"
     local out
 
+    # LLD's ICF would fold the identical abseil/webrtc template instances that BFD
+    # cannot, but lld 21.x crashes on this link (reproduced with --icf=all/safe/none),
+    # so BFD is the default. Set COBALT_NATIVE_LINKER=lld to opt in once lld can link
+    # this tree; the build then adds ICF.
+    local ld_flags=""
+    if [ "${COBALT_NATIVE_LINKER:-}" = lld ] && command -v ld.lld >/dev/null 2>&1; then
+        ld_flags="-fuse-ld=lld -Wl,--icf=all"
+        log "final link: lld + ICF (opt-in)"
+    else
+        log "final link: bfd"
+    fi
+
     case "$OS" in
         linux)
             out="$b/libcobalt-native.so"
             # shellcheck disable=SC2086
-            "$cxx" -shared -fPIC $uflags \
+            "$cxx" -shared -fPIC $uflags $ld_flags \
                 -Wl,--version-script="$expfile" \
                 -Wl,--gc-sections -Wl,--no-undefined \
                 -Wl,-soname,libcobalt-native.so \
@@ -550,10 +631,11 @@ build_combined() {
         windows)
             out="$b/cobalt-native.dll"
             # Bundle dependency archives statically; use import libs for Windows APIs.
+            # --exclude-all-symbols keeps exports to the .def, suppressing leaks.
             # shellcheck disable=SC2086
-            "$cxx" -shared $uflags \
+            "$cxx" -shared $uflags $ld_flags \
                 "$expfile" \
-                -Wl,--gc-sections -Wl,--no-undefined \
+                -Wl,--gc-sections -Wl,--no-undefined -Wl,--exclude-all-symbols \
                 -static-libgcc -static-libstdc++ \
                 -Wl,-Bstatic \
                 -Wl,--start-group \
@@ -569,6 +651,8 @@ build_combined() {
     esac
 
     [ -f "$out" ] || fail "combined library not produced: $out"
+    log "final library sections:"
+    size "$out" 2>/dev/null | sed 's/^/[build-natives] /' || true
     local dest="$NATIVES/bin/$CLASSIFIER"
     mkdir -p "$dest"
     find "$dest" -maxdepth 1 \( -type f -o -type l \) ! -name '.gitkeep' -delete 2>/dev/null || true

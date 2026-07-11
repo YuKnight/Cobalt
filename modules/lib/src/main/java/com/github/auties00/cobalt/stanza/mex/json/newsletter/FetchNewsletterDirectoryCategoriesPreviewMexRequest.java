@@ -17,13 +17,14 @@ import java.io.UncheckedIOException;
  *
  * <p>This query drives the newsletter directory landing screen: the relay returns one entry per
  * requested category, each carrying a handful of featured newsletters for visual preview. The
- * {@code input} payload is supplied as a pre-serialised string so callers can shape the categories
- * list, country code and per-category limit themselves.
+ * {@code input} payload is supplied as a pre-serialised JSON object string so callers can shape the
+ * categories list, country code and per-category limit themselves; it is spliced into the request as
+ * a raw JSON value.
  *
- * @implNote This implementation passes the {@code input} variable as a raw string value rather than
- * building the JSON object in place; the relay's
- * {@code mexFetchNewsletterDirectoryCategoriesPreview} accepts a structured object with
- * {@code categories}, {@code country_code} and {@code per_category_limit} entries.
+ * @implNote This implementation embeds the caller-supplied pre-serialised {@code input} payload as a
+ * raw JSON object value (not a quoted string), matching the structured object WhatsApp Web sends with
+ * {@code categories}, {@code country_code} and {@code per_category_limit} entries alongside
+ * {@code fetch_status_metadata}.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterDirectoryCategoriesPreviewJob")
 public final class FetchNewsletterDirectoryCategoriesPreviewMexRequest implements MexStanza.Request.Json {
@@ -42,7 +43,8 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexRequest implement
     public static final String OPERATION_NAME = "mexFetchNewsletterDirectoryCategoriesPreview";
 
     /**
-     * Holds the pre-serialised {@code input} GraphQL variable payload.
+     * Holds the pre-serialised {@code input} GraphQL variable payload, a JSON object carrying the
+     * {@code categories} list, {@code country_code} and {@code per_category_limit}.
      */
     private final String input;
 
@@ -67,10 +69,10 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexRequest implement
     /**
      * Constructs a request with the given pre-serialised {@code input} payload.
      *
-     * <p>The {@code input} string is forwarded verbatim under the {@code variables.input} key;
-     * callers are responsible for matching the schema (categories list, country code, per-category
-     * limit). The {@code fetchStatusMetadata} flag mirrors whether the newsletter status receiver is
-     * enabled.
+     * <p>The pre-serialised {@code input} object is spliced as a raw JSON value under the
+     * {@code variables.input} key; callers are responsible for matching the schema (categories list,
+     * country code, per-category limit). The {@code fetchStatusMetadata} flag mirrors whether the
+     * newsletter status receiver is enabled.
      *
      * @param input               the pre-serialised input payload, or {@code null} to omit
      * @param fetchStatusMetadata whether to request the optional {@code status_metadata} fragment
@@ -103,14 +105,15 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexRequest implement
     /**
      * {@inheritDoc}
      *
-     * <p>Produces the {@code {variables: {input: "<payload>", fetch_status_metadata}}} envelope; the
-     * {@code input} entry is omitted when {@link #input} is {@code null} so the GraphQL schema never
-     * receives an explicit {@code null} variable, while {@code fetch_status_metadata} is always
-     * emitted.
+     * <p>Produces the {@code {variables: {input: {...}, fetch_status_metadata}}} envelope; the
+     * pre-serialised {@link #input} payload is spliced in as a raw JSON object and is omitted only
+     * when {@code null} so the GraphQL schema never receives an explicit {@code null} variable, while
+     * {@code fetch_status_metadata} is always emitted.
      *
      * @implNote This implementation writes the GraphQL variables directly through a
-     * {@link JSONWriter} and wraps any {@link IOException} from the in-memory writer in an
-     * {@link UncheckedIOException}.
+     * {@link JSONWriter}, splicing the pre-serialised {@link #input} object in via
+     * {@link JSONWriter#writeRaw(String)}, and wraps any {@link IOException} from the in-memory writer
+     * in an {@link UncheckedIOException}.
      *
      * @return the {@link StanzaBuilder} carrying the IQ envelope and serialised GraphQL variables
      * @throws UncheckedIOException if the underlying writer fails
@@ -127,7 +130,7 @@ public final class FetchNewsletterDirectoryCategoriesPreviewMexRequest implement
             if (input != null) {
                 writer.writeName("input");
                 writer.writeColon();
-                writer.writeString(input);
+                writer.writeRaw(input);
             }
             writer.writeName("fetch_status_metadata");
             writer.writeColon();

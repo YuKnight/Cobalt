@@ -18,8 +18,9 @@ import java.io.UncheckedIOException;
  *
  * <p>This request drives the channel-reports moderation surface: the UI lists each pending report
  * under {@code data.xwa2_channels_reports.channels_reports} together with reporter metadata, status,
- * and any appeal information. The request takes no variables; submit it through the MEX IQ
- * dispatcher and pair the result with {@link FetchNewsletterReportsMexResponse#of(Stanza)}.
+ * and any appeal information. The request carries a single {@code locale} variable that localises the
+ * appeal-reason labels the relay attaches to each report; submit it through the MEX IQ dispatcher and
+ * pair the result with {@link FetchNewsletterReportsMexResponse#of(Stanza)}.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexFetchNewsletterReportsJob")
 public final class FetchNewsletterReportsMexRequest implements MexStanza.Request.Json {
@@ -30,7 +31,7 @@ public final class FetchNewsletterReportsMexRequest implements MexStanza.Request
      * <p>Sent as the {@code id} attribute of the outgoing {@code <query>} child; the WhatsApp relay
      * refuses requests whose persisted-query id is unknown.
      */
-    public static final String QUERY_ID = "24241374008893508";
+    public static final String QUERY_ID = "35936238352686172";
 
     /**
      * Holds the GraphQL operation name reported by WA Web's {@code MexPerfTracker} for this query.
@@ -38,12 +39,21 @@ public final class FetchNewsletterReportsMexRequest implements MexStanza.Request
     public static final String OPERATION_NAME = "mexFetchNewsletterReports";
 
     /**
-     * Constructs an empty request.
-     *
-     * <p>The underlying GraphQL query takes no input variables, so the request carries no state and
-     * reuses {@link #QUERY_ID} and {@link #OPERATION_NAME} for dispatch.
+     * Holds the locale tag the relay uses when localising the appeal-reason labels attached to each
+     * report.
      */
-    public FetchNewsletterReportsMexRequest() {
+    private final String locale;
+
+    /**
+     * Constructs a request that localises its report labels under the given locale.
+     *
+     * <p>The {@code locale} is written as the sole GraphQL variable; WhatsApp Web always supplies it
+     * from the active application locale.
+     *
+     * @param locale the locale tag for localised appeal-reason labels
+     */
+    public FetchNewsletterReportsMexRequest(String locale) {
+        this.locale = locale;
     }
 
     /**
@@ -70,9 +80,8 @@ public final class FetchNewsletterReportsMexRequest implements MexStanza.Request
      * Serialises this request into a MEX IQ {@link StanzaBuilder} ready to be dispatched through the
      * WhatsApp relay.
      *
-     * <p>Produces the {@code {variables: {}}} payload consumed by the persisted-query identified by
-     * {@link #QUERY_ID}; the empty {@code variables} object is preserved verbatim because the relay
-     * rejects payloads that omit the key entirely.
+     * <p>Produces the {@code {variables: {locale}}} payload consumed by the persisted-query
+     * identified by {@link #QUERY_ID}.
      *
      * @implNote This implementation writes the GraphQL variables directly through {@link JSONWriter}
      * and delegates IQ envelope construction to {@link Json#createMexNode(String, String)}; any
@@ -91,6 +100,9 @@ public final class FetchNewsletterReportsMexRequest implements MexStanza.Request
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
+            writer.writeName("locale");
+            writer.writeColon();
+            writer.writeString(locale);
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

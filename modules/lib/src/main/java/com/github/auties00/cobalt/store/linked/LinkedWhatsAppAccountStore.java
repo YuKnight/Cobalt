@@ -30,8 +30,9 @@ import java.util.UUID;
  * the local and observed companion app versions, the display name, profile
  * picture and "About" text, and the WhatsApp Business profile fields (address,
  * location, description, websites, email and categories). It also tracks the
- * online presence flag, the registration state, the last ADV revalidation time
- * and the linked-Meta-account state.
+ * online presence flag, the registration state, the last ADV revalidation time,
+ * the linked-Meta-account state and the inactive-group LID migration completion
+ * flag.
  *
  * @apiNote
  * Embedders reach this through {@link LinkedWhatsAppStore#accountStore()}. Identity
@@ -592,4 +593,23 @@ public interface LinkedWhatsAppAccountStore {
      * @return this store instance for method chaining
      */
     LinkedWhatsAppAccountStore setUsernameHasRecoveryPin(Boolean usernameHasRecoveryPin);
+
+    /**
+     * Returns whether the inactive-group LID migration sweep has completed for this account.
+     *
+     * <p>The sweep re-queries the metadata of every group still on phone-number addressing so those
+     * groups flip to LID addressing. The flag is latched once no phone-number groups remain and
+     * survives restarts, so a re-connecting client that already finished the sweep does not re-run it.
+     *
+     * @return {@code true} if the inactive-group LID migration has been recorded as complete
+     */
+    boolean inactiveGroupLidMigrationComplete();
+
+    /**
+     * Sets whether the inactive-group LID migration sweep has completed for this account.
+     *
+     * @param inactiveGroupLidMigrationComplete whether the migration is complete
+     * @return this store instance for method chaining
+     */
+    LinkedWhatsAppAccountStore setInactiveGroupLidMigrationComplete(boolean inactiveGroupLidMigrationComplete);
 }

@@ -83,15 +83,15 @@ public final class LiveBotCertificateRevocationService implements BotCertificate
      * {@inheritDoc}
      */
     @Override
-    public RevocationStatus checkRevocationStatus(BigInteger serial, long nowMs) {
+    public BotRevocationStatus checkRevocationStatus(BigInteger serial, long nowMs) {
         var current = state.get();
         if (current.lastFetchMs == null) {
-            return RevocationStatus.CRL_UNAVAILABLE;
+            return BotRevocationStatus.CRL_UNAVAILABLE;
         }
         if (current.nextUpdateMs != null && nowMs > current.nextUpdateMs) {
-            return RevocationStatus.CRL_STALE;
+            return BotRevocationStatus.CRL_STALE;
         }
-        return current.revokedSerials.contains(serial) ? RevocationStatus.REVOKED : RevocationStatus.VALID;
+        return current.revokedSerials.contains(serial) ? BotRevocationStatus.REVOKED : BotRevocationStatus.VALID;
     }
 
     /**

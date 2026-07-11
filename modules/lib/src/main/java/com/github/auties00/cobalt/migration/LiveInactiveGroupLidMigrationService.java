@@ -15,7 +15,6 @@ import com.github.auties00.cobalt.util.ScheduledTask;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Live implementation of {@link InactiveGroupLidMigrationService}: a background service that
@@ -27,9 +26,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * indefinitely until someone explicitly asks the server for fresh metadata.
  * This service walks the local chat store, picks every group still on PN,
  * issues a metadata query for each one, and re-checks once all queries land.
- * Once no PN-mode groups remain, the migration is marked complete for the
- * session through {@link #setInactiveGroupLidMigrationComplete()}; callers
- * observe completion via {@link #isInactiveGroupLidMigrationComplete()}.
+ * Once no PN-mode groups remain, the migration is marked complete through
+ * {@link #setInactiveGroupLidMigrationComplete()}, which persists across
+ * restarts so a re-connecting client does not re-run the sweep; callers observe
+ * completion via {@link #isInactiveGroupLidMigrationComplete()}.
  *
  * <p>The service is started once per session through {@link #start()} and is
  * stopped through {@link #reset()} when the client disconnects. Callers never
@@ -93,20 +93,6 @@ public final class LiveInactiveGroupLidMigrationService implements InactiveGroup
     private final ABPropsService abPropsService;
 
     /**
-     * Latched completion flag for the inactive-group LID migration.
-     *
-     * <p>The flag is held in memory only, so the migration runs once per
-     * session.
-     *
-     * @implNote
-     * This implementation does not persist the flag because the Cobalt store
-     * is not yet wired to persist UserPrefs across restarts.
-     */
-    // TODO: persist the completion flag across sessions so a restarted
-    //       client does not re-run the migration on every boot.
-    private final AtomicBoolean complete;
-
-    /**
      * The currently scheduled migration task, or {@code null} when no task is
      * pending.
      *
@@ -125,7 +111,6 @@ public final class LiveInactiveGroupLidMigrationService implements InactiveGroup
     public LiveInactiveGroupLidMigrationService(LinkedWhatsAppClient client, ABPropsService abPropsService) {
         this.client = Objects.requireNonNull(client, "client");
         this.abPropsService = Objects.requireNonNull(abPropsService, "abPropsService");
-        this.complete = new AtomicBoolean(false);
     }
 
     /**
@@ -156,24 +141,33 @@ public final class LiveInactiveGroupLidMigrationService implements InactiveGroup
 
     /**
      * {@inheritDoc}
+     *
+     * @implNote
+     * This implementation reads the persisted flag from the account sub-store, so a client that
+     * finished the sweep in an earlier session reports completion immediately after restart and never
+     * re-runs the migration.
      */
     @WhatsAppWebExport(moduleName = "WAWebInactiveGroupLidMigration",
             exports = "isInactiveGroupLidMigrationComplete",
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public boolean isInactiveGroupLidMigrationComplete() {
-        return complete.get();
+        return client.store().accountStore().inactiveGroupLidMigrationComplete();
     }
 
     /**
      * {@inheritDoc}
+     *
+     * @implNote
+     * This implementation latches the flag in the account sub-store, which is snapshotted to
+     * {@code store.proto}, so completion survives restarts.
      */
     @WhatsAppWebExport(moduleName = "WAWebInactiveGroupLidMigration",
             exports = "setInactiveGroupLidMigrationComplete",
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public void setInactiveGroupLidMigrationComplete() {
-        complete.set(true);
+        client.store().accountStore().setInactiveGroupLidMigrationComplete(true);
     }
 
     /**

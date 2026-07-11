@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.socket.datagram;
 
+import com.github.auties00.cobalt.exception.WhatsAppSessionException;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.binary.StanzaReader;
 import com.github.auties00.cobalt.util.AesGcmStreamCipher;
@@ -446,7 +447,9 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
      *
      * <p>In pre-handshake mode this method only resets {@link #textRemaining} to {@link #NO_ACTIVE_DATAGRAM}.
      *
-     * @throws IOException if the GCM tag fails to authenticate
+     * @throws WhatsAppSessionException.BadMac if the GCM tag fails to authenticate; the Noise cipher state is
+     *                                         unusable afterwards, so this is a session-level fault distinct from a
+     *                                         structural stanza-decode error
      */
     private void finalizeDatagram() throws IOException {
         var key = readKey;
@@ -458,7 +461,7 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
             var produced = cipher.doFinal(plaintextChunk, plaintextChunkEnd);
             plaintextChunkEnd += produced;
         } catch (GeneralSecurityException exception) {
-            throw new IOException("AES-GCM decryption failed (bad MAC)", exception);
+            throw new WhatsAppSessionException.BadMac("AES-GCM datagram authentication failed", exception);
         }
     }
 

@@ -16,22 +16,26 @@ import java.io.UncheckedIOException;
  * current owner to another admin.
  *
  * <p>This mutation backs the transfer-ownership action in the community
- * settings. It updates the server-side role mapping for the group; the reply,
- * modelled by {@link TransferCommunityOwnershipMexResponse}, echoes the
- * affected group id and the resulting LID migration state (addressing mode) so
- * callers can update their local view of the community before replaying cached
- * actions. WA Web follows the mutation with a group-metadata refresh only when
- * the addressing mode actually changed.
- *
- * @implNote This implementation accepts the GraphQL {@code input} variable as a
- * single opaque pre-serialised JSON string rather than modelling its inner
- * shape ({@code community_id}, the {@code users_role} update list and the
- * {@code localParentGroupAddressingMode} flag). Callers serialise the input
- * themselves and pass the resulting JSON; the field is dropped from the wire
- * payload when {@code null}.
+ * settings. It promotes the new owner to the community owner role through the
+ * {@code xwa2_group_update_users_role} mutation; the reply, modelled by
+ * {@link TransferCommunityOwnershipMexResponse}, echoes the affected group id
+ * and the resulting LID migration state (addressing mode) so callers can update
+ * their local view of the community before replaying cached actions. WA Web
+ * follows the mutation with a group-metadata refresh only when the addressing
+ * mode actually changed.
  */
 @WhatsAppWebModule(moduleName = "WAWebMexTransferCommunityOwnershipJob")
 public final class TransferCommunityOwnershipMexRequest implements MexStanza.Request.Json {
+    /**
+     * Wire value of the {@code new_role} promotion applied to the new owner.
+     *
+     * <p>WhatsApp Web sends this constant for the sole {@code role_updates}
+     * entry of an ownership transfer; it names the community owner role.
+     */
+    @WhatsAppWebExport(moduleName = "WAWebTransferCommunityOwnershipAction", exports = "transferCommunityOwnershipAction",
+            adaptation = WhatsAppAdaptation.DIRECT)
+    private static final String OWNER_ROLE = "SUPERADMIN_MEMBER";
+
     /**
      * Compiled GraphQL query identifier for the transfer-ownership document.
      *
@@ -50,25 +54,29 @@ public final class TransferCommunityOwnershipMexRequest implements MexStanza.Req
     public static final String OPERATION_NAME = "mexTransferCommunityOwnershipJob";
 
     /**
-     * Pre-serialised GraphQL {@code input} variable, or {@code null} to omit
-     * it.
+     * Holds the Jid string of the community whose ownership is transferred.
      */
-    private final String input;
+    private final String communityId;
 
     /**
-     * Constructs a new request carrying the serialised input payload with the
-     * community id and the new owner's id.
-     *
-     * <p>The WA Web {@code input} variable nests {@code community_id}, a
-     * {@code users_role} array (the new {@code "SUPERADMIN_MEMBER"} promotion)
-     * and the {@code localParentGroupAddressingMode} flag. Callers serialise
-     * this themselves and pass the resulting JSON string; passing {@code null}
-     * omits the field entirely from the wire payload.
-     *
-     * @param input the serialised input variable, may be {@code null}
+     * Holds the Jid string of the admin promoted to the new community owner.
      */
-    public TransferCommunityOwnershipMexRequest(String input) {
-        this.input = input;
+    private final String newOwnerId;
+
+    /**
+     * Constructs a request that transfers ownership of the given community to
+     * the given admin.
+     *
+     * <p>The {@code communityId} is written as the {@code group_id} input field
+     * and {@code newOwnerId} becomes the sole {@code role_updates} entry,
+     * promoted to {@link #OWNER_ROLE}.
+     *
+     * @param communityId the Jid of the community whose ownership is transferred
+     * @param newOwnerId  the Jid of the admin promoted to the new owner
+     */
+    public TransferCommunityOwnershipMexRequest(String communityId, String newOwnerId) {
+        this.communityId = communityId;
+        this.newOwnerId = newOwnerId;
     }
 
     /**
@@ -90,10 +98,19 @@ public final class TransferCommunityOwnershipMexRequest implements MexStanza.Req
     /**
      * {@inheritDoc}
      *
+     * <p>Produces the
+     * {@code {variables: {input: {group_id, role_updates: [{new_role, user_jid}]}}}}
+     * payload consumed by the persisted-query identified by {@link #QUERY_ID}.
+     * The {@code localParentGroupAddressingMode} flag WhatsApp Web threads
+     * alongside {@code mexInput} is a client-only decision input (it gates a
+     * follow-up metadata refresh) and is not part of the wire request, so it is
+     * not sent.
+     *
      * @implNote This implementation streams the GraphQL variables through
-     * fastjson2's {@link JSONWriter} and emits the {@code input} field only
-     * when the constructor argument is non-null. The envelope is built through
-     * {@link MexStanza.Request.Json#createMexNode(String, String)}.
+     * fastjson2's {@link JSONWriter} and builds the envelope through
+     * {@link MexStanza.Request.Json#createMexNode(String, String)}. Any
+     * {@link IOException} raised by the in-memory writer is wrapped in an
+     * {@link UncheckedIOException}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexTransferCommunityOwnershipJob", exports = "mexTransferCommunityOwnershipJob",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -104,11 +121,25 @@ public final class TransferCommunityOwnershipMexRequest implements MexStanza.Req
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (input != null) {
-                writer.writeName("input");
-                writer.writeColon();
-                writer.writeString(input);
-            }
+            writer.writeName("input");
+            writer.writeColon();
+            writer.startObject();
+            writer.writeName("group_id");
+            writer.writeColon();
+            writer.writeString(communityId);
+            writer.writeName("role_updates");
+            writer.writeColon();
+            writer.startArray();
+            writer.startObject();
+            writer.writeName("new_role");
+            writer.writeColon();
+            writer.writeString(OWNER_ROLE);
+            writer.writeName("user_jid");
+            writer.writeColon();
+            writer.writeString(newOwnerId);
+            writer.endObject();
+            writer.endArray();
+            writer.endObject();
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

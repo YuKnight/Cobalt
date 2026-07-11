@@ -67,11 +67,12 @@ public final class UpdateGroupPropertyMexRequest implements MexStanza.Request.Js
      *     var update = "{\"addressing_mode_override\":{\"addressing_mode\":\"LID\"}}";
      *     new UpdateGroupPropertyMexRequest(groupId, update);
      * }
-     * Either argument may be {@code null} to omit it from the wire payload, matching the WA Web
-     * undefined-variable convention; an empty mutation is normally rejected by the relay.
+     * Both {@code group_id} and {@code update} are declared top-level variables that WA Web always
+     * sends, so callers are expected to supply non-null values; an empty mutation is normally
+     * rejected by the relay.
      *
-     * @param groupId the target group id, may be {@code null} to omit
-     * @param update  the pre-serialised JSON property-update payload, may be {@code null} to omit
+     * @param groupId the target group id
+     * @param update  the pre-serialised JSON property-update payload
      */
     public UpdateGroupPropertyMexRequest(String groupId, String update) {
         this.groupId = groupId;
@@ -98,11 +99,10 @@ public final class UpdateGroupPropertyMexRequest implements MexStanza.Request.Js
      * {@inheritDoc}
      *
      * @implNote This implementation streams the GraphQL variables through fastjson2's
-     * {@link JSONWriter} and emits the {@code group_id} and {@code update} fields only when their
-     * corresponding constructor argument is non-null, matching the WA Web convention of omitting
-     * undefined GraphQL variables. The {@code update} value is written as a JSON-string literal with
-     * its content forwarded verbatim rather than re-parsed, mirroring the WA Web call shape where the
-     * variable is already a JSON-serialisable scalar.
+     * {@link JSONWriter}, always emitting the declared top-level {@code group_id} and {@code update}
+     * variables, matching WA Web which always sends every declared variable. The {@code update} value
+     * is written as a JSON-string literal with its content forwarded verbatim rather than re-parsed,
+     * mirroring the WA Web call shape where the variable is already a JSON-serialisable scalar.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexUpdateGroupPropertyJob", exports = "mexUpdateGroupPropertyJob",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -113,16 +113,12 @@ public final class UpdateGroupPropertyMexRequest implements MexStanza.Request.Js
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (groupId != null) {
-                writer.writeName("group_id");
-                writer.writeColon();
-                writer.writeString(groupId);
-            }
-            if (update != null) {
-                writer.writeName("update");
-                writer.writeColon();
-                writer.writeString(update);
-            }
+            writer.writeName("group_id");
+            writer.writeColon();
+            writer.writeString(groupId);
+            writer.writeName("update");
+            writer.writeColon();
+            writer.writeString(update);
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

@@ -40,9 +40,10 @@ public final class FetchNewsletterPendingInvitesMexRequest implements MexStanza.
     /**
      * Constructs a request for the pending admin invites of the given newsletter.
      *
-     * <p>Passing {@code null} omits the {@code newsletter_id} variable from the payload entirely.
+     * <p>The {@code newsletter_id} variable is a declared top-level variable that is always emitted,
+     * so callers supply a non-null value.
      *
-     * @param newsletterId the newsletter Jid, may be {@code null}
+     * @param newsletterId the newsletter Jid
      */
     public FetchNewsletterPendingInvitesMexRequest(String newsletterId) {
         this.newsletterId = newsletterId;
@@ -72,7 +73,7 @@ public final class FetchNewsletterPendingInvitesMexRequest implements MexStanza.
      * Serialises this request into a MEX IQ {@link StanzaBuilder}.
      *
      * <p>Produces the {@code {variables: {newsletter_id}}} payload; the {@code newsletter_id}
-     * variable is omitted when the field is {@code null}.
+     * variable is the sole declared top-level variable and is always emitted.
      *
      * @implNote This implementation writes the GraphQL variables directly through {@link JSONWriter}
      * and wraps any {@link IOException} from the in-memory writer in an {@link UncheckedIOException}.
@@ -89,11 +90,9 @@ public final class FetchNewsletterPendingInvitesMexRequest implements MexStanza.
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (newsletterId != null) {
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
-            }
+            writer.writeName("newsletter_id");
+            writer.writeColon();
+            writer.writeString(newsletterId);
             writer.endObject();
             writer.endObject();
 

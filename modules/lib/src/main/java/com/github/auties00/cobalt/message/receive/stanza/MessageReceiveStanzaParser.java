@@ -79,6 +79,7 @@ public final class MessageReceiveStanzaParser {
 
         var senderPn = stanza.getAttributeAsJid("sender_pn", null);
         var senderLid = stanza.getAttributeAsJid("sender_lid", null);
+        var recipient = stanza.getAttributeAsJid("recipient", null);
         var recipientPn = stanza.getAttributeAsJid("recipient_pn", null);
         var recipientLid = stanza.getAttributeAsJid("recipient_lid", null);
         var peerRecipientPn = stanza.getAttributeAsJid("peer_recipient_pn", null);
@@ -193,6 +194,7 @@ public final class MessageReceiveStanzaParser {
                 count,
                 senderPn,
                 senderLid,
+                recipient,
                 recipientPn,
                 recipientLid,
                 peerRecipientPn,

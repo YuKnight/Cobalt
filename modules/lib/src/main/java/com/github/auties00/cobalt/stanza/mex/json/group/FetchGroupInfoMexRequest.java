@@ -54,7 +54,8 @@ public final class FetchGroupInfoMexRequest implements MexStanza.Request.Json {
     private final String id;
 
     /**
-     * Username-projection toggle bound to the {@code include_username} GraphQL variable.
+     * Username-projection toggle bound to the {@code include_username} GraphQL variable; always
+     * emitted, with a {@code null} value written as {@code false}.
      */
     private final Boolean includeUsername;
 
@@ -76,12 +77,13 @@ public final class FetchGroupInfoMexRequest implements MexStanza.Request.Json {
      * mirroring WA Web's username-display gating. The {@code participantsPhash} is the rolling hash
      * maintained on the cached participant set; sending it lets the relay reply with
      * {@code participants_phash_match = true} and skip the edge list to save bandwidth. The
-     * {@code id}, {@code includeUsername} and {@code participantsPhash} arguments may each be
-     * {@code null} to omit their variable; {@code queryContext} is required and always emitted,
-     * matching WA Web which never sends this query without it.
+     * {@code id} and {@code participantsPhash} arguments may each be {@code null} to omit their
+     * variable; {@code includeUsername} is always emitted, with a {@code null} value written as
+     * {@code false}; {@code queryContext} is required and always emitted, matching WA Web which never
+     * sends this query without it.
      *
      * @param id                 the target group identifier, may be {@code null} to omit
-     * @param includeUsername    whether to project usernames on participant edges, may be {@code null} to omit
+     * @param includeUsername    whether to project usernames on participant edges; a {@code null} value is sent as {@code false}
      * @param participantsPhash  the rolling participant-set hash, may be {@code null} to omit
      * @param queryContext       the query-context tag; never {@code null}
      * @throws NullPointerException if {@code queryContext} is {@code null}
@@ -113,10 +115,12 @@ public final class FetchGroupInfoMexRequest implements MexStanza.Request.Json {
      * {@inheritDoc}
      *
      * @implNote This implementation streams the GraphQL variables through fastjson2's
-     * {@link JSONWriter}, always emitting {@code query_context} and emitting each remaining field only
-     * when its corresponding constructor argument is non-null, matching WA Web which always sends the
-     * query context and omits other undefined GraphQL variables. The wrapped envelope is built through
-     * {@link MexStanza.Request.Json#createMexNode(String, String)}.
+     * {@link JSONWriter}, always emitting the declared top-level variables {@code include_username}
+     * (a {@code null} value written as {@code false}) and {@code query_context}, and emitting the
+     * optional {@code id} and {@code participants_phash} fields only when their corresponding
+     * constructor argument is non-null, matching WA Web which always sends the declared boolean and
+     * context variables and omits other undefined GraphQL variables. The wrapped envelope is built
+     * through {@link MexStanza.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexFetchGroupInfoJob", exports = "mexGetGroupInfo",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -132,11 +136,9 @@ public final class FetchGroupInfoMexRequest implements MexStanza.Request.Json {
                 writer.writeColon();
                 writer.writeString(id);
             }
-            if (includeUsername != null) {
-                writer.writeName("include_username");
-                writer.writeColon();
-                writer.writeBool(includeUsername);
-            }
+            writer.writeName("include_username");
+            writer.writeColon();
+            writer.writeBool(includeUsername != null && includeUsername);
             if (participantsPhash != null) {
                 writer.writeName("participants_phash");
                 writer.writeColon();

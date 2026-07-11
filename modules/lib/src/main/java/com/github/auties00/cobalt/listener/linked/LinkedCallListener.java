@@ -20,7 +20,7 @@ public non-sealed interface LinkedCallListener extends LinkedListener {
      * Notifies the listener that an inbound call offer has arrived.
      *
      * <p>The listener must respond by calling
-     * {@link LinkedWhatsAppClient#acceptCall(IncomingCall, com.github.auties00.cobalt.calls2.stream.AudioOutput, com.github.auties00.cobalt.calls2.stream.AudioInput)}
+     * {@link LinkedWhatsAppClient#acceptCall(IncomingCall, com.github.auties00.cobalt.calls.stream.AudioOutput, com.github.auties00.cobalt.calls.stream.AudioInput)}
      * or
      * {@link LinkedWhatsAppClient#rejectCall(IncomingCall, com.github.auties00.cobalt.model.call.CallEndReason)}
      * with the supplied offer within the WhatsApp-imposed offer timeout

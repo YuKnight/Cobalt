@@ -18,7 +18,7 @@ import java.io.UncheckedIOException;
  * <p>The relay performs the URL unfurl server-side so the preview does not leak reader identity to
  * the link target, and returns a {@code xwa2_newsletter_link_preview} envelope carrying the title,
  * description and thumbnail handle. The {@link #input} variable is forwarded as an opaque
- * caller-supplied JSON string; passing {@code null} omits it from the wire payload.
+ * caller-supplied JSON string and is always materialised on the wire.
  *
  * @implNote This implementation leaves URL validation to the caller (WhatsApp Web validates the URL
  * before sending {@code {"url":"..."}}) because the codegen pipeline does not model the newsletter
@@ -54,10 +54,9 @@ public final class FetchPlaintextLinkPreviewMexRequest implements MexStanza.Requ
     /**
      * Constructs a new request with the serialised {@code input} GraphQL variable.
      *
-     * <p>The caller produces the JSON payload; passing {@code null} omits the variable from the
-     * wire envelope.
+     * <p>The caller produces the JSON payload, which is always emitted on the wire.
      *
-     * @param input the serialised {@code input} JSON payload, may be {@code null} to omit
+     * @param input the serialised {@code input} JSON payload
      */
     public FetchPlaintextLinkPreviewMexRequest(String input) {
         this.input = input;
@@ -83,9 +82,8 @@ public final class FetchPlaintextLinkPreviewMexRequest implements MexStanza.Requ
      * {@inheritDoc}
      *
      * @implNote This implementation streams the GraphQL variables through fastjson2's
-     * {@link JSONWriter}, emits the {@code input} string only when the constructor argument is
-     * non-{@code null}, then wraps the payload via
-     * {@link MexStanza.Request.Json#createMexNode(String, String)}.
+     * {@link JSONWriter}, always materialising the declared {@code input} string, then wraps the
+     * payload via {@link MexStanza.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexFetchPlaintextLinkPreviewJobQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -96,11 +94,9 @@ public final class FetchPlaintextLinkPreviewMexRequest implements MexStanza.Requ
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (input != null) {
-                writer.writeName("input");
-                writer.writeColon();
-                writer.writeString(input);
-            }
+            writer.writeName("input");
+            writer.writeColon();
+            writer.writeString(input);
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

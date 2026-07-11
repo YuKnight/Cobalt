@@ -8,8 +8,9 @@ package com.github.auties00.cobalt.migration;
  * sends a message, but inactive groups stay on PN indefinitely until someone explicitly asks the
  * server for fresh metadata. This service walks the local chat store, picks every group still on
  * PN, issues a metadata query for each one, and re-checks once all queries land. Once no PN-mode
- * groups remain, the migration is marked complete for the session through
- * {@link #setInactiveGroupLidMigrationComplete()}; callers observe completion via
+ * groups remain, the migration is marked complete through
+ * {@link #setInactiveGroupLidMigrationComplete()}, which persists across restarts so a re-connecting
+ * client does not re-run the sweep; callers observe completion via
  * {@link #isInactiveGroupLidMigrationComplete()}.
  *
  * <p>The service is started once per session through {@link #start()} and is stopped through

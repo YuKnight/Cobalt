@@ -293,8 +293,8 @@ public final class MetaStanza {
     /**
      * Returns whether the given {@link Jid} identifies the Meta AI bot account.
      * <p>
-     * Matches both the FBID Meta AI bot ({@link Jid#metaAiBotAccount()}) and the legacy PN-form bot user
-     * {@code 13135550002@c.us}.
+     * Matches both the FBID Meta AI bot ({@link Jid#metaAiBotAccount()}) and the
+     * {@link Jid#metaAiBotPhoneAccount() legacy phone-number Meta AI bot}.
      *
      * @param jid the {@link Jid} to test
      * @return {@code true} when the JID is a Meta AI bot
@@ -303,7 +303,7 @@ public final class MetaStanza {
             adaptation = WhatsAppAdaptation.DIRECT)
     private static boolean isMetaAiBot(Jid jid) {
         return jid.equals(Jid.metaAiBotAccount())
-                || "13135550002".equals(jid.user());
+                || Jid.metaAiBotPhoneAccount().hasUser(jid.user());
     }
 
     /**

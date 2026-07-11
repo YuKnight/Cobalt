@@ -22,7 +22,6 @@ import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.SequencedCollection;
 import java.util.SequencedMap;
-import java.util.function.Supplier;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -56,18 +55,17 @@ import static com.github.auties00.cobalt.stanza.binary.StanzaTokens.*;
  *       consumed
  *   <li>{@link #fromSegment(MemorySegment, long)} reads from a
  *       {@link MemorySegment} starting at the supplied byte offset
- *   <li>{@link #fromStream(InputStream)} and
- *       {@link #fromStream(InputStream, int)} read from an
- *       {@link InputStream} through a per-instance staging buffer
- *       (8 KiB by default) so wrapping the input in
- *       {@link java.io.BufferedInputStream} is unnecessary
+ *   <li>{@link #fromStream(InputStream, int)} reads one stanza bounded
+ *       to the next {@code length} bytes of an {@link InputStream}
+ *       through a per-instance 8 KiB staging buffer (so wrapping the
+ *       input in {@link java.io.BufferedInputStream} is unnecessary),
+ *       leaving {@link #drain()} to advance a continuous
+ *       multi-frame source onto the next frame boundary
  * </ul>
  *
  * <p>Decoders are {@link AutoCloseable}: a compressed decoder releases
- * its {@link Inflater} on close; an uncompressed decoder is a no-op;
- * a stream-backed decoder additionally closes the underlying source
- * when it owns the stream lifecycle (created via
- * {@link #fromStream(Supplier)}).
+ * its {@link Inflater} on close; an uncompressed decoder is a no-op. The
+ * source is always caller-owned and left open.
  *
  * @see Stanza
  * @see StanzaAttribute
@@ -212,105 +210,50 @@ public abstract class StanzaReader implements AutoCloseable {
     }
 
     /**
-     * Returns a decoder appropriate for the leading flags byte of the supplied
-     * caller-owned {@link InputStream} source using the default 8 KiB staging
-     * buffer.
+     * Returns a decoder for a single stanza that occupies exactly {@code length}
+     * plaintext bytes of the supplied caller-owned {@link InputStream}.
      *
-     * <p>The decoder does not close {@code source} on {@link #close()}; the
-     * stream is caller-owned and typically long-lived (a socket input stream
-     * shared across many decoded stanzas). The {@link #fromStream(Supplier)}
-     * variant transfers stream ownership to the decoder.
+     * <p>The decoder reads at most {@code length} bytes from {@code source}: once
+     * those bytes are exhausted the read primitives report end-of-stream, so a
+     * stanza can be streamed off one datagram frame without ever crossing into
+     * the following frame even though {@code source} is a continuous multi-frame
+     * stream. The leading flags byte (counted within {@code length}) is consumed
+     * immediately to pick the uncompressed or compressed variant; the decoder
+     * pulls bulk reads of up to 8 KiB from {@code source} so wrapping the input
+     * in {@link java.io.BufferedInputStream} is unnecessary, it never materialises
+     * the whole frame, and it does not close {@code source} on {@link #close()}.
      *
-     * @param source the input stream of encoded stanza bytes
+     * <p>A well-formed stanza consumes its frame exactly; when it does not (the
+     * frame carries trailing bytes, or {@link #decode()} fails part way through),
+     * {@link #drain()} drains whatever is left so {@code source} lands on
+     * the next frame's length prefix.
+     *
+     * @param source the input stream of encoded stanza bytes, positioned at the
+     *               flags byte of the frame
+     * @param length the frame's plaintext byte count, including the flags byte
      * @return an inflating decoder when the compression flag is set, a direct
      *         decoder otherwise
-     * @throws EOFException if the stream is already at end-of-stream so no
-     *         flags byte can be read; this is the clean frame-boundary
-     *         end-of-stream a caller decoding a continuous stanza stream uses
-     *         to detect an orderly close as distinct from a malformed frame
+     * @throws EOFException if the stream is already at end-of-stream so no flags
+     *         byte can be read
      * @throws IOException if reading the flags byte otherwise fails
+     * @throws IllegalArgumentException if {@code length} is not positive
      */
-    public static StanzaReader fromStream(InputStream source) throws IOException {
-        return fromStream(source, DEFAULT_BUFFER_SIZE, false);
-    }
-
-    /**
-     * Returns a decoder appropriate for the leading flags byte of the supplied
-     * caller-owned {@link InputStream} source using a staging buffer of the
-     * requested capacity.
-     *
-     * <p>The leading flags byte is consumed immediately to pick the
-     * uncompressed or compressed variant; the returned decoder pulls bulk
-     * reads of up to {@code bufferSize} bytes from {@code source} so wrapping
-     * the input in {@link java.io.BufferedInputStream} is unnecessary. The
-     * decoder does not close {@code source} on {@link #close()}.
-     *
-     * @param source     the input stream of encoded stanza bytes
-     * @param bufferSize the capacity of the staging buffer, in bytes; must be
-     *                   at least four for primitive reads
-     * @return an inflating decoder when the compression flag is set, a direct
-     *         decoder otherwise
-     * @throws EOFException if the stream is already at end-of-stream so no
-     *         flags byte can be read
-     * @throws IOException if reading the flags byte otherwise fails
-     * @throws IllegalArgumentException if {@code bufferSize} is less than four
-     */
-    public static StanzaReader fromStream(InputStream source, int bufferSize) throws IOException {
-        return fromStream(source, bufferSize, false);
-    }
-
-    /**
-     * Returns a decoder appropriate for the leading flags byte of an
-     * {@link InputStream} resolved from {@code supplier} and owned by the
-     * decoder.
-     *
-     * <p>Used when the decoder should fully own the stream lifecycle (for
-     * example a stream over a file opened only to decode a single stanza). The
-     * supplier is resolved eagerly at this call; the returned decoder closes
-     * the resolved stream when {@link #close()} runs.
-     *
-     * @param supplier the source of the input stream; resolved eagerly
-     * @return an inflating decoder when the compression flag is set, a direct
-     *         decoder otherwise
-     * @throws IOException if reading the flags byte fails
-     */
-    public static StanzaReader fromStream(Supplier<? extends InputStream> supplier) throws IOException {
-        Objects.requireNonNull(supplier, "supplier");
-        return fromStream(supplier.get(), DEFAULT_BUFFER_SIZE, true);
-    }
-
-    /**
-     * Returns the decoder for the leading flags byte, shared by the
-     * {@code fromStream} factories.
-     *
-     * <p>Consolidates the prefill-and-pick logic so the three public variants
-     * differ only in their buffer size and ownership arguments.
-     *
-     * @param source     the input stream of encoded stanza bytes
-     * @param bufferSize the capacity of the staging buffer, in bytes
-     * @param owned      whether the returned decoder owns {@code source} and
-     *                   must close it on {@link #close()}
-     * @return the decoder for the leading flags byte
-     * @throws EOFException if the stream is already at end-of-stream so no
-     *         flags byte can be read
-     * @throws IOException if reading the flags byte otherwise fails
-     * @throws IllegalArgumentException if {@code bufferSize} is less than four
-     */
-    private static StanzaReader fromStream(InputStream source, int bufferSize, boolean owned) throws IOException {
+    public static StanzaReader fromStream(InputStream source, int length) throws IOException {
         Objects.requireNonNull(source, "source");
-        if (bufferSize < 4) {
-            throw new IllegalArgumentException("bufferSize must be at least 4, got " + bufferSize);
+        if (length <= 0) {
+            throw new IllegalArgumentException("length must be positive, got " + length);
         }
-        var buffer = new byte[bufferSize];
-        var prefilledBytes = source.read(buffer);
+        var buffer = new byte[DEFAULT_BUFFER_SIZE];
+        var prefilledBytes = source.read(buffer, 0, Math.min(DEFAULT_BUFFER_SIZE, length));
         if (prefilledBytes <= 0) {
             throw new EOFException("Unexpected end of stream while reading flags byte");
         }
+        var frameRemaining = length - prefilledBytes;
         var flags = buffer[0] & 0xFF;
         if ((flags & COMPRESSION_FLAG) != 0) {
-            return new StreamCompressed(source, buffer, prefilledBytes, owned);
+            return new StreamCompressed(source, buffer, prefilledBytes, frameRemaining);
         }
-        return new StreamUncompressed(source, buffer, prefilledBytes, owned);
+        return new StreamUncompressed(source, buffer, prefilledBytes, frameRemaining);
     }
 
     /**
@@ -399,13 +342,36 @@ public abstract class StanzaReader implements AutoCloseable {
     abstract byte[] readBytes(int length) throws IOException;
 
     /**
+     * Consumes and discards any bytes of the current stanza's frame that
+     * {@link #decode()} did not read.
+     *
+     * <p>Relevant only to the {@link #fromStream(InputStream, int) length-bounded
+     * stream decoder}, whose {@code source} is a continuous multi-frame stream: a
+     * stanza that decodes to fewer bytes than its frame carries (trailing bytes,
+     * or a decode that failed part way through) leaves the source mid-frame, and
+     * this drains the rest so the next read starts on the following frame's length
+     * prefix. Draining also lets the transport layer finish authenticating the
+     * frame it streamed.
+     *
+     * @implSpec
+     * A fully-buffered source ({@code byte[]}, {@link ByteBuffer},
+     * {@link MemorySegment}) is already bounded to exactly one stanza, so its
+     * implementation does nothing. A stream-backed source drains the frame bytes
+     * {@link #decode()} left unread.
+     *
+     * @throws IOException if the source ends before the frame is fully consumed,
+     *         which leaves the frame unauthenticated and is a reconnect-worthy
+     *         fault for the caller
+     */
+    public abstract void drain() throws IOException;
+
+    /**
      * Closes this decoder, releasing any resources it holds.
      *
      * <p>The default implementation is a no-op because the buffer-backed
      * uncompressed subclasses hold no resources beyond the caller-owned
-     * source. Compressed subclasses override to release the {@link Inflater};
-     * the stream-backed subclasses additionally close the underlying stream
-     * when they own it (factory variant {@link #fromStream(Supplier)}).
+     * source. Compressed subclasses override to release the {@link Inflater}.
+     * The source is always caller-owned and is never closed here.
      *
      * @implNote
      * This implementation narrows the throws clause from {@link Exception} on
@@ -896,6 +862,18 @@ public abstract class StanzaReader implements AutoCloseable {
             position += length;
             return result;
         }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation does nothing: the array is already bounded to one
+         * stanza, so no continuous-stream cursor needs advancing.
+         */
+        @Override
+        public void drain() {
+
+        }
     }
 
     /**
@@ -977,6 +955,18 @@ public abstract class StanzaReader implements AutoCloseable {
             var result = new byte[length];
             source.get(result);
             return result;
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation does nothing: the buffer is already bounded to one
+         * stanza, so no continuous-stream cursor needs advancing.
+         */
+        @Override
+        public void drain() {
+
         }
     }
 
@@ -1083,6 +1073,18 @@ public abstract class StanzaReader implements AutoCloseable {
             position += length;
             return result;
         }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation does nothing: the segment is already bounded to one
+         * stanza, so no continuous-stream cursor needs advancing.
+         */
+        @Override
+        public void drain() {
+
+        }
     }
 
     /**
@@ -1101,13 +1103,14 @@ public abstract class StanzaReader implements AutoCloseable {
         private final InputStream source;
 
         /**
-         * Indicates whether this decoder owns {@link #source} and so must close
-         * it during {@link #close()}.
+         * Holds the number of bytes of the current frame not yet pulled from
+         * {@link #source}.
          *
-         * <p>When {@code false}, the stream is caller-owned and {@link #close()}
-         * leaves it open.
+         * <p>Every read from {@code source} is clamped to this count so the
+         * decoder never crosses into the following frame of a continuous
+         * multi-frame stream; once it reaches zero the frame is exhausted.
          */
-        private final boolean owned;
+        private int frameRemaining;
 
         /**
          * Holds the bytes pulled from {@link #source} pending consumption.
@@ -1147,30 +1150,15 @@ public abstract class StanzaReader implements AutoCloseable {
          * @param prefilledBytes  the count of valid bytes at the head of
          *                        {@code buffer}; the first byte is the consumed
          *                        flags byte
-         * @param owned           {@code true} when the decoder owns
-         *                        {@code source} and must close it on
-         *                        {@link #close()}; {@code false} when the
-         *                        stream is caller-owned
+         * @param frameRemaining  the number of frame bytes not yet pulled from
+         *                        {@code source} after the prefill
          */
-        StreamUncompressed(InputStream source, byte[] buffer, int prefilledBytes, boolean owned) {
+        StreamUncompressed(InputStream source, byte[] buffer, int prefilledBytes, int frameRemaining) {
             this.source = source;
-            this.owned = owned;
+            this.frameRemaining = frameRemaining;
             this.buffer = buffer;
             this.bufferPosition = 1;
             this.bufferLimit = prefilledBytes;
-        }
-
-        /**
-         * Closes the source stream when the decoder owns it; otherwise
-         * a no-op.
-         *
-         * @throws IOException if the downstream close fails
-         */
-        @Override
-        public void close() throws IOException {
-            if (owned) {
-                source.close();
-            }
         }
 
         /**
@@ -1269,18 +1257,20 @@ public abstract class StanzaReader implements AutoCloseable {
          * @throws IOException if the underlying stream fails
          */
         private void fillBuffer() throws IOException {
-            if (exhausted) {
+            if (exhausted || frameRemaining <= 0) {
+                exhausted = true;
                 bufferPosition = 0;
                 bufferLimit = 0;
                 return;
             }
-            var n = source.read(buffer);
+            var n = source.read(buffer, 0, Math.min(buffer.length, frameRemaining));
             if (n < 0) {
                 exhausted = true;
                 bufferPosition = 0;
                 bufferLimit = 0;
                 return;
             }
+            frameRemaining -= n;
             bufferPosition = 0;
             bufferLimit = n;
         }
@@ -1310,16 +1300,39 @@ public abstract class StanzaReader implements AutoCloseable {
             bufferPosition = 0;
             bufferLimit = available;
             while (bufferLimit < needed) {
-                if (exhausted) {
+                if (exhausted || frameRemaining <= 0) {
+                    exhausted = true;
                     throw new IOException("Unexpected end of data");
                 }
-                var n = source.read(buffer, bufferLimit, buffer.length - bufferLimit);
+                var n = source.read(buffer, bufferLimit, Math.min(buffer.length - bufferLimit, frameRemaining));
                 if (n < 0) {
                     exhausted = true;
                     throw new IOException("Unexpected end of data");
                 }
+                frameRemaining -= n;
                 bufferLimit += n;
             }
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation discards the staging buffer and drains any frame
+         * bytes not yet pulled from {@link #source}, reusing the staging buffer
+         * as scratch so no frame-sized array is allocated.
+         */
+        @Override
+        public void drain() throws IOException {
+            bufferPosition = bufferLimit;
+            while (frameRemaining > 0) {
+                var n = source.read(buffer, 0, Math.min(buffer.length, frameRemaining));
+                if (n < 0) {
+                    throw new IOException("Datagram truncated: " + frameRemaining + " plaintext byte(s) missing");
+                }
+                frameRemaining -= n;
+            }
+            exhausted = true;
         }
     }
 
@@ -1582,6 +1595,19 @@ public abstract class StanzaReader implements AutoCloseable {
         }
 
         /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation does nothing: a fully-buffered compressed source is
+         * bounded to one stanza, so no continuous-stream cursor needs advancing.
+         * {@link StreamCompressed} overrides this to drain a frame's unread bytes.
+         */
+        @Override
+        public void drain() throws IOException {
+
+        }
+
+        /**
          * Releases the {@link Inflater} held by this decoder.
          *
          * @throws IOException never thrown by the base implementation;
@@ -1751,20 +1777,15 @@ public abstract class StanzaReader implements AutoCloseable {
         private final InputStream source;
 
         /**
-         * Indicates whether this decoder owns {@link #source} and so must close
-         * it during {@link #close()}.
+         * Holds the number of bytes of the current frame not yet pulled from
+         * {@link #source}.
          *
-         * <p>When {@code false}, the stream is caller-owned and {@link #close()}
-         * leaves it open.
+         * <p>Every read from {@code source} is clamped to this count so the
+         * inflater is never fed compressed bytes belonging to the following
+         * frame of a continuous multi-frame stream; once it reaches zero the
+         * frame is exhausted.
          */
-        private final boolean owned;
-
-        /**
-         * Marks that {@link InputStream#read(byte[], int, int)} has returned
-         * end-of-stream so subsequent {@link #sourceHasRemaining()} queries do
-         * not re-query the stream.
-         */
-        private boolean exhausted;
+        private int frameRemaining;
 
         /**
          * Constructs a new {@link InputStream}-backed compressed decoder seeded
@@ -1784,32 +1805,13 @@ public abstract class StanzaReader implements AutoCloseable {
          * @param prefilledBytes         the count of valid bytes at the head of
          *                               {@code prefilledInflaterInput}; the
          *                               first byte is the consumed flags byte
-         * @param owned                  {@code true} when the decoder owns
-         *                               {@code source} and must close it on
-         *                               {@link #close()}; {@code false} when
-         *                               the stream is caller-owned
+         * @param frameRemaining         the number of frame bytes not yet pulled
+         *                               from {@code source} after the prefill
          */
-        StreamCompressed(InputStream source, byte[] prefilledInflaterInput, int prefilledBytes, boolean owned) {
+        StreamCompressed(InputStream source, byte[] prefilledInflaterInput, int prefilledBytes, int frameRemaining) {
             super(prefilledInflaterInput, 1, prefilledBytes);
             this.source = source;
-            this.owned = owned;
-        }
-
-        /**
-         * Releases the {@link Inflater} and, when the decoder owns the
-         * source stream, closes it too.
-         *
-         * @throws IOException if closing the source stream fails
-         */
-        @Override
-        public void close() throws IOException {
-            try {
-                super.close();
-            } finally {
-                if (owned) {
-                    source.close();
-                }
-            }
+            this.frameRemaining = frameRemaining;
         }
 
         /**
@@ -1817,35 +1819,57 @@ public abstract class StanzaReader implements AutoCloseable {
          */
         @Override
         boolean sourceHasRemaining() {
-            return !exhausted;
+            return frameRemaining > 0;
         }
 
         /**
          * {@inheritDoc}
          *
          * @implNote
-         * This implementation marks the stream exhausted on either
-         * an end-of-stream return or an {@link IOException} so
-         * subsequent calls short-circuit and do not propagate
-         * downstream failures further into the inflater.
+         * This implementation clamps the read to the frame's remaining bytes so
+         * the inflater is never fed input from the following frame. A transport
+         * {@link IOException} or an end-of-stream returns {@code 0}, which surfaces
+         * to the inflater as truncated compressed input; the reconnect-worthy
+         * fault is then re-raised by {@link #drain()} when it re-reads the
+         * unconsumed frame bytes. A datagram authentication failure arrives as an
+         * unchecked exception and is not swallowed here.
          */
         @Override
         int fillInflaterInput(byte[] dst, int max) {
-            if (exhausted) {
+            if (frameRemaining <= 0) {
                 return 0;
             }
             int n;
             try {
-                n = source.read(dst, 0, max);
+                n = source.read(dst, 0, Math.min(max, frameRemaining));
             } catch (IOException e) {
-                exhausted = true;
                 return 0;
             }
             if (n < 0) {
-                exhausted = true;
                 return 0;
             }
+            frameRemaining -= n;
             return n;
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation drains the frame's unread compressed bytes without
+         * inflating them, reusing the inflater input buffer as scratch, so the
+         * transport layer advances onto the next frame and finishes authenticating
+         * this one.
+         */
+        @Override
+        public void drain() throws IOException {
+            while (frameRemaining > 0) {
+                var n = source.read(inflaterInputBuffer, 0, Math.min(inflaterInputBuffer.length, frameRemaining));
+                if (n < 0) {
+                    throw new IOException("Datagram truncated: " + frameRemaining + " plaintext byte(s) missing");
+                }
+                frameRemaining -= n;
+            }
         }
     }
 }

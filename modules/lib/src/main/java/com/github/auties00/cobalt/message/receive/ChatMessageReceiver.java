@@ -374,8 +374,9 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
     }
 
     /**
-     * Rejects stanzas that carry a {@code recipient_pn} or {@code recipient_lid}
-     * attribute when the sender is not the logged-in user's own device.
+     * Rejects stanzas that carry a {@code recipient}, {@code recipient_pn}, or
+     * {@code recipient_lid} attribute when the sender is not the logged-in user's
+     * own device.
      *
      * <p>The recipient attributes are reserved for peer-protocol messages echoed
      * between the user's own devices; receiving them from any other sender is a
@@ -388,7 +389,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
     @WhatsAppWebExport(moduleName = "WAWebHandleMsgParser", exports = "incomingMsgParser",
             adaptation = WhatsAppAdaptation.DIRECT)
     private void validateRecipient(MessageReceiveStanza stanza) {
-        var hasRecipient = stanza.recipientPn().isPresent()
+        var hasRecipient = stanza.recipient().isPresent()
+                || stanza.recipientPn().isPresent()
                 || stanza.recipientLid().isPresent();
 
         if (hasRecipient && !isFromMe(stanza)) {

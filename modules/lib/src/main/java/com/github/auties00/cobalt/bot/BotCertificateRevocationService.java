@@ -12,48 +12,26 @@ import java.math.BigInteger;
  * through a MEX-fetched CRL rather than the certificates' own distribution points. An implementation
  * fetches that CRL through {@link FetchBotCertificateRevocationListMexRequest}, parses its revoked
  * serial numbers, records the {@code next_update} watermark, and refreshes it periodically while
- * verification is enabled. A revocation query returns {@link RevocationStatus#CRL_UNAVAILABLE} until
- * the first fetch succeeds and {@link RevocationStatus#CRL_STALE} once the CRL has aged past its
+ * verification is enabled. A revocation query returns {@link BotRevocationStatus#CRL_UNAVAILABLE} until
+ * the first fetch succeeds and {@link BotRevocationStatus#CRL_STALE} once the CRL has aged past its
  * {@code next_update}; either is treated as a verification failure, matching WA Web's fail-closed
  * policy.
  */
 public interface BotCertificateRevocationService {
     /**
-     * The outcome of a certificate revocation query.
-     */
-    enum RevocationStatus {
-        /**
-         * The certificate is not revoked and the CRL is fresh.
-         */
-        VALID,
-        /**
-         * The certificate's serial number is listed in the CRL.
-         */
-        REVOKED,
-        /**
-         * No CRL has been fetched yet.
-         */
-        CRL_UNAVAILABLE,
-        /**
-         * The CRL has aged past its {@code next_update} watermark.
-         */
-        CRL_STALE
-    }
-
-    /**
      * Returns the revocation status of a certificate serial number at the given time.
      *
      * @implSpec
-     * Implementations return {@link RevocationStatus#CRL_UNAVAILABLE} before any successful fetch,
-     * {@link RevocationStatus#CRL_STALE} when {@code nowMs} is past the recorded {@code next_update}
-     * watermark, {@link RevocationStatus#REVOKED} when {@code serial} is listed in the current CRL, and
-     * {@link RevocationStatus#VALID} otherwise.
+     * Implementations return {@link BotRevocationStatus#CRL_UNAVAILABLE} before any successful fetch,
+     * {@link BotRevocationStatus#CRL_STALE} when {@code nowMs} is past the recorded {@code next_update}
+     * watermark, {@link BotRevocationStatus#REVOKED} when {@code serial} is listed in the current CRL, and
+     * {@link BotRevocationStatus#VALID} otherwise.
      *
      * @param serial the certificate serial number
      * @param nowMs  the reference time in epoch milliseconds
      * @return the revocation status
      */
-    RevocationStatus checkRevocationStatus(BigInteger serial, long nowMs);
+    BotRevocationStatus checkRevocationStatus(BigInteger serial, long nowMs);
 
     /**
      * Starts the periodic CRL refresh if it is not already running.

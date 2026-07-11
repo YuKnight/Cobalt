@@ -4,10 +4,10 @@ import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.calls2.stream.AudioInput;
-import com.github.auties00.cobalt.calls2.stream.AudioOutput;
-import com.github.auties00.cobalt.calls2.stream.VideoInput;
-import com.github.auties00.cobalt.calls2.stream.VideoOutput;
+import com.github.auties00.cobalt.calls.stream.AudioInput;
+import com.github.auties00.cobalt.calls.stream.AudioOutput;
+import com.github.auties00.cobalt.calls.stream.VideoInput;
+import com.github.auties00.cobalt.calls.stream.VideoOutput;
 import com.github.auties00.cobalt.emoji.WhatsAppEmoji;
 import com.github.auties00.cobalt.model.call.Call;
 import com.github.auties00.cobalt.model.call.CallEndReason;
@@ -2018,6 +2018,138 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @throws WhatsAppSessionException.Closed if the socket has been closed
      */
     Call joinCallLink(URI link, AudioOutput audioOut, AudioInput audioIn);
+
+    /**
+     * Joins the in-progress group call described by {@code call} carrying the supplied media streams and
+     * returns a live session.
+     *
+     * <p>Late-joining an ongoing group call is a group-only operation, distinct from
+     * {@link #acceptCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)} only in that the join
+     * enters the call's lobby before answering: accepting answers a ringing offer directly, while joining
+     * answers the same offer from the ongoing-call banner after the ring was dismissed. It applies only to a
+     * group {@link IncomingCall} the engine still tracks from its inbound offer (one surfaced through
+     * {@link LinkedWhatsAppClientListener#onCall}); a one-to-one {@code call} has no join and is rejected, and an
+     * offer whose ring has already ended is no longer joinable.
+     *
+     * <p>The local user joins with video when {@code videoOut} is non-{@code null} and audio-only otherwise,
+     * independently of whether video was offered. The two outbound sources supply the local audio and video the
+     * call transmits, and the two inbound sinks receive the remote audio and video; the streams are owned by
+     * the call engine and ended automatically when the call ends, so the application never closes them.
+     *
+     * @apiNote
+     * Drives the "Join" affordance on an ongoing group-call banner. Prefer
+     * {@link #acceptCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)} to answer a call that
+     * is actively ringing this device; use this to join a group call that is already in progress. For an
+     * audio-only join prefer the {@link #joinGroupCall(IncomingCall, AudioOutput, AudioInput)} overload.
+     *
+     * @param call     the ongoing group call to join; never {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @param videoOut the source the engine drains local video from for transmission, or {@code null} to join
+     *                 audio-only
+     * @param videoIn  the sink the engine fills with received remote video, or {@code null} to join audio-only
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code call}, {@code audioOut}, or {@code audioIn} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code call} is not a group call, or the engine no longer
+     *                                         tracks an offer for it
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     * @see #joinGroupCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)
+     * @see #acceptCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)
+     */
+    Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn,
+                       VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Joins the in-progress group call described by {@code call} as audio-only carrying the supplied audio
+     * streams and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinGroupCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * with no video; the joined leg can still be upgraded to video later.
+     *
+     * @param call     the ongoing group call to join; never {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code call}, {@code audioOut}, or {@code audioIn} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code call} is not a group call, or the engine no longer
+     *                                         tracks an offer for it
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn);
+
+    /**
+     * Joins the single in-progress group call in {@code group} carrying the supplied media streams and returns
+     * a live session.
+     *
+     * <p>A group hosts at most one call at a time, so naming the group is enough to join it: the single received
+     * offer this client is tracking for {@code group} is resolved and joined. This is the offer-less counterpart
+     * of {@link #joinGroupCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)}, convenient when
+     * the caller holds the group but not the specific {@link IncomingCall}; the group must have a call this
+     * device was offered and is still tracking.
+     *
+     * <p>The local user joins with video when {@code videoOut} is non-{@code null} and audio-only otherwise.
+     * The two outbound sources supply the local audio and video the call transmits, and the two inbound sinks
+     * receive the remote audio and video; the streams are owned by the call engine and ended automatically when
+     * the call ends, so the application never closes them.
+     *
+     * @apiNote
+     * Drives the "Join" affordance in a group header when a call is in progress. For an audio-only join prefer
+     * the {@link #joinGroupCall(JidProvider, AudioOutput, AudioInput)} overload.
+     *
+     * @param group    the group whose ongoing call to join; must be a group or community JID; never
+     *                 {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @param videoOut the source the engine drains local video from for transmission, or {@code null} to join
+     *                 audio-only
+     * @param videoIn  the sink the engine fills with received remote video, or {@code null} to join audio-only
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code group}, {@code audioOut}, or {@code audioIn} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code group} is not a group or community JID
+     * @throws NoSuchElementException          if {@code group} has no ongoing group call this device is tracking
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     * @see #joinGroupCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)
+     * @see #startCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)
+     */
+    Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn,
+                       VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Joins the single in-progress group call in {@code group} as audio-only carrying the supplied audio
+     * streams and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinGroupCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * with no video; the joined leg can still be upgraded to video later.
+     *
+     * @param group    the group whose ongoing call to join; must be a group or community JID; never
+     *                 {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code group}, {@code audioOut}, or {@code audioIn} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code group} is not a group or community JID
+     * @throws NoSuchElementException          if {@code group} has no ongoing group call this device is tracking
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn);
 
     /**
      * Reconciles the local view of the Channels tab with the server.

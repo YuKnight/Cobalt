@@ -4,10 +4,10 @@ import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
 import com.github.auties00.cobalt.exception.WhatsAppException;
 import com.github.auties00.cobalt.exception.WhatsAppSessionException;
+import com.github.auties00.cobalt.exception.WhatsAppStreamException;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
-import com.github.auties00.cobalt.model.device.pairing.DevicePlatformType;
 import com.github.auties00.cobalt.model.device.DevicePropsBuilder;
 import com.github.auties00.cobalt.model.device.DevicePropsHistorySyncConfigBuilder;
 import com.github.auties00.cobalt.model.device.DevicePropsSpec;
@@ -18,11 +18,6 @@ import com.github.auties00.cobalt.model.signal.CertChainSpec;
 import com.github.auties00.cobalt.model.signal.NoiseCertificateCertChainDetailsSpec;
 import com.github.auties00.cobalt.model.signal.NoiseCertificateDetailsSpec;
 import com.github.auties00.cobalt.model.signal.NoiseCertificateSpec;
-import com.github.auties00.cobalt.stanza.Stanza;
-import com.github.auties00.cobalt.stanza.binary.StanzaReader;
-import com.github.auties00.cobalt.stanza.binary.StanzaTokens;
-import com.github.auties00.cobalt.stanza.binary.StanzaSizer;
-import com.github.auties00.cobalt.stanza.binary.StanzaWriter;
 import com.github.auties00.cobalt.socket.datagram.WhatsAppDatagramInputStream;
 import com.github.auties00.cobalt.socket.datagram.WhatsAppDatagramOutputStream;
 import com.github.auties00.cobalt.socket.tunnel.HttpTunnel;
@@ -30,6 +25,11 @@ import com.github.auties00.cobalt.socket.tunnel.SocksTunnel;
 import com.github.auties00.cobalt.socket.websocket.WebSocketFrameInputStream;
 import com.github.auties00.cobalt.socket.websocket.WebSocketFrameOutputStream;
 import com.github.auties00.cobalt.socket.websocket.WebSocketUpgrade;
+import com.github.auties00.cobalt.stanza.Stanza;
+import com.github.auties00.cobalt.stanza.binary.StanzaReader;
+import com.github.auties00.cobalt.stanza.binary.StanzaSizer;
+import com.github.auties00.cobalt.stanza.binary.StanzaTokens;
+import com.github.auties00.cobalt.stanza.binary.StanzaWriter;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.curve25519.Curve25519;
@@ -46,7 +46,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,8 +104,8 @@ import java.util.OptionalInt;
  * {@link WhatsAppDatagramOutputStream#setWriteKey(SecretKey)}, and
  * every subsequent {@link #sendNode(Stanza)} is encoded straight into
  * the wire by {@link StanzaWriter#toStream(OutputStream)}; the reader
- * thread mirrors the same chain by decoding nodes from the datagram
- * input stream with {@link StanzaReader#fromStream(InputStream)}.
+ * thread mirrors the same chain by decoding one node per datagram frame
+ * with {@link StanzaReader#fromStream(InputStream, int)}.
  *
  * <p>HTTP {@code CONNECT} and SOCKS4/4a/5/5h proxies are supported
  * on every form factor through {@link HttpTunnel} and
@@ -1112,17 +1111,41 @@ public sealed abstract class WhatsAppSocketClient {
      * until the server signals end-of-stream, the transport is closed,
      * or a fatal error is observed.
      *
+     * <p>Each iteration decodes exactly one datagram: its plaintext length is taken
+     * from {@link WhatsAppDatagramInputStream#readDatagramLength()} and a single
+     * {@link Stanza} is streamed off the datagram stream through
+     * {@link StanzaReader#fromStream(InputStream, int)}, which bounds its reads to
+     * that length through a fixed staging buffer so a multi-megabyte frame is never
+     * materialised whole. Binding the decode to the datagram frame is what keeps the
+     * reader in sync: the frame boundary is authoritative, so a stanza that decodes
+     * to fewer bytes than the frame carries cannot bleed into the next stanza, and a
+     * malformed frame cannot shift the cursor for the frames that follow. After the
+     * decode, {@link StanzaReader#drain()} discards any bytes the decoder
+     * left unread so the datagram cursor lands exactly on the next frame's length
+     * prefix (and the transport finishes authenticating the frame it streamed).
+     *
+     * <p>Because decoding is frame-bounded, a malformed inbound stanza cannot corrupt
+     * the frames that follow, so a {@link StanzaReader#decode()} failure is isolated
+     * per frame rather than dropping the connection: the frame is drained and a
+     * non-fatal {@link WhatsAppStreamException.MalformedNode} is surfaced through
+     * {@link WhatsAppSocketListener#onError(WhatsAppException)} while the loop keeps
+     * reading, mirroring WA Web's {@code WAComms.parseAndHandleStanza}, which logs a
+     * stanza-parse failure and continues. A {@link WhatsAppSessionException.BadMac}
+     * from the datagram layer is not a decode failure: it means the frame did not
+     * authenticate, so it is re-raised as a fatal fault rather than isolated.
+     *
      * <p>A {@code <xmlstreamend>} stanza is dispatched like any other stanza and
      * the loop keeps reading: WhatsApp ends a logical XML stream with
      * {@code <xmlstreamend>} without necessarily closing the transport. During a
      * clean server-initiated teardown (after a {@code <stream:error>}, a logout,
      * or a conflict) the server closes the socket right after, so the next
-     * {@link StanzaReader#fromStream(InputStream)} observes a frame-boundary
-     * end-of-stream and throws {@link EOFException}, which this loop treats as an
-     * orderly close (it stops without surfacing an error). The server may trail a
-     * few bytes that never form a whole datagram before closing; the datagram
-     * layer drops such a partial tail and reports the same clean end-of-stream,
-     * so a server-initiated close never surfaces as a framing error. During the
+     * {@link WhatsAppDatagramInputStream#readDatagramLength()} observes a
+     * frame-boundary end-of-stream and returns {@code -1}, which this loop treats
+     * as an orderly close (it stops without surfacing an error). The server may
+     * trail a few bytes that never form a whole datagram before closing; the
+     * datagram layer drops such a partial tail and reports the same clean
+     * {@code -1} length, so a server-initiated close never surfaces as a framing
+     * error. During the
      * unregistered pairing phase the server instead ends one stream segment and
      * immediately pushes a fresh {@code <pair-device>} on the same socket to
      * rotate the QR refs or refresh the pairing code; treating
@@ -1149,9 +1172,22 @@ public sealed abstract class WhatsAppSocketClient {
     private void runReaderLoop() {
         try {
             while (!closed && isTransportOpen()) {
+                var length = in.readDatagramLength();
+                if (length < 0) {
+                    break;
+                }
                 Stanza stanza;
-                try (var decoder = StanzaReader.fromStream(in)) {
-                    stanza = decoder.decode();
+                try (var decoder = StanzaReader.fromStream(in, length)) {
+                    try {
+                        stanza = decoder.decode();
+                    } catch (WhatsAppSessionException.BadMac fatal) {
+                        throw fatal;
+                    } catch (IOException | RuntimeException malformed) {
+                        decoder.drain();
+                        listener.onError(new WhatsAppStreamException.MalformedNode("Failed to decode inbound stanza", malformed));
+                        continue;
+                    }
+                    decoder.drain();
                 }
                 listener.onNode(stanza);
             }

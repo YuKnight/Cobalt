@@ -39,27 +39,32 @@ public final class FetchNewsletterMexRequest implements MexStanza.Request.Json {
     public static final String OPERATION_NAME = "mexGetNewsletter";
 
     /**
-     * Holds the {@code fetch_creation_time} GraphQL variable, or {@code null} to omit it.
+     * Holds the {@code fetch_creation_time} GraphQL variable; {@code null} is serialised as
+     * {@code false}.
      */
     private final Boolean fetchCreationTime;
 
     /**
-     * Holds the {@code fetch_full_image} GraphQL variable, or {@code null} to omit it.
+     * Holds the {@code fetch_full_image} GraphQL variable; {@code null} is serialised as
+     * {@code false}.
      */
     private final Boolean fetchFullImage;
 
     /**
-     * Holds the {@code fetch_status_metadata} GraphQL variable, or {@code null} to omit it.
+     * Holds the {@code fetch_status_metadata} GraphQL variable; {@code null} is serialised as
+     * {@code false}.
      */
     private final Boolean fetchStatusMetadata;
 
     /**
-     * Holds the {@code fetch_viewer_metadata} GraphQL variable, or {@code null} to omit it.
+     * Holds the {@code fetch_viewer_metadata} GraphQL variable; {@code null} is serialised as
+     * {@code false}.
      */
     private final Boolean fetchViewerMetadata;
 
     /**
-     * Holds the {@code fetch_wamo_sub} GraphQL variable, or {@code null} to omit it.
+     * Holds the {@code fetch_wamo_sub} GraphQL variable; {@code null} is serialised as
+     * {@code false}.
      */
     private final Boolean fetchWamoSub;
 
@@ -73,12 +78,12 @@ public final class FetchNewsletterMexRequest implements MexStanza.Request.Json {
      * non-status code path.
      *
      * <p>Equivalent to invoking the full constructor with {@code fetchStatusMetadata} set to
-     * {@code null}.
+     * {@code null}, which serialises as {@code false}.
      *
-     * @param fetchCreationTime   the {@code fetch_creation_time} flag, may be {@code null}
-     * @param fetchFullImage      the {@code fetch_full_image} flag, may be {@code null}
-     * @param fetchViewerMetadata the {@code fetch_viewer_metadata} flag, may be {@code null}
-     * @param fetchWamoSub        the {@code fetch_wamo_sub} flag, may be {@code null}
+     * @param fetchCreationTime   the {@code fetch_creation_time} flag; {@code null} is sent as {@code false}
+     * @param fetchFullImage      the {@code fetch_full_image} flag; {@code null} is sent as {@code false}
+     * @param fetchViewerMetadata the {@code fetch_viewer_metadata} flag; {@code null} is sent as {@code false}
+     * @param fetchWamoSub        the {@code fetch_wamo_sub} flag; {@code null} is sent as {@code false}
      * @param input               the structured {@code input} GraphQL variable
      */
     public FetchNewsletterMexRequest(Boolean fetchCreationTime, Boolean fetchFullImage, Boolean fetchViewerMetadata, Boolean fetchWamoSub, Input input) {
@@ -88,14 +93,14 @@ public final class FetchNewsletterMexRequest implements MexStanza.Request.Json {
     /**
      * Constructs a request with the full set of fragment-gating flags and the structured input.
      *
-     * <p>Every {@code fetch_*} flag is optional; passing {@code null} omits the variable from the
-     * on-wire payload and lets the relay apply its default.
+     * <p>Every {@code fetch_*} flag is a declared top-level GraphQL variable and is always emitted;
+     * passing {@code null} serialises as {@code false} rather than omitting the variable.
      *
-     * @param fetchCreationTime    the {@code fetch_creation_time} flag, may be {@code null}
-     * @param fetchFullImage       the {@code fetch_full_image} flag, may be {@code null}
-     * @param fetchStatusMetadata  the {@code fetch_status_metadata} flag, may be {@code null}
-     * @param fetchViewerMetadata  the {@code fetch_viewer_metadata} flag, may be {@code null}
-     * @param fetchWamoSub         the {@code fetch_wamo_sub} flag, may be {@code null}
+     * @param fetchCreationTime    the {@code fetch_creation_time} flag; {@code null} is sent as {@code false}
+     * @param fetchFullImage       the {@code fetch_full_image} flag; {@code null} is sent as {@code false}
+     * @param fetchStatusMetadata  the {@code fetch_status_metadata} flag; {@code null} is sent as {@code false}
+     * @param fetchViewerMetadata  the {@code fetch_viewer_metadata} flag; {@code null} is sent as {@code false}
+     * @param fetchWamoSub         the {@code fetch_wamo_sub} flag; {@code null} is sent as {@code false}
      * @param input                the structured {@code input} GraphQL variable
      */
     public FetchNewsletterMexRequest(Boolean fetchCreationTime, Boolean fetchFullImage, Boolean fetchStatusMetadata, Boolean fetchViewerMetadata, Boolean fetchWamoSub, Input input) {
@@ -132,7 +137,9 @@ public final class FetchNewsletterMexRequest implements MexStanza.Request.Json {
      *
      * <p>Produces the
      * {@code {variables: {input: {key, type, view_role}, fetch_viewer_metadata, fetch_full_image, fetch_creation_time, fetch_wamo_sub, fetch_status_metadata}}}
-     * payload; every field is omitted when its source value is {@code null}.
+     * payload. The {@code input} object and all five {@code fetch_*} booleans are declared top-level
+     * variables and are always emitted; a {@code null} boolean is written as {@code false}. Only the
+     * {@code input} sub-fields ({@code key}, {@code type}, {@code view_role}) are omitted when unset.
      *
      * @implNote This implementation writes the GraphQL variables directly through {@link JSONWriter}
      * and wraps any {@link IOException} from the in-memory writer in an {@link UncheckedIOException}.
@@ -149,52 +156,40 @@ public final class FetchNewsletterMexRequest implements MexStanza.Request.Json {
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (input != null) {
-                writer.writeName("input");
+            writer.writeName("input");
+            writer.writeColon();
+            writer.startObject();
+            if (input.key() != null) {
+                writer.writeName("key");
                 writer.writeColon();
-                writer.startObject();
-                if (input.key() != null) {
-                    writer.writeName("key");
-                    writer.writeColon();
-                    writer.writeString(input.key());
-                }
-                if (input.type() != null) {
-                    writer.writeName("type");
-                    writer.writeColon();
-                    writer.writeString(input.type());
-                }
-                if (input.viewRole() != null) {
-                    writer.writeName("view_role");
-                    writer.writeColon();
-                    writer.writeString(input.viewRole());
-                }
-                writer.endObject();
+                writer.writeString(input.key());
             }
-            if (fetchViewerMetadata != null) {
-                writer.writeName("fetch_viewer_metadata");
+            if (input.type() != null) {
+                writer.writeName("type");
                 writer.writeColon();
-                writer.writeBool(fetchViewerMetadata);
+                writer.writeString(input.type());
             }
-            if (fetchFullImage != null) {
-                writer.writeName("fetch_full_image");
+            if (input.viewRole() != null) {
+                writer.writeName("view_role");
                 writer.writeColon();
-                writer.writeBool(fetchFullImage);
+                writer.writeString(input.viewRole());
             }
-            if (fetchCreationTime != null) {
-                writer.writeName("fetch_creation_time");
-                writer.writeColon();
-                writer.writeBool(fetchCreationTime);
-            }
-            if (fetchWamoSub != null) {
-                writer.writeName("fetch_wamo_sub");
-                writer.writeColon();
-                writer.writeBool(fetchWamoSub);
-            }
-            if (fetchStatusMetadata != null) {
-                writer.writeName("fetch_status_metadata");
-                writer.writeColon();
-                writer.writeBool(fetchStatusMetadata);
-            }
+            writer.endObject();
+            writer.writeName("fetch_viewer_metadata");
+            writer.writeColon();
+            writer.writeBool(fetchViewerMetadata != null && fetchViewerMetadata);
+            writer.writeName("fetch_full_image");
+            writer.writeColon();
+            writer.writeBool(fetchFullImage != null && fetchFullImage);
+            writer.writeName("fetch_creation_time");
+            writer.writeColon();
+            writer.writeBool(fetchCreationTime != null && fetchCreationTime);
+            writer.writeName("fetch_wamo_sub");
+            writer.writeColon();
+            writer.writeBool(fetchWamoSub != null && fetchWamoSub);
+            writer.writeName("fetch_status_metadata");
+            writer.writeColon();
+            writer.writeBool(fetchStatusMetadata != null && fetchStatusMetadata);
             writer.endObject();
             writer.endObject();
 

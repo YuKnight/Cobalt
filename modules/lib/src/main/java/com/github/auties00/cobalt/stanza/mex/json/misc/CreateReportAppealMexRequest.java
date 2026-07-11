@@ -20,8 +20,8 @@ import java.util.Optional;
  * produces a fresh channel-report envelope (report id, status, channel name and JID,
  * reported-content data, plus the appeal sub-object carrying the appeal id and state) which the
  * caller parses through {@link CreateReportAppealMexResponse} and renders as an updated report
- * record. The two GraphQL variables, {@link #reason} and {@link #reportId}, are forwarded
- * verbatim, and either may be {@code null} to omit it from the wire payload.
+ * record. The two declared GraphQL variables, {@link #reason} and {@link #reportId}, are always
+ * materialised on the wire and forwarded verbatim.
  *
  * @implNote This implementation surfaces a missing
  * {@code data.xwa2_create_channel_report_appeal_v2} envelope as
@@ -38,7 +38,7 @@ public final class CreateReportAppealMexRequest implements MexStanza.Request.Jso
      */
     @WhatsAppWebExport(moduleName = "WAWebMexCreateReportAppealJobMutation.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
-    public static final String QUERY_ID = "27283301737925761";
+    public static final String QUERY_ID = "27103316329328467";
 
     /**
      * Holds the GraphQL operation name reported to the MEX perf tracker when this mutation is
@@ -64,11 +64,10 @@ public final class CreateReportAppealMexRequest implements MexStanza.Request.Jso
      * Constructs a new request with the two GraphQL variables.
      *
      * <p>The {@code reason} is the user-typed appeal justification and {@code reportId} identifies
-     * the original channel report. Either argument may be {@code null} to omit the corresponding
-     * variable from the wire payload.
+     * the original channel report. Both variables are always emitted on the wire.
      *
-     * @param reason   the free-form appeal justification, may be {@code null} to omit
-     * @param reportId the identifier of the report being contested, may be {@code null} to omit
+     * @param reason   the free-form appeal justification
+     * @param reportId the identifier of the report being contested
      */
     public CreateReportAppealMexRequest(String reason, String reportId) {
         this.reason = reason;
@@ -95,8 +94,8 @@ public final class CreateReportAppealMexRequest implements MexStanza.Request.Jso
      * {@inheritDoc}
      *
      * @implNote This implementation streams the GraphQL variables through fastjson2's
-     * {@link JSONWriter} and emits each field only when its corresponding constructor argument is
-     * non-{@code null}, then wraps the payload through
+     * {@link JSONWriter}, always materialising both declared {@code reason} and {@code report_id}
+     * variables, then wraps the payload through
      * {@link MexStanza.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexCreateReportAppealJob", exports = "createReportAppeal",
@@ -108,16 +107,12 @@ public final class CreateReportAppealMexRequest implements MexStanza.Request.Jso
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (reason != null) {
-                writer.writeName("reason");
-                writer.writeColon();
-                writer.writeString(reason);
-            }
-            if (reportId != null) {
-                writer.writeName("report_id");
-                writer.writeColon();
-                writer.writeString(reportId);
-            }
+            writer.writeName("reason");
+            writer.writeColon();
+            writer.writeString(reason);
+            writer.writeName("report_id");
+            writer.writeColon();
+            writer.writeString(reportId);
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

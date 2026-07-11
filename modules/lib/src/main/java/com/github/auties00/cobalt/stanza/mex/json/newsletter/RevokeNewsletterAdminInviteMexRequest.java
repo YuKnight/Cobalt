@@ -53,9 +53,9 @@ public final class RevokeNewsletterAdminInviteMexRequest implements MexStanza.Re
     /**
      * Constructs a request targeting the given pending admin invite.
      *
-     * <p>Both arguments are required for the relay to identify the invite. A {@code null} value is
-     * preserved (the corresponding variable is simply omitted from the wire payload) so the relay
-     * returns a validation error rather than this request raising synchronously.
+     * <p>Both arguments are required for the relay to identify the invite and are written
+     * unconditionally as the two declared top-level GraphQL variables, so callers supply non-null
+     * values.
      *
      * @param newsletterId the newsletter Jid whose pending admin invite is being revoked
      * @param userId       the lid-migrated identifier of the invite target
@@ -89,9 +89,9 @@ public final class RevokeNewsletterAdminInviteMexRequest implements MexStanza.Re
      * Serialises this request into a MEX IQ {@link StanzaBuilder} ready to be dispatched through the
      * WhatsApp relay.
      *
-     * <p>Produces the {@code {variables: {newsletter_id?, user_id?}}} payload consumed by the
-     * persisted-query identified by {@link #QUERY_ID}. Both entries are omitted when {@code null} so
-     * the GraphQL schema never receives explicit {@code null} variables.
+     * <p>Produces the {@code {variables: {newsletter_id, user_id}}} payload consumed by the
+     * persisted-query identified by {@link #QUERY_ID}. Both are declared top-level variables and are
+     * always emitted.
      *
      * @implNote This implementation writes the GraphQL variables directly through
      * {@link JSONWriter} and delegates IQ envelope construction to
@@ -110,17 +110,12 @@ public final class RevokeNewsletterAdminInviteMexRequest implements MexStanza.Re
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (newsletterId != null) {
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
-            }
-
-            if (userId != null) {
-                writer.writeName("user_id");
-                writer.writeColon();
-                writer.writeString(userId);
-            }
+            writer.writeName("newsletter_id");
+            writer.writeColon();
+            writer.writeString(newsletterId);
+            writer.writeName("user_id");
+            writer.writeColon();
+            writer.writeString(userId);
             writer.endObject();
             writer.endObject();
 

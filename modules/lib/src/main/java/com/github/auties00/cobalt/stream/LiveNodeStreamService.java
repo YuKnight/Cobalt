@@ -1,13 +1,13 @@
 package com.github.auties00.cobalt.stream;
 
 import com.github.auties00.cobalt.ack.AckSender;
-import com.github.auties00.cobalt.calls2.Calls2Service;
-import com.github.auties00.cobalt.calls2.signaling.CallMessage;
-import com.github.auties00.cobalt.calls2.signaling.CallMessageBuffer;
-import com.github.auties00.cobalt.calls2.signaling.CallSignalingRouter;
-import com.github.auties00.cobalt.calls2.signaling.Calls2CallAckReceiver;
-import com.github.auties00.cobalt.calls2.signaling.Calls2CallReceiver;
-import com.github.auties00.cobalt.calls2.signaling.Calls2TerminateReceiver;
+import com.github.auties00.cobalt.calls.CallsService;
+import com.github.auties00.cobalt.calls.signaling.CallMessage;
+import com.github.auties00.cobalt.calls.signaling.receive.CallMessageBuffer;
+import com.github.auties00.cobalt.calls.signaling.receive.CallSignalingRouter;
+import com.github.auties00.cobalt.calls.signaling.receive.CallAckReceiver;
+import com.github.auties00.cobalt.calls.signaling.receive.CallReceiver;
+import com.github.auties00.cobalt.calls.signaling.receive.TerminateReceiver;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientPasskeyAuthenticator;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
@@ -120,13 +120,13 @@ public final class LiveNodeStreamService implements NodeStreamService {
      *                                         handler for store access,
      *                                         outbound stanza dispatch
      *                                         and listener fan-out
-     * @param calls2Service                    the {@link Calls2Service}
+     * @param callsService                    the {@link CallsService}
      *                                         the {@code <call>} and
      *                                         {@code <terminate>} call
      *                                         signalling handlers forward
      *                                         every decoded inbound action
      *                                         to, and whose
-     *                                         {@link Calls2Service#callExists(String)}
+     *                                         {@link CallsService#callExists(String)}
      *                                         predicate gates whether an
      *                                         inbound payload is processed
      *                                         now or buffered
@@ -185,7 +185,7 @@ public final class LiveNodeStreamService implements NodeStreamService {
      *                                         for answering integrity checkpoints,
      *                                         or {@code null} when none is configured
      */
-    public LiveNodeStreamService(LinkedWhatsAppClient whatsapp, Calls2Service calls2Service, LinkedWhatsAppClientVerificationHandler.Web webVerificationHandler, LidMigrationService lidMigrationService, InactiveGroupLidMigrationService inactiveGroupLidMigrationService, MessageService messageService, ABPropsService abPropsService, DeviceService deviceService, WamService wamService, SnapshotRecoveryService snapshotRecoveryService, WebAppStateService webAppStateService, CompanionPairingService companionPairingService, ShortcakePairingService shortcakePairingService, AckSender ackSender, MediaConnectionService mediaConnectionService, TosService tosService, QuarantineService quarantineService, LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator) {
+    public LiveNodeStreamService(LinkedWhatsAppClient whatsapp, CallsService callsService, LinkedWhatsAppClientVerificationHandler.Web webVerificationHandler, LidMigrationService lidMigrationService, InactiveGroupLidMigrationService inactiveGroupLidMigrationService, MessageService messageService, ABPropsService abPropsService, DeviceService deviceService, WamService wamService, SnapshotRecoveryService snapshotRecoveryService, WebAppStateService webAppStateService, CompanionPairingService companionPairingService, ShortcakePairingService shortcakePairingService, AckSender ackSender, MediaConnectionService mediaConnectionService, TosService tosService, QuarantineService quarantineService, LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator) {
         var offlineNotificationsReporter = new OfflineNotificationsReporter(whatsapp, wamService);
         var callSignalingRouter = new CallSignalingRouter();
         var callMessageBuffer = new CallMessageBuffer();
@@ -207,9 +207,9 @@ public final class LiveNodeStreamService implements NodeStreamService {
         addHandler(result, "receipt", new ReceiptStreamHandler(whatsapp, messageService, wamService, ackSender));
         addHandler(result, "presence", new PresenceStreamHandler(whatsapp));
         addHandler(result, "chatstate", new ChatStateStreamHandler(whatsapp));
-        addHandler(result, "call", new Calls2CallReceiver(whatsapp, ackSender, callSignalingRouter, callMessageBuffer, calls2Service::callExists, (message, from) -> routeInboundCall(calls2Service, message, from), calls2Service::handleOfferNotice));
-        addHandler(result, "terminate", new Calls2TerminateReceiver((terminate, from) -> calls2Service.handleInboundTerminate(terminate, from != null ? from : terminate.callCreator())));
-        addHandler(result, "ack", new Calls2CallAckReceiver(calls2Service));
+        addHandler(result, "call", new CallReceiver(whatsapp, ackSender, callSignalingRouter, callMessageBuffer, callsService::callExists, (message, from) -> routeInboundCall(callsService, message, from), callsService::handleOfferNotice));
+        addHandler(result, "terminate", new TerminateReceiver((terminate, from) -> callsService.handleInboundTerminate(terminate, from != null ? from : terminate.callCreator().orElseThrow())));
+        addHandler(result, "ack", new CallAckReceiver(callsService));
         addHandler(result, "notification", new NotificationStreamHandler(
                 whatsapp,
                 companionPairingService,
@@ -271,8 +271,8 @@ public final class LiveNodeStreamService implements NodeStreamService {
      * Forwards one decoded inbound call signaling action, with its envelope sender, to the call service's
      * inbound seam.
      *
-     * <p>This adapts the {@link Calls2CallReceiver} sink onto
-     * {@link Calls2Service#handleInbound(CallMessage, Jid)}: the receiver surfaces the {@code <call>}
+     * <p>This adapts the {@link CallReceiver} sink onto
+     * {@link CallsService#handleInbound(CallMessage, Jid)}: the receiver surfaces the {@code <call>}
      * envelope's {@code from} attribute alongside the decoded message, and that envelope sender is the
      * authoring device JID the engine consumes as the decryption sender, the peer signaling device, and
      * the companion-device discriminator the terminate guards key on. The envelope {@code from} is used in
@@ -281,12 +281,12 @@ public final class LiveNodeStreamService implements NodeStreamService {
      * authored the terminate; the guards need the true author. A malformed envelope with no {@code from}
      * never reaches this method, because the receiver drops it before the sink.
      *
-     * @param calls2Service the call service the action is forwarded to
+     * @param callsService the call service the action is forwarded to
      * @param message       the decoded inbound action
      * @param from          the {@code <call>} envelope sender, the device JID that authored the action
      */
-    private void routeInboundCall(Calls2Service calls2Service, CallMessage message, Jid from) {
-        calls2Service.handleInbound(message, from);
+    private void routeInboundCall(CallsService callsService, CallMessage message, Jid from) {
+        callsService.handleInbound(message, from);
     }
 
     /**

@@ -28,7 +28,7 @@ public final class FetchNewsletterEnforcementsMexRequest implements MexStanza.Re
      *
      * <p>Sent as the {@code query_id} attribute of the outgoing {@code <query>} child.
      */
-    public static final String QUERY_ID = "26807357005541676";
+    public static final String QUERY_ID = "36570925279217516";
 
     /**
      * Holds the GraphQL operation name reported by WhatsApp Web's MEX perf tracker for this query.
@@ -50,8 +50,8 @@ public final class FetchNewsletterEnforcementsMexRequest implements MexStanza.Re
      * Constructs a request for the enforcement history of the given newsletter under the given
      * locale.
      *
-     * <p>Both arguments are written as top-level GraphQL variables; passing {@code null} for either
-     * skips emitting it and the server then applies its defaults.
+     * <p>Both arguments are written unconditionally as the two declared top-level GraphQL variables;
+     * the relay expects every declared variable to be present, so callers supply non-null values.
      *
      * @param locale       the locale tag for localised policy text
      * @param newsletterId the newsletter Jid
@@ -84,8 +84,8 @@ public final class FetchNewsletterEnforcementsMexRequest implements MexStanza.Re
     /**
      * {@inheritDoc}
      *
-     * <p>Produces the {@code {variables: {locale, newsletter_id}}} payload; either variable is
-     * omitted when its field is {@code null}.
+     * <p>Produces the {@code {variables: {locale, newsletter_id}}} payload; both are declared
+     * top-level variables and are always emitted.
      *
      * @implNote This implementation writes the GraphQL variables directly through a
      * {@link JSONWriter} and wraps any {@link IOException} from the in-memory writer in an
@@ -103,17 +103,12 @@ public final class FetchNewsletterEnforcementsMexRequest implements MexStanza.Re
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (locale != null) {
-                writer.writeName("locale");
-                writer.writeColon();
-                writer.writeString(locale);
-            }
-
-            if (newsletterId != null) {
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
-            }
+            writer.writeName("locale");
+            writer.writeColon();
+            writer.writeString(locale);
+            writer.writeName("newsletter_id");
+            writer.writeColon();
+            writer.writeString(newsletterId);
             writer.endObject();
             writer.endObject();
 

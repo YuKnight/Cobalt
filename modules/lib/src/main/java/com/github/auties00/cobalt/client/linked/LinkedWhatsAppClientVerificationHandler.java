@@ -6,9 +6,7 @@ import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
-import com.github.auties00.cobalt.model.device.identity.LocalPasskeyCredential;
-import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
-import it.auties.qr.QrTerminal;
+import com.github.auties00.qr.QrTerminal;
 
 import java.awt.*;
 import java.io.IOException;
@@ -63,6 +61,52 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
         void handle(String value);
 
         /**
+         * Returns the passkey authenticator this handler carries for answering a server-pushed
+         * integrity checkpoint on the connected session.
+         *
+         * @apiNote
+         * A QR-scan or pairing-code link completes without a passkey, but the connected session can
+         * still be challenged with an integrity checkpoint that only a passkey assertion (or a logout)
+         * satisfies. Override the default through {@link QrCode#withPasskeyAuthenticator} or
+         * {@link PairingCode#withPasskeyAuthenticator}, or the {@code toTerminal}/{@code toFile} factory
+         * overloads that take one, to answer the checkpoint with a different authenticator (for example
+         * a relay to a browser).
+         *
+         * @implSpec
+         * The default renders the assertion's QR on the terminal through
+         * {@link LinkedWhatsAppClientPasskeyAuthenticator#toTerminal()}, so any web client can answer
+         * a checkpoint out of the box by scanning it with the phone that holds the passkey.
+         *
+         * @return the passkey authenticator; never {@code null}
+         */
+        default LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator() {
+            return LinkedWhatsAppClientPasskeyAuthenticator.toTerminal();
+        }
+
+        /**
+         * Encodes a QR payload into a {@link BitMatrix} suitable
+         * for rendering.
+         *
+         * @param qr     the payload to encode
+         * @param size   the side length, in pixels, of the rendered
+         *               square
+         * @param margin the white margin around the rendered code,
+         *               in modules
+         * @return the encoded bit matrix
+         * @throws UnsupportedOperationException if the payload
+         *                                       cannot be encoded
+         *                                       as a QR code
+         */
+        private static BitMatrix createMatrix(String qr, int size, int margin) {
+            try {
+                var writer = new MultiFormatWriter();
+                return writer.encode(qr, BarcodeFormat.QR_CODE, size, size, Map.of(EncodeHintType.MARGIN, margin, EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L));
+            } catch (WriterException exception) {
+                throw new UnsupportedOperationException("Cannot create QR code", exception);
+            }
+        }
+
+        /**
          * A verification handler that renders the QR code produced
          * during the companion-linking flow.
          *
@@ -88,41 +132,20 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
             static QrCode toTerminal() {
                 return qr -> {
                     var matrix = createMatrix(qr, 10, 0);
-                    System.out.println(QrTerminal.toString(matrix, true));
+                    QrTerminal.print(matrix, true);
                 };
             }
 
             /**
-             * Encodes a QR payload into a {@link BitMatrix} suitable
-             * for rendering.
+             * Returns a handler that renders the QR code as ASCII art on standard output and carries the
+             * given passkey authenticator for answering a server-pushed integrity checkpoint.
              *
-             * @apiNote
-             * Used internally by the static factory methods; exposed so
-             * applications can render the matrix via a custom writer.
-             *
-             * @implNote
-             * This implementation pins the error-correction level to
-             * {@link ErrorCorrectionLevel#L} to maximise the data
-             * capacity of the rendered code; WhatsApp's QR payloads are
-             * comfortably within the level-{@code L} budget.
-             *
-             * @param qr     the payload to encode
-             * @param size   the side length, in pixels, of the rendered
-             *               square
-             * @param margin the white margin around the rendered code,
-             *               in modules
-             * @return the encoded bit matrix
-             * @throws UnsupportedOperationException if the payload
-             *                                       cannot be encoded
-             *                                       as a QR code
+             * @param authenticator the passkey authenticator to attach; never {@code null}
+             * @return the terminal-rendering handler carrying the authenticator
+             * @throws NullPointerException if {@code authenticator} is {@code null}
              */
-            static BitMatrix createMatrix(String qr, int size, int margin) {
-                try {
-                    var writer = new MultiFormatWriter();
-                    return writer.encode(qr, BarcodeFormat.QR_CODE, size, size, Map.of(EncodeHintType.MARGIN, margin, EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L));
-                } catch (WriterException exception) {
-                    throw new UnsupportedOperationException("Cannot create QR code", exception);
-                }
+            static QrCode toTerminal(LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
+                return toTerminal().withPasskeyAuthenticator(authenticator);
             }
 
             /**
@@ -174,6 +197,61 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
                         fileConsumer.accept(path);
                     } catch (IOException exception) {
                         throw new UncheckedIOException("Cannot save QR code to file", exception);
+                    }
+                };
+            }
+
+            /**
+             * Returns a handler that writes the QR code to a temporary JPEG file, forwards the file path
+             * to the supplied consumer, and carries the given passkey authenticator for answering a
+             * server-pushed integrity checkpoint.
+             *
+             * @param fileConsumer  the consumer that receives the path of the rendered file
+             * @param authenticator the passkey authenticator to attach; never {@code null}
+             * @return the file-rendering handler carrying the authenticator
+             * @throws NullPointerException if {@code authenticator} is {@code null}
+             * @throws UncheckedIOException if the temporary file cannot be created
+             */
+            static QrCode toFile(QrCode.ToFile fileConsumer, LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
+                return toFile(fileConsumer).withPasskeyAuthenticator(authenticator);
+            }
+
+            /**
+             * Returns a handler that writes the QR code to the supplied path, forwards it to the supplied
+             * consumer, and carries the given passkey authenticator for answering a server-pushed
+             * integrity checkpoint.
+             *
+             * @param path          the destination path where the QR code image is saved
+             * @param fileConsumer  the consumer that receives the path of the rendered file
+             * @param authenticator the passkey authenticator to attach; never {@code null}
+             * @return the file-rendering handler carrying the authenticator
+             * @throws NullPointerException if {@code authenticator} is {@code null}
+             */
+            static QrCode toFile(Path path, QrCode.ToFile fileConsumer, LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
+                return toFile(path, fileConsumer).withPasskeyAuthenticator(authenticator);
+            }
+
+            /**
+             * Returns a handler that renders the QR code exactly as this one does and also carries the
+             * given passkey authenticator, so the linked session can answer a server-pushed integrity
+             * checkpoint instead of logging out.
+             *
+             * @param authenticator the passkey authenticator to attach; never {@code null}
+             * @return a handler that renders as this one and carries the authenticator
+             * @throws NullPointerException if {@code authenticator} is {@code null}
+             */
+            default QrCode withPasskeyAuthenticator(LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
+                Objects.requireNonNull(authenticator, "authenticator must not be null");
+                var self = this;
+                return new QrCode() {
+                    @Override
+                    public void handle(String value) {
+                        self.handle(value);
+                    }
+
+                    @Override
+                    public LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator() {
+                        return authenticator;
                     }
                 };
             }
@@ -264,6 +342,43 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
             static PairingCode toTerminal() {
                 return System.out::println;
             }
+
+            /**
+             * Returns a handler that prints the pairing code on standard output and carries the given
+             * passkey authenticator for answering a server-pushed integrity checkpoint.
+             *
+             * @param authenticator the passkey authenticator to attach; never {@code null}
+             * @return the terminal-printing handler carrying the authenticator
+             * @throws NullPointerException if {@code authenticator} is {@code null}
+             */
+            static PairingCode toTerminal(LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
+                return toTerminal().withPasskeyAuthenticator(authenticator);
+            }
+
+            /**
+             * Returns a handler that prints the pairing code exactly as this one does and also carries
+             * the given passkey authenticator, so the linked session can answer a server-pushed integrity
+             * checkpoint instead of logging out.
+             *
+             * @param authenticator the passkey authenticator to attach; never {@code null}
+             * @return a handler that prints as this one and carries the authenticator
+             * @throws NullPointerException if {@code authenticator} is {@code null}
+             */
+            default PairingCode withPasskeyAuthenticator(LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
+                Objects.requireNonNull(authenticator, "authenticator must not be null");
+                var self = this;
+                return new PairingCode() {
+                    @Override
+                    public void handle(String value) {
+                        self.handle(value);
+                    }
+
+                    @Override
+                    public LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator() {
+                        return authenticator;
+                    }
+                };
+            }
         }
 
         /**
@@ -272,29 +387,15 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
          *
          * @apiNote
          * Passkey linking authenticates the companion with a WebAuthn assertion (driven by the
-         * {@link #authenticator(LinkedWhatsAppStore)} this handler carries) and then runs a key-agreement handshake with
-         * the primary device that yields a short verification code. The inherited
+         * {@link #passkeyAuthenticator()} this handler carries) and then runs a key-agreement handshake
+         * with the primary device that yields a short verification code. The inherited
          * {@link #handle(String)} surfaces that code for the user to compare against the one shown on
          * the primary, and {@link #confirmVerificationCode(String)} reports whether the codes matched.
-         * The same {@link #authenticator(LinkedWhatsAppStore)} also answers a server-pushed integrity checkpoint on the
-         * connected session, so configuring this handler is how a web client opts into passkey
-         * checkpoint satisfaction; a client linked through {@link QrCode} or {@link PairingCode}
-         * carries no authenticator and logs out when challenged.
+         * The same {@link #passkeyAuthenticator()} also answers a server-pushed integrity checkpoint on
+         * the connected session. A client linked through {@link QrCode} or {@link PairingCode} answers a
+         * checkpoint with its own {@link #passkeyAuthenticator()} too, which defaults to a terminal QR.
          */
         non-sealed interface Passkey extends Web {
-            /**
-             * Resolves the authenticator that asserts the account passkey, against the store the
-             * client is being built on.
-             *
-             * <p>Used both to produce the prologue assertion that begins passkey linking and to answer
-             * a server-pushed integrity checkpoint on the connected session. It is resolved once, at
-             * client construction.
-             *
-             * @param store the store the client is being built on
-             * @return the passkey authenticator; never {@code null}
-             */
-            LinkedWhatsAppClientPasskeyAuthenticator authenticator(LinkedWhatsAppStore store);
-
             /**
              * Reports whether the verification code the companion derived matches the one shown on
              * the primary device, gating completion of the link.
@@ -317,64 +418,75 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
             }
 
             /**
-             * Returns a handler whose authenticator drives the host operating system's native
-             * WebAuthn API, mirroring {@link LinkedWhatsAppClientPasskeyAuthenticator#system()}.
+             * Returns a handler whose authenticator drives Warden's cross-device hybrid transport,
+             * rendering each ceremony's QR code as a scannable QR on standard output.
              *
-             * @return the system-backed handler
+             * <p>Shows a {@code FIDO:/...} QR code (printed to standard output, the same way
+             * {@link Web.QrCode#toTerminal()} renders the companion-linking QR); the user scans it with
+             * the phone that holds the {@code whatsapp.com} passkey, which then produces the assertion
+             * over an encrypted tunnel. Use {@link #toQr(Consumer)} to render the QR yourself.
+             *
+             * @return the terminal-rendering handler
              */
-            static Passkey fromSystem() {
-                return from(_ -> LinkedWhatsAppClientPasskeyAuthenticator.system());
+            static Passkey toTerminal() {
+                return of(LinkedWhatsAppClientPasskeyAuthenticator.toTerminal());
             }
 
             /**
-             * Returns a handler that signs with the passkey credential already set on the
-             * client's store, mirroring {@link LinkedWhatsAppClientPasskeyAuthenticator#stored(LinkedWhatsAppStore)}.
+             * Returns a handler whose authenticator drives Warden's cross-device hybrid transport,
+             * handing each ceremony's {@code FIDO:/...} QR payload to the given consumer to render,
+             * backed by {@link LinkedWhatsAppClientPasskeyAuthenticator#toQr(Consumer)}.
              *
-             * @return the stored-credential handler
-             * @throws IllegalStateException at client construction when no passkey credential has
-             *                               been set on the store; pass one to {@link #fromStored(LocalPasskeyCredential)}
-             *                               or set it through
-             *                               {@link com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore#setPasskeyCredential}
+             * <p>The user scans the rendered QR with the phone that holds the {@code whatsapp.com}
+             * passkey, which then produces the assertion over an encrypted tunnel. The returned handler
+             * auto-confirms the short verification code and prints it on standard output; implement
+             * {@link Passkey} directly and override {@link #confirmVerificationCode(String)} to compare
+             * it by hand.
+             *
+             * @param onQrCode the consumer the {@code FIDO:/...} QR payload is handed to for rendering;
+             *                 never {@code null}
+             * @return the QR-rendering handler
+             * @throws NullPointerException if {@code onQrCode} is {@code null}
              */
-            static Passkey fromStored() {
-                return from(store -> {
-                    if (store.signalStore().passkeyCredential().isEmpty()) {
-                        throw new IllegalStateException("No passkey credential is set on the store");
-                    }
-                    return LinkedWhatsAppClientPasskeyAuthenticator.stored(store);
-                });
+            static Passkey toQr(Consumer<String> onQrCode) {
+                Objects.requireNonNull(onQrCode, "onQrCode must not be null");
+                return of(LinkedWhatsAppClientPasskeyAuthenticator.toQr(onQrCode));
             }
 
             /**
-             * Returns a handler that sets the given credential on the client's store and signs with it.
+             * Returns a handler whose authenticator relays each ceremony to an external WebAuthn
+             * authenticator as JSON, backed by
+             * {@link LinkedWhatsAppClientPasskeyAuthenticator#toWebAuthnJson(Function)}.
              *
-             * <p>The credential is persisted into the store's Signal sub-store when the client is
-             * built, so it survives restarts and a later {@link #fromStored()} finds it.
+             * <p>The {@code ceremony} handler forwards the {@code navigator.credentials.get} options JSON
+             * to an authenticator it controls (a browser served from {@code *.whatsapp.com}, the user's
+             * phone, a hardware key, a REST endpoint) and returns the resulting {@code PublicKeyCredential}
+             * JSON. The returned handler auto-confirms the short verification code and prints it on
+             * standard output; implement {@link Passkey} directly and override
+             * {@link #confirmVerificationCode(String)} to compare it by hand.
              *
-             * @param credential the imported credential to set on the store and sign with
-             * @return the stored-credential handler
-             * @throws NullPointerException if {@code credential} is {@code null}
+             * @param ceremony maps the {@code navigator.credentials.get} options JSON to the resulting
+             *                 {@code PublicKeyCredential} JSON; never {@code null}
+             * @return the relay handler
+             * @throws NullPointerException if {@code ceremony} is {@code null}
              */
-            static Passkey fromStored(LocalPasskeyCredential credential) {
-                Objects.requireNonNull(credential, "credential must not be null");
-                return from(store -> {
-                    store.signalStore().setPasskeyCredential(credential);
-                    return LinkedWhatsAppClientPasskeyAuthenticator.stored(store);
-                });
+            static Passkey toWebAuthnJson(Function<String, String> ceremony) {
+                Objects.requireNonNull(ceremony, "ceremony must not be null");
+                return of(LinkedWhatsAppClientPasskeyAuthenticator.toWebAuthnJson(ceremony));
             }
 
             /**
-             * Wraps a store-to-authenticator resolver in an auto-confirming passkey handler that prints
-             * the verification code on standard output.
+             * Wraps an authenticator in an auto-confirming passkey handler that prints the verification
+             * code on standard output.
              *
-             * @param resolver resolves the authenticator against the client's store
+             * @param authenticator the authenticator the handler carries
              * @return the auto-confirming handler
              */
-            private static Passkey from(Function<LinkedWhatsAppStore, LinkedWhatsAppClientPasskeyAuthenticator> resolver) {
+            private static Passkey of(LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
                 return new Passkey() {
                     @Override
-                    public LinkedWhatsAppClientPasskeyAuthenticator authenticator(LinkedWhatsAppStore store) {
-                        return resolver.apply(store);
+                    public LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator() {
+                        return authenticator;
                     }
 
                     @Override

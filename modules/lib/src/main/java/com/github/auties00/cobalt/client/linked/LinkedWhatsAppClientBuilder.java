@@ -560,12 +560,14 @@ public sealed class LinkedWhatsAppClientBuilder {
          * Sets the release channel advertised by the connection in the
          * handshake client payload.
          *
-         * <p>The server resolves per-session feature exposure (including
-         * beta-gated surfaces such as WhatsApp Web calling) partly from this
+         * <p>The server resolves per-session feature exposure partly from this
          * channel: {@link ClientPayload.ClientReleaseChannel#BETA} opts the
          * connection into the public beta cohort, whereas the default
          * {@link ClientPayload.ClientReleaseChannel#RELEASE} only sees
-         * generally available features.
+         * generally available features. The mobile handshake advertises this
+         * stored value directly; the {@link Web} flavour overrides this setter
+         * to also toggle the Web/Desktop beta-program enrolment, keeping the
+         * stored channel and the enrolment flag in sync.
          *
          * @param releaseChannel the release channel, or {@code null} to keep
          *                       the default {@link ClientPayload.ClientReleaseChannel#RELEASE}
@@ -653,11 +655,36 @@ public sealed class LinkedWhatsAppClientBuilder {
             }
 
             /**
-             * {@inheritDoc}
+             * Declares the Web/Desktop beta-program enrolment advertised in
+             * the handshake.
+             *
+             * <p>Passing {@link ClientPayload.ClientReleaseChannel#BETA} opts
+             * this session into the external web beta program; any other value
+             * opts out. The enrolment flag and the stored release channel are
+             * kept in sync, so the handshake advertises the beta channel while
+             * enrolled. Once a session is enrolled (here, through
+             * {@link LinkedWhatsAppClient#enableWebBetaEnrollment()}, or via a
+             * synced {@code external_web_beta} mutation) it starts on the beta
+             * channel automatically, without setting this again.
+             *
+             * @apiNote
+             * This declares enrolment locally only; it does not push the
+             * enrolment to the server or to other linked devices. Use
+             * {@link LinkedWhatsAppClient#enableWebBetaEnrollment()} on a
+             * connected client to enrol and fan the change out.
+             *
+             * @param releaseChannel the release channel; {@code null} keeps the
+             *                       current enrolment
+             * @return this builder, for chaining
              */
             @Override
             public Web releaseChannel(ClientPayload.ClientReleaseChannel releaseChannel) {
-                return (Web) super.releaseChannel(releaseChannel);
+                if (releaseChannel != null) {
+                    var beta = releaseChannel == ClientPayload.ClientReleaseChannel.BETA;
+                    store.syncStore().setExternalWebBeta(beta);
+                    store.accountStore().setReleaseChannel(beta ? ClientPayload.ClientReleaseChannel.BETA : ClientPayload.ClientReleaseChannel.RELEASE);
+                }
+                return this;
             }
 
             /**
@@ -805,8 +832,8 @@ public sealed class LinkedWhatsAppClientBuilder {
              *
              * @apiNote
              * The passkey itself is asserted by the
-             * {@link LinkedWhatsAppClientVerificationHandler.Web.Passkey#authenticator(LinkedWhatsAppStore)
-             * authenticator the handler resolves}; the handler also presents and confirms the resulting
+             * {@link LinkedWhatsAppClientVerificationHandler.Web#passkeyAuthenticator()
+             * authenticator the handler carries}; the handler also presents and confirms the resulting
              * verification code.
              *
              * @param passkeyHandler the passkey verification-code handler

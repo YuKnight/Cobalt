@@ -40,7 +40,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -645,7 +644,7 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
             var request = new LinkedWhatsAppClientPasskeyAuthenticator.Request(
                     LinkedWhatsAppClientPasskeyAuthenticator.Request.WHATSAPP_RP_ID,
                     challenge.passkeyChallenge().orElseThrow(),
-                    List.of(),
+                    new byte[0][],
                     LinkedWhatsAppClientPasskeyAuthenticator.UserVerification.PREFERRED,
                     Duration.ofMinutes(10),
                     "whatsapp-challenge".getBytes(StandardCharsets.UTF_8),

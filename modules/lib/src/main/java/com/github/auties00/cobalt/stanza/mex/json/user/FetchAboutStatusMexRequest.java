@@ -59,11 +59,9 @@ public final class FetchAboutStatusMexRequest implements MexStanza.Request.Json 
      * Constructs a request that asks for the about-status of a single user.
      *
      * <p>The identifier is forwarded verbatim as the {@code user} GraphQL variable; WhatsApp Web
-     * populates it from the bare user portion of the JID, without the server suffix. A {@code null}
-     * value omits the variable entirely.
+     * populates it from the bare user portion of the JID, without the server suffix.
      *
-     * @param user the bare user identifier of the target account, or {@code null} to omit the
-     *             variable
+     * @param user the bare user identifier of the target account
      */
     public FetchAboutStatusMexRequest(String user) {
         this.user = user;
@@ -88,8 +86,8 @@ public final class FetchAboutStatusMexRequest implements MexStanza.Request.Json 
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation serialises {@code {"variables": {"user": <user>}}}, or
-     * {@code {"variables": {}}} when {@code user} is {@code null}, and delegates to
+     * @implNote This implementation always materialises the declared {@code user} variable,
+     * serialising {@code {"variables": {"user": <user>}}}, and delegates to
      * {@link MexStanza.Request.Json#createMexNode(String, String)} to wrap the JSON in the
      * {@code <iq xmlns="w:mex">} envelope.
      */
@@ -102,11 +100,9 @@ public final class FetchAboutStatusMexRequest implements MexStanza.Request.Json 
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (user != null) {
-                writer.writeName("user");
-                writer.writeColon();
-                writer.writeString(user);
-            }
+            writer.writeName("user");
+            writer.writeColon();
+            writer.writeString(user);
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

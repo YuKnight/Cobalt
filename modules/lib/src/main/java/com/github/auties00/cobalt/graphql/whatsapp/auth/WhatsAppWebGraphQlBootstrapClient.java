@@ -46,10 +46,15 @@ import java.util.regex.Pattern;
  * <p>The client owns its own {@link HttpClient} configured with an {@link CookieManager} so cookies
  * accumulate opaquely across the two requests; it follows redirects normally.
  *
- * @implNote The {@code lsd} embedding string in the real bootstrap HTML is not directly captured (an
- * in-page {@code fetch} returned an opaque service-worker body), so this implementation tries the
- * primary {@code ["LSD",[],{"token":"..."}]} pattern first and two fallbacks; if a future bootstrap
- * shape diverges, the patterns are the place to widen. The {@code /auth/token/} POST sends only the
+ * @implNote Every request carries the browser {@code Sec-Fetch-*} metadata headers: the edge in front
+ * of {@code web.whatsapp.com} enforces a Fetch-Metadata resource-isolation policy keyed on
+ * {@code Sec-Fetch-Site} and rejects a request that omits it with {@code 400} before any application
+ * logic runs, so {@link #fetchLsd()} sends the top-level-navigation set ({@code Sec-Fetch-Site: none},
+ * {@code navigate}, {@code document}) and {@link #exchange(CanonicalCredentials, String)} sends the
+ * same-origin XHR set ({@code Sec-Fetch-Site: same-origin}, {@code cors}, {@code empty}) with
+ * {@code Origin}/{@code Referer}. With those headers the {@code GET /} returns the full bootstrap HTML;
+ * the {@code lsd} token is scraped with the primary {@code ["LSD",[],{"token":"..."}]} pattern and two
+ * fallbacks, so a future bootstrap shape is widened there. The {@code /auth/token/} POST sends only the
  * minimal X-Controller parameter set ({@code __a}, {@code __user}, {@code lsd}, {@code jazoest}) plus
  * the four exchange fields, mirroring what the relay capture proved sufficient on {@code /graphql/};
  * if the server rejects the minimal set on {@code /auth/token/}, the FB bootloader parameters
@@ -146,6 +151,12 @@ public final class WhatsAppWebGraphQlBootstrapClient {
         var request = HttpRequest.newBuilder(BASE)
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .header("Accept-Language", "en-US,en;q=0.9")
+                .header("Sec-Fetch-Site", "none")
+                .header("Sec-Fetch-Mode", "navigate")
+                .header("Sec-Fetch-Dest", "document")
+                .header("Sec-Fetch-User", "?1")
+                .header("Upgrade-Insecure-Requests", "1")
                 .GET()
                 .build();
 
@@ -231,6 +242,11 @@ public final class WhatsAppWebGraphQlBootstrapClient {
                 .header("User-Agent", USER_AGENT)
                 .header("X-FB-LSD", lsd)
                 .header("X-ASBD-ID", X_ASBD_ID)
+                .header("Origin", "https://web.whatsapp.com")
+                .header("Referer", "https://web.whatsapp.com/")
+                .header("Sec-Fetch-Site", "same-origin")
+                .header("Sec-Fetch-Mode", "cors")
+                .header("Sec-Fetch-Dest", "empty")
                 .POST(HttpRequest.BodyPublishers.ofString(encodeBody(credentials, lsd)))
                 .build();
 

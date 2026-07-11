@@ -171,4 +171,37 @@ class MessageReceiveStanzaParserTest {
         assertFalse(parsed.isHsm(),
                 "no <hsm> child means isHsm=false");
     }
+
+    @Test
+    @DisplayName("parse: plain recipient attribute on a self-echo names the peer, not from")
+    void parseSelfEchoRecipient() {
+        var msg = new StanzaBuilder()
+                .description("message")
+                .attribute("id", "3EB0")
+                .attribute("t", 1700000000L)
+                .attribute("from", SELF_PN)
+                .attribute("recipient", PEER_PN)
+                .attribute("type", "text")
+                .build();
+        var parsed = MessageReceiveStanzaParser.parse(msg, SELF_PN, SELF_LID);
+        assertEquals(PEER_PN, parsed.recipient().orElseThrow(),
+                "plain recipient attribute must carry the peer the echo was addressed to");
+        assertEquals(SELF_PN, parsed.chatJid(),
+                "chatJid stays the raw from JID; the recipient is tracked separately");
+    }
+
+    @Test
+    @DisplayName("parse: recipient is empty when the attribute is absent")
+    void parseRecipientAbsent() {
+        var msg = new StanzaBuilder()
+                .description("message")
+                .attribute("id", "3EB0")
+                .attribute("t", 1700000000L)
+                .attribute("from", PEER_PN)
+                .attribute("type", "text")
+                .build();
+        var parsed = MessageReceiveStanzaParser.parse(msg, SELF_PN, SELF_LID);
+        assertTrue(parsed.recipient().isEmpty(),
+                "no recipient attribute means recipient() is empty");
+    }
 }

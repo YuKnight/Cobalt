@@ -62,7 +62,7 @@ public final class FetchTextStatusListMexRequest implements MexStanza.Request.Js
      * {@code [{jid, last_update_time}]} array the relay expects; the array is not materialised on
      * the caller's behalf.
      *
-     * @param input the serialised batch payload, or {@code null} to omit the variable
+     * @param input the serialised batch payload
      */
     public FetchTextStatusListMexRequest(String input) {
         this.input = input;
@@ -87,8 +87,8 @@ public final class FetchTextStatusListMexRequest implements MexStanza.Request.Js
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"variables": {"input": <input>}}}, or
-     * {@code {"variables": {}}} when {@code input} is {@code null}, and defers envelope construction
+     * @implNote This implementation always materialises the declared {@code input} variable, emitting
+     * {@code {"variables": {"input": <input>}}}, and defers envelope construction
      * to {@link MexStanza.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexFetchTextStatusListJob", exports = "mexGetTextStatusList",
@@ -100,11 +100,9 @@ public final class FetchTextStatusListMexRequest implements MexStanza.Request.Js
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (input != null) {
-                writer.writeName("input");
-                writer.writeColon();
-                writer.writeString(input);
-            }
+            writer.writeName("input");
+            writer.writeColon();
+            writer.writeString(input);
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

@@ -37,14 +37,14 @@ import java.util.regex.Pattern;
  * (no facebook.com browser login), so an embedder must acquire it through that channel and pass it
  * here.
  *
- * @implNote This implementation models the {@code access_token}-bearing graph flavor (Path A) used by
+ * @implNote This implementation models the {@code access_token}-bearing graph flavor used by
  * {@code WAWebRelayEnvironment} for the facebook environment type, which sends an
  * {@code access_token}+{@code doc_id}+{@code variables}+{@code locale} body plus the optional
  * {@code X-WA-Device-ID} header. The Comet Path-B parameters WhatsApp Web's ad-creation flows add
  * through the relay-fb network layer ({@code fb_dtsg}, {@code fb_api_caller_class},
  * {@code fb_api_req_friendly_name}, {@code server_timestamps}) are intentionally omitted: they
  * require a {@code facebook.com} Comet web session that a linked WhatsApp client never establishes.
- * The Relay {@code actorID}/{@code bp_id} is likewise not sent on Path A; WhatsApp Web uses it only as
+ * The Relay {@code actorID}/{@code bp_id} is likewise not sent; WhatsApp Web uses it only as
  * a client-side Relay store-scoping option, not as a wire field.
  */
 @WhatsAppWebModule(moduleName = "CometRelay")

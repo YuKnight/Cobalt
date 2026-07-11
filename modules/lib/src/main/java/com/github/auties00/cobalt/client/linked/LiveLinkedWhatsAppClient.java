@@ -10,14 +10,14 @@ import com.github.auties00.cobalt.bot.BotCertificateRevocationService;
 import com.github.auties00.cobalt.bot.BotSignatureVerificationService;
 import com.github.auties00.cobalt.bot.LiveBotCertificateRevocationService;
 import com.github.auties00.cobalt.bot.LiveBotSignatureVerificationService;
-import com.github.auties00.cobalt.calls2.Calls2Service;
-import com.github.auties00.cobalt.calls2.LiveCalls2Service;
-import com.github.auties00.cobalt.calls2.core.Calls2EngineAssembler;
-import com.github.auties00.cobalt.calls2.stream.AudioInput;
-import com.github.auties00.cobalt.calls2.stream.AudioOutput;
-import com.github.auties00.cobalt.calls2.stream.VideoInput;
-import com.github.auties00.cobalt.calls2.stream.VideoOutput;
-import com.github.auties00.cobalt.calls2.sync.Calls2CallLogSync;
+import com.github.auties00.cobalt.calls.CallsService;
+import com.github.auties00.cobalt.calls.LiveCallsService;
+import com.github.auties00.cobalt.calls.engine.EngineAssembler;
+import com.github.auties00.cobalt.calls.stream.AudioInput;
+import com.github.auties00.cobalt.calls.stream.AudioOutput;
+import com.github.auties00.cobalt.calls.stream.VideoInput;
+import com.github.auties00.cobalt.calls.stream.VideoOutput;
+import com.github.auties00.cobalt.calls.telemetry.CallLogSync;
 import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
 import com.github.auties00.cobalt.ctwa.CtwaConversionSignalService;
 import com.github.auties00.cobalt.ctwa.LiveCtwaConversionSignalService;
@@ -468,7 +468,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     /**
      * The call engine
      */
-    private final Calls2Service calls2Service;
+    private final CallsService callsService;
     /**
      * The strategy that decides how the client should react to errors
      * raised by any subsystem.
@@ -661,8 +661,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
     /**
      * The passkey authenticator used for passkey companion linking and the server-pushed integrity
-     * checkpoint, taken from the {@link LinkedWhatsAppClientVerificationHandler.Web.Passkey} handler,
-     * or {@code null} when the verification handler is not a passkey handler.
+     * checkpoint, taken from the {@link LinkedWhatsAppClientVerificationHandler.Web} handler through
+     * {@link LinkedWhatsAppClientVerificationHandler.Web#passkeyAuthenticator()}, or {@code null} for a
+     * mobile client that has no web verification handler.
      */
     private final LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator;
 
@@ -807,7 +808,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * pushing the {@code call_log} app-state mutation, bound onto the engine's lifecycle controller so a
      * call end is logged and replicated.
      */
-    private final Calls2CallLogSync calls2CallLogSync;
+    private final CallLogSync calls2CallLogSync;
     /**
      * Factory that builds outgoing NUX (onboarding-hint) sync mutations.
      */
@@ -966,19 +967,6 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     private static final Duration TC_TOKEN_TIMEOUT = Duration.ofSeconds(5);
 
     /**
-     * Holds the bound on how long a disconnect waits for the final WAM telemetry flush before
-     * proceeding with the teardown.
-     *
-     * @implNote This implementation uses two seconds: a healthy connection ships the final
-     * {@code w:stats} buffer well within it, while a disconnect driven by an unresponsive or
-     * half-dead session (a logout the server never answers) is not held up. The flush runs on a
-     * daemon virtual thread joined with this bound, mirroring {@link #flushDirtyCollectionsWithTimeout()};
-     * if the join expires the upload is left to unblock when the socket is torn down a few lines later
-     * (its pending response future is completed in {@link #disconnect0(WhatsAppClientDisconnectReason, boolean)}).
-     */
-    private static final Duration WAM_CLOSE_TIMEOUT = Duration.ofSeconds(2);
-
-    /**
      * Maps a peer's user JID to the waiter of the call currently blocked in
      * {@link #queryTrustedContactToken(JidProvider, Duration)} for that peer.
      *
@@ -1015,9 +1003,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     LiveLinkedWhatsAppClient(LinkedWhatsAppStore store, LinkedWhatsAppClientVerificationHandler.Web webVerificationHandler, WhatsAppLinkedClientErrorHandler errorHandler) {
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.errorHandler = Objects.requireNonNull(errorHandler, "errorHandler cannot be null");
-        this.passkeyAuthenticator = webVerificationHandler instanceof LinkedWhatsAppClientVerificationHandler.Web.Passkey passkeyHandler
-                ? passkeyHandler.authenticator(store)
-                : null;
+        this.passkeyAuthenticator = webVerificationHandler == null
+                ? null
+                : webVerificationHandler.passkeyAuthenticator();
         if ((store.accountStore().clientType() == LinkedWhatsAppClientType.WEB) == (webVerificationHandler == null)) {
             throw new IllegalArgumentException("webVerificationHandler cannot be null when client type is WEB");
         }
@@ -1110,15 +1098,15 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         this.pendingSocketRequests = new ConcurrentHashMap<>();
         this.companionPairingService = new LiveCompanionPairingService(this, webVerificationHandler);
         this.shortcakePairingService = new LiveShortcakePairingService(this, webVerificationHandler, passkeyAuthenticator);
-        var calls2EventBus = new com.github.auties00.cobalt.calls2.core.LiveCallEventBus(this);
-        var calls2Engine = Calls2EngineAssembler.assemble(this, messageEncryption, messageService, deviceService, store, abPropsService, calls2EventBus);
-        this.calls2CallLogSync = new Calls2CallLogSync(this, callLogMutationFactory, webAppStateService);
+        var calls2EventBus = new com.github.auties00.cobalt.calls.engine.event.LiveCallEventBus(this);
+        var calls2Engine = EngineAssembler.assemble(this, messageEncryption, messageService, deviceService, store, abPropsService, calls2EventBus);
+        this.calls2CallLogSync = new CallLogSync(this, callLogMutationFactory, webAppStateService);
         calls2Engine.bindCallLogSink(calls2CallLogSync::recordEndOfCall);
-        var liveCalls2Service = new LiveCalls2Service(this, wamService, messageService, calls2Engine, calls2EventBus);
-        this.calls2Service = liveCalls2Service;
+        var liveCalls2Service = new LiveCallsService(this, wamService, messageService, calls2Engine, calls2EventBus);
+        this.callsService = liveCalls2Service;
         calls2Engine.bindResultSink(liveCalls2Service::recordCallResult);
         var ackSender = new AckSender(this);
-        this.nodeStreamService = new LiveNodeStreamService(this, calls2Service, webVerificationHandler, lidMigrationService, inactiveGroupLidMigrationService, messageService, abPropsService, deviceService, wamService, snapshotRecoveryService, webAppStateService, companionPairingService, shortcakePairingService, ackSender, mediaConnectionService, tosService, quarantineService, passkeyAuthenticator);
+        this.nodeStreamService = new LiveNodeStreamService(this, callsService, webVerificationHandler, lidMigrationService, inactiveGroupLidMigrationService, messageService, abPropsService, deviceService, wamService, snapshotRecoveryService, webAppStateService, companionPairingService, shortcakePairingService, ackSender, mediaConnectionService, tosService, quarantineService, passkeyAuthenticator);
         this.disconnecting = new AtomicBoolean();
         this.state = new AtomicReference<>(ConnectionState.ACTIVE);
         this.connectivityMonitor = ConnectivityMonitor.create();
@@ -1456,7 +1444,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             flushDirtyCollectionsWithTimeout();
         }
 
-        closeWamServiceWithTimeout();
+        closeWamService();
 
         if (reason != WhatsAppClientDisconnectReason.RECONNECTING) {
             state.set(ConnectionState.TERMINATED);
@@ -1572,43 +1560,19 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     /**
-     * Closes the WAM telemetry service on a daemon virtual thread joined with {@link #WAM_CLOSE_TIMEOUT}
-     * so a final telemetry upload cannot stall the disconnect.
+     * Closes the WAM telemetry service inline as part of the disconnect.
      *
-     * <p>{@link WamService#close()} cancels the recurring schedulers and then attempts one final
-     * {@code w:stats} upload of any buffered events. That upload blocks on a server response, and on a
-     * disconnect the response future is only completed once the socket is torn down later in
-     * {@link #disconnect0(WhatsAppClientDisconnectReason, boolean)}, so running the close inline would
-     * make the teardown wait for the upload's own request timeout. Running it on a joined daemon thread
-     * bounds the wait: a healthy session finishes within the timeout, and a session whose server never
-     * answers proceeds anyway, the upload unblocking when its pending request is completed during the
-     * socket teardown. Exceptions from the close are swallowed because the disconnect must not be
-     * blocked by a telemetry failure.
+     * <p>{@link WamService#close()} cancels the recurring schedulers and persists any buffered events
+     * to the durable WAM store without a network upload, so the next session recovers and ships them
+     * on a live connection. Because the close performs only local persistence and never awaits a
+     * {@code w:stats} acknowledgement, it cannot stall the teardown and needs no bounding thread.
+     * Exceptions are swallowed because a telemetry-persistence failure must not block the disconnect.
      */
-    private void closeWamServiceWithTimeout() {
-        var closeThread = Thread.ofVirtual()
-                .name("CobaltWamClose")
-                .unstarted(() -> {
-                    try {
-                        wamService.close();
-                    } catch (Exception _) {
-                        // Best-effort: don't let a telemetry-flush failure block disconnect
-                    }
-                });
-        closeThread.start();
-
+    private void closeWamService() {
         try {
-            closeThread.join(WAM_CLOSE_TIMEOUT.toMillis());
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            return;
-        }
-
-        if (closeThread.isAlive()) {
-            System.getLogger(LiveLinkedWhatsAppClient.class.getName())
-                    .log(System.Logger.Level.WARNING,
-                            "WAM telemetry flush did not complete within {0}ms, proceeding with disconnect",
-                            WAM_CLOSE_TIMEOUT.toMillis());
+            wamService.close();
+        } catch (Exception _) {
+            // Best-effort: don't let a telemetry-persistence failure block disconnect
         }
     }
 
@@ -3645,28 +3609,46 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (target.hasGroupOrCommunityServer()) {
             Objects.requireNonNull(audioOut, "audioOut cannot be null");
             Objects.requireNonNull(audioIn, "audioIn cannot be null");
-            var metadata = queryGroupInfo(target)
-                    .orElseThrow(() -> new IllegalArgumentException("Cannot resolve metadata for group " + target));
-            var selfJid = store.accountStore()
-                    .jid()
-                    .map(Jid::toUserJid)
-                    .orElse(null);
-            var selfLid = store.accountStore()
-                    .lid()
-                    .map(Jid::toUserJid)
-                    .orElse(null);
-            var participants = metadata.participants()
-                    .stream()
-                    .map(GroupParticipant::userJid)
-                    .filter(jid -> !jid.toUserJid().equals(selfJid) && !jid.toUserJid().equals(selfLid))
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
-            if (participants.isEmpty()) {
-                throw new IllegalArgumentException("Group " + target + " has no member other than this account to call");
-            }
-            return calls2Service.placeGroupCall(participants, target, audioOut, audioIn, videoOut, videoIn);
+            var participants = resolveGroupCallParticipants(target);
+            return callsService.placeGroupCall(participants, target, audioOut, audioIn, videoOut, videoIn);
         } else {
-            return calls2Service.placeCall(target, audioOut, audioIn, videoOut, videoIn);
+            return callsService.placeCall(target, audioOut, audioIn, videoOut, videoIn);
         }
+    }
+
+    /**
+     * Resolves the other members of a group as the participant set for a group call, excluding this account.
+     *
+     * <p>Queries the group's metadata through {@link #queryGroupInfo(JidProvider)} and collects every member
+     * other than this account's phone-number and LID identities, in metadata order. This is the participant
+     * roster a group call is placed or joined against, so the caller never enumerates the members and the
+     * offer is fanned to the group with this set inlined.
+     *
+     * @param group the group or community JID whose members are resolved
+     * @return the group members other than this account, in metadata order
+     * @throws IllegalArgumentException if the group's metadata cannot be resolved, or the group has no member
+     *                                  other than this account
+     */
+    private Set<Jid> resolveGroupCallParticipants(Jid group) {
+        var metadata = queryGroupInfo(group)
+                .orElseThrow(() -> new IllegalArgumentException("Cannot resolve metadata for group " + group));
+        var selfJid = store.accountStore()
+                .jid()
+                .map(Jid::toUserJid)
+                .orElse(null);
+        var selfLid = store.accountStore()
+                .lid()
+                .map(Jid::toUserJid)
+                .orElse(null);
+        var participants = metadata.participants()
+                .stream()
+                .map(GroupParticipant::userJid)
+                .filter(jid -> !jid.toUserJid().equals(selfJid) && !jid.toUserJid().equals(selfLid))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (participants.isEmpty()) {
+            throw new IllegalArgumentException("Group " + group + " has no member other than this account to call");
+        }
+        return participants;
     }
 
     /** {@inheritDoc} */
@@ -3683,7 +3665,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                            VideoOutput videoOut, VideoInput videoIn) {
         requireWebClient();
         Objects.requireNonNull(offer, "offer cannot be null");
-        return calls2Service.accept(offer, audioOut, audioIn, videoOut, videoIn);
+        return callsService.accept(offer, audioOut, audioIn, videoOut, videoIn);
     }
 
     /** {@inheritDoc} */
@@ -3699,7 +3681,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void rejectCall(IncomingCall offer, CallEndReason reason) {
         Objects.requireNonNull(offer, "offer cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
-        calls2Service.reject(offer, reason);
+        callsService.reject(offer, reason);
     }
 
     /** {@inheritDoc} */
@@ -3714,7 +3696,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (store.chatStore().findCallById(callId).isEmpty()) {
             throw new NoSuchElementException("No call with id " + callId);
         }
-        calls2Service.terminate(callId, reason);
+        callsService.terminate(callId, reason);
     }
 
     /** {@inheritDoc} */
@@ -3722,7 +3704,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void terminateCall(Call call, CallEndReason reason) {
         Objects.requireNonNull(call, "call cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
-        calls2Service.terminate(call.callId(), reason);
+        callsService.terminate(call.callId(), reason);
     }
 
     /** {@inheritDoc} */
@@ -3734,14 +3716,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (store.chatStore().findCallById(callId).isEmpty()) {
             throw new NoSuchElementException("No call with id " + callId);
         }
-        calls2Service.preaccept(callId);
+        callsService.preaccept(callId);
     }
 
     /** {@inheritDoc} */
     @Override
     public void preacceptCall(IncomingCall call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.preaccept(call.callId());
+        callsService.preaccept(call.callId());
     }
 
     /** {@inheritDoc} */
@@ -3777,7 +3759,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         Objects.requireNonNull(callId, "callId cannot be null");
         var call = store.chatStore().findCallById(callId)
                 .orElseThrow(() -> new NoSuchElementException("No call with id " + callId));
-        calls2Service.sendMute(call.peer(), call.peer(), callId, muted);
+        callsService.sendMute(call.peer(), call.peer(), callId, muted);
     }
 
     /** {@inheritDoc} */
@@ -3804,7 +3786,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private void setCallMute(Call call, boolean muted) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.sendMute(call.peer(), call.creator(), call.callId(), muted);
+        callsService.sendMute(call.peer(), call.creator(), call.callId(), muted);
     }
 
     /** {@inheritDoc} */
@@ -3833,44 +3815,44 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      */
     private void setCallVideo(Call call, boolean videoEnabled) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.sendVideoState(call.peer(), call.creator(), call.callId(), videoEnabled);
+        callsService.sendVideoState(call.peer(), call.creator(), call.callId(), videoEnabled);
     }
 
     /** {@inheritDoc} */
     @Override
     public void requestCallVideoUpgrade(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.sendVideoUpgradeRequest(call.peer(), call.creator(), call.callId());
-        calls2Service.startLocalVideo(call.callId());
+        callsService.sendVideoUpgradeRequest(call.peer(), call.creator(), call.callId());
+        callsService.startLocalVideo(call.callId());
     }
 
     /** {@inheritDoc} */
     @Override
     public void acceptCallVideoUpgrade(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.sendVideoState(call.peer(), call.creator(), call.callId(), true);
-        calls2Service.startLocalVideo(call.callId());
+        callsService.sendVideoState(call.peer(), call.creator(), call.callId(), true);
+        callsService.startLocalVideo(call.callId());
     }
 
     /** {@inheritDoc} */
     @Override
     public void rejectCallVideoUpgrade(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.sendVideoUpgradeReject(call.peer(), call.creator(), call.callId());
+        callsService.sendVideoUpgradeReject(call.peer(), call.creator(), call.callId());
     }
 
     /** {@inheritDoc} */
     @Override
     public void startCallScreenShare(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.startScreenShare(call.callId());
+        callsService.startScreenShare(call.callId());
     }
 
     /** {@inheritDoc} */
     @Override
     public void stopCallScreenShare(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.stopScreenShare(call.callId());
+        callsService.stopScreenShare(call.callId());
     }
 
     /** {@inheritDoc} */
@@ -3878,7 +3860,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void sendCallReaction(Call call, String emoji) {
         Objects.requireNonNull(call, "call cannot be null");
         Objects.requireNonNull(emoji, "emoji cannot be null");
-        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
+        callsService.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.Reaction(emoji));
     }
 
@@ -3886,7 +3868,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public void raiseCallHand(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
+        callsService.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.RaiseHand());
     }
 
@@ -3894,7 +3876,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public void lowerCallHand(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
+        callsService.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.LowerHand());
     }
 
@@ -3903,7 +3885,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void requestCallPeerMute(Call call, JidProvider participant) {
         Objects.requireNonNull(call, "call cannot be null");
         Objects.requireNonNull(participant, "participant cannot be null");
-        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
+        callsService.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.PeerMuteRequest(participant.toJid().toString(), Optional.empty()));
     }
 
@@ -3911,7 +3893,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public void requestCallKeyFrame(Call call) {
         Objects.requireNonNull(call, "call cannot be null");
-        calls2Service.sendInteraction(call.peer(), call.creator(), call.callId(),
+        callsService.sendInteraction(call.peer(), call.creator(), call.callId(),
                 new CallInteraction.KeyFrameRequest());
     }
 
@@ -3928,7 +3910,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!group.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community JID");
         }
-        calls2Service.sendGroupParticipants(callId, group, callCreatorSelfJid(), toCallParticipantLids(participants), true);
+        callsService.sendGroupParticipants(callId, group, callCreatorSelfJid(), toCallParticipantLids(participants), true);
     }
 
     /** {@inheritDoc} */
@@ -3939,7 +3921,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!call.peer().hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community JID");
         }
-        calls2Service.sendGroupParticipants(call.callId(), call.peer(), callCreatorSelfJid(), toCallParticipantLids(participants), true);
+        callsService.sendGroupParticipants(call.callId(), call.peer(), callCreatorSelfJid(), toCallParticipantLids(participants), true);
     }
 
     /** {@inheritDoc} */
@@ -3955,7 +3937,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!group.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community JID");
         }
-        calls2Service.sendGroupParticipants(callId, group, callCreatorSelfJid(), toCallParticipantLids(participants), false);
+        callsService.sendGroupParticipants(callId, group, callCreatorSelfJid(), toCallParticipantLids(participants), false);
     }
 
     /** {@inheritDoc} */
@@ -3966,7 +3948,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!call.peer().hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community JID");
         }
-        calls2Service.sendGroupParticipants(call.callId(), call.peer(), callCreatorSelfJid(), toCallParticipantLids(participants), false);
+        callsService.sendGroupParticipants(call.callId(), call.peer(), callCreatorSelfJid(), toCallParticipantLids(participants), false);
     }
 
     /**
@@ -4320,13 +4302,65 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         Objects.requireNonNull(audioOut, "audioOut cannot be null");
         Objects.requireNonNull(audioIn, "audioIn cannot be null");
         var ref = parseCallLink(link);
-        return calls2Service.joinCallLink(ref.token(), ref.media(), audioOut, audioIn, videoOut, videoIn);
+        return callsService.joinCallLink(ref.token(), ref.media(), audioOut, audioIn, videoOut, videoIn);
     }
 
     /** {@inheritDoc} */
     @Override
     public Call joinCallLink(URI link, AudioOutput audioOut, AudioInput audioIn) {
         return joinCallLink(link, audioOut, audioIn, null, null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @WhatsAppWebExport(moduleName = "WAWebVoipStartCall", exports = "joinOngoingCallByCallId",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn,
+                              VideoOutput videoOut, VideoInput videoIn) {
+        requireWebClient();
+        Objects.requireNonNull(call, "call cannot be null");
+        if (!call.group()) {
+            throw new IllegalArgumentException(
+                    "joinGroupCall is for group calls; call " + call.callId() + " is one-to-one");
+        }
+        return callsService.joinGroupCall(call, audioOut, audioIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn) {
+        return joinGroupCall(call, audioOut, audioIn, null, null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @WhatsAppWebExport(moduleName = "WAWebVoipStartCall", exports = "joinOngoingCallByCallId",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn,
+                              VideoOutput videoOut, VideoInput videoIn) {
+        requireWebClient();
+        var groupJid = Objects.requireNonNull(group, "group cannot be null").toJid();
+        if (!groupJid.hasGroupOrCommunityServer()) {
+            throw new IllegalArgumentException(
+                    "joinGroupCall requires a group or community JID; got " + groupJid);
+        }
+        // A group hosts at most one ongoing call at a time, so the single tracked received group offer for the
+        // group is the one to join; an offline offer_notice (no relay) is not joinable and is excluded.
+        var offer = store.chatStore()
+                .calls()
+                .stream()
+                .filter(IncomingCall::group)
+                .filter(candidate -> !candidate.offlineOffer())
+                .filter(candidate -> candidate.groupJid().map(groupJid::equals).orElse(false))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException("No ongoing group call to join for " + groupJid));
+        return joinGroupCall(offer, audioOut, audioIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn) {
+        return joinGroupCall(group, audioOut, audioIn, null, null);
     }
 
     /**
@@ -4375,7 +4409,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebNewsletterMetadataJob", exports = "getAllNewslettersMetadata",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void refreshNewsletters() {
-        var request = new FetchAllNewslettersMetadataMexRequest(Boolean.TRUE);
+        var request = new FetchAllNewslettersMetadataMexRequest(true, false);
         var response = sendNode(request);
         FetchAllNewslettersMetadataMexResponse.of(response).ifPresent(r -> {
             for (var item : r.items()) {
@@ -6285,7 +6319,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.DIRECT)
     public void addNewsletterPaidPartnershipLabel(NewsletterMessageInfo message) {
         var newsletter = newsletterJid(message);
-        var request = new NewsletterAddPaidPartnershipLabelMexRequest(newsletter.toString(), String.valueOf(message.serverId()));
+        var request = new NewsletterAddPaidPartnershipLabelMexRequest(newsletter.toString(), String.valueOf(message.serverId()), "MESSAGE");
         var response = sendNode(request);
         NewsletterAddPaidPartnershipLabelMexResponse.of(response)
                 .orElseThrow(() -> new WhatsAppServerRuntimeException("Missing newsletter paid-partnership label response: %s".formatted(response)));
@@ -6455,7 +6489,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebMexFetchNewsletterReportsJob", exports = "mexFetchNewsletterReports",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<NewsletterReport> queryNewsletterReports() {
-        var request = new FetchNewsletterReportsMexRequest();
+        var request = new FetchNewsletterReportsMexRequest(store.accountStore().locale().orElse("en_US"));
         var response = sendNode(request);
         var parsed = FetchNewsletterReportsMexResponse.of(response)
                 .orElseThrow(() -> new WhatsAppServerRuntimeException("Missing newsletter reports response: %s".formatted(response)));
@@ -12418,11 +12452,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (newOwner.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a user JID for newOwner");
         }
-        var input = JSON.toJSONString(Map.of(
-                "group_id", community.toString(),
-                "new_owner_id", newOwner.toString()
-        ));
-        var request = new TransferCommunityOwnershipMexRequest(input);
+        var request = new TransferCommunityOwnershipMexRequest(community.toString(), newOwner.toString());
         var response = sendNode(request);
         var parsed = TransferCommunityOwnershipMexResponse.of(response)
                 .orElseThrow(() -> new WhatsAppServerRuntimeException("Missing transfer-community-ownership response: %s".formatted(response)));
@@ -12526,7 +12556,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (!subgroup.hasGroupOrCommunityServer()) {
             throw new IllegalArgumentException("Expected a group/community");
         }
-        var request = new QuerySubgroupParticipantCountMexRequest(subgroup.toString());
+        var community = queryGroupInfo(subgroup)
+                .flatMap(GroupMetadata::parentCommunityJid)
+                .orElseThrow(() -> new WhatsAppServerRuntimeException("Cannot resolve the parent community of subgroup %s".formatted(subgroup)));
+        var request = new QuerySubgroupParticipantCountMexRequest(community.toString(), subgroup.toString());
         var response = sendNode(request);
         return QuerySubgroupParticipantCountMexResponse.of(response)
                 .flatMap(QuerySubgroupParticipantCountMexResponse::subGroups)
@@ -17792,16 +17825,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @throws WhatsAppSessionException.Closed if the socket is closed
      */
     private void setWebBetaEnrollment(boolean enrolled) {
-        var releaseChannel = store.accountStore().releaseChannel();
-        var alreadyEnrolled = enrolled
-                ? releaseChannel == ClientPayload.ClientReleaseChannel.BETA
-                : releaseChannel == ClientPayload.ClientReleaseChannel.RELEASE;
-        if(alreadyEnrolled) {
+        if (store.syncStore().externalWebBeta() == enrolled) {
             return;
         }
 
         var mutation = externalWebBetaMutationFactory.getExternalWebBetaMutation(enrolled);
         webAppStateService.pushPatches(ExternalWebBetaAction.COLLECTION_NAME, List.of(mutation));
+        store.syncStore().setExternalWebBeta(enrolled);
         store.accountStore().setReleaseChannel(enrolled ? ClientPayload.ClientReleaseChannel.BETA : ClientPayload.ClientReleaseChannel.RELEASE);
         disconnect(WhatsAppClientDisconnectReason.RECONNECTING);
     }

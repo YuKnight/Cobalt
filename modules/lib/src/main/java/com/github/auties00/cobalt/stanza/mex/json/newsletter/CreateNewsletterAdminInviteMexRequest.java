@@ -83,9 +83,8 @@ public final class CreateNewsletterAdminInviteMexRequest implements MexStanza.Re
     /**
      * {@inheritDoc}
      *
-     * <p>Produces the {@code {variables: {newsletter_id, user_id}}} payload; either field is
-     * omitted when its backing string is {@code null} so the GraphQL schema never receives an
-     * explicit {@code null} variable.
+     * <p>Produces the {@code {variables: {newsletter_id, user_id}}} payload; both are declared
+     * top-level variables and are always emitted.
      *
      * @implNote This implementation writes the GraphQL variables directly through a
      * {@link JSONWriter} and wraps any {@link IOException} from the in-memory writer in an
@@ -103,18 +102,12 @@ public final class CreateNewsletterAdminInviteMexRequest implements MexStanza.Re
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-
-            if (newsletterId != null) {
-                writer.writeName("newsletter_id");
-                writer.writeColon();
-                writer.writeString(newsletterId);
-            }
-
-            if (userId != null) {
-                writer.writeName("user_id");
-                writer.writeColon();
-                writer.writeString(userId);
-            }
+            writer.writeName("newsletter_id");
+            writer.writeColon();
+            writer.writeString(newsletterId);
+            writer.writeName("user_id");
+            writer.writeColon();
+            writer.writeString(userId);
             writer.endObject();
             writer.endObject();
 

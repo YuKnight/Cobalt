@@ -21,7 +21,7 @@ import java.util.List;
  * <p>When a VoIP call ends, the resulting mutation is pushed so the call
  * appears in every linked device's call tab. This factory builds the outgoing
  * mutation; the inbound counterpart is
- * {@link com.github.auties00.cobalt.sync.handler.Calls2CallLogHandler}.
+ * {@link com.github.auties00.cobalt.sync.handler.CallLogHandler}.
  *
  * @implNote
  * This implementation takes the resolved caller JID as a parameter. WA Web

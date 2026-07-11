@@ -52,10 +52,10 @@ public final class FetchGroupIsInternalMexRequest implements MexStanza.Request.J
     /**
      * Constructs a new request with the single {@code id} GraphQL variable.
      *
-     * <p>The argument is forwarded verbatim to the relay; pass {@code null} to omit the variable
-     * from the wire payload, matching the WA Web undefined-variable convention.
+     * <p>The argument is forwarded verbatim to the relay as the declared top-level {@code id}
+     * variable, which WA Web always sends; callers are expected to supply a non-null identifier.
      *
-     * @param groupId the target group identifier, may be {@code null} to omit
+     * @param groupId the target group identifier
      */
     public FetchGroupIsInternalMexRequest(String groupId) {
         this.groupId = groupId;
@@ -93,11 +93,9 @@ public final class FetchGroupIsInternalMexRequest implements MexStanza.Request.J
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (groupId != null) {
-                writer.writeName("id");
-                writer.writeColon();
-                writer.writeString(groupId);
-            }
+            writer.writeName("id");
+            writer.writeColon();
+            writer.writeString(groupId);
             writer.endObject();
             writer.endObject();
 

@@ -159,6 +159,30 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
     private static final Jid META_AI_BOT_ACCOUNT = new Jid("867051314767696", JidServer.bot());
 
     /**
+     * The JID for the legacy phone-number Meta AI bot account
+     * ({@code 13135550002@s.whatsapp.net}).
+     */
+    private static final Jid META_AI_BOT_PHONE_ACCOUNT = new Jid("13135550002", JidServer.user());
+
+    /**
+     * The JID for the in-app support (IAS) account
+     * ({@code 16508638904@s.whatsapp.net}).
+     */
+    private static final Jid IN_APP_SUPPORT_ACCOUNT = new Jid("16508638904", JidServer.user());
+
+    /**
+     * The JID for the Meta AI hub account on the Linked Identity domain
+     * ({@code 165332417282214@lid}).
+     */
+    private static final Jid AI_HUB_LID_ACCOUNT = new Jid("165332417282214", JidServer.lid());
+
+    /**
+     * The JID for the Meta AI hub account on the bot domain
+     * ({@code 1807055946647698@bot}).
+     */
+    private static final Jid AI_HUB_BOT_ACCOUNT = new Jid("1807055946647698", JidServer.bot());
+
+    /**
      * The JID for the live location sharing broadcast
      * ({@code location@broadcast}).
      */
@@ -352,6 +376,46 @@ public record Jid(String user, JidServer server, int device, int agent) implemen
      */
     public static Jid metaAiBotAccount() {
         return Jid.META_AI_BOT_ACCOUNT;
+    }
+
+    /**
+     * Returns the JID for the legacy phone-number Meta AI bot account
+     * ({@code 13135550002@s.whatsapp.net}).
+     *
+     * @return the legacy phone-number Meta AI bot account JID
+     */
+    public static Jid metaAiBotPhoneAccount() {
+        return Jid.META_AI_BOT_PHONE_ACCOUNT;
+    }
+
+    /**
+     * Returns the JID for the in-app support (IAS) account
+     * ({@code 16508638904@s.whatsapp.net}).
+     *
+     * @return the in-app support account JID
+     */
+    public static Jid inAppSupportAccount() {
+        return Jid.IN_APP_SUPPORT_ACCOUNT;
+    }
+
+    /**
+     * Returns the JID for the Meta AI hub account on the Linked Identity domain
+     * ({@code 165332417282214@lid}).
+     *
+     * @return the AI hub LID account JID
+     */
+    public static Jid aiHubLidAccount() {
+        return Jid.AI_HUB_LID_ACCOUNT;
+    }
+
+    /**
+     * Returns the JID for the Meta AI hub account on the bot domain
+     * ({@code 1807055946647698@bot}).
+     *
+     * @return the AI hub bot account JID
+     */
+    public static Jid aiHubBotAccount() {
+        return Jid.AI_HUB_BOT_ACCOUNT;
     }
 
     /**

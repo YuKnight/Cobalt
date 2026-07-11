@@ -37,41 +37,32 @@ public final class FetchAllNewslettersMetadataMexRequest implements MexStanza.Re
     public static final String OPERATION_NAME = "mexFetchAllNewsletters";
 
     /**
-     * Holds the value of the {@code fetch_wamo_sub} GraphQL variable, or {@code null} to omit the
-     * entry.
+     * Holds the value of the {@code fetch_wamo_sub} GraphQL variable.
      */
-    private final Boolean fetchWamoSub;
+    private final boolean fetchWamoSub;
 
     /**
-     * Holds the value of the {@code fetch_status_metadata} GraphQL variable, or {@code null} to omit
-     * the entry.
+     * Holds the value of the {@code fetch_status_metadata} GraphQL variable.
      */
-    private final Boolean fetchStatusMetadata;
+    private final boolean fetchStatusMetadata;
 
     /**
-     * Constructs a request that selects only the {@code fetch_wamo_sub} gating flag.
+     * Constructs a request that selects the {@code fetch_wamo_sub} gating flag with
+     * {@code fetch_status_metadata} defaulted to {@code false}.
      *
-     * <p>The {@code fetch_status_metadata} variable is implicitly omitted, leaving the
-     * {@code status_metadata} fragment unrequested.
-     *
-     * @param fetchWamoSub the value of the {@code fetch_wamo_sub} variable, or {@code null} to omit
+     * @param fetchWamoSub the value of the {@code fetch_wamo_sub} variable
      */
-    public FetchAllNewslettersMetadataMexRequest(Boolean fetchWamoSub) {
-        this(fetchWamoSub, null);
+    public FetchAllNewslettersMetadataMexRequest(boolean fetchWamoSub) {
+        this(fetchWamoSub, false);
     }
 
     /**
      * Constructs a request with both GraphQL gating variables.
      *
-     * <p>Passing {@code null} for either flag omits the corresponding variable from the GraphQL
-     * payload so the relay applies its default.
-     *
-     * @param fetchWamoSub        the value of the {@code fetch_wamo_sub} variable, or {@code null}
-     *                            to omit
-     * @param fetchStatusMetadata the value of the {@code fetch_status_metadata} variable, or
-     *                            {@code null} to omit
+     * @param fetchWamoSub        the value of the {@code fetch_wamo_sub} variable
+     * @param fetchStatusMetadata the value of the {@code fetch_status_metadata} variable
      */
-    public FetchAllNewslettersMetadataMexRequest(Boolean fetchWamoSub, Boolean fetchStatusMetadata) {
+    public FetchAllNewslettersMetadataMexRequest(boolean fetchWamoSub, boolean fetchStatusMetadata) {
         this.fetchWamoSub = fetchWamoSub;
         this.fetchStatusMetadata = fetchStatusMetadata;
     }
@@ -99,9 +90,10 @@ public final class FetchAllNewslettersMetadataMexRequest implements MexStanza.Re
     /**
      * {@inheritDoc}
      *
-     * <p>Produces the {@code {variables: {fetch_wamo_sub?, fetch_status_metadata?}}} payload; either
-     * gating boolean is omitted when its backing {@link Boolean} is {@code null} so the GraphQL
-     * schema never receives an explicit {@code null} variable.
+     * <p>Produces the {@code {variables: {fetch_wamo_sub, fetch_status_metadata}}} payload. Both
+     * gating booleans are always emitted: the compiled query declares both as required variables and
+     * WhatsApp Web always sends both (coalescing an unset flag to {@code false}), so omitting either
+     * makes the relay reject the request as {@code 400 Bad Request}.
      *
      * @implNote This implementation writes the GraphQL variables directly through a
      * {@link JSONWriter} and wraps any {@link IOException} from the in-memory writer in an
@@ -119,16 +111,12 @@ public final class FetchAllNewslettersMetadataMexRequest implements MexStanza.Re
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (fetchWamoSub != null) {
-                writer.writeName("fetch_wamo_sub");
-                writer.writeColon();
-                writer.writeBool(fetchWamoSub);
-            }
-            if (fetchStatusMetadata != null) {
-                writer.writeName("fetch_status_metadata");
-                writer.writeColon();
-                writer.writeBool(fetchStatusMetadata);
-            }
+            writer.writeName("fetch_wamo_sub");
+            writer.writeColon();
+            writer.writeBool(fetchWamoSub);
+            writer.writeName("fetch_status_metadata");
+            writer.writeColon();
+            writer.writeBool(fetchStatusMetadata);
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

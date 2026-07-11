@@ -69,10 +69,13 @@ public final class SetUsernameMexRequest implements MexStanza.Request.Json {
      * {@code sessionId} ties the reservation to a registration flow, and {@code source} tags the
      * entry point ({@code "USER_INPUT"} is the value the settings UI emits).
      *
-     * @param input the candidate username to claim or update
-     * @param reserved whether the username should be reserved, or {@code null} to omit the flag
-     * @param sessionId the registration-flow session identifier, or {@code null} to omit
-     * @param source the entry-point tag, or {@code null} to omit
+     * @param input the candidate username to claim or update; {@code null} is emitted as JSON
+     *              {@code null}
+     * @param reserved whether the username should be reserved; {@code null} is emitted as JSON
+     *                 {@code null}
+     * @param sessionId the registration-flow session identifier; {@code null} is emitted as JSON
+     *                  {@code null}
+     * @param source the entry-point tag; {@code null} is emitted as JSON {@code null}
      */
     public SetUsernameMexRequest(String input, Boolean reserved, String sessionId, String source) {
         this.input = input;
@@ -100,10 +103,10 @@ public final class SetUsernameMexRequest implements MexStanza.Request.Json {
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation gates the whole {@code variables} body on {@link #input}: when
-     * {@code input} is {@code null} or empty the object is emitted as {@code {}} regardless of the
-     * other fields, otherwise {@code reserved}, {@code session_id}, and {@code source} are forwarded
-     * whenever non-{@code null}; envelope construction is delegated to
+     * @implNote This implementation always materialises every declared top-level variable, mirroring
+     * the relay's compiled mutation: {@code input}, {@code reserved}, {@code session_id}, and
+     * {@code source} are each emitted with their supplied value or as JSON {@code null} when unset;
+     * envelope construction is delegated to
      * {@link MexStanza.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexSetUsernameJob", exports = "mexSetUsernameQueryJob",
@@ -115,25 +118,33 @@ public final class SetUsernameMexRequest implements MexStanza.Request.Json {
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (input != null && !input.isEmpty()) {
-                writer.writeName("input");
-                writer.writeColon();
+            writer.writeName("input");
+            writer.writeColon();
+            if (input != null) {
                 writer.writeString(input);
-                if (reserved != null) {
-                    writer.writeName("reserved");
-                    writer.writeColon();
-                    writer.writeBool(reserved);
-                }
-                if (sessionId != null) {
-                    writer.writeName("session_id");
-                    writer.writeColon();
-                    writer.writeString(sessionId);
-                }
-                if (source != null) {
-                    writer.writeName("source");
-                    writer.writeColon();
-                    writer.writeString(source);
-                }
+            } else {
+                writer.writeNull();
+            }
+            writer.writeName("reserved");
+            writer.writeColon();
+            if (reserved != null) {
+                writer.writeBool(reserved);
+            } else {
+                writer.writeNull();
+            }
+            writer.writeName("session_id");
+            writer.writeColon();
+            if (sessionId != null) {
+                writer.writeString(sessionId);
+            } else {
+                writer.writeNull();
+            }
+            writer.writeName("source");
+            writer.writeColon();
+            if (source != null) {
+                writer.writeString(source);
+            } else {
+                writer.writeNull();
             }
             writer.endObject();
             writer.endObject();

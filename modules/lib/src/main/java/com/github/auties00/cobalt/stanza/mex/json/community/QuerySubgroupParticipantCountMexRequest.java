@@ -5,26 +5,21 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import com.github.auties00.cobalt.stanza.mex.MexStanza;
+import com.github.auties00.cobalt.stanza.mex.json.MexGroupQueryContext;
 
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Outbound MEX request that fetches the current participant count for one or
- * more subgroups inside a community.
+ * Outbound MEX request that fetches the current participant counts for the subgroups of a community.
  *
- * <p>This query backs the community-panel participant-count refresh path:
- * it fetches only the {@code id} and {@code total_participants_count} fields
- * rather than reloading full subgroup metadata, and is typically issued when
- * the user scrolls or sorts the community subgroup list. The reply is modelled
- * by {@link QuerySubgroupParticipantCountMexResponse}.
- *
- * @implNote This implementation accepts the GraphQL {@code input} variable as a
- * single opaque pre-serialised JSON string rather than modelling its inner
- * shape ({@code group_jid}, {@code query_context}, {@code sub_group_jid_hint}).
- * Callers serialise the input themselves and pass the resulting JSON; the field
- * is dropped from the wire payload when {@code null}.
+ * <p>This query backs the community-panel participant-count refresh path: it queries the community by
+ * id and reads only the {@code id} and {@code total_participants_count} of each subgroup edge rather
+ * than reloading full subgroup metadata, and is typically issued when the user scrolls or sorts the
+ * community subgroup list. The {@code group_jid} names the parent community whose subgroups are read,
+ * while {@code sub_group_jid_hint} names the subgroup of interest so the relay can prioritise it. The
+ * reply is modelled by {@link QuerySubgroupParticipantCountMexResponse}.
  */
 public final class QuerySubgroupParticipantCountMexRequest implements MexStanza.Request.Json {
     /**
@@ -45,29 +40,29 @@ public final class QuerySubgroupParticipantCountMexRequest implements MexStanza.
     public static final String OPERATION_NAME = "mexQuerySubgroupParticipantCount";
 
     /**
-     * Pre-serialised GraphQL {@code input} variable, or {@code null} to omit
-     * it.
+     * Holds the Jid string of the parent community whose subgroups are queried.
      */
-    private final String input;
+    private final String communityJid;
 
     /**
-     * Constructs a new request carrying the serialised input payload.
-     *
-     * <p>The WA Web {@code input} variable is a nested object of the shape
-     * {@snippet lang = json:
-     * {
-     *   "group_jid": "...",
-     *   "query_context": "...",
-     *   "sub_group_jid_hint": "..."
-     * }
-     *}
-     * Callers serialise this themselves and pass the resulting JSON string;
-     * passing {@code null} omits the field entirely from the wire payload.
-     *
-     * @param input the serialised input variable, may be {@code null}
+     * Holds the Jid string of the subgroup of interest, sent to the relay as the prioritisation hint.
      */
-    public QuerySubgroupParticipantCountMexRequest(String input) {
-        this.input = input;
+    private final String subgroupJid;
+
+    /**
+     * Constructs a request that reads the participant counts of the given community's subgroups.
+     *
+     * <p>The {@code communityJid} is written as the {@code group_jid} input field, the fixed
+     * {@code query_context} of {@link MexGroupQueryContext#INTERACTIVE} tags the query as
+     * foreground-driven, and {@code subgroupJid} is written as {@code sub_group_jid_hint} so the relay
+     * prioritises the subgroup the caller cares about.
+     *
+     * @param communityJid the Jid of the parent community
+     * @param subgroupJid  the Jid of the subgroup of interest
+     */
+    public QuerySubgroupParticipantCountMexRequest(String communityJid, String subgroupJid) {
+        this.communityJid = communityJid;
+        this.subgroupJid = subgroupJid;
     }
 
     /**
@@ -89,13 +84,17 @@ public final class QuerySubgroupParticipantCountMexRequest implements MexStanza.
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation streams the GraphQL variables through
-     * fastjson2's {@link JSONWriter} and emits the {@code input} field only
-     * when the constructor argument is non-null, matching WA Web's pattern of
-     * omitting undefined GraphQL variables. The envelope is built through
-     * {@link MexStanza.Request.Json#createMexNode(String, String)}.
+     * <p>Produces the
+     * {@code {variables: {input: {group_jid, query_context, sub_group_jid_hint}}}} payload consumed by
+     * the persisted-query identified by {@link #QUERY_ID}.
+     *
+     * @implNote This implementation streams the GraphQL variables through fastjson2's
+     * {@link JSONWriter}, pinning {@code query_context} to {@link MexGroupQueryContext#INTERACTIVE}
+     * exactly as WhatsApp Web's subgroup job does, and builds the envelope through
+     * {@link MexStanza.Request.Json#createMexNode(String, String)}. Any {@link IOException} raised by
+     * the in-memory writer is wrapped in an {@link UncheckedIOException}.
      */
-    @WhatsAppWebExport(moduleName = "WAWebMexQuerySubgroupParticipantCountJobQuery.graphql", exports = "params.id",
+    @WhatsAppWebExport(moduleName = "WAWebMexQuerySubgroupParticipantCountJob", exports = "mexQuerySubgroupParticipantCountJob",
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public StanzaBuilder toStanza() {
@@ -104,11 +103,19 @@ public final class QuerySubgroupParticipantCountMexRequest implements MexStanza.
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (input != null) {
-                writer.writeName("input");
-                writer.writeColon();
-                writer.writeString(input);
-            }
+            writer.writeName("input");
+            writer.writeColon();
+            writer.startObject();
+            writer.writeName("group_jid");
+            writer.writeColon();
+            writer.writeString(communityJid);
+            writer.writeName("query_context");
+            writer.writeColon();
+            writer.writeString(MexGroupQueryContext.INTERACTIVE.wireValue());
+            writer.writeName("sub_group_jid_hint");
+            writer.writeColon();
+            writer.writeString(subgroupJid);
+            writer.endObject();
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

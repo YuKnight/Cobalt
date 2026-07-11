@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.exception;
 
-import com.github.auties00.cobalt.calls2.media.audio.opus.bindings.CobaltOpus;
-import com.github.auties00.cobalt.calls2.media.video.vpx.bindings.CobaltVpx;
+import com.github.auties00.cobalt.calls.media.audio.codec.opus.bindings.CobaltOpus;
+import com.github.auties00.cobalt.calls.media.video.codec.vpx.bindings.CobaltVpx;
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 
 import java.lang.foreign.MemorySegment;

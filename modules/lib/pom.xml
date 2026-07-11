@@ -322,6 +322,13 @@
             <version>${srtp.version}</version>
         </dependency>
 
+        <!-- Pure-Java SCTP for WebRTC Data Channels (replaces the native usrsctp shim) -->
+        <dependency>
+            <groupId>com.github.auties00</groupId>
+            <artifactId>sctp</artifactId>
+            <version>${sctp.version}</version>
+        </dependency>
+
         <!-- Testing framework -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

@@ -28,10 +28,12 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  *
  * @implNote
  * This implementation persists the bit through
- * {@link LinkedWhatsAppSyncStore#setExternalWebBeta(boolean)}
- * and performs none of the backend restart, A/B-prop refresh or telemetry that
- * the build-channel negotiation would otherwise trigger, because a Cobalt
- * embedder does not negotiate its build channel through Meta's update service.
+ * {@link LinkedWhatsAppSyncStore#setExternalWebBeta(boolean)} and mirrors it
+ * onto the account release channel so the next handshake advertises the beta
+ * channel while enrolled. It performs none of the backend restart, A/B-prop
+ * refresh or telemetry that the build-channel negotiation would otherwise
+ * trigger, because a Cobalt embedder does not negotiate its build channel
+ * through Meta's update service.
  */
 @WhatsAppWebModule(moduleName = "WAWebExternalWebBetaSync")
 public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
@@ -87,7 +89,8 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
      * flag is off; non-{@link SyncdOperation#SET} operations are also reported
      * as unsupported and a missing or mistyped action payload yields a
      * malformed result. When the flag is on the value is persisted through
-     * {@link LinkedWhatsAppSyncStore#setExternalWebBeta(boolean)}.
+     * {@link LinkedWhatsAppSyncStore#setExternalWebBeta(boolean)} and mirrored
+     * onto the account release channel.
      *
      * @implNote
      * This implementation re-reads the A/B prop on every mutation rather than

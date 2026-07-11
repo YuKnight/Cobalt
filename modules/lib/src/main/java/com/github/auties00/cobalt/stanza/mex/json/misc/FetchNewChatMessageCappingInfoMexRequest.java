@@ -18,8 +18,7 @@ import java.io.UncheckedIOException;
  * <p>This query is issued when the individual new-chat messaging capping feature is enabled. The
  * parsed snapshot drives the messaging-capping UI and exposes the {@code capping_status},
  * {@code ote_status} and {@code mv_status} flags. The {@link #input} value names the capping
- * thread type and is wrapped on the wire as the GraphQL object {@code {"type": <input>}}; passing
- * {@code null} omits the variable from the payload.
+ * thread type and is always wrapped on the wire as the GraphQL object {@code {"type": <input>}}.
  *
  * @implNote This implementation wraps {@link #input} in a {@code {"type": ...}} object, mirroring
  * WhatsApp Web which hard-codes {@code {"type":"INDIVIDUAL_NEW_CHAT_THREAD"}}.
@@ -59,10 +58,9 @@ public final class FetchNewChatMessageCappingInfoMexRequest implements MexStanza
     /**
      * Constructs a new request for the given capping thread type.
      *
-     * <p>Passing {@code null} omits the {@code input} variable from the wire envelope.
+     * <p>The value is always emitted on the wire as the object {@code {"type": <input>}}.
      *
-     * @param input the capping thread type (for example {@code "INDIVIDUAL_NEW_CHAT_THREAD"}),
-     *              may be {@code null} to omit
+     * @param input the capping thread type (for example {@code "INDIVIDUAL_NEW_CHAT_THREAD"})
      */
     public FetchNewChatMessageCappingInfoMexRequest(String input) {
         this.input = input;
@@ -88,8 +86,8 @@ public final class FetchNewChatMessageCappingInfoMexRequest implements MexStanza
      * {@inheritDoc}
      *
      * @implNote This implementation streams the GraphQL variables through fastjson2's
-     * {@link JSONWriter}, emitting {@code input} as the object {@code {"type": <input>}} only when
-     * the constructor argument is non-{@code null}, then wraps the payload via
+     * {@link JSONWriter}, always materialising the declared {@code input} variable as the object
+     * {@code {"type": <input>}}, then wraps the payload via
      * {@link MexStanza.Request.Json#createMexNode(String, String)}.
      */
     @WhatsAppWebExport(moduleName = "WAWebMexFetchNewChatMessageCappingInfoJobQuery.graphql", exports = "params.id",
@@ -101,15 +99,13 @@ public final class FetchNewChatMessageCappingInfoMexRequest implements MexStanza
             writer.writeName("variables");
             writer.writeColon();
             writer.startObject();
-            if (input != null) {
-                writer.writeName("input");
-                writer.writeColon();
-                writer.startObject();
-                writer.writeName("type");
-                writer.writeColon();
-                writer.writeString(input);
-                writer.endObject();
-            }
+            writer.writeName("input");
+            writer.writeColon();
+            writer.startObject();
+            writer.writeName("type");
+            writer.writeColon();
+            writer.writeString(input);
+            writer.endObject();
             writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {

@@ -9,7 +9,6 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.message.Message;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.model.message.MessageContainerSpec;
@@ -234,28 +233,209 @@ public final class LiveQuarantineService implements QuarantineService {
      * Returns whether the given sender's messages are subject to quarantine.
      *
      * @implNote
-     * This implementation gates on the sender being a non-self user JID that is not a saved
-     * contact (no {@linkplain Contact#fullName() address-book name}). WA Web additionally exempts
-     * PSA, IAS, official-business, support, CAPI-support, AI-hub and Meta-AI-bot senders; Cobalt
-     * does not yet classify those special account types, so they are not exempted here.
+     * This implementation mirrors WA Web's {@code shouldQuarantineSender}: the sender must be a
+     * {@linkplain #isUser(Jid) user, LID or bot JID} that is neither the current account nor one of
+     * the exempt system senders ({@linkplain #isPsa(Jid) PSA}, {@linkplain #isIas(Jid) in-app
+     * support}, {@linkplain #isOfficialBusinessAccount(Jid) official business},
+     * {@linkplain #isSupportAccount(Jid) support}, {@linkplain #isCapiSupportAccount(Jid) CAPI
+     * support}, {@linkplain #isAiHub(Jid) AI hub} or {@linkplain #isMetaAiBot(Jid) Meta AI bot}),
+     * and must not be a saved address-book contact. WA Web keys the address-book test off a stored
+     * {@code isAddressBookContact} flag; the {@link Contact} model has no such flag, so the presence
+     * of a {@linkplain Contact#fullName() saved name} stands in for it.
      *
      * @param sender the message sender, or {@code null}
      * @return {@code true} when the sender is quarantinable, {@code false} otherwise
      */
     @WhatsAppWebExport(moduleName = "WAWebQuarantineActionUtils", exports = "shouldQuarantineSender", adaptation = WhatsAppAdaptation.ADAPTED)
     private boolean isQuarantinableSender(Jid sender) {
-        if (sender == null || !sender.hasServer(JidServer.user())) {
+        if (sender == null || !isUser(sender)) {
             return false;
         }
         var account = client.store().accountStore();
         if (account.jid().filter(sender::equals).isPresent() || account.lid().filter(sender::equals).isPresent()) {
             return false;
         }
-        // TODO: exempt PSA/IAS/official-business/support/CAPI-support/AI-hub/Meta-AI-bot senders once
-        //       Cobalt models those special account types.
+        if (isPsa(sender) || isIas(sender) || isOfficialBusinessAccount(sender)
+                || isSupportAccount(sender) || isCapiSupportAccount(sender)
+                || isAiHub(sender) || isMetaAiBot(sender)) {
+            return false;
+        }
         return client.store().contactStore().findContactByJid(sender)
                 .flatMap(Contact::fullName)
                 .isEmpty();
+    }
+
+    /**
+     * Returns whether the given JID addresses a user, LID or bot account.
+     *
+     * @param sender the sender JID
+     * @return {@code true} when the JID lives on the user, LID or bot server
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isUser", adaptation = WhatsAppAdaptation.DIRECT)
+    private static boolean isUser(Jid sender) {
+        return sender.hasUserServer() || sender.hasLidServer() || sender.hasBotServer();
+    }
+
+    /**
+     * Returns whether the given JID addresses the public service announcements (PSA) account.
+     *
+     * <p>This is the {@link Jid#announcementsAccount() announcements account}, whose user component
+     * is {@code 0}.
+     *
+     * @param sender the sender JID
+     * @return {@code true} when the JID is the PSA account
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isPSA", adaptation = WhatsAppAdaptation.ADAPTED)
+    private static boolean isPsa(Jid sender) {
+        return sender.hasUserServer() && Jid.announcementsAccount().hasUser(sender.user());
+    }
+
+    /**
+     * Returns whether the given JID addresses WhatsApp's in-app support (IAS) account.
+     *
+     * <p>This is the {@link Jid#inAppSupportAccount() in-app support account}, whose user component
+     * is {@code 16508638904}.
+     *
+     * @param sender the sender JID
+     * @return {@code true} when the JID is the in-app support account
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isIAS", adaptation = WhatsAppAdaptation.ADAPTED)
+    private static boolean isIas(Jid sender) {
+        return sender.hasUserServer() && Jid.inAppSupportAccount().hasUser(sender.user());
+    }
+
+    /**
+     * Returns whether the given JID addresses the official WhatsApp business account.
+     *
+     * <p>This is the {@link Jid#officialBusinessAccount() official business account}, whose user
+     * component is {@code 16505361212}.
+     *
+     * @param sender the sender JID
+     * @return {@code true} when the JID is the official business account
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isOfficialBizAccount", adaptation = WhatsAppAdaptation.ADAPTED)
+    private static boolean isOfficialBusinessAccount(Jid sender) {
+        return sender.hasUserServer() && Jid.officialBusinessAccount().hasUser(sender.user());
+    }
+
+    /**
+     * Returns whether the given JID addresses a WhatsApp support account.
+     *
+     * @implNote
+     * This implementation mirrors WA Web: a {@linkplain Jid#hasLidServer() LID} sender is a support
+     * account when its user is listed in the {@link ABProp#SUPPORT_LIDS} or
+     * {@link ABProp#PAYMENT_SUPPORT_LIDS} AB prop; any other sender is a support account when its
+     * user begins with one of the comma-separated prefixes in the
+     * {@link ABProp#IN_APP_SUPPORT_V2_NUMBER_PREFIXES} AB prop.
+     *
+     * @param sender the sender JID
+     * @return {@code true} when the JID is a support account
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isSupportAccount", adaptation = WhatsAppAdaptation.ADAPTED)
+    private boolean isSupportAccount(Jid sender) {
+        var user = sender.user();
+        if (user == null) {
+            return false;
+        }
+        if (sender.hasLidServer()) {
+            return isListedUser(ABProp.SUPPORT_LIDS, user) || isListedUser(ABProp.PAYMENT_SUPPORT_LIDS, user);
+        }
+        return hasListedPrefix(ABProp.IN_APP_SUPPORT_V2_NUMBER_PREFIXES, user);
+    }
+
+    /**
+     * Returns whether the given JID addresses a WhatsApp CAPI support account.
+     *
+     * @implNote
+     * This implementation mirrors WA Web: a {@linkplain Jid#hasLidServer() LID} sender is a CAPI
+     * support account when its user is listed in the {@link ABProp#SUPPORT_LIDS} AB prop; any other
+     * sender is a CAPI support account when its user begins with one of the comma-separated prefixes
+     * in the {@link ABProp#IN_APP_SUPPORT_CAPI_NUMBER_PREFIXES} AB prop.
+     *
+     * @param sender the sender JID
+     * @return {@code true} when the JID is a CAPI support account
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isCAPISupportAccount", adaptation = WhatsAppAdaptation.ADAPTED)
+    private boolean isCapiSupportAccount(Jid sender) {
+        var user = sender.user();
+        if (user == null) {
+            return false;
+        }
+        if (sender.hasLidServer()) {
+            return isListedUser(ABProp.SUPPORT_LIDS, user);
+        }
+        return hasListedPrefix(ABProp.IN_APP_SUPPORT_CAPI_NUMBER_PREFIXES, user);
+    }
+
+    /**
+     * Returns whether the given JID addresses the Meta AI hub account.
+     *
+     * <p>Matches the {@link Jid#aiHubLidAccount() AI hub LID} and the
+     * {@link Jid#aiHubBotAccount() AI hub bot} account.
+     *
+     * @param sender the sender JID
+     * @return {@code true} when the JID is the AI hub LID or bot account
+     */
+    @WhatsAppWebExport(moduleName = "WAWebWid", exports = "isAiHub", adaptation = WhatsAppAdaptation.DIRECT)
+    private static boolean isAiHub(Jid sender) {
+        return (sender.hasLidServer() && Jid.aiHubLidAccount().hasUser(sender.user()))
+                || (sender.hasBotServer() && Jid.aiHubBotAccount().hasUser(sender.user()));
+    }
+
+    /**
+     * Returns whether the given JID addresses the Meta AI bot account.
+     *
+     * <p>Matches both the FBID Meta AI bot ({@link Jid#metaAiBotAccount()}) and the
+     * {@link Jid#metaAiBotPhoneAccount() legacy phone-number Meta AI bot}.
+     *
+     * @param sender the sender JID
+     * @return {@code true} when the JID is a Meta AI bot
+     */
+    @WhatsAppWebExport(moduleName = "WAWebBotUtils", exports = "isMetaAiBot", adaptation = WhatsAppAdaptation.DIRECT)
+    private static boolean isMetaAiBot(Jid sender) {
+        return sender.equals(Jid.metaAiBotAccount())
+                || Jid.metaAiBotPhoneAccount().hasUser(sender.user());
+    }
+
+    /**
+     * Returns whether the given user is listed in the comma-separated value of the AB prop.
+     *
+     * @param prop the AB prop holding a comma-separated list of user identifiers
+     * @param user the user component to look up
+     * @return {@code true} when the user exactly matches one of the listed entries
+     */
+    private boolean isListedUser(ABProp prop, String user) {
+        var value = abPropsService.getString(prop);
+        if (value == null || value.isEmpty()) {
+            return false;
+        }
+        for (var entry : value.split(",")) {
+            if (entry.equals(user)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Returns whether the given user begins with one of the comma-separated prefixes in the value
+     * of the AB prop.
+     *
+     * @param prop the AB prop holding a comma-separated list of number prefixes
+     * @param user the user component to test
+     * @return {@code true} when the user starts with one of the listed prefixes
+     */
+    private boolean hasListedPrefix(ABProp prop, String user) {
+        var value = abPropsService.getString(prop);
+        if (value == null || value.isEmpty()) {
+            return false;
+        }
+        for (var prefix : value.split(",")) {
+            if (user.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

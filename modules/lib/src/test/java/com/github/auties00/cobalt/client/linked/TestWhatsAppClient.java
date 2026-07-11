@@ -7,10 +7,10 @@ import com.github.auties00.cobalt.listener.NewMessageListener;
 
 import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.calls2.stream.AudioInput;
-import com.github.auties00.cobalt.calls2.stream.AudioOutput;
-import com.github.auties00.cobalt.calls2.stream.VideoInput;
-import com.github.auties00.cobalt.calls2.stream.VideoOutput;
+import com.github.auties00.cobalt.calls.stream.AudioInput;
+import com.github.auties00.cobalt.calls.stream.AudioOutput;
+import com.github.auties00.cobalt.calls.stream.VideoInput;
+import com.github.auties00.cobalt.calls.stream.VideoOutput;
 import com.github.auties00.cobalt.model.call.Call;
 import com.github.auties00.cobalt.model.call.IncomingCall;
 import com.github.auties00.cobalt.model.call.CallEndReason;
@@ -739,6 +739,26 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public Call joinCallLink(URI link, AudioOutput audioOut, AudioInput audioIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: joinCallLink(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
     }
 
     @Override

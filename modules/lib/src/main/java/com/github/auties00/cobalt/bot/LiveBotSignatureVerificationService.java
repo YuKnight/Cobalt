@@ -110,15 +110,15 @@ public final class LiveBotSignatureVerificationService implements BotSignatureVe
      */
     @WhatsAppWebExport(moduleName = "WAWebBotSignatureVerificationGating", exports = "getForwardVerificationEnforcementLevel", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
-    public EnforcementLevel enforcementLevel() {
+    public BotSignatureEnforcementLevel enforcementLevel() {
         var raw = abPropsService.getString(ABProp.AI_RICH_RESPONSE_FORWARDING_VERIFICATION_ENABLED_V1);
         if (raw == null) {
-            return EnforcementLevel.NONE;
+            return BotSignatureEnforcementLevel.NONE;
         }
         return switch (raw.replace("\"", "").trim()) {
-            case "log_only" -> EnforcementLevel.LOG_ONLY;
-            case "enforce_blocking" -> EnforcementLevel.ENFORCE_BLOCKING;
-            default -> EnforcementLevel.NONE;
+            case "log_only" -> BotSignatureEnforcementLevel.LOG_ONLY;
+            case "enforce_blocking" -> BotSignatureEnforcementLevel.ENFORCE_BLOCKING;
+            default -> BotSignatureEnforcementLevel.NONE;
         };
     }
 
@@ -128,7 +128,7 @@ public final class LiveBotSignatureVerificationService implements BotSignatureVe
     @WhatsAppWebExport(moduleName = "WAWebBotSignatureVerificationGating", exports = "isForwardVerificationEnabled", adaptation = WhatsAppAdaptation.DIRECT)
     @Override
     public boolean isForwardVerificationEnabled() {
-        return enforcementLevel() != EnforcementLevel.NONE;
+        return enforcementLevel() != BotSignatureEnforcementLevel.NONE;
     }
 
     /**
@@ -139,11 +139,11 @@ public final class LiveBotSignatureVerificationService implements BotSignatureVe
     public boolean verifyBotMessageSignature(String botFbid, BotSignatureVerificationMetadata metadata, byte[] messageDigest) {
         var builder = new CertificateValidationEventEventBuilder().startVerificationLatency();
         var level = enforcementLevel();
-        if (level == EnforcementLevel.NONE) {
+        if (level == BotSignatureEnforcementLevel.NONE) {
             commit(builder, 0, CertVerificationResultType.SKIPPED_AB_DISABLED, null);
             return true;
         }
-        var blocking = level == EnforcementLevel.ENFORCE_BLOCKING;
+        var blocking = level == BotSignatureEnforcementLevel.ENFORCE_BLOCKING;
         try {
             if (metadata == null || messageDigest == null) {
                 commit(builder, 0, CertVerificationResultType.FAILED_SIGNATURE_DATA_MISSING, null);

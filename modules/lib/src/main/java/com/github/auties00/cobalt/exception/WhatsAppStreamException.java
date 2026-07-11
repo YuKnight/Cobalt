@@ -17,17 +17,19 @@ import java.util.Objects;
  * never arrives ({@link NodeTimeout}).
  *
  * @apiNote
- * Raised by the stanza pipeline; {@link #toErrorResult()} reports
- * {@link WhatsAppLinkedClientErrorResult#RECONNECT} for every subtype, so a
- * configured {@code WhatsAppClientErrorHandler} cannot meaningfully discard
- * the event and instead reconnects to clear the in-flight protocol state.
+ * Raised by the stanza pipeline. {@link NodeTimeout} reports
+ * {@link WhatsAppLinkedClientErrorResult#RECONNECT} because an in-flight request
+ * was lost and the channel is re-established to clear the correlation state, while
+ * {@link MalformedNode} reports {@link WhatsAppLinkedClientErrorResult#DISCARD}:
+ * inbound stanzas are decoded frame-by-frame, so one unparseable stanza cannot
+ * affect the frames that follow, and a configured
+ * {@code WhatsAppClientErrorHandler} drops it while keeping the session running
+ * (it may still override the verdict to reconnect).
  *
  * @implNote
- * This implementation classifies every stream fault as
- * {@link WhatsAppLinkedClientErrorResult#RECONNECT} because the stanza pipeline is a
- * shared resource: a single corrupted frame poisons the in-flight protocol
- * state and the connection has to be re-established before traffic can
- * resume.
+ * This implementation returns {@link WhatsAppLinkedClientErrorResult#RECONNECT} as
+ * the default; {@link MalformedNode} overrides it to
+ * {@link WhatsAppLinkedClientErrorResult#DISCARD}.
  *
  * @see MalformedNode
  * @see NodeTimeout
@@ -74,11 +76,12 @@ public sealed class WhatsAppStreamException extends WhatsAppException
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation always returns
-     * {@link WhatsAppLinkedClientErrorResult#RECONNECT}: a single corrupted frame
-     * poisons the in-flight protocol state, so the connection is dropped and
-     * re-opened with fresh Noise state, collapsing to WhatsApp Web's
-     * {@code CLOSE_SOCKET} resolution.
+     * This implementation returns {@link WhatsAppLinkedClientErrorResult#RECONNECT}
+     * as the default for a stream fault, inherited by {@link NodeTimeout} (a lost
+     * in-flight request), and re-opens the channel with fresh Noise state,
+     * collapsing to WhatsApp Web's {@code CLOSE_SOCKET} resolution.
+     * {@link MalformedNode} overrides it to
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}.
      */
     @Override
     public WhatsAppLinkedClientErrorResult toErrorResult() {
@@ -94,9 +97,13 @@ public sealed class WhatsAppStreamException extends WhatsAppException
      * otherwise cannot be parsed into a {@link Stanza}.
      *
      * @apiNote
-     * Raised locally on a decode failure; a configured
-     * {@code WhatsAppClientErrorHandler} decides whether to NACK the
-     * offending stanza or reconnect.
+     * Raised locally on a decode failure. Because inbound stanzas are decoded one
+     * per datagram frame, an unparseable stanza is contained to its own frame and
+     * does not desync the ones that follow, so {@link #toErrorResult()} defaults to
+     * {@link WhatsAppLinkedClientErrorResult#DISCARD}: the offending stanza is
+     * dropped and the session keeps running. A configured
+     * {@code WhatsAppClientErrorHandler} may still override the verdict to
+     * reconnect.
      *
      * @implNote
      * This implementation raises the exception rather than emitting an
@@ -128,6 +135,21 @@ public sealed class WhatsAppStreamException extends WhatsAppException
          */
         public MalformedNode(String message, Throwable cause) {
             super(message, cause);
+        }
+
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote
+         * This implementation returns {@link WhatsAppLinkedClientErrorResult#DISCARD}:
+         * frame-bounded decoding isolates a malformed stanza to its own datagram, so
+         * the stanza is dropped without tearing down the session, mirroring WA Web's
+         * {@code WAComms.parseAndHandleStanza}, which logs a stanza-parse failure and
+         * keeps reading.
+         */
+        @Override
+        public WhatsAppLinkedClientErrorResult toErrorResult() {
+            return WhatsAppLinkedClientErrorResult.DISCARD;
         }
     }
 
