@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.ml;
 
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.PidController;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Translates a machine learning congestion signal into a multiplicative rate adjustment using an
@@ -21,6 +24,11 @@ import com.github.auties00.cobalt.calls.transport.congestion.bwe.PidController;
  * voip settings, so they are supplied by the caller through the constructor.
  */
 public final class MlCongestionPidController {
+    /**
+     * The logger for {@link MlCongestionPidController}.
+     */
+    private static final System.Logger LOGGER = Log.get(MlCongestionPidController.class);
+
     /**
      * The underlying anti windup controller driving the congestion level toward the target.
      */
@@ -73,6 +81,10 @@ public final class MlCongestionPidController {
     public double computeFactor(double congestionLevel) {
         var output = pid.compute(congestionLevel);
         lastFactor = Math.clamp(1.0 + output, minFactor, 1.0);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "ml congestion factor computed: level={0} output={1} factor={2}",
+                    congestionLevel, output, lastFactor);
+        }
         return lastFactor;
     }
 
@@ -94,5 +106,8 @@ public final class MlCongestionPidController {
     public void reset() {
         pid.reset();
         lastFactor = 1.0;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ml congestion pid controller reset");
+        }
     }
 }

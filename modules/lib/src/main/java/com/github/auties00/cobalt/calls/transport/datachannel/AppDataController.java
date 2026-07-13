@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.calls.transport.datachannel;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.AppDataMessage;
 import com.github.auties00.cobalt.model.call.datachannel.AppDataMessageBuilder;
 import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloads;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.call.datachannel.ReactionInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.util.ScheduledTask;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +62,11 @@ import java.util.function.Consumer;
  * because they share the application data stream this controller owns.
  */
 public final class AppDataController implements AutoCloseable {
+    /**
+     * The logger for {@link AppDataController}.
+     */
+    private static final System.Logger LOGGER = Log.get(AppDataController.class);
+
     /**
      * Default lifetime of an outbound reaction before its clear timer fires.
      *
@@ -358,6 +365,9 @@ public final class AppDataController implements AutoCloseable {
             txReaction = reaction;
             channel.send(new AppDataMessageBuilder().reactionInfo(reaction).build());
             rescheduleTxClear();
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "sending reaction txn={0}", transactionId);
+            }
             return transactionId;
         } finally {
             reactionLock.unlock();
@@ -377,6 +387,9 @@ public final class AppDataController implements AutoCloseable {
         Objects.requireNonNull(rekey, "rekey cannot be null");
         if (closed) {
             return;
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sending e2e rekey bundle");
         }
         channel.sendRekey(rekey);
     }
@@ -398,6 +411,9 @@ public final class AppDataController implements AutoCloseable {
         if (closed) {
             return;
         }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "sending peer feedback");
+        }
         channel.sendFeedback(feedback);
     }
 
@@ -418,6 +434,10 @@ public final class AppDataController implements AutoCloseable {
         Objects.requireNonNull(payloads, "payloads cannot be null");
         if (closed) {
             return;
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "demultiplexing app data batch from {0}, messages={1}",
+                    sender, payloads.messages().size());
         }
         // TODO: this routes only the AppDataPayloads batch path. Telling an AppDataPayloads batch apart from
         //  a top level E2eRekeyPayload or PeerFeedback blob arriving on the same application data stream is
@@ -449,6 +469,9 @@ public final class AppDataController implements AutoCloseable {
         if (closed) {
             return;
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "received e2e rekey bundle");
+        }
         rekeyHandler.accept(rekey);
     }
 
@@ -466,6 +489,9 @@ public final class AppDataController implements AutoCloseable {
         Objects.requireNonNull(feedback, "feedback cannot be null");
         if (closed) {
             return;
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "received peer feedback");
         }
         feedbackHandler.accept(feedback);
     }
@@ -509,6 +535,9 @@ public final class AppDataController implements AutoCloseable {
             return;
         }
         closed = true;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "closing app data controller, cancelling timers");
+        }
         reactionLock.lock();
         try {
             cancel(txClearTimer);
@@ -593,6 +622,9 @@ public final class AppDataController implements AutoCloseable {
             reactionLock.unlock();
         }
         if (expired != null) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "expired {0} inbound reactions", expired.size());
+            }
             for (var participant : expired) {
                 // TODO: WhatsApp clears each aged reaction but only optionally notifies the app on expiry;
                 //  the condition that gates that notification is not yet known. This fires the expiry
@@ -617,6 +649,10 @@ public final class AppDataController implements AutoCloseable {
         reactionLock.lock();
         try {
             if (txReaction != null) {
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "retransmitting live outbound reaction txn={0}",
+                            txReaction.transactionId());
+                }
                 channel.send(new AppDataMessageBuilder().reactionInfo(txReaction).build());
             }
         } finally {
@@ -640,6 +676,9 @@ public final class AppDataController implements AutoCloseable {
             rxReactions.put(sender, new RxReaction(reaction, System.nanoTime()));
         } finally {
             reactionLock.unlock();
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "recorded inbound reaction from {0}", sender);
         }
         reactionObserver.accept(sender, Optional.of(reaction));
     }

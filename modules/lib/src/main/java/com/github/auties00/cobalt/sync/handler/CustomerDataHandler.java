@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,8 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.business.CustomerDataAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Acknowledges Business CRM customer-data mutations from {@code customer_data} sync mutations without persisting them.
@@ -32,6 +35,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebCustomerDataSync")
 public final class CustomerDataHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link CustomerDataHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(CustomerDataHandler.class);
 
     /**
      * Constructs the singleton customer-data handler.
@@ -89,24 +96,30 @@ public final class CustomerDataHandler implements WebAppStateActionHandler {
 
         if (mutation.operation() == SyncdOperation.SET) {
             if (chatJidString == null || chatJidString.isBlank()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "customer data: missing chat jid in mutation index");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chatJid = Jid.of(chatJidString);
             if (chatJid == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "customer data: chat jid failed to parse, jid={0}", Log.jid(chatJidString));
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             if (mutation.value().isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "customer data: acknowledging empty value for {0}, not persisted", chatJid);
                 return MutationApplicationResult.success();
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof CustomerDataAction)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "customer data: mutation value is not a CustomerDataAction");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "customer data: acknowledging set for {0}, not persisted", chatJid);
             return MutationApplicationResult.success();
         } else if (mutation.operation() == SyncdOperation.REMOVE) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "customer data: acknowledging remove, not persisted");
             return MutationApplicationResult.success();
         } else {
             return MutationApplicationResult.unsupported();

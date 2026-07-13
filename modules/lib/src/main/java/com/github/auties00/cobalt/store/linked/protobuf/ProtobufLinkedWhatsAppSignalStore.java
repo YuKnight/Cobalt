@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.device.identity.ADVSignedDeviceIdentity;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
@@ -15,6 +16,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HexFormat;
@@ -53,6 +55,11 @@ import static java.util.Objects.requireNonNullElseGet;
 @ProtobufMessage
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSignalStore {
+    /**
+     * The logger for {@link ProtobufLinkedWhatsAppSignalStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufLinkedWhatsAppSignalStore.class);
+
     /**
      * The Signal registration id published in every pre-key bundle so peers can tell apart
      * different installs of the same account.
@@ -233,20 +240,27 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         this.usersNeedingSenderKeyRotation = ConcurrentHashMap.newKeySet();
         this.unconfirmedIdentityChanges = ConcurrentHashMap.newKeySet();
         this.groupSenderKeyDistribution = new ConcurrentHashMap<>();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "signal store initialized, preKeys={0}, sessions={1}, senderKeys={2}, hasDeviceIdentity={3}",
+                    this.preKeysMap.size(), this.sessionsMap.size(), this.senderKeysMap.size(), this.signedDeviceIdentity != null);
+        }
     }
 
     /**
-     * Binds the account sub-store used for the self-address case of {@link #findIdentityByAddress}
+     * Sets the account sub-store used for the self-address case of {@link #findIdentityByAddress}
      * and for the LID canonicalisation of {@link #canonicalAddress(SignalProtocolAddress)}.
      *
-     * <p>Binding also runs the one-time {@link #migrateSelfRecordsToLid()} consolidation so a store
-     * loaded from disk before the canonicalisation existed has its split self records folded onto a
-     * single LID-keyed form.
+     * <p>The account sub-store cannot be a constructor argument because the protobuf deserializer builds
+     * this sub-store from its own wire fields alone; it is set once by the {@link ProtobufWhatsAppStore}
+     * aggregate constructor, which composes both sub-stores. Setting it also runs the one-time
+     * {@link #migrateSelfRecordsToLid()} consolidation so a store loaded from disk before the
+     * canonicalisation existed has its split self records folded onto a single LID-keyed form.
      *
      * @param account the account sub-store, never {@code null}
      */
-    void bindAccount(LinkedWhatsAppAccountStore account) {
+    void setAccount(LinkedWhatsAppAccountStore account) {
         this.account = Objects.requireNonNull(account, "account cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "signal store account sub-store set");
         migrateSelfRecordsToLid();
     }
 
@@ -278,6 +292,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
             return address;
         }
         if (address.name().equals(selfPn.user()) && !address.name().equals(selfLid.user())) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "canonicalizing self address {0} to lid form", Log.jid(address.toString()));
             return new SignalProtocolAddress(selfLid.user(), address.id());
         }
         return address;
@@ -307,6 +322,9 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         var lidUser = selfLid.user();
         if (pnUser.equals(lidUser)) {
             return;
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "migrating self signal records from {0} to {1}", Log.jid(pnUser), Log.jid(lidUser));
         }
         migrateSelfMap(sessionsMap, pnUser, lidUser);
         migrateSelfMap(remoteIdentitiesMap, pnUser, lidUser);
@@ -496,6 +514,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
      */
     @Override
     public void addSignedPreKey(SignalSignedKeyPair signalSignedKeyPair) {
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "rejected attempt to add a signed pre key to a singleton store");
         throw new UnsupportedOperationException("Cannot add signed pre keys to a Keys instance");
     }
 
@@ -506,6 +525,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
 
     @Override
     public void addSession(SignalProtocolAddress address, SignalSessionRecord record) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "storing signal session for {0}", Log.jid(address.toString()));
         sessionsMap.put(canonicalAddress(address), record);
     }
 
@@ -516,16 +536,19 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
 
     @Override
     public void addSenderKey(SignalSenderKeyName name, SignalSenderKeyRecord newRecord) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "storing sender key for {0}", Log.jid(name.toString()));
         senderKeysMap.put(name, newRecord);
     }
 
     @Override
     public boolean removeSession(SignalProtocolAddress address) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing signal session for {0}", Log.jid(address.toString()));
         return sessionsMap.remove(canonicalAddress(address)) != null;
     }
 
     @Override
     public void removeSenderKeys(Jid deviceJid) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing sender keys for device {0}", deviceJid);
         var signalAddress = deviceJid.toSignalAddress();
         senderKeysMap.keySet().removeIf(name ->
                 name.sender().equals(signalAddress)
@@ -535,11 +558,13 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
     @Override
     public void removeSenderKeys(SignalSenderKeyName senderKeyName) {
         Objects.requireNonNull(senderKeyName, "senderKeyName cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing sender key {0}", Log.jid(senderKeyName.toString()));
         senderKeysMap.remove(senderKeyName);
     }
 
     @Override
     public void cleanupSignalSessions(Jid deviceJid) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cleaning up signal sessions for device {0}", deviceJid);
         var signalAddress = deviceJid.toSignalAddress();
         removeSession(signalAddress);
         removeSenderKeys(deviceJid);
@@ -565,6 +590,10 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         Objects.requireNonNull(address, "address cannot be null");
         Objects.requireNonNull(originalMsgId, "originalMsgId cannot be null");
         Objects.requireNonNull(baseKey, "baseKey cannot be null");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "saving session base key for {0}, msgId={1}, key={2}",
+                    Log.jid(address.toString()), originalMsgId, baseKey);
+        }
         baseKeysMap.put(encodeBaseKeyKey(canonicalAddress(address), originalMsgId), baseKey);
     }
 
@@ -581,7 +610,11 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         Objects.requireNonNull(originalMsgId, "originalMsgId cannot be null");
         Objects.requireNonNull(candidate, "candidate cannot be null");
         var stored = baseKeysMap.get(encodeBaseKeyKey(canonicalAddress(address), originalMsgId));
-        return stored != null && Arrays.equals(stored, candidate);
+        var matches = stored != null && Arrays.equals(stored, candidate);
+        if (!matches && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "base key mismatch for {0}, msgId={1}", Log.jid(address.toString()), originalMsgId);
+        }
+        return matches;
     }
 
     @Override
@@ -593,12 +626,15 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
 
     @Override
     public void markKeyRotation(Jid userJid) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "marking sender key rotation needed for {0}", userJid);
         usersNeedingSenderKeyRotation.add(userJid.toUserJid());
     }
 
     @Override
     public boolean clearKeyRotation(Jid userJid) {
-        return usersNeedingSenderKeyRotation.remove(userJid.toUserJid());
+        var cleared = usersNeedingSenderKeyRotation.remove(userJid.toUserJid());
+        if (cleared && Log.DEBUG) LOGGER.log(Level.DEBUG, "cleared sender key rotation flag for {0}", userJid);
+        return cleared;
     }
 
     @Override
@@ -614,17 +650,21 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
             var address = device.toSignalAddress();
             identityEncryptionRange.merge(address, seq, Math::min);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "updated identity range for {0} devices, seq={1}", devices.size(), seq);
         return seq;
     }
 
     @Override
     public boolean hasIdentityChanged(long sendSequence, Jid device) {
         var recorded = identityEncryptionRange.get(device.toSignalAddress());
-        return recorded == null || recorded > sendSequence;
+        var changed = recorded == null || recorded > sendSequence;
+        if (changed && Log.DEBUG) LOGGER.log(Level.DEBUG, "identity range changed for device {0}", device);
+        return changed;
     }
 
     @Override
     public void clearIdentityRange(Jid device) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clearing identity range for device {0}", device);
         identityEncryptionRange.remove(device.toSignalAddress());
     }
 
@@ -646,6 +686,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(participantJid, "participantJid cannot be null");
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "marking sender key distributed for group {0} to {1}", groupJid, participantJid);
         var groupKey = groupJid.toString();
         groupSenderKeyDistribution
                 .computeIfAbsent(groupKey, k -> ConcurrentHashMap.newKeySet())
@@ -655,12 +696,14 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
     @Override
     public void clearSenderKeyDistribution(Jid groupJid) {
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clearing sender key distribution for group {0}", groupJid);
         groupSenderKeyDistribution.remove(groupJid.toString());
     }
 
     @Override
     public void clearSenderKeyDistributionForParticipant(Jid participantJid) {
         Objects.requireNonNull(participantJid, "participantJid cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clearing sender key distribution for participant {0}", participantJid);
         var participantKey = participantJid.toString();
 
         for (var participants : groupSenderKeyDistribution.values()) {
@@ -673,6 +716,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         Objects.requireNonNull(groupJid, "groupJid cannot be null");
         Objects.requireNonNull(participantJid, "participantJid cannot be null");
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "forgetting sender key distribution for group {0} to {1}", groupJid, participantJid);
         var groupKey = groupJid.toString();
         var participants = groupSenderKeyDistribution.get(groupKey);
         if (participants != null) {
@@ -682,6 +726,10 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
 
     @Override
     public boolean isTrustedIdentity(SignalProtocolAddress signalProtocolAddress, SignalIdentityPublicKey signalIdentityPublicKey, SignalKeyDirection signalKeyDirection) {
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "trust-on-first-use accept for {0}, direction={1}",
+                    Log.jid(signalProtocolAddress.toString()), signalKeyDirection);
+        }
         return true;
     }
 
@@ -694,6 +742,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
     public void saveIdentity(SignalProtocolAddress address, SignalIdentityPublicKey identityKey) {
         Objects.requireNonNull(address, "address cannot be null");
         Objects.requireNonNull(identityKey, "identityKey cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "saving remote identity for {0}", Log.jid(address.toString()));
         remoteIdentitiesMap.put(canonicalAddress(address), identityKey);
     }
 
@@ -713,6 +762,7 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
         var canonical = canonicalAddress(address);
         var localJid = account == null ? null : account.jid().orElse(null);
         if (localJid != null && canonical.equals(canonicalAddress(localJid.toSignalAddress()))) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "resolved identity for {0} as local account identity", Log.jid(canonical.toString()));
             return Optional.of(identityKeyPair.publicKey());
         }
         return Optional.ofNullable(remoteIdentitiesMap.get(canonical));
@@ -725,16 +775,19 @@ public final class ProtobufLinkedWhatsAppSignalStore implements LinkedWhatsAppSi
 
     @Override
     public void markIdentityChange(Jid deviceJid) {
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "unconfirmed identity change detected for {0}", deviceJid);
         unconfirmedIdentityChanges.add(deviceJid);
     }
 
     @Override
     public void confirmIdentityChange(Jid deviceJid) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "identity change confirmed for {0}", deviceJid);
         unconfirmedIdentityChanges.remove(deviceJid);
     }
 
     @Override
     public void clearUnconfirmedIdentityChanges() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clearing {0} unconfirmed identity changes", unconfirmedIdentityChanges.size());
         unconfirmedIdentityChanges.clear();
     }
 

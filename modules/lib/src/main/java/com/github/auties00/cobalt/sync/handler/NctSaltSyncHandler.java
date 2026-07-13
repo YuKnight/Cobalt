@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,7 +11,7 @@ import com.github.auties00.cobalt.model.sync.action.setting.NctSaltSyncAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import java.util.logging.Logger;
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code nct_salt_sync} app-state action that distributes the
@@ -38,15 +39,15 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebNctSaltSync")
 public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     /**
-     * Logger used for diagnostic traces emitted by
-     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}.
+     * The logger for {@link NctSaltSyncHandler}.
      *
      * @implNote
-     * This implementation logs at {@code FINE} for the success/clear paths and
-     * {@code WARNING} for the unsupported/missing-salt paths, mirroring the WA
-     * Web log granularity even though the per-batch counters are dropped.
+     * This implementation logs at {@link Level#DEBUG} for the success/clear
+     * paths and {@link Level#WARNING} for the unsupported/missing-salt paths,
+     * mirroring the WA Web log granularity even though the per-batch counters
+     * are dropped.
      */
-    private static final Logger LOGGER = Logger.getLogger(NctSaltSyncHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NctSaltSyncHandler.class);
 
     /**
      * Constructs a stateless {@link NctSaltSyncHandler} for registration in
@@ -109,13 +110,14 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebNctSaltSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() == SyncdOperation.REMOVE) {
-            LOGGER.fine("[nct-salt-sync] Removing stored NCT salt");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "nct salt sync: removing stored salt");
             client.store().accountStore().setNotificationContentTokenSalt(null);
             return MutationApplicationResult.success();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
-            LOGGER.warning(() -> "[nct-salt-sync] Unsupported operation: " + mutation.operation());
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "nct salt sync: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
@@ -125,12 +127,12 @@ public final class NctSaltSyncHandler implements WebAppStateActionHandler {
                 .flatMap(NctSaltSyncAction::salt)
                 .orElse(null);
         if (salt == null) {
-            LOGGER.warning("[nct-salt-sync] Missing salt in nctSaltSyncAction");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "nct salt sync mutation malformed: missing salt");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         client.store().accountStore().setNotificationContentTokenSalt(salt);
-        LOGGER.fine("[nct-salt-sync] Stored NCT salt");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "nct salt sync: stored salt {0}", salt);
         return MutationApplicationResult.success();
     }
 }

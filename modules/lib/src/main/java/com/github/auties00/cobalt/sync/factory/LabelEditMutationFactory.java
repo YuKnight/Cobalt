@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -30,6 +32,11 @@ import java.util.List;
  * warning that WA Web logs is unreachable here.
  */
 public final class LabelEditMutationFactory {
+    /**
+     * The logger for {@link LabelEditMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(LabelEditMutationFactory.class);
+
     /**
      * Creates an instance with no collaborators.
      *
@@ -80,6 +87,7 @@ public final class LabelEditMutationFactory {
             LabelEditAction.ListType type,
             Instant timestamp
     ) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building label edit mutation label={0} deleted={1}", labelId, deleted);
         var action = new LabelEditActionBuilder()
                 .name(name)
                 .deleted(deleted)

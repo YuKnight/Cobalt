@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,14 +14,14 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that reads one page of a WhatsApp Business catalog's product collections.
+ * Builds the graph.whatsapp.com GraphQL query that reads one page of a WhatsApp Business catalog's product collections.
  *
  * <p>Collections are named groups of products a business defines inside a catalog; this query fetches
  * the page of collections paired with the products nested inside each. The single {@code request}
  * GraphQL variable nests a {@code collections} object that {@code WAWebQueryProductCollections} fills
  * with the catalog-owning business {@link Jid}, the per-page collection limit and per-collection item
  * limit, the page cursor, the requested image dimensions, and the optional direct-connection and
- * variant selectors. The relay returns the collections under
+ * variant selectors. The graph.whatsapp.com endpoint returns the collections under
  * {@code xwa_product_catalog_get_collections}; the reply is consumed through
  * {@link QueryProductCollectionsWhatsAppGraphQlResponse}.
  *
@@ -28,10 +30,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebQueryProductCollectionsQuery")
 public final class QueryProductCollectionsWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryProductCollectionsQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -69,13 +71,13 @@ public final class QueryProductCollectionsWhatsAppGraphQlRequest implements What
     private final String after;
 
     /**
-     * The requested image width in pixels used when the relay rewrites image URLs, or {@code null} to
+     * The requested image width in pixels used when the graph.whatsapp.com endpoint rewrites image URLs, or {@code null} to
      * omit it.
      */
     private final Integer width;
 
     /**
-     * The requested image height in pixels used when the relay rewrites image URLs, or {@code null}
+     * The requested image height in pixels used when the graph.whatsapp.com endpoint rewrites image URLs, or {@code null}
      * to omit it.
      */
     private final Integer height;
@@ -131,9 +133,9 @@ public final class QueryProductCollectionsWhatsAppGraphQlRequest implements What
      *                                      {@code null} when not requested
      */
     public QueryProductCollectionsWhatsAppGraphQlRequest(Jid bizJid, Integer collectionLimit, Integer itemLimit, String after,
-                                                         Integer width, Integer height, String directConnectionEncryptedInfo,
-                                                         String variantInfoFields, Integer variantThumbnailHeight,
-                                                         Integer variantThumbnailWidth) {
+                                                            Integer width, Integer height, String directConnectionEncryptedInfo,
+                                                            String variantInfoFields, Integer variantThumbnailHeight,
+                                                            Integer variantThumbnailWidth) {
         this.bizJid = bizJid;
         this.collectionLimit = collectionLimit;
         this.itemLimit = itemLimit;
@@ -254,5 +256,21 @@ public final class QueryProductCollectionsWhatsAppGraphQlRequest implements What
         } else {
             writer.writeString(value);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

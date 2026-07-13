@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
 import com.github.auties00.cobalt.pairing.ShortcakePairingService;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,6 +15,8 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.stream.control.OfflineNotificationsReporter;
 import com.github.auties00.cobalt.wam.WamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Routes inbound {@code <notification>} stanzas in the device branch to the matching per-type handler.
@@ -34,6 +37,11 @@ import com.github.auties00.cobalt.wam.WamService;
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class NotificationDeviceDispatcher extends SocketStreamHandler.Concurrent {
+    /**
+     * The logger for {@link NotificationDeviceDispatcher}.
+     */
+    private static final System.Logger LOGGER = Log.get(NotificationDeviceDispatcher.class);
+
     /**
      * Handles {@code type="devices"} notifications carrying device add, remove, or update actions
      * for a user's device list.
@@ -121,6 +129,9 @@ public final class NotificationDeviceDispatcher extends SocketStreamHandler.Conc
             case "server_sync" ->
                     notificationSyncHandler.handle(stanza);
             default -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "dropping device-branch notification with unowned type {0}", type);
+                }
             }
         }
     }
@@ -133,6 +144,9 @@ public final class NotificationDeviceDispatcher extends SocketStreamHandler.Conc
      */
     @Override
     public void reset() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "propagating stream reset to device-branch sub-handlers");
+        }
         notificationDeviceHandler.reset();
         notificationLinkingHandler.reset();
         notificationServerCryptoHandler.reset();

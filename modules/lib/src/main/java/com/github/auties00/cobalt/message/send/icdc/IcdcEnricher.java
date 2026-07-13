@@ -27,10 +27,10 @@ public final class IcdcEnricher {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private IcdcEnricher() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

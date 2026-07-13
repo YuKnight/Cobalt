@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.token.ContentBindingToken;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.util.List;
 import java.util.Map;
@@ -29,15 +31,15 @@ import java.util.Map;
 @WhatsAppWebModule(moduleName = "WAWebMsgRcatUtils")
 public final class SenderContentBindingStanza {
     /**
-     * Logs RCAT generation failures.
+     * The logger for {@link SenderContentBindingStanza}.
      */
-    private static final System.Logger LOGGER = System.getLogger(SenderContentBindingStanza.class.getName());
+    private static final System.Logger LOGGER = Log.get(SenderContentBindingStanza.class);
 
     /**
      * Prevents instantiation; this is a static composer.
      */
     private SenderContentBindingStanza() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -78,10 +80,10 @@ public final class SenderContentBindingStanza {
             var bindings = ContentBindingToken.generate(
                     messageInfo.key().id().orElseThrow(), messageSecret,
                     userJid, List.of(userJid), contentId);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sender content binding derived for user {0}", userJid);
             return build(userJid, bindings);
         } catch (GeneralSecurityException e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to generate sender content binding: {0}", e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sender content binding generation failed", e);
             return null;
         }
     }

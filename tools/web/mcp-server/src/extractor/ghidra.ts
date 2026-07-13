@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -188,15 +188,53 @@ export interface WasmDecompileResult {
   signature: string;
   decompiled: boolean;
   code: string;
+  error?: string;
+  hint?: string;
+}
+
+export interface WasmDecompileOptions extends GhidraOptions {
+  cacheDir?: string;
 }
 
 export async function decompileWasmFunctions(
   wasmPath: string,
   funcIndices: number[],
-  options: GhidraOptions = {}
+  options: WasmDecompileOptions = {}
 ): Promise<WasmDecompileResult[]> {
   if (funcIndices.length === 0) return [];
 
+  const { cacheDir } = options;
+  const resultByIdx = new Map<number, WasmDecompileResult>();
+  const misses: number[] = [];
+  for (const idx of new Set(funcIndices)) {
+    const cached = cacheDir ? await readDecompileCache(cacheDir, idx) : null;
+    if (cached) resultByIdx.set(idx, cached);
+    else misses.push(idx);
+  }
+
+  if (misses.length > 0) {
+    const fresh = await runWasmDecompile(wasmPath, misses, options);
+    for (const result of fresh) {
+      resultByIdx.set(result.funcIndex, result);
+      if (cacheDir) {
+        await writeDecompileCache(cacheDir, result.funcIndex, result).catch(() => {});
+      }
+    }
+  }
+
+  const out: WasmDecompileResult[] = [];
+  for (const idx of funcIndices) {
+    const result = resultByIdx.get(idx);
+    if (result) out.push(withDecompileHint(result));
+  }
+  return out;
+}
+
+async function runWasmDecompile(
+  wasmPath: string,
+  funcIndices: number[],
+  options: GhidraOptions
+): Promise<WasmDecompileResult[]> {
   const ghidraDir = await findGhidraInstallation(options.ghidraPath);
   const headless = ghidraDir ? analyzeHeadlessPath(ghidraDir) : "analyzeHeadless";
 
@@ -211,30 +249,27 @@ export async function decompileWasmFunctions(
     "WasmProj",
     "-import",
     wasmPath,
-
+    "-noanalysis",
     "-scriptPath",
     SCRIPTS_DIR,
     "-postScript",
     GHIDRA_WASM_SCRIPT_NAME,
     indicesPath,
     outputPath,
-    "-analysisTimeoutPerFile",
-    String(timeoutSec),
     "-deleteProject",
   ];
 
-  // Importing and auto-analyzing a multi-MB WASM module dominates the runtime of
-  // a single-function decompile, so the post-script handles a whole batch in one
-  // invocation to pay that cost once. Ghidra defaults to all available cores;
-  // only throttle when a caller explicitly asks, since -max-cpu slows the
-  // already-dominant analysis pass.
   if (options.maxCpu != null) {
     args.push("-max-cpu", String(options.maxCpu));
   }
 
   log.info(`running headless wasm decompile on ${wasmPath} funcIndices=[${funcIndices.join(",")}]`);
   try {
-    await execFileAsync(headless, args, { timeout: timeoutSec * 1000 * 2, maxBuffer: 50 * 1024 * 1024 });
+    await execFileAsync(headless, args, {
+      timeout: timeoutSec * 1000 * 2,
+      maxBuffer: 50 * 1024 * 1024,
+      env: { ...process.env, MAXMEM: process.env.MAXMEM ?? "6G" },
+    });
   } catch (error) {
     await rm(projectDir, { recursive: true, force: true }).catch(() => {});
     const message = error instanceof Error ? error.message : String(error);
@@ -251,6 +286,41 @@ export async function decompileWasmFunctions(
   const raw = await readFile(outputPath, "utf8");
   await rm(projectDir, { recursive: true, force: true }).catch(() => {});
   return JSON.parse(raw) as WasmDecompileResult[];
+}
+
+function withDecompileHint(result: WasmDecompileResult): WasmDecompileResult {
+  if (result.decompiled) return result;
+  return {
+    ...result,
+    hint:
+      result.hint ??
+      "Ghidra's wasm plugin could not decode this function (commonly the SIMD/atomics " +
+        "opcodes it mis-decodes). Request the same index with format='wat' for a readable disassembly.",
+  };
+}
+
+async function readDecompileCache(
+  cacheDir: string,
+  funcIndex: number
+): Promise<WasmDecompileResult | null> {
+  try {
+    const raw = await readFile(join(cacheDir, `${funcIndex}.json`), "utf8");
+    return JSON.parse(raw) as WasmDecompileResult;
+  } catch {
+    return null;
+  }
+}
+
+async function writeDecompileCache(
+  cacheDir: string,
+  funcIndex: number,
+  result: WasmDecompileResult
+): Promise<void> {
+  await mkdir(cacheDir, { recursive: true });
+  const finalPath = join(cacheDir, `${funcIndex}.json`);
+  const tmpPath = `${finalPath}.tmp-${process.pid}`;
+  await writeFile(tmpPath, JSON.stringify(result));
+  await rename(tmpPath, finalPath);
 }
 
 function analyzeHeadlessPath(ghidraDir: string): string {
@@ -272,7 +342,7 @@ async function fileExists(path: string): Promise<boolean> {
 function execFileAsync(
   command: string,
   args: string[],
-  options?: { timeout?: number; maxBuffer?: number }
+  options?: { timeout?: number; maxBuffer?: number; env?: NodeJS.ProcessEnv }
 ): Promise<{ stdout: string; stderr: string }> {
 
   const isWindowsBatch = process.platform === "win32" && /\.(bat|cmd)$/i.test(command);
@@ -288,6 +358,7 @@ function execFileAsync(
         encoding: "utf8",
         shell: isWindowsBatch,
         windowsHide: true,
+        ...(options?.env ? { env: options.env } : {}),
       },
       (error, stdout, stderr) => {
         if (error) {

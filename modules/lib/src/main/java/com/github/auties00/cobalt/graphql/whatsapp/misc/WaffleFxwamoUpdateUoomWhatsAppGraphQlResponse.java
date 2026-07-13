@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the Waffle FX WAMO update-UOOM mutation built by
+ * Parses the graph.whatsapp.com GraphQL response of the Waffle FX WAMO update-UOOM mutation built by
  * {@link WaffleFxwamoUpdateUoomWhatsAppGraphQlRequest}.
  *
  * <p>Exposes the single boolean scalar field {@code xfb_waffle_fx_wamo_update_uoom}, the outcome of
@@ -21,7 +21,7 @@ import java.util.Optional;
 public final class WaffleFxwamoUpdateUoomWhatsAppGraphQlResponse implements WhatsAppGraphQlOperation.Response {
     /**
      * Holds the update outcome returned under {@code xfb_waffle_fx_wamo_update_uoom}, or {@code null}
-     * when the relay omitted the field.
+     * when the graph.whatsapp.com endpoint omitted the field.
      */
     private final Boolean updated;
 
@@ -30,14 +30,14 @@ public final class WaffleFxwamoUpdateUoomWhatsAppGraphQlResponse implements What
      *
      * <p>Reserved for the static parser.
      *
-     * @param updated the update outcome, or {@code null} when the relay omitted the field
+     * @param updated the update outcome, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private WaffleFxwamoUpdateUoomWhatsAppGraphQlResponse(Boolean updated) {
         this.updated = updated;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the scalar root {@code xfb_waffle_fx_wamo_update_uoom}; the returned {@link Optional}
      * is empty when {@code data} is {@code null}.
@@ -58,7 +58,7 @@ public final class WaffleFxwamoUpdateUoomWhatsAppGraphQlResponse implements What
     /**
      * Returns whether the universal opt-out update succeeded.
      *
-     * @return {@code true} when the relay reported a successful update, {@code false} when it
+     * @return {@code true} when the graph.whatsapp.com endpoint reported a successful update, {@code false} when it
      *         reported failure or omitted the field
      */
     public boolean updated() {

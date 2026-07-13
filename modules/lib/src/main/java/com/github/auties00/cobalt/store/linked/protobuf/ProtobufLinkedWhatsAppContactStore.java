@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.business.BusinessVerifiedName;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.contact.Contact;
@@ -20,6 +21,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -44,12 +46,17 @@ import static java.util.Objects.requireNonNullElseGet;
  * This implementation seeds the LID mapping table from the contacts passed to its constructor. The
  * self-address case of {@link #findPhoneByLid(Jid)} and {@link #findLidByPhone(Jid)} reads the local
  * account JID/LID through an {@link LinkedWhatsAppAccountStore} reference wired by the owning aggregate via
- * {@link #bindAccount(LinkedWhatsAppAccountStore)} after construction (the protobuf deserializer cannot pass a
+ * {@link #setAccount(LinkedWhatsAppAccountStore)} after construction (the protobuf deserializer cannot pass a
  * sibling sub-store into this object's constructor).
  */
 @ProtobufMessage
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppContactStore {
+    /**
+     * The logger for {@link ProtobufLinkedWhatsAppContactStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufLinkedWhatsAppContactStore.class);
+
     /**
      * The maximum number of per-user device-list entries kept before the eldest is evicted.
      */
@@ -161,15 +168,24 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
             contact.lid()
                     .ifPresent(entry -> registerLidMapping(contact.jid(), entry));
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "contact store initialized, contacts={0}, outContacts={1}, verifiedNames={2}",
+                    contactsMap.size(), this.outContactsMap.size(), this.verifiedBusinessNamesMap.size());
+        }
     }
 
     /**
-     * Binds the account sub-store used for the self-address LID resolution case.
+     * Sets the account sub-store used for the self-address LID resolution case.
+     *
+     * <p>The account sub-store cannot be a constructor argument because the protobuf deserializer builds
+     * this sub-store from its own wire fields alone; it is set once by the {@link ProtobufWhatsAppStore}
+     * aggregate constructor, which composes both sub-stores.
      *
      * @param account the account sub-store, never {@code null}
      */
-    void bindAccount(LinkedWhatsAppAccountStore account) {
+    void setAccount(LinkedWhatsAppAccountStore account) {
         this.account = Objects.requireNonNull(account, "account cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "contact store account sub-store set");
     }
 
     /**
@@ -253,6 +269,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
     @Override
     public Contact addContact(Contact contact) {
         Objects.requireNonNull(contact, "contact cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "adding contact {0}", contact.jid());
         contactsMap.put(contact.jid(), contact);
         return contact;
     }
@@ -270,6 +287,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
             return Optional.empty();
         } else {
             var targetJid = contactJid.toJid();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing contact {0}", targetJid);
             if (targetJid.hasUserServer()) {
                 var jidContact = contactsMap.remove(targetJid);
                 if (jidContact != null) {
@@ -389,6 +407,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
     @Override
     public LinkedWhatsAppContactStore addOutContact(OutContact outContact) {
         Objects.requireNonNull(outContact, "outContact cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "adding out-contact {0}", outContact.jid());
         outContactsMap.merge(outContact.jid(), outContact, (existing, incoming) -> {
             existing.setFullName(incoming.fullName().orElse(null));
             existing.setFirstName(incoming.firstName().orElse(null));
@@ -435,12 +454,16 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
         if (timestamp != null) {
             var existing = lidMappingTimestamps.get(normalizedLid);
             if (existing != null && timestamp.isBefore(existing)) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "dropping stale lid mapping for {0}, event older than recorded timestamp", normalizedLid);
+                }
                 return;
             }
             lidMappingTimestamps.put(normalizedLid, timestamp);
         }
         lidToPhoneMappings.put(normalizedLid, normalizedPhone);
         phoneToLidMappings.put(normalizedPhone, normalizedLid);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "registered lid mapping {0} <-> {1}", normalizedPhone, normalizedLid);
     }
 
     /**
@@ -467,6 +490,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
         if (mapped != null) {
             return Optional.of(mapped);
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "lid mapping table miss for {0}, scanning contacts", lidJid);
         return contactsMap.values()
                 .stream()
                 .filter(contact -> contact.lid().filter(lidJid::equals).isPresent())
@@ -503,6 +527,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
         if (mapped != null) {
             return Optional.of(mapped);
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "phone-to-lid mapping table miss for {0}, checking contact record", normalisedPhone);
         var contact = contactsMap.get(normalisedPhone);
         if (contact != null) {
             return contact.lid();
@@ -520,12 +545,14 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
     public void addVerifiedBusinessName(Jid jid, BusinessVerifiedName record) {
         Objects.requireNonNull(jid, "jid cannot be null");
         Objects.requireNonNull(record, "record cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "adding verified business name for {0}", jid);
         verifiedBusinessNamesMap.put(jid.toUserJid(), record);
     }
 
     @Override
     public void removeVerifiedBusinessName(Jid jid) {
         Objects.requireNonNull(jid, "jid cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing verified business name for {0}", jid);
         verifiedBusinessNamesMap.remove(jid.toUserJid());
     }
 
@@ -559,6 +586,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
             return Optional.empty();
         }
 
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "device list cache miss for {0}, resolved alternate identity {1}", userJid, alternateJid);
         var alternateList = deviceLists.get(alternateJid);
         return Optional.ofNullable(alternateList);
     }
@@ -583,6 +611,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
         var userJid = deviceList.userJid();
 
         if (deviceLists.size() >= MAX_DEVICE_LISTS && !deviceLists.containsKey(userJid)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "device list cache full at {0} entries, evicting eldest entry", MAX_DEVICE_LISTS);
             deviceLists.pollLastEntry();
         }
 
@@ -628,6 +657,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
     @Override
     public void addBlockedContact(Jid contact) {
         if (contact != null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "blocking contact {0}", contact);
             blockedContacts.add(contact.toUserJid());
         }
     }
@@ -635,6 +665,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
     @Override
     public void removeBlockedContact(Jid contact) {
         if (contact != null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unblocking contact {0}", contact);
             blockedContacts.remove(contact.toUserJid());
         }
     }
@@ -649,6 +680,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
                 }
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "block list replaced, entries={0}", blockedContacts.size());
     }
 
     @Override
@@ -711,6 +743,7 @@ public final class ProtobufLinkedWhatsAppContactStore implements LinkedWhatsAppC
     @Override
     public LinkedWhatsAppContactStore putDeviceCapabilitiesEntry(DeviceCapabilitiesEntry entry) {
         Objects.requireNonNull(entry, "entry cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "storing device capabilities entry for {0}", entry.deviceJid());
         deviceCapabilitiesStates.put(entry.deviceJid(), entry);
         return this;
     }

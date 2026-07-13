@@ -2,9 +2,14 @@ package com.github.auties00.cobalt.graphql.facebook.misc;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
+import com.github.auties00.cobalt.graphql.facebook.ads.BizAdInputJson;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.ads.AdsLwiAudience;
+import com.github.auties00.cobalt.model.business.ads.OptimizationGoalInput;
+import com.github.auties00.cobalt.model.business.ads.PlacementSpec;
+import com.github.auties00.cobalt.model.business.ads.TargetingSpec;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -31,11 +36,9 @@ import java.io.UncheckedIOException;
  * (numeric strings), not WhatsApp addresses, so they are modelled as {@code String} rather than
  * {@link com.github.auties00.cobalt.model.jid.Jid}; {@code currency}, {@code flowID} and {@code flow}
  * are scalar {@code String} variables. The {@code targetingSpecAudience}, {@code optimizationGoalInput},
- * {@code audienceOptionAudience} and {@code configuredPlacementSpec} variables are GraphQL input
- * objects whose field names are not recoverable from the bundle, so each is accepted as a
- * caller-supplied, already JSON-encoded object literal and spliced in verbatim via
- * {@link JSONWriter#writeRaw(String)}. Once a caller that builds those objects surfaces, replace the
- * raw-JSON fields with typed scalar fields mirroring that construction.
+ * {@code audienceOptionAudience} and {@code configuredPlacementSpec} variables are the typed
+ * {@link TargetingSpec}, {@link OptimizationGoalInput}, {@link AdsLwiAudience} and {@link PlacementSpec}
+ * input objects, mapped to their snake_case JSON shapes by {@link BizAdInputJson}.
  *
  * @see EstimatedDailyReachFacebookGraphQlResponse
  */
@@ -69,28 +72,28 @@ public final class EstimatedDailyReachFacebookGraphQlRequest implements Facebook
     private final String legacyAdAccountId;
 
     /**
-     * The pre-encoded JSON of the {@code targetingSpecAudience} GraphQL input object carrying the
-     * audience targeting spec, or {@code null} to omit it.
+     * The {@code targetingSpecAudience} GraphQL input object carrying the audience targeting spec, or
+     * {@code null} to omit it.
      */
-    private final String targetingSpecAudienceJson;
+    private final TargetingSpec targetingSpecAudience;
 
     /**
-     * The pre-encoded JSON of the {@code optimizationGoalInput} GraphQL input object carrying the
-     * optimisation goal, or {@code null} to omit it.
+     * The {@code optimizationGoalInput} GraphQL input object carrying the optimisation goal, or
+     * {@code null} to omit it.
      */
-    private final String optimizationGoalInputJson;
+    private final OptimizationGoalInput optimizationGoalInput;
 
     /**
-     * The pre-encoded JSON of the {@code audienceOptionAudience} GraphQL input object carrying the
-     * chosen audience option, or {@code null} to omit it.
+     * The {@code audienceOptionAudience} GraphQL input object carrying the chosen audience option, or
+     * {@code null} to omit it.
      */
-    private final String audienceOptionAudienceJson;
+    private final AdsLwiAudience audienceOptionAudience;
 
     /**
-     * The pre-encoded JSON of the {@code configuredPlacementSpec} GraphQL input object carrying the
-     * configured placement spec, or {@code null} to omit it.
+     * The {@code configuredPlacementSpec} GraphQL input object carrying the configured placement spec,
+     * or {@code null} to omit it.
      */
-    private final String configuredPlacementSpecJson;
+    private final PlacementSpec configuredPlacementSpec;
 
     /**
      * The {@code currency} GraphQL variable naming the billing currency the estimate is expressed in,
@@ -122,38 +125,32 @@ public final class EstimatedDailyReachFacebookGraphQlRequest implements Facebook
      *
      * <p>The {@code legacyAdAccountId}, {@code currency}, {@code postId}, {@code flowId} and
      * {@code flow} populate the corresponding scalar GraphQL variables. The
-     * {@code targetingSpecAudienceJson}, {@code optimizationGoalInputJson},
-     * {@code audienceOptionAudienceJson} and {@code configuredPlacementSpecJson} are the
-     * already-JSON-encoded {@code targetingSpecAudience}, {@code optimizationGoalInput},
-     * {@code audienceOptionAudience} and {@code configuredPlacementSpec} input objects; their field
-     * names are defined by the server-side input types and are not modelled here (see the class
-     * {@code @implNote}). Each value that is {@code null} omits its variable from the serialized
-     * object.
+     * {@code targetingSpecAudience}, {@code optimizationGoalInput}, {@code audienceOptionAudience} and
+     * {@code configuredPlacementSpec} are the typed input objects the estimate is parameterised by.
+     * Each value that is {@code null} omits its variable from the serialized object.
      *
-     * @param legacyAdAccountId           the Facebook ad-account identifier, or {@code null} to omit
-     *                                    the variable
-     * @param targetingSpecAudienceJson   the already-JSON-encoded {@code targetingSpecAudience}
-     *                                    object, or {@code null} to omit the variable
-     * @param optimizationGoalInputJson   the already-JSON-encoded {@code optimizationGoalInput}
-     *                                    object, or {@code null} to omit the variable
-     * @param audienceOptionAudienceJson  the already-JSON-encoded {@code audienceOptionAudience}
-     *                                    object, or {@code null} to omit the variable
-     * @param configuredPlacementSpecJson the already-JSON-encoded {@code configuredPlacementSpec}
-     *                                    object, or {@code null} to omit the variable
-     * @param currency                    the billing currency, or {@code null} to omit the variable
-     * @param postId                      the Facebook post identifier, or {@code null} to omit the
-     *                                    variable
-     * @param flowId                      the ad-creation flow instance identifier, or {@code null} to
-     *                                    omit the variable
-     * @param flow                        the ad-creation flow name, or {@code null} to omit the
-     *                                    variable
+     * @param legacyAdAccountId       the Facebook ad-account identifier, or {@code null} to omit
+     *                                the variable
+     * @param targetingSpecAudience   the {@code targetingSpecAudience} object, or {@code null} to omit
+     *                                the variable
+     * @param optimizationGoalInput   the {@code optimizationGoalInput} object, or {@code null} to omit
+     *                                the variable
+     * @param audienceOptionAudience  the {@code audienceOptionAudience} object, or {@code null} to omit
+     *                                the variable
+     * @param configuredPlacementSpec the {@code configuredPlacementSpec} object, or {@code null} to
+     *                                omit the variable
+     * @param currency                the billing currency, or {@code null} to omit the variable
+     * @param postId                  the Facebook post identifier, or {@code null} to omit the variable
+     * @param flowId                  the ad-creation flow instance identifier, or {@code null} to omit
+     *                                the variable
+     * @param flow                    the ad-creation flow name, or {@code null} to omit the variable
      */
-    public EstimatedDailyReachFacebookGraphQlRequest(String legacyAdAccountId, String targetingSpecAudienceJson, String optimizationGoalInputJson, String audienceOptionAudienceJson, String configuredPlacementSpecJson, String currency, String postId, String flowId, String flow) {
+    public EstimatedDailyReachFacebookGraphQlRequest(String legacyAdAccountId, TargetingSpec targetingSpecAudience, OptimizationGoalInput optimizationGoalInput, AdsLwiAudience audienceOptionAudience, PlacementSpec configuredPlacementSpec, String currency, String postId, String flowId, String flow) {
         this.legacyAdAccountId = legacyAdAccountId;
-        this.targetingSpecAudienceJson = targetingSpecAudienceJson;
-        this.optimizationGoalInputJson = optimizationGoalInputJson;
-        this.audienceOptionAudienceJson = audienceOptionAudienceJson;
-        this.configuredPlacementSpecJson = configuredPlacementSpecJson;
+        this.targetingSpecAudience = targetingSpecAudience;
+        this.optimizationGoalInput = optimizationGoalInput;
+        this.audienceOptionAudience = audienceOptionAudience;
+        this.configuredPlacementSpec = configuredPlacementSpec;
         this.currency = currency;
         this.postId = postId;
         this.flowId = flowId;
@@ -180,14 +177,11 @@ public final class EstimatedDailyReachFacebookGraphQlRequest implements Facebook
      * {@inheritDoc}
      *
      * @implNote This implementation emits {@code {"legacyAdAccountID": <legacyAdAccountId>,
-     * "targetingSpecAudience": <targetingSpecAudienceJson>, "optimizationGoalInput":
-     * <optimizationGoalInputJson>, "audienceOptionAudience": <audienceOptionAudienceJson>,
-     * "configuredPlacementSpec": <configuredPlacementSpecJson>, "currency": <currency>, "postID":
-     * <postId>, "flowID": <flowId>, "flow": <flow>}}, writing each variable only when its value is
-     * non-null and emitting {@code "{}"} when all are {@code null}. The {@code targetingSpecAudience},
-     * {@code optimizationGoalInput}, {@code audienceOptionAudience} and {@code configuredPlacementSpec}
-     * values are spliced in as raw JSON values via {@link JSONWriter#writeRaw(String)} because they
-     * are supplied already encoded.
+     * "targetingSpecAudience": {...}, "optimizationGoalInput": {...}, "audienceOptionAudience": {...},
+     * "configuredPlacementSpec": {...}, "currency": <currency>, "postID": <postId>, "flowID": <flowId>,
+     * "flow": <flow>}}, writing each variable only when its value is non-null and emitting {@code "{}"}
+     * when all are {@code null}. The four typed input objects are mapped to their snake_case JSON
+     * shapes by {@link BizAdInputJson}.
      */
     @Override
     public String variables() {
@@ -199,28 +193,28 @@ public final class EstimatedDailyReachFacebookGraphQlRequest implements Facebook
                 writer.writeString(legacyAdAccountId);
             }
 
-            if (targetingSpecAudienceJson != null) {
+            if (targetingSpecAudience != null) {
                 writer.writeName("targetingSpecAudience");
                 writer.writeColon();
-                writer.writeRaw(targetingSpecAudienceJson);
+                BizAdInputJson.writeTargetingSpec(writer, targetingSpecAudience);
             }
 
-            if (optimizationGoalInputJson != null) {
+            if (optimizationGoalInput != null) {
                 writer.writeName("optimizationGoalInput");
                 writer.writeColon();
-                writer.writeRaw(optimizationGoalInputJson);
+                BizAdInputJson.writeOptimizationGoalInput(writer, optimizationGoalInput);
             }
 
-            if (audienceOptionAudienceJson != null) {
+            if (audienceOptionAudience != null) {
                 writer.writeName("audienceOptionAudience");
                 writer.writeColon();
-                writer.writeRaw(audienceOptionAudienceJson);
+                BizAdInputJson.writeAdsLwiAudience(writer, audienceOptionAudience);
             }
 
-            if (configuredPlacementSpecJson != null) {
+            if (configuredPlacementSpec != null) {
                 writer.writeName("configuredPlacementSpec");
                 writer.writeColon();
-                writer.writeRaw(configuredPlacementSpecJson);
+                BizAdInputJson.writePlacementSpec(writer, configuredPlacementSpec);
             }
 
             if (currency != null) {

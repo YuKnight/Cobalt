@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -15,6 +16,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -33,6 +35,10 @@ import java.util.List;
  */
 @WhatsAppWebModule(moduleName = "WAWebArchiveSettingSync")
 public final class UnarchiveChatsSettingHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link UnarchiveChatsSettingHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(UnarchiveChatsSettingHandler.class);
 
     /**
      * Constructs the handler.
@@ -124,14 +130,17 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
 
         try {
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof UnarchiveChatsSetting setting)) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unarchive chats setting: malformed mutation value");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var unarchiveChats = setting.unarchiveChats();
             client.store().settingsStore().setUnarchiveChats(unarchiveChats);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unarchive chats setting: set unarchiveChats={0}", unarchiveChats);
             updateSideEffectOnChats(client, unarchiveChats);
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "unarchive chats setting mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -183,6 +192,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
         //       maintains active-message-range tracking; today Cobalt may unarchive chats
         //       that WA Web would have left archived.
         var archiveEntries = client.store().syncStore().getSyncActionEntries(SyncPatchType.REGULAR_LOW);
+        var unarchivedCount = 0;
         for (var entry : archiveEntries) {
             if (entry.actionState() != SyncActionState.SUCCESS
                     && entry.actionState() != SyncActionState.ORPHAN) {
@@ -227,7 +237,10 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
             }
 
             chat.get().setArchived(false);
+            unarchivedCount++;
         }
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "unarchive chats setting: unarchived {0} chats", unarchivedCount);
     }
 
     /**
@@ -249,6 +262,7 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
     @WhatsAppWebExport(moduleName = "WAWebArchiveSettingSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     private void applyArchiveSideEffect(LinkedWhatsAppClient client) {
         var archiveEntries = client.store().syncStore().getSyncActionEntries(SyncPatchType.REGULAR_LOW);
+        var archivedCount = 0;
         for (var entry : archiveEntries) {
             if (entry.actionState() != SyncActionState.SUCCESS) {
                 continue;
@@ -284,7 +298,10 @@ public final class UnarchiveChatsSettingHandler implements WebAppStateActionHand
             }
 
             chat.get().setArchived(true);
+            archivedCount++;
         }
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "unarchive chats setting: re-archived {0} chats", archivedCount);
     }
 
     /**

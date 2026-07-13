@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.wam.privatestats;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.wam.type.PsBufferUploadResult;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -60,6 +62,11 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebUploadPrivateStatsBackend")
 public final class WamPrivateStatsUploader {
+    /**
+     * The logger for {@link WamPrivateStatsUploader}.
+     */
+    private static final System.Logger LOGGER = Log.get(WamPrivateStatsUploader.class);
+
     /**
      * The destination URL accepting the upload.
      */
@@ -188,9 +195,19 @@ public final class WamPrivateStatsUploader {
     @WhatsAppWebExport(moduleName = "WAWebUploadPrivateStatsBackend", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public WamPrivateStatsUploadResult upload(byte[] buffer) {
         Objects.requireNonNull(buffer, "buffer must not be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wam private-stats upload starting, size={0}", buffer.length);
         var startNanos = System.nanoTime();
         var result = doUpload(buffer);
         var uploadMillis = (System.nanoTime() - startNanos) / 1_000_000L;
+        if (result.result() == WamPrivateStatsUploadResult.Type.SUCCESS) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "wam private-stats upload succeeded, httpStatus={0} durationMs={1}",
+                        result.httpResponseCode(), uploadMillis);
+            }
+        } else if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "wam private-stats upload failed, result={0} httpStatus={1} durationMs={2}",
+                    result.result(), result.httpResponseCode(), uploadMillis);
+        }
         emitBufferUploadEvent(result, uploadMillis);
         return result;
     }
@@ -211,6 +228,7 @@ public final class WamPrivateStatsUploader {
         try {
             token = issuer.issue();
         } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "wam private-stats token issuance failed", e);
             return new WamPrivateStatsUploadResult(WamPrivateStatsUploadResult.Type.ERROR_CREDENTIAL, -1);
         }
 
@@ -224,8 +242,10 @@ public final class WamPrivateStatsUploader {
                 .build();
 
         try {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "posting wam private-stats buffer, size={0}", buffer.length);
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
             var status = response.statusCode();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wam private-stats upload response received, httpStatus={0}", status);
             return switch (status) {
                 case 200 -> new WamPrivateStatsUploadResult(WamPrivateStatsUploadResult.Type.SUCCESS, status);
                 case 400 -> new WamPrivateStatsUploadResult(WamPrivateStatsUploadResult.Type.ERROR_PARSING, status);
@@ -233,7 +253,8 @@ public final class WamPrivateStatsUploader {
                 case 429, 500 -> new WamPrivateStatsUploadResult(WamPrivateStatsUploadResult.Type.ERROR_SERVER_OTHER, status);
                 default -> new WamPrivateStatsUploadResult(WamPrivateStatsUploadResult.Type.ERROR_OTHER, status);
             };
-        } catch (Throwable _) {
+        } catch (Throwable e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "wam private-stats upload transport failure", e);
             return new WamPrivateStatsUploadResult(WamPrivateStatsUploadResult.Type.ERROR_OTHER, -1);
         }
     }
@@ -265,6 +286,10 @@ public final class WamPrivateStatsUploader {
      */
     @WhatsAppWebExport(moduleName = "WAWebPsBufferUploadWamEvent", exports = "PsBufferUploadWamEvent", adaptation = WhatsAppAdaptation.ADAPTED)
     private void emitBufferUploadEvent(WamPrivateStatsUploadResult result, long uploadMillis) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "committing ps-buffer-upload wam event, result={0} httpStatus={1} durationMs={2}",
+                    result.result(), result.httpResponseCode(), uploadMillis);
+        }
         wamService.commit(new PsBufferUploadEventBuilder()
                 .psBufferUploadResult(mapResult(result.result()))
                 .psBufferUploadT(Instant.ofEpochMilli(uploadMillis))

@@ -12,6 +12,9 @@ import com.github.auties00.cobalt.calls.media.audio.codec.EncodedAudioFrame;
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusAudioCodec;
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusCodecParams;
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusDefaultAttr;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * The MLow low bitrate speech codec, a permitted {@link AudioCodec} backed by the pure Java
@@ -112,9 +115,9 @@ public final class MLowAudioCodec implements AudioCodec {
     private static final int INITIAL_TARGET_BITRATE = 25000;
 
     /**
-     * The system logger MLow uses to record an applied target bitrate change, at {@code INFO} level.
+     * The logger for {@link MLowAudioCodec}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MLowAudioCodec.class.getName());
+    private static final System.Logger LOGGER = Log.get(MLowAudioCodec.class);
 
     /**
      * The pure Java MLow CELP analysis by synthesis kernel the encode path delegates to.
@@ -210,6 +213,10 @@ public final class MLowAudioCodec implements AudioCodec {
         var discontinuous = payload.length < SPEECH_THRESHOLD_BYTES;
         lastWasDiscontinuous = discontinuous;
         var levelDbov = audioLevelDbov(pcm, frameSize);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls mlow encode: bytes={0} voiceActive={1} discontinuous={2} fec={3}",
+                    payload.length, voiceActive, discontinuous, hasFec);
+        }
         return new EncodedAudioFrame(payload, voiceActive, discontinuous, hasFec, levelDbov);
     }
 
@@ -229,6 +236,10 @@ public final class MLowAudioCodec implements AudioCodec {
         requireOpen();
         var pcm = decoder.decode(payload, frameSize, decodeFec);
         totalDecodedFrames++;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls mlow decode: bytes={0} decodeFec={1} samples={2}",
+                    payload.length, decodeFec, pcm.length);
+        }
         return pcm;
     }
 
@@ -248,6 +259,10 @@ public final class MLowAudioCodec implements AudioCodec {
                 ? decoder.decode(nextPayload, frameSize, true)
                 : decoder.conceal(frameSize);
         totalDecodedFrames++;
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "calls mlow recover: concealmentOnly={0} frameSize={1}",
+                    nextPayload == null, frameSize);
+        }
         return pcm;
     }
 
@@ -279,7 +294,7 @@ public final class MLowAudioCodec implements AudioCodec {
         }
         encoder.updateTargetBitrate(clamped);
         appliedTargetBitrate = clamped;
-        LOGGER.log(System.Logger.Level.INFO, "calls MLow audio target bitrate -> {0} bps", clamped);
+        if (Log.INFO) LOGGER.log(Level.INFO, "calls mlow audio target bitrate -> {0} bps", clamped);
     }
 
     /**
@@ -316,6 +331,7 @@ public final class MLowAudioCodec implements AudioCodec {
     public void close() {
         decoder.close();
         closed = true;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls mlow codec closed");
     }
 
     /**

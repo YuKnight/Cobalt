@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.key;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -26,6 +27,7 @@ import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProce
 import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
 import com.github.auties00.cobalt.wam.type.MdAppStateKeyRotationReasonCode;
 
+import java.lang.System.Logger.Level;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -35,7 +37,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 
 /**
  * Live implementation of {@link SyncKeyRotationService} that manages the lifecycle of the active
@@ -64,9 +65,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebTasksDefinitions")
 public final class LiveSyncKeyRotationService implements SyncKeyRotationService {
     /**
-     * Holds the diagnostic logger for the sync key rotation flow.
+     * The logger for {@link LiveSyncKeyRotationService}.
      */
-    private static final Logger LOGGER = Logger.getLogger(LiveSyncKeyRotationService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveSyncKeyRotationService.class);
 
     /**
      * Holds the lower bound applied to {@code syncd_key_max_use_days} after AB-prop clamping.
@@ -152,13 +153,14 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public void handleKeyShare(int senderDeviceId, List<AppStateSyncKey> keys) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "handling key share from device {0}, keys={1}", senderDeviceId, keys.size());
         var hasAnyKeyData = keys.stream()
                 .anyMatch(key -> key.keyData()
                         .flatMap(AppStateSyncKeyData::keyData)
                         .map(data -> data.length > 0)
                         .orElse(false));
         if (!hasAnyKeyData) {
-            LOGGER.warning("syncd: key share from device " + senderDeviceId + " has no keys with keydata.");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "key share from device {0} has no keys with keydata", senderDeviceId);
         }
 
         var blockedToPull = coordinator.runLocked(() -> {
@@ -185,8 +187,7 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
                     if (existingKey == null) {
                         newKeysStored.add(key);
 
-                        LOGGER.info("syncd: stored key share key id " + keyIdHex
-                                + " from device " + senderDeviceId);
+                        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stored key share, keyId={0} device={1}", keyIdHex, senderDeviceId);
                     } else {
                         var existingKeyData = existingKey.keyData()
                                 .flatMap(AppStateSyncKeyData::keyData)
@@ -196,8 +197,7 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
                                 .orElse(null);
                         if (existingKeyData != null && incomingKeyData != null
                                 && !Arrays.equals(existingKeyData, incomingKeyData)) {
-                            LOGGER.severe("syncd: got key share for existing key " + keyIdHex
-                                    + " with different key data from device " + senderDeviceId);
+                            if (Log.ERROR) LOGGER.log(Level.ERROR, "key share mismatch: existing key data differs, keyId={0} device={1}", keyIdHex, senderDeviceId);
                         }
                     }
 
@@ -239,7 +239,7 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
         });
 
         if (!blockedToPull.isEmpty()) {
-            LOGGER.info("syncd: sync blocked collections: " + blockedToPull);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "key share unblocked {0} sync collection(s): {1}", blockedToPull.size(), blockedToPull);
             whatsapp.pullWebAppState(blockedToPull.toArray(SyncPatchType[]::new));
         }
     }
@@ -334,6 +334,8 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
         if (newestKey != null) {
             expired = hasKeyExpired(newestKey);
             deviceRemoved = hasADeviceBeenRemoved(newestKey, currentFingerprint);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "active key check: expired={0} deviceRemoved={1} triggerRotation={2}",
+                    expired, deviceRemoved, triggerRotation);
 
             if (!triggerRotation || (!expired && !deviceRemoved)) {
                 return newestKey;
@@ -347,11 +349,11 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
             return newestKey;
         }
 
-        LOGGER.info("syncd: rotating key id " + SyncKeyUtils.syncKeyIdToHex(rotatedKey));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "rotating sync key, new keyId={0}", SyncKeyUtils.syncKeyIdToHex(rotatedKey));
 
         if (SyncKeyUtils.getEnableSyncdKeyPersistenceOnlyAfterServerAck(abPropsService)) {
             coordinator.runWithMonitorReleased(() -> shareKeyWithCompanionDevices(rotatedKey));
-            LOGGER.info("syncd: key share ACK received, storing key id " + SyncKeyUtils.syncKeyIdToHex(rotatedKey));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "key share ack received, storing keyId={0}", SyncKeyUtils.syncKeyIdToHex(rotatedKey));
             whatsapp.store().syncStore().addWebAppStateKeys(List.of(rotatedKey));
         } else {
             whatsapp.store().syncStore().addWebAppStateKeys(List.of(rotatedKey));
@@ -359,13 +361,13 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
         }
 
         if (expired) {
-            LOGGER.info("syncd: key rotation due to key expiry");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "key rotation triggered by expiry");
             wamService.commit(new MdAppStateKeyRotationEventBuilder()
                     .mdAppStateKeyRotationReason(MdAppStateKeyRotationReasonCode.APP_STATE_SYNC_KEY_EXPIRY)
                     .build());
         }
         if (deviceRemoved) {
-            LOGGER.info("syncd: key rotation due to device removal");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "key rotation triggered by device removal");
             wamService.commit(new MdAppStateKeyRotationEventBuilder()
                     .mdAppStateKeyRotationReason(MdAppStateKeyRotationReasonCode.DEVICE_DEREGISTERATION)
                     .build());
@@ -549,18 +551,18 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
                 .flatMap(AppStateSyncKeyId::keyId)
                 .orElse(null);
         if (previousKeyIdBytes == null) {
-            LOGGER.warning("Cannot rotate key: previous key has no ID");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot rotate key: previous key has no id");
             return null;
         }
 
         var myJid = whatsapp.store().accountStore().jid().orElse(null);
         if (myJid == null) {
-            LOGGER.warning("Cannot rotate key: own JID not available");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot rotate key: own jid not available");
             return null;
         }
 
         if (currentFingerprint == null) {
-            LOGGER.warning("Cannot rotate key: device fingerprint not available");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot rotate key: device fingerprint not available");
             return null;
         }
 
@@ -639,13 +641,13 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
      */
     private void sendAppStateSyncKeyShare(List<AppStateSyncKey> keys, List<byte[]> orphanKeyIds, List<Jid> targetDevices, String reason) {
         if (targetDevices.isEmpty()) {
-            LOGGER.fine("No target devices to share keys with");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no target devices to share keys with");
             return;
         }
 
         var myJid = whatsapp.store().accountStore().jid().orElse(null);
         if (myJid == null) {
-            LOGGER.warning("Cannot send key share: own JID not available");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot send key share: own jid not available");
             return;
         }
 
@@ -690,15 +692,14 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
         var deviceIdList = targetDevices.stream()
                 .map(Jid::device)
                 .toList();
-        LOGGER.info("syncd: send key share key id " + keyIdHexList
-                + " to peer deviceIds " + deviceIdList
-                + " due to " + reason);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "send key share: keyIds={0} deviceIds={1} reason={2}",
+                keyIdHexList, deviceIdList, reason);
 
         for (var entry : messages) {
             try {
                 whatsapp.sendPeerMessage(entry.getKey(), entry.getValue());
             } catch (Exception e) {
-                LOGGER.warning("Failed to send key share to device " + entry.getKey() + ": " + e.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to send key share to device {0}: {1}", entry.getKey(), e.getMessage());
             }
         }
     }
@@ -723,6 +724,7 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
         try {
             var myDeviceList = whatsapp.store().contactStore().findDeviceList(myJid.toUserJid());
             if (myDeviceList.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "getCompanionDevices: no device list available");
                 return List.of();
             }
 
@@ -733,7 +735,7 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
                     .map(device -> device.toDeviceJid(myJid.user(), myJid.server()))
                     .toList();
         } catch (Exception e) {
-            LOGGER.warning("[syncd] getPeerDevices: " + e.getMessage() + ". Key reqs->primary only");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "getPeerDevices: device list lookup failed, falling back to primary device only", e);
             return List.of(Jid.of(myJid.user(), myJid.server(), 0, 0));
         }
     }
@@ -759,7 +761,7 @@ public final class LiveSyncKeyRotationService implements SyncKeyRotationService 
         try {
             getActiveKey(true);
         } catch (Exception e) {
-            LOGGER.warning("Periodic key rotation check failed: " + e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "periodic key rotation check failed", e);
         }
     }
 

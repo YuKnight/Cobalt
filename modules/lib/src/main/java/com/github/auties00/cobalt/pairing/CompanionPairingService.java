@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.pairing;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
-import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
+import com.github.auties00.cobalt.exception.linked.mobile.WhatsAppRegistrationException;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore;
 
 import java.security.GeneralSecurityException;

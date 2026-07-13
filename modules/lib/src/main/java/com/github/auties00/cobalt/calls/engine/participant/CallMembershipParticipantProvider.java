@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.calls.engine.participant;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * A {@link ParticipantProvider} backed by a {@link CallMembership}'s per slot {@link CallParticipant}
@@ -73,10 +74,19 @@ final class CallMembershipParticipantProvider implements ParticipantProvider {
         return membership.participantSelfView();
     }
 
-    // TODO: override the ParticipantProvider first active peer accessor with a
-    //  CallMembership.firstActivePeerView() that scans the self view and the participant views under a single
-    //  membership lock, closing the consistency window where a reconcile can land between the separate
-    //  selfView() and views() snapshots. This needs a new single lock scan primitive on CallMembership; the
-    //  matching change (running the participant projection and control dispatch under one lock in
-    //  LifecycleController.handlePeerVideoState and handlePeerScreenShare) belongs to the lifecycle controller.
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote This implementation delegates to {@link CallMembership#firstActivePeerView()}, which scans the
+     * self slot and every member slot under a single membership lock acquisition, so the returned peer is
+     * selected against a self snapshot taken in the same critical section rather than the two separate lock
+     * acquisitions the {@link ParticipantProvider#firstActivePeer() default} takes through {@link #selfView()}
+     * and {@link #views()}. Running the participant projection and the in call control dispatch under one lock
+     * (in {@code LifecycleController.handlePeerVideoState} and {@code handlePeerScreenShare}) is a separate
+     * lifecycle controller change and is not folded in here.
+     */
+    @Override
+    public Optional<ParticipantView> firstActivePeer() {
+        return membership.firstActivePeerView();
+    }
 }

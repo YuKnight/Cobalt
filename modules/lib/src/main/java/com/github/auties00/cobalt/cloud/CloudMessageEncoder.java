@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButton;
 import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonCopyCodeBuilder;
 import com.github.auties00.cobalt.model.cloud.template.CloudTemplateButtonFlowBuilder;
@@ -33,6 +34,7 @@ import com.github.auties00.cobalt.model.message.media.VideoMessage;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
 
+import java.lang.System.Logger.Level;
 import java.util.List;
 
 /**
@@ -51,6 +53,11 @@ import java.util.List;
  * limited-time-offer templates.
  */
 public final class CloudMessageEncoder {
+    /**
+     * The logger for {@link CloudMessageEncoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(CloudMessageEncoder.class);
+
     /**
      * Private constructor; the encoder exposes only static behaviour.
      */
@@ -146,8 +153,12 @@ public final class CloudMessageEncoder {
                 root.put("type", "interactive");
                 root.put("interactive", interactiveNode(interactive));
             }
-            default -> throw new IllegalArgumentException(
-                    "message type has no Cloud API representation: " + container.content().getClass().getSimpleName());
+            default -> {
+                var typeName = container.content().getClass().getSimpleName();
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "message type has no cloud api representation: {0}", typeName);
+                throw new IllegalArgumentException(
+                        "message type has no Cloud API representation: " + typeName);
+            }
         }
     }
 
@@ -527,9 +538,10 @@ public final class CloudMessageEncoder {
         if (content instanceof InteractiveMessage.NativeFlowMessage flow) {
             return nativeFlowNode(interactive, flow);
         }
+        var typeName = content == null ? "empty" : content.getClass().getSimpleName();
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "interactive content has no cloud api representation: {0}", typeName);
         throw new IllegalArgumentException(
-                "interactive content has no Cloud API representation: "
-                        + (content == null ? "empty" : content.getClass().getSimpleName()));
+                "interactive content has no Cloud API representation: " + typeName);
     }
 
     /**
@@ -579,6 +591,9 @@ public final class CloudMessageEncoder {
             }
             default -> {
                 if (!isFlowButton(button)) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "native flow button has no cloud api representation: {0}", name);
+                    }
                     throw new IllegalArgumentException(
                             "native flow button has no Cloud API representation: " + name);
                 }
@@ -898,7 +913,10 @@ public final class CloudMessageEncoder {
                 }
                 yield new CloudTemplateComponent.Carousel(cards);
             }
-            default -> null;
+            default -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "unrecognized cloud template component type {0}", type);
+                yield null;
+            }
         };
     }
 
@@ -940,7 +958,10 @@ public final class CloudMessageEncoder {
                     .flowAction(node.getString("flow_action"))
                     .navigateScreen(node.getString("navigate_screen"))
                     .build();
-            default -> null;
+            default -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "unrecognized cloud template button type {0}", type);
+                yield null;
+            }
         };
     }
 }

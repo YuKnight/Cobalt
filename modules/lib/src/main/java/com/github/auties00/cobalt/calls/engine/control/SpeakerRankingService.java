@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +32,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.CallGridRankingChan
  * ordering.
  */
 public final class SpeakerRankingService {
+    /**
+     * The logger for {@link SpeakerRankingService}.
+     */
+    private static final System.Logger LOGGER = Log.get(SpeakerRankingService.class);
+
     /**
      * Orders participants by the grid ranking rule: raised hand first, then active speakers, then higher
      * rank, then lower index.
@@ -123,6 +130,7 @@ public final class SpeakerRankingService {
         lock.lock();
         try {
             if (inputs.remove(participant) != null) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removed participant {0} from grid ranking", participant);
                 recomputeAndEmit();
             }
         } finally {
@@ -183,6 +191,7 @@ public final class SpeakerRankingService {
                 .toList();
         if (!order.equals(lastOrder)) {
             lastOrder = order;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "grid ranking changed, {0} participants", order.size());
             events.emit(new CallGridRankingChanged(order));
         }
     }

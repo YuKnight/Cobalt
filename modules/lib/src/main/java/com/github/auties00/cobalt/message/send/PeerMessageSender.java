@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -16,6 +17,7 @@ import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
 
+import java.lang.System.Logger.Level;
 import java.util.List;
 import java.util.Objects;
 
@@ -32,9 +34,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebSendMsgCreateDeviceStanza")
 final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
     /**
-     * Surfaces peer-send diagnostics.
+     * The logger for {@link PeerMessageSender}.
      */
-    private static final System.Logger LOGGER = System.getLogger(PeerMessageSender.class.getName());
+    private static final System.Logger LOGGER = Log.get(PeerMessageSender.class);
 
     /**
      * Performs per-device Signal encryption.
@@ -93,12 +95,19 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
         var container = messageInfo.message();
         var plaintext = MessageContainerSpec.encode(container);
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sending peer message {0} to {1}", messageInfo.key().id().orElse(null), targetDevice);
+        }
+
         deviceService.ensureSessions(List.of(targetDevice));
         MessageEncryptedPayload payload;
         try {
             payload = encryption.encryptForDevice(targetDevice, plaintext);
             emitE2eMessageSendEvent(targetDevice, container, true, payload.type(), 0);
         } catch (RuntimeException encryptionError) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "peer message encryption failed for " + Log.jid(targetDevice.toString()), encryptionError);
+            }
             emitE2eMessageSendEvent(targetDevice, container, false, null, 0);
             throw encryptionError;
         }
@@ -133,7 +142,11 @@ final class PeerMessageSender extends MessageSender<ChatMessageInfo> {
 
         flushStore();
         var ackNode = client.sendNode(stanza);
-        return AckParser.parse(ackNode);
+        var ack = AckParser.parse(ackNode);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "peer message send to {0} finished, success={1}", targetDevice, ack.isSuccess());
+        }
+        return ack;
     }
 
 }

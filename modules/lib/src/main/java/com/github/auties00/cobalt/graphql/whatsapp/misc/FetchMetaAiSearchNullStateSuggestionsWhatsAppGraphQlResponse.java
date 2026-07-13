@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the Meta AI search null-state suggestions query built by
+ * Parses the graph.whatsapp.com GraphQL response of the Meta AI search null-state suggestions query built by
  * {@link FetchMetaAiSearchNullStateSuggestionsWhatsAppGraphQlRequest} into a {@link MetaAiSearchSuggestions}.
  *
  * <p>Reads the linked {@code xwa_genai_meta_ai_search_null_state} field and projects its suggestion
@@ -36,7 +36,7 @@ public final class FetchMetaAiSearchNullStateSuggestionsWhatsAppGraphQlResponse 
      *
      * <p>Reserved for the static parser.
      *
-     * @param suggestions the parsed suggestions result, or {@code null} when the relay omitted the
+     * @param suggestions the parsed suggestions result, or {@code null} when the graph.whatsapp.com endpoint omitted the
      *                    field
      */
     private FetchMetaAiSearchNullStateSuggestionsWhatsAppGraphQlResponse(MetaAiSearchSuggestions suggestions) {
@@ -44,7 +44,7 @@ public final class FetchMetaAiSearchNullStateSuggestionsWhatsAppGraphQlResponse 
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_genai_meta_ai_search_null_state} and projects its tiles onto
      * a {@link MetaAiSearchSuggestions}; the returned {@link Optional} is empty when {@code data} or the

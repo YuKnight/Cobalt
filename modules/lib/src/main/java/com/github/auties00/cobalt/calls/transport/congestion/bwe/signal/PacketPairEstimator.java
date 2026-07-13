@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.signal;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Estimates the bottleneck link capacity from packet pair dispersion and tracks a flip counter that
  * decides whether the link can sustain high definition video.
@@ -25,6 +29,11 @@ package com.github.auties00.cobalt.calls.transport.congestion.bwe.signal;
  * cannot toggle the reported capability.
  */
 public final class PacketPairEstimator {
+    /**
+     * The logger for {@link PacketPairEstimator}.
+     */
+    private static final System.Logger LOGGER = Log.get(PacketPairEstimator.class);
+
     /**
      * Smoothing factor for the exponential moving average over packet pair capacity samples.
      */
@@ -107,6 +116,9 @@ public final class PacketPairEstimator {
             return;
         }
         if (lastSampleMs >= 0 && arrivalMs - lastSampleMs > SAMPLE_WINDOW_MS) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "packet pair estimator window reset: gap={0}ms", arrivalMs - lastSampleMs);
+            }
             linkCapacityBps = 0;
             flipCount = 0;
         }
@@ -117,10 +129,19 @@ public final class PacketPairEstimator {
         } else {
             linkCapacityBps += (long) (LINK_CAPACITY_ALPHA * (instantBps - linkCapacityBps));
         }
+        var wasHdCapable = flipCount >= FLIP_COUNT_FOR_HD;
         if (linkCapacityBps > hdHighThresholdBps) {
             flipCount = Math.min(FLIP_COUNT_FOR_HD, flipCount + 1);
         } else if (linkCapacityBps < hdLowThresholdBps) {
             flipCount = Math.max(-FLIP_COUNT_FOR_HD, flipCount - 1);
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "packet pair sample: instant={0}bps capacity={1}bps flip={2}",
+                    instantBps, linkCapacityBps, flipCount);
+        }
+        var isHdCapable = flipCount >= FLIP_COUNT_FOR_HD;
+        if (Log.DEBUG && wasHdCapable != isHdCapable) {
+            LOGGER.log(Level.DEBUG, "hd capability changed: capable={0} capacity={1}bps", isHdCapable, linkCapacityBps);
         }
     }
 

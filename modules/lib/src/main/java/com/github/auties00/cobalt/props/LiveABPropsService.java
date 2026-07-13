@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.props;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppServerRuntimeException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppABPropException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppServerRuntimeException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +15,7 @@ import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.WefrClientExposureEventBuilder;
 import com.github.auties00.cobalt.wam.event.WefrGroupClientExposureEventBuilder;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -69,9 +72,9 @@ import java.util.stream.Collectors;
 @WhatsAppWebModule(moduleName = "WAWebWefrGroupClientExposureWamEvent")
 public final class LiveABPropsService implements ABPropsService {
     /**
-     * Logger used for sync-cycle warnings, errors, and informational diagnostics.
+     * The logger for {@link LiveABPropsService}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveABPropsService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveABPropsService.class);
 
     /**
      * Default timeout that query methods wait for the first sync to complete before falling back
@@ -336,9 +339,9 @@ public final class LiveABPropsService implements ABPropsService {
                 }
             } catch (Throwable throwable) {
                 lastFailure = throwable;
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "AB props sync attempt failed (remaining={0}): {1}",
-                        attempt, throwable.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "ab props sync attempt failed, remaining=" + attempt, throwable);
+                }
             }
             if (attempt > 0) {
                 try {
@@ -349,10 +352,11 @@ public final class LiveABPropsService implements ABPropsService {
                 }
             }
         }
-        LOGGER.log(System.Logger.Level.ERROR, "Failed to sync ABProps after 3 attempts");
         if (lastFailure != null) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "ab props sync failed after 3 attempts", lastFailure);
             failSync(lastFailure);
         } else {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "ab props sync failed after 3 attempts");
             completeSync(false);
         }
         return false;
@@ -428,14 +432,13 @@ public final class LiveABPropsService implements ABPropsService {
             var result = syncFuture.get().get(syncTimeout.toMillis(), TimeUnit.MILLISECONDS);
             return result != null && result;
         } catch (TimeoutException e) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Timeout waiting for AB props sync");
-            return false;
+            throw new WhatsAppABPropException.SyncTimeout(syncTimeout, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            LOGGER.log(System.Logger.Level.WARNING, "Interrupted while waiting for AB props sync");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "interrupted while waiting for ab props sync");
             return false;
         } catch (Throwable e) {
-            LOGGER.log(System.Logger.Level.WARNING, "Error waiting for AB props sync: {0}", e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "error waiting for ab props sync", e);
             return false;
         }
     }
@@ -518,7 +521,7 @@ public final class LiveABPropsService implements ABPropsService {
 
         var propsNode = response.getChild("props", null);
         if (propsNode == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "AB props response missing <props> stanza");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "ab props response missing <props> stanza");
             return false;
         }
 
@@ -526,7 +529,7 @@ public final class LiveABPropsService implements ABPropsService {
         var responseAbKey = propsNode.getAttributeAsString("ab_key").orElse(null);
         var responseRefreshOpt = propsNode.getAttributeAsLong("refresh");
         if (responseHash != null) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Updated AB props hash: {0}", responseHash);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "updated ab props hash: {0}", responseHash);
         }
 
         var isDelta = propsNode.getAttributeAsBool("delta_update", false);
@@ -556,35 +559,42 @@ public final class LiveABPropsService implements ABPropsService {
                 var eventCodeValue = eventCode.getAsInt();
                 var samplingWeightValue = samplingWeight.getAsInt();
                 if (eventCodeValue < SAMPLING_EVENT_CODE_MIN) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "Skipping SamplingConfig <prop>: event_code={0} below minimum {1}",
-                            eventCodeValue, SAMPLING_EVENT_CODE_MIN);
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "skipping samplingconfig prop: event_code={0} below minimum {1}",
+                                eventCodeValue, SAMPLING_EVENT_CODE_MIN);
+                    }
                     continue;
                 }
                 if (samplingWeightValue < SAMPLING_WEIGHT_MIN
                         || samplingWeightValue > SAMPLING_WEIGHT_MAX) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "Skipping SamplingConfig <prop>: sampling_weight={0} outside [{1}, {2}]",
-                            samplingWeightValue, SAMPLING_WEIGHT_MIN, SAMPLING_WEIGHT_MAX);
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "skipping samplingconfig prop: sampling_weight={0} outside [{1}, {2}]",
+                                samplingWeightValue, SAMPLING_WEIGHT_MIN, SAMPLING_WEIGHT_MAX);
+                    }
                     continue;
                 }
                 parsedSamplingConfigs.put(eventCodeValue, samplingWeightValue);
                 continue;
             }
 
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Skipping <prop> matching neither ExperimentConfig nor SamplingConfig");
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "skipping prop matching neither experimentconfig nor samplingconfig");
+            }
         }
 
         var samplingUpdated = !isDelta && updateEventSamplingConfigs(parsedSamplingConfigs);
 
-        LOGGER.log(System.Logger.Level.INFO,
-                "Synced {0} AB props and {1} sampling configs from server (delta={2}, samplingUpdated={3})",
-                experimentCount, parsedSamplingConfigs.size(), isDelta, samplingUpdated);
+        if (Log.INFO) {
+            LOGGER.log(Level.INFO,
+                    "synced {0} ab props and {1} sampling configs from server (delta={2}, samplingUpdated={3})",
+                    experimentCount, parsedSamplingConfigs.size(), isDelta, samplingUpdated);
+        }
 
         var eridNode = response.getChild("erid", null);
         if (eridNode != null) {
-            LOGGER.log(System.Logger.Level.DEBUG, "AB props response included <erid> blob");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ab props response included <erid> blob");
         }
 
         return true;
@@ -840,8 +850,11 @@ public final class LiveABPropsService implements ABPropsService {
         try {
             var bundle = client.queryGroupExperimentConfig(groupJid, propsHash).orElse(null);
             if (bundle == null) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "getGroupAbPropsProtocol failed: response did not parse as Success");
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "get group ab props protocol failed for {0}: response did not parse as success",
+                            groupJid);
+                }
                 return Optional.empty();
             }
 
@@ -858,8 +871,9 @@ public final class LiveABPropsService implements ABPropsService {
             emitGroupExposurePulse(groupJid, entries);
             return Optional.of(result);
         } catch (WhatsAppServerRuntimeException e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "getGroupAbPropsProtocol failed: {0}", e.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "get group ab props protocol failed for " + Log.jid(String.valueOf(groupJid)), e);
+            }
             return Optional.empty();
         }
     }
@@ -1318,6 +1332,6 @@ public final class LiveABPropsService implements ABPropsService {
         store.syncStore().setAbPropsHash(null);
         store.syncStore().setAbPropsLastSyncTime(null);
         syncFuture.set(new CompletableFuture<>());
-        LOGGER.log(System.Logger.Level.DEBUG, "Cleared all AB props and reset sync state");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cleared all ab props and reset sync state");
     }
 }

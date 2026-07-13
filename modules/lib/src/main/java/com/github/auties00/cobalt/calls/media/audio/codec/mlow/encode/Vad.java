@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Encoder voice activity detector of the MLow speech codec.
  *
@@ -63,6 +67,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
  * running sum, so no float reduction is involved and accumulation order is fixed.
  */
 public final class Vad {
+    /**
+     * The logger for {@link Vad}.
+     */
+    private static final System.Logger LOGGER = Log.get(Vad.class);
+
     /**
      * Number of analysis bands of the SILK voice activity detector.
      */
@@ -341,6 +350,9 @@ public final class Vad {
      * configured hangover length and the silence insertion descriptor counter to zero.
      */
     public void reset() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "vad reset");
+        }
         for (int b = 0; b < N_BANDS; b++) {
             noiseLevelBias[b] = Math.max(NOISE_LEVELS_BIAS / (b + 1), 1);
         }
@@ -435,6 +447,11 @@ public final class Vad {
             }
         } else {
             dtxRemainingMs = 0;
+        }
+
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "vad decision vad={0} activeVoice={1} sidFrame={2} sendSidFrame={3}",
+                    vad, codedAsActiveVoice, sidFrame, sendSidFrame);
         }
 
         return new VadDecision(vad, codedAsActiveVoice, types, saQ8, tiltQ15, sidFrame, sendSidFrame);

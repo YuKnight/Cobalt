@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.audio;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.util.ffmpeg.AVChannelLayout;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecContext;
@@ -19,6 +20,7 @@ import com.github.auties00.cobalt.media.transcode.avio.AvioWriteBuffer;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.model.message.media.AudioMessage;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -45,6 +47,9 @@ import java.nio.channels.SeekableByteChannel;
  * @see WaveformGenerator
  */
 public final class PttPipeline {
+    /** The logger for {@link PttPipeline}. */
+    private static final System.Logger LOGGER = Log.get(PttPipeline.class);
+
     /**
      * Holds the target sample rate for the encoded voice note in Hz, matching
      * the mobile recorders' wire-format profile.
@@ -118,6 +123,7 @@ public final class PttPipeline {
     public MediaPayload run(MediaProvider provider, SeekableByteChannel source)
             throws WhatsAppMediaException.Processing {
         FFmpegLoader.ensureLoaded();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ptt transcode start");
         try (var arena = Arena.ofShared()) {
             var pcm = decodeAndResample(arena, source);
             var durationSeconds = Math.max(1, pcm.length / PTT_SAMPLE_RATE);
@@ -131,7 +137,14 @@ public final class PttPipeline {
                 audio.setWaveform(waveform);
                 audio.setPtt(Boolean.TRUE);
             }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "ptt transcode done: samples={0} durationSeconds={1} encodedBytes={2}",
+                        pcm.length, durationSeconds, oggOpus.length);
+            }
             return new MediaPayload.OfBytes(oggOpus);
+        } catch (WhatsAppMediaException.Processing e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "ptt transcode failed", e);
+            throw e;
         }
     }
 
@@ -156,6 +169,7 @@ public final class PttPipeline {
             formatCtx = openInput(arena, bridge);
             var audioStream = pickStream(formatCtx, Ffmpeg.AVMEDIA_TYPE_AUDIO());
             if (audioStream < 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "no audio stream in ptt source");
                 throw new WhatsAppMediaException.Processing("no audio stream in voice-note source");
             }
             var stream = streamPointer(formatCtx, audioStream);

@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.dsp.Pffft;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.A2nlsfBridge;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Short term linear prediction analysis front end of the MLow speech encoder.
@@ -52,6 +55,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.A2nlsfBridge;
  * float[])} are order independent.
  */
 public final class LpcAnalysis {
+    /**
+     * The logger for {@link LpcAnalysis}.
+     */
+    private static final System.Logger LOGGER = Log.get(LpcAnalysis.class);
+
     /**
      * Linear prediction order of the MLow short term filter.
      */
@@ -228,6 +236,9 @@ public final class LpcAnalysis {
         bweExpand(lpc, LPC_ORDER, LPC_BWE);
 
         float[] lsf = A2nlsfBridge.a2nlsf(lpc);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "lpc analysis: samples={0}", len);
+        }
         return new Result(lpcRaw, lpc, lsf, r, f2);
     }
 
@@ -490,6 +501,9 @@ public final class LpcAnalysis {
         float[] rc = ac2rcFloat(rEmph, respLen - 1, reg);
         float[] a = new float[MAX_L_RESP];
         rc2a(rc, respLen - 1, a);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "perceptual weighting filter: emph={0} respLen={1}", emph, respLen);
+        }
         return a;
     }
 

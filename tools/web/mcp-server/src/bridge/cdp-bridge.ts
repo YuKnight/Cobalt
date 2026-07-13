@@ -1,8 +1,12 @@
 import { execSync } from "node:child_process";
+import { createServer } from "node:net";
 import { chromium, type Browser, type BrowserContext, type Page, type Response } from "playwright";
 import type { SnapshotPlatform } from "../types/snapshot.js";
 import type { PlatformBridge, CapturedResponse, ResponseListener, LoadedResources } from "../types/bridge.js";
 import { sleep } from "../utils/async.js";
+import { createLogger } from "../utils/logger.js";
+
+const log = createLogger("cdp-bridge");
 
 const DESKTOP_AUMID = "5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App";
 const CDP_ENV_VAR = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
@@ -26,6 +30,7 @@ export class CdpBridge implements PlatformBridge {
   readonly page: Page;
   readonly context: BrowserContext;
   readonly browser: Browser;
+  readonly cdpUrl: string | null;
 
   private readonly ownsBrowser: boolean;
   private responseListeners: ResponseListener[] = [];
@@ -35,13 +40,15 @@ export class CdpBridge implements PlatformBridge {
     browser: Browser,
     context: BrowserContext,
     page: Page,
-    ownsBrowser: boolean
+    ownsBrowser: boolean,
+    cdpUrl: string | null = null
   ) {
     this.platform = platform;
     this.browser = browser;
     this.context = context;
     this.page = page;
     this.ownsBrowser = ownsBrowser;
+    this.cdpUrl = cdpUrl;
 
     this.page.on("response", (res: Response) => {
       if (this.responseListeners.length === 0) return;
@@ -61,10 +68,11 @@ export class CdpBridge implements PlatformBridge {
     options: CdpBridgeOptions = {}
   ): Promise<CdpBridge> {
     if (options.cdpUrl) {
+      let cdpUrl = options.cdpUrl;
       if (options.autoLaunchDesktop) {
-        await CdpBridge.ensureDesktopRunning(options.cdpUrl);
+        cdpUrl = await CdpBridge.ensureDesktopRunning(cdpUrl);
       }
-      const browser = await chromium.connectOverCDP(options.cdpUrl);
+      const browser = await chromium.connectOverCDP(cdpUrl);
       const contexts = browser.contexts();
       if (contexts.length === 0) {
         throw new Error("No browser contexts found via CDP.");
@@ -74,12 +82,12 @@ export class CdpBridge implements PlatformBridge {
           (p) => p.url().includes("web.whatsapp.com")
         );
         if (page) {
-          return new CdpBridge(platform, browser, context, page, false);
+          return new CdpBridge(platform, browser, context, page, false, cdpUrl);
         }
       }
       const urls = contexts.flatMap((c) => c.pages().map((p) => p.url()));
       throw new Error(
-        `No WhatsApp page found on CDP endpoint ${options.cdpUrl}. ` +
+        `No WhatsApp page found on CDP endpoint ${cdpUrl}. ` +
           `The port may be held by another WebView2 process (e.g., Windows Widgets). ` +
           `Available pages: ${urls.join(", ")}`
       );
@@ -102,22 +110,32 @@ export class CdpBridge implements PlatformBridge {
     return new CdpBridge(platform, browser, context, page, true);
   }
 
-  private static async ensureDesktopRunning(cdpUrl: string): Promise<void> {
-    if (await CdpBridge.hasWhatsAppPage(cdpUrl)) return;
+  private static async ensureDesktopRunning(preferredCdpUrl: string): Promise<string> {
+    if (await CdpBridge.hasWhatsAppPage(preferredCdpUrl)) return preferredCdpUrl;
+
+    const preferredPort = Number(new URL(preferredCdpUrl).port || "9222");
+    const port = (await CdpBridge.isPortFree(preferredPort))
+      ? preferredPort
+      : await CdpBridge.findFreePort();
+    const cdpUrl = `http://localhost:${port}`;
+    if (port !== preferredPort) {
+      log.warn(
+        `CDP port ${preferredPort} is held by another process; launching WhatsApp Desktop on free port ${port} instead`
+      );
+    }
 
     CdpBridge.ensureCdpEnvVar(cdpUrl);
     CdpBridge.killDesktopProcesses();
-    CdpBridge.freeCdpPort(cdpUrl);
     await sleep(1_000);
     CdpBridge.launchDesktopApp();
 
     const ready = await CdpBridge.waitForWhatsAppPage(cdpUrl);
     if (!ready) {
       throw new Error(
-        `WhatsApp Desktop launched but no web.whatsapp.com page appeared on CDP at ${cdpUrl} within ${CDP_MAX_WAIT_MS / 1000}s. ` +
-          `Another WebView2 process may still be holding port ${new URL(cdpUrl).port || "9222"}.`
+        `WhatsApp Desktop launched but no web.whatsapp.com page appeared on CDP at ${cdpUrl} within ${CDP_MAX_WAIT_MS / 1000}s.`
       );
     }
+    return cdpUrl;
   }
 
   private static async hasWhatsAppPage(cdpUrl: string): Promise<boolean> {
@@ -140,16 +158,33 @@ export class CdpBridge implements PlatformBridge {
     return false;
   }
 
-  private static freeCdpPort(cdpUrl: string): void {
-    const port = new URL(cdpUrl).port || "9222";
-    try {
-      execSync(
-        `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"`,
-        { encoding: "utf-8" }
-      );
-    } catch {
+  private static isPortFree(port: number): Promise<boolean> {
+    return new Promise((resolvePort) => {
+      const server = createServer();
+      server.unref();
+      server.once("error", () => resolvePort(false));
+      server.listen(port, "127.0.0.1", () => {
+        server.close(() => resolvePort(true));
+      });
+    });
+  }
 
-    }
+  private static findFreePort(): Promise<number> {
+    return new Promise((resolvePort, rejectPort) => {
+      const server = createServer();
+      server.unref();
+      server.once("error", rejectPort);
+      server.listen(0, "127.0.0.1", () => {
+        const address = server.address();
+        if (!address || typeof address === "string") {
+          server.close();
+          rejectPort(new Error("Could not allocate a free TCP port"));
+          return;
+        }
+        const port = address.port;
+        server.close(() => resolvePort(port));
+      });
+    });
   }
 
   private static ensureCdpEnvVar(cdpUrl: string): void {

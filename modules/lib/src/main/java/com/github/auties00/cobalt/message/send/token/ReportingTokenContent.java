@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.token;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -7,6 +8,7 @@ import com.github.auties00.cobalt.model.reporting.ReportingConfig;
 import com.github.auties00.cobalt.model.reporting.ReportingConfigSpec;
 import com.github.auties00.cobalt.model.reporting.ReportingField;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -30,6 +32,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @WhatsAppWebModule(moduleName = "WAWebReportingTokenConfig")
 @WhatsAppWebModule(moduleName = "WAWebReportingTokenContent")
 public final class ReportingTokenContent {
+    /**
+     * The logger for {@link ReportingTokenContent}.
+     */
+    private static final System.Logger LOGGER = Log.get(ReportingTokenContent.class);
+
     /**
      * The protobuf wire type for VARINT fields ({@code int32}, {@code int64},
      * {@code bool}, {@code enum}).
@@ -120,10 +127,10 @@ public final class ReportingTokenContent {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private ReportingTokenContent() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -190,11 +197,19 @@ public final class ReportingTokenContent {
         if (messageBytes.length == 0) {
             return messageBytes;
         }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "computing reporting token content, input size {0}, version {1}",
+                    messageBytes.length, senderVersion);
+        }
         var config = getConfig(senderVersion);
         var topRules = config.field();
         var kept = new ArrayList<KeptNode>();
         var totalSize = extract(messageBytes, 0, messageBytes.length, topRules, topRules, senderVersion, kept);
         if (kept.isEmpty()) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "reporting token content: no whitelisted fields kept, version {0}",
+                        senderVersion);
+            }
             return new byte[0];
         }
         kept.sort(NODE_BY_FIELD_NUMBER);
@@ -202,6 +217,9 @@ public final class ReportingTokenContent {
         var cursor = 0;
         for (var node : kept) {
             cursor = node.write(messageBytes, out, cursor);
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "reporting token content computed, output size {0}", out.length);
         }
         return out;
     }
@@ -253,6 +271,11 @@ public final class ReportingTokenContent {
                 var innerStart = lengthRead.cursor();
                 var innerEnd = innerStart + (int) lengthRead.value();
                 if (innerEnd > end) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "reporting token content: inner submessage exceeds parent bounds, field {0}",
+                                fieldNumber);
+                    }
                     throw new IllegalArgumentException("Reporting-token content: inner submessage exceeds parent bounds");
                 }
                 cursor = innerEnd;
@@ -319,6 +342,10 @@ public final class ReportingTokenContent {
             if (CONFIG == null) {
                 var bytes = Base64.getDecoder().decode(REPORTING_TOKEN_CONFIG_BASE64);
                 CONFIG = ReportingConfigSpec.decode(bytes);
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "reporting token config decoded, {0} top-level rules",
+                            CONFIG.field().size());
+                }
             }
             return CONFIG;
         }
@@ -346,6 +373,9 @@ public final class ReportingTokenContent {
             }
             case WIRE_BIT64 -> {
                 if (cursor + 8 > end) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "reporting token content: truncated 64-bit value");
+                    }
                     throw new IllegalArgumentException("Reporting-token content: truncated 64-bit value");
                 }
                 return cursor + 8;
@@ -355,17 +385,28 @@ public final class ReportingTokenContent {
                 var afterLen = lengthRead.cursor();
                 var length = (int) lengthRead.value();
                 if (afterLen + length > end) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "reporting token content: truncated length-delimited value");
+                    }
                     throw new IllegalArgumentException("Reporting-token content: truncated length-delimited value");
                 }
                 return afterLen + length;
             }
             case WIRE_BIT32 -> {
                 if (cursor + 4 > end) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "reporting token content: truncated 32-bit value");
+                    }
                     throw new IllegalArgumentException("Reporting-token content: truncated 32-bit value");
                 }
                 return cursor + 4;
             }
-            default -> throw new IllegalArgumentException("Reporting-token content: unsupported wire type " + wireType);
+            default -> {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "reporting token content: unsupported wire type {0}", wireType);
+                }
+                throw new IllegalArgumentException("Reporting-token content: unsupported wire type " + wireType);
+            }
         }
     }
 
@@ -395,8 +436,14 @@ public final class ReportingTokenContent {
             }
             shift += 7;
             if (shift > 63) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "reporting token content: varint overflow");
+                }
                 throw new IllegalArgumentException("Reporting-token content: varint overflow");
             }
+        }
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "reporting token content: truncated varint");
         }
         throw new IllegalArgumentException("Reporting-token content: truncated varint");
     }

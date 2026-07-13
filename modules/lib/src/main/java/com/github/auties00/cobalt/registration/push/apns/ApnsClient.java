@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.registration.push.apns;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevicePushClient;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.util.Objects;
 import java.util.Set;
@@ -48,6 +50,11 @@ import java.util.concurrent.atomic.AtomicReference;
  * }</pre>
  */
 public final class ApnsClient implements LinkedWhatsAppClientDevicePushClient, AutoCloseable {
+    /**
+     * The logger for {@link ApnsClient}.
+     */
+    private static final System.Logger LOGGER = Log.get(ApnsClient.class);
+
     /**
      * Holds the cached, unmodifiable set of platforms this client can authenticate against.
      *
@@ -209,12 +216,14 @@ public final class ApnsClient implements LinkedWhatsAppClientDevicePushClient, A
      */
     public static ApnsClient loadSession(ApnsSession session, URI proxy) throws IOException {
         Objects.requireNonNull(session, "session");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns client restoring session");
         var client = new ApnsClient(proxy);
         client.session = session;
         client.activation.activate(session);
         client.connection = new ApnsCourierConnection(session, client.pushCode, proxy);
         client.connection.start();
         client.state.set(State.AUTHENTICATED);
+        if (Log.INFO) LOGGER.log(Level.INFO, "apns client restored, state {0} -> {1}", State.UNAUTHENTICATED, State.AUTHENTICATED);
         return client;
     }
 
@@ -268,18 +277,23 @@ public final class ApnsClient implements LinkedWhatsAppClientDevicePushClient, A
                     "ApnsClient.authenticate requires IOS or IOS_BUSINESS, got " + platform);
         };
         if (!state.compareAndSet(State.UNAUTHENTICATED, State.AUTHENTICATING)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apns client authenticate rejected, current state={0}", state.get());
             throw new IllegalStateException("ApnsClient already " + state.get());
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns client authenticating, platform={0}", platform);
         try {
             this.session = ApnsSession.newSession(config);
             activation.activate(session);
             this.connection = new ApnsCourierConnection(session, pushCode, proxy);
             this.connection.start();
             state.set(State.AUTHENTICATED);
+            if (Log.INFO) LOGGER.log(Level.INFO, "apns client authenticated, platform={0}", platform);
         } catch (IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apns client authenticate failed for platform " + platform, e);
             rollbackAuthentication();
             throw new UncheckedIOException(e);
         } catch (RuntimeException | Error e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apns client authenticate failed for platform " + platform, e);
             rollbackAuthentication();
             throw e;
         }
@@ -374,9 +388,13 @@ public final class ApnsClient implements LinkedWhatsAppClientDevicePushClient, A
     @Override
     public String getPushCode() {
         requireAuthenticated();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns client waiting for push code");
         try {
-            return pushCode.waitForCode();
+            var code = pushCode.waitForCode();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns client push code delivered");
+            return code;
         } catch (IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apns client push code failed", e);
             throw new UncheckedIOException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -413,6 +431,7 @@ public final class ApnsClient implements LinkedWhatsAppClientDevicePushClient, A
         if (prev == State.CLOSED) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns client closing, previous state={0}", prev);
         var c = connection;
         if (c != null) {
             c.close();

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
@@ -22,6 +23,7 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.stanza.usync.UsyncContext;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -54,7 +56,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
     /**
      * Logs warnings about unhandled notifications and debug messages about ignored child elements.
      */
-    private static final System.Logger LOGGER = System.getLogger(NotificationAccountStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationAccountStreamHandler.class);
 
     /**
      * Holds the {@code PDFN_ACCEPTED} notice-stage value used by the {@code notice} child path to
@@ -126,8 +128,8 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
         try {
             deferAck = handleNotification(stanza);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot handle account_sync notification " + stanza.getAttributeAsString("id", "<missing>"),
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "cannot handle account_sync notification " + stanza.getAttributeAsString("id", "<missing>"),
                     throwable);
         } finally {
             if (!deferAck) {
@@ -200,8 +202,8 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
             }
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Ignoring unrecognized account_sync notification {0}",
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                "ignoring unrecognized account_sync notification {0}",
                 stanza.getAttributeAsString("id", "<missing>"));
         return false;
     }
@@ -234,6 +236,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
                 .text(newAbout)
                 .build();
         whatsapp.store().accountStore().setSelfTextStatus(newStatus);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "own about text changed for {0}", self);
         fireListeners(LinkedAboutChangedListener.class, listener -> listener.onAboutChanged(whatsapp, oldAbout, newAbout));
     }
 
@@ -360,9 +363,13 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
         if (!store.connectionStore().isResumeFromRestartComplete()) {
             var notificationId = stanza.getAttributeAsString("id", null);
             if (notificationId == null) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "queuing pending device sync for {0} without deferred ack, resume incomplete", from);
                 store.syncStore().addPendingDeviceSync(PendingDeviceSync.of(List.of(from), UsyncContext.NOTIFICATION.wireValue()));
                 return false;
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "queuing pending device sync for {0} with deferred ack, notification {1}", from, notificationId);
             store.syncStore().addPendingDeviceSync(PendingDeviceSync.ofDeferredAck(
                     List.of(from), UsyncContext.NOTIFICATION.wireValue(), notificationId, rawFrom));
             return true;
@@ -370,11 +377,13 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
 
         var devicesChild = stanza.getChild("devices").orElse(null);
         if (devicesChild == null || devicesChild.getChildren("device").isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "devices child empty for {0}, triggering full device list sync", from);
             deviceService.syncMyDeviceList();
             return false;
         }
 
         for (var wid : resolveSelfWids(from)) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "refreshing own device list for {0}", wid);
             deviceService.refreshOwnDeviceList(wid, devicesChild);
         }
         return false;
@@ -470,6 +479,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
         }
 
         whatsapp.store().accountStore().setProfilePicture(newPicture);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "own profile picture changed for {0}", self);
         fireListeners(LinkedProfilePictureChangedListener.class, listener -> listener.onProfilePictureChanged(whatsapp, self));
     }
 
@@ -504,9 +514,9 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
         if ("modify".equals(action)) {
             // TODO: implement a disappearing-mode server query; today the modify branch waits for the next full app-state sync to converge.
             var selfJid = getUserJid(stanza, "from");
-            if (selfJid != null) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Deferring disappearing_mode modify for {0} to next app-state sync",
+            if (selfJid != null && Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "deferring disappearing_mode modify for {0} to next app-state sync",
                         selfJid);
             }
         }
@@ -617,6 +627,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
 
         if (!Objects.equals(storedHash, prevDhash)) {
             // TODO: trigger a full opt-out list refresh when prev_dhash mismatches; today Cobalt waits for the next app-state sync to converge.
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "biz_opt_out_list prev_dhash mismatch, skipping reconciliation");
             return;
         }
 
@@ -726,7 +737,7 @@ final class NotificationAccountStreamHandler extends SocketStreamHandler.Concurr
      * mark this notification as delivered.
      *
      * <p>The ack is fire-and-forget; a closed socket surfaces as a
-     * {@link com.github.auties00.cobalt.exception.WhatsAppSessionException.Closed} which the surrounding
+     * {@link com.github.auties00.cobalt.exception.linked.WhatsAppSessionException.Closed} which the surrounding
      * {@link #handle(Stanza)} {@code finally} block already isolates from the mutation path.</p>
      *
      * @param stanza the original {@code <notification>} stanza

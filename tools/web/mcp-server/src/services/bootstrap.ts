@@ -33,14 +33,19 @@ async function rebuildIndexFromManifest(platform: SnapshotPlatform, snapshotId: 
   log.info(`rebuilding index from manifest: platform=${platform} snapshot=${snapshotId}`);
   const manifest = await loadManifest(platform, snapshotId);
   log.debug(`manifest loaded: ${manifest.modules.length} modules`);
-  const modules: ParsedModule[] = await Promise.all(
-    manifest.modules.map(async (module) => ({
-      name: module.name,
-      dependencies: module.dependencies,
-      exports: module.exports,
-      body: await loadModuleSource(platform, snapshotId, module.sourcePath),
-    }))
-  );
+  const READ_BATCH = 200;
+  const modules: ParsedModule[] = [];
+  for (let i = 0; i < manifest.modules.length; i += READ_BATCH) {
+    const loaded = await Promise.all(
+      manifest.modules.slice(i, i + READ_BATCH).map(async (module) => ({
+        name: module.name,
+        dependencies: module.dependencies,
+        exports: module.exports,
+        body: await loadModuleSource(platform, snapshotId, module.sourcePath),
+      }))
+    );
+    modules.push(...loaded);
+  }
   log.debug(`loaded ${modules.length} module sources, running analysis`);
   const analyses = analyzeModules(modules);
   await saveIndex(platform, snapshotId, manifest.revision, analyses);

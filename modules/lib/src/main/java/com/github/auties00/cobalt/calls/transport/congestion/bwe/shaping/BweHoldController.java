@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -24,6 +27,11 @@ import java.util.Map;
  * over the active keys.
  */
 public final class BweHoldController {
+    /**
+     * The logger for {@link BweHoldController}.
+     */
+    private static final System.Logger LOGGER = Log.get(BweHoldController.class);
+
     /**
      * Start times, in milliseconds, for the reasons currently holding.
      *
@@ -66,7 +74,10 @@ public final class BweHoldController {
         if (reasonStartMs.isEmpty()) {
             heldTargetBps = targetBps;
         }
-        reasonStartMs.putIfAbsent(reason, nowMs);
+        var alreadyActive = reasonStartMs.putIfAbsent(reason, nowMs) != null;
+        if (Log.DEBUG && !alreadyActive) {
+            LOGGER.log(Level.DEBUG, "bwe hold started: reason={0} target={1}bps", reason, targetBps);
+        }
     }
 
     /**
@@ -88,7 +99,11 @@ public final class BweHoldController {
         if (start == null) {
             return -1;
         }
-        return nowMs - start;
+        var durationMs = nowMs - start;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "bwe hold ended: reason={0} duration={1}ms", reason, durationMs);
+        }
+        return durationMs;
     }
 
     /**
@@ -149,5 +164,8 @@ public final class BweHoldController {
     public void reset() {
         reasonStartMs.clear();
         heldTargetBps = 0;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "bwe hold controller reset");
+        }
     }
 }

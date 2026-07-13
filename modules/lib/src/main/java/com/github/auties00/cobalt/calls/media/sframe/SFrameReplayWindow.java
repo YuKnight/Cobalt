@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.calls.media.sframe;
 
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 
 /**
@@ -28,6 +30,11 @@ import java.util.Arrays;
  * {@code base + WINDOW_SIZE} advances the base and clears the vacated bits.
  */
 public final class SFrameReplayWindow {
+    /**
+     * The logger for {@link SFrameReplayWindow}.
+     */
+    private static final System.Logger LOGGER = Log.get(SFrameReplayWindow.class);
+
     /**
      * Holds the replay window width in counter slots ({@code 0x800} = 2048 bits = 256 bytes).
      */
@@ -100,19 +107,23 @@ public final class SFrameReplayWindow {
      * and the new edge (exclusive) are cleared so they start fresh before {@link #accept(long)} sets
      * the new edge's own bit.
      *
+     * @implNote This implementation clears the vacated slots one bit at a time rather than by a byte
+     * granularity fill of the run. The vacated slots ({@code (highest+1 .. newHighest-1) mod WINDOW_SIZE})
+     * form a ring run that can wrap and rarely aligns to byte boundaries, so a byte fill equivalent would
+     * need masked partial end bytes plus wraparound handling that is not statically provable byte for byte
+     * against every partial slide; the bit at a time clear is kept to avoid any replay window divergence,
+     * and its loop is empty for the in order packets that are the common case.
      * @param newHighest the new upper edge counter
      */
     private void slideUpTo(long newHighest) {
         if (highest < 0 || Long.compareUnsigned(newHighest - highest, WINDOW_SIZE) >= 0) {
+            if (Log.DEBUG && highest >= 0) {
+                LOGGER.log(Level.DEBUG, "sframe replay window reset, gap {0} exceeds window size {1}",
+                        newHighest - highest, WINDOW_SIZE);
+            }
             Arrays.fill(bitmap, (byte) 0);
             return;
         }
-        // TODO: a byte granularity clear of the vacated slot range would replace this bit at a time
-        //  loop, but the slots (highest+1 .. newHighest-1) mod WINDOW_SIZE form a run that can wrap
-        //  the ring and rarely aligns to byte boundaries, so an exact equivalent needs masked partial
-        //  end bytes plus wraparound handling. That is not statically provable byte for byte against
-        //  every partial slide input here, and the loop is already empty for in order packets, so the
-        //  bit at a time clear is kept to avoid any replay window divergence.
         for (var counter = highest + 1; Long.compareUnsigned(counter, newHighest) < 0; counter++) {
             clearBit(counter);
         }

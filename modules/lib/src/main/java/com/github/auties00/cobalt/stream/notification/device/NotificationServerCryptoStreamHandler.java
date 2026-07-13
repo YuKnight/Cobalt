@@ -8,6 +8,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedDeviceIdentityChangedListener;
 import com.github.auties00.cobalt.listener.linked.LinkedRegistrationCodeListener;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -29,6 +30,7 @@ import javax.crypto.Cipher;
 import javax.crypto.KDF;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.HKDFParameterSpec;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Set;
@@ -64,9 +66,9 @@ import java.util.function.Consumer;
 @WhatsAppWebModule(moduleName = "WAWebHandleDigestKey")
 final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * Logs warnings and debug messages about server-crypto notification handling.
+     * The logger for {@link NotificationServerCryptoStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(NotificationServerCryptoStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationServerCryptoStreamHandler.class);
 
     /**
      * Holds the notification {@code type} values routed to this handler.
@@ -158,11 +160,11 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
                 }
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot handle server-crypto notification {0}/{1}: {2}",
-                    type,
-                    stanza.getAttributeAsString("id", "<missing>"),
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "cannot handle server-crypto notification type=" + type + " id=" + stanza.getAttributeAsString("id", "<missing>"),
+                        throwable);
+            }
         } finally {
             sendNotificationAck(stanza, type);
         }
@@ -199,13 +201,21 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
 
         switch (firstChild.description()) {
             case "count" -> handlePreKeyLow(stanza, firstChild.getAttributeAsLong("value", 0L));
-            case "digest" -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring unsupported digest-key notification {0}",
-                    stanza.getAttributeAsString("id", "<missing>"));
+            case "digest" -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "ignoring unsupported digest-key notification {0}",
+                            stanza.getAttributeAsString("id", "<missing>"));
+                }
+            }
             case "identity" -> handleIdentityChange(stanza);
-            default -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring unsupported encrypt notification child {0}",
-                    firstChild.description());
+            default -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "ignoring unsupported encrypt notification child {0}",
+                            firstChild.description());
+                }
+            }
         }
     }
 
@@ -228,6 +238,7 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
             return;
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pre-key reserve low, remaining={0}, uploading fresh batch", keysCount);
         try {
             whatsapp.sendPreKeys(keysCount);
         } finally {
@@ -262,8 +273,7 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (selfJid != null && selfJid.equals(userJid)) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Ignoring self primary identity-change notification");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "ignoring self primary identity-change notification");
             return;
         }
 
@@ -286,6 +296,7 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
         whatsapp.store().signalStore().cleanupSignalSessions(deviceJid);
         whatsapp.store().signalStore().clearSenderKeyDistributionForParticipant(deviceJid);
         whatsapp.store().signalStore().markKeyRotation(userJid);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "identity change applied for {0}, signal session and sender-key reset", deviceJid);
         emitSenderKeyExpired(userJid);
         // Re-hand our trusted-contact token to the peer whose device identity just changed, matching
         // WAWebHandleIdentityChange, so the peer's rotated identity keeps a valid token to validate our
@@ -439,8 +450,10 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
             notification.directPath().ifPresent(directPath -> {
                 mediaProvider.setMediaUrl(null);
                 mediaProvider.setMediaDirectPath(directPath);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "media retry direct path replaced for message {0}", message.key().id().orElse(null));
             });
-        } catch (Exception _) {
+        } catch (Exception exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot apply media retry notification", exception);
         }
     }
 
@@ -460,11 +473,16 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
     private void handleServer(Stanza stanza) {
         var firstChild = stanza.getChild().map(Stanza::description).orElse(null);
         switch (firstChild) {
-            case "log" -> LOGGER.log(System.Logger.Level.WARNING,
-                    "Ignoring server log-request notification");
-            case "abprops" -> abPropsService.sync();
-            case null, default -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring unknown server notification child {0}", firstChild);
+            case "log" -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "ignoring server log-request notification");
+            }
+            case "abprops" -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "server requested ab-props resync");
+                abPropsService.sync();
+            }
+            case null, default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring unknown server notification child {0}", firstChild);
+            }
         }
     }
 
@@ -486,9 +504,11 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
     private void handleRegistration(Stanza stanza) {
         var registration = stanza.getChild("wa_old_registration").orElse(null);
         if (registration == null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Ignoring unsupported registration notification {0}",
-                    stanza.getAttributeAsString("id", "<missing>"));
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "ignoring unsupported registration notification {0}",
+                        stanza.getAttributeAsString("id", "<missing>"));
+            }
             return;
         }
 
@@ -502,10 +522,9 @@ final class NotificationServerCryptoStreamHandler extends SocketStreamHandler.Co
         try {
             var numericCode = Long.parseLong(code);
             fireListeners(LinkedRegistrationCodeListener.class, listener -> listener.onRegistrationCode(whatsapp, numericCode));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "delivered device-switch registration code {0}", Log.code(code));
         } catch (NumberFormatException exception) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring non-numeric device-switch code {0}",
-                    code);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring non-numeric device-switch code {0}", Log.code(code));
         }
 
         var meDeviceId = whatsapp.store().accountStore().jid()

@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.bwe;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.NlsfBridge;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Deterministic parametric high band (above 16 kHz) bandwidth extension of the MLow speech codec.
@@ -53,6 +56,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.NlsfBridge;
  * band uses.
  */
 public final class MlowBandwidthExtension {
+    /**
+     * The logger for {@link MlowBandwidthExtension}.
+     */
+    private static final System.Logger LOGGER = Log.get(MlowBandwidthExtension.class);
+
     /**
      * The high band linear prediction order, {@code 4}.
      */
@@ -329,7 +337,14 @@ public final class MlowBandwidthExtension {
     public short[] decodeWideband(float[] lowBand, HbFrameInput[] frames, int frameLength, int numSubframes,
                                   boolean lowRate, int apiSampleRateHz) {
         if (apiSampleRateHz != 32000 && apiSampleRateHz != 48000) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "mlow wideband decode: unsupported api rate {0}", apiSampleRateHz);
+            }
             throw new IllegalArgumentException("unsupported wideband API rate " + apiSampleRateHz);
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "mlow wideband decode: frames={0} frameLength={1} apiRate={2}",
+                    frames.length, frameLength, apiSampleRateHz);
         }
         int numFrames = frames.length;
         int numHbSubframes = frameLength / HB_SF_LEN;

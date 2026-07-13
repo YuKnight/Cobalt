@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -27,6 +28,7 @@ import com.github.auties00.cobalt.wam.type.SignalType;
 import com.github.auties00.cobalt.wam.type.SmbPerCustomerDataSharingControlAction;
 import com.github.auties00.cobalt.wam.type.SmbPerCustomerDataSharingControlEntryPoint;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
@@ -69,6 +71,11 @@ import java.util.Base64;
 @WhatsAppWebModule(moduleName = "WAWebPerCustomerDataSharingControlLogging")
 @WhatsAppWebModule(moduleName = "WAWebMmSignalSharingLoggingUtils")
 public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link CtwaPerCustomerDataSharingHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(CtwaPerCustomerDataSharingHandler.class);
+
     /**
      * The version stamp carried by every SMB per-customer data-sharing control
      * event.
@@ -169,10 +176,12 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
         switch (mutation.operation()) {
             case SET -> {
                 if (accountLid == null) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "ctwa per-customer data sharing: missing account lid in mutation index");
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
                 if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof CtwaPerCustomerDataSharingAction action)) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "ctwa per-customer data sharing: mutation value is not a CtwaPerCustomerDataSharingAction");
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
@@ -186,6 +195,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
                         .accountLid(accountLid)
                         .enabled(enabled)
                         .build());
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa per-customer data sharing: set lid={0} enabled={1}", Log.jid(accountLid), enabled);
 
                 if (previousEnabled == null || previousEnabled != enabled) {
                     logPerCustomerDataSharingStateChange(client, accountLid, enabled);
@@ -194,6 +204,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
                 return MutationApplicationResult.success();
             }
             case REMOVE -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa per-customer data sharing: remove lid={0}", Log.jid(accountLid));
                 client.store().businessStore().removeCtwaDataSharing(accountLid);
 
                 return MutationApplicationResult.success();
@@ -224,6 +235,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
         var globalEnabled = client.store().businessStore().ctwaDataSharingSetting()
                 .orElse(CtwaDataSharingSetting.NOT_SET) == CtwaDataSharingSetting.ENABLED;
         var optIn = enabled && globalEnabled;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa per-customer data sharing: committing telemetry lid={0} optIn={1}", Log.jid(accountLid), optIn);
 
         commitControlEvent(optIn);
         commitSignalSharingVerificationEvent(accountLid, globalEnabled, optIn);

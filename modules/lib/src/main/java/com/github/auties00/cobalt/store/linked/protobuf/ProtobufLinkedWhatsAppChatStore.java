@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.IncomingCall;
 import com.github.auties00.cobalt.model.call.CallLog;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
@@ -18,6 +19,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -42,12 +44,19 @@ import static java.util.Objects.requireNonNullElseGet;
  *
  * @implNote
  * Phone-number/LID resolution used by {@link #findChatByJid(JidProvider)} (in the concrete subtypes)
- * reads the mapping table through a {@link LinkedWhatsAppContactStore} reference wired by the owning aggregate via
- * {@link #bindContacts(LinkedWhatsAppContactStore)} after construction.
+ * reads the mapping table through a {@link LinkedWhatsAppContactStore} reference wired by the
+ * {@link ProtobufWhatsAppStore} aggregate constructor via
+ * {@link #setContacts(LinkedWhatsAppContactStore)}; the protobuf deserialiser builds each sub-store
+ * from its own wire fields alone, so the sibling reference cannot be a constructor argument here.
  */
 @ProtobufMessage
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public abstract class ProtobufLinkedWhatsAppChatStore implements LinkedWhatsAppChatStore {
+    /**
+     * The logger for {@link ProtobufLinkedWhatsAppChatStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufLinkedWhatsAppChatStore.class);
+
     /**
      * The ordered list of pinned (favourite) chat JIDs.
      */
@@ -96,7 +105,9 @@ public abstract class ProtobufLinkedWhatsAppChatStore implements LinkedWhatsAppC
     private final ConcurrentMap<Jid, NewsletterPin> newsletterPinStates;
 
     /**
-     * The contact sub-store consulted for phone-number/LID resolution; wired post-construction.
+     * The contact sub-store consulted for phone-number/LID resolution; wired by the
+     * {@link ProtobufWhatsAppStore} aggregate constructor, so it is bound before the store is
+     * reachable by any consumer.
      */
     protected LinkedWhatsAppContactStore contacts;
 
@@ -119,11 +130,15 @@ public abstract class ProtobufLinkedWhatsAppChatStore implements LinkedWhatsAppC
     }
 
     /**
-     * Binds the contact sub-store used for phone-number/LID resolution.
+     * Sets the contact sub-store used for phone-number/LID resolution.
+     *
+     * <p>The contact sub-store cannot be a constructor argument because the protobuf deserializer builds
+     * this sub-store from its own wire fields alone; it is set once by the {@link ProtobufWhatsAppStore}
+     * aggregate constructor, which composes both sub-stores.
      *
      * @param contacts the contact sub-store, never {@code null}
      */
-    public void bindContacts(LinkedWhatsAppContactStore contacts) {
+    void setContacts(LinkedWhatsAppContactStore contacts) {
         this.contacts = Objects.requireNonNull(contacts, "contacts cannot be null");
     }
 
@@ -214,6 +229,7 @@ public abstract class ProtobufLinkedWhatsAppChatStore implements LinkedWhatsAppC
         Objects.requireNonNull(edit, "edit cannot be null");
         var existing = chatMetadata.get(groupJid);
         if (!(existing instanceof GroupMetadata group)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "group metadata edit dropped, no cached group for {0}", groupJid);
             return Optional.empty();
         }
         edit.statusMuted().ifPresent(group::setStatusMuted);

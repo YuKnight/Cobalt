@@ -4,6 +4,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -18,13 +19,11 @@ import java.util.Optional;
  * a compliant form in a single round trip. This input carries the
  * parameters the server uses to compute that batched rewrite.
  *
- * <p>The {@link #targetingSpecJson() targeting},
- * {@link #regulatedCategoriesJson() regulated categories},
- * {@link #specialAdCategoryCountriesJson() special-ad-category
- * countries}, and {@link #tuningOptionsJson() tuning options} are each
- * JSON-encoded objects whose field sets are defined by the server-side
- * input types and are therefore carried verbatim as strings. The
- * {@link #adAccountId() ad account} scopes the adjustment.
+ * <p>The {@link #targetSpec() targeting}, {@link #regulatedCategories()
+ * regulated categories}, {@link #specialAdCategoryCountries()
+ * special-ad-category countries}, and {@link #tuningOptions() tuning
+ * options} parameterise the rewrite. The {@link #adAccountId() ad account}
+ * scopes the adjustment.
  */
 @ProtobufMessage(name = "BusinessAdRegulatedCategoryBatchTuning")
 public final class BusinessAdRegulatedCategoryBatchTuning {
@@ -36,107 +35,98 @@ public final class BusinessAdRegulatedCategoryBatchTuning {
     final String adAccountId;
 
     /**
-     * JSON-encoded audience targeting specification to adjust. The field
-     * set is defined by the server and is carried verbatim. Unset omits
-     * the variable.
+     * Audience targeting specification to adjust. Unset omits the variable.
      */
-    @ProtobufProperty(index = 2, type = ProtobufType.STRING)
-    final String targetingSpecJson;
+    @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
+    final TargetingSpec targetSpec;
 
     /**
-     * JSON-encoded list of regulated categories that apply. The field set
-     * is defined by the server and is carried verbatim. Unset omits the
-     * variable.
+     * Regulated categories that apply, in the order they are sent. Never
+     * {@code null}, possibly empty.
      */
-    @ProtobufProperty(index = 3, type = ProtobufType.STRING)
-    final String regulatedCategoriesJson;
+    @ProtobufProperty(index = 3, type = ProtobufType.ENUM)
+    final List<SpecialAdCategory> regulatedCategories;
 
     /**
-     * JSON-encoded list of countries whose special-ad-category rules
-     * apply. The field set is defined by the server and is carried
-     * verbatim. Unset omits the variable.
+     * Countries whose special-ad-category rules apply, in the order they are
+     * sent. Never {@code null}, possibly empty.
      */
     @ProtobufProperty(index = 4, type = ProtobufType.STRING)
-    final String specialAdCategoryCountriesJson;
+    final List<String> specialAdCategoryCountries;
 
     /**
-     * JSON-encoded tuning options. The field set is defined by the server
-     * and is carried verbatim. Unset omits the variable.
+     * Tuning options controlling how the spec is rewritten. Unset omits the
+     * variable.
      */
-    @ProtobufProperty(index = 5, type = ProtobufType.STRING)
-    final String tuningOptionsJson;
+    @ProtobufProperty(index = 5, type = ProtobufType.MESSAGE)
+    final TuningOptions tuningOptions;
 
     /**
-     * Constructs a new {@code BusinessAdRegulatedCategoryBatchTuning}.
-     * Every argument may be {@code null} to omit the corresponding
-     * variable from the request.
+     * Constructs a new {@code BusinessAdRegulatedCategoryBatchTuning}. A
+     * {@code null} list argument is coerced to an empty list; every other
+     * argument may be {@code null} to omit the corresponding variable from
+     * the request.
      *
-     * @param adAccountId                    the advertising-account
-     *                                       identifier, or {@code null}
-     * @param targetingSpecJson              the JSON-encoded targeting, or
-     *                                       {@code null}
-     * @param regulatedCategoriesJson        the JSON-encoded categories, or
-     *                                       {@code null}
-     * @param specialAdCategoryCountriesJson the JSON-encoded countries, or
-     *                                       {@code null}
-     * @param tuningOptionsJson              the JSON-encoded tuning
-     *                                       options, or {@code null}
+     * @param adAccountId                the advertising-account identifier, or {@code null}
+     * @param targetSpec                 the audience targeting, or {@code null}
+     * @param regulatedCategories        the regulated categories; {@code null} treated as empty
+     * @param specialAdCategoryCountries the special-ad-category countries; {@code null} treated as empty
+     * @param tuningOptions              the tuning options, or {@code null}
      */
-    public BusinessAdRegulatedCategoryBatchTuning(String adAccountId, String targetingSpecJson,
-                                                  String regulatedCategoriesJson,
-                                                  String specialAdCategoryCountriesJson,
-                                                  String tuningOptionsJson) {
+    public BusinessAdRegulatedCategoryBatchTuning(String adAccountId, TargetingSpec targetSpec,
+                                                  List<SpecialAdCategory> regulatedCategories,
+                                                  List<String> specialAdCategoryCountries,
+                                                  TuningOptions tuningOptions) {
         this.adAccountId = adAccountId;
-        this.targetingSpecJson = targetingSpecJson;
-        this.regulatedCategoriesJson = regulatedCategoriesJson;
-        this.specialAdCategoryCountriesJson = specialAdCategoryCountriesJson;
-        this.tuningOptionsJson = tuningOptionsJson;
+        this.targetSpec = targetSpec;
+        this.regulatedCategories = regulatedCategories == null ? List.of() : List.copyOf(regulatedCategories);
+        this.specialAdCategoryCountries = specialAdCategoryCountries == null ? List.of() : List.copyOf(specialAdCategoryCountries);
+        this.tuningOptions = tuningOptions;
     }
 
     /**
      * Returns the advertising-account identifier.
      *
-     * @return an {@link Optional} carrying the identifier, or empty when
-     *         unset
+     * @return an {@link Optional} carrying the identifier, or empty when unset
      */
     public Optional<String> adAccountId() {
         return Optional.ofNullable(adAccountId);
     }
 
     /**
-     * Returns the JSON-encoded audience targeting specification.
+     * Returns the audience targeting specification.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an {@link Optional} carrying the targeting spec, or empty when unset
      */
-    public Optional<String> targetingSpecJson() {
-        return Optional.ofNullable(targetingSpecJson);
+    public Optional<TargetingSpec> targetSpec() {
+        return Optional.ofNullable(targetSpec);
     }
 
     /**
-     * Returns the JSON-encoded regulated categories.
+     * Returns the regulated categories that apply.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an unmodifiable view of the regulated categories; never {@code null}, possibly empty
      */
-    public Optional<String> regulatedCategoriesJson() {
-        return Optional.ofNullable(regulatedCategoriesJson);
+    public List<SpecialAdCategory> regulatedCategories() {
+        return regulatedCategories;
     }
 
     /**
-     * Returns the JSON-encoded special-ad-category countries.
+     * Returns the countries whose special-ad-category rules apply.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an unmodifiable view of the countries; never {@code null}, possibly empty
      */
-    public Optional<String> specialAdCategoryCountriesJson() {
-        return Optional.ofNullable(specialAdCategoryCountriesJson);
+    public List<String> specialAdCategoryCountries() {
+        return specialAdCategoryCountries;
     }
 
     /**
-     * Returns the JSON-encoded tuning options.
+     * Returns the tuning options controlling how the spec is rewritten.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an {@link Optional} carrying the tuning options, or empty when unset
      */
-    public Optional<String> tuningOptionsJson() {
-        return Optional.ofNullable(tuningOptionsJson);
+    public Optional<TuningOptions> tuningOptions() {
+        return Optional.ofNullable(tuningOptions);
     }
 
     @Override
@@ -145,25 +135,25 @@ public final class BusinessAdRegulatedCategoryBatchTuning {
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (BusinessAdRegulatedCategoryBatchTuning) obj;
         return Objects.equals(adAccountId, that.adAccountId)
-                && Objects.equals(targetingSpecJson, that.targetingSpecJson)
-                && Objects.equals(regulatedCategoriesJson, that.regulatedCategoriesJson)
-                && Objects.equals(specialAdCategoryCountriesJson, that.specialAdCategoryCountriesJson)
-                && Objects.equals(tuningOptionsJson, that.tuningOptionsJson);
+                && Objects.equals(targetSpec, that.targetSpec)
+                && Objects.equals(regulatedCategories, that.regulatedCategories)
+                && Objects.equals(specialAdCategoryCountries, that.specialAdCategoryCountries)
+                && Objects.equals(tuningOptions, that.tuningOptions);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(adAccountId, targetingSpecJson, regulatedCategoriesJson,
-                specialAdCategoryCountriesJson, tuningOptionsJson);
+        return Objects.hash(adAccountId, targetSpec, regulatedCategories,
+                specialAdCategoryCountries, tuningOptions);
     }
 
     @Override
     public String toString() {
         return "BusinessAdRegulatedCategoryBatchTuning[" +
                 "adAccountId=" + adAccountId + ", " +
-                "targetingSpecJson=" + targetingSpecJson + ", " +
-                "regulatedCategoriesJson=" + regulatedCategoriesJson + ", " +
-                "specialAdCategoryCountriesJson=" + specialAdCategoryCountriesJson + ", " +
-                "tuningOptionsJson=" + tuningOptionsJson + ']';
+                "targetSpec=" + targetSpec + ", " +
+                "regulatedCategories=" + regulatedCategories + ", " +
+                "specialAdCategoryCountries=" + specialAdCategoryCountries + ", " +
+                "tuningOptions=" + tuningOptions + ']';
     }
 }

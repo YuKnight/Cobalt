@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -13,11 +14,11 @@ import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.key.SyncKeyUtils;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Logger;
 
 /**
  * Builds outgoing sentinel sync mutations.
@@ -36,13 +37,9 @@ import java.util.logging.Logger;
  */
 public final class SentinelMutationFactory {
     /**
-     * Logs the sentinel mutation preparation progress.
-     *
-     * @implNote
-     * This logger emits the same tag strings WA Web uses ({@code preparing mutations...} and the
-     * no-key-pair warning) for parity with the source's syncd sentinel tag.
+     * The logger for {@link SentinelMutationFactory}.
      */
-    private static final Logger LOGGER = Logger.getLogger(SentinelMutationFactory.class.getName());
+    private static final System.Logger LOGGER = Log.get(SentinelMutationFactory.class);
 
     /**
      * Constructs a sentinel mutation factory.
@@ -76,13 +73,13 @@ public final class SentinelMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebSentinelMutationSync", exports = "getSentinelMutations", adaptation = WhatsAppAdaptation.DIRECT)
     public List<SyncPendingMutation> getSentinelMutations(LinkedWhatsAppClient client) {
-        LOGGER.fine("preparing mutations...");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "preparing sentinel mutations");
 
         var timestamp = Instant.now();
         var collections = SyncPatchType.values();
         var newestKey = SyncKeyUtils.findNewestKey(client.store().syncStore().appStateKeys());
         if (newestKey == null) {
-            LOGGER.warning("sentinel mutation sync: no key pairs");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sentinel mutation sync: no key pairs available");
             return Collections.emptyList();
         }
 
@@ -107,6 +104,7 @@ public final class SentinelMutationFactory {
             );
             mutations.add(new SyncPendingMutation(mutation, 0));
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "built {0} sentinel mutations, keyEpoch={1}", mutations.size(), keyEpoch);
         return mutations;
     }
 }

@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientOfflineResumeState;
-import com.github.auties00.cobalt.exception.WhatsAppLidMigrationException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppLidMigrationException;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingBuilder;
 import com.github.auties00.cobalt.model.jid.migration.LIDMigrationMappingSyncPayloadBuilder;

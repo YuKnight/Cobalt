@@ -2,10 +2,11 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.ack.MessageAck;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.stanza.*;
@@ -44,6 +45,7 @@ import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
 import com.github.auties00.cobalt.wam.type.SizeBucket;
 import com.github.auties00.cobalt.wam.type.StructuredMessageClass;
 
+import java.lang.System.Logger.Level;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -65,9 +67,9 @@ import java.util.stream.Collectors;
 @WhatsAppWebModule(moduleName = "WAWebBuyerEventLogger")
 final class UserMessageSender extends MessageSender<ChatMessageInfo> {
     /**
-     * Surfaces user-send diagnostics.
+     * The logger for {@link UserMessageSender}.
      */
-    private static final System.Logger LOGGER = System.getLogger(UserMessageSender.class.getName());
+    private static final System.Logger LOGGER = Log.get(UserMessageSender.class);
 
     /**
      * Flags a phone-number-hidden click-to-WhatsApp chat as originating from the
@@ -195,6 +197,11 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
 
         var fanoutDevices = deviceService.getUserFanout(routedChatJid, null);
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sending user message {0} to {1}, devices={2}",
+                    messageInfo.key().id().orElse(null), routedChatJid, fanoutDevices.size());
+        }
+
         store.chatStore().createOrMergeReceiptRecords(messageInfo.key().id().orElseThrow(), fanoutDevices);
 
         var ack = encryptBuildAndSend(routedChatJid, messageInfo, fanoutDevices, false);
@@ -250,6 +257,10 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         var flowName = nativeFlowResponse.name()
                 .filter(name -> !name.isEmpty())
                 .orElse("native_flow");
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "emitting buyer interaction event for {0}, flow={1}", chatJid, flowName);
+        }
 
         wamService.commit(new StructuredMessageBuyerInteractionEventBuilder()
                 .bizPlatform(resolveBuyerBizPlatform(chatJid))
@@ -523,8 +534,9 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             return;
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Server requested LID refresh for {0}", chatJid);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "server requested lid refresh for {0}", chatJid);
+        }
 
         var pnJid = chatJid.hasLidServer()
                 ? store.contactStore().findPhoneByLid(chatJid.toUserJid()).orElse(null)
@@ -570,6 +582,9 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
                 .orElse(null);
         var payloads = encryptForDevices(encryption, devices, container, chatJid, senderIcdc, recipientIcdc);
         if (payloads.isEmpty()) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "encryption failed for all devices targeting {0}", chatJid);
+            }
             throw new WhatsAppMessageException.Send.Unknown(
                     "Encryption failed for all devices targeting " + chatJid, null);
         }
@@ -580,6 +595,10 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
         var ack = AckParser.parse(ackNode);
 
         if (ack.error().isPresent()) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "server nacked message to {0}, error={1}",
+                        chatJid, ack.error().getAsInt());
+            }
             throw new WhatsAppMessageException.Send.Unknown(
                     "Invalid ack from server (error " + ack.error().getAsInt() + ") for " + chatJid, null);
         }
@@ -870,8 +889,9 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
             Collection<Jid> originalDevices,
             String serverPhash
     ) {
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Phash mismatch for {0}, server phash: {1}", chatJid, serverPhash);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "phash mismatch for {0}, server phash={1}", chatJid, serverPhash);
+        }
 
         wamService.commit(new MdDeviceSyncAckEventBuilder()
                 .revoke(isRevokeMessage(messageInfo))
@@ -889,14 +909,15 @@ final class UserMessageSender extends MessageSender<ChatMessageInfo> {
                 .toList();
 
         if (deltaDevices.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "No new devices after phash resync for {0}", chatJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "no new devices after phash resync for {0}", chatJid);
+            }
             return;
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Resending to {0} new devices for {1}",
-                deltaDevices.size(), chatJid);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "resending to {0} new devices for {1}", deltaDevices.size(), chatJid);
+        }
 
         encryptBuildAndSend(chatJid, messageInfo, deltaDevices, true);
     }

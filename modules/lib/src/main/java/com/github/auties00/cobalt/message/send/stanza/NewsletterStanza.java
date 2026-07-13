@@ -20,7 +20,7 @@ public final class NewsletterStanza {
      * Prevents instantiation; this is a static composer.
      */
     private NewsletterStanza() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

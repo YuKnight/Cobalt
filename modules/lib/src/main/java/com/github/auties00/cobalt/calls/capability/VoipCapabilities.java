@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.capability;
 
+import com.github.auties00.cobalt.log.Log;
+
 import java.io.ByteArrayOutputStream;
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Set;
@@ -42,7 +45,12 @@ import java.util.TreeMap;
  * {@code F7 09 E4 BB 13}) into its twenty two set indices; {@link #serialize()} of that set
  * reproduces the stream byte for byte, which is the load bearing interoperability check.
  */
-public final class VoipCapabilities {
+public final class VoipCapabilities implements Cloneable {
+    /**
+     * The logger for {@link VoipCapabilities}.
+     */
+    private static final System.Logger LOGGER = Log.get(VoipCapabilities.class);
+
     /**
      * The number of bytes in a single version's capability mask.
      *
@@ -67,6 +75,16 @@ public final class VoipCapabilities {
     private static final VoipCapability[] VALUES = VoipCapability.values();
 
     /**
+     * The reference client's standard self advertisement, built once at class initialization and
+     * defensively cloned by {@link #standard()}.
+     *
+     * <p>Holds exactly the version {@code 1} bits the reference wa-voip client advertises; its
+     * {@link #serialize()} is the canonical seven byte stream {@code 01 05 F7 09 E4 BB 13}. It is never
+     * handed to callers directly, so this shared instance is never mutated after construction.
+     */
+    private static final VoipCapabilities STANDARD = createStandard();
+
+    /**
      * The per version masks, keyed by version and ordered ascending.
      *
      * <p>A version is present in this map once any of its bits has been set; a mask is a fresh
@@ -80,7 +98,20 @@ public final class VoipCapabilities {
      * Constructs an empty capability bitset with no versions present.
      */
     public VoipCapabilities() {
-        this.masks = new TreeMap<>();
+        this(new TreeMap<>());
+    }
+
+    /**
+     * Constructs a capability bitset backed by the given version mask map.
+     *
+     * <p>The map is adopted by reference, not copied, so the caller must neither retain nor mutate it
+     * afterwards. It exists so {@link #clone()} can hand over a map built in a single linear pass from
+     * an already sorted source rather than inserting entry by entry into an empty tree.
+     *
+     * @param masks the version mask map to adopt, keyed by version and ordered ascending
+     */
+    private VoipCapabilities(TreeMap<Integer, byte[]> masks) {
+        this.masks = masks;
     }
 
     /**
@@ -88,12 +119,23 @@ public final class VoipCapabilities {
      *
      * <p>The returned bitset has exactly the version {@code 1} bits the reference wa-voip
      * client advertises; its {@link #serialize()} is the canonical seven byte stream
-     * {@code 01 05 F7 09 E4 BB 13}. The instance is freshly allocated and mutable, so callers
-     * may tailor it before serializing.
+     * {@code 01 05 F7 09 E4 BB 13}. The instance is a fresh, independently mutable copy, so callers
+     * may tailor it before serializing without affecting other callers.
      *
      * @return a new capability bitset holding the standard self advertisement
+     * @implNote This implementation clones the {@link #STANDARD} bitset built once at class
+     * initialization rather than rebuilding it bit by bit on each call.
      */
     public static VoipCapabilities standard() {
+        return STANDARD.clone();
+    }
+
+    /**
+     * Builds the {@link #STANDARD} advertisement by setting every named capability bit.
+     *
+     * @return a new bitset holding the reference client's standard self advertisement
+     */
+    private static VoipCapabilities createStandard() {
         var capabilities = new VoipCapabilities();
         for (var capability : VALUES) {
             capabilities.set(capability);
@@ -228,6 +270,7 @@ public final class VoipCapabilities {
     public byte[] serialize() {
         var top = topVersion();
         if (top > MAX_VERSION) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "voip capability serialize failed, top version {0} exceeds max {1}", top, MAX_VERSION);
             throw new IllegalStateException("Capability version " + top + " exceeds max " + MAX_VERSION);
         }
         var out = new ByteArrayOutputStream();
@@ -240,12 +283,18 @@ public final class VoipCapabilities {
                 continue;
             }
             if (length > MASK_BYTES) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "voip capability serialize failed, mask length {0} for version {1} exceeds max {2}",
+                            length, version, MASK_BYTES);
+                }
                 throw new IllegalStateException("Capability mask length " + length + " for version " + version + " exceeds max " + MASK_BYTES);
             }
             out.write(length);
             out.write(mask, 0, length);
         }
-        return out.toByteArray();
+        var serialized = out.toByteArray();
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "serialized voip capabilities, top_version={0}, bytes={1}", top, serialized.length);
+        return serialized;
     }
 
     /**
@@ -265,6 +314,7 @@ public final class VoipCapabilities {
      */
     public static VoipCapabilities deserialize(byte[] bytes) {
         if (bytes.length == 0) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "voip capability deserialize failed, empty byte stream");
             throw new IllegalArgumentException("Empty capability byte stream");
         }
         var capabilities = new VoipCapabilities();
@@ -272,13 +322,16 @@ public final class VoipCapabilities {
         var offset = 1;
         while (offset < bytes.length) {
             if (version < 1) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "voip capability deserialize failed, more masks than versions, bytes={0}", bytes.length);
                 throw new IllegalArgumentException("Capability byte stream has more masks than versions");
             }
             var length = bytes[offset++] & 0xff;
             if (length > MASK_BYTES) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "voip capability deserialize failed, mask length {0} exceeds max {1}", length, MASK_BYTES);
                 throw new IllegalArgumentException("Capability mask length " + length + " exceeds max " + MASK_BYTES);
             }
             if (offset + length > bytes.length) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "voip capability deserialize failed, mask length {0} exceeds remaining bytes", length);
                 throw new IllegalArgumentException("Capability mask length " + length + " exceeds remaining bytes");
             }
             if (length > 0) {
@@ -289,6 +342,7 @@ public final class VoipCapabilities {
             offset += length;
             version--;
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "deserialized voip capabilities, top_version={0}, bytes={1}", capabilities.topVersion(), bytes.length);
         return capabilities;
     }
 
@@ -350,6 +404,26 @@ public final class VoipCapabilities {
         if (version < 1 || version > MAX_VERSION) {
             throw new IllegalArgumentException("Capability version " + version + " out of range 1.." + MAX_VERSION);
         }
+    }
+
+    /**
+     * Returns an independent, mutable copy of this capability bitset.
+     *
+     * <p>Every version mask is copied into a fresh byte array, so mutating the returned bitset through
+     * {@link #set(int, int)} or {@link #clear(int, int)} leaves this one unchanged.
+     *
+     * @return a deep copy of this bitset
+     * @implNote This implementation copies the mask map through the {@link TreeMap#TreeMap(java.util.SortedMap)}
+     * constructor, which builds a balanced tree in one linear pass from the already sorted entries, then
+     * clones each mask array in place and adopts the result through the private constructor. It does not
+     * call {@link Object#clone()}, which keeps {@link #masks} {@code final}; a shallow {@link Object#clone()}
+     * would also alias the version mask arrays between the two instances.
+     */
+    @Override
+    public VoipCapabilities clone() {
+        var copy = new TreeMap<>(masks);
+        copy.replaceAll((_, mask) -> mask.clone());
+        return new VoipCapabilities(copy);
     }
 
     /**

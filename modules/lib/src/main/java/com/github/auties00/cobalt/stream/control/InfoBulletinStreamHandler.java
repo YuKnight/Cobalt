@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedTosNoticesChangedListener;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientOfflineResumeState;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -23,6 +24,7 @@ import com.github.auties00.cobalt.wam.type.OfflineProcessRunReasons;
 import com.github.auties00.cobalt.wam.type.OfflineProcessStages;
 import com.github.auties00.cobalt.wam.type.OfflineResumeResultType;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,10 +61,9 @@ import java.util.stream.Collectors;
 @WhatsAppWebModule(moduleName = "WAWebWamWorkerOfflineProcessReporter")
 public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * The system logger used for diagnostic output during info bulletin processing.
+     * The logger for {@link InfoBulletinStreamHandler}.
      */
-    private static final System.Logger LOGGER =
-            System.getLogger(InfoBulletinStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(InfoBulletinStreamHandler.class);
 
     /**
      * The child tag carrying dirty-bit notifications.
@@ -315,14 +316,17 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                 return;
             }
 
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "handleInfoBulletin unrecognized info bulletin {0}",
-                    stanza.getAttributeAsString("id", "[missing-id]"));
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "unrecognized info bulletin id={0}",
+                        stanza.getAttributeAsString("id", "[missing-id]"));
+            }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle info bulletin {0}: {1}",
-                    stanza.getAttributeAsString("id", "[missing-id]"),
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "failed to handle info bulletin id=" + stanza.getAttributeAsString("id", "[missing-id]"),
+                        throwable);
+            }
         }
     }
 
@@ -366,25 +370,37 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                     switch (protocol) {
                         case "devices" -> {
                             syncOwnDevices = true;
-                            LOGGER.log(System.Logger.Level.DEBUG,
-                                    "Dirty bit account_sync/devices: syncing own device list");
+                            if (Log.DEBUG) {
+                                LOGGER.log(Level.DEBUG,
+                                        "dirty bit account_sync/devices: syncing own device list");
+                            }
                         }
-                        case "picture" ->
-                                LOGGER.log(System.Logger.Level.DEBUG,
-                                        "Dirty bit account_sync/picture: profile picture refresh needed");
+                        case "picture" -> {
+                            if (Log.DEBUG) {
+                                LOGGER.log(Level.DEBUG,
+                                        "dirty bit account_sync/picture: profile picture refresh needed");
+                            }
+                        }
                         case "privacy" -> {
                             whatsapp.store().syncStore().setSyncedContacts(false);
-                            LOGGER.log(System.Logger.Level.DEBUG,
-                                    "Dirty bit account_sync/privacy: privacy settings refresh needed");
+                            if (Log.DEBUG) {
+                                LOGGER.log(Level.DEBUG,
+                                        "dirty bit account_sync/privacy: privacy settings refresh needed");
+                            }
                         }
                         case "blocklist" -> {
                             whatsapp.store().syncStore().setSyncedContacts(false);
-                            LOGGER.log(System.Logger.Level.DEBUG,
-                                    "Dirty bit account_sync/blocklist: block list refresh needed");
+                            if (Log.DEBUG) {
+                                LOGGER.log(Level.DEBUG,
+                                        "dirty bit account_sync/blocklist: block list refresh needed");
+                            }
                         }
-                        case "notice" ->
-                                LOGGER.log(System.Logger.Level.DEBUG,
-                                        "Dirty bit account_sync/notice: notice refresh needed");
+                        case "notice" -> {
+                            if (Log.DEBUG) {
+                                LOGGER.log(Level.DEBUG,
+                                        "dirty bit account_sync/notice: notice refresh needed");
+                            }
+                        }
                         default -> {
                         }
                     }
@@ -395,21 +411,27 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                 Collections.addAll(collectionsToSync, SyncPatchType.values());
             } else if (DIRTY_TYPE_GROUPS.equals(type)) {
                 supportedTypes.add(type);
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Dirty bit groups: group metadata refresh needed");
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "dirty bit groups: group metadata refresh needed");
+                }
             } else if (DIRTY_TYPE_NEWSLETTER_METADATA.equals(type)) {
                 supportedTypes.add(type);
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Dirty bit newsletter_metadata: newsletter metadata refresh needed");
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "dirty bit newsletter_metadata: newsletter metadata refresh needed");
+                }
             } else {
                 unsupportedTypes.add(type == null ? "" : type);
             }
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "handleDirtyBits supported={0} unsupported={1}",
-                String.join(",", supportedTypes),
-                String.join(",", unsupportedTypes));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "handleDirtyBits supported={0} unsupported={1}",
+                    String.join(",", supportedTypes),
+                    String.join(",", unsupportedTypes));
+        }
 
         if (!collectionsToSync.isEmpty()) {
             var hasAppStateChanges = whatsapp.pullWebAppState(collectionsToSync.toArray(SyncPatchType[]::new));
@@ -461,15 +483,18 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                     .attribute("type", "set")
                     .attribute("xmlns", "urn:xmpp:whatsapp:dirty")
                     .content(cleanChildren));
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "clearDirtyBits: success for type: {0}",
-                    dirtyEntries.stream()
-                            .map(d -> d.getAttributeAsString("type", "unknown"))
-                            .reduce((a, b) -> a + "," + b)
-                            .orElse(""));
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "clearDirtyBits acked types={0}",
+                        dirtyEntries.stream()
+                                .map(d -> d.getAttributeAsString("type", "unknown"))
+                                .reduce((a, b) -> a + "," + b)
+                                .orElse(""));
+            }
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "clearDirtyBits: failed with error");
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "clearDirtyBits failed", e);
+            }
         }
     }
 
@@ -504,9 +529,11 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
         }
         whatsapp.store().connectionStore().setRoutingInfo(edgeRouting);
         whatsapp.store().connectionStore().setRoutingDomain(domain);
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "handleInfoBulletin setting and domain: {0} and edgeRouting: {1} bytes",
-                domain, edgeRouting == null ? 0 : edgeRouting.length);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "edge routing updated domain={0} edgeRoutingBytes={1}",
+                    domain, edgeRouting == null ? 0 : edgeRouting.length);
+        }
     }
 
     /**
@@ -546,8 +573,10 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleOffline(Stanza offlineStanza) {
         var count = offlineStanza.getAttributeAsInt("count", 0);
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Received offline bulletin with count={0}", count);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "received offline bulletin count={0}", count);
+        }
         offlineNotificationsReporter.report();
         if (count == 0) {
             webAppStateService.retryAllOrphanMutations();
@@ -565,9 +594,10 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
             try {
                 deviceService.retryPendingSyncs();
             } catch (Throwable throwable) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "doPendingDeviceSync failed during open-tab resume completion: {0}",
-                        throwable.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "pending device sync failed during open-tab resume completion", throwable);
+                }
             }
             store.connectionStore().setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState.COMPLETE);
             firstOfflinePreviewMillis = 0L;
@@ -583,9 +613,10 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Throwable throwable) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "doPendingDeviceSync failed after offline resume completion: {0}",
-                        throwable.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "pending device sync failed after offline resume completion", throwable);
+                }
             }
         });
     }
@@ -631,13 +662,15 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
         lastOfflinePreviewReceiptCount = receiptCount;
         lastOfflinePreviewNotificationCount = notificationCount;
         lastOfflinePreviewCallCount = callCount;
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Received offline preview bulletin count={0} message={1} receipt={2} notification={3} call={4}",
-                envelopeCount,
-                messageCount,
-                receiptCount,
-                notificationCount,
-                callCount);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "received offline preview bulletin count={0} message={1} receipt={2} notification={3} call={4}",
+                    envelopeCount,
+                    messageCount,
+                    receiptCount,
+                    notificationCount,
+                    callCount);
+        }
 
         var store = whatsapp.store();
         if (store.connectionStore().isResumeFromRestartComplete()) {
@@ -658,12 +691,14 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
         }
         var delay = System.currentTimeMillis() - firstMillis;
         if (delay < LinkedWhatsAppClientOfflineResumeState.OFFLINE_PREVIEW_PERIOD_MS) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Accept multiple offline preview ibs during offline resume, delay={0} message={1}",
-                    delay, messageCount);
-        } else {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Reject multiple offline preview ibs during offline resume, delay={0}",
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "accepted repeated offline preview ib delay={0} message={1}",
+                        delay, messageCount);
+            }
+        } else if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "rejected repeated offline preview ib delay={0}",
                     delay);
         }
     }
@@ -681,8 +716,10 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
     @WhatsAppWebExport(moduleName = "WAWebHandleInfoBulletin", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleOfflinePriorityComplete() {
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Received priority_offline_complete bulletin");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "received priority_offline_complete bulletin");
+        }
         webAppStateService.retryAllOrphanMutations();
     }
 
@@ -711,8 +748,10 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                 Thread.startVirtualThread(() -> typed.onTosNoticesChanged(whatsapp, snapshot));
             }
         }
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Received TOS bulletin notices={0}", notices);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "received tos bulletin noticeCount={0}", notices.size());
+        }
     }
 
     /**
@@ -735,12 +774,16 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                 continue;
             }
             itemCount++;
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "thread_metadata item chat={0} timestamp={1}",
-                    from, timestamp);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE,
+                        "thread_metadata item chat={0} timestamp={1}",
+                        from, timestamp);
+            }
         }
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Received thread_metadata bulletin with {0} items", itemCount);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "received thread_metadata bulletin itemCount={0}", itemCount);
+        }
     }
 
     /**
@@ -766,9 +809,11 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
     private void handleClientExpiration(Stanza stanza) {
         var parsed = SmaxClientExpirationResponse.of(stanza).orElse(null);
         if (!(parsed instanceof SmaxClientExpirationResponse.Inbound inbound)) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to parse client_expiration bulletin {0}",
-                    stanza.getAttributeAsString("id", "[missing-id]"));
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "failed to parse client_expiration bulletin id={0}",
+                        stanza.getAttributeAsString("id", "[missing-id]"));
+            }
             return;
         }
 
@@ -777,17 +822,21 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                 .orElse(null);
         if (newExpiration == null) {
             whatsapp.store().accountStore().setClientExpiration(null);
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Cleared client expiration override");
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "cleared client expiration override");
+            }
             return;
         }
 
         var existingExpiration = whatsapp.store().accountStore().clientExpiration().orElse(null);
 
         if (existingExpiration != null && newExpiration >= existingExpiration.getEpochSecond()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring client expiration {0}: not earlier than existing {1}",
-                    newExpiration, existingExpiration);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "ignoring client expiration {0}, not earlier than existing {1}",
+                        newExpiration, existingExpiration);
+            }
             return;
         }
 
@@ -798,8 +847,10 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                 : Instant.ofEpochSecond(newExpiration);
 
         whatsapp.store().accountStore().setClientExpiration(clampedExpiration);
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Received client expiration bulletin, clamped to {0}", clampedExpiration);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "applied client expiration bulletin, clamped to {0}", clampedExpiration);
+        }
     }
 
     /**
@@ -835,6 +886,9 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
         var envelopeCount = Math.max(lastOfflinePreviewEnvelopeCount, count);
         try {
             if (envelopeCount == 0 && messageCount == 0 && receiptCount == 0 && notificationCount == 0 && callCount == 0) {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "skipping offline resume telemetry, no envelopes observed");
+                }
                 return;
             }
 
@@ -892,6 +946,12 @@ public final class InfoBulletinStreamHandler extends SocketStreamHandler.Concurr
                     .offlineProcessMailboxAge(0L)
                     .swVersion(offlineProcessSwVersion())
                     .build());
+
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "emitted offline resume telemetry envelopeCount={0} messageCount={1} processingMillis={2}",
+                        envelopeCount, messageCount, processingMillis);
+            }
         } finally {
             lastOfflinePreviewEnvelopeCount = 0;
             lastOfflinePreviewMessageCount = 0;

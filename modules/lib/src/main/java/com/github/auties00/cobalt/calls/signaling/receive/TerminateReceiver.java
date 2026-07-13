@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.signaling.receive;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.function.BiConsumer;
 import com.github.auties00.cobalt.calls.signaling.session.TerminateStanza;
@@ -38,9 +40,9 @@ import com.github.auties00.cobalt.calls.signaling.session.TerminateStanza;
  */
 public final class TerminateReceiver extends SocketStreamHandler.Ordered {
     /**
-     * Logs malformed stanza traces.
+     * The logger for {@link TerminateReceiver}.
      */
-    private static final System.Logger LOGGER = System.getLogger(TerminateReceiver.class.getName());
+    private static final System.Logger LOGGER = Log.get(TerminateReceiver.class);
 
     /**
      * The stream tag this handler is registered under.
@@ -110,17 +112,21 @@ public final class TerminateReceiver extends SocketStreamHandler.Ordered {
     @Override
     public void handle(Stanza stanza) {
         if (!stanza.hasAttribute(CALL_ID_ATTRIBUTE)) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring bare <terminate> without call-id: {0}", stanza);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring bare terminate without call-id: {0}", stanza);
             return;
         }
         TerminateStanza terminate;
         try {
             terminate = TerminateStanza.of(stanza);
-        } catch (RuntimeException _) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring malformed bare <terminate>: {0}", stanza);
+        } catch (RuntimeException exception) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring malformed bare terminate stanza", exception);
             return;
         }
         var from = stanza.getAttributeAsJid(FROM_ATTRIBUTE, null);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "forwarding bare terminate for call {0}",
+                    stanza.getAttributeAsString(CALL_ID_ATTRIBUTE, UNKEYED_ORDERING_KEY));
+        }
         sink.accept(terminate, from);
     }
 }

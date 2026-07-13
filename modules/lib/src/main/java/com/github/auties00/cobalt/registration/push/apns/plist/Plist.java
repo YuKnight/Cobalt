@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.registration.push.apns.plist;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.plist.binary.PlistBinaryParser;
 import com.github.auties00.cobalt.registration.push.apns.plist.binary.PlistBinaryWriter;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistValue;
@@ -7,6 +8,7 @@ import com.github.auties00.cobalt.registration.push.apns.plist.xml.PlistXmlParse
 import com.github.auties00.cobalt.registration.push.apns.plist.xml.PlistXmlWriter;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 
 /**
  * Routes property-list parsing and serialisation to the format-specific Apple
@@ -24,6 +26,11 @@ import java.io.IOException;
  * value hierarchy.
  */
 public final class Plist {
+    /**
+     * The logger for {@link Plist}.
+     */
+    private static final System.Logger LOGGER = Log.get(Plist.class);
+
     /**
      * Prevents instantiation of this stateless namespace.
      */
@@ -49,8 +56,10 @@ public final class Plist {
      */
     public static PlistValue parse(byte[] data) throws IOException {
         if (PlistBinaryParser.isBinary(data)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsing binary plist, bytes={0}", data.length);
             return PlistBinaryParser.parse(data);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsing xml plist, bytes={0}", data.length);
         return PlistXmlParser.parse(data);
     }
 

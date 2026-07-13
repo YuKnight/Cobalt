@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
@@ -35,9 +37,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
 public final class CsTokenStanza {
     /**
-     * Logs missing-salt and HMAC failures.
+     * The logger for {@link CsTokenStanza}.
      */
-    private static final System.Logger LOGGER = System.getLogger(CsTokenStanza.class.getName());
+    private static final System.Logger LOGGER = Log.get(CsTokenStanza.class);
 
     /**
      * Caps the number of cached HMAC results per salt.
@@ -112,14 +114,14 @@ public final class CsTokenStanza {
 
         var salt = store.accountStore().notificationContentTokenSalt().orElse(null);
         if (salt == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "[nct-cstoken] no salt available in store");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cstoken build skipped: no nct salt in store");
             return null;
         }
 
         var chat = store.chatStore().findChatByJid(chatJid).orElse(null);
         var recipientLid = chat != null ? chat.accountLid().orElse(null) : null;
         if (recipientLid == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "[nct-cstoken] recipientLid is null");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cstoken build skipped: no account lid for chat {0}", chatJid);
             return null;
         }
 
@@ -133,6 +135,7 @@ public final class CsTokenStanza {
 
             var cached = hmacCache.get(lidString);
             if (cached != null) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "cstoken hmac cache hit for chat {0}", chatJid);
                 return new StanzaBuilder()
                         .description("cstoken")
                         .content(cached)
@@ -151,13 +154,13 @@ public final class CsTokenStanza {
             }
             hmacCache.put(lidString, hmacResult);
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cstoken hmac computed for chat {0}", chatJid);
             return new StanzaBuilder()
                     .description("cstoken")
                     .content(hmacResult)
                     .build();
         } catch (GeneralSecurityException e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "[nct-cstoken] generation failed - {0}", e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cstoken hmac generation failed for chat " + Log.jid(String.valueOf(chatJid)), e);
             return null;
         }
     }

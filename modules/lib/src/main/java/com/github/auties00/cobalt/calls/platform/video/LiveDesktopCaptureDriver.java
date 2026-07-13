@@ -5,7 +5,9 @@ import com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.VideoC
 import com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.VideoSink;
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoOutput;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -18,7 +20,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * surface. {@link #initDriver(String, VideoSink)} binds a source for the named surface through the
  * installed {@link ScreenSourceFactory} and latches the engine sink;
  * {@link #start(VideoCaptureCapability)} spins a virtual thread capture pump that repeatedly
- * {@linkplain VideoOutput#take() pulls} frames and forwards each through
+ * {@linkplain VideoOutput#takeVideo() pulls} frames and forwards each through
  * {@link #sendVideoToSink(VideoFrame)}; {@link #setConfig(VideoCaptureCapability)} updates the capture
  * geometry in place and reseeds the frame size baseline so the next differently sized frame is accepted
  * rather than dropped; {@link #stop()} ends the pump and closes the bound source. The frame drop and
@@ -33,9 +35,9 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
     /**
-     * Logs lifecycle transitions, dropped frames, and sink errors.
+     * The logger for {@link LiveDesktopCaptureDriver}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveDesktopCaptureDriver.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveDesktopCaptureDriver.class);
 
     /**
      * Success code returned when a {@link VideoSink} accepts a forwarded frame.
@@ -59,7 +61,7 @@ public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
      *
      * <p>This is the seam between the driver's state machine and the concrete screen capture backend:
      * the engine or embedder installs a factory that opens the named display, window, or capture target
-     * and returns it as a {@link VideoOutput} whose {@link VideoOutput#take()} yields raw frames. It is a
+     * and returns it as a {@link VideoOutput} whose {@link VideoOutput#takeVideo()} yields raw frames. It is a
      * single abstract method type, so a lambda or a method reference to a stream factory satisfies it.
      */
     @FunctionalInterface
@@ -68,7 +70,7 @@ public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
          * Opens the named screen surface and returns it as a frame source.
          *
          * <p>Binds the operating system display or window identified by {@code surfaceId} and returns a
-         * {@link VideoOutput} whose {@link VideoOutput#take()} delivers its captured frames. The returned
+         * {@link VideoOutput} whose {@link VideoOutput#takeVideo()} delivers its captured frames. The returned
          * source is owned by the driver and {@linkplain VideoOutput#shutdown() shut down} when the driver
          * stops.
          *
@@ -180,6 +182,7 @@ public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
             this.lastWidth = -1;
             this.lastHeight = -1;
             this.state = State.INITIALIZED;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "desktop capture driver initialized");
         } finally {
             lock.unlock();
         }
@@ -204,6 +207,9 @@ public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
             this.pump = Thread.ofVirtual()
                     .name("calls-desktop-capture-" + capability.width() + "x" + capability.height())
                     .start(this::pumpLoop);
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "desktop capture started: {0}x{1} maxFps={2}",
+                        capability.width(), capability.height(), capability.maxFps());
         } finally {
             lock.unlock();
         }
@@ -226,6 +232,9 @@ public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
             }
             this.lastWidth = -1;
             this.lastHeight = -1;
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "desktop capture reconfigured: {0}x{1} maxFps={2}",
+                        capability.width(), capability.height(), capability.maxFps());
         } finally {
             lock.unlock();
         }
@@ -245,19 +254,20 @@ public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
         lock.lock();
         try {
             if (state != State.RUNNING) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "send_video_data_to_sink dropped: driver not running, state " + state);
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "send_video_data_to_sink dropped: driver not running, state {0}",
+                            state);
                 return SINK_DROPPED;
             }
             if (sink == null) {
-                LOGGER.log(System.Logger.Level.WARNING, "send_video_data_to_sink dropped: sink is null");
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "send_video_data_to_sink dropped: sink is null");
                 return SINK_DROPPED;
             }
             if (lastWidth != -1 && (frame.width() != lastWidth || frame.height() != lastHeight)) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "send_video_data_to_sink dropped: frame size changed from "
-                                + lastWidth + "x" + lastHeight + " to "
-                                + frame.width() + "x" + frame.height());
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG,
+                            "send_video_data_to_sink dropped: frame size changed from {0}x{1} to {2}x{3}",
+                            lastWidth, lastHeight, frame.width(), frame.height());
                 return SINK_DROPPED;
             }
             this.lastWidth = frame.width();
@@ -269,12 +279,12 @@ public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
         try {
             var code = target.accept(frame);
             if (code != SINK_OK) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "send_video_data_to_sink: sink returned error code " + code);
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "send_video_data_to_sink: sink returned error code {0}", code);
             }
             return code;
         } catch (RuntimeException e) {
-            LOGGER.log(System.Logger.Level.WARNING, "send_video_data_to_sink: exception calling sink", e);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "send_video_data_to_sink: exception calling sink", e);
             return SINK_DROPPED;
         }
     }
@@ -312,16 +322,20 @@ public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
         if (toClose != null) {
             toClose.shutdown();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "desktop capture stopped");
     }
 
     /**
      * Pulls frames from the bound source and forwards them until the driver leaves {@link State#RUNNING}.
      *
      * <p>Runs on the capture pump virtual thread spun by {@link #start(VideoCaptureCapability)}. Each
-     * iteration {@linkplain VideoOutput#take() takes} the next frame from the source and forwards it
-     * through {@link #sendVideoToSink(VideoFrame)}; a {@code null} frame signals the source ended and
-     * exits the loop, and an interrupt from {@link #stop()} exits the loop. The loop reads {@code state}
-     * and {@code source} under {@link #lock} so a concurrent {@link #stop()} is observed cleanly.
+     * iteration {@linkplain VideoOutput#takeVideo() takes} the next frame from the source and forwards it
+     * through {@link #sendVideoToSink(VideoFrame)}; an interrupt from {@link #stop()} exits the loop cleanly.
+     * A shared surface never cleanly drains on its own, so a {@code null} frame or a capture fault while the
+     * driver is still {@link State#RUNNING} is an operating system surface revocation (the user stopped
+     * sharing or the shared window closed), which enters {@link State#INTERRUPTED} through
+     * {@link #enterInterrupted(RuntimeException)}. The loop reads {@code state} and {@code source} under
+     * {@link #lock} so a concurrent {@link #stop()} is observed cleanly.
      */
     private void pumpLoop() {
         while (true) {
@@ -340,24 +354,53 @@ public final class LiveDesktopCaptureDriver implements DesktopCaptureDriver {
             }
             VideoFrame frame;
             try {
-                frame = current.take();
+                frame = current.takeVideo();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
+            } catch (RuntimeException e) {
+                enterInterrupted(e);
+                return;
             }
-            // TODO: surface an OS surface revocation (the user stops sharing, or the shared window
-            //  closes) under a running capture as State.INTERRUPTED. No transition currently targets
-            //  INTERRUPTED: the state exists only so stop() tolerates it, and WhatsApp writes an
-            //  interrupted state from the call and peer layer (a peer interrupted by a phone call), not
-            //  from a driver level surface revocation; no host downcall to interrupt the driver exists.
-            //  Wiring this edge on a null take() (end of stream) or a capture fault would invent a
-            //  transition WhatsApp does not have, so this loop exits cleanly instead; resolve only once a
-            //  capture backend exposes a distinguishable surface revocation signal and the owner of the
-            //  edge is known.
             if (frame == null) {
+                enterInterrupted(null);
                 return;
             }
             sendVideoToSink(frame);
+        }
+    }
+
+    /**
+     * Transitions a running driver into {@link State#INTERRUPTED} on an operating system surface revocation
+     * and notifies the latched sink.
+     *
+     * <p>Called by {@link #pumpLoop()} when the capture source ended or faulted without a {@link #stop()}.
+     * The state is flipped under {@link #lock} guarded by a {@link State#RUNNING} check so a concurrent
+     * {@link #stop()}, which sets {@link State#INITIALIZED} under the same lock before it unblocks the pump,
+     * is not mistaken for a revocation and the transition is made at most once. When the transition is made
+     * the latched {@link VideoSink} is notified through {@link VideoSink#onInterrupted()} outside the lock so
+     * the engine can react.
+     *
+     * @param cause the capture fault that ended the surface, or {@code null} when the source returned end of
+     *              stream
+     */
+    private void enterInterrupted(RuntimeException cause) {
+        VideoSink latched;
+        lock.lock();
+        try {
+            if (state != State.RUNNING) {
+                return;
+            }
+            this.state = State.INTERRUPTED;
+            latched = sink;
+        } finally {
+            lock.unlock();
+        }
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "desktop capture surface revoked, entering INTERRUPTED", cause);
+        }
+        if (latched != null) {
+            latched.onInterrupted();
         }
     }
 }

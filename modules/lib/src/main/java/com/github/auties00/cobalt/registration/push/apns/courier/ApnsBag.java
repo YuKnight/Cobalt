@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.registration.push.apns.courier;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.plist.Plist;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDataValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDictionaryValue;
@@ -7,6 +8,7 @@ import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistIntege
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistStringValue;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 
 /**
  * Holds the two courier-routing values decoded from the APNS bag response.
@@ -28,6 +30,11 @@ import java.io.IOException;
  * but discarded.
  */
 public record ApnsBag(int hostCount, String hostname) {
+    /**
+     * The logger for {@link ApnsBag}.
+     */
+    private static final System.Logger LOGGER = Log.get(ApnsBag.class);
+
     /**
      * Decodes the raw bag plist bytes into an {@link ApnsBag}.
      *
@@ -56,8 +63,11 @@ public record ApnsBag(int hostCount, String hostname) {
             var bag = (PlistDictionaryValue) Plist.parse(bagData.toByteArray());
             var hostCount = (int) ((PlistIntegerValue) bag.get("APNSCourierHostcount").orElseThrow()).value();
             var hostname = ((PlistStringValue) bag.get("APNSCourierHostname").orElseThrow()).value();
-            return new ApnsBag(hostCount, hostname);
+            var result = new ApnsBag(hostCount, hostname);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsed apns bag, host count={0}, hostname={1}", hostCount, hostname);
+            return result;
         } catch (Exception e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot parse apns bag", e);
             throw new IOException("Cannot parse APNS bag", e);
         }
     }

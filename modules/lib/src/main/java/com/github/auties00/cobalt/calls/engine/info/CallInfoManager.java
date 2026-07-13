@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.calls.engine.info;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
 import com.github.auties00.cobalt.calls.engine.state.CallLifecycleState;
 import com.github.auties00.cobalt.calls.telemetry.CallResult;
+import com.github.auties00.cobalt.log.Log;
 
 /**
  * Maintains the periodically updated immutable snapshot of one call's coarse information for listeners,
@@ -29,6 +31,11 @@ import com.github.auties00.cobalt.calls.telemetry.CallResult;
  * listener or the host leaks no mutable state.
  */
 public final class CallInfoManager {
+    /**
+     * The logger for {@link CallInfoManager}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallInfoManager.class);
+
     /**
      * Holds the latest published immutable snapshot, or {@code null} before the first update.
      *
@@ -86,6 +93,9 @@ public final class CallInfoManager {
         synchronized (lock) {
             current = new Snapshot(true, state, result, activeDuration.plus(lonelyDuration),
                     activeDuration, lonelyDuration, setupDuration, linkToken);
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "call info snapshot updated, state {0} result {1}", state, result);
         }
     }
 
@@ -146,6 +156,7 @@ public final class CallInfoManager {
         synchronized (lock) {
             current = null;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call info snapshot reset");
     }
 
     /**
@@ -170,7 +181,13 @@ public final class CallInfoManager {
      */
     private static CallResult deriveResult(CallEventType event, CallResult result) {
         return switch (event) {
-            case RELAY_BINDS_FAILED, AUDIO_INIT_ERROR, VIDEO_PREVIEW_FAILED -> CallResult.SETUP_ERROR;
+            case RELAY_BINDS_FAILED, AUDIO_INIT_ERROR, VIDEO_PREVIEW_FAILED -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "call info result overridden to {0} by event {1}",
+                            CallResult.SETUP_ERROR, event);
+                }
+                yield CallResult.SETUP_ERROR;
+            }
             default -> result;
         };
     }

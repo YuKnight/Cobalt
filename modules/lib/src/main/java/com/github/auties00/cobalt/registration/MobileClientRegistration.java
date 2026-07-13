@@ -6,7 +6,8 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerification
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevicePushClient;
 import com.github.auties00.cobalt.client.linked.info.WhatsAppMobileClientInfo;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDeviceAttestor;
-import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
+import com.github.auties00.cobalt.exception.linked.mobile.WhatsAppRegistrationException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.business.*;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -25,6 +26,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -82,6 +84,11 @@ import java.util.*;
  */
 public abstract sealed class MobileClientRegistration implements AutoCloseable
         permits AndroidClientRegistration, IosClientRegistration {
+    /**
+     * The logger for {@link MobileClientRegistration}.
+     */
+    private static final System.Logger LOGGER = Log.get(MobileClientRegistration.class);
+
     /**
      * Base URL shared by every endpoint used during registration
      * ({@code /exist}, {@code /code}, {@code /register},
@@ -502,6 +509,9 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      *                                       fails
      */
     public void register() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "mobile registration starting, platform={0}", store.accountStore().device().platform());
+        }
         try {
             sendPrePnFunnelLog("session_start", "registration_session_start");
 
@@ -511,6 +521,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
 
             sendVerificationCode();
         } catch (IOException | InterruptedException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "mobile registration failed", exception);
             throw new WhatsAppRegistrationException(exception);
         }
     }
@@ -547,18 +558,22 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
         var response = JSON.parseObject(result);
         if (Objects.equals(response.getString("reason"), "incorrect")) {
             sendFunnelLog("enter_number", "exist_check", "exist_success");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "exist check confirmed free account slot");
             return;
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "exist check retrying, reason={0}", response.getString("reason"));
         result = sendRequest("/exist", attrs);
         response = JSON.parseObject(result);
         if (Objects.equals(response.getString("reason"), "incorrect")) {
             sendFunnelLog("enter_number", "exist_check", "exist_success");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "exist check confirmed free account slot on retry");
             return;
         }
 
         sendFunnelLog("enter_number", "exist_check", "exist_failure");
 
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "exist check failed, reason={0}", response.getString("reason"));
         throw new WhatsAppRegistrationException("Cannot get account data", new String(result));
     }
 
@@ -580,6 +595,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
     private void requestVerificationCodeIfNecessary() throws IOException, InterruptedException {
         var codeResult = verification.requestMethod();
         if (codeResult.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "verification code request skipped, method already requested externally");
             return;
         }
 
@@ -616,6 +632,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
         lastRequestedMethod = method;
         var verifyScreen = "verify_" + method;
         sendFunnelLog(verifyScreen, "request_code", "request_code_attempt");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "requesting verification code via {0}", method);
         while (true) {
             var params = getRequestVerificationCodeParameters(method);
             var attrs = getRegistrationOptions(true, params);
@@ -625,11 +642,13 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             var status = response.getString("status");
             if (isSuccessful(status)) {
                 sendFunnelLog(verifyScreen, "request_code", "request_code_success");
+                if (Log.INFO) LOGGER.log(Level.INFO, "verification code requested via {0}", method);
                 return;
             }
 
             var reason = response.getString("reason");
             if(isTooRecent(reason)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "verification code request rate limited, reason={0}", reason);
                 throw new WhatsAppRegistrationException(
                         "Please wait before trying to register this phone value again. Don't spam!"
                                 + formatWaitSuffix(response, method),
@@ -638,6 +657,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
 
             if(isRegistrationBlocked(reason)) {
                 var resultJson = new String(result);
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "verification code request blocked, method={0}", method);
                 if(method.equals("wa_old")) {
                     throw new WhatsAppRegistrationException("The registration attempt was blocked by Whatsapp: you might want to change platform(iOS/Android) or try using a residential proxy (don't spam)", resultJson);
                 }else {
@@ -646,9 +666,11 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             }
 
             if (Objects.equals(reason, lastError)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "verification code request failed twice, reason={0}", reason);
                 throw new WhatsAppRegistrationException("An error occurred while registering: " + reason, new String(result));
             }
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "verification code request attempt {0} failed, reason={1}", attempt, reason);
             lastError = reason;
             attempt++;
         }
@@ -768,6 +790,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
 
         var verifyScreen = currentVerifyScreen();
         sendFunnelLog(verifyScreen, "submit_code", "submit_code_attempt");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "submitting verification code {0}", Log.code(code));
 
         var attrs = getRegistrationOptions(true, "code", normalizeCodeResult(code));
         var result = sendRequest("/register", attrs);
@@ -780,15 +803,18 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
         }
 
         if (hasChallenge(response)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "verification code submit requires captcha challenge");
             handleChallenge(response);
             return;
         }
 
         if (is2FARequired(response)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "verification code submit requires two-factor pin");
             handle2FA();
             return;
         }
 
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "verification code submit rejected, status={0}", status);
         throw new WhatsAppRegistrationException("Cannot confirm registration", new String(result));
     }
 
@@ -858,6 +884,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             throws IOException, InterruptedException {
         var verifyScreen = currentVerifyScreen();
         sendFunnelLog(verifyScreen, "challenge_shown", "captcha_shown");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "captcha challenge shown");
         var response = initialResponse;
         for (;;) {
             var image = decodeOrNull(response.getString("image_blob"));
@@ -865,6 +892,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             var answer = verification.solveCaptcha(image, audio);
             if (answer.isEmpty()) {
                 sendFunnelLog(verifyScreen, "challenge_abandoned", "captcha_abandoned");
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "captcha challenge abandoned, handler returned no answer");
                 throw new WhatsAppRegistrationException(
                         "Server requires a CAPTCHA that the verification handler cannot solve",
                         response.toString());
@@ -882,12 +910,14 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             }
             if (hasChallenge(response)) {
                 sendFunnelLog(verifyScreen, "challenge_retry", "captcha_retry");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "captcha challenge retry requested");
                 continue;
             }
             if (is2FARequired(response)) {
                 handle2FA();
                 return;
             }
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "captcha challenge submit rejected, status={0}", status);
             throw new WhatsAppRegistrationException("Cannot complete challenge", new String(result));
         }
     }
@@ -909,9 +939,11 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      */
     private void handle2FA() throws IOException, InterruptedException {
         sendFunnelLog("verify_twofac", "twofac_shown", "twofac_prompt_shown");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "two-factor pin prompt shown");
         var pin = verification.twoFactorPin();
         if (pin.isEmpty()) {
             sendFunnelLog("verify_twofac", "twofac_abandoned", "twofac_abandoned");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "two-factor pin abandoned, handler returned no pin");
             throw new WhatsAppRegistrationException(
                     "Server requires a 2FA PIN that the verification handler cannot supply", "");
         }
@@ -926,6 +958,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             saveRegistrationStatus(true);
             return;
         }
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "two-factor pin submit rejected, status={0}", status);
         throw new WhatsAppRegistrationException("Cannot confirm 2FA", new String(result));
     }
 
@@ -979,6 +1012,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
                     .orElseThrow(() -> new WhatsAppRegistrationException("Phone number wasn't set"));
             var jid = Jid.of(phoneNumber);
             store.accountStore().setJid(jid);
+            if (Log.INFO) LOGGER.log(Level.INFO, "mobile registration complete, jid={0}", jid);
         }
         store.save();
     }
@@ -1069,12 +1103,16 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             }
             var requestBuilder = createRequest(path, body.toString(), attestation.authorizationHeader());
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending mobile registration request to {0}", path);
             var response = httpClient.send(requestBuilder, HttpResponse.BodyHandlers.ofByteArray());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mobile registration request to {0} -> status {1}", path, response.statusCode());
             if(response.statusCode() != 200) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "mobile registration request to {0} failed, status={1}", path, response.statusCode());
                 throw new RuntimeException("Cannot send request to " + path + ": status code" + response.statusCode());
             }
             return response.body();
         } catch (GeneralSecurityException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "mobile registration request encryption failed for " + path, exception);
             throw new RuntimeException("Cannot encrypt request", exception);
         }
     }
@@ -1261,6 +1299,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             return PhoneNumberUtil.getInstance()
                     .parse("+" + phoneNumber, null);
         }catch (NumberParseException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "malformed phone number in store", exception);
             throw new WhatsAppRegistrationException("Malformed phone number: " + phoneNumber);
         }
     }
@@ -1357,7 +1396,8 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
                     "event_name", eventName
             );
             sendRequest("/pre_pn_client_log", body);
-        } catch (Throwable _) {
+        } catch (Throwable e) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pre-pn funnel log failed, action=" + actionTaken, e);
         }
     }
 
@@ -1406,7 +1446,8 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
             );
             sendRequest("/client_log", body);
             previousFunnelScreen = currentScreen;
-        } catch (Throwable _) {
+        } catch (Throwable e) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "funnel log failed, screen=" + currentScreen, e);
         }
     }
 
@@ -1437,6 +1478,7 @@ public abstract sealed class MobileClientRegistration implements AutoCloseable
      */
     @Override
     public void close() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mobile registration client closing");
         httpClient.close();
     }
 }

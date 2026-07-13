@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.MlowTocByte;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.param.ParamDecoder;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Per frame line spectral frequency to linear prediction (LSF to LPC) driver for the MLow speech codec.
@@ -41,6 +44,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.param.ParamDecode
  * carried previous frame LSF state.
  */
 public final class SubframeLpc {
+    /**
+     * The logger for {@link SubframeLpc}.
+     */
+    private static final System.Logger LOGGER = Log.get(SubframeLpc.class);
+
     /**
      * Per subframe interpolation factors for a single subframe frame.
      *
@@ -178,7 +186,12 @@ public final class SubframeLpc {
             case 1 -> sid ? INTERPOL_DTX_1 : INTERPOL_1;
             case 2 -> sid ? INTERPOL_DTX_2 : INTERPOL_2[lsfInterpolIdx];
             case 4 -> sid ? INTERPOL_DTX_4 : INTERPOL_4[lsfInterpolIdx];
-            default -> throw new IllegalArgumentException("unsupported subframe count " + numSubframes);
+            default -> {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "mlow subframe lpc: unsupported subframe count={0}", numSubframes);
+                }
+                throw new IllegalArgumentException("unsupported subframe count " + numSubframes);
+            }
         };
     }
 }

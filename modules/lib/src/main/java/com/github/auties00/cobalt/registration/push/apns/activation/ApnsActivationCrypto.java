@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.registration.push.apns.activation;
 
+import com.github.auties00.cobalt.log.Log;
+
 import javax.security.auth.x500.X500Principal;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -37,6 +40,14 @@ import java.util.UUID;
  * components.
  */
 public final class ApnsActivationCrypto {
+    /**
+     * The logger for {@link ApnsActivationCrypto}.
+     *
+     * <p>Declared first so it is initialized before {@link #FAIRPLAY_PRIVATE_KEY}, whose own
+     * initializer calls {@link #loadFairplayPrivateKey()} and logs through this field.
+     */
+    private static final System.Logger LOGGER = Log.get(ApnsActivationCrypto.class);
+
     /**
      * Holds the modulus {@code n} of the leaked FairPlay private key.
      *
@@ -163,6 +174,7 @@ public final class ApnsActivationCrypto {
             return KeyFactory.getInstance("RSA")
                     .generatePrivate(spec);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "fairplay private key load failed", e);
             throw new IllegalStateException("FairPlay private key load failed", e);
         }
     }
@@ -173,10 +185,10 @@ public final class ApnsActivationCrypto {
      * <p>The class exposes only static helpers, so any attempt to construct it through reflection
      * fails fast.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private ApnsActivationCrypto() {
-        throw new UnsupportedOperationException("ApnsActivationCrypto is a utility class and cannot be initialized");
+        throw new AssertionError();
     }
 
     /**
@@ -197,8 +209,11 @@ public final class ApnsActivationCrypto {
         try {
             var gen = KeyPairGenerator.getInstance("RSA");
             gen.initialize(RSA_KEY_SIZE);
-            return gen.generateKeyPair();
+            var pair = gen.generateKeyPair();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "generated device rsa keypair, bits={0}", RSA_KEY_SIZE);
+            return pair;
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "rsa generator unavailable", e);
             throw new IllegalStateException("RSA generator unavailable", e);
         }
     }
@@ -229,11 +244,14 @@ public final class ApnsActivationCrypto {
                     subject.getEncoded(), keyPair.getPublic());
             var signature = signSha256(keyPair.getPrivate(), requestInfo);
             var certificationRequest = encodeCertificationRequest(requestInfo, signature);
-            return wrapAsPem(
+            var pem = wrapAsPem(
                     "-----BEGIN CERTIFICATE REQUEST-----",
                     certificationRequest,
                     "-----END CERTIFICATE REQUEST-----");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "generated activation csr, bytes={0}", pem.length);
+            return pem;
         } catch (GeneralSecurityException | IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "csr generation failed", e);
             throw new IllegalStateException("CSR generation failed", e);
         }
     }
@@ -258,8 +276,11 @@ public final class ApnsActivationCrypto {
             var sig = Signature.getInstance("SHA1withRSA");
             sig.initSign(FAIRPLAY_PRIVATE_KEY);
             sig.update(activationInfoXml);
-            return sig.sign();
+            var signature = sig.sign();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "signed activation info, bytes={0}", signature.length);
+            return signature;
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "fairplay signature failed", e);
             throw new IllegalStateException("FairPlay signature failed", e);
         }
     }

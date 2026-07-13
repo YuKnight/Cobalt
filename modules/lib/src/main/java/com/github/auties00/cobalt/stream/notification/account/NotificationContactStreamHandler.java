@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
@@ -10,6 +11,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Handles {@code type="contacts"} notifications carrying server-side mutations to the user's contact
@@ -30,7 +33,7 @@ final class NotificationContactStreamHandler extends SocketStreamHandler.Concurr
     /**
      * Logs warnings about malformed stanzas and debug messages about unhandled child types.
      */
-    private static final System.Logger LOGGER = System.getLogger(NotificationContactStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationContactStreamHandler.class);
 
     /**
      * Holds the client used for store reads and name queries.
@@ -72,10 +75,9 @@ final class NotificationContactStreamHandler extends SocketStreamHandler.Concurr
         try {
             handleNotification(stanza);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle contacts notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "[missing-id]"),
-                    throwable.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "failed to handle contacts notification " + stanza.getAttributeAsString("id", "[missing-id]"),
+                    throwable);
         } finally {
             sendNotificationAck(stanza);
         }
@@ -104,8 +106,8 @@ final class NotificationContactStreamHandler extends SocketStreamHandler.Concurr
             }
         }
         if (actionStanza == null) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Contacts notification {0} has no supported action child",
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "contacts notification {0} has no supported action child",
                     stanza.getAttributeAsString("id", "[missing-id]"));
             return;
         }
@@ -114,14 +116,15 @@ final class NotificationContactStreamHandler extends SocketStreamHandler.Concurr
             case "update" -> handleUpdate(stanza, actionStanza);
             case "modify" -> handleModify(stanza, actionStanza);
             case "sync" -> {
-                LOGGER.log(System.Logger.Level.DEBUG, "Received contact sync notification");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received contact sync notification");
                 whatsapp.store().syncStore().setSyncedContacts(false);
             }
-            default ->
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "Ignoring unhandled contacts notification type {0} for notification {1}",
-                            actionStanza.description(),
-                            stanza.getAttributeAsString("id", "[missing-id]"));
+            default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "ignoring unhandled contacts notification type {0} for notification {1}",
+                        actionStanza.description(),
+                        stanza.getAttributeAsString("id", "[missing-id]"));
+            }
         }
     }
 
@@ -146,7 +149,7 @@ final class NotificationContactStreamHandler extends SocketStreamHandler.Concurr
                     .map(Jid::toUserJid)
                     .orElse(null);
             if (targetJid == null) {
-                LOGGER.log(System.Logger.Level.DEBUG,
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
                         "handleContactsNotification: update cmd missing jid");
                 return;
             }
@@ -162,14 +165,14 @@ final class NotificationContactStreamHandler extends SocketStreamHandler.Concurr
 
         if (updateStanza.hasAttribute("hash")) {
             // TODO: resolve the hash-only update by walking the contact store and matching the WA Web userhash truncation. Today the hash-only path is silently skipped.
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring hash-only contacts update notification {0}",
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "ignoring hash-only contacts update notification {0}",
                     notificationStanza.getAttributeAsString("id", "[missing-id]"));
             return;
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Contacts update notification {0} has neither jid nor hash",
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                "contacts update notification {0} has neither jid nor hash",
                 notificationStanza.getAttributeAsString("id", "[missing-id]"));
     }
 
@@ -197,7 +200,7 @@ final class NotificationContactStreamHandler extends SocketStreamHandler.Concurr
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (oldJid == null || newJid == null) {
-            LOGGER.log(System.Logger.Level.DEBUG,
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
                     "modify notification missing old or new jid");
             return;
         }
@@ -228,6 +231,7 @@ final class NotificationContactStreamHandler extends SocketStreamHandler.Concurr
             updated.setLid(newLid);
         }
         whatsapp.store().contactStore().addContact(updated);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "contact number migrated from {0} to {1}", oldJid, newJid);
     }
 
     /**
@@ -243,8 +247,8 @@ final class NotificationContactStreamHandler extends SocketStreamHandler.Concurr
         try {
             whatsapp.queryName(targetJid).ifPresent(contact::setChosenName);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Cannot refresh contact name for {0}: {1}",
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "cannot refresh contact name for {0}: {1}",
                     targetJid,
                     throwable.getMessage());
         }

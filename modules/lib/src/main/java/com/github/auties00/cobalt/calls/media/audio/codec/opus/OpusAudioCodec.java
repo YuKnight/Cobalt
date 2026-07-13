@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.opus;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.bindings.CobaltOpus;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.util.NativeLibLoader;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -96,6 +98,11 @@ public final class OpusAudioCodec implements AudioCodec {
      * the average encode time per second in the same unit.
      */
     private static final long ENCODE_BUDGET_MILLIS_PER_SECOND = 10;
+
+    /**
+     * The logger for {@link OpusAudioCodec}.
+     */
+    private static final System.Logger LOGGER = Log.get(OpusAudioCodec.class);
 
     /**
      * Per instance arena owning the native encoder and decoder states and the scratch buffers.
@@ -249,7 +256,12 @@ public final class OpusAudioCodec implements AudioCodec {
                     ENCODE_BUDGET_MILLIS_PER_SECOND, params.complexity());
             this.fecPacker = new OpusInbandFecPacker();
             applyOpenControls(params);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "calls opus codec opened: sampleRate={0} channels={1} application={2} bitrate={3}",
+                        params.sampleRate(), channels, params.application(), params.defaultBitrate());
+            }
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus codec open failed", e);
             destroyStates();
             arena.close();
             throw e;
@@ -269,10 +281,12 @@ public final class OpusAudioCodec implements AudioCodec {
         try {
             rc = CobaltOpus.cobalt_opus_encoder_create(params.sampleRate(), channels, params.application().toNative(), outHandle);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus encoder create failed", t);
             throw new WhatsAppCallException.Opus("cobalt_opus_encoder_create failed", t);
         }
         var state = outHandle.get(ValueLayout.ADDRESS, 0);
         if (rc != CobaltOpus.COBALT_OPUS_OK() || state.equals(MemorySegment.NULL)) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus encoder create rejected: rc={0}", rc);
             throw WhatsAppCallException.Opus.fromErr("cobalt_opus_encoder_create", rc);
         }
         return state;
@@ -291,10 +305,12 @@ public final class OpusAudioCodec implements AudioCodec {
         try {
             rc = CobaltOpus.cobalt_opus_decoder_create(params.sampleRate(), channels, outHandle);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus decoder create failed", t);
             throw new WhatsAppCallException.Opus("cobalt_opus_decoder_create failed", t);
         }
         var state = outHandle.get(ValueLayout.ADDRESS, 0);
         if (rc != CobaltOpus.COBALT_OPUS_OK() || state.equals(MemorySegment.NULL)) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus decoder create rejected: rc={0}", rc);
             throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decoder_create", rc);
         }
         return state;
@@ -310,8 +326,11 @@ public final class OpusAudioCodec implements AudioCodec {
      * @param params the parameters whose fields select the control values
      */
     private void applyOpenControls(OpusCodecParams params) {
-        // TODO: the WhatsApp patched extended SILK and CELT CTLs the native open path also issues are
-        //  not applied here because stock system libopus rejects them.
+        // TODO: the WhatsApp patched extended SILK and CELT CTLs the native open path also issues (in
+        //  wa_opus.cc) are not applied here: RE (re/calls) shows they are WhatsApp-fork custom encoder-ctl
+        //  request numbers that stock system libopus rejects, so applying them faithfully would need Cobalt to
+        //  bundle WhatsApp's patched libopus rather than the stock library, not merely the recovered request
+        //  numbers. Blocked on that library choice, not on recovery alone.
         var signal = params.signalVoice() ? CobaltOpus.COBALT_OPUS_SIGNAL_VOICE() : CobaltOpus.COBALT_OPUS_SIGNAL_MUSIC();
         encApply("set_bitrate", CobaltOpus.cobalt_opus_encoder_set_bitrate(encoder, params.defaultBitrate()));
         this.appliedTargetBitrate = params.defaultBitrate();
@@ -341,10 +360,12 @@ public final class OpusAudioCodec implements AudioCodec {
         try {
             written = CobaltOpus.cobalt_opus_encode(encoder, pcmInBuf, frameSize, packetBuf, MAX_PACKET_BYTES);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus encode failed", t);
             throw new WhatsAppCallException.Opus("cobalt_opus_encode failed", t);
         }
         var encodeMicros = (System.nanoTime() - t0) / 1000L;
         if (written < 0) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus encode rejected: rc={0}", written);
             throw WhatsAppCallException.Opus.fromErr("cobalt_opus_encode", written);
         }
         totalEncodedFrames++;
@@ -362,6 +383,7 @@ public final class OpusAudioCodec implements AudioCodec {
             // its level and it never reaches the wire, so reuse a shared empty payload and skip the
             // per sample level scan whose result would go unread.
             lastWasDiscontinuous = true;
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls opus encode: discontinuous frame, bytes=0");
             return new EncodedAudioFrame(DataUtils.EMPTY_BYTE_ARRAY, false, true, false, EncodedAudioFrame.SILENCE_LEVEL);
         }
         var payload = new byte[written];
@@ -371,6 +393,10 @@ public final class OpusAudioCodec implements AudioCodec {
         var voiceActive = !discontinuous && packetHasVoiceActivity(payload);
         var hasFec = !discontinuous && packetHasInbandFec(payload);
         var levelDbov = audioLevelDbov(pcm, required);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls opus encode: bytes={0} voiceActive={1} discontinuous={2} fec={3}",
+                    written, voiceActive, discontinuous, hasFec);
+        }
         return new EncodedAudioFrame(payload, voiceActive, discontinuous, hasFec, levelDbov);
     }
 
@@ -420,6 +446,7 @@ public final class OpusAudioCodec implements AudioCodec {
         complexityController.recordEncode(encodeMicros, params.frameMillis());
         if (complexityController.complexityChanged()) {
             encApply("set_complexity", CobaltOpus.cobalt_opus_encoder_set_complexity(encoder, complexityController.complexity()));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls opus adaptive complexity -> {0}", complexityController.complexity());
         }
     }
 
@@ -433,17 +460,24 @@ public final class OpusAudioCodec implements AudioCodec {
         try {
             decoded = CobaltOpus.cobalt_opus_decode(decoder, packetInBuf, payload.length, pcmOutBuf, frameSize, decodeFec ? 1 : 0);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus decode failed", t);
             throw new WhatsAppCallException.Opus("cobalt_opus_decode failed", t);
         }
         lifetimeDecodeMicros += (System.nanoTime() - t0) / 1000L;
         if (decoded < 0) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus decode rejected: rc={0}", decoded);
             throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decode", decoded);
         }
         totalDecodedFrames++;
         if (decodeFec) {
             fecFrames++;
         }
-        return readPcm(decoded);
+        var pcm = readPcm(decoded);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls opus decode: bytes={0} decodeFec={1} samples={2}",
+                    payload.length, decodeFec, pcm.length);
+        }
+        return pcm;
     }
 
     @Override
@@ -460,16 +494,22 @@ public final class OpusAudioCodec implements AudioCodec {
                 decoded = CobaltOpus.cobalt_opus_decode(decoder, MemorySegment.NULL, 0, pcmOutBuf, frameSize, 0);
             }
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus decode recovery failed", t);
             throw new WhatsAppCallException.Opus("cobalt_opus_decode recovery failed", t);
         }
         lifetimeDecodeMicros += (System.nanoTime() - t0) / 1000L;
         if (decoded < 0) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus decode recovery rejected: rc={0}", decoded);
             throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decode recovery", decoded);
         }
         if (decodeFec) {
             fecFrames++;
         } else {
             plcFrames++;
+        }
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "calls opus recover: concealmentOnly={0} frameSize={1}",
+                    nextPayload == null, frameSize);
         }
         return readPcm(decoded);
     }
@@ -499,6 +539,10 @@ public final class OpusAudioCodec implements AudioCodec {
         encApply("set_complexity", CobaltOpus.cobalt_opus_encoder_set_complexity(encoder, params.complexity()));
         encApply("set_max_bandwidth", CobaltOpus.cobalt_opus_encoder_set_max_bandwidth(encoder, params.maxBandwidth().toNative()));
         this.params = params;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "calls opus codec modify: bitrate={0} packetLossPercent={1} complexity={2} maxBandwidth={3}",
+                    cappedBitrate, params.packetLossPercent(), params.complexity(), params.maxBandwidth());
+        }
     }
 
     /**
@@ -594,6 +638,7 @@ public final class OpusAudioCodec implements AudioCodec {
         try {
             return CobaltOpus.cobalt_opus_packet_get_bandwidth(packetInBuf) >= 0;
         } catch (Throwable t) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls opus packet bandwidth probe failed", t);
             return false;
         }
     }
@@ -618,7 +663,8 @@ public final class OpusAudioCodec implements AudioCodec {
         MemorySegment.copy(payload, 0, packetInBuf, ValueLayout.JAVA_BYTE, 0, payload.length);
         try {
             return CobaltOpus.cobalt_opus_packet_has_lbrr(packetInBuf, payload.length) == 1;
-        } catch (Throwable _) {
+        } catch (Throwable t) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls opus packet lbrr probe failed", t);
             return false;
         }
     }
@@ -637,6 +683,7 @@ public final class OpusAudioCodec implements AudioCodec {
      */
     private void encApply(String control, int rc) {
         if (rc != CobaltOpus.COBALT_OPUS_OK()) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus encoder control failed: control={0} rc={1}", control, rc);
             throw WhatsAppCallException.Opus.fromErr("cobalt_opus_encoder_" + control, rc);
         }
     }
@@ -663,14 +710,16 @@ public final class OpusAudioCodec implements AudioCodec {
         if (encoder != null && !encoder.equals(MemorySegment.NULL)) {
             try {
                 CobaltOpus.cobalt_opus_encoder_destroy(encoder);
-            } catch (Throwable _) {
+            } catch (Throwable t) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "calls opus encoder destroy failed", t);
             }
             encoder = MemorySegment.NULL;
         }
         if (decoder != null && !decoder.equals(MemorySegment.NULL)) {
             try {
                 CobaltOpus.cobalt_opus_decoder_destroy(decoder);
-            } catch (Throwable _) {
+            } catch (Throwable t) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "calls opus decoder destroy failed", t);
             }
             decoder = MemorySegment.NULL;
         }
@@ -683,5 +732,6 @@ public final class OpusAudioCodec implements AudioCodec {
         }
         destroyStates();
         arena.close();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls opus codec closed");
     }
 }

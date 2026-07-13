@@ -16,13 +16,13 @@ import com.github.auties00.cobalt.calls.stream.video.ScreenVideoOutput;
  *
  * <p>This is the write side of a call's video, and its presence on a placed or accepted call is what
  * makes the call a video call; supplying no video source makes the call audio only. The engine
- * repeatedly {@linkplain #take() pulls} frames on a dedicated virtual thread, encodes each with the
+ * repeatedly {@linkplain #takeVideo() pulls} frames on a dedicated virtual thread, encodes each with the
  * negotiated video codec at this source's {@link #width()} by {@link #height()} at {@link #fps()} and
  * {@link #bitrateBps()}, and ships it to the peer. The contract has two faces. The application facing
- * face is {@link #write(VideoFrame)}, by which a programmatic producer pushes the picture it wants
- * transmitted. The engine facing face is {@link #take()} and {@link #shutdown()}. A device backed
- * source instead fills itself inside its {@link #take()} from a camera, screen, or media file and
- * ignores {@link #write(VideoFrame)}.
+ * face is {@link #writeVideo(VideoFrame)}, by which a programmatic producer pushes the picture it wants
+ * transmitted. The engine facing face is {@link #takeVideo()} and {@link #shutdown()}. A device backed
+ * source instead fills itself inside its {@link #takeVideo()} from a camera, screen, or media file and
+ * ignores {@link #writeVideo(VideoFrame)}.
  *
  * <p>Frames carry planar 4:2:0 pixels as described by {@link VideoFrame}; the resolution carried by an
  * individual frame may differ from this source's advertised {@link #width()} by {@link #height()},
@@ -44,11 +44,11 @@ import com.github.auties00.cobalt.calls.stream.video.ScreenVideoOutput;
  * squished to a fixed default. A camera opened at a requested geometry through
  * {@link #fromCamera(String, int, int, int)} instead advertises the resolution the device delivers, so no
  * rescale is needed. A screen share source is announced to the peer as a screen share video stream carrying
- * its detected source resolution. The {@link #take()} and
+ * its detected source resolution. The {@link #takeVideo()} and
  * {@link #shutdown()} methods belong to the engine; application code drives a programmatic source
- * through {@link #write(VideoFrame)} and never calls the engine facing pair directly.
+ * through {@link #writeVideo(VideoFrame)} and never calls the engine facing pair directly.
  */
-public interface VideoOutput {
+public interface VideoOutput extends AudioOutput {
     /**
      * Returns a source that transmits a solid color at a default {@code 640x480} 30 fps geometry.
      *
@@ -162,7 +162,7 @@ public interface VideoOutput {
     /**
      * Returns a source bound to the platform's default camera, advertising its detected native resolution.
      *
-     * <p>Each {@link #take()} captures one planar 4:2:0 frame from the default camera, blocking on the
+     * <p>Each {@link #takeVideo()} captures one planar 4:2:0 frame from the default camera, blocking on the
      * device until a frame is available, until the call ends and the device is released; the captured
      * frames are scaled to the advertised geometry by the encoder. The advertised geometry is the camera's
      * own native resolution, capped to {@code 1280} on the longer side and rounded to even.
@@ -243,7 +243,7 @@ public interface VideoOutput {
      * Returns a source that shares the platform's default screen, advertising its detected native
      * resolution.
      *
-     * <p>Each {@link #take()} captures the default display as one planar 4:2:0 frame, until the call ends.
+     * <p>Each {@link #takeVideo()} captures the default display as one planar 4:2:0 frame, until the call ends.
      * The engine announces this to the peer as a screen share video stream carrying the display's own
      * native resolution, capped to {@code 1280} on the longer side and rounded to even.
      *
@@ -260,20 +260,20 @@ public interface VideoOutput {
      * <p>Offers the frame to the engine for encoding and transmission. An implementation chooses
      * whether a full internal buffer blocks the caller (backpressure) or drops a frame, and what
      * happens after {@link #shutdown()} has run; the only universal requirement is that the frame is
-     * never {@code null}. A device backed source produces frames inside {@link #take()} and may ignore
+     * never {@code null}. A device backed source produces frames inside {@link #takeVideo()} and may ignore
      * this method.
      *
      * @param frame the frame to transmit; never {@code null}
      * @throws NullPointerException if {@code frame} is {@code null}
      * @throws InterruptedException if the calling thread is interrupted while waiting for buffer space
      */
-    void write(VideoFrame frame) throws InterruptedException;
+    void writeVideo(VideoFrame frame) throws InterruptedException;
 
     /**
      * Returns the next frame for the engine to encode, blocking until one is available, or
      * {@code null} once the source has ended.
      *
-     * <p>A buffered source returns frames previously supplied through {@link #write(VideoFrame)}; a
+     * <p>A buffered source returns frames previously supplied through {@link #writeVideo(VideoFrame)}; a
      * device backed source pulls the next frame straight from its capture device or decoder. The
      * method blocks while no frame is ready and returns {@code null} exactly once the source is
      * permanently drained, after which the engine stops pulling.
@@ -289,12 +289,12 @@ public interface VideoOutput {
      * @return the next frame, or {@code null} at end of stream
      * @throws InterruptedException if the calling thread is interrupted while waiting
      */
-    VideoFrame take() throws InterruptedException;
+    VideoFrame takeVideo() throws InterruptedException;
 
     /**
-     * Ends the source, unblocking a pending {@link #take()} and releasing any bound device.
+     * Ends the source, unblocking a pending {@link #takeVideo()} and releasing any bound device.
      *
-     * <p>Invoked by the engine when the call ends. After it runs, {@link #take()} returns {@code null}
+     * <p>Invoked by the engine when the call ends. After it runs, {@link #takeVideo()} returns {@code null}
      * and the implementation releases any capture device or decoder it held. Implementations make this
      * idempotent, since the engine may signal teardown more than once during a racing shutdown.
      */

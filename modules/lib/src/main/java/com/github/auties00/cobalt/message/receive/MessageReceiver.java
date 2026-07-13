@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.receive;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -36,9 +38,9 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
         permits ChatMessageReceiver, NewsletterMessageReceiver {
 
     /**
-     * Logger used for diagnostic output emitted by the protobuf decoder fallback.
+     * The logger for {@link MessageReceiver}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MessageReceiver.class.getName());
+    private static final System.Logger LOGGER = Log.get(MessageReceiver.class);
 
     /**
      * Central session store shared with every receive subclass.
@@ -71,7 +73,7 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
      * @implSpec
      * A subclass must return {@code null} only for intentional silent drops; it must
      * throw a
-     * {@link com.github.auties00.cobalt.exception.WhatsAppMessageException.Receive}
+     * {@link com.github.auties00.cobalt.exception.linked.WhatsAppMessageException.Receive}
      * subtype for failures so the orchestrator can decide between retry, NACK, and
      * dedup.
      *
@@ -129,9 +131,8 @@ abstract sealed class MessageReceiver<T extends MessageInfo>
         try {
             return MessageContainerSpec.decode(plaintext);
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to decode protobuf for message {0}: {1}",
-                    messageId, e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "failed to decode protobuf for message " + messageId, e);
             return null;
         }
     }

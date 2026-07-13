@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,12 +14,12 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that fetches a WhatsApp Business merchant's legal-compliance information.
+ * Builds the graph.whatsapp.com GraphQL query that fetches a WhatsApp Business merchant's legal-compliance information.
  *
  * <p>The single {@code request} GraphQL variable is the
  * {@code XFBWhatsAppBizMerchantGetComplianceInfoRequest} input object. WhatsApp Web's
  * {@code WAWebMerchantComplianceJob} fills it with a single {@code biz_jid} field naming the business
- * account whose compliance record is being read. The relay returns the record under
+ * account whose compliance record is being read. The graph.whatsapp.com endpoint returns the record under
  * {@code xfb_whatsapp_biz_merchant_compliance_info}; the reply is consumed through
  * {@link BizGetMerchantComplianceWhatsAppGraphQlResponse}.
  *
@@ -26,10 +28,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebBizGetMerchantComplianceQuery")
 public final class BizGetMerchantComplianceWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebBizGetMerchantComplianceQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -109,5 +111,21 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlRequest implements Wha
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

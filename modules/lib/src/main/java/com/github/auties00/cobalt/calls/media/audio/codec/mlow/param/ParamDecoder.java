@@ -9,6 +9,9 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowRange
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.LsfDequantizer;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PulseTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Decodes the low band parameter set of every internal frame in an MLow speech codec packet.
@@ -58,6 +61,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PulseTable
  * voicing predictor is held here and seeded to the unvoiced state.
  */
 public final class ParamDecoder {
+    /**
+     * The logger for {@link ParamDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(ParamDecoder.class);
+
     /**
      * Number of taps per adaptive codebook gain codebook vector.
      *
@@ -286,6 +294,10 @@ public final class ParamDecoder {
     public DecodedFrame[] decodePacket(MlowTocByte toc, byte[] packet, int offset, int length,
                                        boolean fecRecovery) {
         if (toc.sampleRateHz() > 16000) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "mlow param decode: rejecting out-of-scope sample rate={0}",
+                        toc.sampleRateHz());
+            }
             throw new IllegalArgumentException(
                     "high-band decode (fs " + toc.sampleRateHz() + " Hz) is out of low-band scope");
         }
@@ -297,6 +309,7 @@ public final class ParamDecoder {
         MlowRangeDecoder decoder = rangeDecoder;
         int numFrames = toc.numFrames();
         if (toc.fec() && !fecRecovery) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mlow param decode: skipping fec leading frames={0}", numFrames);
             skipLeadingFec(decoder, toc, numFrames);
         }
         int decodedFrames = toc.sid() ? 1 : numFrames;
@@ -373,6 +386,10 @@ public final class ParamDecoder {
 
         boolean cond = condCoding && (voiced == prevVoiced);
         if (!cond) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "mlow param decode: resetting predictors frame={0} voiced={1}",
+                        frameNum, voiced != 0);
+            }
             prevAcbIdx = -1;
             prevFcbIdx = -1;
             prevNrgresIdx = -1;

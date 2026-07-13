@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
 import com.github.auties00.cobalt.calls.signaling.incall.RaiseHandStanza;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.engine.control.event.RaiseHandStateChanged;
 
@@ -25,6 +27,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.RaiseHandStateChang
  * {@code 1} when raised or {@code 0} when lowered.
  */
 public final class RaiseHandController {
+    /**
+     * The logger for {@link RaiseHandController}.
+     */
+    private static final System.Logger LOGGER = Log.get(RaiseHandController.class);
+
     /**
      * The call identity this controller stamps onto its raise hand actions.
      */
@@ -81,6 +88,7 @@ public final class RaiseHandController {
      */
     public void setHandRaised(boolean raised) {
         this.handRaised = raised;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "self hand raised state changed to {0}", raised);
         sender.send(new RaiseHandStanza(context.callId(), context.callCreator(), raised, context.group()));
         events.emit(new RaiseHandStateChanged(context.selfJid(), raised, true));
         ranking.setHandRaised(context.selfJid(), raised);
@@ -107,6 +115,7 @@ public final class RaiseHandController {
      */
     public void onPeerHandRaised(Jid peer, boolean raised) {
         Objects.requireNonNull(peer, "peer cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "peer {0} hand raised state changed to {1}", peer, raised);
         events.emit(new RaiseHandStateChanged(peer, raised, false));
         ranking.setHandRaised(peer, raised);
     }

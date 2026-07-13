@@ -33,7 +33,7 @@ public final class WamRegistryGenerator {
     private static final ClassName WAM_EVENT_SPEC = ClassName.get(WamEventSpec.class);
 
     private WamRegistryGenerator() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -53,9 +53,7 @@ public final class WamRegistryGenerator {
 
         typeBuilder.addMethod(MethodSpec.constructorBuilder()
                 .addModifiers(Modifier.PRIVATE)
-                .addStatement("throw new $T($S)",
-                        UnsupportedOperationException.class,
-                        "This is a utility class and cannot be instantiated")
+                .addStatement("throw new $T()", AssertionError.class)
                 .build());
 
         typeBuilder.addMethod(buildDecode(packageName, events));

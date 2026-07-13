@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppLidMigrationException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppLidMigrationException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -32,6 +33,7 @@ import com.github.auties00.cobalt.wam.type.StageFailureReasonEnum;
 
 import com.github.auties00.cobalt.util.ScheduledTask;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -84,9 +86,9 @@ import java.util.function.Function;
 @WhatsAppWebModule(moduleName = "WAWebApiContact")
 public final class LiveLidMigrationService implements LidMigrationService {
     /**
-     * The shared logger that traces the migration lifecycle.
+     * The logger for {@link LiveLidMigrationService}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveLidMigrationService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveLidMigrationService.class);
 
     /**
      * The {@code lidOriginType} marker stamped on a chat whose LID was minted
@@ -419,7 +421,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
     @Override
     public void initialize() {
         if (state.compareAndSet(LidMigrationState.NOT_STARTED, LidMigrationState.WAITING_PROP)) {
-            LOGGER.log(System.Logger.Level.INFO, "LID migration initialized, waiting for AB prop");
+            if (Log.INFO) LOGGER.log(Level.INFO, "LID migration initialized, waiting for AB prop");
         }
     }
 
@@ -448,11 +450,11 @@ public final class LiveLidMigrationService implements LidMigrationService {
     @Override
     public void enableMigration() {
         if (state.compareAndSet(LidMigrationState.WAITING_PROP, LidMigrationState.WAITING_MAPPINGS)) {
-            LOGGER.log(System.Logger.Level.INFO, "LID migration enabled, waiting for mappings from primary");
+            if (Log.INFO) LOGGER.log(Level.INFO, "LID migration enabled, waiting for mappings from primary");
 
             var timeoutSeconds = abPropsService.getInt(ABProp.LID_ONE_ON_ONE_MIGRATION_PEER_SYNC_TIMEOUT_IN_SECONDS);
             if (timeoutSeconds == 0) {
-                LOGGER.log(System.Logger.Level.INFO, "LID migration peer sync timeout disabled by AB prop");
+                if (Log.INFO) LOGGER.log(Level.INFO, "LID migration peer sync timeout disabled by AB prop");
                 return;
             }
 
@@ -460,7 +462,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
                     Duration.ofSeconds(timeoutSeconds),
                     () -> {
                         if (state.get() == LidMigrationState.WAITING_MAPPINGS) {
-                            LOGGER.log(System.Logger.Level.WARNING,
+                            if (Log.WARNING) LOGGER.log(Level.WARNING,
                                     "LID migration timed out after {0}s waiting for mappings", timeoutSeconds);
                             var hasDiscrepancy = hasStateDiscrepancy();
                             var failureReason = hasDiscrepancy
@@ -493,7 +495,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
     @Override
     public void disableMigration() {
         if (state.compareAndSet(LidMigrationState.WAITING_PROP, LidMigrationState.DISABLED)) {
-            LOGGER.log(System.Logger.Level.INFO, "LID migration disabled");
+            if (Log.INFO) LOGGER.log(Level.INFO, "LID migration disabled");
         }
     }
 
@@ -543,7 +545,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
 
         var currentState = state.get();
         if (currentState != LidMigrationState.WAITING_MAPPINGS && currentState != LidMigrationState.WAITING_PROP) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring mappings in state: {0}", currentState);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "Ignoring mappings in state: {0}", currentState);
             return;
         }
 
@@ -574,14 +576,14 @@ public final class LiveLidMigrationService implements LidMigrationService {
             this.chatDbMigrationTimestamp = payload.chatDbMigrationTimestamp()
                     .orElse(null);
 
-            LOGGER.log(System.Logger.Level.INFO, "Processing {0} LID mappings from primary", mappings.size());
+            if (Log.INFO) LOGGER.log(Level.INFO, "Processing {0} LID mappings from primary", mappings.size());
 
             for (var mapping : mappings) {
                 processSingleMapping(mapping);
             }
 
             state.set(LidMigrationState.READY);
-            LOGGER.log(System.Logger.Level.INFO, "LID migration ready with {0} assigned mappings, {1} latest mappings",
+            if (Log.INFO) LOGGER.log(Level.INFO, "LID migration ready with {0} assigned mappings, {1} latest mappings",
                     primaryPnToAssignedLidCache.size(), primaryPnToLatestLidCache.size());
 
             if (shouldAutoStartMigration()) {
@@ -675,13 +677,13 @@ public final class LiveLidMigrationService implements LidMigrationService {
         if (chatDbLidMigrationTimestamp.isPresent()) {
             if (chatDbMigrationTimestamp == null || chatDbLidMigrationTimestamp.get().isAfter(chatDbMigrationTimestamp)) {
                 this.chatDbMigrationTimestamp = chatDbLidMigrationTimestamp.get();
-                LOGGER.log(System.Logger.Level.DEBUG,
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
                         "Updated chatDbMigrationTimestamp from GlobalSettings: {0}", chatDbLidMigrationTimestamp.get());
             }
         }
 
         if (mappingsProcessed > 0) {
-            LOGGER.log(System.Logger.Level.INFO,
+            if (Log.INFO) LOGGER.log(Level.INFO,
                     "Processed {0} LID mappings from history sync (type={1})",
                     mappingsProcessed, historySync.syncType());
         }
@@ -865,7 +867,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
     public void executeMigration() {
         if (!state.compareAndSet(LidMigrationState.READY, LidMigrationState.IN_PROGRESS)) {
             var currentState = state.get();
-            LOGGER.log(System.Logger.Level.WARNING, "Cannot start migration in state: {0}", currentState);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "Cannot start migration in state: {0}", currentState);
             return;
         }
 
@@ -883,9 +885,9 @@ public final class LiveLidMigrationService implements LidMigrationService {
             return;
         }
 
-        LOGGER.log(System.Logger.Level.INFO, "Starting LID migration execution, waiting for offline delivery");
+        if (Log.INFO) LOGGER.log(Level.INFO, "Starting LID migration execution, waiting for offline delivery");
         store.connectionStore().waitForOfflineDeliveryEnd();
-        LOGGER.log(System.Logger.Level.INFO, "Offline delivery complete, proceeding with migration");
+        if (Log.INFO) LOGGER.log(Level.INFO, "Offline delivery complete, proceeding with migration");
 
         try {
             var resolutions = new ArrayList<LidMigrationResolution>();
@@ -935,7 +937,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
             executeResolutions(resolutions);
 
             state.set(LidMigrationState.COMPLETE);
-            LOGGER.log(System.Logger.Level.INFO, "LID migration completed");
+            if (Log.INFO) LOGGER.log(Level.INFO, "LID migration completed");
 
             learnMappingsInBulk();
 
@@ -1453,8 +1455,8 @@ public final class LiveLidMigrationService implements LidMigrationService {
                     case LidMigrationResolution.Keep _ -> {}
                 }
             } catch (Throwable throwable) {
-                LOGGER.log(System.Logger.Level.ERROR, "Error executing resolution for {0}: {1}",
-                        resolution.originalJid(), throwable.getMessage());
+                if (Log.ERROR) LOGGER.log(Level.ERROR,
+                        "error executing resolution for " + Log.jid(String.valueOf(resolution.originalJid())), throwable);
             }
         }
     }
@@ -1485,7 +1487,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
 
         var chat = store.chatStore().findChatByJid(originalJid).orElse(null);
         if (chat == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "Chat not found for migration: {0}", originalJid);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "chat not found for migration: {0}", originalJid);
             return;
         }
 
@@ -1495,7 +1497,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
         store.contactStore().registerLidMapping(originalJid, targetLid);
         store.contactStore().findContactByJid(originalJid).ifPresent(contact -> contact.setLid(targetLid));
 
-        LOGGER.log(System.Logger.Level.DEBUG, "Migrated chat {0} -> {1}", originalJid, targetLid);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "migrated chat {0} -> {1}", originalJid, targetLid);
     }
 
     /**
@@ -1515,7 +1517,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
 
         var removed = store.chatStore().removeChat(originalJid);
         if (removed.isPresent()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Deleted chat {0}: {1}", originalJid, delete.reason());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deleted chat {0}: {1}", originalJid, delete.reason());
         }
     }
 
@@ -1554,7 +1556,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
             chat.setPhoneNumberJid(phoneJid);
         });
 
-        LOGGER.log(System.Logger.Level.DEBUG, "LID changed for {0}: {1} -> {2}", phoneJid, oldLid, newLid);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid changed for {0}: {1} -> {2}", phoneJid, oldLid, newLid);
     }
 
     /**
@@ -1634,8 +1636,8 @@ public final class LiveLidMigrationService implements LidMigrationService {
             store.contactStore().registerLidMapping(mapping.getKey(), mapping.getValue());
         }
 
-        LOGGER.log(System.Logger.Level.INFO,
-                "Bulk-registered LID mappings: {0} old, {1} latest",
+        if (Log.INFO) LOGGER.log(Level.INFO,
+                "bulk-registered lid mappings: {0} old, {1} latest",
                 oldMappings.size(), latestMappings.size());
     }
 
@@ -1755,8 +1757,8 @@ public final class LiveLidMigrationService implements LidMigrationService {
         }
         wamService.commit(builder.build());
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Committed LID migration daily census: {0} PN groups, {1} LID groups, {2} regular PN chats",
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                "committed lid migration daily census: {0} pn groups, {1} lid groups, {2} regular pn chats",
                 pnGroups, lidGroups, regularPnChats);
     }
 
@@ -1794,7 +1796,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
      */
     private void handleError(WhatsAppLidMigrationException error) {
         state.set(LidMigrationState.FAILED);
-        LOGGER.log(System.Logger.Level.ERROR, "LID migration failed: {0}", error.getMessage());
+        if (Log.ERROR) LOGGER.log(Level.ERROR, "lid migration failed", error);
         whatsapp.handleFailure(error);
     }
 

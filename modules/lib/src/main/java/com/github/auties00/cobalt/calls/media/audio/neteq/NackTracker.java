@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedMap;
@@ -26,6 +29,11 @@ import java.util.TreeMap;
  * {@link LiveNetEq} insert lock.
  */
 public final class NackTracker {
+    /**
+     * The logger for {@link NackTracker}.
+     */
+    private static final System.Logger LOGGER = Log.get(NackTracker.class);
+
     /**
      * The number of distinct values a 16 bit sequence number takes, the wrap around modulus.
      */
@@ -148,6 +156,10 @@ public final class NackTracker {
                 var missingSeq = (lastReceivedSequence + offset) % SEQUENCE_MODULUS;
                 missing.putIfAbsent(missingSeq, new MissingPacket(nowMillis));
             }
+            if (gap > 1 && Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "nack tracker: gap detected, missing={0} packets after seq={1}",
+                        gap - 1, lastReceivedSequence);
+            }
             lastReceivedSequence = masked;
         }
         enforceListSize();
@@ -191,6 +203,10 @@ public final class NackTracker {
      */
     public List<Integer> nackList(long nowMillis, long rttMillis) {
         if (rttMillis > config.nackRttLimitMs()) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "nack tracker: suppressed, rtt={0}ms exceeds limit={1}ms",
+                        rttMillis, config.nackRttLimitMs());
+            }
             return List.of();
         }
         var initialThreshold = rttMillis;
@@ -217,6 +233,9 @@ public final class NackTracker {
                 }
             }
         }
+        if (!due.isEmpty() && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "nack tracker: requesting retransmit count={0}", due.size());
+        }
         return due;
     }
 
@@ -240,6 +259,7 @@ public final class NackTracker {
         lastReceivedSequence = -1;
         lastDecodedSequence = -1;
         seeded = false;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "nack tracker: reset");
     }
 
     /**

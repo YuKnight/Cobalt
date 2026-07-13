@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.transport.congestion.ratecontrol;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusCodecParams;
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusInbandFecPacker;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Turns the combined bandwidth estimate target into the audio encoder's bitrate, packet loss
@@ -29,6 +32,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusInbandFecPack
  * floor and ceiling that clamp the result come from the supplied {@link OpusCodecParams}.
  */
 public final class AudioRateController {
+    /**
+     * The logger for {@link AudioRateController}.
+     */
+    private static final System.Logger LOGGER = Log.get(AudioRateController.class);
+
     /**
      * The unified audio quality control whose state gates the forward error correction budget.
      */
@@ -93,6 +101,10 @@ public final class AudioRateController {
                 params.maxBandwidth(), params.complexity(), fecEnabled, lossPercent,
                 params.discontinuousTransmission(), params.forceChannels(), params.signalVoice(),
                 params.lsbDepth(), params.framesPerPacket(), params.frameMillis());
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "audio rate applied: target={0}bps codec={1}bps state={2} fec={3} lossPercent={4}",
+                    combinedTargetBps, codecBps, state, fecEnabled, lossPercent);
+        }
         return new AudioRateResult(updated, state, fecFraction);
     }
 

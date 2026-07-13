@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code favoriteSticker} app-state sync action that adds or
@@ -31,6 +34,11 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebStickersFavoriteSyncAction")
 public final class FavoriteStickerHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link FavoriteStickerHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(FavoriteStickerHandler.class);
+
     /**
      * The primary-feature id consulted to gate favourite-sticker sync.
      */
@@ -107,33 +115,41 @@ public final class FavoriteStickerHandler implements WebAppStateActionHandler {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() <= 1) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "favorite sticker: malformed mutation index");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             var stickerHash = indexArray.getString(1);
             if (stickerHash == null || stickerHash.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "favorite sticker: missing sticker hash");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof StickerAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "favorite sticker: mutation value is not a StickerAction");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
             if (!client.store().syncStore().primaryFeatures().contains(FAVORITE_STICKER_FEATURE)) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "favorite sticker: orphan, primary feature not advertised");
                 return MutationApplicationResult.orphan(stickerHash, "FavoriteSticker");
             }
 
             if (action.isFavorite()) {
                 if (client.store().settingsStore().findFavouriteSticker(stickerHash).isPresent()) {
+                    if (Log.TRACE) LOGGER.log(Level.TRACE, "favorite sticker: already favourited, skipping");
                     return MutationApplicationResult.success();
                 }
                 var sticker = action.toSticker();
                 sticker.setTimestamp(mutation.timestamp().getEpochSecond());
                 client.store().settingsStore().addFavouriteSticker(stickerHash, sticker);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "favorite sticker: added");
             } else {
                 client.store().settingsStore().removeFavouriteSticker(stickerHash);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "favorite sticker: removed");
             }
 
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "favorite sticker: failed to apply mutation", e);
             return MutationApplicationResult.failed();
         }
     }

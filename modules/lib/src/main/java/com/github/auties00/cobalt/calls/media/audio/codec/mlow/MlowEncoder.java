@@ -5,6 +5,9 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode.LbQuantPar
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode.ParamEncoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode.Vad;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowRangeEncoder;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Encodes low band speech into MLow codec packets, the exact inverse of {@link MlowDecoder}.
@@ -51,6 +54,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowRange
  * {@code prevVoiced} reset to the unvoiced state at the start of each packet.
  */
 public final class MlowEncoder {
+    /**
+     * The logger for {@link MlowEncoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(MlowEncoder.class);
+
     /**
      * Sample clock rate of the CELP core in kilohertz; the per frame and per subframe sample counts are
      * products of it.
@@ -210,6 +218,7 @@ public final class MlowEncoder {
         paramEncoder.reset();
         vad.reset();
         coreEncoder.reset();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls mlow encoder: stream reset");
     }
 
     /**
@@ -251,9 +260,13 @@ public final class MlowEncoder {
     public byte[] encodeFrames(LbQuantParams[] frames, boolean vad, int sampleRateHz, boolean lowRate,
                                boolean fec, boolean codedAsActiveVoice, boolean stereo) {
         if (frames == null || frames.length == 0) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow encode: no frames to encode");
             throw new IllegalArgumentException("no frames to encode");
         }
         if (sampleRateHz > 16000) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "calls mlow encode: sample rate {0} out of low-band scope", sampleRateHz);
+            }
             throw new IllegalArgumentException(
                     "high-band encode (fs " + sampleRateHz + " Hz) is out of low-band scope");
         }
@@ -314,6 +327,10 @@ public final class MlowEncoder {
      */
     public byte[] encode(short[] pcm) {
         if (pcm == null || pcm.length == 0 || pcm.length % FRAME_LEN != 0) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "calls mlow encode: invalid pcm length {0}",
+                        pcm == null ? -1 : pcm.length);
+            }
             throw new IllegalArgumentException(
                     "PCM-in MLow encode requires a whole number of " + FRAME_LEN + "-sample 20 ms frames");
         }
@@ -334,6 +351,7 @@ public final class MlowEncoder {
         // candidate ring, so a later SID or speech packet stays exact. Return an empty payload for the caller
         // to drop.
         if (vadDecision.sidFrame() && !vadDecision.sendSidFrame()) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls mlow encode: dtx suppressing silent packet");
             return new byte[0];
         }
 

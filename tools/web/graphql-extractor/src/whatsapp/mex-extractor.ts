@@ -1,5 +1,5 @@
 import { withForceLoadedBundle } from "./runtime.js";
-import type { MexOperation, Transport } from "../parser/types.js";
+import type { MexOperation, MexPageResult, Transport } from "../parser/types.js";
 
 /**
  * Runs inside the WhatsApp Web page after the bundle is force-loaded.
@@ -21,7 +21,7 @@ import type { MexOperation, Transport } from "../parser/types.js";
  * over imports or module-scope bindings. The sentinel lists, the Relay-AST flattener, and the
  * resolver are all defined locally.
  */
-function interceptMexInPage(): MexOperation[] {
+function interceptMexInPage(): MexPageResult {
   const mexSentinels = [
     "WAWebMexClient",
     "WAWebMexNativeClient",
@@ -155,15 +155,18 @@ function interceptMexInPage(): MexOperation[] {
   }
 
   operations.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  return operations;
+  return {
+    operations,
+    relaySources: ((window as any).__waModuleSource || {}) as Record<string, string>,
+  };
 }
 
 /**
  * Force-loads the WhatsApp Web bundle and returns every compiled Relay operation it defines.
  *
  * Returns all ".graphql" ConcreteRequest operations (queries and mutations) sorted by name, each
- * tagged with its dispatch transport.
+ * tagged with its dispatch transport, alongside the source of every relay consumer.
  */
-export async function extractMexSchemas(): Promise<MexOperation[]> {
+export async function extractMexSchemas(): Promise<MexPageResult> {
   return await withForceLoadedBundle(interceptMexInPage);
 }

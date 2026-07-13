@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PitchTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Open loop pitch lag estimator of the MLow speech encoder.
@@ -375,6 +378,11 @@ public final class OpenLoopPitch {
     }
 
     /**
+     * The logger for {@link OpenLoopPitch}.
+     */
+    private static final System.Logger LOGGER = Log.get(OpenLoopPitch.class);
+
+    /**
      * The shared 20 ms pitch decode data: block segmentations, the permutation, the rate coding cumulative mass
      * functions, and the first block ranges.
      */
@@ -520,6 +528,9 @@ public final class OpenLoopPitch {
      * the reset only clears the block and index carry.
      */
     public void reset() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "open loop pitch estimator reset");
+        }
         this.prevLagblk = -1;
         this.prevLagidx = -1;
     }
@@ -548,6 +559,9 @@ public final class OpenLoopPitch {
         float[] lags = new float[numsubfrs];
         int[] laginds = new int[numsubfrs];
         if (!codedAsActiveVoice) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "open loop pitch estimate: inactive voice, using minimum pitch");
+            }
             for (int i = 0; i < numsubfrs; i++) {
                 lags[i] = MINPITCH_LEN;
             }
@@ -557,7 +571,12 @@ public final class OpenLoopPitch {
             prevLagidx = -1;
             return new Result(lags, laginds, 0.0f, 0, (float) MINPITCH_LEN, 0.0f);
         }
-        return search(ltpBuf, l, lookAhead, f2, numsubfrs, lags, laginds);
+        Result result = search(ltpBuf, l, lookAhead, f2, numsubfrs, lags, laginds);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "open loop pitch estimate: corr={0} blockseg={1} avgLag={2}",
+                    result.pitchCorr(), result.blocksegIdx(), result.avgLag());
+        }
+        return result;
     }
 
     /**

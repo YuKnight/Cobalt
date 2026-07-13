@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.calls.config.param;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONException;
 import com.alibaba.fastjson2.JSONObject;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Parses an uncompressed {@code <voip_settings>} JSON document into a {@link VoipParams} set.
@@ -24,6 +27,11 @@ import com.alibaba.fastjson2.JSONObject;
  * BWE/rate control reader that owns the rule table format, not of this deserializer.
  */
 public final class VoipParamJsonDeserializer {
+    /**
+     * The logger for {@link VoipParamJsonDeserializer}.
+     */
+    private static final System.Logger LOGGER = Log.get(VoipParamJsonDeserializer.class);
+
     /**
      * Constructs a voip param JSON deserializer.
      *
@@ -54,13 +62,22 @@ public final class VoipParamJsonDeserializer {
         try {
             root = JSON.parseObject(json);
         } catch (JSONException exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "voip_settings body is not valid JSON", exception);
+            }
             throw new IllegalArgumentException("voip_settings body is not valid JSON", exception);
         }
         if (root == null) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "voip_settings body is not a JSON object");
+            }
             throw new IllegalArgumentException("voip_settings body is not a JSON object");
         }
         var params = new VoipParams();
         flatten(root, "", params);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "parsed voip params json, paramCount={0}", params.size());
+        }
         return params;
     }
 
@@ -85,7 +102,12 @@ public final class VoipParamJsonDeserializer {
             if (value instanceof JSONObject child) {
                 flatten(child, path, params);
             } else {
-                var key = VoipParamKey.ofWirePath(path).orElseGet(() -> VoipParamKey.unknown(path));
+                var key = VoipParamKey.ofWirePath(path).orElseGet(() -> {
+                    if (Log.TRACE) {
+                        LOGGER.log(Level.TRACE, "voip param wire path not modelled, path={0}", path);
+                    }
+                    return VoipParamKey.unknown(path);
+                });
                 params.put(key, value);
             }
         }

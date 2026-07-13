@@ -22,7 +22,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
  * into a sealed Java type. The thread-LID shape becomes {@link Migrate}, the
  * already-LID and not-eligible cases become {@link Keep}, the delete-chat shape
  * becomes {@link Delete}, and the logout shape is rethrown by the caller as a
- * {@link com.github.auties00.cobalt.exception.WhatsAppLidMigrationException}
+ * {@link com.github.auties00.cobalt.exception.linked.WhatsAppLidMigrationException}
  * rather than being modelled here, because logout decisions live in the
  * configurable error handler instead of the per-chat resolution result.
  */

@@ -4,8 +4,10 @@ import com.github.auties00.cobalt.calls.engine.participant.VideoStreamState;
 import com.github.auties00.cobalt.calls.engine.event.CallEvent;
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
 import com.github.auties00.cobalt.calls.engine.event.LiveCallEventBus;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.ReactionInfo;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.function.Supplier;
 import com.github.auties00.cobalt.calls.engine.control.event.CallGridRankingChanged;
@@ -63,6 +65,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.WaitingRoomToggleAc
  * @see LiveCallEventBus
  */
 public final class ControlEventBridge implements CallEventSink {
+    /**
+     * The logger for {@link ControlEventBridge}.
+     */
+    private static final System.Logger LOGGER = Log.get(ControlEventBridge.class);
+
     /**
      * Supplies the identifier of the call this bridge stamps onto every translated {@link CallEvent}, read
      * on each {@link #emit(ControlCallEvent)} rather than captured at construction.
@@ -165,6 +172,10 @@ public final class ControlEventBridge implements CallEventSink {
             case PlayCallTone ignored ->
                     new CallEvent.Generic(CallEventType.PLAY_CALL_TONE, callId);
         };
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "translated control event {0} to {1} for call {2}",
+                    event.getClass().getSimpleName(), translated.getClass().getSimpleName(), callId);
+        }
         bus.emit(translated);
     }
 

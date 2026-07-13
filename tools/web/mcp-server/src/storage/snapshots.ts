@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import type { Dirent } from "node:fs";
-import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { access, mkdir, open, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { createInterface } from "node:readline";
 import type {
   ModuleAnalysis,
 } from "../types/analysis.js";
@@ -39,6 +41,16 @@ import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("storage");
 
+interface IndexFileHeader {
+  schemaVersion: number;
+  snapshotId: string;
+  revision: string;
+  builtAt: string;
+  count: number;
+}
+
+const INDEX_FLUSH_BYTES = 4 * 1024 * 1024;
+
 export async function listSnapshots(platform: SnapshotPlatform): Promise<string[]> {
   await ensureDirectories(platform);
   const entries: Dirent[] = await readdir(platformDir(platform), { withFileTypes: true });
@@ -66,8 +78,48 @@ export async function loadManifest(platform: SnapshotPlatform, snapshotId: strin
 }
 
 export async function loadIndex(platform: SnapshotPlatform, snapshotId: string): Promise<SnapshotIndex> {
-  const raw = await readFile(indexPath(platform, snapshotId), "utf8");
-  return JSON.parse(raw) as SnapshotIndex;
+  const path = indexPath(platform, snapshotId);
+  const input = createReadStream(path, { encoding: "utf8" });
+  const reader = createInterface({ input, crlfDelay: Infinity });
+  let header: IndexFileHeader | null = null;
+  let legacyPretty = false;
+  const analyses: ModuleAnalysis[] = [];
+  try {
+    for await (const line of reader) {
+      const trimmed = line.trim();
+      if (trimmed.length === 0) continue;
+      if (header === null) {
+        if (trimmed === "{") {
+          legacyPretty = true;
+          break;
+        }
+        const parsed = JSON.parse(trimmed) as Partial<SnapshotIndex> & IndexFileHeader;
+        if (Array.isArray(parsed.analyses)) {
+          return parsed as SnapshotIndex;
+        }
+        header = parsed;
+        continue;
+      }
+      analyses.push(JSON.parse(trimmed) as ModuleAnalysis);
+    }
+  } finally {
+    reader.close();
+    input.destroy();
+  }
+  if (legacyPretty) {
+    const raw = await readFile(path, "utf8");
+    return JSON.parse(raw) as SnapshotIndex;
+  }
+  if (header === null) {
+    throw new Error(`index file is empty or malformed: ${path}`);
+  }
+  return {
+    schemaVersion: header.schemaVersion ?? SCHEMA_VERSION,
+    snapshotId: header.snapshotId ?? snapshotId,
+    revision: header.revision ?? "",
+    builtAt: header.builtAt ?? "",
+    analyses,
+  };
 }
 
 export async function saveIndex(
@@ -77,16 +129,33 @@ export async function saveIndex(
   analyses: ModuleAnalysis[]
 ): Promise<void> {
   log.info(`saving index: platform=${platform} snapshot=${snapshotId} analyses=${analyses.length}`);
-  const payload: SnapshotIndex = {
+  const header: IndexFileHeader = {
     schemaVersion: SCHEMA_VERSION,
     snapshotId,
     revision,
     builtAt: new Date().toISOString(),
-    analyses,
+    count: analyses.length,
   };
-  const json = JSON.stringify(payload, null, 2);
-  await writeFile(indexPath(platform, snapshotId), json, "utf8");
-  log.debug(`index saved: ${(json.length / 1024).toFixed(0)}KB written`);
+  const handle = await open(indexPath(platform, snapshotId), "w");
+  try {
+    let buffer = `${JSON.stringify(header)}\n`;
+    let bytesWritten = 0;
+    for (const analysis of analyses) {
+      buffer += `${JSON.stringify(analysis)}\n`;
+      if (buffer.length >= INDEX_FLUSH_BYTES) {
+        await handle.write(buffer);
+        bytesWritten += buffer.length;
+        buffer = "";
+      }
+    }
+    if (buffer.length > 0) {
+      await handle.write(buffer);
+      bytesWritten += buffer.length;
+    }
+    log.debug(`index saved: ${(bytesWritten / 1024).toFixed(0)}KB written (ndjson, ${analyses.length} records)`);
+  } finally {
+    await handle.close();
+  }
 }
 
 export async function loadModuleSource(

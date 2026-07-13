@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.graphql.facebook;
 
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsappWeb.WhatsAppWebGraphQlOperation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -20,7 +20,7 @@ import java.util.Optional;
  * {@code doc_id} to a server-side compiled document.
  *
  * <p>This hierarchy mirrors the role {@code MexStanza} plays for the MEX transport and
- * {@link WhatsAppGraphQlOperation} plays for the WhatsApp Web GraphQL transport: it
+ * {@link WhatsAppWebGraphQlOperation} plays for the WhatsApp Web GraphQL transport: it
  * collapses each compiled GraphQL document into a sealed operation permitting exactly two variants,
  * {@link Request} and {@link Response}. All three transports share the same persisted-query identity
  * and operation shape; the Facebook GraphQL transport differs in carrier (Meta graph HTTP endpoint), body

@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the native-ML-model query built by
+ * Parses the graph.whatsapp.com GraphQL response of the native-ML-model query built by
  * {@link NativeMlModelWhatsAppGraphQlRequest} into a {@link NativeMachineLearningModelManifest}.
  *
  * <p>Reads the linked root {@code aim_model_batched_manifest} and projects it onto the Cobalt
@@ -40,14 +40,14 @@ public final class NativeMlModelWhatsAppGraphQlResponse implements WhatsAppGraph
      *
      * <p>Reserved for the static parser.
      *
-     * @param manifest the parsed manifest, or {@code null} when the relay omitted the field
+     * @param manifest the parsed manifest, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private NativeMlModelWhatsAppGraphQlResponse(NativeMachineLearningModelManifest manifest) {
         this.manifest = manifest;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code aim_model_batched_manifest} and projects it onto a
      * {@link NativeMachineLearningModelManifest}; the returned {@link Optional} is empty when

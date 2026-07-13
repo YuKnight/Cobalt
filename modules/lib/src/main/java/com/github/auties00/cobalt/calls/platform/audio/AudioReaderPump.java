@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.platform.audio;
 
 import com.github.auties00.cobalt.calls.stream.AudioFrame;
 import com.github.auties00.cobalt.calls.stream.AudioOutput;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.LockSupport;
@@ -14,7 +16,7 @@ import java.util.concurrent.locks.LockSupport;
  * <p>The engine encodes a steady cadence of fixed size sample blocks, but a capture source delivers
  * frames of whatever size and timing its device or producer chooses, so the pump decouples the two
  * through the capture ring. On each turn it pulls one {@link AudioFrame} from the source with a blocking
- * {@link AudioOutput#take()}, writes its samples into the ring as the producer, then drains as many whole
+ * {@link AudioOutput#takeAudio()}, writes its samples into the ring as the producer, then drains as many whole
  * {@link #framesPerChunk()} blocks as the ring now holds and hands each to the engine through the
  * supplied {@link AudioBlockSink}. A source frame whose sample count is not a multiple of the block size
  * leaves a remainder buffered in the ring that the next frame completes, so the engine always receives
@@ -26,7 +28,7 @@ import java.util.concurrent.locks.LockSupport;
  * nor stalls the encoder permanently. At startup the pump buffers a target number of samples before
  * forwarding the first block, which establishes the capture to render skew margin the engine's clock
  * expects. The loop ends when the source signals end of stream by returning {@code null} from
- * {@link AudioOutput#take()} or when {@link #stop()} is called; either way the backing virtual thread
+ * {@link AudioOutput#takeAudio()} or when {@link #stop()} is called; either way the backing virtual thread
  * exits and any buffered samples are discarded.
  *
  * <p>The pump runs on its own virtual thread and blocks freely on the source pull without affecting any
@@ -45,9 +47,9 @@ import java.util.concurrent.locks.LockSupport;
  */
 public final class AudioReaderPump {
     /**
-     * The logger the periodic capture underrun diagnostic is emitted through.
+     * The logger for {@link AudioReaderPump}.
      */
-    private static final System.Logger LOGGER = System.getLogger(AudioReaderPump.class.getName());
+    private static final System.Logger LOGGER = Log.get(AudioReaderPump.class);
 
     /**
      * Number of underruns between successive log lines.
@@ -76,7 +78,7 @@ public final class AudioReaderPump {
     /**
      * The local outbound audio source the pump drains for captured frames.
      *
-     * <p>Pulled with a blocking {@link AudioOutput#take()} each turn; a {@code null} return ends the
+     * <p>Pulled with a blocking {@link AudioOutput#takeAudio()} each turn; a {@code null} return ends the
      * loop. The pump never calls the source's application facing write side.
      */
     private final AudioOutput source;
@@ -240,6 +242,7 @@ public final class AudioReaderPump {
      */
     public void start() {
         if (running.compareAndSet(false, true)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting audio reader pump, framesPerChunk={0}", framesPerChunk);
             thread = Thread.ofVirtual()
                     .name("calls-audio-reader-pump")
                     .start(this::loop);
@@ -255,6 +258,7 @@ public final class AudioReaderPump {
      */
     public void stop() {
         if (running.compareAndSet(true, false)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stopping audio reader pump");
             var current = thread;
             if (current != null) {
                 current.interrupt();
@@ -277,7 +281,7 @@ public final class AudioReaderPump {
             while (running.get()) {
                 AudioFrame frame;
                 try {
-                    frame = source.take();
+                    frame = source.takeAudio();
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     break;
@@ -350,11 +354,10 @@ public final class AudioReaderPump {
      */
     private void recordUnderrun() {
         underrunCount++;
-        if (underrunCount % UNDERRUN_LOG_INTERVAL == 0) {
+        if (underrunCount % UNDERRUN_LOG_INTERVAL == 0 && Log.DEBUG) {
             var available = ring.available();
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    () -> " Not enough captured audio, underrun count: " + underrunCount
-                            + ", available: " + available + ", needed: " + framesPerChunk);
+            LOGGER.log(Level.DEBUG, "capture underrun, count={0}, available={1}, needed={2}",
+                    underrunCount, available, framesPerChunk);
         }
         for (var i = 0; i < UNDERRUN_BACKOFF_LIMIT; i++) {
             if (!running.get() || ring.available() >= framesPerChunk) {

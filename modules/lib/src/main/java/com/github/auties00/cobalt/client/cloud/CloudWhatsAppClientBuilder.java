@@ -3,11 +3,13 @@ package com.github.auties00.cobalt.client.cloud;
 import com.github.auties00.cobalt.client.WhatsAppClientBuilder;
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.Authenticator;
 import java.net.InetSocketAddress;
 import java.net.PasswordAuthentication;
@@ -36,6 +38,11 @@ import java.util.Optional;
  * @see WhatsAppClientBuilder#cloudApi()
  */
 public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilder.Options {
+    /**
+     * The logger for {@link CloudWhatsAppClientBuilder}.
+     */
+    private static final System.Logger LOGGER = Log.get(CloudWhatsAppClientBuilder.class);
+
     /**
      * The factory that resolves the backing store.
      */
@@ -82,8 +89,10 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
         Objects.requireNonNull(phoneNumberId, "phoneNumberId must not be null");
         var existing = storeFactory.load(phoneNumberId);
         if (existing.isPresent()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resuming persisted connection for phone number {0}", Log.phone(phoneNumberId));
             return new Options(existing.get().setAccessToken(accessToken));
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating fresh connection for phone number {0}", Log.phone(phoneNumberId));
         return new Options(storeFactory.create(accessToken, phoneNumberId));
     }
 
@@ -97,7 +106,9 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
      */
     public Optional<Options> loadConnection(String phoneNumberId) throws IOException {
         Objects.requireNonNull(phoneNumberId, "phoneNumberId must not be null");
-        return storeFactory.load(phoneNumberId).map(Options::new);
+        var result = storeFactory.load(phoneNumberId).map(Options::new);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded connection for phone number {0}: {1}", Log.phone(phoneNumberId), result.isPresent());
+        return result;
     }
 
     /**
@@ -107,7 +118,9 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
      * @throws IOException if the store cannot be read
      */
     public Optional<Options> loadLatestConnection() throws IOException {
-        return storeFactory.loadLatest().map(Options::new);
+        var result = storeFactory.loadLatest().map(Options::new);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded latest connection: {0}", result.isPresent());
+        return result;
     }
 
     /**
@@ -253,6 +266,7 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
             store.setWebhookVerifyToken(verifyToken);
             store.setWebhookPort(port);
             store.setWebhookPath(DEFAULT_WEBHOOK_PATH);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "configuring webhook receiver on port {0}", port);
             return new Webhook(store);
         }
 
@@ -265,6 +279,7 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
         public CloudWhatsAppClient build() {
             store.save();
             var resolvedHttpClient = httpClient != null ? httpClient : buildHttpClient();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "assembled cloud whatsapp client");
             return new LiveCloudWhatsAppClient(store, resolvedHttpClient);
         }
 
@@ -276,9 +291,11 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
          */
         private HttpClient buildHttpClient() {
             if (proxy == null) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building http client with no proxy");
                 return HttpClient.newHttpClient();
             }
             if (proxy instanceof WhatsAppClientProxy.Socks) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "socks proxy rejected for the cloud transport");
                 throw new IllegalArgumentException("The Cloud transport supports only HTTP proxies");
             }
             var builder = HttpClient.newBuilder()
@@ -291,6 +308,7 @@ public sealed class CloudWhatsAppClientBuilder permits CloudWhatsAppClientBuilde
                     }
                 });
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building http client with proxy {0}:{1}", proxy.host(), proxy.port());
             return builder.build();
         }
     }

@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.calls.media.sframe;
 
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -20,6 +22,11 @@ import java.util.Objects;
  * counter, and the length byte) up to {@value #MAX_TRAILER_LENGTH}.
  */
 public final class SFrameHeaderCodec {
+    /**
+     * The logger for {@link SFrameHeaderCodec}.
+     */
+    private static final System.Logger LOGGER = Log.get(SFrameHeaderCodec.class);
+
     /**
      * Holds the maximum number of bytes a LEB128-encoded 64-bit value can occupy.
      *
@@ -127,6 +134,7 @@ public final class SFrameHeaderCodec {
             }
             shift += PAYLOAD_BITS;
         }
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe trailer varint truncated or too long, offset={0} limit={1}", offset, limit);
         return 0;
     }
 
@@ -168,11 +176,13 @@ public final class SFrameHeaderCodec {
     public static int readTrailerLength(byte[] frame, int frameLength) {
         Objects.requireNonNull(frame, "frame cannot be null");
         if (frameLength < MIN_TRAILER_LENGTH) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe frame shorter than minimum trailer length, frameLength={0}", frameLength);
             return -1;
         }
         var trailerLength = frame[frameLength - 1] & 0xFF;
         if (trailerLength < MIN_TRAILER_LENGTH || trailerLength > MAX_TRAILER_LENGTH
                 || trailerLength > frameLength) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe trailer length out of range, trailerLength={0} frameLength={1}", trailerLength, frameLength);
             return -1;
         }
         return trailerLength;
@@ -204,6 +214,10 @@ public final class SFrameHeaderCodec {
         var counterLength = readVarint(
                 frame, trailerStart + keyIdLength, trailerLength - 1 - keyIdLength, counterOut);
         if (counterLength == 0 || keyIdLength + counterLength + 1 != trailerLength) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "sframe trailer length mismatch, declared={0} keyIdLen={1} counterLen={2}",
+                        trailerLength, keyIdLength, counterLength);
+            }
             return null;
         }
         return new Trailer(keyIdOut[0], counterOut[0]);

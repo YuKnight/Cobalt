@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.ctwa;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -25,6 +26,7 @@ import com.github.auties00.cobalt.wam.type.CtwaLabelTarget;
 import com.github.auties00.cobalt.wam.type.CtwaLabelType;
 import com.github.auties00.cobalt.wam.type.CustomerAdsSharingSettingEnabled;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Objects;
@@ -54,6 +56,11 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebCtwaConversationDepthUtils")
 @WhatsAppWebModule(moduleName = "WAWebGetCTWAEligibilityFromConversion")
 public final class LiveCtwaConversionSignalService implements CtwaConversionSignalService {
+    /**
+     * The logger for {@link LiveCtwaConversionSignalService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveCtwaConversionSignalService.class);
+
     /**
      * The only conversion source that makes a chat CTWA-eligible.
      */
@@ -134,25 +141,30 @@ public final class LiveCtwaConversionSignalService implements CtwaConversionSign
         Objects.requireNonNull(chat, "chat cannot be null");
         Objects.requireNonNull(label, "label cannot be null");
         if (!abPropsService.getBool(ABProp.SMB_LABELS_CTWA_DATA_SHARING)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa label conversion skipped, data sharing disabled for chat {0}", chat.toJid());
             return;
         }
 
         var predefinedId = label.predefinedId();
         if (predefinedId.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa label conversion skipped, label has no predefined id");
             return;
         }
 
         var conversion = labelConversionFor(predefinedId.getAsInt());
         if (conversion == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa label conversion skipped, predefined id {0} not a ctwa identifier", predefinedId.getAsInt());
             return;
         }
         if (conversion.labelType() == CtwaLabelType.IMPORTANT
                 && !abPropsService.getBool(ABProp.CTWA_IMPORTANT_LABEL_SENDS_SIGNALS)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa label conversion skipped, important label signals disabled");
             return;
         }
 
         var resolved = client.store().chatStore().findChatByJid(chat.toJid());
         if (resolved.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa label conversion skipped, chat {0} not found", chat.toJid());
             return;
         }
 
@@ -171,11 +183,13 @@ public final class LiveCtwaConversionSignalService implements CtwaConversionSign
         Objects.requireNonNull(chat, "chat cannot be null");
         Objects.requireNonNull(status, "status cannot be null");
         if (!abPropsService.getBool(ABProp.CTWA_SMB_DATA_SHARING_CONSENT)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa order conversion skipped, data sharing consent disabled for chat {0}", chat.toJid());
             return;
         }
 
         var resolved = client.store().chatStore().findChatByJid(chat.toJid());
         if (resolved.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa order conversion skipped, chat {0} not found", chat.toJid());
             return;
         }
 
@@ -200,9 +214,15 @@ public final class LiveCtwaConversionSignalService implements CtwaConversionSign
     private void emit3pdConversion(Chat chat, String surface, String type, String subtype, String paidData) {
         var eligibility = resolveEligibility(chat);
         if (eligibility.isEmpty() || globalSetting() != CtwaDataSharingSetting.ENABLED) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "ctwa 3pd conversion skipped, not eligible or sharing disabled for chat {0}", chat.toJid());
+            }
             return;
         }
         if (abPropsService.getBool(ABProp.PER_CUSTOMER_DATA_SHARING_CONTROLS_ELIGIBLE) && !perCustomerEnabled(chat)) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "ctwa 3pd conversion skipped, per-customer sharing disabled for chat {0}", chat.toJid());
+            }
             return;
         }
 
@@ -217,6 +237,7 @@ public final class LiveCtwaConversionSignalService implements CtwaConversionSign
                 .ctwaTrackingPayload(eligibility.get().trackingPayload())
                 .build();
         wamService.commit(event);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa 3pd conversion committed, surface={0} type={1} subtype={2}", surface, type, subtype);
     }
 
     /**
@@ -235,6 +256,9 @@ public final class LiveCtwaConversionSignalService implements CtwaConversionSign
         var eligibility = resolveEligibility(chat);
         var global = globalSetting();
         if (eligibility.isEmpty() || global == CtwaDataSharingSetting.NOT_SET) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "ctwa label signal skipped, not eligible or sharing not set for chat {0}", chat.toJid());
+            }
             return;
         }
 
@@ -261,6 +285,7 @@ public final class LiveCtwaConversionSignalService implements CtwaConversionSign
             }
             wamService.commit(builder.build());
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa label signal committed, chat {0} count={1}", chat.toJid(), labelTypes.size());
     }
 
     /**
@@ -346,7 +371,17 @@ public final class LiveCtwaConversionSignalService implements CtwaConversionSign
     @WhatsAppWebExport(moduleName = "WAWebCommonCTWADataSharing", exports = "fetchDataSharingSettingAndUpdateModel", adaptation = WhatsAppAdaptation.ADAPTED)
     private CtwaDataSharingSetting globalSetting() {
         return client.store().businessStore().ctwaDataSharingSetting()
-                .orElseGet(client::refreshBusinessDataSharingSetting);
+                .orElseGet(this::fetchGlobalSetting);
+    }
+
+    /**
+     * Fetches the business account's global CTWA data-sharing setting from the relay.
+     *
+     * @return the freshly fetched tri-state setting
+     */
+    private CtwaDataSharingSetting fetchGlobalSetting() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa global data sharing setting not cached, fetching from server");
+        return client.refreshBusinessDataSharingSetting();
     }
 
     /**

@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.misc;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,14 +14,14 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that verifies a postcode against a WhatsApp Business direct-connection
+ * Builds the graph.whatsapp.com GraphQL query that verifies a postcode against a WhatsApp Business direct-connection
  * catalogue.
  *
  * <p>The single {@code request} GraphQL variable nests a {@code verify_postcode} object carrying the
  * business account {@code biz_jid} {@link Jid} and the {@code direct_connection_encrypted_info}
  * cypher token tying the postcode to the catalogue's direct-connection session. WhatsApp Web's
  * {@code WAWebGraphQLVerifyPostcodeJob.verifyPostcode(wid, encryptedInfo)} fills both fields. The
- * relay returns the verification outcome under {@code xwa_product_catalog_get_verify_postcode}; the
+ * graph.whatsapp.com endpoint returns the verification outcome under {@code xwa_product_catalog_get_verify_postcode}; the
  * reply is consumed through {@link GraphQlVerifyPostcodeJobWhatsAppGraphQlResponse}.
  *
  * @see GraphQlVerifyPostcodeJobWhatsAppGraphQlResponse
@@ -27,10 +29,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebGraphQLVerifyPostcodeJobQuery")
 public final class GraphQlVerifyPostcodeJobWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      *
      * @implNote This implementation ships the live {@code WAWebGraphQLPersistedQueries} numeric id
      * rather than the compiled {@code params.id} literal, which for this operation is the document
@@ -136,5 +138,21 @@ public final class GraphQlVerifyPostcodeJobWhatsAppGraphQlRequest implements Wha
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

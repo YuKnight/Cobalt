@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the profile-shimlinks query built by
+ * Parses the graph.whatsapp.com GraphQL response of the profile-shimlinks query built by
  * {@link BizGetProfileShimlinksWhatsAppGraphQlRequest} into a list of {@link BusinessWebsiteLink}.
  *
  * <p>Reads the plural {@code xwa_whatsapp_smb_get_profile_linkshims} root and projects each entry,
@@ -42,7 +42,7 @@ public final class BizGetProfileShimlinksWhatsAppGraphQlResponse implements What
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the plural root {@code xwa_whatsapp_smb_get_profile_linkshims} and projects each entry
      * onto a {@link BusinessWebsiteLink}; the returned {@link Optional} is empty when {@code data} is
@@ -93,7 +93,7 @@ public final class BizGetProfileShimlinksWhatsAppGraphQlResponse implements What
      * <p>Each {@link BusinessWebsiteLink} pairs a raw advertised website with the safe redirect URL to
      * navigate to instead.
      *
-     * @return the parsed website links, empty when the relay returned none
+     * @return the parsed website links, empty when the graph.whatsapp.com endpoint returned none
      */
     public List<BusinessWebsiteLink> websites() {
         return websites;

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,8 @@ import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Records that a LID-identified contact may now see the local user's phone
@@ -27,6 +30,11 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebShareOwnPnSync")
 public final class ShareOwnPnHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link ShareOwnPnHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(ShareOwnPnHandler.class);
+
     /**
      * The AB-props service consulted before applying any mutation.
      */
@@ -93,6 +101,7 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebShareOwnPnSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!abPropsService.getBool(ABProp.SHARE_OWN_PN_SYNC)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "share own pn: unsupported, ab-prop gate closed");
             return MutationApplicationResult.unsupported();
         }
 
@@ -103,17 +112,20 @@ public final class ShareOwnPnHandler implements WebAppStateActionHandler {
         var indexArray = JSON.parseArray(mutation.index());
         var lidJidString = indexArray != null && indexArray.size() > 1 ? indexArray.getString(1) : null;
         if (lidJidString == null || lidJidString.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "share own pn mutation malformed: missing lid index");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "share own pn mutation malformed: index is not a lid");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         var contact = client.store().contactStore().findContactByJid(lidJid)
                 .orElseGet(() -> client.store().contactStore().addNewContact(lidJid));
         contact.setPhoneNumberShared(true);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "share own pn: marked phone number shared for lid={0}", lidJid);
         return MutationApplicationResult.success();
     }
 }

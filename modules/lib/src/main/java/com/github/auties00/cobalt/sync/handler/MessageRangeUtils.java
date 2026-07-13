@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.handler;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.action.SyncActionMessageBuilder;
 import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRange;
 import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRangeBuilder;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.*;
 
@@ -41,6 +43,11 @@ import java.util.*;
  */
 @WhatsAppWebModule(moduleName = "WAWebMessageRangeUtils")
 final class MessageRangeUtils {
+    /**
+     * The logger for {@link MessageRangeUtils}.
+     */
+    private static final System.Logger LOGGER = Log.get(MessageRangeUtils.class);
+
     /**
      * The result of comparing two {@link SyncActionMessageRange} instances for
      * enclosure.
@@ -114,15 +121,18 @@ final class MessageRangeUtils {
     static EnclosureType compareMessageRanges(SyncActionMessageRange rangeA, SyncActionMessageRange rangeB) {
         var aEnclosesB = encloses(rangeA, rangeB);
         var bEnclosesA = encloses(rangeB, rangeA);
+        EnclosureType result;
         if (aEnclosesB && bEnclosesA) {
-            return EnclosureType.RANGES_ARE_EQUAL;
+            result = EnclosureType.RANGES_ARE_EQUAL;
         } else if (aEnclosesB) {
-            return EnclosureType.RANGE_A_ENCLOSES_RANGE_B;
+            result = EnclosureType.RANGE_A_ENCLOSES_RANGE_B;
         } else if (bEnclosesA) {
-            return EnclosureType.RANGE_B_ENCLOSES_RANGE_A;
+            result = EnclosureType.RANGE_B_ENCLOSES_RANGE_A;
         } else {
-            return EnclosureType.RANGES_NOT_ENCLOSING;
+            result = EnclosureType.RANGES_NOT_ENCLOSING;
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "compare message ranges: {0}", result);
+        return result;
     }
 
     /**
@@ -179,6 +189,8 @@ final class MessageRangeUtils {
             }
         }
 
+        if (Log.TRACE)
+            LOGGER.log(Level.TRACE, "merge message ranges: {0} + {1} messages -> {2} merged", rangeA.messages().size(), rangeB.messages().size(), mergedMessages.size());
         return builder.build();
     }
 
@@ -266,6 +278,8 @@ final class MessageRangeUtils {
                 .messages(rewrittenMessages);
         messageRange.lastMessageTimestamp().ifPresent(builder::lastMessageTimestamp);
         messageRange.lastSystemMessageTimestamp().ifPresent(builder::lastSystemMessageTimestamp);
+        if (Log.TRACE)
+            LOGGER.log(Level.TRACE, "replace message range remote jid: {0}, {1} messages rewritten", remoteJid, rewrittenMessages.size());
         return builder.build();
     }
 

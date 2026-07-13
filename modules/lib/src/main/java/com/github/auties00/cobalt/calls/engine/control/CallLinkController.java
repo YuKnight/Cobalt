@@ -9,8 +9,10 @@ import com.github.auties00.cobalt.calls.signaling.link.LinkJoinAck;
 import com.github.auties00.cobalt.calls.signaling.link.LinkJoinStanza;
 import com.github.auties00.cobalt.calls.signaling.link.LinkQueryAck;
 import com.github.auties00.cobalt.calls.signaling.link.LinkQueryStanza;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.CallLinkMedia;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
@@ -40,6 +42,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.LinkQueryAcked;
  * @implNote This implementation guards the mutable link substate with a {@link ReentrantLock}.
  */
 public final class CallLinkController {
+    /**
+     * The logger for {@link CallLinkController}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallLinkController.class);
+
     /**
      * The request reply egress link IQs are dispatched through.
      */
@@ -91,6 +98,7 @@ public final class CallLinkController {
         Objects.requireNonNull(token, "token cannot be null");
         Objects.requireNonNull(media, "media cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "querying call link {0}, media {1}, action {2}", Log.token(token), media, action);
         setLinkState(CallLinkState.LINK_QUERY_SENT);
         var request = new LinkQueryStanza(token, media, Optional.of(action.wireValue()),
                 Optional.empty(), Optional.empty());
@@ -120,9 +128,12 @@ public final class CallLinkController {
      */
     public LinkCreateAck create(CallLinkMedia media, boolean waitingRoomEnabled) {
         Objects.requireNonNull(media, "media cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating call link, media {0}, waiting room {1}", media, waitingRoomEnabled);
         var request = LinkCreateStanza.of(media, waitingRoomEnabled);
         var reply = iqSender.sendForReply(request);
-        return LinkCreateAck.of(reply);
+        var ack = LinkCreateAck.of(reply);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created call link {0}", Log.token(ack.token()));
+        return ack;
     }
 
     /**
@@ -172,6 +183,7 @@ public final class CallLinkController {
      */
     public LinkJoinAck join(String token, int joinState) {
         Objects.requireNonNull(token, "token cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "joining call link {0}, join state {1}", Log.token(token), joinState);
         setLinkState(CallLinkState.LINK_JOIN_SENT);
         var request = new LinkJoinStanza(token, joinState);
         var reply = iqSender.sendForReply(request);
@@ -194,6 +206,7 @@ public final class CallLinkController {
      */
     public LinkEditAck edit(String token, boolean waitingRoomEnabled) {
         Objects.requireNonNull(token, "token cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "editing call link {0}, waiting room {1}", Log.token(token), waitingRoomEnabled);
         var request = LinkEditStanza.ofWaitingRoom(token, waitingRoomEnabled);
         var reply = iqSender.sendForReply(request);
         return LinkEditAck.of(reply);
@@ -223,9 +236,11 @@ public final class CallLinkController {
      */
     private void setLinkState(CallLinkState next) {
         var changed = false;
+        CallLinkState previous = null;
         lock.lock();
         try {
             if (linkState != next) {
+                previous = linkState;
                 linkState = next;
                 changed = true;
             }
@@ -233,6 +248,7 @@ public final class CallLinkController {
             lock.unlock();
         }
         if (changed) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call link state {0} -> {1}", previous, next);
             events.emit(new CallLinkStateChanged(next));
         }
     }

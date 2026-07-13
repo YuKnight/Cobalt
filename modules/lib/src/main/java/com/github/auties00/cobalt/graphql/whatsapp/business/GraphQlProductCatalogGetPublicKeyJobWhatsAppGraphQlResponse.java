@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogPublicKe
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the get-public-key query built by
+ * Parses the graph.whatsapp.com GraphQL response of the get-public-key query built by
  * {@link GraphQlProductCatalogGetPublicKeyJobWhatsAppGraphQlRequest} into a {@link BusinessCatalogPublicKey}.
  *
  * <p>Reads the linked {@code xwa_product_catalog_get_public_key} field and projects its PEM
@@ -32,14 +32,14 @@ public final class GraphQlProductCatalogGetPublicKeyJobWhatsAppGraphQlResponse i
      *
      * <p>Reserved for the static parser.
      *
-     * @param publicKey the parsed catalog public key, or {@code null} when the relay omitted the field
+     * @param publicKey the parsed catalog public key, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private GraphQlProductCatalogGetPublicKeyJobWhatsAppGraphQlResponse(BusinessCatalogPublicKey publicKey) {
         this.publicKey = publicKey;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_product_catalog_get_public_key}, its
      * {@code public_key_certificate_pem} scalar, and its {@code public_key_with_signature} child, and

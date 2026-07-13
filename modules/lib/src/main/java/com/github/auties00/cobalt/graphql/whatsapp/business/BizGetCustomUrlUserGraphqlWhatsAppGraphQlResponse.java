@@ -13,7 +13,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the custom-url resolution query built by
+ * Parses the graph.whatsapp.com GraphQL response of the custom-url resolution query built by
  * {@link BizGetCustomUrlUserGraphqlWhatsAppGraphQlRequest} into a {@link BusinessCustomUrlIdentity}.
  *
  * <p>Reads the linked {@code xwa_custom_url_get_user} field and projects its {@code success} flag, the
@@ -34,14 +34,14 @@ public final class BizGetCustomUrlUserGraphqlWhatsAppGraphQlResponse implements 
      *
      * <p>Reserved for the static parser.
      *
-     * @param identity the parsed resolution outcome, or {@code null} when the relay omitted the field
+     * @param identity the parsed resolution outcome, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private BizGetCustomUrlUserGraphqlWhatsAppGraphQlResponse(BusinessCustomUrlIdentity identity) {
         this.identity = identity;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_custom_url_get_user} and projects its resolution flag, the
      * resolved {@code user.jid} as the primary identifier, and the failure pair onto a

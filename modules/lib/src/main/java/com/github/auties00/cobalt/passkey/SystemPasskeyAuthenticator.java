@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.passkey;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientPasskeyAuthenticator;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.warden.HybridAssertion;
 import com.github.auties00.warden.HybridAssertionListener;
 import com.github.auties00.warden.PasskeyAssertion;
@@ -8,7 +9,6 @@ import com.github.auties00.warden.PasskeyRequest;
 import com.github.auties00.warden.WardenAuthenticator;
 import com.github.auties00.warden.exception.PasskeyException;
 
-import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -38,9 +38,9 @@ import java.util.function.Consumer;
  */
 public final class SystemPasskeyAuthenticator implements LinkedWhatsAppClientPasskeyAuthenticator {
     /**
-     * The logger this authenticator reports hybrid-ceremony progress through.
+     * The logger for {@link SystemPasskeyAuthenticator}.
      */
-    private static final Logger LOGGER = System.getLogger(SystemPasskeyAuthenticator.class.getName());
+    private static final System.Logger LOGGER = Log.get(SystemPasskeyAuthenticator.class);
 
     /**
      * The slack added to the request timeout when waiting for a terminal callback, letting Warden's own
@@ -88,6 +88,7 @@ public final class SystemPasskeyAuthenticator implements LinkedWhatsAppClientPas
         try {
             return new SystemPasskeyAuthenticator(WardenAuthenticator.create(), onQrCode);
         } catch (PasskeyException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "host passkey service could not be initialised", exception);
             throw new IllegalStateException("The host passkey service could not be initialised", exception);
         }
     }
@@ -105,6 +106,7 @@ public final class SystemPasskeyAuthenticator implements LinkedWhatsAppClientPas
      */
     @Override
     public Assertion assertCredential(Request request) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting hybrid passkey ceremony for {0}", request.relyingPartyId());
         var passkeyRequest = new PasskeyRequest(
                 request.relyingPartyId(),
                 request.challenge(),
@@ -117,26 +119,29 @@ public final class SystemPasskeyAuthenticator implements LinkedWhatsAppClientPas
         var listener = new HybridAssertionListener() {
             @Override
             public void onQrCode(String fidoUrl) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "hybrid passkey ceremony: qr code issued");
                 onQrCode.accept(fidoUrl);
             }
 
             @Override
             public void onDeviceDetected() {
-                LOGGER.log(Level.DEBUG, "Hybrid passkey ceremony: nearby device detected");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "hybrid passkey ceremony: nearby device detected");
             }
 
             @Override
             public void onConnecting() {
-                LOGGER.log(Level.DEBUG, "Hybrid passkey ceremony: establishing encrypted tunnel");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "hybrid passkey ceremony: establishing encrypted tunnel");
             }
 
             @Override
             public void onAssertion(PasskeyAssertion assertion) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "hybrid passkey ceremony: assertion received");
                 handoff.offer(assertion);
             }
 
             @Override
             public void onFailure(PasskeyException failure) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "hybrid passkey ceremony failed", failure);
                 handoff.offer(failure);
             }
         };
@@ -145,27 +150,38 @@ public final class SystemPasskeyAuthenticator implements LinkedWhatsAppClientPas
         try {
             ceremony = authenticator.getHybridAssertion(passkeyRequest, listener);
         } catch (PasskeyException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "hybrid passkey ceremony could not be started", exception);
             throw new IllegalStateException("The host passkey ceremony could not be started", exception);
         }
         try (ceremony) {
             var outcome = handoff.poll(request.timeout().toMillis() + TIMEOUT_SLACK_MILLIS, TimeUnit.MILLISECONDS);
             return switch (outcome) {
-                case PasskeyAssertion assertion -> new Assertion(
-                        assertion.credentialId(),
-                        assertion.authenticatorData(),
-                        assertion.clientDataJson(),
-                        assertion.signature(),
-                        assertion.userHandle(),
-                        assertion.prfOutput());
-                case PasskeyException failure ->
-                        throw new IllegalStateException("The host passkey ceremony did not produce an assertion", failure);
-                case null ->
-                        throw new IllegalStateException("The host passkey ceremony timed out before producing an assertion");
-                default ->
-                        throw new IllegalStateException("The host passkey ceremony produced an unexpected result");
+                case PasskeyAssertion assertion -> {
+                    if (Log.INFO) LOGGER.log(Level.INFO, "hybrid passkey ceremony completed");
+                    yield new Assertion(
+                            assertion.credentialId(),
+                            assertion.authenticatorData(),
+                            assertion.clientDataJson(),
+                            assertion.signature(),
+                            assertion.userHandle(),
+                            assertion.prfOutput());
+                }
+                case PasskeyException failure -> {
+                    if (Log.ERROR) LOGGER.log(Level.ERROR, "hybrid passkey ceremony did not produce an assertion", failure);
+                    throw new IllegalStateException("The host passkey ceremony did not produce an assertion", failure);
+                }
+                case null -> {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "hybrid passkey ceremony timed out");
+                    throw new IllegalStateException("The host passkey ceremony timed out before producing an assertion");
+                }
+                default -> {
+                    if (Log.ERROR) LOGGER.log(Level.ERROR, "hybrid passkey ceremony produced an unexpected result");
+                    throw new IllegalStateException("The host passkey ceremony produced an unexpected result");
+                }
             };
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "hybrid passkey ceremony interrupted");
             throw new IllegalStateException("The host passkey ceremony was interrupted", exception);
         }
     }

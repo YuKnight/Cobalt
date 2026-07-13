@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.auth;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,15 +14,14 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay mutation that authorises an external-context (deep-link) chat partner for the
- * authenticated session.
+ * Builds the graph.whatsapp.com GraphQL mutation that authorises an external-context (deep-link) chat partner.
  *
  * <p>The single {@code input} GraphQL variable is the external-context authorisation object. WhatsApp
  * Web fills it from {@code WAWebExternalCtxAuthoriseWAChat} with the recipient chat
  * {@code recipient_jid}, the {@code deeplink_type} that opened the chat, the {@code deeplink_source}
  * (the literal {@code "1"} for an external entry point or {@code "2"} for an internal one), the
  * {@code deeplink_platform} (always {@code "Web"} for this client), and the {@code partner_token}
- * carried by the deep link. The relay returns the authorisation outcome under
+ * carried by the deep link. The graph.whatsapp.com endpoint returns the authorisation outcome under
  * {@code xwa_external_ctx_authorise_wa_chat}; the reply is consumed through
  * {@link ExternalCtxAuthoriseWaChatWhatsAppGraphQlResponse}.
  *
@@ -46,10 +47,10 @@ public final class ExternalCtxAuthoriseWaChatWhatsAppGraphQlRequest implements W
     private static final String DEEPLINK_PLATFORM = "Web";
 
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebExternalCtxAuthoriseWAChatMutation.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -183,5 +184,21 @@ public final class ExternalCtxAuthoriseWaChatWhatsAppGraphQlRequest implements W
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

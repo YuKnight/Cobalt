@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.ads.SensitiveString;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -14,19 +15,11 @@ import java.io.UncheckedIOException;
  * Builds the comet mutation that confirms the email step of WhatsApp Business ad-account onboarding.
  *
  * <p>The single {@code input} GraphQL variable is the onboarding-data upsert object WhatsApp Web
- * passes to {@code wa_ad_account_upsert_onboarding_data(input: $input)}. The compiled
- * {@code useWAWebBizAdCreationConfirmEmailOnboardingMutation.graphql} document and the hook module
- * that builds the object are both absent from the analysed bundle, so its field names are not
- * recoverable; the caller supplies it as an already JSON-encoded object. The mutation returns the
- * upsert outcome under {@code wa_ad_account_upsert_onboarding_data}; the reply is consumed through
- * {@link BizAdCreationConfirmEmailOnboardingFacebookGraphQlResponse}.
- *
- * @implNote This implementation accepts the {@code input} object as a caller-supplied, already
- * JSON-encoded object literal because neither the
- * {@code useWAWebBizAdCreationConfirmEmailOnboardingMutation.graphql} document nor a caller building
- * the input object is present in the JS bundle of snapshot {@code 1040120866}; the value is emitted
- * verbatim as the {@code input} variable. Once a caller that builds the object surfaces, replace this
- * with typed scalar fields mirroring that construction.
+ * passes to {@code wa_ad_account_upsert_onboarding_data(input: $input)}: the verification code the
+ * user entered ({@code code}), the email address ({@code email}), and the silent nonce returned from
+ * the send-code step ({@code silent_nonce}), each carried as a {@link SensitiveString}. The mutation
+ * returns the upsert outcome under {@code wa_ad_account_upsert_onboarding_data}; the reply is consumed
+ * through {@link BizAdCreationConfirmEmailOnboardingFacebookGraphQlResponse}.
  *
  * @see BizAdCreationConfirmEmailOnboardingFacebookGraphQlResponse
  */
@@ -52,24 +45,36 @@ public final class BizAdCreationConfirmEmailOnboardingFacebookGraphQlRequest imp
     public static final String OPERATION_NAME = "useWAWebBizAdCreationConfirmEmailOnboardingMutation";
 
     /**
-     * The pre-encoded JSON of the {@code input} GraphQL object carrying the onboarding data to
-     * upsert, or {@code null} to omit it.
+     * The {@code code} field of the {@code input} object carrying the verification code the user
+     * entered as a sensitive string, or {@code null} to omit it.
      */
-    private final String inputJson;
+    private final SensitiveString code;
+
+    /**
+     * The {@code email} field of the {@code input} object carrying the onboarding email address as a
+     * sensitive string, or {@code null} to omit it.
+     */
+    private final SensitiveString email;
+
+    /**
+     * The {@code silent_nonce} field of the {@code input} object carrying the nonce returned from the
+     * send-code step as a sensitive string, or {@code null} to omit it.
+     */
+    private final SensitiveString silentNonce;
 
     /**
      * Constructs a confirm-email-onboarding mutation request.
      *
-     * <p>The {@code inputJson} is the already-JSON-encoded {@code input} object holding the
-     * onboarding data to upsert; its field names are defined by the server-side input type and are
-     * not modelled here (see the class {@code @implNote}). A {@code null} value omits the variable
-     * from the serialized object.
+     * <p>Each value that is {@code null} omits its field from the serialized {@code input} object.
      *
-     * @param inputJson the already-JSON-encoded {@code input} object, or {@code null} to omit the
-     *                  variable
+     * @param code        the verification code the user entered, or {@code null} to omit the field
+     * @param email       the onboarding email address, or {@code null} to omit the field
+     * @param silentNonce the silent nonce from the send-code step, or {@code null} to omit the field
      */
-    public BizAdCreationConfirmEmailOnboardingFacebookGraphQlRequest(String inputJson) {
-        this.inputJson = inputJson;
+    public BizAdCreationConfirmEmailOnboardingFacebookGraphQlRequest(SensitiveString code, SensitiveString email, SensitiveString silentNonce) {
+        this.code = code;
+        this.email = email;
+        this.silentNonce = silentNonce;
     }
 
     /**
@@ -91,20 +96,36 @@ public final class BizAdCreationConfirmEmailOnboardingFacebookGraphQlRequest imp
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"input": <inputJson>}}, writing the variable only
-     * when its value is non-null and emitting {@code "{}"} when it is {@code null}. The {@code input}
-     * value is spliced in as a raw JSON value via {@link JSONWriter#writeRaw(String)} because it is
-     * supplied already encoded.
+     * @implNote This implementation emits {@code {"input": {"code": {"sensitive_string_value": ...},
+     * "email": {"sensitive_string_value": ...}, "silent_nonce": {"sensitive_string_value": ...}}}},
+     * writing each field only when its value is non-null and emitting {@code {"input": {}}} when all
+     * are {@code null}.
      */
     @Override
     public String variables() {
         try (var writer = JSONWriter.ofUTF8()) {
             writer.startObject();
-            if (inputJson != null) {
-                writer.writeName("input");
+            writer.writeName("input");
+            writer.writeColon();
+            writer.startObject();
+            if (code != null) {
+                writer.writeName("code");
                 writer.writeColon();
-                writer.writeRaw(inputJson);
+                BizAdInputJson.writeSensitiveString(writer, code);
             }
+
+            if (email != null) {
+                writer.writeName("email");
+                writer.writeColon();
+                BizAdInputJson.writeSensitiveString(writer, email);
+            }
+
+            if (silentNonce != null) {
+                writer.writeName("silent_nonce");
+                writer.writeColon();
+                BizAdInputJson.writeSensitiveString(writer, silentNonce);
+            }
+            writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {
                 writer.flushTo(output);

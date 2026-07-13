@@ -72,10 +72,10 @@ public final class StanzaSizer {
     /**
      * Prevents instantiation of this stateless utility.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private StanzaSizer() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

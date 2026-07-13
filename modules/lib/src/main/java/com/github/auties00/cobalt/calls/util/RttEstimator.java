@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.util;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Smooths a stream of round trip time samples into a single exponential moving
  * average and tracks a slowly decaying minimum, the path round trip time floor.
@@ -33,6 +37,11 @@ package com.github.auties00.cobalt.calls.util;
  * around the floor while still tracking a genuine improvement.
  */
 public final class RttEstimator {
+    /**
+     * The logger for {@link RttEstimator}.
+     */
+    private static final System.Logger LOGGER = Log.get(RttEstimator.class);
+
     /**
      * Lower bound applied to the smoothing factor before it is used.
      *
@@ -106,6 +115,7 @@ public final class RttEstimator {
             next = (1.0 - clampedAlpha) * estimate + clampedAlpha * sample;
         }
         estimate = truncateNonNegative(next);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "rtt estimate updated to {0} from sample {1} alpha {2}", estimate, sample, clampedAlpha);
         return estimate;
     }
 
@@ -137,6 +147,7 @@ public final class RttEstimator {
         } else {
             minEstimate = truncateNonNegative(sample);
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "rtt min estimate updated to {0} from sample {1}", minEstimate, sample);
         return minEstimate;
     }
 

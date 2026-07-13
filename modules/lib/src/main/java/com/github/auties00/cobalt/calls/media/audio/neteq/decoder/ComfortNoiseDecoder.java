@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq.decoder;
 
 import com.github.auties00.cobalt.calls.media.audio.neteq.ComfortNoiseGenerator;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Renders RFC 3389 comfort noise as a permitted {@link AudioDecoder}, the pseudo decoder the jitter buffer
@@ -22,6 +25,11 @@ import com.github.auties00.cobalt.calls.media.audio.neteq.ComfortNoiseGenerator;
  * produced instead by the active audio decoder, not by this class.
  */
 public final class ComfortNoiseDecoder implements AudioDecoder {
+    /**
+     * The logger for {@link ComfortNoiseDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(ComfortNoiseDecoder.class);
+
     /**
      * The output sample rate in hertz this decoder reports.
      */
@@ -66,6 +74,10 @@ public final class ComfortNoiseDecoder implements AudioDecoder {
     public short[] decode(byte[] payload, int frameSamples, boolean fec) {
         java.util.Objects.requireNonNull(payload, "payload cannot be null");
         requireOpen();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "comfort noise descriptor updated, payload={0} frameSamples={1}",
+                    payload, frameSamples);
+        }
         generator.update(payload);
         return generator.generate(frameSamples);
     }
@@ -103,6 +115,7 @@ public final class ComfortNoiseDecoder implements AudioDecoder {
     public void reset() {
         requireOpen();
         generator.reset();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "comfort noise decoder reset");
     }
 
     /**

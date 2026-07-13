@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -43,8 +45,7 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
     /**
      * Logs warnings about malformed action children and debug messages about unhandled types.
      */
-    private static final System.Logger LOGGER =
-            System.getLogger(NotificationProfileStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationProfileStreamHandler.class);
 
     /**
      * Holds the salt appended to a contact's user component before the truncated MD5 hash used by the WA
@@ -122,8 +123,8 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
             var actionNode = stanza.getChild("delete", "set", "request", "set_avatar")
                     .orElse(null);
             if (actionNode == null) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Picture notification {0} has no known action child",
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "picture notification {0} has no known action child",
                         stanza.getAttributeAsString("id", "[missing-id]"));
                 return;
             }
@@ -133,6 +134,7 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
             var from = stanza.getAttributeAsJid("from")
                     .map(Jid::withoutData)
                     .orElse(null);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "picture notification {0} action {1} from {2}", stanzaId, actionType, from);
 
             Jid targetJid;
             if (actionNode.getAttributeAsJid("jid").isPresent()) {
@@ -144,8 +146,8 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
                 if (hash != null) {
                     targetJid = resolveContactByHash(hash);
                     if (targetJid == null) {
-                        LOGGER.log(System.Logger.Level.WARNING,
-                                "Side contact hash not found for pic update");
+                        if (Log.WARNING) LOGGER.log(Level.WARNING,
+                                "side contact hash not found for pic update");
                     }
                 } else {
                     targetJid = null;
@@ -161,19 +163,19 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
                     }
                     case "set_avatar" -> {
                         // TODO: implement the set_avatar branch once Cobalt has avatar metadata; today the stanza is logged and ACKed without effect.
-                        LOGGER.log(System.Logger.Level.WARNING,
+                        if (Log.WARNING) LOGGER.log(Level.WARNING,
                                 "set_avatar picture notification is not implemented");
                     }
                     default -> {
-                        LOGGER.log(System.Logger.Level.WARNING,
-                                "Invalid type received for picture notification: {0}", actionType);
+                        if (Log.WARNING) LOGGER.log(Level.WARNING,
+                                "invalid type received for picture notification: {0}", actionType);
                     }
                 }
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle picture notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "[missing-id]"), throwable.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "failed to handle picture notification " + stanza.getAttributeAsString("id", "[missing-id]"),
+                    throwable);
         } finally {
             sendPictureNotificationAck(stanza);
         }
@@ -211,8 +213,8 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
             var ts = stanza.getAttributeAsLong("t", (Long) null);
             if (ts != null) {
                 // TODO: synthesize the group-pic-change system message via MessageService once it is injected here; today the change is only delivered via the listener fan-out below.
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Group {0} picture changed at {1} by {2} - system message generation not available",
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "group {0} picture changed at {1} by {2} - system message generation not available",
                         targetJid,
                         Instant.ofEpochSecond(ts),
                         actionStanza.getAttributeAsJid("author").map(Jid::toUserJid).orElse(null));
@@ -244,13 +246,13 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
                 handleAboutSideListChange(setNode, stanzaId);
             } else {
                 var fromStr = stanza.getAttributeAsString("from", "[unknown]");
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "handleAboutNotification: unhandled type unknown from {0}", fromStr);
+                if (Log.WARNING) LOGGER.log(Level.WARNING,
+                        "handleAboutNotification: unhandled type, unknown from {0}", Log.jid(fromStr));
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle status notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "[missing-id]"), throwable.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "failed to handle status notification " + stanza.getAttributeAsString("id", "[missing-id]"),
+                    throwable);
         } finally {
             sendStatusNotificationAck(stanza);
         }
@@ -279,8 +281,8 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (from == null) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Status notification {0} is missing from",
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "status notification {0} is missing from",
                     Objects.requireNonNullElse(stanzaId, "[missing-id]"));
             return;
         }
@@ -305,7 +307,7 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
                 whatsapp.store().contactStore().addContactTextStatus(jid.toUserJid(), existingStatus);
                 notifyContactTextStatusChanged(jid.toUserJid(), existingStatus);
             } else {
-                LOGGER.log(System.Logger.Level.WARNING,
+                if (Log.WARNING) LOGGER.log(Level.WARNING,
                         "handleAboutNotification: unknown contact {0}", jid);
             }
         }
@@ -334,8 +336,8 @@ public final class NotificationProfileStreamHandler extends SocketStreamHandler.
 
         var resolvedJid = resolveContactByHash(hash);
         if (resolvedJid == null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Side contact hash not found for status update");
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "side contact hash not found for status update");
             return;
         }
 

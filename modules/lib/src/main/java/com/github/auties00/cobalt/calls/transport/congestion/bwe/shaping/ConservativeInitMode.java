@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Latches the conservative startup mode off once the initial bandwidth estimate leaves a configured
  * band, releasing the estimator to ramp normally.
@@ -15,6 +19,11 @@ package com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping;
  * transport thread.
  */
 public final class ConservativeInitMode {
+    /**
+     * The logger for {@link ConservativeInitMode}.
+     */
+    private static final System.Logger LOGGER = Log.get(ConservativeInitMode.class);
+
     /**
      * Whether conservative init mode is enabled by configuration.
      *
@@ -71,6 +80,10 @@ public final class ConservativeInitMode {
         }
         if (initBweBps < lowerBoundBps || initBweBps > upperBoundBps) {
             stopped = true;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "conservative init mode latched off: estimate={0}bps bounds=[{1},{2}]bps",
+                        initBweBps, lowerBoundBps, upperBoundBps);
+            }
             return false;
         }
         return true;

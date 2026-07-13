@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.calls.crypto;
 
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 import com.github.auties00.cobalt.model.jid.Jid;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -27,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class CallE2eKeyDerivationTest {
     private static final HexFormat HEX = HexFormat.of();
 
-    private static CallDeviceJid device(String jid) {
-        return CallDeviceJid.of(Jid.of(jid));
+    private static Jid device(String jid) {
+        return Jid.of(jid);
     }
 
     @Nested
@@ -37,7 +36,7 @@ public class CallE2eKeyDerivationTest {
         // group-sframe-frame.json capturedKeyDerivation.sample1_self
         private static final byte[] RAW_KEY =
                 HEX.parseHex("86e0004078464597d59c751fde9a8b61908dcbd04197ffdc7636582be7f439aa");
-        private static final CallDeviceJid PARTICIPANT = device("83116928594056:2@lid");
+        private static final Jid PARTICIPANT = device("83116928594056:2@lid");
         private static final byte[] EXPECTED_BASE_KEY =
                 HEX.parseHex("409102bf2c1a3816c76a6d64819d0c901556e030d5f33da251c13cdfcf0b9353");
 
@@ -98,7 +97,7 @@ public class CallE2eKeyDerivationTest {
     class KeyChain {
         private static final byte[] CALL_KEY =
                 HEX.parseHex("bc4e7efa3efe251b9d5aeb3c36843d776c27777d67e5555f7956fd4f8ab003d8");
-        private static final CallDeviceJid PARTICIPANT = device("39110693621863:29@lid");
+        private static final Jid PARTICIPANT = device("39110693621863:29@lid");
 
         @Test
         @DisplayName("packages the SFrame base key and SRTP master matching the standalone derivations")
@@ -192,7 +191,7 @@ public class CallE2eKeyDerivationTest {
     @Nested
     @DisplayName("input validation")
     class Validation {
-        private static final CallDeviceJid PARTICIPANT = device("39110693621863:29@lid");
+        private static final Jid PARTICIPANT = device("39110693621863:29@lid");
 
         @Test
         @DisplayName("rejects a raw key that is not 32 bytes")

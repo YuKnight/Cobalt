@@ -10,6 +10,9 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.LsfCodeboo
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.LsfCodebooks.Codebook;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.LsfCodebooks.Stage1;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.LsfCodebooks.Stage2;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Two stage line spectral frequency (LSF) vector quantizer for the MLow speech codec, the encode side inverse
@@ -95,6 +98,11 @@ public final class LsfQuantizer {
      * partial sort.
      */
     private static final float FLT_MAX = Float.MAX_VALUE;
+
+    /**
+     * The logger for {@link LsfQuantizer}.
+     */
+    private static final System.Logger LOGGER = Log.get(LsfQuantizer.class);
 
     /**
      * The encoder stage 1 search products, stage 2 bit costs, and scalar quantizer geometry, loaded once from
@@ -288,6 +296,10 @@ public final class LsfQuantizer {
      */
     private QuantizedLsf quantCore(int surv, float[] a, float[] precomputedLsf, float rdwAdj, int voiced,
                                    int lowRate, CondParams cond) {
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "lsf quant: surv={0} voiced={1} lowRate={2} cond={3}",
+                    surv, voiced, lowRate, cond != null);
+        }
         Stage1 dec = codebook.stage1(voiced);
         LsfStage1 enc = search.stage1(voiced);
 
@@ -398,6 +410,10 @@ public final class LsfQuantizer {
                 }
                 bits = bits0 + numBits[indChgd][qi2New] - numBits[indChgd][qi2Old];
             }
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "lsf quant result: stage1Idx={0} bits={1} rdBest={2}",
+                    qi[0], bitsUsed[0], rdBest);
         }
         return new QuantizedLsf(qi, qlsfOut, bitsUsed[0], rdBest, wlsf);
     }
@@ -775,6 +791,9 @@ public final class LsfQuantizer {
                 }
                 return;
             }
+        }
+        if (Log.ERROR) {
+            LOGGER.log(Level.ERROR, "lsf minimum-distance relaxation did not converge after 1000 iterations");
         }
         throw new AssertionError("LSF minimum-distance relaxation did not converge");
     }

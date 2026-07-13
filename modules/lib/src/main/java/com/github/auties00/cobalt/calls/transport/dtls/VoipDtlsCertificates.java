@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.dtls;
 
-import com.github.auties00.cobalt.util.X509CertificateGenerator;
-import com.github.auties00.cobalt.util.X509CertificateSpec;
+import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.util.certificate.X509CertificateGenerator;
+import com.github.auties00.cobalt.util.certificate.X509CertificateSpec;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -10,6 +11,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509ExtendedTrustManager;
 import javax.security.auth.x500.X500Principal;
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.math.BigInteger;
 import java.net.Socket;
 import java.security.GeneralSecurityException;
@@ -24,7 +26,6 @@ import java.security.cert.X509Certificate;
 import java.security.spec.ECGenParameterSpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import com.github.auties00.cobalt.calls.transport.srtp.SfuKeyDeriver;
 
 /**
  * Builds the fingerprint pinning DTLS {@link SSLEngine} for the WhatsApp Web relay leg's DTLS handshake and
@@ -52,6 +53,11 @@ import com.github.auties00.cobalt.calls.transport.srtp.SfuKeyDeriver;
  *           is involved.
  */
 public final class VoipDtlsCertificates {
+    /**
+     * The logger for {@link VoipDtlsCertificates}.
+     */
+    private static final System.Logger LOGGER = Log.get(VoipDtlsCertificates.class);
+
     /**
      * The length, in bytes, of a SHA-256 certificate fingerprint.
      */
@@ -159,6 +165,9 @@ public final class VoipDtlsCertificates {
      */
     public static SSLEngine createEngine(boolean clientRole, byte[] pinnedFingerprint)
             throws GeneralSecurityException, IOException {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "building relay dtls engine, clientRole={0}", clientRole);
+        }
         var keyPair = generateKeyPair();
         var certificate = selfSignCertificate(keyPair);
         // TODO: bind this DTLS certificate fingerprint over the Web P2P relay data channel; at Accept build and verify, key an HMAC with a salted HKDF SHA256 derive (SfuKeyDeriver.Domain.CERT_FINGERPRINT_HMAC label, 16 byte salt taken from the raw e2e key, remaining e2e bytes as IKM, not a zero salt derive()), generating the outbound HMAC here and verifying the peer's on handle_accept
@@ -252,15 +261,24 @@ public final class VoipDtlsCertificates {
 
             private void verify(X509Certificate[] chain) throws CertificateException {
                 if (chain == null || chain.length == 0) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "relay dtls handshake failed: peer presented no certificate");
+                    }
                     throw new CertificateException("relay presented no certificate");
                 }
                 byte[] actual;
                 try {
                     actual = MessageDigest.getInstance(SHA256_ALGORITHM).digest(chain[0].getEncoded());
                 } catch (NoSuchAlgorithmException exception) {
+                    if (Log.ERROR) {
+                        LOGGER.log(Level.ERROR, "sha-256 digest unavailable for relay dtls pin check", exception);
+                    }
                     throw new CertificateException("SHA-256 unavailable", exception);
                 }
                 if (!MessageDigest.isEqual(actual, pin)) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "relay dtls handshake failed: certificate does not match pinned fingerprint");
+                    }
                     throw new CertificateException("relay certificate does not pin");
                 }
             }

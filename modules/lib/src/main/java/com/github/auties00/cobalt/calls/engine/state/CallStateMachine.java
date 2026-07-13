@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.calls.engine.state;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Optional;
 import com.github.auties00.cobalt.calls.engine.context.CallContext;
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
 import com.github.auties00.cobalt.calls.engine.context.CallManager;
 import com.github.auties00.cobalt.calls.engine.event.CallLifecycleEventSink;
+import com.github.auties00.cobalt.log.Log;
 
 /**
  * Guards every internal state change of a call and implements the {@link CallStateTransition} seam.
@@ -48,9 +50,9 @@ import com.github.auties00.cobalt.calls.engine.event.CallLifecycleEventSink;
  */
 public final class CallStateMachine implements CallStateTransition {
     /**
-     * Logs accepted transitions at debug level and rejected illegal transitions at warning level.
+     * The logger for {@link CallStateMachine}.
      */
-    private static final System.Logger LOGGER = System.getLogger(CallStateMachine.class.getName());
+    private static final System.Logger LOGGER = Log.get(CallStateMachine.class);
 
     /**
      * The manager the {@link #transition(String, CallLifecycleState)} seam resolves a call context from.
@@ -95,8 +97,10 @@ public final class CallStateMachine implements CallStateTransition {
         Objects.requireNonNull(newState, "newState cannot be null");
         var context = manager.getByCallId(callId).orElse(null);
         if (context == null) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "State transition to {0} ignored: no call for id {1}", newState, callId);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "state transition to {0} ignored: no call for id {1}", newState, callId);
+            }
             return Optional.empty();
         }
         context.lock().lock();
@@ -188,8 +192,10 @@ public final class CallStateMachine implements CallStateTransition {
         applyAccounting(context, current, nowMillis);
         context.state(newState);
         applyEntryEffects(context, newState, nowMillis);
-        LOGGER.log(System.Logger.Level.DEBUG, "change_call_state call id {0}: [{1} -> {2}]",
-                context.callId(), current, newState);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "change_call_state call id {0}: [{1} -> {2}]",
+                    context.callId(), current, newState);
+        }
         return Transition.accepted(current, newState);
     }
 
@@ -255,10 +261,11 @@ public final class CallStateMachine implements CallStateTransition {
     /**
      * Applies the duration accounting and lonely timer cancellation for the state being left.
      *
-     * <p>Leaving {@link CallLifecycleState#CONNECTED_LONELY} closes the open lonely segment and cancels the
-     * connected lonely timer; leaving {@link CallLifecycleState#CALL_ACTIVE} closes the open active segment.
-     * This runs before the state field is written so the segment that is closing is still the current
-     * state's segment.
+     * <p>Leaving {@link CallLifecycleState#CONNECTED_LONELY} closes the open lonely segment; leaving
+     * {@link CallLifecycleState#CALL_ACTIVE} closes the open active segment. This runs before the state
+     * field is written so the segment that is closing is still the current state's segment. The connected
+     * lonely timer is armed and cancelled by the lifecycle controller around its transition call, not
+     * here, so this guard is a pure segment accountant.
      *
      * @param context   the call context being transitioned
      * @param current   the state being left
@@ -267,19 +274,19 @@ public final class CallStateMachine implements CallStateTransition {
     private static void applyAccounting(CallContext context, CallLifecycleState current, long nowMillis) {
         if (current == CallLifecycleState.CONNECTED_LONELY) {
             context.closeLonelySegment(nowMillis);
-            context.fireCancelConnectedLonelyTimer();
         } else if (current == CallLifecycleState.CALL_ACTIVE) {
             context.closeActiveSegment(nowMillis);
         }
     }
 
     /**
-     * Applies the segment opening and timer effects for the state being entered.
+     * Applies the segment opening for the state being entered.
      *
-     * <p>Entering {@link CallLifecycleState#CONNECTED_LONELY} opens a lonely segment and schedules the
-     * connected lonely timer; entering {@link CallLifecycleState#CALL_ACTIVE} cancels the connected lonely
-     * timer (in case it was scheduled) and opens an active segment. This runs after the state field is
-     * written so a scheduler that reads {@link CallContext#state()} sees the new state.
+     * <p>Entering {@link CallLifecycleState#CONNECTED_LONELY} opens a lonely segment; entering
+     * {@link CallLifecycleState#CALL_ACTIVE} opens an active segment. This runs after the state field is
+     * written. The connected lonely timer scheduling and cancellation is driven by the lifecycle
+     * controller around its transition call, keyed off the prior and new states this transition reports,
+     * not by this guard.
      *
      * @param context   the call context being transitioned
      * @param newState  the state being entered
@@ -287,14 +294,8 @@ public final class CallStateMachine implements CallStateTransition {
      */
     private static void applyEntryEffects(CallContext context, CallLifecycleState newState, long nowMillis) {
         switch (newState) {
-            case CONNECTED_LONELY -> {
-                context.openLonelySegment(nowMillis);
-                context.fireScheduleConnectedLonelyTimer();
-            }
-            case CALL_ACTIVE -> {
-                context.fireCancelConnectedLonelyTimer();
-                context.openActiveSegment(nowMillis);
-            }
+            case CONNECTED_LONELY -> context.openLonelySegment(nowMillis);
+            case CALL_ACTIVE -> context.openActiveSegment(nowMillis);
             default -> {
                 // The other states have no entry effect here; their setup is driven by the lifecycle
                 // controller, not by the state guard.
@@ -311,9 +312,11 @@ public final class CallStateMachine implements CallStateTransition {
      * @return a rejected {@link Transition} reporting the unchanged current state
      */
     private static Transition reject(CallContext context, CallLifecycleState current, CallLifecycleState newState) {
-        LOGGER.log(System.Logger.Level.WARNING,
-                "Rejecting illegal call state transition for call {0}: [{1} -> {2}]",
-                context.callId(), current, newState);
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING,
+                    "rejecting illegal call state transition for call {0}: [{1} -> {2}]",
+                    context.callId(), current, newState);
+        }
         return Transition.rejected(current, newState);
     }
 

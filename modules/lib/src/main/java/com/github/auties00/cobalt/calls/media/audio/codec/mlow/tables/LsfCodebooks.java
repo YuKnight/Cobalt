@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Builds the decode-ready two-stage line-spectral-frequency (LSF) codebook from the packed tables in
  * {@link LsfTables}, the port of the decode-relevant half of {@code smpl_load_lsf_CBks}
@@ -50,6 +54,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables;
  * arrays.
  */
 public final class LsfCodebooks {
+    /**
+     * The logger for {@link LsfCodebooks}.
+     */
+    private static final System.Logger LOGGER = Log.get(LsfCodebooks.class);
+
     /**
      * Smallest LSF spacing used by the Laroia weighting, the {@code 1e-3f} floor in
      * {@code smpl_lsf_weights_laroia}.
@@ -181,6 +190,9 @@ public final class LsfCodebooks {
             synchronized (LsfCodebooks.class) {
                 local = cached;
                 if (local == null) {
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "building decode-ready lsf codebook");
+                    }
                     local = build();
                     cached = local;
                 }

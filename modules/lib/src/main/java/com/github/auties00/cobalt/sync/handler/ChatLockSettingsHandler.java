@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,9 +13,10 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 /**
  * Maintains the global chat-lock settings (hide-locked-chats flag and PBKDF2 secret-code material) from {@code setting_chatLock} sync mutations.
@@ -43,12 +45,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebChatLockSettingsSync")
 public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
     /**
-     * The handler-scoped {@link Logger} used to emit the mutations-parse-failed warning.
-     *
-     * <p>Records the line emitted when a batch of {@code setting_chatLock}
-     * mutations finishes without producing a writable settings record.
+     * The logger for {@link ChatLockSettingsHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(ChatLockSettingsHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(ChatLockSettingsHandler.class);
 
     /**
      * Constructs the singleton chat-lock-settings handler.
@@ -99,18 +98,22 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebChatLockSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat lock settings mutation unsupported: operation={0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ChatLockSettings settings)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "chat lock settings mutation malformed: missing action value");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         if (!isSecretCodeValid(settings)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "chat lock settings mutation malformed: invalid secret code payload");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().settingsStore().setChatLockSettings(settings);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat lock settings updated: hideLockedChats={0}", settings.hideLockedChats());
         return MutationApplicationResult.success();
     }
 
@@ -165,8 +168,9 @@ public final class ChatLockSettingsHandler implements WebAppStateActionHandler {
 
         if (pending != null) {
             client.store().settingsStore().setChatLockSettings(pending);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat lock settings batch applied: mutations={0}", mutations.size());
         } else {
-            LOGGER.warning("ChatLockSettingsSync: mutations parse failed");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "chat lock settings sync: mutations parse failed, batch size={0}", mutations.size());
         }
 
         return results;

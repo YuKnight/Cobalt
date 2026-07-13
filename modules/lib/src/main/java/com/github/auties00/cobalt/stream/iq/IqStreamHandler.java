@@ -6,8 +6,9 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.graphql.whatsapp.auth.CanonicalNonceDecryptor;
-import com.github.auties00.cobalt.graphql.whatsapp.auth.WhatsAppWebGraphQlBootstrapClient;
+import com.github.auties00.cobalt.graphql.whatsappWeb.auth.CanonicalNonceDecryptor;
+import com.github.auties00.cobalt.graphql.whatsappWeb.auth.WhatsAppWebGraphQlBootstrapClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.business.webgraphql.WhatsAppWebGraphQlSessionBuilder;
 import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
@@ -35,6 +36,7 @@ import com.github.auties00.cobalt.wam.event.MdLinkDeviceCompanionEventBuilder;
 import com.github.auties00.cobalt.wam.type.MdLinkDeviceCompanionStage;
 import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -80,9 +82,9 @@ import java.util.UUID;
 public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
-     * Logs diagnostic output during pairing-flow IQ processing.
+     * The logger for {@link IqStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(IqStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(IqStreamHandler.class);
 
     /**
      * The display duration, in milliseconds, for the first QR ref of a fresh
@@ -269,15 +271,16 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
 
         var child = stanza.getChild().orElse(null);
         if (child == null) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring md iq without child: {0}", stanza);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring md iq without child: {0}", stanza);
             return;
         }
 
         switch (child.description()) {
             case "pair-device" -> handlePairDevice(stanza);
             case "pair-success" -> handlePairSuccess(stanza);
-            default -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring unsupported md iq child {0}", child.description());
+            default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring unsupported md iq child {0}", child.description());
+            }
         }
     }
 
@@ -296,7 +299,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
     private void handlePing(Stanza stanza) {
         var from = stanza.getAttributeAsJid("from").orElse(null);
         if (from == null) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring ping iq without from attribute");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring ping iq without from attribute");
             return;
         }
 
@@ -307,6 +310,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
                 .attribute("id", stanza.getAttributeAsString("id", null))
                 .build();
         whatsapp.sendNodeWithNoResponse(response);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "replied to ping iq from {0}", from);
     }
 
     /**
@@ -330,7 +334,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
     private void handlePairDevice(Stanza iqStanza) {
         var pairDevice = iqStanza.getChild("pair-device").orElse(null);
         if (pairDevice == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "Received md iq without pair-device child");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "received md iq without pair-device child");
             return;
         }
 
@@ -340,8 +344,9 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
         if (shortcakePairingService.isEnabled()) {
             try {
                 shortcakePairingService.start();
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "started shortcake passkey linking");
             } catch (Throwable throwable) {
-                LOGGER.log(System.Logger.Level.WARNING, "Cannot start Shortcake passkey linking: {0}", throwable.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot start shortcake passkey linking", throwable);
             }
             return;
         }
@@ -349,18 +354,20 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
         if (deviceLinkingService.isEnabled()) {
             try {
                 deviceLinkingService.start();
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "started alt-device-linking");
             } catch (Throwable throwable) {
-                LOGGER.log(System.Logger.Level.WARNING, "Cannot start alt-device-linking: {0}", throwable.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot start alt-device-linking", throwable);
             }
             return;
         }
 
         var refs = extractPairRefs(pairDevice);
         if (refs.isEmpty()) {
-            LOGGER.log(System.Logger.Level.WARNING, "Received pair-device iq without any usable refs");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "received pair-device iq without any usable refs");
             return;
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting qr ref rotation with {0} refs", refs.size());
         scheduleVerificationValues(refs);
     }
 
@@ -379,7 +386,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
         var id = iqStanza.getAttributeAsString("id", null);
         var from = iqStanza.getAttributeAsJid("from").orElse(null);
         if (id == null || from == null) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Cannot send pair-device ack: missing id or from");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cannot send pair-device ack: missing id or from");
             return;
         }
 
@@ -585,7 +592,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
      */
     private void handlePairSuccess(Stanza iqStanza) {
         if (whatsapp.store().accountStore().registered()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring pair-success iq: store already registered");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring pair-success iq: store already registered");
             return;
         }
 
@@ -597,7 +604,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
 
         var pairSuccess = iqStanza.getChild("pair-success").orElse(null);
         if (pairSuccess == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "Received md iq without pair-success child");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "received md iq without pair-success child");
             return;
         }
 
@@ -622,6 +629,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
                 .orElse(null);
 
         if (validatedIdentity == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "pair-success adv identity validation failed");
             emitMdLinkDeviceCompanionStage(null, -1, null, regStartSeconds);
             return;
         }
@@ -630,6 +638,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
                 validatedIdentity.accountSignatureKey().orElse(null),
                 store.signalStore().identityKeyPair().publicKey().toEncodedPoint()
         );
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pair-success adv identity validated, session {0}", Log.token(mdSessionId));
         emitMdLinkDeviceCompanionStage(MdLinkDeviceCompanionStage.PAIR_SUCCESS_RECEIVED, null, mdSessionId, regStartSeconds);
 
         try {
@@ -655,9 +664,11 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
             store.accountStore().setRegistered(true);
             store.accountStore().setOnline(true);
             safeSave("pair-success");
+            if (Log.INFO) LOGGER.log(Level.INFO, "device pairing completed");
             acquireWhatsAppWebGraphQlSession(pairSuccess);
         } catch (RuntimeException exception) {
             emitMdLinkDeviceCompanionStage(null, -1, mdSessionId, regStartSeconds);
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "pair-success handling failed", exception);
             throw exception;
         }
     }
@@ -711,7 +722,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
 
             var pairedJid = store.accountStore().jid().orElse(null);
             if (pairedJid == null) {
-                LOGGER.log(System.Logger.Level.DEBUG, "Canonical registration missing paired jid; skipping WhatsApp Web GraphQL bootstrap");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "canonical registration missing paired jid; skipping whatsapp web graphql bootstrap");
                 emitCanonicalRecoveryCriticalEvent("registration_missing_jid", "registration", null);
                 return;
             }
@@ -721,7 +732,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
                             store.signalStore().advSecretKey().orElse(null), noiseStaticPublicKey, metadata)
                     .orElse(null);
             if (credentials == null) {
-                LOGGER.log(System.Logger.Level.DEBUG, "Canonical nonce blob absent or undecryptable; skipping WhatsApp Web GraphQL bootstrap");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "canonical nonce blob absent or undecryptable; skipping whatsapp web graphql bootstrap");
                 emitCanonicalRecoveryCriticalEvent("nonce_decryption_failed", "registration", null);
                 return;
             }
@@ -736,12 +747,12 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
                         .fbid(credentials.fbid())
                         .build());
                 store.save();
-                LOGGER.log(System.Logger.Level.DEBUG, "Established http_relay session at pair-success");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "established http_relay session at pair-success");
             } else {
-                LOGGER.log(System.Logger.Level.DEBUG, "Canonical /auth/token/ exchange did not succeed; WhatsApp Web GraphQL session not established");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "canonical auth/token exchange did not succeed; whatsapp web graphql session not established");
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.DEBUG, "WhatsApp Web GraphQL credential acquisition failed: {0}", throwable.getMessage());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "whatsapp web graphql credential acquisition failed", throwable);
             emitCanonicalRecoveryCriticalEvent("registration_unexpected_error", "registration", String.valueOf(throwable));
         }
     }
@@ -792,7 +803,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
                     .familyDeviceId("")
                     .build());
         } catch (RuntimeException wamException) {
-            LOGGER.log(System.Logger.Level.WARNING, "Cannot commit CanonicalEntRecoveryCriticalEvent event: {0}", wamException.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot commit canonicalentrecoverycriticalevent event", wamException);
         }
     }
 
@@ -891,7 +902,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
             digest.update(localIdentityKey);
             return Base64.getEncoder().encodeToString(digest.digest());
         } catch (NoSuchAlgorithmException exception) {
-            LOGGER.log(System.Logger.Level.WARNING, "SHA-256 is not available: {0}", exception.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sha-256 algorithm unavailable", exception);
             return null;
         }
     }
@@ -941,7 +952,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
             }
             wamService.commit(builder.build());
         } catch (RuntimeException wamException) {
-            LOGGER.log(System.Logger.Level.WARNING, "Cannot commit MdLinkDeviceCompanion event: {0}", wamException.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot commit mdlinkdevicecompanion event", wamException);
         }
     }
 
@@ -969,13 +980,13 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
     private void sendPairSuccessResponse(Stanza iqStanza, ADVSignedDeviceIdentity validatedIdentity) {
         var id = iqStanza.getAttributeAsString("id", null);
         if (id == null) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Cannot send pair-success response: missing id");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cannot send pair-success response: missing id");
             return;
         }
 
         var details = validatedIdentity.details().orElse(null);
         if (details == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "Cannot send pair-success response: missing details in validated identity");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot send pair-success response: missing details in validated identity");
             return;
         }
 
@@ -985,7 +996,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
             keyIndex = innerIdentity.keyIndex().orElseThrow(() ->
                     new NullPointerException("keyIndex cannot be null"));
         } catch (Exception exception) {
-            LOGGER.log(System.Logger.Level.WARNING, "Cannot send pair-success response: failed to decode inner device identity: {0}", exception.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot send pair-success response: failed to decode inner device identity", exception);
             return;
         }
 
@@ -1017,6 +1028,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
                 .build();
 
         whatsapp.sendNodeWithNoResponse(response);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent pair-device-sign response, key-index {0}", keyIndex);
     }
 
     /**
@@ -1197,10 +1209,7 @@ public final class IqStreamHandler extends SocketStreamHandler.Concurrent {
         try {
             whatsapp.store().save();
         } catch (Exception exception) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "{0}: failed to persist store: {1}",
-                    context,
-                    exception.getMessage());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "failed to persist store during " + context, exception);
         }
     }
 }

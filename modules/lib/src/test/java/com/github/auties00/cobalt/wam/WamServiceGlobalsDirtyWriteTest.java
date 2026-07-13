@@ -112,12 +112,12 @@ class WamServiceGlobalsDirtyWriteTest {
     }
 
     /**
-     * Test double for {@link WamService} that stubs the four abstract
+     * Test double for {@link WamService} that stubs the four protected
      * timing/scheduling hooks with no-ops; the dirty-tracking test never
      * sleeps or schedules and drives flushes synchronously via
-     * {@link WamService#flushChannel(WamChannel)}.
+     * {@link LiveWamService#flushChannel(WamChannel)}.
      */
-    private static final class InstrumentedWamService extends WamService {
+    private static final class InstrumentedWamService extends LiveWamService {
         private final AtomicReference<Instant> now = new AtomicReference<>(Instant.ofEpochSecond(1_747_000_000L));
 
         InstrumentedWamService(

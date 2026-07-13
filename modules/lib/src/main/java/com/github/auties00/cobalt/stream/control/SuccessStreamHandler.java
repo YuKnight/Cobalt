@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.control;
 
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebGraphQlException;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
@@ -12,9 +13,10 @@ import com.github.auties00.cobalt.listener.linked.LinkedNewslettersListener;
 import com.github.auties00.cobalt.listener.linked.LinkedStatusListener;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.exception.WhatsAppFacebookGraphQlException;
-import com.github.auties00.cobalt.exception.WhatsAppServerRuntimeException;
-import com.github.auties00.cobalt.exception.WhatsAppWebGraphQlException;
+import com.github.auties00.cobalt.exception.WhatsAppException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppFacebookGraphQlException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppServerRuntimeException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.model.device.pairing.LinkedPrimaryPlatform;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -46,6 +48,7 @@ import com.github.auties00.cobalt.wam.type.LoginPortNumber;
 import com.github.auties00.cobalt.wam.type.LoginResultType;
 import com.github.auties00.cobalt.wam.type.StreamSocketProviderType;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -187,6 +190,8 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
     public void handle(Stanza stanza) {
         if (started.compareAndSet(false, true)) {
             bootstrap(stanza);
+        } else if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "duplicate success stanza ignored, bootstrap already ran");
         }
     }
 
@@ -199,6 +204,9 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
     @Override
     public void reset() {
         started.set(false);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "success handler reset for reconnect");
+        }
         var job = mediaConnectionRefreshJob;
         if (job != null) {
             job.cancel();
@@ -235,6 +243,11 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
     private void bootstrap(Stanza stanza) {
         var store = whatsapp.store();
 
+        if (Log.INFO) {
+            LOGGER.log(Level.INFO, "success stanza received, starting post-handshake bootstrap clientType={0}",
+                    store.accountStore().clientType());
+        }
+
         var replayChats = store.syncStore().syncedChats();
         var replayContacts = store.syncStore().syncedContacts();
         var replayNewsletters = store.syncStore().syncedNewsletters();
@@ -248,12 +261,20 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
             var localSeconds = Instant.now().getEpochSecond();
             var skewSeconds = serverTimestampSeconds - localSeconds;
             var clockSkewHourly = (int) Math.round(skewSeconds / 3600.0);
-            if (clockSkewHourly != 0 && abPropsService.getBool(ABProp.LOG_CLOCK_SKEW)) {
-                wamService.commit(new ClockSkewDifferenceTEventBuilder()
-                        .clockSkewHourly(clockSkewHourly)
-                        .build());
-            }
             store.syncStore().setClockSkewSeconds(skewSeconds);
+            if (clockSkewHourly != 0) {
+                Thread.ofVirtual().start(() -> {
+                    try {
+                        if (abPropsService.getBool(ABProp.LOG_CLOCK_SKEW)) {
+                            wamService.commit(new ClockSkewDifferenceTEventBuilder()
+                                    .clockSkewHourly(clockSkewHourly)
+                                    .build());
+                        }
+                    } catch (WhatsAppException exception) {
+                        whatsapp.handleFailure(exception);
+                    }
+                });
+            }
         }
 
         stanza.getAttributeAsJid("lid").ifPresent(store.accountStore()::setLid);
@@ -274,11 +295,20 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         lidMigrationService.initialize();
 
         var abPropsSynced = abPropsService.sync();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ab props synced={0}", abPropsSynced);
+        }
 
         if (abPropsSynced && abPropsService.getBool(ABProp.LID_ONE_ON_ONE_MIGRATION_ENABLED)) {
             lidMigrationService.enableMigration();
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "lid one-on-one migration enabled");
+            }
         } else {
             lidMigrationService.disableMigration();
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "lid one-on-one migration disabled");
+            }
         }
 
         wamService.initialize();
@@ -344,8 +374,10 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
                 } catch (WhatsAppWebGraphQlException.SessionUnseeded _) {
 
                 } catch (WhatsAppWebGraphQlException exception) {
-                    LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
-                            "WhatsApp Web GraphQL credentials auto-refresh failed", exception);
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "whatsapp web graphql credentials auto-refresh failed", exception);
+                    }
                 }
             });
             if (store.accountStore().primaryPlatform().filter(LinkedPrimaryPlatform::isBusiness).isPresent()
@@ -356,8 +388,10 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
                     } catch (WhatsAppFacebookGraphQlException.SessionUnseeded _) {
 
                     } catch (WhatsAppFacebookGraphQlException exception) {
-                        LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
-                                "Facebook GraphQL credentials auto-refresh failed", exception);
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING,
+                                    "facebook graphql credentials auto-refresh failed", exception);
+                        }
                     }
                 });
             }
@@ -365,7 +399,14 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
 
         try {
             store.save();
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "store save after bootstrap failed", exception);
+            }
+        }
+
+        if (Log.INFO) {
+            LOGGER.log(Level.INFO, "post-handshake bootstrap complete");
         }
     }
 
@@ -445,7 +486,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
      * out {@link LinkedNewslettersListener#onNewsletters(LinkedWhatsAppClient, java.util.Collection)} internally.
      *
      * @implNote This implementation runs the fetch on a fresh virtual thread because the round trip can be slow on
-     * first install; failures are logged through {@link #LOGGER_COMPLIANCE} and swallowed so the rest of the bootstrap
+     * first install; failures are logged through {@link #LOGGER} and swallowed so the rest of the bootstrap
      * is unaffected.
      */
     @WhatsAppWebExport(moduleName = "WAWebBootstrapNewsletter", exports = "bootstrapNewsletterBackend",
@@ -461,10 +502,14 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         Thread.startVirtualThread(() -> {
             try {
                 whatsapp.refreshNewsletters();
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "initial newsletter metadata fetch complete");
+                }
             } catch (Exception exception) {
-                LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
-                        "Initial newsletter metadata fetch failed: {0}",
-                        exception.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "initial newsletter metadata fetch failed", exception);
+                }
             }
         });
     }
@@ -496,10 +541,14 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
             try {
                 whatsapp.queryBusinessProfile(self.withoutData())
                         .ifPresent(this::applyOwnBusinessProfile);
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "initial business certificate fetch complete");
+                }
             } catch (Exception exception) {
-                LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
-                        "Initial business certificate fetch failed: {0}",
-                        exception.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "initial business certificate fetch failed", exception);
+                }
             } finally {
                 store.syncStore().setSyncedBusinessCertificate(true);
             }
@@ -525,10 +574,9 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
     }
 
     /**
-     * The system logger reused by every post-success compliance probe so probe failures are surfaced as warnings
-     * without aborting the bootstrap.
+     * The logger for {@link SuccessStreamHandler}.
      */
-    private static final System.Logger LOGGER_COMPLIANCE = System.getLogger(SuccessStreamHandler.class.getName() + ".compliance");
+    private static final System.Logger LOGGER = Log.get(SuccessStreamHandler.class);
 
     /**
      * The floor delay between successive media-connection refresh attempts.
@@ -560,10 +608,10 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         try {
             probe.get();
         } catch (Throwable throwable) {
-            LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
-                    "Cannot run {0} compliance probe: {1}",
-                    probeName,
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "compliance probe failed: " + probeName, throwable);
+            }
         }
     }
 
@@ -585,7 +633,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
      * an already-populated pre-key store and skip the upload.
      *
      * @implNote WA Web runs the equivalent upload as a passive task registered before the passive-mode iq; Cobalt has
-     * no passive-task pipeline, so the upload is inlined here. Failures are logged through {@link #LOGGER_COMPLIANCE}
+     * no passive-task pipeline, so the upload is inlined here. Failures are logged through {@link #LOGGER}
      * and swallowed so a transient WhatsApp Web GraphQL error does not abort the rest of the post-success bootstrap; the next
      * pre-key-low {@code <notification type="encrypt">} push retries the upload.
      */
@@ -599,10 +647,14 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         }
         try {
             whatsapp.sendPreKeys(INITIAL_PRE_KEYS_COUNT);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "uploaded {0} initial pre-keys", INITIAL_PRE_KEYS_COUNT);
+            }
         } catch (Throwable throwable) {
-            LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
-                    "Initial pre-key upload after pairing failed: {0}",
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "initial pre-key upload after pairing failed", throwable);
+            }
         }
     }
 
@@ -636,10 +688,15 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
                     ? MEDIA_CONNECTION_MIN_REFRESH_DELAY
                     : delay;
         } catch (Throwable throwable) {
-            LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
-                    "Media-connection refresh failed, retrying in {0}s: {1}",
-                    MEDIA_CONNECTION_RETRY_DELAY.toSeconds(), throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "media connection refresh failed, retrying in " + MEDIA_CONNECTION_RETRY_DELAY.toSeconds() + "s",
+                        throwable);
+            }
             nextDelay = MEDIA_CONNECTION_RETRY_DELAY;
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "media connection refresh scheduled, nextRefreshSeconds={0}", nextDelay.toSeconds());
         }
         mediaConnectionRefreshJob = ScheduledTask.scheduleDelayed(nextDelay, this::refreshMediaConnection);
     }
@@ -682,7 +739,7 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
      * <p>Issues the {@code <iq xmlns="privacy" type="get">} query through
      * {@link LinkedWhatsAppClient#refreshPrivacySettings()}, which stores each returned category.
      *
-     * @implNote This implementation swallows a failure through {@link #LOGGER_COMPLIANCE} so a transient WhatsApp Web GraphQL error
+     * @implNote This implementation swallows a failure through {@link #LOGGER} so a transient WhatsApp Web GraphQL error
      * does not abort the rest of the bootstrap; the settings can still be re-queried on demand.
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncPrivacyDisallowedLists",
@@ -692,10 +749,14 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
     private void syncPrivacySettings() {
         try {
             whatsapp.refreshPrivacySettings();
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "privacy settings refreshed");
+            }
         } catch (Throwable throwable) {
-            LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
-                    "Cannot fetch privacy settings: {0}",
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "cannot fetch privacy settings", throwable);
+            }
         }
     }
 
@@ -708,11 +769,14 @@ public final class SuccessStreamHandler extends SocketStreamHandler.Concurrent {
         for (var category : categories) {
             try {
                 whatsapp.queryPrivacyDisallowedList(meLid, "", category, "DENYLIST");
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "privacy disallowed list reconciled category={0}", category);
+                }
             } catch (Throwable throwable) {
-                LOGGER_COMPLIANCE.log(System.Logger.Level.WARNING,
-                        "Cannot reconcile privacy disallowed list {0}: {1}",
-                        category,
-                        throwable.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "cannot reconcile privacy disallowed list " + category, throwable);
+                }
             }
         }
     }

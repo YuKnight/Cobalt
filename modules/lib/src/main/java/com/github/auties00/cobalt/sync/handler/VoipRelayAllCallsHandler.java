@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,8 @@ import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingRelayA
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Mirrors the "Always relay calls" privacy setting across linked devices.
@@ -24,6 +27,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebVoipRelayAllCallsSettingSync")
 public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link VoipRelayAllCallsHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(VoipRelayAllCallsHandler.class);
 
     /**
      * Constructs the handler.
@@ -88,10 +95,12 @@ public final class VoipRelayAllCallsHandler implements WebAppStateActionHandler 
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrivacySettingRelayAllCalls action)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "voip relay all calls: malformed mutation");
             return MutationApplicationResult.malformed();
         }
 
         client.store().settingsStore().setRelayAllCalls(action.isEnabled());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "voip relay all calls: set enabled={0}", action.isEnabled());
         return MutationApplicationResult.success();
     }
 

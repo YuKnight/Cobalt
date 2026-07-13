@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.platform.audio;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -47,9 +50,9 @@ public final class AudioWriterPump {
     private static final long DEFAULT_WAIT_TIMEOUT_NANOS = TimeUnit.MILLISECONDS.toNanos(20);
 
     /**
-     * Logger for the message the pump emits when a decode throws and its packet is skipped.
+     * The logger for {@link AudioWriterPump}.
      */
-    private static final System.Logger LOGGER = System.getLogger(AudioWriterPump.class.getName());
+    private static final System.Logger LOGGER = Log.get(AudioWriterPump.class);
 
     /**
      * The playback ring the pump fills and waits on for demand.
@@ -259,6 +262,7 @@ public final class AudioWriterPump {
      */
     public void start() {
         if (running.compareAndSet(false, true)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting audio writer pump, framesPerChunk={0}", framesPerChunk);
             thread = Thread.ofVirtual()
                     .name("calls-audio-writer-pump")
                     .start(this::loop);
@@ -273,6 +277,7 @@ public final class AudioWriterPump {
      */
     public void stop() {
         if (running.compareAndSet(true, false)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stopping audio writer pump");
             ring.signalDemand();
             var current = thread;
             if (current != null) {
@@ -309,9 +314,10 @@ public final class AudioWriterPump {
                     // A single malformed packet must never silence the whole leg: the decoder throw is caught,
                     // counted, and logged once, and the pump keeps servicing later packets instead of
                     // unwinding and terminating this thread.
-                    if (pumpFailureCount++ == 0) {
-                        LOGGER.log(System.Logger.Level.WARNING,
-                                "calls audio pump: a decode threw; skipping the packet and continuing", exception);
+                    var firstFailure = pumpFailureCount++ == 0;
+                    if (firstFailure && Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "audio writer pump decode failed, skipping packet", exception);
                     }
                 }
             }

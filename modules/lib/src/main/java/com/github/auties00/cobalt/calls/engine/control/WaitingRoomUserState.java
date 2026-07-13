@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -37,6 +39,24 @@ public enum WaitingRoomUserState {
     JOINED(4);
 
     /**
+     * Resolves an engine code to its state, backing {@link #ofCode(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #code}, so a code resolves to its
+     * state in constant time rather than by scanning {@link #values()}.
+     */
+    private static final Map<Integer, WaitingRoomUserState> BY_CODE;
+
+    static {
+        var byCode = new HashMap<Integer, WaitingRoomUserState>();
+        for (var state : values()) {
+            if (byCode.put(state.code, state) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_CODE = Map.copyOf(byCode);
+    }
+
+    /**
      * Holds the integer code the engine stores for this state.
      */
     private final int code;
@@ -65,15 +85,12 @@ public enum WaitingRoomUserState {
      * <p>The codes start at {@code 1}; a value of {@code 0} or any value outside {@code 1..4} yields an
      * empty result.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_CODE} map rather than
+     * scanning {@link #values()}.
      * @param code the engine code to resolve
      * @return the matching state, or an empty result when no state carries the code
      */
     public static Optional<WaitingRoomUserState> ofCode(int code) {
-        for (var state : values()) {
-            if (state.code == code) {
-                return Optional.of(state);
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(BY_CODE.get(code));
     }
 }

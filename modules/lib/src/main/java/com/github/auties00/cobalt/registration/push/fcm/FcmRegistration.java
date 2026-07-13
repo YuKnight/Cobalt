@@ -2,12 +2,12 @@ package com.github.auties00.cobalt.registration.push.fcm;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.fcm.checkin.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.net.ProxySelector;
@@ -46,13 +46,8 @@ import java.util.zip.GZIPOutputStream;
  * FIS-only refresh) on a session restored from {@link FcmClient#loadSession(FcmSession)}.
  */
 final class FcmRegistration {
-    /**
-     * Logger shared with the rest of the FCM client.
-     *
-     * <p>Uses the same logger name {@code cobalt.fcm} as {@link FcmMcsConnection} so consumers can configure verbosity
-     * for the whole subsystem in one place.
-     */
-    private static final Logger LOG = System.getLogger("cobalt.fcm");
+    /** The logger for {@link FcmRegistration}. */
+    private static final System.Logger LOGGER = Log.get(FcmRegistration.class);
 
     /**
      * Endpoint for the first registration step.
@@ -137,20 +132,20 @@ final class FcmRegistration {
      */
     void ensureCredentials(FcmSession session) throws IOException {
         if (session.androidId() == 0L || session.securityToken() == 0L) {
-            LOG.log(Level.INFO, () -> "[1/3] checkin -> " + CHECKIN_URL);
+            if (Log.INFO) LOGGER.log(Level.INFO, "fcm registration step 1/3: checkin -> {0}", CHECKIN_URL);
             performCheckin(session);
         }
         if (session.config().useFis()) {
             var nowSeconds = System.currentTimeMillis() / 1000L;
             if (session.fisAuthToken().isEmpty() || session.fisExpiresAt() < nowSeconds + 60L) {
-                LOG.log(Level.INFO, () -> "[2/3] FIS install -> " + fisUrl(session));
+                if (Log.INFO) LOGGER.log(Level.INFO, "fcm registration step 2/3: fis install -> {0}", fisUrl(session));
                 firebaseInstall(session);
             }
         } else {
-            LOG.log(Level.DEBUG, "[2/3] FIS install skipped (legacy project)");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fcm registration step 2/3: fis install skipped (legacy project)");
         }
         if (session.fcmToken().isEmpty()) {
-            LOG.log(Level.INFO, () -> "[3/3] register3 -> " + REGISTER_URL);
+            if (Log.INFO) LOGGER.log(Level.INFO, "fcm registration step 3/3: register3 -> {0}", REGISTER_URL);
             gcmRegister(session);
         }
     }
@@ -215,10 +210,12 @@ final class FcmRegistration {
 
         var parsed = FcmCheckinResponseSpec.decode(decoded);
         if (parsed.androidId() == 0L || parsed.securityToken() == 0L) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "checkin failed, no android id in response, size={0} bytes", decoded.length);
             throw new IOException("checkin returned no android id (response=" + decoded.length + " B)");
         }
         session.setAndroidId(parsed.androidId());
         session.setSecurityToken(parsed.securityToken());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "checkin succeeded, android id and security token acquired");
     }
 
     /**
@@ -269,6 +266,7 @@ final class FcmRegistration {
                 ? parsed.getString("refreshToken") : "");
         session.setFisAuthToken(token == null ? "" : token);
         session.setFisExpiresAt(System.currentTimeMillis() / 1000L + seconds);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fis install succeeded, token expires in {0}s", seconds);
     }
 
     /**
@@ -329,9 +327,11 @@ final class FcmRegistration {
             }
         }
         if (token == null || token.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "register3 failed, no token in response, size={0} bytes", raw.length());
             throw new IOException("register3 returned no token: " + raw);
         }
         session.setFcmToken(token);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "register3 succeeded, token acquired, length={0}", token.length());
     }
 
     /**
@@ -349,11 +349,14 @@ final class FcmRegistration {
         try {
             var response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() / 100 != 2) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "{0} http request failed, status={1}", stepName, response.statusCode());
                 throw new IOException(stepName + " HTTP " + response.statusCode() + ": "
                         + new String(response.body(), StandardCharsets.UTF_8));
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "{0} http request succeeded, status={1}, size={2} bytes", stepName, response.statusCode(), response.body().length);
             return response.body();
         } catch (InterruptedException ie) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "{0} http request interrupted", stepName);
             Thread.currentThread().interrupt();
             throw new IOException(stepName + " interrupted", ie);
         }

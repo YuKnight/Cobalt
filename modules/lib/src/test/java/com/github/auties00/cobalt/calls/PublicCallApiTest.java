@@ -234,7 +234,8 @@ class PublicCallApiTest {
                                com.github.auties00.cobalt.calls.engine.participant.CallMembership membership,
                                MediaStreams streams,
                                com.github.auties00.cobalt.model.jid.Jid peerDeviceJid,
-                               Optional<String> electedRelayName) {
+                               Optional<String> electedRelayName,
+                               com.github.auties00.cobalt.calls.engine.mediaplane.MediaSessionListener listener) {
             bringUps.add(new BringUp(callId, isCaller, video, List.copyOf(voipSettings), participantCount, streams));
             return () -> {
             };
@@ -293,7 +294,7 @@ class PublicCallApiTest {
 
     private static final class NoopTimers implements CallTimerScheduler {
         @Override
-        public void arm(String callId, CallTimerKind kind) {
+        public void arm(String callId, CallTimerKind kind, Runnable action) {
         }
 
         @Override

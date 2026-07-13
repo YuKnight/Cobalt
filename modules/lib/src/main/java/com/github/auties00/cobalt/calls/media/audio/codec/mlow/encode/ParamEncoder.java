@@ -13,6 +13,9 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PitchTable
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PitchTables.Blockseg;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PitchTables.PitchData;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PulseTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Serializes the low band parameter set of one internal frame for the MLow speech codec, the exact inverse
@@ -93,6 +96,11 @@ public final class ParamEncoder {
     private static final int BLOCKSIZE = 64;
 
     /**
+     * The logger for {@link ParamEncoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(ParamEncoder.class);
+
+    /**
      * The shared prebuilt pulse coding CMF families.
      */
     private final PulseTables.Tables pulseTables;
@@ -156,6 +164,9 @@ public final class ParamEncoder {
      * stream, which must thread state.
      */
     public void reset() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "param encoder reset");
+        }
         this.prevAcbIdx = -1;
         this.prevFcbIdx = -1;
         this.prevNrgresIdx = -1;
@@ -186,6 +197,11 @@ public final class ParamEncoder {
     public void encodeFrame(MlowRangeEncoder encoder, LbQuantParams params, int framelen, int numSubfr,
                             boolean codedAsActiveVoice, boolean condCoding, boolean lowRate, int frameNum,
                             int prevVoiced, boolean sid) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "param encode frame {0}: numSubfr={1} activeVoice={2} condCoding={3} lowRate={4} sid={5}",
+                    frameNum, numSubfr, codedAsActiveVoice, condCoding, lowRate, sid);
+        }
         int voiced = params.voiced() ? 1 : 0;
         int lowRateIx = lowRate ? 1 : 0;
 
@@ -283,6 +299,10 @@ public final class ParamEncoder {
         } else if (meanInt < thr[1]) {
             mode = 1;
         }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "param encode voiced: deltaLagMode={0} blocksegsIx={1}",
+                    mode, params.blocksegsIx());
+        }
         encodeLags(encoder, params.blocksegsIx(), params.laginds(), mode);
         Blockseg seg = pitchData.blocksegs()[params.blocksegsIx()];
         prevLagblk = seg.blocks()[seg.nblocks() - 1];
@@ -309,10 +329,16 @@ public final class ParamEncoder {
         int numBlocksegs = pitchData.numBlocksegs();
 
         if (prevLagblk < 0) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "param encode lags: first frame of packet, uniform blockseg index");
+            }
             int[] cmf = pitchData.blocksegIdxCmf();
             encoder.encode(cmf[ixJulia - 1] & 0xFFFFFFFFL, cmf[ixJulia] & 0xFFFFFFFFL,
                     cmf[numBlocksegs] & 0xFFFFFFFFL);
         } else {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "param encode lags: block transition from prevLagblk={0}", prevLagblk);
+            }
             int[] transCmf = pitchData.blockTransitionCmf()[prevLagblk];
             int block0 = seg.blocks()[0];
             encoder.encode(transCmf[block0] & 0xFFFFFFFFL, transCmf[block0 + 1] & 0xFFFFFFFFL,

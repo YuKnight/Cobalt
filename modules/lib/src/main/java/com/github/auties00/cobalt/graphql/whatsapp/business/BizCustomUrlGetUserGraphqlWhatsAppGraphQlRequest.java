@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,13 +13,13 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that resolves a WhatsApp Business short-link custom-url path to its owning
+ * Builds the graph.whatsapp.com GraphQL query that resolves a WhatsApp Business short-link custom-url path to its owning
  * account.
  *
  * <p>The single {@code data} GraphQL variable is an object whose only field is the nested
  * {@code custom_url} object carrying the {@code path} slug to resolve. WhatsApp Web's
  * {@code WAWebBizCustomUrlGetUserGraphql.queryCustomUrlGetUser(path)} fills it as
- * {@code {custom_url: {path}}}. The relay returns the resolution outcome under the linked
+ * {@code {custom_url: {path}}}. The graph.whatsapp.com endpoint returns the resolution outcome under the linked
  * {@code xwa_custom_url_get_user}; the reply is consumed through
  * {@link BizCustomUrlGetUserGraphqlWhatsAppGraphQlResponse}.
  *
@@ -26,10 +28,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebBizCustomUrlGetUserGraphqlQuery")
 public final class BizCustomUrlGetUserGraphqlWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebBizCustomUrlGetUserGraphqlQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -113,5 +115,21 @@ public final class BizCustomUrlGetUserGraphqlWhatsAppGraphQlRequest implements W
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

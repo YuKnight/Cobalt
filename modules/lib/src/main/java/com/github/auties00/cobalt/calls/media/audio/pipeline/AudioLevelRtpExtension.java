@@ -24,14 +24,14 @@ package com.github.auties00.cobalt.calls.media.audio.pipeline;
  * @param voiceActive whether the encoder classified the frame as voice active
  * @implNote This implementation follows RFC 6464 section 3 for the value octet: bit {@code 0x80} is
  * the voice activity flag and bits {@code 0x7f} are the level magnitude in {@code -dBov}, the form both
- * WebRTC and pjmedia emit. Because a single value octet is shared by both framings, the record
- * serializes either header form on demand through {@link #toOneByteElement(int)} and
- * {@link #toTwoByteElement(int)} rather than committing to one at construction.
+ * WebRTC and pjmedia emit. WhatsApp carries it in the RFC 8285 one byte framing: its calls RTP builds the
+ * one byte element header {@code (id << 4) | (len - 1)} inside a {@code 0xBEDE}/{@code 0xDEBE} extension
+ * block (confirmed from the native {@code rtp_ext.cc}, which accepts those profiles and parses/builds only
+ * the one byte header form), with the extmap id negotiated per call. Callers therefore use
+ * {@link #toOneByteElement(int)} with the negotiated id; {@link #toTwoByteElement(int)} is retained for
+ * completeness since a single value octet serializes into either framing on demand.
  */
 public record AudioLevelRtpExtension(int level, boolean voiceActive) {
-    // TODO: capture which header framing (RFC 6464 one byte or RFC 8285 two byte) and which extmap id
-    //  WhatsApp negotiates for this extension; both forms are serialized on demand and the id is taken
-    //  as a parameter until the negotiated value is observed on the wire.
 
     /**
      * The maximum audio level magnitude, in {@code -dBov}, representing silence.

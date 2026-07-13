@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -31,6 +33,11 @@ import java.util.List;
  * higher layer so this factory does not duplicate that translation.
  */
 public final class FavoritesMutationFactory {
+    /**
+     * The logger for {@link FavoritesMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(FavoritesMutationFactory.class);
+
     /**
      * Creates an instance with no collaborators.
      *
@@ -65,6 +72,7 @@ public final class FavoritesMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebFavoritesSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getFavoritesMutation(List<Jid> favoriteJids, Instant timestamp) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building favorites mutation count={0}", favoriteJids.size());
         var favoriteEntries = favoriteJids.stream()
                 .map(jid -> new FavoritesActionFavoriteBuilder()
                         .id(jid.toString())

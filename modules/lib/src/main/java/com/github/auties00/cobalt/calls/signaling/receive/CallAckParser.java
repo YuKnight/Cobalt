@@ -4,9 +4,11 @@ import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.CallAck;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Optional;
 import com.github.auties00.cobalt.calls.signaling.relay.RelayInfo;
@@ -36,12 +38,17 @@ import com.github.auties00.cobalt.calls.signaling.relay.RelayInfo;
  */
 public final class CallAckParser {
     /**
+     * The logger for {@link CallAckParser}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallAckParser.class);
+
+    /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private CallAckParser() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -65,8 +72,14 @@ public final class CallAckParser {
     public static Optional<CallAckOutcome> parse(Stanza ack) {
         Objects.requireNonNull(ack, "ack cannot be null");
         if (!(AckParser.parse(ack) instanceof CallAck callAck)) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "ack is not a call class ack");
             return Optional.empty();
         }
-        return Optional.of(CallAckOutcome.of(callAck, callAck.relay().orElse(null)));
+        var outcome = CallAckOutcome.of(callAck, callAck.relay().orElse(null));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "parsed call ack id={0} nack={1} relay={2}",
+                    outcome.id(), outcome.isNack(), outcome.relay().isPresent());
+        }
+        return Optional.of(outcome);
     }
 }

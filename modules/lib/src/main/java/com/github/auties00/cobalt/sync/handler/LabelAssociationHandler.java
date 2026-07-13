@@ -14,6 +14,9 @@ import com.github.auties00.cobalt.model.sync.action.contact.LabelAssociationActi
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code label_jid} app-state sync action that pins or unpins a
@@ -35,6 +38,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebLabelJidSync")
 public final class LabelAssociationHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link LabelAssociationHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(LabelAssociationHandler.class);
 
     /**
      * The position of the target JID inside the parsed mutation index array.
@@ -119,6 +126,7 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LabelAssociationAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "label association mutation has malformed action value, label={0}", labelId);
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
@@ -162,8 +170,10 @@ public final class LabelAssociationHandler implements WebAppStateActionHandler {
                 label.removeAssignment(resolvedTargetJid);
             }
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "label association applied, label={0} target={1} labeled={2}", labelId, resolvedTargetJid, labeled);
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "label association mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

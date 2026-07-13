@@ -1,4 +1,6 @@
 package com.github.auties00.cobalt.client.linked;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import com.github.auties00.cobalt.graphql.whatsappWeb.WhatsAppWebGraphQlOperation;
 import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.client.WhatsAppClientDisconnectReason;
 import com.github.auties00.cobalt.client.WhatsAppClient;
@@ -14,6 +16,8 @@ import com.github.auties00.cobalt.model.call.CallEndReason;
 import com.github.auties00.cobalt.model.call.CallInteraction;
 import com.github.auties00.cobalt.model.call.IncomingCall;
 import com.github.auties00.cobalt.exception.*;
+import com.github.auties00.cobalt.exception.linked.*;
+import com.github.auties00.cobalt.exception.linked.web.*;
 import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
@@ -373,20 +377,20 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @throws WhatsAppServerRuntimeException if the transport fails or the relay reports GraphQL
      *                                        errors
      */
-    JSONObject sendGraphQl(WhatsAppGraphQlOperation.Request request, String sessionCookie, String lsdToken);
+    JSONObject sendGraphQl(WhatsAppWebGraphQlOperation.Request request, String sessionCookie, String lsdToken);
 
     /**
      * Dispatches a typed {@code http_relay} GraphQL request using the WhatsApp Web GraphQL session credentials stored
      * in {@link LinkedWebSessionStore}, and returns the unwrapped GraphQL
      * {@code data} object.
      *
-     * <p>This is the convenience form of {@link #sendGraphQl(WhatsAppGraphQlOperation.Request, String, String)}:
+     * <p>This is the convenience form of {@link #sendGraphQl(WhatsAppWebGraphQlOperation.Request, String, String)}:
      * the session cookie and {@code lsd} token are read from the store, where they are placed
      * automatically after a successful connection on a WhatsApp Web client. When no WhatsApp Web GraphQL session is
      * stored the client attempts a {@link #refreshWhatsAppWebGraphQlSession() refresh} once before failing.
      *
      * @apiNote Prefer this form; the WhatsApp Web GraphQL session is established and refreshed for you. Use
-     * {@link #sendGraphQl(WhatsAppGraphQlOperation.Request, String, String)} only to supply credentials extracted
+     * {@link #sendGraphQl(WhatsAppWebGraphQlOperation.Request, String, String)} only to supply credentials extracted
      * out of band from a browser session.
      *
      * @param request the typed WhatsApp Web GraphQL request to dispatch
@@ -395,7 +399,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @throws WhatsAppServerRuntimeException if no WhatsApp Web GraphQL session can be established or the relay reports
      *                                        GraphQL errors
      */
-    JSONObject sendGraphQl(WhatsAppGraphQlOperation.Request request);
+    JSONObject sendGraphQl(WhatsAppWebGraphQlOperation.Request request);
 
     /**
      * Re-bootstraps the WhatsApp Web GraphQL session credentials and stores them in
@@ -498,6 +502,34 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *                                        endpoint reports GraphQL errors
      */
     JSONObject sendGraphQl(FacebookGraphQlOperation.Request request);
+
+    /**
+     * Dispatches a typed {@code graph.whatsapp.com} GraphQL request over HTTP and returns the unwrapped
+     * GraphQL {@code data} object.
+     *
+     * <p>Unlike {@link #sendGraphQl(WhatsAppWebGraphQlOperation.Request)} and
+     * {@link #sendGraphQl(FacebookGraphQlOperation.Request)}, which need a browser session cookie or a
+     * per-user Facebook access token, this transport is session-independent: it authenticates with a
+     * shared, hardcoded app-level access token baked into the release, so it needs neither login nor
+     * credentials of its own. WhatsApp Web uses it for reads that must run before or outside a signed-in
+     * session (signup and pre-login, guest, public catalog, ML-model, and Meta-AI search). The request
+     * is a {@code POST} to a {@code graph.whatsapp.com} endpoint selected by the operation's
+     * {@link WhatsAppGraphQlEnvironment environment};
+     * the returned {@link JSONObject} is the GraphQL {@code data} map, which callers project through the
+     * matching response parser.
+     *
+     * @apiNote No session is required; the shared app token authenticates the call, so this is safe to
+     * dispatch before login. The token is resolved from the operation's environment, except for the
+     * {@code GUEST} environment, whose requests must supply an explicit token through
+     * {@link WhatsAppGraphQlOperation.Request#accessToken()}.
+     *
+     * @param request the typed {@code graph.whatsapp.com} GraphQL request to dispatch
+     * @return the unwrapped GraphQL {@code data} object from the endpoint
+     * @throws NullPointerException           if {@code request} is {@code null}
+     * @throws WhatsAppServerRuntimeException if a guest request supplies no access token, the transport
+     *                                        fails, or the endpoint reports GraphQL errors
+     */
+    JSONObject sendGraphQl(WhatsAppGraphQlOperation.Request request);
 
     /**
      * Refreshes the WhatsApp Business Facebook GraphQL session credentials and stores them in
@@ -1321,6 +1353,77 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
     Call startCall(JidProvider target, AudioOutput audioOut, AudioInput audioIn);
 
     /**
+     * Places a call to {@code target} that draws both the audio and the video from a single video source
+     * and a single video sink, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #startCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)} that
+     * passes {@code videoOut} as both the audio and video source and {@code videoIn} as both the audio and
+     * video sink, for a caller whose video device already carries the audio.
+     *
+     * @param target   the JID of the callee (a user JID) or of the group or community to call
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session bound to the negotiated call id
+     * @throws NullPointerException            if {@code target}, {@code videoOut}, or {@code videoIn} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code target} is a group or community JID whose metadata
+     *                                         cannot be resolved or that has no member other than this
+     *                                         account to call
+     * @throws IllegalStateException           if this client is not logged in
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call startCall(JidProvider target, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Places a call to {@code target} that draws both the audio and the video input from a single video
+     * sink while transmitting from separate audio and video sources, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #startCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)} that
+     * passes {@code videoIn} as both the audio and video sink, for a caller whose video device also renders
+     * the remote audio.
+     *
+     * @param target   the JID of the callee (a user JID) or of the group or community to call
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param videoOut the source the engine drains local video from for transmission; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session bound to the negotiated call id
+     * @throws NullPointerException            if {@code target}, {@code audioOut}, {@code videoOut}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalArgumentException        if {@code target} is a group or community JID whose metadata
+     *                                         cannot be resolved or that has no member other than this
+     *                                         account to call
+     * @throws IllegalStateException           if this client is not logged in
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call startCall(JidProvider target, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Places a call to {@code target} that draws both the audio and the video output from a single video
+     * source while receiving into separate audio and video sinks, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #startCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)} that
+     * passes {@code videoOut} as both the audio and video source, for a caller whose video device also
+     * captures the local audio.
+     *
+     * @param target   the JID of the callee (a user JID) or of the group or community to call
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote video; never {@code null}
+     * @return the live {@link Call} session bound to the negotiated call id
+     * @throws NullPointerException            if {@code target}, {@code videoOut}, {@code audioIn}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalArgumentException        if {@code target} is a group or community JID whose metadata
+     *                                         cannot be resolved or that has no member other than this
+     *                                         account to call
+     * @throws IllegalStateException           if this client is not logged in
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call startCall(JidProvider target, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn);
+
+    /**
      * Accepts a pending {@link IncomingCall} offer with the supplied media streams and returns a live
      * session.
      *
@@ -1375,6 +1478,69 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @throws WhatsAppSessionException.Closed if the socket has been closed
      */
     Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn);
+
+    /**
+     * Accepts a pending {@link IncomingCall} offer that draws both the audio and the video from a single
+     * video source and a single video sink, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #acceptCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * that passes {@code videoOut} as both the audio and video source and {@code videoIn} as both the audio
+     * and video sink, for a caller whose video device already carries the audio.
+     *
+     * @param offer    the incoming offer to accept; never {@code null}
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session for the accepted call
+     * @throws NullPointerException            if {@code offer}, {@code videoOut}, or {@code videoIn} is
+     *                                         {@code null}
+     * @throws IllegalStateException           if the offer has already been responded to
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call acceptCall(IncomingCall offer, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Accepts a pending {@link IncomingCall} offer that draws both the audio and the video input from a
+     * single video sink while transmitting from separate audio and video sources, and returns a live
+     * session.
+     *
+     * @apiNote
+     * Convenience for {@link #acceptCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * that passes {@code videoIn} as both the audio and video sink, for a caller whose video device also
+     * renders the remote audio.
+     *
+     * @param offer    the incoming offer to accept; never {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param videoOut the source the engine drains local video from for transmission; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session for the accepted call
+     * @throws NullPointerException            if {@code offer}, {@code audioOut}, {@code videoOut}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalStateException           if the offer has already been responded to
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call acceptCall(IncomingCall offer, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Accepts a pending {@link IncomingCall} offer that draws both the audio and the video output from a
+     * single video source while receiving into separate audio and video sinks, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #acceptCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * that passes {@code videoOut} as both the audio and video source, for a caller whose video device also
+     * captures the local audio.
+     *
+     * @param offer    the incoming offer to accept; never {@code null}
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote video; never {@code null}
+     * @return the live {@link Call} session for the accepted call
+     * @throws NullPointerException            if {@code offer}, {@code videoOut}, {@code audioIn}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalStateException           if the offer has already been responded to
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call acceptCall(IncomingCall offer, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn);
 
     /**
      * Rejects a pending {@link IncomingCall} offer with the supplied end-call reason.
@@ -2020,6 +2186,86 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
     Call joinCallLink(URI link, AudioOutput audioOut, AudioInput audioIn);
 
     /**
+     * Joins the call behind {@code link} drawing both the audio and the video from a single video source
+     * and a single video sink, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinCallLink(URI, AudioOutput, AudioInput, VideoOutput, VideoInput)} that
+     * passes {@code videoOut} as both the audio and video source and {@code videoIn} as both the audio and
+     * video sink, for a caller whose video device already carries the audio.
+     *
+     * @param link     the {@code https://call.whatsapp.com/{voice|video}/<token>} call-link URL; never {@code null}
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported
+     *                                         on the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code link}, {@code videoOut}, or {@code videoIn} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code link} is not a well-formed
+     *                                         {@code call.whatsapp.com/{voice|video}/<token>} call-link URL
+     * @throws IllegalStateException           if this client is not logged in, or call links are disabled
+     *                                         for this account by the server feature gate
+     * @throws WhatsAppServerRuntimeException  if the relay rejects the link query
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinCallLink(URI link, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Joins the call behind {@code link} drawing both the audio and the video input from a single video
+     * sink while transmitting from separate audio and video sources, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinCallLink(URI, AudioOutput, AudioInput, VideoOutput, VideoInput)} that
+     * passes {@code videoIn} as both the audio and video sink, for a caller whose video device also renders
+     * the remote audio.
+     *
+     * @param link     the {@code https://call.whatsapp.com/{voice|video}/<token>} call-link URL; never {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param videoOut the source the engine drains local video from for transmission; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported
+     *                                         on the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code link}, {@code audioOut}, {@code videoOut}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalArgumentException        if {@code link} is not a well-formed
+     *                                         {@code call.whatsapp.com/{voice|video}/<token>} call-link URL
+     * @throws IllegalStateException           if this client is not logged in, or call links are disabled
+     *                                         for this account by the server feature gate
+     * @throws WhatsAppServerRuntimeException  if the relay rejects the link query
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinCallLink(URI link, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Joins the call behind {@code link} drawing both the audio and the video output from a single video
+     * source while receiving into separate audio and video sinks, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinCallLink(URI, AudioOutput, AudioInput, VideoOutput, VideoInput)} that
+     * passes {@code videoOut} as both the audio and video source, for a caller whose video device also
+     * captures the local audio.
+     *
+     * @param link     the {@code https://call.whatsapp.com/{voice|video}/<token>} call-link URL; never {@code null}
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote video; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported
+     *                                         on the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code link}, {@code videoOut}, {@code audioIn}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalArgumentException        if {@code link} is not a well-formed
+     *                                         {@code call.whatsapp.com/{voice|video}/<token>} call-link URL
+     * @throws IllegalStateException           if this client is not logged in, or call links are disabled
+     *                                         for this account by the server feature gate
+     * @throws WhatsAppServerRuntimeException  if the relay rejects the link query
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinCallLink(URI link, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn);
+
+    /**
      * Joins the in-progress group call described by {@code call} carrying the supplied media streams and
      * returns a live session.
      *
@@ -2087,6 +2333,82 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
     Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn);
 
     /**
+     * Joins the in-progress group call described by {@code call} drawing both the audio and the video from
+     * a single video source and a single video sink, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinGroupCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * that passes {@code videoOut} as both the audio and video source and {@code videoIn} as both the audio
+     * and video sink, for a caller whose video device already carries the audio.
+     *
+     * @param call     the ongoing group call to join; never {@code null}
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code call}, {@code videoOut}, or {@code videoIn} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code call} is not a group call, or the engine no longer
+     *                                         tracks an offer for it
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinGroupCall(IncomingCall call, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Joins the in-progress group call described by {@code call} drawing both the audio and the video input
+     * from a single video sink while transmitting from separate audio and video sources, and returns a live
+     * session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinGroupCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * that passes {@code videoIn} as both the audio and video sink, for a caller whose video device also
+     * renders the remote audio.
+     *
+     * @param call     the ongoing group call to join; never {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param videoOut the source the engine drains local video from for transmission; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code call}, {@code audioOut}, {@code videoOut}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalArgumentException        if {@code call} is not a group call, or the engine no longer
+     *                                         tracks an offer for it
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinGroupCall(IncomingCall call, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Joins the in-progress group call described by {@code call} drawing both the audio and the video
+     * output from a single video source while receiving into separate audio and video sinks, and returns a
+     * live session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinGroupCall(IncomingCall, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * that passes {@code videoOut} as both the audio and video source, for a caller whose video device also
+     * captures the local audio.
+     *
+     * @param call     the ongoing group call to join; never {@code null}
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote video; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code call}, {@code videoOut}, {@code audioIn}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalArgumentException        if {@code call} is not a group call, or the engine no longer
+     *                                         tracks an offer for it
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinGroupCall(IncomingCall call, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn);
+
+    /**
      * Joins the single in-progress group call in {@code group} carrying the supplied media streams and returns
      * a live session.
      *
@@ -2150,6 +2472,85 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @throws WhatsAppSessionException.Closed if the socket has been closed
      */
     Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn);
+
+    /**
+     * Joins the single in-progress group call in {@code group} drawing both the audio and the video from a
+     * single video source and a single video sink, and returns a live session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinGroupCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * that passes {@code videoOut} as both the audio and video source and {@code videoIn} as both the audio
+     * and video sink, for a caller whose video device already carries the audio.
+     *
+     * @param group    the group whose ongoing call to join; must be a group or community JID; never
+     *                 {@code null}
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code group}, {@code videoOut}, or {@code videoIn} is
+     *                                         {@code null}
+     * @throws IllegalArgumentException        if {@code group} is not a group or community JID
+     * @throws NoSuchElementException          if {@code group} has no ongoing group call this device is tracking
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinGroupCall(JidProvider group, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Joins the single in-progress group call in {@code group} drawing both the audio and the video input
+     * from a single video sink while transmitting from separate audio and video sources, and returns a live
+     * session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinGroupCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * that passes {@code videoIn} as both the audio and video sink, for a caller whose video device also
+     * renders the remote audio.
+     *
+     * @param group    the group whose ongoing call to join; must be a group or community JID; never
+     *                 {@code null}
+     * @param audioOut the source the engine drains local audio from for transmission; never {@code null}
+     * @param videoOut the source the engine drains local video from for transmission; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote audio and video; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code group}, {@code audioOut}, {@code videoOut}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalArgumentException        if {@code group} is not a group or community JID
+     * @throws NoSuchElementException          if {@code group} has no ongoing group call this device is tracking
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinGroupCall(JidProvider group, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn);
+
+    /**
+     * Joins the single in-progress group call in {@code group} drawing both the audio and the video output
+     * from a single video source while receiving into separate audio and video sinks, and returns a live
+     * session.
+     *
+     * @apiNote
+     * Convenience for {@link #joinGroupCall(JidProvider, AudioOutput, AudioInput, VideoOutput, VideoInput)}
+     * that passes {@code videoOut} as both the audio and video source, for a caller whose video device also
+     * captures the local audio.
+     *
+     * @param group    the group whose ongoing call to join; must be a group or community JID; never
+     *                 {@code null}
+     * @param videoOut the source the engine drains local audio and video from; never {@code null}
+     * @param audioIn  the sink the engine fills with received remote audio; never {@code null}
+     * @param videoIn  the sink the engine fills with received remote video; never {@code null}
+     * @return the live {@link Call} session bound to the joined call
+     * @throws UnsupportedOperationException   if this client is not a web client; calls are only supported on
+     *                                         the WhatsApp Web flavour
+     * @throws NullPointerException            if {@code group}, {@code videoOut}, {@code audioIn}, or
+     *                                         {@code videoIn} is {@code null}
+     * @throws IllegalArgumentException        if {@code group} is not a group or community JID
+     * @throws NoSuchElementException          if {@code group} has no ongoing group call this device is tracking
+     * @throws IllegalStateException           if the call is not in an answerable state
+     * @throws WhatsAppSessionException.Closed if the socket has been closed
+     */
+    Call joinGroupCall(JidProvider group, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn);
 
     /**
      * Reconciles the local view of the Channels tab with the server.
@@ -9287,25 +9688,22 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Convenience overload that calls {@link #addCatalogProduct(BusinessCatalogProductCreate)} with
-     * the supplied account and pre-encoded product fields and no thumbnail dimensions.
+     * the supplied account and product fields and no thumbnail dimensions.
      *
-     * @param bizJid          the account that owns the catalog
-     * @param productInfoJson the already-JSON-encoded product fields object, or {@code null} to omit
-     *                        it
+     * @param bizJid      the account that owns the catalog
+     * @param productInfo the product fields, or {@code null} to omit them
      * @return the created product as recorded by the server, or {@link Optional#empty()} when the
      *         server returned no product
      * @throws NullPointerException           if {@code bizJid} is {@code null}
      * @throws WhatsAppServerRuntimeException if the request fails or the server reports an error
      */
-    Optional<BusinessProduct> addCatalogProduct(JidProvider bizJid, String productInfoJson);
+    Optional<BusinessProduct> addCatalogProduct(JidProvider bizJid, CatalogProductInfo productInfo);
 
     /**
      * Adds a product to a business catalog owned by the given account.
      *
      * <p>Files a new product under the account's catalog and returns the created product as the server
-     * recorded it, including the server-assigned identifier and the moderation outcome. The product
-     * fields are supplied as a pre-encoded JSON object literal because the field set varies per product
-     * and is not modelled as fixed typed fields.
+     * recorded it, including the server-assigned identifier and the moderation outcome.
      *
      * @apiNote
      * Backs the "Add product" affordance in the business catalog editor, where the merchant supplies
@@ -9327,18 +9725,17 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Convenience overload that calls {@link #editCatalogProduct(BusinessCatalogProductEdit)} with the
-     * supplied account, product id, and pre-encoded changed fields and no thumbnail dimensions.
+     * supplied account, product id, and changed fields and no thumbnail dimensions.
      *
-     * @param bizJid          the account that owns the catalog
-     * @param productId       the identifier of the product to edit
-     * @param productInfoJson the already-JSON-encoded changed-fields object, or {@code null} to omit
-     *                        it
+     * @param bizJid      the account that owns the catalog
+     * @param productId   the identifier of the product to edit
+     * @param productInfo the changed product fields, or {@code null} to omit them
      * @return the edited product as recorded by the server, or {@link Optional#empty()} when the
      *         server returned no product
      * @throws NullPointerException           if {@code bizJid} or {@code productId} is {@code null}
      * @throws WhatsAppServerRuntimeException if the request fails or the server reports an error
      */
-    Optional<BusinessProduct> editCatalogProduct(JidProvider bizJid, String productId, String productInfoJson);
+    Optional<BusinessProduct> editCatalogProduct(JidProvider bizJid, String productId, CatalogProductInfo productInfo);
 
     /**
      * Edits an existing product in a business catalog owned by the given account.
@@ -9895,16 +10292,14 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Backs the assistant's "learn from chat history" setup step, which teaches the auto-reply
-     * assistant from the business's past conversations. The {@code inputJson} is an already-encoded
-     * payload forwarded verbatim, because the underlying input shape's field names are not recoverable
-     * from the WhatsApp client.
+     * assistant from the business's past conversations grouped by the customer they were held with.
      *
-     * @param inputJson the already-encoded creation payload, or {@code null} to omit it
+     * @param input the chat-history upload request, or {@code null} to omit it
      * @return the outcome reporting whether the chat-history backup was created, or
      *         {@link Optional#empty()} when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAiMutationResult> createAiChatHistory(String inputJson);
+    Optional<BusinessAiMutationResult> createAiChatHistory(AiChatHistoryUploadRequest input);
 
     /**
      * Deletes every example response of the given knowledge types for this WhatsApp Business AI
@@ -9959,18 +10354,16 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * knowledge the assistant answers from).
      *
      * @apiNote
-     * Saves the assistant's frequently-asked-question knowledge. The {@code faqJson} is an
-     * already-encoded knowledge object forwarded verbatim, because its underlying field names are not
-     * recoverable from the WhatsApp client. When the update references websites that fail validation,
-     * the result lists those website URLs among its affected ids and carries the first reported
-     * validation error.
+     * Saves the assistant's frequently-asked-question knowledge as the whole FAQ set. When the update
+     * references websites that fail validation, the result lists those website URLs among its affected
+     * ids and carries the first reported validation error.
      *
-     * @param faqJson the already-encoded knowledge object, or {@code null} to omit it
+     * @param faq the FAQ entries to save, or {@code null} to omit them
      * @return the outcome reporting whether the update applied, or {@link Optional#empty()}
      *         when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAiMutationResult> updateAiExampleResponses(String faqJson);
+    Optional<BusinessAiMutationResult> updateAiExampleResponses(List<AiFaqEntry> faq);
 
     /**
      * Queries this WhatsApp Business AI agent's potential knowledge pending review as of now.
@@ -10108,32 +10501,30 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Adds a flow that lets the assistant collect contact details from interested customers. The
-     * {@code requestJson} is an already-encoded description of the flow forwarded verbatim, because its
-     * underlying field names are not recoverable from the WhatsApp client. The returned flow is present
-     * only when the creation took effect.
+     * {@code request} describes the flow to create and leaves its flow id unset. The returned flow is
+     * present only when the creation took effect.
      *
-     * @param requestJson the already-encoded flow description, or {@code null} to omit it
+     * @param request the flow to create, or {@code null} to omit it
      * @return the created lead-capture flow, or {@link Optional#empty()} when the creation did not take
      *         effect or the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAiLeadGenForm> createAiLeadGenFlow(String requestJson);
+    Optional<BusinessAiLeadGenForm> createAiLeadGenFlow(AiLeadGenFlowInput request);
 
     /**
      * Updates a lead-capture flow of this WhatsApp Business AI agent.
      *
      * @apiNote
      * Saves changes to a flow that collects contact details from interested customers. The
-     * {@code requestJson} is an already-encoded description of the flow forwarded verbatim, because its
-     * underlying field names are not recoverable from the WhatsApp client. The returned flow is present
-     * only when the update took effect.
+     * {@code request} describes the flow changes and carries the flow id being updated. The returned
+     * flow is present only when the update took effect.
      *
-     * @param requestJson the already-encoded flow description, or {@code null} to omit it
+     * @param request the flow changes, or {@code null} to omit them
      * @return the updated lead-capture flow, or {@link Optional#empty()} when the update did not take
      *         effect or the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAiLeadGenForm> updateAiLeadGenFlow(String requestJson);
+    Optional<BusinessAiLeadGenForm> updateAiLeadGenFlow(AiLeadGenFlowInput request);
 
     /**
      * Deletes a lead-capture flow of this WhatsApp Business AI agent.
@@ -10182,19 +10573,18 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Convenience overload that calls {@link #createAiProductInfo(BusinessAiProductInfoCreate)} with
-     * only a name, structured price, and description. No imagery is uploaded and the server picks
-     * default thumbnail dimensions.
+     * only a name, price, and description. No imagery is uploaded and the server picks default
+     * thumbnail dimensions.
      *
-     * @param name        the product name
-     * @param priceJson   the already-JSON-encoded structured price, or {@code null} to emit a JSON
-     *                    {@code null}
-     * @param description the product description, or {@code null} to emit a JSON {@code null}
+     * @param name         the product name
+     * @param complexPrice the product price, or {@code null} to emit a JSON {@code null}
+     * @param description  the product description, or {@code null} to emit a JSON {@code null}
      * @return the created product entry, or {@link Optional#empty()} when the creation did not take
      *         effect or the server returned no payload
      * @throws NullPointerException           if {@code name} is {@code null}
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAiProductInfo> createAiProductInfo(String name, String priceJson, String description);
+    Optional<BusinessAiProductInfo> createAiProductInfo(String name, String complexPrice, String description);
 
     /**
      * Creates product-info knowledge for this WhatsApp Business AI agent.
@@ -10326,33 +10716,31 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Adds a rule that shapes how the assistant talks to customers (a free-form instruction, an
-     * emoji-usage setting, or a price-sharing setting). The {@code requestJson} is an already-encoded
-     * description of the rule forwarded verbatim, because its underlying field names are not
-     * recoverable from the WhatsApp client. The returned rule is present only when the creation took
+     * emoji-usage setting, or a price-sharing setting). The {@code request} describes the rule to
+     * create and leaves its rule id unset. The returned rule is present only when the creation took
      * effect.
      *
-     * @param requestJson the already-encoded rule description, or {@code null} to omit it
+     * @param request the rule to create, or {@code null} to omit it
      * @return the created rule, or {@link Optional#empty()} when the creation did not take effect or
      *         the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAiRule> createAiRule(String requestJson);
+    Optional<BusinessAiRule> createAiRule(AiRuleInput request);
 
     /**
      * Updates an auto-reply behaviour rule of this WhatsApp Business AI agent.
      *
      * @apiNote
-     * Saves changes to a rule that shapes how the assistant talks to customers. The {@code requestJson}
-     * is an already-encoded description of the rule forwarded verbatim, because its underlying field
-     * names are not recoverable from the WhatsApp client. The returned rule reflects its post-update
-     * state and is present only when the update took effect.
+     * Saves changes to a rule that shapes how the assistant talks to customers. The {@code request}
+     * describes the rule to update and carries the rule id being updated. The returned rule reflects
+     * its post-update state and is present only when the update took effect.
      *
-     * @param requestJson the already-encoded rule description, or {@code null} to omit it
+     * @param request the rule to update, or {@code null} to omit it
      * @return the updated rule, or {@link Optional#empty()} when the update did not take effect or the
      *         server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAiRule> updateAiRule(String requestJson);
+    Optional<BusinessAiRule> updateAiRule(AiRuleInput request);
 
     /**
      * Deletes an auto-reply behaviour rule of this WhatsApp Business AI agent.
@@ -10586,15 +10974,15 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @apiNote
      * Convenience overload of
      * {@link #queryBusinessAddressAutocomplete(BusinessAddressAutocompleteQuery)} for the common case in
-     * which only the partial address text is supplied and the locale and country bias are left for the
-     * server to default.
+     * which only the partial address text is supplied and the map center and use-case scope are left
+     * for the server to default.
      *
      * @param query the partial address text the user has typed, or {@code null} to omit it
      * @return the ranked address suggestions, or an empty list when the server returned none
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
     default List<BusinessAddressSuggestion> queryBusinessAddressAutocomplete(String query) {
-        return queryBusinessAddressAutocomplete(new BusinessAddressAutocompleteQuery(query, null, null));
+        return queryBusinessAddressAutocomplete(new BusinessAddressAutocompleteQuery(null, query, null));
     }
 
     /**
@@ -10669,16 +11057,16 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Backs the broadcast onboarding step that resolves which Facebook business, ad account, page, and
-     * payment account back the broadcast surface. The lookup input is passed as a pre-encoded JSON object
-     * literal because its shape is not modelled as fixed typed fields.
+     * payment account back the broadcast surface.
      *
-     * @param inputJson the already-JSON-encoded lookup input object, or {@code null} to omit it
+     * @param shouldReturnAdAccount whether the resolved ad account is returned, or {@code null} to omit
+     *                              the lookup input
      * @return the resolved linked-account business information, or {@link Optional#empty()} when the
      *         relay returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the relay reports a GraphQL
      *                                        error
      */
-    Optional<BusinessBroadcastTargetInfo> queryBroadcastBusinessInfo(String inputJson);
+    Optional<BusinessBroadcastTargetInfo> queryBroadcastBusinessInfo(Boolean shouldReturnAdAccount);
 
     /**
      * Queries a generative-AI message recommendation for a WhatsApp Business broadcast.
@@ -10721,16 +11109,16 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Backs the quota indicator in the broadcast composer, reporting how many marketing messages the
-     * account may still send. The quota input is passed as a pre-encoded JSON object literal because its
-     * shape is not modelled as fixed typed fields.
+     * account may still send.
      *
-     * @param dataJson the already-JSON-encoded quota input object, or {@code null} to omit it
+     * @param data the quota-lookup data carrying the marketing-message terms acknowledgement, or
+     *             {@code null} to omit it
      * @return the remaining broadcast quota, or {@link Optional#empty()} when the relay returned no
      *         payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the relay reports a GraphQL
      *                                        error
      */
-    Optional<BusinessBroadcastQuota> queryBroadcastQuota(String dataJson);
+    Optional<BusinessBroadcastQuota> queryBroadcastQuota(BusinessBroadcastQuotaData data);
 
     /**
      * Toggles the AI auto-reply control state for a single WhatsApp Business chat thread.
@@ -10983,20 +11371,17 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Backs on-device ML model provisioning: it resolves the requested model names and versions into
-     * the list of files the client must download, given the client's decode capabilities. The two
-     * arguments are passed as pre-encoded JSON because the server-side input shapes are not modelled
-     * as fixed typed fields.
+     * the list of files the client must download, given the client's decode capabilities.
      *
-     * @param modelRequestMetadatasJson    the already-JSON-encoded list naming the models to resolve,
-     *                                     or {@code null} to omit it
-     * @param clientCapabilityMetadataJson the already-JSON-encoded object describing the client's
-     *                                     decode capabilities, or {@code null} to omit it
+     * @param modelRequestMetadatas    the models to resolve, or an empty list to omit the variable
+     * @param clientCapabilityMetadata the client decode capabilities, or {@code null} to omit the
+     *                                 variable
      * @return the parsed model manifest, or {@link Optional#empty()} when the relay returned no
      *         payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the relay reports a GraphQL
      *                                        error
      */
-    Optional<NativeMachineLearningModelManifest> queryNativeMlModelManifest(String modelRequestMetadatasJson, String clientCapabilityMetadataJson);
+    Optional<NativeMachineLearningModelManifest> queryNativeMlModelManifest(List<ModelRequestMetadata> modelRequestMetadatas, ClientCapabilityMetadata clientCapabilityMetadata);
 
     /**
      * Clears the caller's cached account-type preference for the WhatsApp Ads sign-in flow.
@@ -11061,7 +11446,8 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *                                        error
      */
     default Optional<SupportBugReportSubmission> submitSupportBugReport(String category, String description) {
-        return submitSupportBugReport(new SupportBugReportSubmissionRequest(category, description, null));
+        return submitSupportBugReport(new SupportBugReportSubmissionRequest(category, description, null,
+                null, null, null, List.of()));
     }
 
     /**
@@ -11619,29 +12005,26 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * Click-to-WhatsApp ads are paid promotions that open a chat with the business when tapped. Before
      * publishing one, the merchant assembles it as a draft that can be edited and is charged for only
      * once published. This saves a new draft and returns it so its identifier can drive later edits and
-     * publishing. The draft contents are passed as an already-JSON-encoded object because their field
-     * set is defined by the server and is not modelled as typed fields.
+     * publishing.
      *
-     * @param inputJson the already-JSON-encoded draft contents, or {@code null} to omit them
+     * @param input the boosted-component draft contents, or {@code null} to omit them
      * @return the created draft, or {@link Optional#empty()} when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAdDraft> createAdDraft(String inputJson);
+    Optional<BusinessAdDraft> createAdDraft(LwiBoostedComponentInput input);
 
     /**
      * Edits the draft of a Click-to-WhatsApp ad.
      *
      * @apiNote
      * Changes the contents of an unpublished Click-to-WhatsApp ad draft (a paid promotion that opens a
-     * chat with the business when tapped) and returns the updated draft. The changed contents are
-     * passed as an already-JSON-encoded object because their field set is defined by the server and is
-     * not modelled as typed fields.
+     * chat with the business when tapped) and returns the updated draft.
      *
-     * @param inputJson the already-JSON-encoded changed draft contents, or {@code null} to omit them
+     * @param input the changed boosted-component draft contents, or {@code null} to omit them
      * @return the edited draft, or {@link Optional#empty()} when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAdDraft> editAdDraft(String inputJson);
+    Optional<BusinessAdDraft> editAdDraft(LwiBoostedComponentInput input);
 
     /**
      * Discards the draft of a Click-to-WhatsApp ad.
@@ -11652,7 +12035,7 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * {@link BusinessAdMutationResult#success()}.
      *
      * @param draftId the opaque identifier of the draft to delete, as returned by
-     *                {@link #createAdDraft(String)}, or {@code null} to omit it
+     *                {@link #createAdDraft(LwiBoostedComponentInput)}, or {@code null} to omit it
      * @return the deletion outcome, or {@link Optional#empty()} when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
@@ -11711,15 +12094,13 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * This records that certification and reports whether it took effect through
      * {@link BusinessAdMutationResult#success()}; the name recorded against the certification is echoed
      * in {@link BusinessAdMutationResult#affectedIds()}. Whether certification is required can be
-     * checked first with {@link #queryAdCertificationRequired()}. The certification details are passed
-     * as an already-JSON-encoded object because their field set is defined by the server and is not
-     * modelled as typed fields.
+     * checked first with {@link #queryAdCertificationRequired()}.
      *
-     * @param inputJson the already-JSON-encoded certification details, or {@code null} to omit them
+     * @param source the surface the certification was made from, or {@code null} to omit it
      * @return the certification outcome, or {@link Optional#empty()} when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAdMutationResult> certifyAd(String inputJson);
+    Optional<BusinessAdMutationResult> certifyAd(String source);
 
     /**
      * Publishes a Click-to-WhatsApp ad from an assembled draft.
@@ -11727,14 +12108,13 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @apiNote
      * Confirms an assembled draft and brings the Click-to-WhatsApp ad (a paid promotion that opens a
      * chat with the business when tapped) live, returning the running ad with its identifier, budget,
-     * duration, audience, and creatives. The ad to publish is passed as an already-JSON-encoded object
-     * because its field set is defined by the server and is not modelled as typed fields.
+     * duration, audience, and creatives.
      *
-     * @param inputJson the already-JSON-encoded ad specification, or {@code null} to omit it
+     * @param input the boosted-component ad specification, or {@code null} to omit it
      * @return the published ad, or {@link Optional#empty()} when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessBoostedComponent> createBoostedComponent(String inputJson);
+    Optional<BusinessBoostedComponent> createBoostedComponent(LwiBoostedComponentInput input);
 
     /**
      * Queries the advertising account that funds a merchant's Click-to-WhatsApp ads.
@@ -11757,16 +12137,16 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @apiNote
      * Returns the pre-computed spend amounts the merchant can pick from and the lowest daily spend the
      * server allows, so the budget for a Click-to-WhatsApp ad (a paid promotion that opens a chat with
-     * the business when tapped) can be chosen without being set too low to deliver. The budget context
-     * is passed as an already-JSON-encoded object because its field set is defined by the server and is
-     * not modelled as typed fields.
+     * the business when tapped) can be chosen without being set too low to deliver.
      *
-     * @param inputJson the already-JSON-encoded budget context, or {@code null} to omit it
+     * @param legacyAdAccountId the funding ad-account identifier, or {@code null} to omit it
+     * @param budget            the budget amount in minor units, or {@code null} to omit it
+     * @param currency          the currency code, or {@code null} to omit it
      * @return the offered budget choices, or {@link Optional#empty()} when the server returned no
      *         payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAdBudgetOptions> queryAdBudgetOptions(String inputJson);
+    Optional<BusinessAdBudgetOptions> queryAdBudgetOptions(String legacyAdAccountId, Long budget, String currency);
 
     /**
      * Queries the payment state for a Click-to-WhatsApp ad.
@@ -11881,17 +12261,18 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Convenience overload of
-     * {@link #confirmAdEmailOnboarding(BusinessAdEmailOnboardingConfirmation)} for the common case in
-     * which the merchant supplies only the advertising-account identifier and the verification code,
-     * and the email being verified is implied by the account's onboarding state.
+     * {@link #confirmAdEmailOnboarding(BusinessAdEmailOnboardingConfirmation)} that takes the
+     * verification code, the email being verified, and the silent nonce returned from the send-code
+     * step directly.
      *
-     * @param adAccountId      the advertising-account identifier, or {@code null} to omit it
-     * @param verificationCode the verification code from the email, or {@code null} to omit it
+     * @param code        the verification code from the email, or {@code null} to omit it
+     * @param email       the email address being verified, or {@code null} to omit it
+     * @param silentNonce the silent nonce from the send-code step, or {@code null} to omit it
      * @return the confirmation outcome, or {@link Optional#empty()} when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    default Optional<BusinessAdMutationResult> confirmAdEmailOnboarding(String adAccountId, String verificationCode) {
-        return confirmAdEmailOnboarding(new BusinessAdEmailOnboardingConfirmation(adAccountId, null, verificationCode));
+    default Optional<BusinessAdMutationResult> confirmAdEmailOnboarding(String code, String email, String silentNonce) {
+        return confirmAdEmailOnboarding(new BusinessAdEmailOnboardingConfirmation(code, email, silentNonce));
     }
 
     /**
@@ -11916,16 +12297,15 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *
      * @apiNote
      * Convenience overload of
-     * {@link #sendAdEmailVerificationCode(BusinessAdEmailVerificationCodeRequest)} for the common case
-     * in which only the advertising-account identifier and the target email are supplied.
+     * {@link #sendAdEmailVerificationCode(BusinessAdEmailVerificationCodeRequest)} that takes the
+     * target email directly.
      *
-     * @param adAccountId the advertising-account identifier, or {@code null} to omit it
-     * @param email       the target email address, or {@code null} to omit it
+     * @param email the target email address, or {@code null} to omit it
      * @return the send outcome, or {@link Optional#empty()} when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    default Optional<BusinessAdMutationResult> sendAdEmailVerificationCode(String adAccountId, String email) {
-        return sendAdEmailVerificationCode(new BusinessAdEmailVerificationCodeRequest(adAccountId, email));
+    default Optional<BusinessAdMutationResult> sendAdEmailVerificationCode(String email) {
+        return sendAdEmailVerificationCode(new BusinessAdEmailVerificationCodeRequest(email));
     }
 
     /**
@@ -12078,15 +12458,14 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * Convenience overload of {@link #suggestAdInterests(BusinessAdInterestSuggestionQuery)} that
      * builds the query from the three scalar fields.
      *
-     * @param adAccountId                the advertising-account identifier the suggestion is scoped to
-     * @param detailedTargetingItemsJson the already-JSON-encoded chosen interests, or {@code null} to
-     *                                   omit it
-     * @param count                      the maximum number of suggestions, or {@code null} to omit it
+     * @param adAccountId            the advertising-account identifier the suggestion is scoped to
+     * @param detailedTargetingItems the chosen interests used as the seed, or {@code null} to omit them
+     * @param count                  the maximum number of suggestions, or {@code null} to omit it
      * @return the suggested interests, or an empty list when the server returned none
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    default List<BusinessAdInterest> suggestAdInterests(String adAccountId, String detailedTargetingItemsJson, Integer count) {
-        return suggestAdInterests(new BusinessAdInterestSuggestionQuery(adAccountId, detailedTargetingItemsJson, count));
+    default List<BusinessAdInterest> suggestAdInterests(String adAccountId, List<DetailedTargetingItem> detailedTargetingItems, Integer count) {
+        return suggestAdInterests(new BusinessAdInterestSuggestionQuery(adAccountId, detailedTargetingItems, count));
     }
 
     /**
@@ -12236,16 +12615,17 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      * @apiNote
      * Returns the billing breakdown shown on the final review step of the Click-to-WhatsApp ad flow (a
      * paid promotion that opens a chat with the business when tapped): which advertising account is
-     * billed, the estimated taxes itemised by name, and the estimated grand total. The budget is passed
-     * as an already-JSON-encoded object because its field set is defined by the server and is not
-     * modelled as typed fields.
+     * billed, the estimated taxes itemised by name, and the estimated grand total.
      *
-     * @param assetId    the asset identifier the summary is resolved for
-     * @param budgetJson the already-JSON-encoded budget, or {@code null} to omit it
+     * @param assetId        the asset identifier the summary is resolved for
+     * @param budget         the budget amount in minor units, or {@code null} to omit it
+     * @param budgetType     the budget-type token, or {@code null} to omit it
+     * @param currency       the currency code, or {@code null} to omit it
+     * @param durationInDays the campaign duration in days, or {@code null} to omit it
      * @return the cost summary, or {@link Optional#empty()} when the server returned no payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    Optional<BusinessAdCreationSummary> queryAdCreationSummaryContent(String assetId, String budgetJson);
+    Optional<BusinessAdCreationSummary> queryAdCreationSummaryContent(String assetId, Long budget, String budgetType, String currency, Integer durationInDays);
 
     /**
      * Queries the confirmation screen shown after a Click-to-WhatsApp ad goes live.
@@ -12309,13 +12689,13 @@ public non-sealed interface LinkedWhatsAppClient extends WhatsAppClient<LinkedWh
      *                          {@code null} to omit it
      * @param targetingSpec     the JSON-encoded targeting spec to adjust, or {@code null} to omit it
      * @param regulatedCategory the regulated category to adjust for, or {@code null} to omit it
-     * @param tuningOptionsJson the JSON-encoded tuning options, or {@code null} to omit it
+     * @param tuningOptions     the tuning options, or {@code null} to omit them
      * @return the adjusted targeting spec, or {@link Optional#empty()} when the server returned no
      *         payload
      * @throws WhatsAppServerRuntimeException if the transport fails or the server reports an error
      */
-    default Optional<AdTargetingTuningResult> adjustAdTargetingForRegulatedCategory(String adAccountId, String targetingSpec, String regulatedCategory, String tuningOptionsJson) {
-        return adjustAdTargetingForRegulatedCategory(new BusinessAdRegulatedCategoryTuning(adAccountId, targetingSpec, regulatedCategory, tuningOptionsJson));
+    default Optional<AdTargetingTuningResult> adjustAdTargetingForRegulatedCategory(String adAccountId, String targetingSpec, String regulatedCategory, TuningOptions tuningOptions) {
+        return adjustAdTargetingForRegulatedCategory(new BusinessAdRegulatedCategoryTuning(adAccountId, targetingSpec, regulatedCategory, tuningOptions));
     }
 
     /**

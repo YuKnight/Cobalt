@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,14 +15,14 @@ import java.io.UncheckedIOException;
 import java.util.List;
 
 /**
- * Builds the relay query that fetches a list of catalog products for a business catalog by their
+ * Builds the graph.whatsapp.com GraphQL query that fetches a list of catalog products for a business catalog by their
  * retailer product ids.
  *
  * <p>The single {@code request} GraphQL variable wraps a {@code product_list} object naming the
  * business catalog {@link Jid}, the explicit set of product ids to fetch, and the requested image
  * dimensions. WhatsApp Web's {@code WAWebQueryProductListCatalogJob} builds it from the catalog wid,
  * the product-id list, the rendered image width and height (stringified pixels), and an optional
- * direct-connection encrypted-info blob used for the merchant direct-connection path. The relay
+ * direct-connection encrypted-info blob used for the merchant direct-connection path. The graph.whatsapp.com endpoint
  * returns the product list under {@code xwa_product_catalog_get_product_list}; the reply is consumed
  * through {@link QueryProductListCatalogJobWhatsAppGraphQlResponse}.
  *
@@ -29,10 +31,10 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebQueryProductListCatalogJobQuery")
 public final class QueryProductListCatalogJobWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryProductListCatalogJobQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -191,5 +193,21 @@ public final class QueryProductListCatalogJobWhatsAppGraphQlRequest implements W
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

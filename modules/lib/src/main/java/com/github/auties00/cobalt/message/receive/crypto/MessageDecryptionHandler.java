@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.message.receive.crypto;
 
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveEncryptedPayload;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
@@ -21,6 +22,7 @@ import com.github.auties00.cobalt.wam.type.SessionScopeType;
 import com.github.auties00.cobalt.wam.type.StanzaType;
 import com.github.auties00.cobalt.wam.type.TypeOfGroupEnum;
 
+import java.lang.System.Logger.Level;
 import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
@@ -59,9 +61,9 @@ import java.util.Set;
 @WhatsAppWebModule(moduleName = "WAWebMsgProcessingDecryptionHandler")
 public final class MessageDecryptionHandler {
     /**
-     * Holds the logger used for per-enc decryption-error diagnostics.
+     * The logger for {@link MessageDecryptionHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MessageDecryptionHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(MessageDecryptionHandler.class);
 
     /**
      * Holds the Signal ciphertext wire version reported on the per-message
@@ -163,6 +165,7 @@ public final class MessageDecryptionHandler {
             adaptation = WhatsAppAdaptation.DIRECT)
     public boolean canDecryptNext(MessageReceiveEncryptedPayload enc) {
         if (pkOrMsgFailure != null && RETRYABLE_BLOCKERS.contains(pkOrMsgFailure.errorType)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "decryption of {0} blocked by prior retryable failure", enc.e2eType());
             return false;
         }
 
@@ -201,9 +204,7 @@ public final class MessageDecryptionHandler {
             pkOrMsgFailure = failure;
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Decryption error for {0}: {1} ({2})",
-                enc.e2eType(), errorType, error.getMessage());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "decryption error for enc type {0}: {1}", enc.e2eType(), errorType);
     }
 
     /**
@@ -230,15 +231,19 @@ public final class MessageDecryptionHandler {
         var dominant = skMsgFailure != null ? skMsgFailure : pkOrMsgFailure;
 
         if (dominant == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "decryption result {0}", MessageDecryptionResult.SUCCESS);
             return MessageDecryptionResult.SUCCESS;
         }
 
         var skMsgAccessed = accessedEncs.contains(MessageEncryptionType.SKMSG);
         if (skMsgAccessed && skMsgFailure == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "decryption result {0}", MessageDecryptionResult.SUCCESS);
             return MessageDecryptionResult.SUCCESS;
         }
 
-        return mapErrorToResult(dominant);
+        var result = mapErrorToResult(dominant);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "decryption result {0}", result);
+        return result;
     }
 
     /**
@@ -302,7 +307,11 @@ public final class MessageDecryptionHandler {
         resolveMediaType(stanza).ifPresent(builder::messageMediaType);
 
         if (!successful) {
-            builder.e2eFailureReason(resolveFailureReason());
+            var failureReason = resolveFailureReason();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "decryption failed for chat {0} sender {1} reason {2}", chatJid, senderJid, failureReason);
+            builder.e2eFailureReason(failureReason);
+        } else if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "decryption succeeded for chat {0} sender {1}", chatJid, senderJid);
         }
 
         wamService.commit(builder.build());

@@ -382,7 +382,8 @@ final class ControllerHarness {
                                com.github.auties00.cobalt.calls.engine.participant.CallMembership membership,
                                MediaStreams streams,
                                com.github.auties00.cobalt.model.jid.Jid peerDeviceJid,
-                               Optional<String> electedRelayName) {
+                               Optional<String> electedRelayName,
+                               com.github.auties00.cobalt.calls.engine.mediaplane.MediaSessionListener listener) {
             var session = new RecordingSession(callId);
             bringUps.add(new BringUp(callId, isCaller, video, callKey.clone(), List.copyOf(voipSettings),
                     participantCount, streams, session));
@@ -423,8 +424,10 @@ final class ControllerHarness {
     }
 
     /**
-     * Records every timer arm and cancel and retains the armed callback so a test can fire a timeout
-     * synchronously, standing in for the real virtual-thread {@link CallTimers} driver.
+     * Records every timer arm and cancel so a test can assert which timers the controller armed and
+     * cancelled, standing in for the real virtual-thread {@link CallTimers} driver. The controller
+     * supplied fire action is not run: these tests assert the arm and cancel choreography, not the fired
+     * teardown, which the real driver covers.
      */
     static final class RecordingTimers implements CallTimerScheduler {
         private final List<Armed> armed = new CopyOnWriteArrayList<>();
@@ -449,7 +452,7 @@ final class ControllerHarness {
         }
 
         @Override
-        public void arm(String callId, CallTimerKind kind) {
+        public void arm(String callId, CallTimerKind kind, Runnable action) {
             armed.add(new Armed(callId, kind));
         }
 

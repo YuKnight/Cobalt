@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the flat category-typeahead query built by
+ * Parses the graph.whatsapp.com GraphQL response of the flat category-typeahead query built by
  * {@link BizGetCategoriesWhatsAppGraphQlRequest} into a flat list of {@link BusinessCategory}.
  *
  * <p>Reads the linked {@code whatsapp_catkit_typeahead_proxy} field and projects its {@code categories}
@@ -42,7 +42,7 @@ public final class BizGetCategoriesWhatsAppGraphQlResponse implements WhatsAppGr
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code whatsapp_catkit_typeahead_proxy} and projects its
      * {@code categories} list onto {@link BusinessCategory} entries; the returned {@link Optional} is
@@ -92,7 +92,7 @@ public final class BizGetCategoriesWhatsAppGraphQlResponse implements WhatsAppGr
      *
      * <p>Each {@link BusinessCategory} pairs a server category id with its localised display name.
      *
-     * @return the parsed categories, empty when the relay returned none
+     * @return the parsed categories, empty when the graph.whatsapp.com endpoint returned none
      */
     public List<BusinessCategory> categories() {
         return categories;

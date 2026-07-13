@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
@@ -9,6 +10,8 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.wam.WamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Routes inbound {@code <notification>} stanzas in the account category to the matching per-type handler.
@@ -28,6 +31,9 @@ import com.github.auties00.cobalt.wam.WamService;
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class NotificationAccountDispatcher extends SocketStreamHandler.Concurrent {
+    /** The logger for {@link NotificationAccountDispatcher}. */
+    private static final System.Logger LOGGER = Log.get(NotificationAccountDispatcher.class);
+
     /**
      * Handles {@code type="account_sync"} notifications.
      *
@@ -113,6 +119,7 @@ public final class NotificationAccountDispatcher extends SocketStreamHandler.Con
             case "privacy_token" -> privacyHandler.handle(stanza);
             case "picture", "status" -> profileHandler.handle(stanza);
             default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping account notification with unrecognized type {0}", type);
             }
         }
     }

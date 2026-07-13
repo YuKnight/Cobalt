@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.warp;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.List;
 
 /**
@@ -17,6 +20,11 @@ import java.util.List;
  * {@code 0x100}) from the single attribute.
  */
 public final class BweConfigSender {
+    /**
+     * The logger for {@link BweConfigSender}.
+     */
+    private static final System.Logger LOGGER = Log.get(BweConfigSender.class);
+
     /**
      * The version byte written into the bandwidth estimation configuration block.
      */
@@ -46,10 +54,18 @@ public final class BweConfigSender {
      */
     public static WarpMessage.Standalone build(int index, int minRemoteBweKbps) {
         if (index < 0 || index > 0xff) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "bwe config rejected, index out of range: {0}", index);
             throw new IllegalArgumentException("index must be in [0, 255], got " + index);
         }
         if (minRemoteBweKbps < 0 || minRemoteBweKbps > 0xffff) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "bwe config rejected, minRemoteBweKbps out of range: {0}",
+                        minRemoteBweKbps);
+            }
             throw new IllegalArgumentException("minRemoteBweKbps must be in [0, 65535], got " + minRemoteBweKbps);
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "bwe config built index={0} minRemoteBweKbps={1}", index, minRemoteBweKbps);
         }
         var attribute = new WarpAttribute.BandwidthReport(BWE_CONFIG_VERSION, index, minRemoteBweKbps);
         return new WarpMessage.Standalone(List.of(attribute));

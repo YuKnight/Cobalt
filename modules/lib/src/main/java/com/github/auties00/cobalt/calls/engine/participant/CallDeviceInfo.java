@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.calls.capability.VideoDecoderCapability;
+import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.util.EnumSet;
 import java.util.Objects;
@@ -13,7 +13,7 @@ import java.util.Set;
  * multiple devices.
  *
  * <p>A participant may join a call from several devices at once; the engine keeps one of
- * these records per device. Each record carries the device's {@link CallDeviceJid}, the
+ * these records per device. Each record carries the device's {@link Jid}, the
  * numeric participant id the server assigns ({@code pid}), the device's advertised video
  * decode capabilities, a per device video enabled flag the engine toggles as the device
  * starts and stops its camera, the device's generated SSRC set, and a per device server
@@ -50,7 +50,7 @@ public final class CallDeviceInfo {
     /**
      * Holds this device's JID.
      */
-    private final CallDeviceJid deviceJid;
+    private final Jid deviceJid;
 
     /**
      * Holds the numeric participant/device id the server assigns, or {@value #UNASSIGNED_PID}
@@ -109,7 +109,7 @@ public final class CallDeviceInfo {
      * @param deviceJid this device's JID; never {@code null}
      * @throws NullPointerException if {@code deviceJid} is {@code null}
      */
-    public CallDeviceInfo(CallDeviceJid deviceJid) {
+    public CallDeviceInfo(Jid deviceJid) {
         this.deviceJid = Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
         this.pid = UNASSIGNED_PID;
         this.decoderCapabilities = EnumSet.noneOf(VideoDecoderCapability.class);
@@ -127,7 +127,7 @@ public final class CallDeviceInfo {
      *
      * @return the device JID; never {@code null}
      */
-    public CallDeviceJid deviceJid() {
+    public Jid deviceJid() {
         return deviceJid;
     }
 

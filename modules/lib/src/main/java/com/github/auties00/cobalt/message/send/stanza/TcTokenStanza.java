@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.privacy.TrustedContactTokenService;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -26,6 +28,11 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebSendMsgCreateFanoutStanza")
 public final class TcTokenStanza {
+    /**
+     * The logger for {@link TcTokenStanza}.
+     */
+    private static final System.Logger LOGGER = Log.get(TcTokenStanza.class);
+
     /**
      * Holds the {@link LinkedWhatsAppStore} used to look up the recipient chat.
      */
@@ -82,6 +89,7 @@ public final class TcTokenStanza {
 
         var chat = store.chatStore().findChatByJid(chatJid).orElse(null);
         if (chat == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tctoken build skipped: chat {0} not found", chatJid);
             return null;
         }
 
@@ -89,13 +97,16 @@ public final class TcTokenStanza {
         var tcTokenTimestamp = chat.tcTokenTimestamp().orElse(null);
 
         if (tcToken == null || tcTokenTimestamp == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tctoken build skipped: no token recorded for chat {0}", chatJid);
             return null;
         }
 
         if (trustedContactTokenService.hasTokenExpired(tcTokenTimestamp, TrustedContactTokenService.TcTokenMode.RECEIVER)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tctoken build skipped: token expired for chat {0}", chatJid);
             return null;
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tctoken attached for chat {0}", chatJid);
         return new StanzaBuilder()
                 .description("tctoken")
                 .content(tcToken)

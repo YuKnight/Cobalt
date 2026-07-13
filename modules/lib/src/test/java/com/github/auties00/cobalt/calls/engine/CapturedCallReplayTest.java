@@ -15,6 +15,7 @@ import com.github.auties00.cobalt.calls.signaling.session.TransportStanza;
 import com.github.auties00.cobalt.model.call.CallEndReason;
 import com.github.auties00.cobalt.model.call.CallState;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -107,6 +108,16 @@ class CapturedCallReplayTest {
 
     // ---- Stage A: CallSignalingRouter classification ----------------------------------------------------
 
+    // Feeds CallSignalingRouter.classify by extracting the classifier's fields (tag, call-id, call-creator)
+    //  off a rendered payload stanza, the same way CallReceiver reads them from the wire.
+    private static CallSignalingRouter.Verdict classify(CallSignalingRouter router, Stanza payload,
+                                                        Jid senderLid, boolean callExists) {
+        var description = payload.description();
+        var callId = payload.getAttributeAsString("call-id", null);
+        var callCreator = payload.getAttributeAsJid("call-creator", null);
+        return router.classify(description, callId, callCreator, senderLid, callExists);
+    }
+
     @Nested
     @DisplayName("Stage A: CallSignalingRouter classifies the captured inbound envelopes")
     class SignalingClassification {
@@ -114,7 +125,7 @@ class CapturedCallReplayTest {
         @DisplayName("a LID offer for an unknown call is BUFFERed until the call object exists")
         void offerBuffersBeforeCall() {
             var payload = oneToOneOffer().toStanza();
-            var verdict = signalingRouter.classify(payload, CALLER_LID_DEVICE, false);
+            var verdict = classify(signalingRouter, payload, CALLER_LID_DEVICE, false);
             assertSame(Disposition.BUFFER, verdict.disposition());
             assertEquals(ONE_TO_ONE_CALL_ID, verdict.callId().orElseThrow());
         }
@@ -124,7 +135,7 @@ class CapturedCallReplayTest {
         void inCallLegsProcess() {
             for (var payload : List.of(oneToOneAccept().toStanza(), oneToOneTransport().toStanza(),
                     oneToOneTerminate().toStanza())) {
-                var verdict = signalingRouter.classify(payload, CALLER_LID_DEVICE, true);
+                var verdict = classify(signalingRouter, payload, CALLER_LID_DEVICE, true);
                 assertSame(Disposition.PROCESS, verdict.disposition(),
                         payload.description() + " must PROCESS when the call exists");
             }
@@ -137,7 +148,7 @@ class CapturedCallReplayTest {
             var pnOffer = new OfferStanza(ONE_TO_ONE_CALL_ID, CALLER_PN, CALLER_PN, null, null, null, null, null,
                     true, false, null, -1, 3, List.of(), List.of(), List.of(), List.of(), null, null, null, null,
                     null, null, null, List.of(), null);
-            var verdict = signalingRouter.classify(pnOffer.toStanza(), null, false);
+            var verdict = classify(signalingRouter, pnOffer.toStanza(), null, false);
             assertSame(Disposition.DROP, verdict.disposition());
         }
 
@@ -145,7 +156,7 @@ class CapturedCallReplayTest {
         @DisplayName("a payload with no call-id is dropped as a malformed header")
         void missingHeaderDropped() {
             var malformed = new StanzaBuilder().description("offer").build();
-            assertSame(Disposition.DROP, signalingRouter.classify(malformed, CALLER_LID_DEVICE, false).disposition());
+            assertSame(Disposition.DROP, classify(signalingRouter, malformed, CALLER_LID_DEVICE, false).disposition());
         }
     }
 

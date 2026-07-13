@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.socket;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.exception.WhatsAppException;
-import com.github.auties00.cobalt.exception.WhatsAppSessionException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppSessionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

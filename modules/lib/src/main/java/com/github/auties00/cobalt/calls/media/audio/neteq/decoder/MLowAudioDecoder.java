@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.neteq.decoder;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.MlowDecoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.postfilter.MlowDecodePostfilter;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.media.audio.neteq.LiveNetEq;
 
@@ -53,6 +55,11 @@ import com.github.auties00.cobalt.calls.media.audio.neteq.LiveNetEq;
  * constructor.
  */
 public final class MLowAudioDecoder implements AudioDecoder {
+    /**
+     * The logger for {@link MLowAudioDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(MLowAudioDecoder.class);
+
     /**
      * Bit mask of the voice activity flag in the MLow TOC byte.
      *
@@ -189,10 +196,12 @@ public final class MLowAudioDecoder implements AudioDecoder {
             // A CELT coded packet (TOC top two bits set): the low band decoder does not decode CELT, so
             // conceal it rather than misroute it into the MLow frame decoder, which would throw on its short
             // body and, uncaught, terminate the playback pump.
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "mlow decode: celt packet routed to low band decoder, concealing, len={0}", payload.length);
             output = conceal(frameSamples);
         } else if (fec) {
             if (payload.length == 0
                     || !com.github.auties00.cobalt.calls.media.audio.codec.mlow.MlowTocByte.decode(payload[0] & 0xFF).fec()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mlow decode: fec requested but no redundant copy, concealing");
                 output = conceal(frameSamples);
             } else {
                 output = render(kernel.decodeWithSynthesis(payload, lpcPostfilterEnabled, true), false);
@@ -200,7 +209,7 @@ public final class MLowAudioDecoder implements AudioDecoder {
         } else {
             output = render(kernel.decodeWithSynthesis(payload, lpcPostfilterEnabled), false);
         }
-        if (DIAG_FRAMES < 400) {
+        if (Log.TRACE && DIAG_FRAMES < 400) {
             DIAG_FRAMES++;
             var peak = 0;
             for (var s : output) {
@@ -209,10 +218,8 @@ public final class MLowAudioDecoder implements AudioDecoder {
                     peak = a;
                 }
             }
-            System.getLogger(MLowAudioDecoder.class.getName()).log(System.Logger.Level.INFO,
-                    "calls MLOW-DIAG #{0} len={1} celt={2} fec={3} out={4} peak={5} hex={6}",
-                    DIAG_FRAMES, payload.length, celt, fec, output.length, peak,
-                    payload.length <= 24 ? java.util.HexFormat.of().formatHex(payload) : "");
+            LOGGER.log(Level.TRACE, "mlow decode frame #{0} len={1} celt={2} fec={3} out={4} peak={5}",
+                    DIAG_FRAMES, payload.length, celt, fec, output.length, peak);
         }
         return output;
     }
@@ -391,6 +398,7 @@ public final class MLowAudioDecoder implements AudioDecoder {
     @Override
     public void reset() {
         requireOpen();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mlow audio decoder reset");
         kernel.reset();
         postfilter.reset();
     }

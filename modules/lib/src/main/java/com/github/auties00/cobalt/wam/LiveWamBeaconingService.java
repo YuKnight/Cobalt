@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.wam;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.util.DataUtils;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.OptionalLong;
@@ -31,6 +33,11 @@ import java.util.concurrent.ConcurrentMap;
  */
 @WhatsAppWebModule(moduleName = "WAWebWamBeaconing")
 final class LiveWamBeaconingService implements WamBeaconingService {
+    /**
+     * The logger for {@link LiveWamBeaconingService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveWamBeaconingService.class);
+
     /**
      * Holds the one-percent cutoff applied to each fresh
      * {@link DataUtils#randomDouble} roll; matches the literal {@code .01} in
@@ -71,13 +78,16 @@ final class LiveWamBeaconingService implements WamBeaconingService {
             state.activationDayEpoch = currentDayEpoch;
             state.active = DataUtils.randomDouble() <= ACTIVATION_PROBABILITY;
             state.sequenceNumber = 0L;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wam beaconing roll for {0}: active={1}", bufferKey, state.active);
         }
 
         if (!state.active) {
             return OptionalLong.empty();
         }
 
-        return OptionalLong.of(++state.sequenceNumber);
+        var sequence = ++state.sequenceNumber;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "wam beaconing sequence for {0}: {1}", bufferKey, sequence);
+        return OptionalLong.of(sequence);
     }
 
     /**

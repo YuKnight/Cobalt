@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,12 +14,12 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay mutation that reports a catalog product for policy violation.
+ * Builds the graph.whatsapp.com GraphQL mutation that reports a catalog product for policy violation.
  *
  * <p>The single {@code input} GraphQL variable carries the business catalog {@link Jid}, the reported
  * product id, and an optional free-text reason. WhatsApp Web's {@code WAWebReportProductJob} builds it
  * from the catalog wid ({@code jid}), the {@code product_id}, and the {@code reason}, which it omits
- * entirely when the caller passes the empty string. The relay returns the outcome under
+ * entirely when the caller passes the empty string. The graph.whatsapp.com endpoint returns the outcome under
  * {@code xwa_whatsapp_catalog_report_product}; the reply is consumed through
  * {@link ReportProductJobWhatsAppGraphQlResponse}.
  *
@@ -26,10 +28,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebReportProductJobMutation")
 public final class ReportProductJobWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      *
      * @implNote This implementation ships the resolved numeric document id rather than the operation
      * name. The operation's own {@code params.id} in {@code WAWebReportProductJobMutation.graphql} is
@@ -146,5 +148,21 @@ public final class ReportProductJobWhatsAppGraphQlRequest implements WhatsAppGra
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

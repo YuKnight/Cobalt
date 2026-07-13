@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.StatusPostOptInNotificationPreferencesAction;
@@ -8,6 +9,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Mirrors the user's opt-in choice for status-post notifications across linked
@@ -35,6 +38,11 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
      */
     public static final StatusPostOptInNotificationPreferencesHandler INSTANCE =
             new StatusPostOptInNotificationPreferencesHandler();
+
+    /**
+     * The logger for {@link StatusPostOptInNotificationPreferencesHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(StatusPostOptInNotificationPreferencesHandler.class);
 
     /**
      * Constructs the singleton.
@@ -97,10 +105,12 @@ public final class StatusPostOptInNotificationPreferencesHandler implements WebA
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof StatusPostOptInNotificationPreferencesAction action)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "status post opt-in notification preferences: malformed mutation value");
             return MutationApplicationResult.malformed();
         }
 
         client.store().settingsStore().setStatusPostOptInNotificationPreferencesEnabled(action.enabled());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "status post opt-in notification preferences: set enabled={0}", action.enabled());
         return MutationApplicationResult.success();
     }
 }

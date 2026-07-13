@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.receive;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.dedup.MessageDedup;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.wam.WamService;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -32,9 +34,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebHandleMsg")
 public final class LiveMessageReceivingService implements MessageReceivingService {
     /**
-     * Logger used for the dedup-skip diagnostic.
+     * The logger for {@link LiveMessageReceivingService}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveMessageReceivingService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveMessageReceivingService.class);
 
     /**
      * Receiver invoked for every non-newsletter inbound stanza.
@@ -111,8 +113,8 @@ public final class LiveMessageReceivingService implements MessageReceivingServic
         var id = stanza.getRequiredAttributeAsString("id");
         var dedupKey = fromJid + ":" + id;
         if (dedup.isPending(dedupKey)) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Duplicate message {0}, skipping", id);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "duplicate message {0}, skipping", id);
             return null;
         }
         dedup.add(dedupKey);

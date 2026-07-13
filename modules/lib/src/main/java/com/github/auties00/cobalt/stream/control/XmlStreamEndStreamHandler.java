@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.stream.control;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.stream.NodeStreamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Handles the {@code <xmlstreamend>} stanza that the WhatsApp server emits to signal a graceful end of the encrypted
@@ -22,9 +25,9 @@ import com.github.auties00.cobalt.stream.NodeStreamService;
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class XmlStreamEndStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * The system logger used to record the diagnostic line emitted when the server signals end-of-stream.
+     * The logger for {@link XmlStreamEndStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(XmlStreamEndStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(XmlStreamEndStreamHandler.class);
 
     /**
      * Constructs a new {@code <xmlstreamend>} stanza handler.
@@ -41,6 +44,8 @@ public final class XmlStreamEndStreamHandler extends SocketStreamHandler.Concurr
     @Override
     @WhatsAppWebExport(moduleName = "WAWebCommsHandleLoggedInStanza", exports = "handleLoggedInStanza", adaptation = WhatsAppAdaptation.ADAPTED)
     public void handle(Stanza stanza) {
-        LOGGER.log(System.Logger.Level.INFO, "Comms.handleStanza received xmlstreamend, return NO_ACK");
+        if (Log.INFO) {
+            LOGGER.log(Level.INFO, "received xmlstreamend, no ack sent");
+        }
     }
 }

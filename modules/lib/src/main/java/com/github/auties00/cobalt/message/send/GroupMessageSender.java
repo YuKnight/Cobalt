@@ -2,7 +2,8 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
@@ -49,6 +50,7 @@ import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
 import com.github.auties00.cobalt.wam.type.SizeBucket;
 import com.github.auties00.cobalt.wam.type.TypeOfGroupEnum;
 
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -71,9 +73,9 @@ import java.util.stream.Stream;
 @WhatsAppWebModule(moduleName = "WAWebSendGroupKeyDistributionMsgJob")
 final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
     /**
-     * Surfaces group-send diagnostics.
+     * The logger for {@link GroupMessageSender}.
      */
-    private static final System.Logger LOGGER = System.getLogger(GroupMessageSender.class.getName());
+    private static final System.Logger LOGGER = Log.get(GroupMessageSender.class);
 
     /**
      * Performs both the SKMSG and the per-device fanout encryption paths.
@@ -183,6 +185,11 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         var isLidAddressingMode = (chatMetadata != null && chatMetadata.isLidAddressingMode())
                 || isCagAddon;
         var addressingMode = isLidAddressingMode ? "lid" : "pn";
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "group send: {0} fanout device(s) for {1}, addressing={2}",
+                    allDevices.size(), groupJid, addressingMode);
+        }
 
         var senderJid = isLidAddressingMode ? selfLidOrPn() : requireSelfJid();
 
@@ -331,9 +338,11 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         if (!ack.isSuccess()) {
             var errorCode = ack.error().orElse(-1);
             if (errorCode == NackReason.STALE_GROUP_ADDRESSING_MODE.code()) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "encryptAndSendSenderKeyMsg: ack with error code 421 for {0}, refreshing metadata",
-                        groupJid);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "encryptAndSendSenderKeyMsg: ack with error code 421 for {0}, refreshing metadata",
+                            groupJid);
+                }
                 migrateAddressingMode(groupJid, !isLidAddressingMode);
                 throw new WhatsAppMessageException.Send.Unknown(
                         "Stale group addressing mode for " + groupJid, null);
@@ -347,12 +356,19 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
             store.signalStore().markSenderKeyDistributed(groupJid, device);
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "group send: ack success for {0} id={1}",
+                    groupJid, messageInfo.key().id().orElse(null));
+        }
+
         if (ack instanceof MessageAck messageAck) {
             var serverPhash = messageAck.phash().orElse(null);
             if (serverPhash != null && !serverPhash.equals(phash)) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "encryptAndSendSenderKeyMsg: phash mismatch for {0}, server: {1}",
-                        messageInfo.key().id(), serverPhash);
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "encryptAndSendSenderKeyMsg: phash mismatch for {0}, server: {1}",
+                            messageInfo.key().id().orElse(null), serverPhash);
+                }
                 var serverAddressingMode = messageAck.addressingMode().orElse(null);
                 resendAsGroupDirect(groupJid, messageInfo, allSkDevices,
                         addressingMode, serverAddressingMode, chatMetadata, senderJid);
@@ -360,9 +376,11 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
             messageAck.addressingMode().ifPresent(serverMode -> {
                 if (!serverMode.equals(addressingMode)) {
-                    LOGGER.log(System.Logger.Level.INFO,
-                            "Addressing mode mismatch for {0}: local={1}, server={2}, migrating",
-                            groupJid, addressingMode, serverMode);
+                    if (Log.INFO) {
+                        LOGGER.log(Level.INFO,
+                                "Addressing mode mismatch for {0}: local={1}, server={2}, migrating",
+                                groupJid, addressingMode, serverMode);
+                    }
                     wamService.commit(new AddressingModeMismatchEventBuilder()
                             .localAddressingMode(wamAddressingMode(addressingMode))
                             .serverAddressingMode(wamAddressingMode(serverMode))
@@ -412,9 +430,11 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 }
 
                 if (skDistribDevices.isEmpty()) {
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "encryptAndSendGroupKeyDistributionMsg: skip sending {0}: " +
-                                    "sender key distribution list is empty", groupJid);
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG,
+                                "encryptAndSendGroupKeyDistributionMsg: skip sending {0}: " +
+                                        "sender key distribution list is empty", groupJid);
+                    }
                     return null;
                 }
 
@@ -446,6 +466,11 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 var needsIdentity = ParticipantsStanza.requiresIdentityNode(skDistPayloads);
                 var identityNode = needsIdentity ? buildIdentityNode() : null;
 
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "sending key distribution to {0} device(s) for {1}",
+                            skDistribDevices.size(), groupJid);
+                }
+
                 var metaNode = new StanzaBuilder()
                         .description("meta")
                         .attribute("appdata", "default")
@@ -470,6 +495,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 var ack = AckParser.parse(ackNode);
 
                 if (ack.error().isPresent()) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "key distribution ack failed for {0} error={1}",
+                                groupJid, ack.error().orElse(-1));
+                    }
                     throw new WhatsAppMessageException.Send.Unknown(
                             "encryptAndSendSenderKeyMsg: Invalid ack from server for " + groupJid, null);
                 }
@@ -483,6 +512,9 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "key distribution failed for " + Log.jid(String.valueOf(groupJid)), e);
+            }
             throw new RuntimeException("Failed to send key distribution to " + groupJid, e);
         }
     }
@@ -530,8 +562,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                     messageInfo.key().id().orElseThrow(), messageSecret,
                     selfJid, participantJids, contentId);
         } catch (GeneralSecurityException e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to generate content bindings: {0}", e.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "content binding generation failed for message id="
+                        + messageInfo.key().id().orElse(null), e);
+            }
             return null;
         }
     }
@@ -646,14 +680,16 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 .toList();
 
         if (deltaDevices.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "No new devices after group phash resync for {0}", groupJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "No new devices after group phash resync for {0}", groupJid);
+            }
             return;
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Resending as group-direct to {0} new devices for {1}",
-                deltaDevices.size(), groupJid);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "Resending as group-direct to {0} new devices for {1}",
+                    deltaDevices.size(), groupJid);
+        }
 
         var container = messageInfo.message();
         var depletedPrekeyCount = deviceService.ensureSessions(deltaDevices);
@@ -662,9 +698,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                 .orElse(null);
         var payloads = encryptForDevices(encryption, deltaDevices, container, groupJid, senderIcdc, null);
         if (payloads.isEmpty()) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Group direct: encryption failed for all delta devices for {0}",
-                    groupJid);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "Group direct: encryption failed for all delta devices for {0}",
+                        groupJid);
+            }
             return;
         }
 
@@ -864,8 +901,9 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
     private void migrateAddressingMode(Jid groupJid, boolean toLid) {
         var metadata = store.chatStore().findChatMetadata(groupJid).orElse(null);
         if (metadata == null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot migrate addressing mode for {0}: no metadata", groupJid);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "Cannot migrate addressing mode for {0}: no metadata", groupJid);
+            }
             return;
         }
 
@@ -878,9 +916,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
                         .rank(participant.rank().orElse(null))
                         .build());
             } else {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "No {0} mapping for {1}, keeping original",
-                        toLid ? "LID" : "PN", participant.userJid());
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "No {0} mapping for {1}, keeping original",
+                            toLid ? "LID" : "PN", participant.userJid());
+                }
                 migratedParticipants.add(participant);
             }
         }
@@ -891,9 +930,10 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
 
         store.signalStore().clearSenderKeyDistribution(groupJid);
 
-        LOGGER.log(System.Logger.Level.INFO,
-                "Migrated addressing mode for {0} to {1} ({2} participants)",
-                groupJid, toLid ? "lid" : "pn", migratedParticipants.size());
+        if (Log.INFO) {
+            LOGGER.log(Level.INFO, "Migrated addressing mode for {0} to {1} ({2} participants)",
+                    groupJid, toLid ? "lid" : "pn", migratedParticipants.size());
+        }
     }
 
     /**

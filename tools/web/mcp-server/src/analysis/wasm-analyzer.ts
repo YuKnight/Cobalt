@@ -1,4 +1,11 @@
-import wabtInit from "wabt";
+import { execFile } from "node:child_process";
+import { createReadStream } from "node:fs";
+import { access, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { createInterface } from "node:readline";
+import { promisify } from "node:util";
 import type {
     WasmAnalysis,
     WasmCustomSection,
@@ -16,13 +23,101 @@ import type {
 import { BinaryReader } from "./wasm-binary-reader.js";
 import { decodeConstExpr } from "./wasm-decoder.js";
 
-let wabtInstance: Awaited<ReturnType<typeof wabtInit>> | null = null;
+const execFileAsync = promisify(execFile);
+const requireFromHere = createRequire(import.meta.url);
 
-async function getWabt() {
-  if (!wabtInstance) {
-    wabtInstance = await wabtInit();
+let wasm2watPath: string | null = null;
+
+function getWasm2watPath(): string {
+  if (wasm2watPath == null) {
+    wasm2watPath = join(dirname(requireFromHere.resolve("wabt/package.json")), "bin", "wasm2wat");
   }
-  return wabtInstance;
+  return wasm2watPath;
+}
+
+const WASM2WAT_ARGS = ["--enable-all", "--generate-names"] as const;
+
+const MAX_WHOLE_WAT_BYTES = 64 * 1024 * 1024;
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function runWasm2wat(sourceWasmPath: string, watPath: string): Promise<void> {
+  const tmp = `${watPath}.tmp-${process.pid}`;
+  try {
+    await execFileAsync(
+      process.execPath,
+      [getWasm2watPath(), ...WASM2WAT_ARGS, sourceWasmPath, "-o", tmp],
+      { maxBuffer: 16 * 1024 * 1024 }
+    );
+    await rename(tmp, watPath);
+  } catch (error) {
+    await rm(tmp, { force: true }).catch(() => {});
+    throw error;
+  }
+}
+
+export async function watFileForModule(sourceWasmPath: string, cacheWatPath: string): Promise<string> {
+  if (!(await fileExists(cacheWatPath))) {
+    await runWasm2wat(sourceWasmPath, cacheWatPath);
+  }
+  return cacheWatPath;
+}
+
+export async function extractFunctionFromWatFile(
+  watPath: string,
+  functionIndex: number
+): Promise<string | null> {
+  const importFuncRe = /^\s*\(import\b.*\(func\b/;
+  const rl = createInterface({
+    input: createReadStream(watPath, { encoding: "utf8" }),
+    crlfDelay: Infinity,
+  });
+
+  let globalIdx = -1;
+  let capturing = false;
+  let depth = 0;
+  const captured: string[] = [];
+
+  try {
+    for await (const line of rl) {
+      if (!capturing) {
+        if (importFuncRe.test(line)) {
+          globalIdx++;
+          continue;
+        }
+        const trimmed = line.trimStart();
+        if (!trimmed.startsWith("(func ")) continue;
+        globalIdx++;
+        if (globalIdx !== functionIndex) continue;
+        capturing = true;
+        captured.push(line);
+        for (const ch of trimmed) {
+          if (ch === "(") depth++;
+          else if (ch === ")") depth--;
+        }
+        if (depth <= 0) break;
+        continue;
+      }
+
+      captured.push(line);
+      for (const ch of line) {
+        if (ch === "(") depth++;
+        else if (ch === ")") depth--;
+      }
+      if (depth <= 0) break;
+    }
+  } finally {
+    rl.close();
+  }
+
+  return captured.length ? captured.join("\n") : null;
 }
 
 const WASM_MAGIC = 0x6d736100;
@@ -487,35 +582,24 @@ export function analyzeWasm(name: string, binary: Buffer | Uint8Array): WasmAnal
   };
 }
 
-function toFreshUint8Array(binary: Buffer | Uint8Array): Uint8Array {
-  const copy = new Uint8Array(binary.length);
-  copy.set(binary);
-  return copy;
-}
-
-const WABT_READ_OPTIONS = {
-  readDebugNames: true,
-  exceptions: true,
-  mutable_globals: true,
-  sat_float_to_int: true,
-  sign_extension: true,
-  simd: true,
-  threads: true,
-  multi_value: true,
-  tail_call: true,
-  bulk_memory: true,
-  reference_types: true,
-} as const;
-
 export async function disassembleWasm(binary: Buffer | Uint8Array): Promise<string> {
-  const wabt = await getWabt();
-  const mod = wabt.readWasm(toFreshUint8Array(binary), WABT_READ_OPTIONS);
+  const dir = await mkdtemp(join(tmpdir(), "wat-"));
+  const wasmPath = join(dir, "module.wasm");
+  const watPath = join(dir, "module.wat");
   try {
-    mod.generateNames();
-    mod.applyNames();
-    return mod.toText({ foldExprs: false, inlineExport: false });
+    await writeFile(wasmPath, binary);
+    await runWasm2wat(wasmPath, watPath);
+    const { size } = await stat(watPath);
+    if (size > MAX_WHOLE_WAT_BYTES) {
+      throw new Error(
+        `Whole-module WAT is ${(size / 1048576).toFixed(0)} MB (exceeds the ` +
+          `${MAX_WHOLE_WAT_BYTES / 1048576} MB cap); pass functionIndex to ` +
+          `disassemble a single function.`
+      );
+    }
+    return await readFile(watPath, "utf8");
   } finally {
-    mod.destroy();
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -523,39 +607,14 @@ export async function disassembleWasmFunction(
   binary: Buffer | Uint8Array,
   functionIndex: number
 ): Promise<string | null> {
-  const wat = await disassembleWasm(binary);
-  const lines = wat.split("\n");
-
-  let currentFuncIndex = -1;
-  let depth = 0;
-  let funcStart = -1;
-  let funcEnd = -1;
-  let inFunc = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
-
-    if (trimmed.startsWith("(func ")) {
-      currentFuncIndex++;
-      if (currentFuncIndex === functionIndex) {
-        funcStart = i;
-        inFunc = true;
-        depth = 0;
-      }
-    }
-
-    if (inFunc) {
-      for (const ch of trimmed) {
-        if (ch === "(") depth++;
-        if (ch === ")") depth--;
-      }
-      if (depth <= 0 && funcStart !== -1) {
-        funcEnd = i;
-        break;
-      }
-    }
+  const dir = await mkdtemp(join(tmpdir(), "wat-"));
+  const wasmPath = join(dir, "module.wasm");
+  const watPath = join(dir, "module.wat");
+  try {
+    await writeFile(wasmPath, binary);
+    await runWasm2wat(wasmPath, watPath);
+    return await extractFunctionFromWatFile(watPath, functionIndex);
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
-
-  if (funcStart === -1 || funcEnd === -1) return null;
-  return lines.slice(funcStart, funcEnd + 1).join("\n");
 }

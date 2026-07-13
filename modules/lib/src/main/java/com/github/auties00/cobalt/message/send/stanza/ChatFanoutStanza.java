@@ -36,7 +36,7 @@ public final class ChatFanoutStanza {
      * Prevents instantiation; this is a static composer.
      */
     private ChatFanoutStanza() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

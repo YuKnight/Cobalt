@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.calls.signaling.session;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -91,6 +93,24 @@ public enum CallTransportSubType {
     private static final CallTransportSubType[] VALUES = values();
 
     /**
+     * Resolves an engine wire value to its sub type, backing {@link #ofWireValue(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #wireValue}, so a wire value
+     * resolves to its sub type in constant time rather than by scanning {@link #VALUES}.
+     */
+    private static final Map<Integer, CallTransportSubType> BY_WIRE_VALUE;
+
+    static {
+        var byWireValue = new HashMap<Integer, CallTransportSubType>();
+        for (var subType : VALUES) {
+            if (byWireValue.put(subType.wireValue, subType) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_WIRE_VALUE = Map.copyOf(byWireValue);
+    }
+
+    /**
      * The integer value the engine stamps into the Transport message for this sub type.
      */
     private final int wireValue;
@@ -121,6 +141,9 @@ public enum CallTransportSubType {
      * <p>The result is empty for any value that does not correspond to a defined sub type,
      * including the reserved {@code 0xe} sentinel the engine never sends.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_WIRE_VALUE} map rather than
+     * scanning {@link #VALUES}; the reserved {@code 0xe} sentinel is still short circuited to
+     * {@link Optional#empty()} first.
      * @param wireValue the engine wire value to resolve
      * @return the matching sub type, or {@link Optional#empty()} if no sub type matches
      */
@@ -128,11 +151,6 @@ public enum CallTransportSubType {
         if (wireValue == RESERVED_SENTINEL) {
             return Optional.empty();
         }
-        for (var subType : VALUES) {
-            if (subType.wireValue == wireValue) {
-                return Optional.of(subType);
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(BY_WIRE_VALUE.get(wireValue));
     }
 }

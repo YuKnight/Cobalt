@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessageBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -29,6 +31,9 @@ import java.util.concurrent.ConcurrentMap;
  */
 @WhatsAppWebModule(moduleName = "WAWebLinkPreviewCache")
 public final class LinkPreviewCache {
+    /** The logger for {@link LinkPreviewCache}. */
+    private static final System.Logger LOGGER = Log.get(LinkPreviewCache.class);
+
     /**
      * Holds the sentinel value stored when a URL was resolved but
      * produced no preview.
@@ -95,11 +100,14 @@ public final class LinkPreviewCache {
         var pick = newsletterChat ? newsletter : regular;
         var cached = pick.get(url);
         if (cached == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview cache miss, newsletter={0}", newsletterChat);
             return Optional.empty();
         }
         if (cached == NEGATIVE) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview cache hit (negative), newsletter={0}", newsletterChat);
             return Optional.of(NEGATIVE);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview cache hit, newsletter={0}", newsletterChat);
         return Optional.of(cached);
     }
 
@@ -138,6 +146,7 @@ public final class LinkPreviewCache {
     public void put(String url, boolean newsletterChat, ExtendedTextMessage preview) {
         var pick = newsletterChat ? newsletter : regular;
         pick.put(url, preview != null ? preview : NEGATIVE);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview cached, newsletter={0}, negative={1}", newsletterChat, preview == null);
     }
 
     /**
@@ -153,5 +162,6 @@ public final class LinkPreviewCache {
     void clear() {
         regular.clear();
         newsletter.clear();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview cache cleared");
     }
 }

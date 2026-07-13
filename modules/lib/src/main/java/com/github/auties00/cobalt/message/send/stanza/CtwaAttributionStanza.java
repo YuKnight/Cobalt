@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,7 @@ import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -39,6 +41,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @WhatsAppWebModule(moduleName = "WAWebExternalEntryPointPrefs")
 @WhatsAppWebModule(moduleName = "WAWebExternalCtxConfig")
 public final class CtwaAttributionStanza {
+    /**
+     * The logger for {@link CtwaAttributionStanza}.
+     */
+    private static final System.Logger LOGGER = Log.get(CtwaAttributionStanza.class);
+
     /**
      * Holds the recorded entry points keyed by chat JID string.
      */
@@ -103,6 +110,7 @@ public final class CtwaAttributionStanza {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void saveEntryPoint(Jid chatJid, ExternalEntryPoint entryPoint) {
         entryPoints.put(chatJid.toString(), entryPoint);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa entry point saved for chat {0}", chatJid);
         pruneExpired();
     }
 
@@ -117,6 +125,7 @@ public final class CtwaAttributionStanza {
             adaptation = WhatsAppAdaptation.DIRECT)
     public void deleteEntryPoint(Jid chatJid) {
         entryPoints.remove(chatJid.toString());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa entry point deleted for chat {0}", chatJid);
     }
 
     /**
@@ -162,6 +171,7 @@ public final class CtwaAttributionStanza {
         }
 
         if (!isCtxLoggingEnabled()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa build skipped: ctx logging disabled");
             return null;
         }
 
@@ -172,6 +182,7 @@ public final class CtwaAttributionStanza {
 
         var chat = store.chatStore().findChatByJid(chatJid).orElse(null);
         if (!shouldLogFirstMessage(chat, entryPoint.partnerName())) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa build skipped: first-message policy excludes chat {0}", chatJid);
             return null;
         }
 
@@ -186,6 +197,7 @@ public final class CtwaAttributionStanza {
 
         var jsonBytes = serializeJson(json).getBytes(StandardCharsets.UTF_8);
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ctwa attribution built for chat {0}", chatJid);
         return new StanzaBuilder()
                 .description("ctwa_attribution")
                 .content(jsonBytes)

@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowEntropyWrapper;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowRangeEncoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PulseTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Serializes a frame's algebraic fixed codebook (FCB) excitation pulses for the MLow speech codec.
@@ -43,6 +46,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PulseTable
  * uniform symbol.
  */
 public final class PulseEncoder {
+    /**
+     * The logger for {@link PulseEncoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(PulseEncoder.class);
+
     /**
      * Maximum number of pulse signs packed into a single uniform range coder symbol.
      *
@@ -133,6 +141,11 @@ public final class PulseEncoder {
         int nPulses = 0;
         for (int i = 0; i < nSubfr; i++) {
             nPulses += sfPulses[i];
+        }
+
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "fcb pulse encode framelen={0} subframes={1} lowRate={2} voiced={3} nPulses={4}",
+                    framelen, nSubfr, lowRate, voiced, nPulses);
         }
 
         int maxPulses = MAX_PULSES_PER_FRAME[lowRate ? 1 : 0][codedFlag + voicedFlag] * framelen / MAX_PULSES_REF_FRAMELEN;

@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.dsp;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Single precision real and complex fast Fourier transform used by the MLow speech codec for its LPC
  * spectral analysis. The arithmetic reproduces the four wide SSE variant of the PFFFT library (Julien
@@ -54,6 +58,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.dsp;
  * which is what makes the byte level interleave and swap shuffles reproduce the SSE results.
  */
 public final class Pffft {
+    /**
+     * The logger for {@link Pffft}.
+     */
+    private static final System.Logger LOGGER = Log.get(Pffft.class);
+
     /**
      * Number of {@code float} lanes in one SIMD vector on the SSE path.
      *
@@ -177,6 +186,9 @@ public final class Pffft {
         if (m != n / SIMD_SZ) {
             throw new IllegalArgumentException("length not decomposable with factors 2,3,4,5: " + n);
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "pffft setup: n={0} transform={1}", n, transform == REAL ? "REAL" : "COMPLEX");
+        }
     }
 
     /**
@@ -204,6 +216,7 @@ public final class Pffft {
      * @param forward   {@code true} for the forward transform, {@code false} for the backward (inverse, unscaled)
      */
     public void transform(float[] input, float[] output, float[] work, boolean forward) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "pffft transform: n={0} forward={1} ordered=false", n, forward);
         transformInternal(input, output, work, forward, false);
     }
 
@@ -223,6 +236,7 @@ public final class Pffft {
      * @param forward   {@code true} for the forward transform, {@code false} for the backward (inverse, unscaled)
      */
     public void transformOrdered(float[] input, float[] output, float[] work, boolean forward) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "pffft transform: n={0} forward={1} ordered=true", n, forward);
         transformInternal(input, output, work, forward, true);
     }
 

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code nux} app-state action that records acknowledgement of New
@@ -40,6 +43,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebNuxSync")
 public final class NuxActionHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link NuxActionHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(NuxActionHandler.class);
 
     /**
      * Constructs a stateless {@link NuxActionHandler} for registration in the
@@ -96,15 +103,18 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebNuxSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "nux action: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() <= 1) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "nux action mutation malformed: missing nux key index");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
         var nuxKey = indexArray.getString(1);
         if (nuxKey == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "nux action mutation malformed: null nux key");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
@@ -112,6 +122,8 @@ public final class NuxActionHandler implements WebAppStateActionHandler {
         var acknowledged = nuxAction instanceof NuxAction action && action.acknowledged();
 
         client.store().settingsStore().putOnboardingHintState(new OnboardingHintStateBuilder().hintId(nuxKey).dismissed(acknowledged).build());
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "nux action: hint {0} dismissed={1}", nuxKey, acknowledged);
 
         return MutationApplicationResult.success();
     }

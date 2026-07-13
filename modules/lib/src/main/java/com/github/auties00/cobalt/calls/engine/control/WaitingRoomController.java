@@ -9,8 +9,10 @@ import com.github.auties00.cobalt.calls.signaling.waitingroom.WaitingRoomLeaveSt
 import com.github.auties00.cobalt.calls.signaling.waitingroom.WaitingRoomToggleAck;
 import com.github.auties00.cobalt.calls.signaling.waitingroom.WaitingRoomToggleStanza;
 import com.github.auties00.cobalt.calls.signaling.waitingroom.WaitingRoomUser;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -47,6 +49,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.WaitingRoomToggleAc
  * progress ({@code outgoing}, {@code receipt}, {@code terminated}, {@code joined}).
  */
 public final class WaitingRoomController {
+    /**
+     * The logger for {@link WaitingRoomController}.
+     */
+    private static final System.Logger LOGGER = Log.get(WaitingRoomController.class);
+
     /**
      * The call identity this controller stamps onto its waiting room actions.
      */
@@ -88,8 +95,10 @@ public final class WaitingRoomController {
      */
     public WaitingRoomAdmitAck admit(Jid userJid) {
         Objects.requireNonNull(userJid, "userJid cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "admitting waiting room participant {0}", userJid);
         var request = WaitingRoomAdmitStanza.of(context.callId(), context.callCreator(), userJid);
         var ack = WaitingRoomAdmitAck.of(iqSender.sendForReply(request));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "admit acked, {0} users", ack.users().size());
         events.emit(new WaitingRoomAdmitAcked(ack.users()));
         return ack;
     }
@@ -103,8 +112,12 @@ public final class WaitingRoomController {
      * @return the admit acknowledgement
      */
     public WaitingRoomAdmitAck admitAll() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "admitting all waiting room participants for call {0}", context.callId());
+        }
         var request = WaitingRoomAdmitStanza.all(context.callId(), context.callCreator());
         var ack = WaitingRoomAdmitAck.of(iqSender.sendForReply(request));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "admit all acked, {0} users", ack.users().size());
         events.emit(new WaitingRoomAdmitAcked(ack.users()));
         return ack;
     }
@@ -121,8 +134,10 @@ public final class WaitingRoomController {
      */
     public WaitingRoomDenyAck deny(Jid userJid) {
         Objects.requireNonNull(userJid, "userJid cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "denying waiting room participant {0}", userJid);
         var request = WaitingRoomDenyStanza.of(context.callId(), context.callCreator(), userJid);
         var ack = WaitingRoomDenyAck.of(iqSender.sendForReply(request));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deny acked, {0} users", ack.users().size());
         events.emit(new WaitingRoomDenyAcked(ack.users()));
         return ack;
     }
@@ -138,6 +153,9 @@ public final class WaitingRoomController {
      * @return the toggle acknowledgement
      */
     public WaitingRoomToggleAck setEnabled(boolean enabled) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "setting waiting room enabled={0} for call {1}", enabled, context.callId());
+        }
         var request = WaitingRoomToggleStanza.of(context.callId(), context.callCreator(), enabled);
         var ack = WaitingRoomToggleAck.of(iqSender.sendForReply(request));
         events.emit(new WaitingRoomToggleAcked(ack.enabled().orElse(enabled)));
@@ -157,6 +175,7 @@ public final class WaitingRoomController {
      * @return the leave acknowledgement
      */
     public WaitingRoomLeaveAck leave() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "leaving waiting room lobby for call {0}", context.callId());
         var request = WaitingRoomLeaveStanza.of(context.callId(), context.callCreator());
         return WaitingRoomLeaveAck.of(iqSender.sendForReply(request));
     }
@@ -175,6 +194,10 @@ public final class WaitingRoomController {
      */
     public WaitingRoomLeaveAck leave(String linkToken) {
         Objects.requireNonNull(linkToken, "linkToken cannot be null");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "leaving call link lobby {0} for call {1}",
+                    Log.token(linkToken), context.callId());
+        }
         var request = new WaitingRoomLeaveStanza(context.callId(), context.callCreator(), Optional.of(linkToken));
         return WaitingRoomLeaveAck.of(iqSender.sendForReply(request));
     }
@@ -190,6 +213,7 @@ public final class WaitingRoomController {
      */
     public void onWaitingRoomUpdate(List<WaitingRoomUser> waiting) {
         Objects.requireNonNull(waiting, "waiting cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "waiting room update, {0} occupants", waiting.size());
         events.emit(new WaitingRoomStateChanged(waiting));
     }
 
@@ -204,6 +228,7 @@ public final class WaitingRoomController {
      */
     public void onSelfLobbyState(WaitingRoomUserState state) {
         Objects.requireNonNull(state, "state cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "self lobby state -> {0}", state);
         events.emit(new CallLinkLobbySelfStateChanged(state));
     }
 
@@ -213,6 +238,7 @@ public final class WaitingRoomController {
      * <p>Emits a terminal {@link WaitingRoomDenied} so the host can inform the user it will not be joining.
      */
     public void onDenied() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "waiting room admission denied for call {0}", context.callId());
         events.emit(new WaitingRoomDenied());
     }
 }

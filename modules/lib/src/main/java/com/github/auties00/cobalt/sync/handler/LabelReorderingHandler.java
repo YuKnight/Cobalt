@@ -11,6 +11,9 @@ import com.github.auties00.cobalt.model.sync.action.contact.LabelReorderingActio
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code label_reordering} app-state sync action that publishes a
@@ -31,6 +34,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebLabelReorderingSync")
 public final class LabelReorderingHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link LabelReorderingHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(LabelReorderingHandler.class);
 
     /**
      * Constructs a new singleton {@link LabelReorderingHandler}.
@@ -87,11 +94,13 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LabelReorderingAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "label reordering mutation has malformed action value");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var sortedLabelIds = action.sortedLabelIds();
         if (sortedLabelIds.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "label reordering mutation has empty sorted label list");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
@@ -101,9 +110,12 @@ public final class LabelReorderingHandler implements WebAppStateActionHandler {
             var label = client.store().settingsStore().findLabel(labelIdString).orElse(null);
             if (label != null) {
                 label.setOrderIndex(position);
+            } else if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "label reordering skipped unknown label {0}", labelIdString);
             }
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "label reordering applied, count={0}", sortedLabelIds.size());
         return MutationApplicationResult.success();
     }
 

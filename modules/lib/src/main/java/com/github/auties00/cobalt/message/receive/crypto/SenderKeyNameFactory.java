@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.message.receive.crypto;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Builds the {@link SignalSenderKeyName} composite key used by the Signal group cipher
@@ -23,6 +26,10 @@ import com.github.auties00.libsignal.groups.SignalSenderKeyName;
  */
 @WhatsAppWebModule(moduleName = "WAWebSignalCommonUtils")
 public final class SenderKeyNameFactory {
+    /**
+     * The logger for {@link SenderKeyNameFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(SenderKeyNameFactory.class);
 
     /**
      * Prevents instantiation of this utility class.
@@ -30,10 +37,10 @@ public final class SenderKeyNameFactory {
      * <p>The class exposes only the static {@link #create(Jid, Jid)} factory; the
      * constructor throws so reflective instantiation also fails.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private SenderKeyNameFactory() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -59,6 +66,7 @@ public final class SenderKeyNameFactory {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public static SignalSenderKeyName create(Jid groupJid, Jid senderJid) {
         var senderAddress = new SignalProtocolAddress(senderJid.user(), senderJid.device());
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "building sender key name for group {0} sender {1}", groupJid, senderJid);
         return new SignalSenderKeyName(groupJid.toString(), senderAddress);
     }
 }

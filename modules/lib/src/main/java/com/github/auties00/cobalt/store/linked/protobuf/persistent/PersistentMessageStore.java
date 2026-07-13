@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoSpec;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -13,6 +14,7 @@ import org.h2.mvstore.MVStore;
 import org.h2.mvstore.type.ByteArrayDataType;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -41,6 +43,9 @@ import java.util.stream.StreamSupport;
  *   <li>{@code status_messages} flat, keyed by {@code msgId}, holding the global status feed.</li>
  * </ul>
  *
+ * <p>Staged WAM event buffers are not stored here; they offload to the independent
+ * {@link PersistentWamBuffersStore}, which owns its own file.
+ *
  * <p>Every map is an {@link MVMap} of {@code byte[]} keys to {@code byte[]} protobuf payloads. Keys use
  * {@link LexByteArrayType} so they sort by the same unsigned-byte (memcmp) order the previous libmdbx
  * env relied on; values use H2's {@link ByteArrayDataType}. Reads decode straight from the
@@ -66,6 +71,11 @@ import java.util.stream.StreamSupport;
  * @see PersistentStore
  */
 final class PersistentMessageStore implements AutoCloseable {
+    /**
+     * The logger for {@link PersistentMessageStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(PersistentMessageStore.class);
+
     /**
      * The byte separating the JID prefix from the message-id suffix in composite keys.
      *
@@ -193,14 +203,17 @@ final class PersistentMessageStore implements AutoCloseable {
                     .autoCommitBufferSize(AUTO_COMMIT_BUFFER_KB)
                     .open();
         } catch (RuntimeException error) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to open mvstore at " + file, error);
             throw new IOException("Could not open MVStore at " + file, error);
         }
         try {
             var chat = openMap(store, CHAT_MESSAGES);
             var newsletter = openMap(store, NEWSLETTER_MESSAGES);
             var status = openMap(store, STATUS_MESSAGES);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opened message store at {0}", file);
             return new PersistentMessageStore(store, chat, newsletter, status);
         } catch (RuntimeException error) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to open message maps at " + file, error);
             store.closeImmediately();
             throw new IOException("Could not open message maps at " + file, error);
         }
@@ -235,6 +248,7 @@ final class PersistentMessageStore implements AutoCloseable {
     void putChatMessage(Jid chatJid, ChatMessageInfo info) {
         var msgId = info.key().id().orElse(null);
         if (msgId == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "dropping chat message with no key id for chat {0}", chatJid);
             return;
         }
         chatMessages.put(encodePrefixedKey(chatJid, msgId.getBytes(StandardCharsets.UTF_8)), encodeChat(info));
@@ -281,7 +295,9 @@ final class PersistentMessageStore implements AutoCloseable {
      * @return the number of entries removed
      */
     int removeChatMessages(Jid chatJid) {
-        return removeRange(chatMessages, chatJid);
+        var removed = removeRange(chatMessages, chatJid);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removed {0} chat messages for {1}", removed, chatJid);
+        return removed;
     }
 
     /**
@@ -405,7 +421,9 @@ final class PersistentMessageStore implements AutoCloseable {
      * @return the number of entries removed
      */
     int removeNewsletterMessages(Jid newsletterJid) {
-        return removeRange(newsletterMessages, newsletterJid);
+        var removed = removeRange(newsletterMessages, newsletterJid);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removed {0} newsletter messages for {1}", removed, newsletterJid);
+        return removed;
     }
 
     /**
@@ -482,6 +500,7 @@ final class PersistentMessageStore implements AutoCloseable {
     void putStatusMessage(ChatMessageInfo info) {
         var msgId = info.key().id().orElse(null);
         if (msgId == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "dropping status message with no key id");
             return;
         }
         statusMessages.put(msgId.getBytes(StandardCharsets.UTF_8), encodeChat(info));
@@ -589,6 +608,7 @@ final class PersistentMessageStore implements AutoCloseable {
      * without blocking writers; the background auto-commit otherwise covers the steady state.
      */
     void commit() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "committing message store");
         store.commit();
     }
 
@@ -606,6 +626,7 @@ final class PersistentMessageStore implements AutoCloseable {
      */
     @Override
     public void close() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing message store");
         store.close();
     }
 

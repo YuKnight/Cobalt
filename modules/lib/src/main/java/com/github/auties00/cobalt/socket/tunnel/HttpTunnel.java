@@ -2,10 +2,12 @@ package com.github.auties00.cobalt.socket.tunnel;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.socket.WhatsAppSslContextFactory;
 
 import javax.net.ssl.SSLSocket;
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
@@ -41,6 +43,11 @@ import java.nio.charset.StandardCharsets;
  * {@link IOException} to ease proxy debugging.
  */
 public final class HttpTunnel {
+
+    /**
+     * The logger for {@link HttpTunnel}.
+     */
+    private static final System.Logger LOGGER = Log.get(HttpTunnel.class);
 
     /**
      * Holds the size in bytes of the reusable read buffer used to drain the {@code CONNECT}
@@ -96,6 +103,10 @@ public final class HttpTunnel {
      */
     public static Socket tunnel(Socket raw, String targetHost, int targetPort,
                                 WhatsAppClientProxy.Http proxy, WhatsAppSslContextFactory ssl) throws IOException {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "opening http connect tunnel to {0}:{1} via {2} proxy",
+                    targetHost, targetPort, proxy.getClass().getSimpleName());
+        }
         var transport = raw;
         if (proxy instanceof WhatsAppClientProxy.Http.Secure) {
             try {
@@ -105,6 +116,9 @@ public final class HttpTunnel {
                 sslSocket.startHandshake();
                 transport = sslSocket;
             } catch (IOException e) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "tls handshake with http proxy failed", e);
+                }
                 try {
                     raw.close();
                 } catch (IOException _) {
@@ -115,6 +129,9 @@ public final class HttpTunnel {
 
         sendConnect(transport, targetHost, targetPort, proxy.authenticator().orElse(null));
         readConnectResponse(transport);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "http connect tunnel established to {0}:{1}", targetHost, targetPort);
+        }
         return transport;
     }
 
@@ -274,8 +291,11 @@ public final class HttpTunnel {
             throw invalidResponse(buffer, filled);
         }
         if (d1 != '2') {
-            throw new IOException("Proxy refused CONNECT: "
-                    + (char) d1 + (char) d2 + (char) d3);
+            var status = "" + (char) d1 + (char) d2 + (char) d3;
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "http proxy refused connect, status={0}", status);
+            }
+            throw new IOException("Proxy refused CONNECT: " + status);
         }
     }
 

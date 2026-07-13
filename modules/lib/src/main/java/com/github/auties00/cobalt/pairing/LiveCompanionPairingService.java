@@ -2,7 +2,8 @@ package com.github.auties00.cobalt.pairing;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
-import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
+import com.github.auties00.cobalt.exception.linked.mobile.WhatsAppRegistrationException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -19,6 +20,7 @@ import javax.crypto.KDF;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.*;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -76,6 +78,11 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebUserPrefsMultiDevice")
 @WhatsAppWebModule(moduleName = "WACryptoHkdf")
 public final class LiveCompanionPairingService implements CompanionPairingService {
+    /**
+     * The logger for {@link LiveCompanionPairingService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveCompanionPairingService.class);
+
     /**
      * Holds the maximum age of a pairing code before
      * {@code primary_hello} is rejected.
@@ -397,17 +404,22 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
             phoneJid = Jid.of(phoneNumber);
             codeGenerationTs = Instant.now();
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting companion pairing for {0}", phoneJid);
+
             var hello = companionHello();
             pairingCode = hello.linkCodePairingSecret();
             companionEphemeralKeyPair = hello.companionEphemeralKeyPair();
 
             var ref = sendCompanionHello(phoneJid, hello.linkCodePairingWrappedCompanionEphemeralPub());
             if (ref == null || ref.length == 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "companion_hello returned no ref for {0}", phoneJid);
                 clearLocked();
                 throw new GeneralSecurityException("Server did not return a ref for companion_hello");
             }
             cachedRef = ref;
             stage = CompanionPairingStage.AFTER_SEND_COMPANION_HELLO;
+
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "companion pairing code generated: {0}", Log.code(pairingCode));
 
             if (webVerificationHandler != null) {
                 webVerificationHandler.handle(pairingCode);
@@ -433,9 +445,11 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
                 return;
             }
             if (!Arrays.equals(cachedRef, notificationRef)) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "refresh_code ref mismatch, ignoring");
                 return;
             }
             cachedRef = notificationRef;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "refresh_code applied for {0}", phoneJid);
         }
     }
 
@@ -457,8 +471,10 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
     public void handlePrimaryHello(byte[] wrappedPrimaryEphemeralPub, byte[] primaryIdentityPublic, byte[] notificationRef) throws GeneralSecurityException {
         synchronized (lock) {
             primaryHelloAttemptCount++;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "primary_hello received, attempt {0}, stage {1}", primaryHelloAttemptCount, stage);
             if (stage == CompanionPairingStage.AFTER_SEND_COMPANION_FINISH) {
                 if (primaryHelloAttemptCount > MAX_PRIMARY_HELLO_ATTEMPTS) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "primary_hello attempts exceeded for {0}", phoneJid);
                     throw new GeneralSecurityException("Exceeded primary_hello attempts for the current pairing code");
                 }
                 regenerateAdvSecret();
@@ -466,6 +482,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
             }
 
             if (stage != CompanionPairingStage.AFTER_SEND_COMPANION_HELLO) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "primary_hello received out of order, stage {0}", stage);
                 throw new IllegalStateException("primary_hello received while in stage " + stage);
             }
 
@@ -473,6 +490,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
                 throw new GeneralSecurityException("No cached ref from companion_hello");
             }
             if (notificationRef == null || !Arrays.equals(cachedRef, notificationRef)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "primary_hello ref does not match cached ref for {0}", phoneJid);
                 throw new GeneralSecurityException("primary_hello ref does not match cached ref");
             }
             if (companionEphemeralKeyPair == null || pairingCode == null) {
@@ -480,6 +498,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
             }
             if (codeGenerationTs == null
                     || Duration.between(codeGenerationTs, Instant.now()).compareTo(CODE_MAX_AGE) > 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "pairing code expired for {0}", phoneJid);
                 throw new GeneralSecurityException("Pairing code has expired");
             }
 
@@ -494,6 +513,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
             whatsapp.store().signalStore().setAdvSecretKey(finish.advSecret());
             sendCompanionFinish(phoneJid, finish.linkCodePairingWrappedKeyBundle(), finish.companionIdentityPublic(), cachedRef);
             stage = CompanionPairingStage.AFTER_SEND_COMPANION_FINISH;
+            if (Log.INFO) LOGGER.log(Level.INFO, "companion pairing completed for {0}", phoneJid);
         }
     }
 
@@ -540,6 +560,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
      */
     @WhatsAppWebExport(moduleName = "WAWebUserPrefsMultiDevice", exports = "setADVSecretKey", adaptation = WhatsAppAdaptation.ADAPTED)
     private void regenerateAdvSecret() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "regenerating adv secret after repeat primary_hello");
         var key = DataUtils.randomByteArray(32);
         whatsapp.store().signalStore().setAdvSecretKey(key);
     }
@@ -575,6 +596,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
         var error = response.getChild("error").orElse(null);
         var code = error == null ? -1 : error.getAttributeAsInt("code", -1);
         var text = error == null ? null : error.getAttributeAsString("text", null);
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "{0} rejected by server, code={1}", flow, code);
         return new WhatsAppRegistrationException(
                 "alt pairing: " + flow + " rejected by server (code=" + code + ", text=" + text + ")");
     }
@@ -655,6 +677,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
                 .attribute("xmlns", "md")
                 .content(linkCodeCompanionReg);
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending companion_hello iq to {0}", phoneJid);
         var response = whatsapp.sendNode(iq);
         var error = extractIqError(response, "companion_hello");
         if (error != null) {
@@ -718,6 +741,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
                 .attribute("xmlns", "md")
                 .content(linkCodeCompanionReg);
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending companion_finish iq to {0}", phoneJid);
         var response = whatsapp.sendNode(iq);
         var error = extractIqError(response, "companion_finish");
         if (error != null) {
@@ -820,8 +844,7 @@ public final class LiveCompanionPairingService implements CompanionPairingServic
                 .flatMap(Stanza::toContentBytes)
                 .orElse(null);
         if (ref == null) {
-            var logger = System.getLogger(LiveCompanionPairingService.class.getName());
-            logger.log(System.Logger.Level.WARNING, "companion_hello response missing ref: {0}", response);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "companion_hello response missing ref: {0}", response);
         }
         return ref;
     }

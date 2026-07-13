@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +34,11 @@ import java.util.List;
  * {@code lockForSync} transaction.
  */
 public final class LockChatMutationFactory {
+    /**
+     * The logger for {@link LockChatMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(LockChatMutationFactory.class);
+
     /**
      * The archive-chat mutation factory consulted by
      * {@link #getMutationsForLock(Instant, boolean, Jid, SyncActionMessageRange)} to build the
@@ -90,6 +97,7 @@ public final class LockChatMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebLockChatSync", exports = "getChatLockMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getChatLockMutation(Instant timestamp, boolean locked, Jid chatJid) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building lock chat mutation chat={0} locked={1}", chatJid, locked);
         var action = new LockChatActionBuilder()
                 .locked(locked)
                 .build();
@@ -146,6 +154,7 @@ public final class LockChatMutationFactory {
     ) {
         var mutations = new ArrayList<SyncPendingMutation>();
         if (locked) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lock chat={0} also unarchiving and unpinning", chatJid);
             mutations.add(archiveChatMutationFactory.getArchiveChatMutation(timestamp, false, chatJid, messageRange));
             mutations.add(pinChatMutationFactory.getPinMutation(timestamp, false, chatJid));
         }

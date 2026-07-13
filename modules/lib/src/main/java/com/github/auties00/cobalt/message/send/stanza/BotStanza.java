@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.bot.BotMessageSecret;
 import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
@@ -16,6 +17,7 @@ import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.util.Objects;
 
@@ -34,9 +36,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebSendGroupSkmsgJob")
 public final class BotStanza {
     /**
-     * Logs bot encryption diagnostics.
+     * The logger for {@link BotStanza}.
      */
-    private static final System.Logger LOGGER = System.getLogger(BotStanza.class.getName());
+    private static final System.Logger LOGGER = Log.get(BotStanza.class);
 
     /**
      * Encrypts the bot body for the bot device.
@@ -98,8 +100,9 @@ public final class BotStanza {
             try {
                 botSecret = BotMessageSecret.derive(messageSecret);
             } catch (GeneralSecurityException e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Failed to derive bot message secret: {0}", e.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "failed to derive bot message secret", e);
+                }
             }
         }
 
@@ -114,8 +117,9 @@ public final class BotStanza {
         try {
             payload = encryption.encryptForDevice(botJid, plaintext);
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Bot encryption failed for {0}: {1}", botJid, e.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "bot encryption failed for " + Log.jid(String.valueOf(botJid)), e);
+            }
             return null;
         }
 
@@ -233,8 +237,9 @@ public final class BotStanza {
             try {
                 botSecret = BotMessageSecret.derive(messageSecret);
             } catch (GeneralSecurityException e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Failed to derive bot message secret for open group bot: {0}", e.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "failed to derive bot message secret for open group bot", e);
+                }
             }
         }
 
@@ -246,8 +251,9 @@ public final class BotStanza {
         try {
             payload = encryption.encryptForDevice(botJid, plaintext);
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Open group bot encryption failed: {0}", e.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "open group bot encryption failed", e);
+            }
             return null;
         }
 

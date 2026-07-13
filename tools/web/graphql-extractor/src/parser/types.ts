@@ -56,6 +56,13 @@ export interface MexVariable {
  */
 export type Transport = "stanza_mex" | "http_relay" | "http_comet" | "unknown";
 
+export type Environment =
+  | "whatsapp_web"
+  | "whatsapp_www"
+  | "whatsapp_guest"
+  | "whatsapp_catalog"
+  | "facebook";
+
 /**
  * One extracted GraphQL operation: its persisted-query identity, request and response schemas, and
  * the set of transports its consumers dispatch it over.
@@ -72,4 +79,13 @@ export interface MexOperation {
   readonly transports: Transport[];
   readonly variables: ReadonlyArray<MexVariable>;
   readonly response: ReadonlyArray<ResponseNode>;
+}
+
+export interface ClassifiedOperation extends MexOperation {
+  readonly environments: Environment[];
+}
+
+export interface MexPageResult {
+  readonly operations: MexOperation[];
+  readonly relaySources: Record<string, string>;
 }

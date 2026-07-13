@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Encodes symbols into the MLow speech codec bitstream, the inverse of {@link MlowRangeDecoder}.
  *
@@ -44,6 +48,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy;
  * ARM only small division table optimization returns the identical quotient and is not used.
  */
 public final class MlowRangeEncoder {
+    /**
+     * The logger for {@link MlowRangeEncoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(MlowRangeEncoder.class);
+
     /**
      * Number of bits emitted at a time by the range coder.
      *
@@ -265,6 +274,10 @@ public final class MlowRangeEncoder {
      */
     private void writeByte(int value) {
         if (offs + endOffs >= storage) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "mlow range encode: buffer overflow offs={0} endOffs={1} storage={2}",
+                        offs, endOffs, storage);
+            }
             error = 1;
             return;
         }
@@ -282,6 +295,10 @@ public final class MlowRangeEncoder {
      */
     private void writeByteAtEnd(int value) {
         if (offs + endOffs >= storage) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "mlow range encode: buffer overflow offs={0} endOffs={1} storage={2}",
+                        offs, endOffs, storage);
+            }
             error = 1;
             return;
         }
@@ -506,6 +523,10 @@ public final class MlowRangeEncoder {
         } else if (Long.compareUnsigned(rng, EC_CODE_TOP >> nbits) <= 0) {
             val = (val & ~(((long) mask << EC_CODE_SHIFT) & U32)) | (((long) value << (EC_CODE_SHIFT + shift)) & U32);
         } else {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "mlow range encode: patchInitialBits failed, insufficient bits encoded "
+                        + "nbits={0}", nbits);
+            }
             error = -1;
         }
     }
@@ -573,17 +594,28 @@ public final class MlowRangeEncoder {
             }
             if (used > 0) {
                 if (endOffs >= storage) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "mlow range encode finish: trailing bits do not fit storage={0}",
+                                storage);
+                    }
                     error = -1;
                 } else {
                     l = -l;
                     if (offs + endOffs >= storage && l < used) {
                         window &= (1L << l) - 1;
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING, "mlow range encode finish: truncated trailing bit window "
+                                    + "storage={0} used={1}", storage, used);
+                        }
                         error = -1;
                     }
                     int idx = bufBase + storage - endOffs - 1;
                     buf[idx] = (byte) ((buf[idx] & 0xFF) | (int) window);
                 }
             }
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "mlow range encode finish: bytes={0} error={1}", offs, error != 0);
         }
     }
 

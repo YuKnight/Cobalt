@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.calls.engine;
 
 import com.github.auties00.cobalt.calls.engine.participant.VideoStreamState;
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.calls.capability.VoipCapabilities;
 import com.github.auties00.cobalt.calls.config.param.VoipParamJsonDeserializer;
 import com.github.auties00.cobalt.calls.config.param.VoipParamKey;
@@ -26,13 +25,15 @@ import com.github.auties00.cobalt.calls.signaling.receive.*;
 import com.github.auties00.cobalt.calls.signaling.relay.*;
 import com.github.auties00.cobalt.calls.signaling.session.*;
 import com.github.auties00.cobalt.calls.signaling.waitingroom.*;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.*;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import com.github.auties00.cobalt.util.DataUtils;
 
+import java.lang.System.Logger.Level;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -49,12 +50,39 @@ import com.github.auties00.cobalt.calls.engine.timer.CallTimerScheduler;
 import com.github.auties00.cobalt.calls.engine.event.LiveCallEventBus;
 import com.github.auties00.cobalt.calls.engine.mediaplane.MediaPlane;
 import com.github.auties00.cobalt.calls.engine.mediaplane.MediaStreams;
+import com.github.auties00.cobalt.calls.engine.mediaplane.MediaSessionListener;
 import com.github.auties00.cobalt.calls.engine.timer.CallTimerKind;
 import com.github.auties00.cobalt.calls.engine.context.CallContext;
 import com.github.auties00.cobalt.calls.engine.context.CallContextRegistry;
 import com.github.auties00.cobalt.calls.engine.OrchestratedCall;
 import com.github.auties00.cobalt.calls.engine.context.PendingCall;
 import com.github.auties00.cobalt.calls.telemetry.CallResult;
+import com.github.auties00.cobalt.calls.crypto.LiveCallKeyExchange;
+import com.github.auties00.cobalt.calls.platform.audio.LiveAudioCaptureDriver;
+import com.github.auties00.cobalt.calls.platform.audio.LiveAudioPlaybackDriver;
+import com.github.auties00.cobalt.calls.platform.LiveVoipHostApi;
+import com.github.auties00.cobalt.calls.platform.VoipDriverManager;
+import com.github.auties00.cobalt.calls.stream.VideoOutput;
+import com.github.auties00.cobalt.calls.engine.info.CallInfoManager;
+import com.github.auties00.cobalt.calls.engine.info.LiveCallInfoUpdater;
+import com.github.auties00.cobalt.calls.engine.event.LiveCallLifecycleEventSink;
+import com.github.auties00.cobalt.calls.engine.state.CallStateMachine;
+import com.github.auties00.cobalt.calls.engine.mediaplane.LiveMediaSession;
+import com.github.auties00.cobalt.calls.engine.mediaplane.LiveMediaDatagramSink;
+import com.github.auties00.cobalt.calls.engine.context.CallManager;
+import com.github.auties00.cobalt.calls.engine.context.LiveCallContextRegistry;
+import com.github.auties00.cobalt.calls.engine.timer.LiveCallTimerScheduler;
+import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.message.MessageService;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
+import com.github.auties00.cobalt.model.jid.JidServer;
+import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
+import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
+
+import java.security.SecureRandom;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Drives a call through its phases by wiring the signaling, crypto, transport, media, state, timer, and
@@ -109,9 +137,9 @@ import com.github.auties00.cobalt.calls.telemetry.CallResult;
  */
 public final class LifecycleController {
     /**
-     * Logs lifecycle phase traces and isolated call failures.
+     * The logger for {@link LifecycleController}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LifecycleController.class.getName());
+    private static final System.Logger LOGGER = Log.get(LifecycleController.class);
 
     /**
      * The number of random bytes drawn to seed a call identifier.
@@ -249,6 +277,27 @@ public final class LifecycleController {
     private final MediaPlane mediaPlane;
 
     /**
+     * The listener passed into each {@link MediaPlane#bringUp bring up} that forwards the media plane's two
+     * per call notifications back to this controller.
+     *
+     * <p>The media plane holds no reference to this controller; instead each brought up call reports its
+     * media connected and local capture interrupted events through this listener, so the controller owns the
+     * media plane as a plain constructor dependency with no cycle. One instance is reused across calls
+     * because both callbacks forward only the call id to the controller's entry points.
+     */
+    private final MediaSessionListener mediaSessionListener = new MediaSessionListener() {
+        @Override
+        public void onConnected(String callId) {
+            onMediaConnected(callId);
+        }
+
+        @Override
+        public void onCaptureInterrupted(String callId) {
+            onLocalCaptureInterrupted(callId);
+        }
+    };
+
+    /**
      * Validates, deduplicates, and classifies each decoded inbound signaling message before dispatch.
      *
      * <p>The router is stateless (the per call deduplication state is threaded in and out through each
@@ -284,131 +333,67 @@ public final class LifecycleController {
 
     /**
      * The shared host event bus a call's in call control units publish their host facing events onto, or
-     * {@code null} until {@linkplain #bindEventBus(LiveCallEventBus, Supplier) bound}.
+     * {@code null} when the controller is built without a host boundary.
      *
-     * <p>The bus is bound after construction rather than taken as a constructor argument, mirroring the
-     * timer scheduler and media plane connection sink bound the same way; until it is bound a call carries
-     * no in call control units, so the lifecycle path (offer, accept, reject, terminate) is exercisable
-     * without it.
+     * <p>Passed as a constructor argument; a controller built through the bare constructor (the test
+     * harnesses) leaves it {@code null}, so a call carries no in call control units and the lifecycle path
+     * (offer, accept, reject, terminate) is exercisable without it.
      */
-    private volatile LiveCallEventBus eventBus;
-
-    /**
-     * Supplies the local device JID an in call control context is stamped with, or {@code null} until
-     * {@linkplain #bindEventBus(LiveCallEventBus, Supplier) bound}.
-     *
-     * <p>Read each time a call's control units are built so a self JID that became known after assembly (the
-     * engine is assembled before the client logs in) is picked up; an outbound call falls back to its call
-     * creator, which already is the local device.
-     */
-    private volatile Supplier<Jid> selfJidSupplier;
+    private final LiveCallEventBus eventBus;
 
     /**
      * The typed read facade over the server calling AB props that gate which call operations may start, or
-     * {@code null} until {@linkplain #bindFeatureGate(CallsFeatureGate) bound}.
+     * {@code null} when the controller is built without a host boundary.
      *
-     * <p>The gate is bound after construction rather than taken as a constructor argument, mirroring the
-     * event bus and the timer scheduler bound the same way; this keeps the controller's constructor stable
-     * for the test harnesses that build it directly without the live AB props service. Until it is bound the
-     * start, group start, and screen share entry points apply no feature gating, matching a build exercised
-     * without the AB props service.
+     * <p>Passed as a constructor argument; a controller built through the bare constructor leaves it
+     * {@code null}, so the start, group start, and screen share entry points apply no feature gating.
      */
-    private volatile CallsFeatureGate featureGate;
-
-    /**
-     * The store backed predicate reporting whether a device JID is one of the local account's own
-     * devices, or {@code null} until {@linkplain #bindOwnDeviceResolver(Predicate) bound}.
-     *
-     * <p>Consulted by the companion device terminate guard in {@link #handlePeerTerminate(TerminateStanza,
-     * Jid)} to decide whether an inbound terminate's authoring device is another device of the local
-     * account (a companion) rather than the remote peer. The resolver is bound after construction rather
-     * than taken as a constructor argument, mirroring the event bus and feature gate bound the same way;
-     * this keeps the controller's constructor stable for the test harnesses that build it directly without a
-     * store. Until it is bound the companion device guard never fires, so an unbound build tears the call
-     * down on any terminate.
-     */
-    private volatile Predicate<Jid> ownDeviceResolver;
+    private final CallsFeatureGate featureGate;
 
     /**
      * The request reply IQ sender the per call {@link CallLinkController} and {@link WaitingRoomController}
-     * dispatch their {@code to="call"} link and waiting room IQs through, or {@code null} until
-     * {@linkplain #bindCallLinkIqSender(CallLinkIqSender) bound}.
+     * dispatch their {@code to="call"} link and waiting room IQs through, or {@code null} when the
+     * controller is built without a host boundary.
      *
-     * <p>The sender is bound after construction rather than taken as a constructor argument, mirroring the
-     * event bus, feature gate, and own device resolver bound the same way; this keeps the controller's
-     * constructor stable for the test harnesses that build it directly without a live socket. Until it is
-     * bound the call link join entry point ({@link #joinCallLink(Jid, String, CallLinkMedia, boolean,
-     * MediaStreams)}) cannot run, since the link query and join handshake is a blocking round trip with no
-     * fire and forget fallback.
+     * <p>Passed as a constructor argument; a controller built through the bare constructor leaves it
+     * {@code null}, so the call link join entry point ({@link #joinCallLink(Jid, String, CallLinkMedia,
+     * boolean, MediaStreams)}) cannot run, since the link query and join handshake is a blocking round trip
+     * with no fire and forget fallback.
      */
-    private volatile CallLinkIqSender callLinkIqSender;
+    private final CallLinkIqSender callLinkIqSender;
 
     /**
-     * The outbound call log sink each ended call's finished context is handed to, or a no op until
-     * {@linkplain #bindCallLogSink(BiConsumer) bound}.
+     * The account sub-store the local self identity is read from, or {@code null} when the controller is
+     * built without a host boundary.
      *
-     * <p>The sink is fired once per call from {@link #tearDown(OrchestratedCall, CallEndReason,
-     * CallEventType)} with the call's engine {@link CallContext} and the terminal {@link CallEndReason},
-     * after the call's durations are closed out, so the call log build and the {@code call_log} app state
-     * push run at the same teardown moment the WAM stats drain does while staying an independent output. The
-     * sink is bound after construction rather than taken as a constructor argument, mirroring the event bus,
-     * feature gate, own device resolver, and call link sender bound the same way; the field defaults to a
-     * no op so the test harnesses that build the controller directly and never bind it record no call log and
-     * are otherwise unaffected.
+     * <p>Read live per call by {@link #selfDeviceJid()} for the JID an in call control context is stamped
+     * with (so a self JID that became known after the engine was built is picked up), and by
+     * {@link #isOwnDevice(Jid)} for the companion device terminate guard in
+     * {@link #handlePeerTerminate(TerminateStanza, Jid)}. A controller built through the bare constructor
+     * leaves it {@code null}, so an outbound call falls back to its creator for the self JID and the
+     * companion guard never fires.
      */
-    private volatile BiConsumer<CallContext, CallEndReason> callLogSink = (context, reason) -> {
-    };
+    private final LinkedWhatsAppAccountStore accountStore;
 
     /**
-     * The result sink each engine resolved call result is reported to, or a no op until
-     * {@linkplain #bindResultSink(BiConsumer) bound}.
+     * The observer the three end of call outcomes are reported to, never {@code null}.
      *
-     * <p>Some outcomes carry a distinct engine call result the terminal end reason cannot recover (an offer
-     * NACK is {@link CallResult#SERVER_NACK}, not the generic teardown reason). The controller reports those
-     * to this sink, keyed by call id, so the service can record the result on the call's telemetry before the
-     * call is torn down; it defaults to a no op so an unbound build is unaffected.
+     * <p>The controller reports a call's media connected, engine result, and ended events up to this
+     * observer, which the call service satisfies so it can stamp the connected instant, record the result,
+     * and free the call's service level state, drain its end of call WAM telemetry, and push the call log at
+     * teardown. Set at construction from the {@link #create} factory (the service passes itself) or
+     * {@link CallLifecycleObserver#NONE} for a bare build.
      */
-    private volatile BiConsumer<String, CallResult> resultSink = (callId, result) -> {
-    };
+    private final CallLifecycleObserver observer;
 
     /**
-     * The teardown sink each ended call's identifier is reported to once at the ended transition, or a no op
-     * until {@linkplain #bindTeardownSink(Consumer) bound}.
+     * Constructs a lifecycle controller over its nine collaborating units with no host boundary.
      *
-     * <p>A call's end of call WAM telemetry drains and its per call context is freed exactly once at the
-     * call's ending transition, for every ended call regardless of which side ended it. The controller's
-     * {@link #tearDown(OrchestratedCall, CallEndReason, CallEventType)} is that single ending transition for
-     * every end path (a local hangup through {@link #endCall(String, CallEndReason)}, a peer terminate, a
-     * reject, a timeout, an offer NACK, or a setup failure), so it fires this sink there. The call service
-     * binds {@code unregister} onto it, which removes the call from the service registry, removes it from the
-     * store, and commits the WAM Call event. The sink is bound after construction rather than taken as a
-     * constructor argument, mirroring the result sink and call log sink bound the same way; it defaults to a
-     * no op so the controller construction test harnesses that never bind it tear a call down without
-     * draining service level telemetry.
-     */
-    private volatile Consumer<String> teardownSink = callId -> {
-    };
-
-    /**
-     * The connected sink each call's identifier is reported to once its media plane first goes
-     * {@link CallLifecycleState#CALL_ACTIVE}, or a no op until {@linkplain #bindConnectedSink(Consumer) bound}.
-     *
-     * <p>A call's connected instant is stamped the first time its media plane becomes bidirectional, so the
-     * end of call telemetry can report a nonzero connected duration. The controller fires this sink from
-     * {@link #onMediaConnected(String)} when the media connected transition lands on
-     * {@link CallLifecycleState#CALL_ACTIVE} (a group call that settles in
-     * {@link CallLifecycleState#CONNECTED_LONELY} with no connected peer is not yet connected and fires
-     * nothing). The call service binds a sink that stamps the call's telemetry accumulator, symmetric with
-     * the teardown sink that stamps the ended instant. The sink is bound after construction rather than taken
-     * as a constructor argument, mirroring the teardown and result sinks; it defaults to a no op so the
-     * controller construction test harnesses that never bind it connect a call without stamping service level
-     * telemetry.
-     */
-    private volatile Consumer<String> connectedSink = callId -> {
-    };
-
-    /**
-     * Constructs a lifecycle controller over its collaborating units.
+     * <p>This is the bare engine build the test harnesses use: the event bus, self JID supplier, feature
+     * gate, own device resolver, and call link sender are left {@code null} and the call log, result,
+     * teardown, and connected sinks default to no ops, so the signaling and media lifecycle is exercisable
+     * with no live client, AB props service, or store. The production build goes through {@link #create},
+     * which supplies every host boundary seam.
      *
      * @param offerAckSender the sender that ships an offer and returns its synchronous call ack
      * @param crypto         the call key crypto facade over the Signal pipeline
@@ -427,6 +412,50 @@ public final class LifecycleController {
                                      CallStateTransition stateMachine, CallTimerScheduler timers,
                                      CallInfoUpdater infoUpdater, CallLifecycleEventSink events,
                                      MediaPlane mediaPlane) {
+        this(offerAckSender, crypto, host, registry, stateMachine, timers, infoUpdater, events, mediaPlane,
+                null, null, null, null, CallLifecycleObserver.NONE);
+    }
+
+    /**
+     * Constructs a lifecycle controller over its nine collaborating units, its client host, and its
+     * observer.
+     *
+     * <p>The nine units are the engine's own collaborators; the four client host arguments (event bus,
+     * feature gate, call link sender, account store) carry the client environment the engine talks up to,
+     * each of which may be {@code null} for a bare engine build, and the {@link CallLifecycleObserver}
+     * carries the three end of call outcomes the engine reports up to the call service. A {@code null} host
+     * argument is treated as "that capability is absent"; the bare constructor passes {@code null} for all
+     * four and {@link CallLifecycleObserver#NONE}.
+     *
+     * @param offerAckSender the sender that ships an offer and returns its synchronous call ack
+     * @param crypto         the call key crypto facade over the Signal pipeline
+     * @param host           the host API supplying signaling egress and cryptographically strong
+     *                       randomness
+     * @param registry       the seam that allocates and frees the engine call context
+     * @param stateMachine   the state transition guard
+     * @param timers         the per call timer scheduler
+     * @param infoUpdater    the info manager update that folds events into the result snapshot
+     * @param events         the event sink that gates and fans out the typed events
+     * @param mediaPlane     the media plane bring up and teardown seam
+     * @param eventBus       the shared host event bus the in call control units publish onto, or
+     *                       {@code null} for a bare build
+     * @param featureGate    the server calling feature gate the start entry points consult, or {@code null}
+     *                       for a bare build
+     * @param callLinkIqSender the request reply IQ sender the link and waiting room units dispatch through,
+     *                       or {@code null} for a bare build
+     * @param accountStore   the account sub-store the local self device JID and own device check are read
+     *                       from, or {@code null} for a bare build
+     * @param observer       the observer the end of call outcomes are reported to, never {@code null}
+     * @throws NullPointerException if any unit argument or {@code observer} is {@code null}
+     */
+    private LifecycleController(OfferAckSender offerAckSender, CallKeyExchange crypto,
+                                     VoipHostApi host, CallContextRegistry registry,
+                                     CallStateTransition stateMachine, CallTimerScheduler timers,
+                                     CallInfoUpdater infoUpdater, CallLifecycleEventSink events,
+                                     MediaPlane mediaPlane, LiveCallEventBus eventBus,
+                                     CallsFeatureGate featureGate, CallLinkIqSender callLinkIqSender,
+                                     LinkedWhatsAppAccountStore accountStore,
+                                     CallLifecycleObserver observer) {
         this.offerAckSender = Objects.requireNonNull(offerAckSender, "offerAckSender cannot be null");
         this.crypto = Objects.requireNonNull(crypto, "crypto cannot be null");
         this.host = Objects.requireNonNull(host, "host cannot be null");
@@ -436,175 +465,176 @@ public final class LifecycleController {
         this.infoUpdater = Objects.requireNonNull(infoUpdater, "infoUpdater cannot be null");
         this.events = Objects.requireNonNull(events, "events cannot be null");
         this.mediaPlane = Objects.requireNonNull(mediaPlane, "mediaPlane cannot be null");
+        this.eventBus = eventBus;
+        this.featureGate = featureGate;
+        this.callLinkIqSender = callLinkIqSender;
+        this.accountStore = accountStore;
+        this.observer = Objects.requireNonNull(observer, "observer cannot be null");
     }
 
     /**
-     * Binds the shared host event bus and local JID supplier the in call control units publish through.
+     * Assembles a fully wired live lifecycle controller from a client's call engine units.
      *
-     * <p>The bus and self JID supplier are not constructor arguments because the controller is built before
-     * the bus and the logged in identity are both available; they are bound here once, the same post
-     * construction wiring step the timer scheduler and the media plane connection sink use. Once bound, a
-     * call that becomes answerable is given its in call control units (mute, video, screen share, raise
-     * hand) wired onto a {@link ControlEventBridge} over this bus; before binding a call carries no control
-     * units and the in call control methods are no ops for a tracked call.
+     * <p>This is the engine composition root: it builds the units a live client owns and threads them
+     * into the controller. The offer ack send rides the client's request correlated send, the call key
+     * crypto is the {@link LiveCallKeyExchange} facade over the reused Signal pipeline, signaling egress
+     * and randomness come from {@link LiveVoipHostApi}, the at most two call contexts live in a single
+     * {@link CallManager}, the transition guard is the {@link CallStateMachine} over that manager, the per
+     * call timers run on the {@link LiveCallTimerScheduler}, the call info snapshots refresh through a
+     * single {@link CallInfoManager}, and the {@link MediaPlane} is the real
+     * {@link LiveMediaSession.LiveMediaPlane}. The client environment (event bus, feature gate, call link
+     * sender, account store) is passed as four constructor arguments, and {@code observer} carries the
+     * end of call outcomes back to the call service.
      *
-     * @apiNote The call service's engine assembler is the only caller; an embedder never binds the bus.
-     * @implNote This implementation stores the bus and supplier in {@code volatile} fields read on the
-     * wiring thread and the control threads; both are written once, before any call is placed or answered.
-     * @param eventBus        the shared host event bus the control units publish their events onto
-     * @param selfJidSupplier supplies the local device JID stamped onto a control context, re read per call
-     * @throws NullPointerException if {@code eventBus} or {@code selfJidSupplier} is {@code null}
+     * <p>The whole engine is a directed acyclic graph with no post construction wiring: the scheduler holds
+     * no controller (a fired timer runs the {@link Runnable} the controller arms it with) and the media
+     * plane holds no controller (each brought up call reports its media connected and capture interrupted
+     * events through the per call {@link MediaSessionListener} the controller passes to
+     * {@link MediaPlane#bringUp bringUp}), so neither needs a holder or a setter to reach the controller.
+     *
+     * @apiNote The call service is the only caller; it passes itself as the {@code observer} so the engine
+     * reports back into the service as a plain constructor dependency.
+     * @implNote This implementation initializes the engine's single {@link VoipDriverManager} once here,
+     * owning the audio capture and playback drivers and the camera and screen share source factories every
+     * brought up media session routes through.
+     *
+     * @param whatsapp          the owning client, used for signaling egress and the offer ack round trip
+     * @param messageEncryption the encryption service the call key crypto wraps the key with
+     * @param messageService    the message service the call key crypto decrypts inbound key envelopes with
+     * @param deviceService     the device service the call key crypto ensures sessions through
+     * @param store             the store supplying the local ADV signed device identity and account identity
+     * @param abPropsService    the AB props service the {@link CallsFeatureGate} reads its calling feature
+     *                          flags from
+     * @param eventBus          the shared host event bus the in call control units publish onto
+     * @param observer          the observer the media connected, result, and ended outcomes are reported to
+     * @return a fully wired lifecycle controller
+     * @throws NullPointerException if any of the engine dependencies is {@code null}
      */
-    public void bindEventBus(LiveCallEventBus eventBus, Supplier<Jid> selfJidSupplier) {
-        this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
-        this.selfJidSupplier = Objects.requireNonNull(selfJidSupplier, "selfJidSupplier cannot be null");
+    public static LifecycleController create(LinkedWhatsAppClient whatsapp,
+                                             MessageEncryption messageEncryption,
+                                             MessageService messageService,
+                                             DeviceService deviceService,
+                                             LinkedWhatsAppStore store,
+                                             ABPropsService abPropsService,
+                                             LiveCallEventBus eventBus,
+                                             CallLifecycleObserver observer) {
+        Objects.requireNonNull(whatsapp, "whatsapp cannot be null");
+        Objects.requireNonNull(messageEncryption, "messageEncryption cannot be null");
+        Objects.requireNonNull(messageService, "messageService cannot be null");
+        Objects.requireNonNull(deviceService, "deviceService cannot be null");
+        Objects.requireNonNull(store, "store cannot be null");
+        Objects.requireNonNull(abPropsService, "abPropsService cannot be null");
+        Objects.requireNonNull(eventBus, "eventBus cannot be null");
+        Objects.requireNonNull(observer, "observer cannot be null");
+
+        var secureRandom = new SecureRandom();
+        CallKeyExchange crypto =
+                new LiveCallKeyExchange(messageEncryption, messageService, deviceService, store, secureRandom);
+        var manager = new CallManager();
+        var stateMachine = new CallStateMachine(manager);
+        var infoManager = new CallInfoManager();
+        var events = new LiveCallLifecycleEventSink();
+        VoipHostApi host = new LiveVoipHostApi(whatsapp, new LiveMediaDatagramSink(), frame -> {
+        }, (eventType, payload) -> {
+        });
+
+        var voipDriverManager = newVoipDriverManager();
+        voipDriverManager.initialize();
+        // Built once and shared: this gate backs the controller's start, group start, and screen share
+        // gating and supplies the group call initial BWE seed decision the media plane reads per bring up so
+        // the AB props cache is warm when a call starts rather than read on a cold cache here at assembly.
+        var featureGate = new CallsFeatureGate(abPropsService);
+        var mediaPlane = new LiveMediaSession.LiveMediaPlane(host, store.accountStore(), voipDriverManager,
+                featureGate);
+
+        var timers = new LiveCallTimerScheduler(manager, events, featureGate);
+        var controller = new LifecycleController(
+                new LiveOfferAckSender(whatsapp),
+                crypto,
+                host,
+                new LiveCallContextRegistry(manager),
+                stateMachine,
+                timers,
+                new LiveCallInfoUpdater(manager, infoManager),
+                events,
+                mediaPlane,
+                eventBus,
+                featureGate,
+                new LiveCallLinkIqSender(whatsapp),
+                store.accountStore(),
+                observer);
+        if (Log.INFO) LOGGER.log(Level.INFO, "call engine assembled");
+        return controller;
     }
 
     /**
-     * Binds the server AB prop feature gate the start, group start, and screen share entry points consult.
+     * Builds the engine's single {@link VoipDriverManager} over fresh platform capture and playback
+     * drivers and the default camera and screen share source factories.
      *
-     * <p>The gate is not a constructor argument because the controller is built before the live AB props
-     * service is threaded in, and the test harnesses build the controller directly with no such service;
-     * binding it here, the same post construction wiring step {@link #bindEventBus(LiveCallEventBus,
-     * Supplier)} uses, keeps the constructor stable. Once bound, {@link #startCall(Jid, Jid, List, boolean,
-     * MediaStreams)} is gated on {@link CallsFeatureGate#isWebCallingEnabled()},
-     * {@link #startGroupCall(Jid, Collection, Jid, boolean, MediaStreams)} on
-     * {@link CallsFeatureGate#isGroupCallsEnabled()} and the
-     * {@link CallsFeatureGate#groupCallMaxParticipants()} ceiling, and {@link #startScreenShare(String)} on
-     * {@link CallsFeatureGate#isScreenShareEnabled()}; before binding those entry points apply no gating.
+     * <p>The manager owns the two audio capture drivers (microphone and system audio loopback), the audio
+     * playback driver, and the camera and screen share video source factories for the lifetime of the
+     * engine; each brought up media session routes its capture and playback bring up through this one
+     * manager rather than opening a device directly. The returned manager is not yet
+     * {@linkplain VoipDriverManager#initialize() initialized}; the caller initializes it once.
      *
-     * @apiNote The call service's engine assembler is the only caller; an embedder never binds the gate.
-     * @implNote This implementation stores the gate in a {@code volatile} field read on the calling threads;
-     * it is written once, before any call is placed.
-     * @param featureGate the typed read facade over the server calling AB props
-     * @throws NullPointerException if {@code featureGate} is {@code null}
+     * @return a fresh, uninitialized driver manager owning the engine's capture and playback drivers
      */
-    public void bindFeatureGate(CallsFeatureGate featureGate) {
-        this.featureGate = Objects.requireNonNull(featureGate, "featureGate cannot be null");
+    private static VoipDriverManager newVoipDriverManager() {
+        return new VoipDriverManager(
+                new LiveAudioCaptureDriver(),
+                new LiveAudioCaptureDriver(),
+                new LiveAudioPlaybackDriver(),
+                deviceId -> VideoOutput.fromCamera(),
+                surfaceId -> VideoOutput.fromScreen());
     }
 
     /**
-     * Binds the store backed own device predicate the companion device terminate guard consults.
+     * Reports whether a device JID is one of the local account's own devices for the companion device
+     * terminate guard.
      *
-     * <p>The resolver is not a constructor argument because the controller is built before the logged in
-     * identity and device list are settled, and the test harnesses build the controller directly with no
-     * store; binding it here, the same post construction wiring step
-     * {@link #bindEventBus(LiveCallEventBus, Supplier)} and {@link #bindFeatureGate(CallsFeatureGate)} use,
-     * keeps the constructor stable. Once bound, the companion device guard in
-     * {@link #handlePeerTerminate(TerminateStanza, Jid)} consults it to decide whether a terminate's
-     * authoring device is one of the local account's own devices; before binding the guard never fires.
+     * <p>A device JID belongs to the local account when it resolves to the same account as the account's
+     * own phone number JID or LID, or when it appears in the account's linked device list; the account
+     * equality test normalizes the device and agent suffixes away so a device JID
+     * ({@code user:device@server}) matches the bare account JID. The account store is read live on each call
+     * so a self JID, LID, or linked device set that became known after the engine was built is picked up. A
+     * bare build with no account store never reports a device as own, so the companion guard never fires.
      *
-     * @apiNote The call service's engine assembler is the only caller; an embedder never binds the
-     * resolver.
-     * @implNote This implementation stores the predicate in a {@code volatile} field read on the inbound
-     * signaling threads; it is written once, before any call is placed or answered. The predicate itself
-     * reads the live account store on each call, so a self JID, LID, or linked device set that became known
-     * after binding is picked up without rebinding.
-     * @param ownDeviceResolver the predicate reporting whether a device JID is one of the local account's
-     *                          own devices
-     * @throws NullPointerException if {@code ownDeviceResolver} is {@code null}
+     * @implNote This implementation runs {@link Jid#isSameAccount(Jid)} against both the phone number JID
+     * and the LID, because a call's signaling sender may use either addressing mode, and falls back to the
+     * linked device list as the explicit enumeration of the account's companions when the self identity is
+     * not yet populated.
+     *
+     * @param deviceJid the device JID to test, never {@code null}
+     * @return {@code true} when {@code deviceJid} is one of the local account's own devices
      */
-    public void bindOwnDeviceResolver(Predicate<Jid> ownDeviceResolver) {
-        this.ownDeviceResolver = Objects.requireNonNull(ownDeviceResolver, "ownDeviceResolver cannot be null");
+    private boolean isOwnDevice(Jid deviceJid) {
+        if (accountStore == null) {
+            return false;
+        }
+        if (accountStore.jid().map(deviceJid::isSameAccount).orElse(false)
+                || accountStore.lid().map(deviceJid::isSameAccount).orElse(false)) {
+            return true;
+        }
+        for (var linkedDevice : accountStore.linkedDevices()) {
+            if (deviceJid.isSameAccount(linkedDevice)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
-     * Binds the request reply IQ sender the call link and waiting room control units dispatch through.
+     * Returns the local device JID an in call control context is stamped with, read live from the account
+     * store, or {@code null} when the account is not yet known or the controller has no host boundary.
      *
-     * <p>The sender is not a constructor argument because the controller is built before the client socket it
-     * sends over is reachable, and the test harnesses build the controller directly with no socket; binding
-     * it here, the same post construction wiring step {@link #bindEventBus(LiveCallEventBus, Supplier)} and
-     * {@link #bindFeatureGate(CallsFeatureGate)} use, keeps the constructor stable. Once bound,
-     * {@link #joinCallLink(Jid, String, CallLinkMedia, boolean, MediaStreams)} constructs the per call
-     * {@link CallLinkController} and {@link WaitingRoomController} over this sender so the link query and join
-     * handshake and the waiting room admit and deny ride it; before binding the call link join entry point
-     * refuses to run.
+     * <p>The account phone number JID, read live per call so a JID that became known after the engine was
+     * built is picked up. A bare build with no account store returns {@code null}, and the control context
+     * setup falls back to the call's creator, which already is the local device for an outbound call.
      *
-     * @apiNote The call service's engine assembler is the only caller; an embedder never binds the sender.
-     * @implNote This implementation stores the sender in a {@code volatile} field read on the call link join
-     * thread; it is written once, before any call is placed or joined.
-     * @param callLinkIqSender the blocking {@code to="call"} request reply egress the link controllers use
-     * @throws NullPointerException if {@code callLinkIqSender} is {@code null}
+     * @return the local device JID, or {@code null} when unavailable
      */
-    public void bindCallLinkIqSender(CallLinkIqSender callLinkIqSender) {
-        this.callLinkIqSender = Objects.requireNonNull(callLinkIqSender, "callLinkIqSender cannot be null");
-    }
-
-    /**
-     * Binds the outbound call log sink each ended call's finished context is handed to at teardown.
-     *
-     * <p>The sink is not a constructor argument because the call log collaborator it points at depends on the
-     * client's app state push round, which is threaded in after this controller is built, and the test
-     * harnesses build the controller directly with no such collaborator; binding it here, the same post
-     * construction wiring step {@link #bindEventBus(LiveCallEventBus, Supplier)} and
-     * {@link #bindFeatureGate(CallsFeatureGate)} use, keeps the constructor stable. Once bound,
-     * {@link #tearDown(OrchestratedCall, CallEndReason, CallEventType)} hands the ended call's engine
-     * {@link CallContext} and terminal {@link CallEndReason} to the sink exactly once per call, after the
-     * call's durations are closed out; before binding the teardown records no call log.
-     *
-     * @apiNote The call service's engine assembler, or the client that owns the call log collaborator, is
-     * the only caller; an embedder never binds the sink.
-     * @implNote This implementation stores the sink in a {@code volatile} field read on the teardown thread;
-     * it is written once, before any call is placed or answered, and defaults to a no op so an unbound build
-     * (the controller construction test harnesses) tears a call down without producing a call log.
-     * @param callLogSink the sink consuming the finished {@link CallContext} and terminal
-     *                    {@link CallEndReason} of each ended call
-     * @throws NullPointerException if {@code callLogSink} is {@code null}
-     */
-    public void bindCallLogSink(BiConsumer<CallContext, CallEndReason> callLogSink) {
-        this.callLogSink = Objects.requireNonNull(callLogSink, "callLogSink cannot be null");
-    }
-
-    /**
-     * Binds the sink each engine resolved call result is reported to.
-     *
-     * <p>Bound once, before any call is placed, to the service that records the result on the call's
-     * telemetry accumulator. Defaults to a no op so an unbound build is unaffected.
-     *
-     * @param resultSink the sink consuming the call id and its resolved {@link CallResult}
-     * @throws NullPointerException if {@code resultSink} is {@code null}
-     */
-    public void bindResultSink(BiConsumer<String, CallResult> resultSink) {
-        this.resultSink = Objects.requireNonNull(resultSink, "resultSink cannot be null");
-    }
-
-    /**
-     * Binds the sink each ended call's identifier is reported to once at the ended transition.
-     *
-     * <p>Bound once, before any call is placed, to the service whose {@code unregister} removes the call from
-     * the registry, removes it from the store, and commits the end of call WAM telemetry. The controller
-     * fires it from {@link #tearDown(OrchestratedCall, CallEndReason, CallEventType)} for every end path, so
-     * the service level teardown and WAM drain fire for every ended call regardless of who ended it, draining
-     * the telemetry and freeing the context exactly once per ending transition. Defaults to a no op so an
-     * unbound build is unaffected.
-     *
-     * @apiNote The call service is the only caller; an embedder never binds the sink.
-     * @implNote This implementation stores the sink in a {@code volatile} field read on the teardown thread;
-     * it is written once, before any call is placed or answered. It is kept independent of the call log sink
-     * and the result sink because the service level teardown (registry removal plus WAM commit) is a distinct
-     * end of call output from the app state call log push and the engine result record.
-     * @param teardownSink the sink consuming the identifier of each ended call
-     * @throws NullPointerException if {@code teardownSink} is {@code null}
-     */
-    public void bindTeardownSink(Consumer<String> teardownSink) {
-        this.teardownSink = Objects.requireNonNull(teardownSink, "teardownSink cannot be null");
-    }
-
-    /**
-     * Binds the sink each call's identifier is reported to once its media plane first goes active.
-     *
-     * <p>Bound once, before any call is placed, to the service that stamps the call's telemetry accumulator
-     * with its connected instant. The controller fires it from {@link #onMediaConnected(String)} the first
-     * time the media connected transition lands on {@link CallLifecycleState#CALL_ACTIVE}, symmetric with the
-     * teardown sink that stamps the ended instant, so the WAM Call event reports a nonzero connected
-     * duration. Defaults to a no op so an unbound build is unaffected.
-     *
-     * @apiNote The call service is the only caller; an embedder never binds the sink.
-     * @param connectedSink the sink consuming the identifier of each call whose media plane went active
-     * @throws NullPointerException if {@code connectedSink} is {@code null}
-     */
-    public void bindConnectedSink(Consumer<String> connectedSink) {
-        this.connectedSink = Objects.requireNonNull(connectedSink, "connectedSink cannot be null");
+    private Jid selfDeviceJid() {
+        return accountStore == null ? null : accountStore.jid().orElse(null);
     }
 
     /**
@@ -939,14 +969,16 @@ public final class LifecycleController {
             throw new IllegalArgumentException("deviceJids cannot be empty for an outbound offer");
         }
         var gate = featureGate;
-        /*
-        FIXME
+        // enable_web_calling master gate (AB prop id 15461): WA gates the 1:1 outbound offer on
+        // WAWebVoipGatingUtils.isCallingEnabled() across its deep-link, bundle-load, and voip-init layers; a
+        // headless library collapses those into this single startCall entry, mirroring the inline guard WA
+        // keeps on the group send site (startGroupCall -> isGroupCallingEnabled()).
         if (gate != null && !gate.isWebCallingEnabled()) {
             throw new IllegalStateException("Cannot start a call: web calling is disabled for this account");
-        }st
-         */
+        }
 
         var callId = generateCallId();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting one-to-one call {0} to {1}, video={2}", callId, peer, video);
         var call = new Call(callId, peer, peer, self, true, false, video, CallState.RINGING);
         var orchestrated = new OrchestratedCall(call, true, peer, CallLifecycleState.NONE);
         orchestrated.peerDevices(devices);
@@ -961,14 +993,15 @@ public final class LifecycleController {
 
             var offer = buildOffer(callId, self, devices, callKey, video, offerIdentity());
             transition(orchestrated, CallLifecycleState.CALLING, CallEventType.CALL_OFFER_SENT);
-            timers.arm(callId, CallTimerKind.CALLER_LONELY);
-            timers.arm(callId, CallTimerKind.PERIODIC);
-            timers.arm(callId, CallTimerKind.HEARTBEAT);
+            armTimer(callId, CallTimerKind.CALLER_LONELY);
+            armTimer(callId, CallTimerKind.PERIODIC);
+            armTimer(callId, CallTimerKind.HEARTBEAT);
 
             var ack = sendOffer(callId, self, peer, offer);
             applyOfferAck(orchestrated, ack);
             return call;
         } catch (WhatsAppCallException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "offer send failed for call " + callId, e);
             tearDown(orchestrated, CallEndReason.SETUP_FAILED, CallEventType.CALL_OFFER_SEND_FAILED);
             throw e;
         } finally {
@@ -1145,6 +1178,8 @@ public final class LifecycleController {
             throw new IllegalStateException("Cannot place or join group call " + callId + ": it is already live");
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting group call {0} into {1}, participants={2}, video={3}",
+                callId, groupJid, participants.size(), video);
         var call = new Call(callId, groupJid, groupJid, creator, true, true, video, CallState.CONNECTING);
         var orchestrated = new OrchestratedCall(call, true, null, CallLifecycleState.NONE);
         var membership = new CallMembership(callId);
@@ -1166,9 +1201,9 @@ public final class LifecycleController {
 
             var offer = buildGroupOffer(callId, creator, roster, video, offerIdentity());
             transition(orchestrated, CallLifecycleState.CALLING, CallEventType.CALL_OFFER_SENT);
-            timers.arm(callId, CallTimerKind.CALLER_LONELY);
-            timers.arm(callId, CallTimerKind.PERIODIC);
-            timers.arm(callId, CallTimerKind.HEARTBEAT);
+            armTimer(callId, CallTimerKind.CALLER_LONELY);
+            armTimer(callId, CallTimerKind.PERIODIC);
+            armTimer(callId, CallTimerKind.HEARTBEAT);
 
             var ack = sendOffer(callId, self, groupTarget, offer);
             applyOfferAck(orchestrated, ack);
@@ -1181,10 +1216,11 @@ public final class LifecycleController {
             orchestrated.relay().ifPresent(relay ->
                     bringUpMediaPlane(orchestrated, relay, orchestrated.offerAckVoipSettings(), callKey, true, video));
             fanOutGroupRekey(orchestrated, self, callKey);
-            timers.arm(callId, CallTimerKind.UPDATE_ENCRYPTION_KEY);
+            armTimer(callId, CallTimerKind.UPDATE_ENCRYPTION_KEY);
             ensureControls(orchestrated);
             return call;
         } catch (WhatsAppCallException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "group offer send failed for call " + callId, e);
             tearDown(orchestrated, CallEndReason.SETUP_FAILED, CallEventType.CALL_OFFER_SEND_FAILED);
             throw e;
         } finally {
@@ -1220,6 +1256,7 @@ public final class LifecycleController {
     public Call acceptCall(String callId, boolean video, MediaStreams streams) {
         Objects.requireNonNull(callId, "callId cannot be null");
         Objects.requireNonNull(streams, "streams cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "accepting call {0}, video={1}", callId, video);
         var orchestrated = require(callId);
         orchestrated.lock().lock();
         try {
@@ -1258,10 +1295,11 @@ public final class LifecycleController {
             host.sendSignaling(CallStanza.toCall(accept, to, callId));
 
             transition(orchestrated, CallLifecycleState.ACCEPT_SENT, CallEventType.CALL_ACCEPT_SENT);
-            timers.arm(callId, CallTimerKind.PERIODIC);
+            armTimer(callId, CallTimerKind.PERIODIC);
             ensureControls(orchestrated);
             return call;
         } catch (WhatsAppCallException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "accept send failed for call " + callId, e);
             tearDown(orchestrated, CallEndReason.SETUP_FAILED, CallEventType.CALL_ACCEPT_SEND_FAILED);
             throw e;
         } finally {
@@ -1469,6 +1507,7 @@ public final class LifecycleController {
                     "Cannot join a call link: the call-link IQ sender is not wired");
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "joining call link token={0}, video={1}", Log.token(token), video);
         // The joiner mints its call object at preview under the all zeros sentinel call id, registers it,
         // runs the link_join handshake, then adopts the relay assigned id and creator from the join ack while
         // the id is still the placeholder. Register under the placeholder, transition to LINK, run the
@@ -1520,6 +1559,7 @@ public final class LifecycleController {
             // answered, so tear it down here. A media bring up failure inside acceptCall has already torn the
             // call down and removed it from the registry, so the still tracked guard avoids a double teardown.
             if (calls.containsKey(callId)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "call link join failed for call " + callId, e);
                 tearDown(orchestrated, CallEndReason.SETUP_FAILED, CallEventType.CALL_IS_ENDING);
             }
             throw e;
@@ -1782,7 +1822,7 @@ public final class LifecycleController {
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
         var callId = offer.callId().orElseThrow();
         if (calls.containsKey(callId)) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Dropping duplicate offer for already-tracked call {0}", callId);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping duplicate offer for already-tracked call {0}", callId);
             return Optional.empty();
         }
 
@@ -1873,13 +1913,13 @@ public final class LifecycleController {
         var existing = pendingCall;
         if (existing != null && existing.state() == PendingCall.State.PENDING
                 && existing.callId().equals(callId)) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Re-ring of buffered pending-call offer {0}: keeping existing buffer", callId);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "re-ring of buffered pending-call offer {0}: keeping existing buffer", callId);
             return;
         }
         pendingCall = new PendingCall(offer);
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Buffering pending-call offer for {0}: dual-call ceiling reached, enable_pending_call set",
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                "buffering pending-call offer for {0}: dual-call ceiling reached, enable_pending_call set",
                 callId);
     }
 
@@ -1912,8 +1952,8 @@ public final class LifecycleController {
     private void bufferPendingMessage(CallMessage message, String callId) {
         var pending = pendingCall;
         if (pending != null && pending.buffer(message)) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Buffered pending-call signaling {0} for {1}", message.type(), callId);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "buffered pending-call signaling {0} for {1}", message.type(), callId);
         }
     }
 
@@ -1970,8 +2010,9 @@ public final class LifecycleController {
      * {@link TransportStanza} to the transport advance, and {@link GroupUpdateStanza} to the membership
      * reconcile and active versus lonely re decision. The remaining in call action types (mute, video state,
      * screen share, reactions, standalone rekey) are dispatched to the control units the controller delegates
-     * to and are not all handled inline here. The per type handlers are unchanged; only dispatch is gated on
-     * the router verdict and the dedup state is threaded around it.
+     * to and are not all handled inline here. Dispatch is gated on the router verdict, the dedup state is
+     * threaded around it, and for a message that resolves an existing call the router's resolved context is
+     * threaded into the direct per type handlers under the call's held lock so they no longer re resolve it.
      *
      * @param message   the decoded inbound action
      * @param senderJid the device JID that authored the message envelope, used as the decryption sender,
@@ -1993,14 +2034,35 @@ public final class LifecycleController {
                 id -> Objects.equals(id, callId) ? resolved : calls.get(id), this::isBufferedPendingCall);
         switch (verdict.routingClass()) {
             case PROCESS, OFFER_RERING, ACCEPT_HANDLE -> {
-                var terminateEffected = dispatchInbound(message, senderJid);
-                advanceDedup(message, callId);
-                return terminateEffected;
+                var orchestrated = verdict.context().orElse(null);
+                if (orchestrated == null) {
+                    // A fresh offer that resolved no context: handleIncomingOffer creates and locks the call
+                    // itself, so there is no existing call to hold a lock on across this dispatch.
+                    var terminateEffected = dispatchInbound(message, senderJid, null);
+                    advanceDedup(message, callId);
+                    return terminateEffected;
+                }
+                orchestrated.lock().lock();
+                try {
+                    // tearDown() removes the call from the map under this same per-call lock, so a call no
+                    // longer mapped once the lock is held was torn down while this thread waited for it: drop
+                    // the message rather than dispatch it against a dead call.
+                    if (calls.get(callId) != orchestrated) {
+                        return false;
+                    }
+                    var terminateEffected = dispatchInbound(message, senderJid, orchestrated);
+                    advanceDedup(message, callId);
+                    return terminateEffected;
+                } finally {
+                    orchestrated.lock().unlock();
+                }
             }
             case BUFFER_PENDING -> bufferPendingMessage(message, callId);
-            case IGNORE, IGNORE_REJECTED, DROP -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Router verdict {0} drops inbound call message {1} for call {2}",
-                    verdict.routingClass(), message.type(), callId);
+            case IGNORE, IGNORE_REJECTED, DROP -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "router verdict {0} drops inbound call message {1} for call {2}",
+                        verdict.routingClass(), message.type(), callId);
+            }
         }
         return false;
     }
@@ -2016,22 +2078,25 @@ public final class LifecycleController {
      * teardown behind a guard. Every other message type returns {@code false}, since only a terminate teardown
      * drives the host end of call notification.
      *
-     * @param message   the router admitted inbound action
-     * @param senderJid the device JID that authored the message envelope
+     * @param message      the router admitted inbound action
+     * @param senderJid    the device JID that authored the message envelope
+     * @param orchestrated the resolved call context the message is dispatched against, whose per-call lock
+     *                     the caller already holds, or {@code null} for a fresh offer that creates its own
+     *                     call context
      * @return {@code true} when the message was a terminate that tore the call down; {@code false} otherwise
      */
-    private boolean dispatchInbound(CallMessage message, Jid senderJid) {
+    private boolean dispatchInbound(CallMessage message, Jid senderJid, OrchestratedCall orchestrated) {
         switch (message) {
             case OfferStanza offer -> handleIncomingOffer(offer, senderJid);
-            case PreacceptStanza preaccept -> handlePeerPreaccept(preaccept);
-            case AcceptStanza accept -> handlePeerAccept(accept, senderJid);
-            case RejectStanza reject -> handlePeerReject(reject, senderJid);
+            case PreacceptStanza preaccept -> handlePeerPreaccept(preaccept, orchestrated);
+            case AcceptStanza accept -> handlePeerAccept(accept, senderJid, orchestrated);
+            case RejectStanza reject -> handlePeerReject(reject, senderJid, orchestrated);
             case TerminateStanza terminate -> {
-                return handlePeerTerminate(terminate, senderJid);
+                return handlePeerTerminate(terminate, senderJid, orchestrated);
             }
-            case TransportStanza transport -> handlePeerTransport(transport);
-            case RelayLatencyStanza relayLatency -> handlePeerRelayLatency(relayLatency, senderJid);
-            case GroupUpdateStanza groupUpdate -> handleGroupUpdate(groupUpdate);
+            case TransportStanza transport -> handlePeerTransport(transport, orchestrated);
+            case RelayLatencyStanza relayLatency -> handlePeerRelayLatency(relayLatency, senderJid, orchestrated);
+            case GroupUpdateStanza groupUpdate -> handleGroupUpdate(groupUpdate, orchestrated);
             case MuteV2Stanza mute -> handlePeerMute(mute, senderJid);
             case VideoStateStanza videoState -> handlePeerVideoState(videoState, senderJid);
             case ScreenShareStanza screenShare -> handlePeerScreenShare(screenShare, senderJid);
@@ -2046,12 +2111,14 @@ public final class LifecycleController {
                 // relay SRTP the group_update brought up carries the media. Engaging the SFrame transform (a
                 // mesh, non SFU topology) would additionally install each peer key through a per participant
                 // CallMembership key seam, which the media plane does not consume today.
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Inbound enc_rekey for call {0} acknowledged (per-participant E2E key is not consumed on "
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "inbound enc_rekey for call {0} acknowledged (per-participant E2E key is not consumed on "
                                 + "the SFU relayed media path)", rekey.callId().orElseThrow());
             }
-            default -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "No inline lifecycle handling for call message {0}", message.type());
+            default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "no inline lifecycle handling for call message {0}", message.type());
+            }
         }
         return false;
     }
@@ -2091,8 +2158,8 @@ public final class LifecycleController {
         var error = outcome.error().getAsInt();
         orchestrated.lock().lock();
         try {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Accept ACK: error code = {0}. Treating as an Accept NACK", error);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "accept ack error code {0}, treating as accept nack for call {1}", error, outcome.id());
             var reason = CallResult.fromAcceptAckError(error)
                     .map(CallResult::toEndReason)
                     .orElse(CallEndReason.SETUP_FAILED);
@@ -2220,6 +2287,26 @@ public final class LifecycleController {
     }
 
     /**
+     * Reacts to a local platform camera capture being revoked by the operating system mid call by pausing
+     * the local video.
+     *
+     * <p>Bound by the assembler to the media plane's capture interrupted sink and invoked with the call's
+     * identifier when that call's manager camera capture driver enters
+     * {@link com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.State#INTERRUPTED}. Drives
+     * the call's {@link VideoStateController#pause()} so the local video stream transitions to
+     * {@link VideoStreamState#PAUSED}, which broadcasts the paused state to the peer and emits the local
+     * change; a paused stream can be resumed without a fresh upgrade negotiation once the device returns. A
+     * signal for an untracked call, or one whose control units are not built, is a no op.
+     *
+     * @param callId the identifier of the call whose local camera capture was revoked
+     * @throws NullPointerException if {@code callId} is {@code null}
+     */
+    public void onLocalCaptureInterrupted(String callId) {
+        Objects.requireNonNull(callId, "callId cannot be null");
+        withControls(callId, controls -> controls.video().pause());
+    }
+
+    /**
      * Reports a call's identifier to the bound service connected sink once its media plane goes active.
      *
      * <p>Fires the {@linkplain #bindConnectedSink(Consumer) bound} sink so the call service stamps the call's
@@ -2233,10 +2320,9 @@ public final class LifecycleController {
      */
     private void notifyConnected(String callId) {
         try {
-            connectedSink.accept(callId);
+            observer.onConnected(callId);
         } catch (RuntimeException e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Connected sink failed for call {0}: {1}", callId, e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "connected sink failed for call " + callId, e);
         }
     }
 
@@ -2339,13 +2425,10 @@ public final class LifecycleController {
      * @implNote This implementation transitions a call in {@link CallLifecycleState#CALLING} to
      * {@link CallLifecycleState#PREACCEPT_RECEIVED}.
      *
-     * @param preaccept the decoded inbound preaccept
+     * @param preaccept    the decoded inbound preaccept
+     * @param orchestrated the resolved call context, whose per-call lock the caller holds
      */
-    private void handlePeerPreaccept(PreacceptStanza preaccept) {
-        var orchestrated = calls.get(preaccept.callId().orElseThrow());
-        if (orchestrated == null) {
-            return;
-        }
+    private void handlePeerPreaccept(PreacceptStanza preaccept, OrchestratedCall orchestrated) {
         orchestrated.lock().lock();
         try {
             transition(orchestrated, CallLifecycleState.PREACCEPT_RECEIVED, CallEventType.CALL_PREACCEPT_RECEIVED);
@@ -2367,14 +2450,11 @@ public final class LifecycleController {
      * point to point signaling and the per participant key derivation address the device that answered,
      * keying media from the answering device JID.
      *
-     * @param accept    the decoded inbound accept
-     * @param senderJid the device JID that authored the accept, recorded as the answering device
+     * @param accept       the decoded inbound accept
+     * @param senderJid    the device JID that authored the accept, recorded as the answering device
+     * @param orchestrated the resolved call context, whose per-call lock the caller holds
      */
-    private void handlePeerAccept(AcceptStanza accept, Jid senderJid) {
-        var orchestrated = calls.get(accept.callId().orElseThrow());
-        if (orchestrated == null) {
-            return;
-        }
+    private void handlePeerAccept(AcceptStanza accept, Jid senderJid, OrchestratedCall orchestrated) {
         orchestrated.lock().lock();
         try {
             orchestrated.peerDeviceJid(senderJid);
@@ -2397,8 +2477,8 @@ public final class LifecycleController {
             }
             ensureControls(orchestrated);
         } catch (WhatsAppCallException e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Media plane bring-up failed after peer accept for {0}: {1}", accept.callId().orElseThrow(), e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "media plane bring-up failed after peer accept for call " + accept.callId().orElseThrow(), e);
             tearDown(orchestrated, CallEndReason.SETUP_FAILED, CallEventType.MEDIA_STREAM_ERROR);
         } finally {
             orchestrated.lock().unlock();
@@ -2420,14 +2500,11 @@ public final class LifecycleController {
      * when it concerns the device the call is established with, so a sibling device dismissing its ringing
      * notification does not end a call another device is already carrying.
      *
-     * @param reject    the decoded inbound reject
-     * @param senderJid the device JID that authored the reject
+     * @param reject       the decoded inbound reject
+     * @param senderJid    the device JID that authored the reject
+     * @param orchestrated the resolved call context, whose per-call lock the caller holds
      */
-    private void handlePeerReject(RejectStanza reject, Jid senderJid) {
-        var orchestrated = calls.get(reject.callId().orElseThrow());
-        if (orchestrated == null) {
-            return;
-        }
+    private void handlePeerReject(RejectStanza reject, Jid senderJid, OrchestratedCall orchestrated) {
         orchestrated.lock().lock();
         try {
             var activePeer = orchestrated.peerDeviceJid().orElse(null);
@@ -2474,28 +2551,25 @@ public final class LifecycleController {
      * for an effected terminate, matching where the end of call host event fires only after the ignore guards
      * pass.
      *
-     * @param terminate the decoded inbound terminate
-     * @param senderJid the device JID that authored the terminate envelope, the companion device
-     *                  discriminator, or {@code null} when the envelope carried no sender
+     * @param terminate    the decoded inbound terminate
+     * @param senderJid    the device JID that authored the terminate envelope, the companion device
+     *                     discriminator, or {@code null} when the envelope carried no sender
+     * @param orchestrated the resolved call context, whose per-call lock the caller holds
      * @return {@code true} when the call was torn down; {@code false} when it was untracked or a guard
      *         suppressed the teardown
      */
-    private boolean handlePeerTerminate(TerminateStanza terminate, Jid senderJid) {
-        var orchestrated = calls.get(terminate.callId().orElseThrow());
-        if (orchestrated == null) {
-            return false;
-        }
+    private boolean handlePeerTerminate(TerminateStanza terminate, Jid senderJid, OrchestratedCall orchestrated) {
         orchestrated.lock().lock();
         try {
             if (isIgnoredCompanionTerminate(orchestrated, senderJid)) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Ignoring terminate from companion device {0} during group call {1}",
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "ignoring terminate from companion device {0} during group call {1}",
                         senderJid, terminate.callId().orElseThrow());
                 return false;
             }
             if (isIgnoredJoinableTerminate(orchestrated, terminate)) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Ignoring joinable terminate in {0} state for call {1}",
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "ignoring joinable terminate in {0} state for call {1}",
                         orchestrated.state(), terminate.callId().orElseThrow());
                 return false;
             }
@@ -2529,13 +2603,12 @@ public final class LifecycleController {
      */
     private boolean isIgnoredCompanionTerminate(OrchestratedCall orchestrated, Jid senderJid) {
         var gate = featureGate;
-        var resolver = ownDeviceResolver;
-        if (gate == null || resolver == null || senderJid == null) {
+        if (gate == null || senderJid == null) {
             return false;
         }
         return gate.isIgnoreOneToOneTerminateInGroupCall()
                 && orchestrated.call().isGroup()
-                && resolver.test(senderJid);
+                && isOwnDevice(senderJid);
     }
 
     /**
@@ -2589,13 +2662,10 @@ public final class LifecycleController {
      * @implNote This implementation captures the relay block; the transport unit handles the candidate, relay
      * latency, and ICE and DTLS subtypes, which are not reproduced here.
      *
-     * @param transport the decoded inbound transport message
+     * @param transport    the decoded inbound transport message
+     * @param orchestrated the resolved call context, whose per-call lock the caller holds
      */
-    private void handlePeerTransport(TransportStanza transport) {
-        var orchestrated = calls.get(transport.callId().orElseThrow());
-        if (orchestrated == null) {
-            return;
-        }
+    private void handlePeerTransport(TransportStanza transport, OrchestratedCall orchestrated) {
         orchestrated.lock().lock();
         try {
             transport.toStanza().getChild("relay").ifPresent(orchestrated::relay);
@@ -2626,14 +2696,11 @@ public final class LifecycleController {
      * relay name. The election itself runs at bring up; the reply mirrors the bidirectional exchange both ends
      * drive, each end reporting its latencies to the specific peer device it is exchanging with.
      *
-     * @param message   the decoded inbound relay latency report
-     * @param senderJid the peer device that sent the report, the reply's recipient
+     * @param message      the decoded inbound relay latency report
+     * @param senderJid    the peer device that sent the report, the reply's recipient
+     * @param orchestrated the resolved call context, whose per-call lock the caller holds
      */
-    private void handlePeerRelayLatency(RelayLatencyStanza message, Jid senderJid) {
-        var orchestrated = calls.get(message.callId().orElseThrow());
-        if (orchestrated == null) {
-            return;
-        }
+    private void handlePeerRelayLatency(RelayLatencyStanza message, Jid senderJid, OrchestratedCall orchestrated) {
         orchestrated.lock().lock();
         try {
             var state = orchestrated.relayLatencyState().orElse(null);
@@ -2732,13 +2799,10 @@ public final class LifecycleController {
      * relay block carries and does not engage the per frame SFrame transform ({@code openSframe} passes the
      * body through); the inbound routing is in {@link #dispatchInbound}.
      *
-     * @param groupUpdate the decoded inbound group update
+     * @param groupUpdate  the decoded inbound group update
+     * @param orchestrated the resolved call context, whose per-call lock the caller holds
      */
-    private void handleGroupUpdate(GroupUpdateStanza groupUpdate) {
-        var orchestrated = calls.get(groupUpdate.callId().orElseThrow());
-        if (orchestrated == null) {
-            return;
-        }
+    private void handleGroupUpdate(GroupUpdateStanza groupUpdate, OrchestratedCall orchestrated) {
         var roster = groupUpdate.groupInfoValue().orElse(null);
         if (roster == null) {
             return;
@@ -2780,8 +2844,8 @@ public final class LifecycleController {
                         bringUpMediaPlane(orchestrated, relay, voipSettings, callKey,
                                 orchestrated.isCaller(), orchestrated.call().isVideo());
                     } catch (WhatsAppCallException e) {
-                        LOGGER.log(System.Logger.Level.WARNING,
-                                "Group media bring-up failed for {0}: {1}", orchestrated.callId(), e.getMessage());
+                        if (Log.WARNING) LOGGER.log(Level.WARNING,
+                                "group media bring-up failed for call " + orchestrated.callId(), e);
                         tearDown(orchestrated, CallEndReason.SETUP_FAILED, CallEventType.MEDIA_STREAM_ERROR);
                         return;
                     }
@@ -2794,7 +2858,8 @@ public final class LifecycleController {
             // from the self JID supplier (the call creator for a placement, the joining device for a join),
             // rather than the call creator, which is the local device only for a placement.
             if (!diff.isEmpty()) {
-                var sender = selfJidSupplier != null ? selfJidSupplier.get() : orchestrated.call().creator();
+                var self = selfDeviceJid();
+                var sender = self != null ? self : orchestrated.call().creator();
                 orchestrated.callKey().ifPresent(callKey -> fanOutGroupRekey(orchestrated, sender, callKey));
             }
 
@@ -2859,7 +2924,7 @@ public final class LifecycleController {
         var state = videoState.state();
         projectPeerMediaState(videoState.callId().orElseThrow(), senderJid, participant -> {
             participant.videoState(state.wireOrdinal());
-            participant.device(CallDeviceJid.of(senderJid))
+            participant.device(senderJid)
                     .ifPresent(device -> device.videoEnabled(state == VideoStreamState.ENABLED));
         });
         withControls(videoState.callId().orElseThrow(), controls -> controls.video().onPeerVideoState(senderJid, state));
@@ -3035,8 +3100,7 @@ public final class LifecycleController {
         var call = orchestrated.call();
         var callId = orchestrated.callId();
         var creator = call.creator();
-        var supplier = selfJidSupplier;
-        var resolvedSelf = supplier == null ? null : supplier.get();
+        var resolvedSelf = selfDeviceJid();
         var self = resolvedSelf != null ? resolvedSelf : creator;
         var context = call.isGroup()
                 ? CallControlContext.group(callId, creator, self)
@@ -3163,7 +3227,7 @@ public final class LifecycleController {
                 .flatMap(state -> state.electBestRelayName(RelayElection.Mode.DEFAULT));
         var session = mediaPlane.bringUp(orchestrated.callId(), relay, voipSettings, callKey, isCaller, video,
                 participantCount, membership, orchestrated.mediaStreams(), orchestrated.peerDeviceJid().orElse(null),
-                electedRelayName);
+                electedRelayName, mediaSessionListener);
         orchestrated.mediaSession(session);
         orchestrated.appDataController(session.appDataController().orElse(null));
     }
@@ -3516,7 +3580,7 @@ public final class LifecycleController {
      */
     private Stanza sendOffer(String callId, Jid self, Jid peer, OfferStanza offer) {
         var envelope = CallStanza.toCall(offer, peer, callId);
-        LOGGER.log(System.Logger.Level.DEBUG, "Sending offer for call {0} from {1} to {2}", callId, self, peer);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending offer for call {0} from {1} to {2}", callId, self, peer);
         return offerAckSender.sendOfferAndAwaitAck(envelope);
     }
 
@@ -3546,9 +3610,9 @@ public final class LifecycleController {
         if (ack.hasAttribute("error")) {
             // Every offer ack error collapses to ServerNack (no 404 or 434 submap as the accept ack has);
             // the call ends as a setup failure carrying that reason rather than UNKNOWN.
-            LOGGER.log(System.Logger.Level.INFO, "Offer NACK for call {0}: error={1}", callId,
+            if (Log.INFO) LOGGER.log(Level.INFO, "offer nack for call {0}: error={1}", callId,
                     ack.getAttributeAsString("error", "?"));
-            resultSink.accept(callId, CallResult.SERVER_NACK);
+            observer.onResult(callId, CallResult.SERVER_NACK);
             tearDown(orchestrated, CallResult.SERVER_NACK.toEndReason(),
                     CallEventType.CALL_OFFER_NACK_RECEIVED);
             return;
@@ -3638,14 +3702,68 @@ public final class LifecycleController {
         if (prior == null || prior == newState) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} state {1} -> {2}", callId, prior, newState);
+        manageConnectedLonelyTimer(callId, prior, newState);
         orchestrated.state(newState);
         orchestrated.call().setState(newState.toPublic());
+        if (newState == CallLifecycleState.CALLING || newState == CallLifecycleState.ACCEPT_SENT) {
+            orchestrated.engineContext().ifPresent(CallContext::markStarted);
+        }
         infoUpdater.updateForEvent(callId, lifecycleEvent);
         events.emit(lifecycleEvent, DataUtils.EMPTY_BYTE_ARRAY);
         var silent = newState == CallLifecycleState.LINK || newState == CallLifecycleState.ENDING;
         if (!silent && lifecycleEvent != CallEventType.CALL_STATE_CHANGED) {
             events.emit(CallEventType.CALL_STATE_CHANGED, DataUtils.EMPTY_BYTE_ARRAY);
         }
+    }
+
+    /**
+     * Arms or cancels the connected lonely timer for the state change a transition just made.
+     *
+     * <p>The scheduler holds no reference to this controller, so the connected lonely timer, which the
+     * state guard used to schedule and cancel itself, is now driven from here where the controller drives
+     * the transition: entering {@link CallLifecycleState#CONNECTED_LONELY} arms it, and leaving it or
+     * entering {@link CallLifecycleState#CALL_ACTIVE} cancels it. This runs only for accepted, state
+     * changing transitions (the caller has already filtered a rejected or no op transition), which are
+     * never the silent {@link CallLifecycleState#LINK} or {@link CallLifecycleState#ENDING} transitions,
+     * matching the exact condition under which the guard formerly fired the seam. The teardown path
+     * reaches {@link CallLifecycleState#NONE} through {@link #timers} {@link CallTimerScheduler#cancelAll
+     * cancelAll}, so a {@link CallLifecycleState#CONNECTED_LONELY} to {@link CallLifecycleState#NONE}
+     * teardown cancels the timer there.
+     *
+     * @param callId   the identifier of the transitioning call
+     * @param prior    the state left
+     * @param newState the state entered
+     */
+    private void manageConnectedLonelyTimer(String callId, CallLifecycleState prior, CallLifecycleState newState) {
+        if (newState == CallLifecycleState.CONNECTED_LONELY) {
+            armTimer(callId, CallTimerKind.CONNECTED_LONELY);
+        } else if (prior == CallLifecycleState.CONNECTED_LONELY || newState == CallLifecycleState.CALL_ACTIVE) {
+            timers.cancel(callId, CallTimerKind.CONNECTED_LONELY);
+        }
+    }
+
+    /**
+     * Arms the given timer for a call, supplying the fire action the scheduler runs.
+     *
+     * <p>The scheduler holds no reference to this controller; it is a pure timer mechanism the controller
+     * drives, so this maps each {@link CallTimerKind} to the controller behavior a fired timer runs: the
+     * lonely timeouts end the call with {@link CallEndReason#TIMEOUT}, the heartbeat sends a heartbeat, and
+     * the periodic watchdog sweeps a group call's unanswered offers. Kinds whose callbacks are owned by
+     * other units are armed with an inert action.
+     *
+     * @param callId the identifier of the call whose timer is armed
+     * @param kind   the timer to arm
+     */
+    private void armTimer(String callId, CallTimerKind kind) {
+        Runnable action = switch (kind) {
+            case CALLER_LONELY, CONNECTED_LONELY -> () -> endCall(callId, CallEndReason.TIMEOUT);
+            case HEARTBEAT -> () -> sendHeartbeat(callId);
+            case PERIODIC -> () -> groupOutbound(callId).ifPresent(GroupCallOutbound::sweepUnansweredOffers);
+            default -> () -> {
+            };
+        };
+        timers.arm(callId, kind, action);
     }
 
     /**
@@ -3681,6 +3799,7 @@ public final class LifecycleController {
      */
     private void tearDown(OrchestratedCall orchestrated, CallEndReason reason, CallEventType endEvent) {
         var callId = orchestrated.callId();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tearing down call {0}, reason={1}, event={2}", callId, reason, endEvent);
         orchestrated.call().setEndReason(reason);
         infoUpdater.updateForEvent(callId, endEvent);
         events.emit(endEvent, DataUtils.EMPTY_BYTE_ARRAY);
@@ -3694,24 +3813,21 @@ public final class LifecycleController {
         orchestrated.call().setState(CallState.ENDED);
         events.emit(CallEventType.CALL_STATE_CHANGED, DataUtils.EMPTY_BYTE_ARRAY);
 
-        recordCallLog(orchestrated, reason);
-        notifyTeardown(callId);
+        notifyEnded(orchestrated, reason);
 
         timers.cancelAll(callId);
         orchestrated.controls().ifPresent(controls -> {
             try {
                 controls.close();
             } catch (RuntimeException e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "In-call control close failed for call {0}: {1}", callId, e.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "in-call control close failed for call " + callId, e);
             }
         });
         orchestrated.mediaSession().ifPresent(session -> {
             try {
                 session.close();
             } catch (RuntimeException e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Media plane close failed for call {0}: {1}", callId, e.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "media plane close failed for call " + callId, e);
             }
         });
         registry.release(callId);
@@ -3719,60 +3835,30 @@ public final class LifecycleController {
     }
 
     /**
-     * Hands a torn down call's finished engine context to the bound outbound call log sink.
+     * Reports a torn down call's end to the {@link CallLifecycleObserver} once, at the single ending
+     * transition.
      *
-     * <p>Resolves the call's engine {@link CallContext} from its orchestration handle and, when the
-     * context is present, fires the bound sink once with the context and the terminal {@link CallEndReason}.
-     * A call whose registry allocated no context (a test registry with no manager) records no log, and a
-     * controller whose sink is unbound runs the no op default sink, so an unbound build records nothing. Any
-     * failure the sink raises is caught and logged so the teardown that called this always completes; the
-     * call log push is best effort exactly as the WAM commit on the same teardown is.
+     * <p>Resolves the call's finished engine {@link CallContext} from its orchestration handle (possibly
+     * {@code null} for a test registry that allocated none) and hands it, the call identifier, and the
+     * terminal {@link CallEndReason} to the observer, so the call service frees the call's service level
+     * state, drains its end of call WAM telemetry, and pushes the call log in one place; a {@code null}
+     * context lets the service skip the call log while still freeing the call. Any failure the observer
+     * raises is caught and logged so the teardown that called this always completes; the service level drain
+     * is best effort.
      *
-     * @implNote This implementation fires the sink after the {@link CallLifecycleState#NONE} transition so the
-     * context's active and lonely duration accumulators are already closed out, reading the finished
-     * durations. It is kept independent of the WAM stats drain the call service runs from the same teardown
-     * moment: the two are separate end of call outputs and are never conflated.
+     * @implNote This implementation reports after the {@link CallLifecycleState#NONE} transition and the
+     * public {@link CallState#ENDED} projection, so the context's duration accumulators are closed out and
+     * the call view the service reads carries the terminal end reason when its WAM Call event is built.
      *
      * @param orchestrated the call being torn down, accessed under its lock
-     * @param reason       the terminal end reason handed to the sink
+     * @param reason       the terminal end reason reported to the observer
      */
-    private void recordCallLog(OrchestratedCall orchestrated, CallEndReason reason) {
-        var context = orchestrated.engineContext().orElse(null);
-        if (context == null) {
-            return;
-        }
+    private void notifyEnded(OrchestratedCall orchestrated, CallEndReason reason) {
+        var callId = orchestrated.callId();
         try {
-            callLogSink.accept(context, reason);
+            observer.onEnded(callId, orchestrated.engineContext().orElse(null), reason);
         } catch (RuntimeException e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Call-log sink failed for call {0}: {1}", orchestrated.callId(), e.getMessage());
-        }
-    }
-
-    /**
-     * Reports a torn down call's identifier to the bound service teardown sink.
-     *
-     * <p>Fires the {@linkplain #bindTeardownSink(Consumer) bound} sink once with the ended call's
-     * identifier, so the call service removes the call from its registry and store and drains its
-     * end of call WAM telemetry. A controller whose sink is unbound runs the no op default sink, so an
-     * unbound build drains no service level telemetry. Any failure the sink raises is caught and logged so
-     * the teardown that called this always completes; the service level drain is best effort exactly as the
-     * call log push on the same teardown is.
-     *
-     * @implNote This implementation fires the sink after the {@link CallLifecycleState#NONE} transition and
-     * the public {@link CallState#ENDED} projection, so the call view the service reads carries the terminal
-     * end reason when its WAM Call event is built. It is kept independent of the call log sink because the
-     * service level teardown (registry removal plus WAM commit) and the app state call log push are separate
-     * end of call outputs.
-     *
-     * @param callId the identifier of the call being torn down
-     */
-    private void notifyTeardown(String callId) {
-        try {
-            teardownSink.accept(callId);
-        } catch (RuntimeException e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Teardown sink failed for call {0}: {1}", callId, e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "lifecycle observer onEnded failed for call " + callId, e);
         }
     }
 

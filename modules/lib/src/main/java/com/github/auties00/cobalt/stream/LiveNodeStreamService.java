@@ -12,6 +12,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientPasskeyAuthenticator;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.pairing.CompanionPairingService;
 import com.github.auties00.cobalt.pairing.ShortcakePairingService;
@@ -44,6 +45,7 @@ import com.github.auties00.cobalt.sync.SnapshotRecoveryService;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 import com.github.auties00.cobalt.wam.WamService;
 
+import java.lang.System.Logger.Level;
 import java.util.*;
 
 /**
@@ -94,6 +96,11 @@ import java.util.*;
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanzaDeferred")
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleWorkerCompatibleStanza")
 public final class LiveNodeStreamService implements NodeStreamService {
+    /**
+     * The logger for {@link LiveNodeStreamService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveNodeStreamService.class);
+
     /**
      * Holds the map from stanza tag (for example {@code "message"}) to
      * the {@link SocketStreamHandler} registered for that tag.
@@ -318,7 +325,10 @@ public final class LiveNodeStreamService implements NodeStreamService {
     public void handle(Stanza stanza) {
         var handler = this.handlers.get(stanza.description());
         if (handler != null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dispatching stanza {0}", stanza.description());
             handler.handleAsync(stanza);
+        } else if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "no handler registered for stanza {0}", stanza.description());
         }
     }
 
@@ -331,6 +341,7 @@ public final class LiveNodeStreamService implements NodeStreamService {
      */
     @Override
     public void reset() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resetting {0} stream handlers", handlers.size());
         for (var handler : new LinkedHashSet<>(handlers.values())) {
             handler.reset();
         }

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.newsletter.NewsletterPin;
 import com.github.auties00.cobalt.model.newsletter.NewsletterPinBuilder;
@@ -23,6 +24,7 @@ import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -60,6 +62,11 @@ import java.util.List;
  * {@code Failed} result inside the batch.
  */
 public final class PinChatHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link PinChatHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(PinChatHandler.class);
+
     /**
      * Holds the per-account cap on pinned chats.
      *
@@ -151,6 +158,7 @@ public final class PinChatHandler implements WebAppStateActionHandler {
     @Override
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pin chat: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
@@ -158,10 +166,12 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             var indexArray = JSON.parseArray(mutation.index());
             var chatJidString = indexArray.size() > 1 ? indexArray.getString(1) : null;
             if (chatJidString == null || chatJidString.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "pin chat mutation malformed: missing jid index");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (chatJidString.indexOf('@') < 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "pin chat mutation malformed: jid missing server");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
@@ -169,13 +179,17 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             try {
                 chatJid = Jid.of(chatJidString);
             } catch (Exception e) {
+                if (Log.WARNING)
+                    LOGGER.log(Level.WARNING, "pin chat mutation malformed: unparseable jid {0}", Log.jid(chatJidString));
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             if (chatJid == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "pin chat mutation malformed: null jid");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PinAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "pin chat mutation malformed: missing action value");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
@@ -188,11 +202,13 @@ public final class PinChatHandler implements WebAppStateActionHandler {
 
             var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pin chat: orphan chat {0}", chatJid);
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
             if (!action.pinned()) {
                 chat.get().setPinnedTimestamp(null);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pin chat: unpinned {0}", chatJid);
                 return MutationApplicationResult.success();
             }
 
@@ -205,15 +221,19 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             if (alreadyPinned) {
                 chat.get().setPinnedTimestamp(currentTimestamp);
                 chat.get().setArchived(false);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pin chat: refreshed pin timestamp for {0}", chatJid);
                 return MutationApplicationResult.success();
             }
 
             if (allPinnedChats.size() < MAX_PINNED_CHATS) {
                 chat.get().setPinnedTimestamp(currentTimestamp);
                 chat.get().setArchived(false);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pin chat: pinned {0}, count={1}", chatJid, allPinnedChats.size() + 1);
                 return MutationApplicationResult.success();
             }
 
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "pin chat: cap of {0} reached, evaluating eviction for {1}", MAX_PINNED_CHATS, chatJid);
             this.wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
                     .mdSyncdDogfoodingFeature(MdFeatureCode.UNPIN_4TH_CHAT_MUTATION)
                     .build());
@@ -229,12 +249,16 @@ public final class PinChatHandler implements WebAppStateActionHandler {
                 queueUnpinMutation(client, oldestPinned.jid(), currentTimestamp);
                 chat.get().setPinnedTimestamp(currentTimestamp);
                 chat.get().setArchived(false);
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "pin chat: evicted oldest pin {0}, pinned {1}", oldestPinned.jid(), chatJid);
                 return MutationApplicationResult.success();
             }
 
             queueUnpinMutation(client, chatJid, currentTimestamp);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pin chat: rejected pin for {0}, cap already newer", chatJid);
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "pin chat mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -302,26 +326,33 @@ public final class PinChatHandler implements WebAppStateActionHandler {
     ) {
         var newsletter = client.store().chatStore().findNewsletterByJid(newsletterJid);
         if (newsletter.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pin chat: orphan newsletter {0}", newsletterJid);
             return MutationApplicationResult.orphan(newsletterJid.toString(), "Newsletter");
         }
 
         if (!action.pinned()) {
             client.store().chatStore().removeNewsletterPin(newsletterJid);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pin chat: unpinned newsletter {0}", newsletterJid);
             return MutationApplicationResult.success();
         }
 
         var existing = client.store().chatStore().findNewsletterPin(newsletterJid).orElse(null);
         if (existing != null) {
             client.store().chatStore().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pin chat: refreshed newsletter pin timestamp for {0}", newsletterJid);
             return MutationApplicationResult.success();
         }
 
         var pins = client.store().chatStore().newsletterPinStates();
         if (pins.size() < MAX_PINNED_NEWSLETTERS) {
             client.store().chatStore().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "pin chat: pinned newsletter {0}, count={1}", newsletterJid, pins.size() + 1);
             return MutationApplicationResult.success();
         }
 
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "pin chat: newsletter cap of {0} reached, evaluating eviction for {1}", MAX_PINNED_NEWSLETTERS, newsletterJid);
         this.wamService.commit(new MdSyncdDogfoodingFeatureUsageEventBuilder()
                 .mdSyncdDogfoodingFeature(MdFeatureCode.UNPIN_4TH_CHAT_MUTATION)
                 .build());
@@ -334,10 +365,14 @@ public final class PinChatHandler implements WebAppStateActionHandler {
             client.store().chatStore().removeNewsletterPin(oldest.newsletterJid());
             client.store().chatStore().putNewsletterPin(new NewsletterPinBuilder().newsletterJid(newsletterJid).pinnedAt(currentTimestamp).build());
             queueUnpinMutation(client, oldest.newsletterJid(), currentTimestamp);
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "pin chat: evicted oldest newsletter pin {0}, pinned {1}", oldest.newsletterJid(), newsletterJid);
             return MutationApplicationResult.success();
         }
 
         queueUnpinMutation(client, newsletterJid, currentTimestamp);
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "pin chat: rejected newsletter pin for {0}, cap already newer", newsletterJid);
         return MutationApplicationResult.success();
     }
 

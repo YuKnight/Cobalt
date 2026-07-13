@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.ack;
 
 import com.github.auties00.cobalt.calls.signaling.relay.RelayInfo;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -35,12 +37,17 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAAckParser")
 public final class AckParser {
     /**
+     * The logger for {@link AckParser}.
+     */
+    private static final System.Logger LOGGER = Log.get(AckParser.class);
+
+    /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private AckParser() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -78,6 +85,17 @@ public final class AckParser {
         var participant = ack.getAttributeAsJid("participant", null);
         var recipient = ack.getAttributeAsJid("recipient", null);
         var error = ack.getAttributeAsInt("error", null);
+
+        if (ackClassToken != null && ackClass == null) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "ack parse unrecognized class={0}, falling back to message, id={1}",
+                        ackClassToken, id);
+            }
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ack parse id={0} class={1} type={2} error={3}",
+                    id, ackClassToken, type, error);
+        }
 
         return switch (ackClass) {
             case RECEIPT -> new ReceiptAck(id, timestamp, type, from, participant, recipient,

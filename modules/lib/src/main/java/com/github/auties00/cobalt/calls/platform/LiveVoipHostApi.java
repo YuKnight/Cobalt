@@ -2,11 +2,13 @@ package com.github.auties00.cobalt.calls.platform;
 
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppSessionException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppSessionException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 
+import java.lang.System.Logger.Level;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
@@ -28,7 +30,7 @@ import java.util.function.IntFunction;
  * comes from a single {@link SecureRandom}; name resolution uses {@link InetAddress}; persistent storage
  * resolves to a directory scoped to the current session under the Cobalt home; the contact lookup consults
  * the client contact store; decoded frames and typed events are handed to injected sinks; and structured
- * logs go to a {@link System.Logger} owned by this instance. Every collaborator is supplied through the
+ * logs go to the {@link System.Logger} for this class. Every collaborator is supplied through the
  * constructor and held as a field, so the host reaches no service through a global accessor.
  *
  * <p>Where the browser client backs these downcalls with JavaScript, this class supplies the JVM
@@ -50,6 +52,13 @@ public final class LiveVoipHostApi implements VoipHostApi {
      * already applied.
      */
     private static final int CAPTURE_AUDIO_PROCESSING_STATUS = 0;
+
+    /**
+     * The logger for {@link LiveVoipHostApi}.
+     *
+     * <p>Also receives engine log records routed through {@link #log}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveVoipHostApi.class);
 
     /**
      * Holds the owning client, used to send signaling stanzas and to reach the contact and account stores
@@ -82,11 +91,6 @@ public final class LiveVoipHostApi implements VoipHostApi {
      * Holds the cryptographically strong generator backing {@link #randomBytes(int)}.
      */
     private final SecureRandom secureRandom;
-
-    /**
-     * Holds the logger that receives engine log records routed through {@link #log}.
-     */
-    private final System.Logger logger;
 
     /**
      * Constructs a host bound to the given client, datagram egress, and event and frame sinks, rooting
@@ -144,7 +148,6 @@ public final class LiveVoipHostApi implements VoipHostApi {
         this.callEventSink = Objects.requireNonNull(callEventSink, "callEventSink cannot be null");
         this.mlModelPathResolver = Objects.requireNonNull(mlModelPathResolver, "mlModelPathResolver cannot be null");
         this.secureRandom = new SecureRandom();
-        this.logger = System.getLogger(LiveVoipHostApi.class.getName());
     }
 
     /**
@@ -163,7 +166,7 @@ public final class LiveVoipHostApi implements VoipHostApi {
         try {
             whatsapp.sendNodeWithNoResponse(stanza);
         } catch (WhatsAppSessionException.Closed exception) {
-            logger.log(System.Logger.Level.DEBUG, "Dropping call signaling on a closed socket", exception);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping call signaling on a closed socket", exception);
         }
     }
 
@@ -191,8 +194,13 @@ public final class LiveVoipHostApi implements VoipHostApi {
     public List<InetAddress> resolveHost(String hostName) {
         Objects.requireNonNull(hostName, "hostName cannot be null");
         try {
-            return List.of(InetAddress.getAllByName(hostName));
+            var addresses = List.of(InetAddress.getAllByName(hostName));
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "call host resolveHost: host={0} resolved={1}", hostName, addresses.size());
+            }
+            return addresses;
         } catch (UnknownHostException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "call host resolveHost: unresolvable host " + hostName, exception);
             return List.of();
         }
     }
@@ -252,6 +260,10 @@ public final class LiveVoipHostApi implements VoipHostApi {
     @Override
     public void renderVideoFrame(RenderedVideoFrame frame) {
         Objects.requireNonNull(frame, "frame cannot be null");
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "call host renderVideoFrame: participant={0} width={1} height={2} format={3}",
+                    frame.participant(), frame.width(), frame.height(), frame.format());
+        }
         videoSink.accept(frame);
     }
 
@@ -262,12 +274,11 @@ public final class LiveVoipHostApi implements VoipHostApi {
      * processing bitmask of the {@code javax.sound.sampled} {@code TargetDataLine} capture path: it applies
      * no acoustic echo cancellation, no noise suppression, and no automatic gain control, so the bitmask
      * {@code (echoCancellation?1)+(noiseSuppression?2)+(autoGainControl?4)} is {@code 0} and the engine runs
-     * its own full processing chain.
+     * its own full processing chain. The value is a truthful constant for this capture path, not a stub: a
+     * capture backend that applied any of these would instead compute the bitmask from its device settings.
      */
     @Override
     public int browserAudioProcessingStatus() {
-        // TODO: a capture backend that honors echo cancellation, noise suppression, or gain control must
-        //  compute this bitmask from its actual device settings instead of returning the fixed constant.
         return CAPTURE_AUDIO_PROCESSING_STATUS;
     }
 
@@ -280,7 +291,9 @@ public final class LiveVoipHostApi implements VoipHostApi {
     @Override
     public void log(System.Logger.Level level, String message) {
         Objects.requireNonNull(level, "level cannot be null");
-        logger.log(level, message);
+        if (LOGGER.isLoggable(level)) {
+            LOGGER.log(level, message);
+        }
     }
 
     /**
@@ -294,6 +307,7 @@ public final class LiveVoipHostApi implements VoipHostApi {
     public void onCallEvent(CallEventType eventType, byte[] payload) {
         Objects.requireNonNull(eventType, "eventType cannot be null");
         Objects.requireNonNull(payload, "payload cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call host onCallEvent: type={0} payloadBytes={1}", eventType, payload.length);
         callEventSink.accept(eventType, payload);
     }
 

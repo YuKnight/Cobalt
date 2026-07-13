@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,7 +13,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import java.util.logging.Logger;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Expires retired app-state-sync keys when the primary device announces a new
@@ -27,9 +29,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebSentinelMutationSync")
 public final class SentinelHandler implements WebAppStateActionHandler {
     /**
-     * The logger used for diagnostic output from sentinel handling.
+     * The logger for {@link SentinelHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(SentinelHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(SentinelHandler.class);
 
     /**
      * Constructs the handler.
@@ -94,15 +96,18 @@ public final class SentinelHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof KeyExpirationAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sentinel mutation malformed: missing action value");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var expiredEpoch = action.expiredKeyEpoch();
         if (expiredEpoch.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sentinel mutation malformed: missing expired key epoch");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().syncStore().expireAppStateKeysByEpoch(expiredEpoch.getAsInt());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sentinel: expired app-state keys for epoch={0}", expiredEpoch.getAsInt());
         return MutationApplicationResult.success();
     }
 

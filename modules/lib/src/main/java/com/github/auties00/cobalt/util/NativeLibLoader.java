@@ -2,10 +2,12 @@ package com.github.auties00.cobalt.util;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.github.auties00.cobalt.log.Log;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.SymbolLookup;
 import java.net.URI;
@@ -64,6 +66,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * several JVMs.
  */
 public final class NativeLibLoader {
+    /**
+     * The logger for {@link NativeLibLoader}.
+     */
+    private static final System.Logger LOGGER = Log.get(NativeLibLoader.class);
+
     /**
      * Holds the resource path (inside the regular {@code cobalt} JAR) of the
      * SHA-256 + path manifest the download leg cross-checks every fetched binary
@@ -256,19 +263,23 @@ public final class NativeLibLoader {
             if (cached != null) {
                 return cached;
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resolving native library {0} for classifier {1}", libraryName, CLASSIFIER);
             var path = resolve(libraryName);
             if (path != null) {
                 System.load(path.toAbsolutePath().toString());
                 var lookup = SymbolLookup.libraryLookup(path, arena);
                 CACHE.put(libraryName, lookup);
+                if (Log.INFO) LOGGER.log(Level.INFO, "loaded native library {0} from {1}", libraryName, path);
                 return lookup;
             }
             try {
                 System.loadLibrary(libraryName);
                 var lookup = SymbolLookup.libraryLookup(System.mapLibraryName(libraryName), arena);
                 CACHE.put(libraryName, lookup);
+                if (Log.INFO) LOGGER.log(Level.INFO, "loaded native library {0} via system library fallback", libraryName);
                 return lookup;
             } catch (UnsatisfiedLinkError e) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to load native library " + libraryName, e);
                 throw new UnsatisfiedLinkError(
                         "could not load native library '" + libraryName + "' for classifier '"
                                 + CLASSIFIER + "': " + describeFailure(libraryName)
@@ -292,6 +303,7 @@ public final class NativeLibLoader {
     private static Path resolve(String libraryName) {
         var lookup = lookupEntry(libraryName, CLASSIFIER).orElse(null);
         if (lookup == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no manifest entry for {0}/{1}", libraryName, CLASSIFIER);
             return null;
         }
         var entry = lookup.entry();
@@ -300,6 +312,7 @@ public final class NativeLibLoader {
 
         var classpathPath = extractFromClasspath(entry, fileName);
         if (classpathPath != null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resolved {0} from classpath bundle", libraryName);
             return classpathPath;
         }
         verifyNoForeignBundle(libraryName, entry);
@@ -309,8 +322,10 @@ public final class NativeLibLoader {
             return null;
         }
         if (acceptIfMatchesEntry(cachePath, entry)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resolved {0} from on-disk cache", libraryName);
             return cachePath;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cache miss for {0}, downloading", libraryName);
         return downloadToCache(libraryName, fileName, lookup, cachePath);
     }
 
@@ -385,6 +400,7 @@ public final class NativeLibLoader {
                 }
                 var actualSha = HexFormat.of().formatHex(digest.digest());
                 if (!actualSha.equalsIgnoreCase(entry.sha256())) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "bundled native library checksum mismatch for {0}", entry.path());
                     throw new UnsatisfiedLinkError(
                             "bundled native library '" + entry.path()
                                     + "' SHA-256 mismatch: expected " + entry.sha256()
@@ -403,6 +419,7 @@ public final class NativeLibLoader {
                 deleteQuietly(tmp);
             }
         } catch (IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to extract bundled native library " + entry.path(), e);
             throw new UncheckedIOException(
                     "failed to extract bundled native library: " + entry.path(), e);
         }
@@ -487,6 +504,7 @@ public final class NativeLibLoader {
             var probe = prefix + other + "/"
                     + suffix.replace(extensionFor(CLASSIFIER), extensionFor(other));
             if (NativeLibLoader.class.getClassLoader().getResource(probe) != null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "wrong native bundle classifier for {0}: found {1}, running classifier {2}", libraryName, probe, CLASSIFIER);
                 throw new UnsatisfiedLinkError(
                         "wrong native bundle on classpath for library '" + libraryName
                                 + "': found " + probe
@@ -564,6 +582,7 @@ public final class NativeLibLoader {
             return cachePath;
         }
         var url = REPO_BASE + commitSha + "/" + entry.path();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "downloading native library {0} from {1}", libraryName, url);
         Path tmp;
         try {
             tmp = Files.createTempFile(cachePath.getParent(), fileName + ".part-", "");
@@ -593,6 +612,7 @@ public final class NativeLibLoader {
                 actualSha = HexFormat.of().formatHex(digest.digest());
                 actualSize = Files.size(tmp);
             } catch (IOException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "download failed for " + libraryName + " from " + url, e);
                 throw new UnsatisfiedLinkError(
                         "failed to download '" + url + "' for native library '" + libraryName
                                 + "': " + e.getMessage()
@@ -607,11 +627,13 @@ public final class NativeLibLoader {
             }
 
             if (actualSize != entry.size()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "downloaded size mismatch for {0}: expected {1} got {2}", libraryName, entry.size(), actualSize);
                 throw new UnsatisfiedLinkError(
                         "downloaded size mismatch for '" + libraryName + "': expected "
                                 + entry.size() + " bytes, got " + actualSize);
             }
             if (!actualSha.equalsIgnoreCase(entry.sha256())) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "downloaded checksum mismatch for {0}", libraryName);
                 throw new UnsatisfiedLinkError(
                         "SHA-256 mismatch for '" + libraryName + "': expected "
                                 + entry.sha256() + ", got " + actualSha);
@@ -626,6 +648,7 @@ public final class NativeLibLoader {
                 throw new UncheckedIOException(
                         "failed to commit cached native library to " + cachePath, e);
             }
+            if (Log.INFO) LOGGER.log(Level.INFO, "downloaded native library {0}, {1} bytes", libraryName, actualSize);
             return cachePath;
         } finally {
             deleteQuietly(tmp);
@@ -877,10 +900,12 @@ public final class NativeLibLoader {
                     }
                 }
             } catch (IOException e) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to enumerate native checksum manifests", e);
                 throw new UncheckedIOException("failed to enumerate " + MANIFEST_RESOURCE, e);
             }
             verifyNoConflicts(loaded);
             manifests = Collections.unmodifiableList(loaded);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded {0} native checksum manifests", manifests.size());
             return manifests;
         }
     }
@@ -908,6 +933,7 @@ public final class NativeLibLoader {
                 var existingEntry = existingModule.entries().get(key);
                 var newEntry = module.entries().get(key);
                 if (!existingEntry.sha256().equalsIgnoreCase(newEntry.sha256())) {
+                    if (Log.ERROR) LOGGER.log(Level.ERROR, "conflicting native checksum entries for key {0}", key);
                     throw new IllegalStateException(
                             "conflicting native-checksum entries for '" + key + "': "
                                     + existingModule.source() + " declares sha=" + existingEntry.sha256()
@@ -1010,6 +1036,7 @@ public final class NativeLibLoader {
     public static void clearCache() {
         synchronized (NativeLibLoader.class) {
             CACHE.clear();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cleared native library symbol lookup cache");
         }
     }
 

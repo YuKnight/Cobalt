@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.util;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Objects;
@@ -42,6 +45,11 @@ import java.util.Objects;
  * preserved among equal deadlines.
  */
 public final class TimerHeap {
+    /**
+     * The logger for {@link TimerHeap}.
+     */
+    private static final System.Logger LOGGER = Log.get(TimerHeap.class);
+
     /**
      * Initial capacity of the backing array before the first growth.
      *
@@ -128,6 +136,7 @@ public final class TimerHeap {
         heap[size] = entry;
         siftUp(size);
         size++;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "timer scheduled seq={0} delayMs={1} size={2}", entry.sequence(), delay.toMillis(), size);
         return entry;
     }
 
@@ -150,7 +159,9 @@ public final class TimerHeap {
         if (size == 0 || heap[0].deadline() > now) {
             return null;
         }
-        return removeAt(0);
+        var due = removeAt(0);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "timer fired seq={0} size={1}", due.sequence(), size);
+        return due;
     }
 
     /**
@@ -214,6 +225,7 @@ public final class TimerHeap {
             return false;
         }
         removeAt(slot);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "timer cancelled seq={0} size={1}", entry.sequence(), size);
         return true;
     }
 

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.sticker;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecContext;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecParameters;
@@ -18,6 +19,7 @@ import com.github.auties00.cobalt.media.transcode.avio.AvioReadBuffer;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.model.message.media.StickerMessage;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -47,6 +49,9 @@ import java.util.Map;
  * single libwebp packet copied straight into a {@link MediaPayload.OfBytes} so no temporary file is created.
  */
 public final class StickerPipeline {
+    /** The logger for {@link StickerPipeline}. */
+    private static final System.Logger LOGGER = Log.get(StickerPipeline.class);
+
     /**
      * Side length, in pixels, of the square output sticker.
      *
@@ -106,6 +111,7 @@ public final class StickerPipeline {
     public MediaPayload run(MediaProvider provider, SeekableByteChannel source,
                             Map<String, Object> metadata)
             throws WhatsAppMediaException.Processing {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sticker transcode started, metadataEntries={0}", metadata.size());
         FFmpegLoader.ensureLoaded();
         try (var arena = Arena.ofShared();
              var decoded = decodeFirstFrame(arena, source)) {
@@ -116,8 +122,10 @@ public final class StickerPipeline {
             } finally {
                 freeFrame(scaled);
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sticker encoded, bytes={0}", webp.length);
             if (!metadata.isEmpty()) {
                 webp = WebpMetadataWriter.write(webp, metadata);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sticker metadata embedded, bytes={0}", webp.length);
             }
             provider.setMediaSize(webp.length);
             if (provider instanceof StickerMessage sticker) {
@@ -125,7 +133,11 @@ public final class StickerPipeline {
                 sticker.setWidth(STICKER_DIMENSION);
                 sticker.setHeight(STICKER_DIMENSION);
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sticker transcode complete, bytes={0}", webp.length);
             return new MediaPayload.OfBytes(webp);
+        } catch (WhatsAppMediaException.Processing failure) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sticker transcode failed", failure);
+            throw failure;
         }
     }
 
@@ -372,6 +384,10 @@ public final class StickerPipeline {
                 }
                 throw new WhatsAppMediaException.Processing(
                         "avcodec_receive_frame failed: " + FFmpegError.describe(got));
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "sticker source decoded, stream={0}, width={1}, height={2}",
+                        streamIndex, AVFrame.width(frame), AVFrame.height(frame));
             }
             return new DecodedSource(arena, bridge, formatCtx, codecCtx, packet, frame);
         } catch (RuntimeException e) {

@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the hierarchical category-typeahead query built by
+ * Parses the graph.whatsapp.com GraphQL response of the hierarchical category-typeahead query built by
  * {@link BizGetCategoriesV2WhatsAppGraphQlRequest} into a tree of {@link BusinessCategoryNode}.
  *
  * <p>Reads the linked {@code whatsapp_catkit_typeahead_proxy} field and projects its nested
@@ -43,7 +43,7 @@ public final class BizGetCategoriesV2WhatsAppGraphQlResponse implements WhatsApp
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code whatsapp_catkit_typeahead_proxy} and recursively projects its
      * nested {@code categories} tree onto {@link BusinessCategoryNode} entries; the returned
@@ -95,7 +95,7 @@ public final class BizGetCategoriesV2WhatsAppGraphQlResponse implements WhatsApp
      * <p>Each {@link BusinessCategoryNode} carries its own children, so the returned list is the root
      * of the full nested tree.
      *
-     * @return the parsed top-level categories, empty when the relay returned none
+     * @return the parsed top-level categories, empty when the graph.whatsapp.com endpoint returned none
      */
     public List<BusinessCategoryNode> categories() {
         return categories;

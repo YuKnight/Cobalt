@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.media.video.jitter;
 
 import com.github.auties00.cobalt.calls.media.video.codec.EncodedVideoFrame;
 import com.github.auties00.cobalt.calls.util.RateCalculator;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -65,6 +67,11 @@ public final class VideoJitterBuffer {
      * zero.
      */
     private static final int LOSS_WINDOW_MIN_BUCKETS = 2;
+
+    /**
+     * The logger for {@link VideoJitterBuffer}.
+     */
+    private static final System.Logger LOGGER = Log.get(VideoJitterBuffer.class);
 
     /**
      * The jitter estimator fed each frame's size and interframe delay.
@@ -198,9 +205,15 @@ public final class VideoJitterBuffer {
         lock.lock();
         try {
             if (lastReleasedCaptureTimestamp >= 0 && captureRtpTimestamp <= lastReleasedCaptureTimestamp) {
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "video jitter buffer: discarding already released frame, seq={0}", sequenceNumber);
+                }
                 return false;
             }
             if (frames.containsKey(captureRtpTimestamp)) {
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "video jitter buffer: discarding duplicate frame, seq={0}", sequenceNumber);
+                }
                 return false;
             }
 
@@ -240,26 +253,34 @@ public final class VideoJitterBuffer {
      * {@link #audioPlayoutMs} through the A/V sync sink.
      */
     public ReleasedFrame poll(long nowMs) {
+        AvSyncFeedback pendingAvSync = null;
+        ReleasedFrame released = null;
         lock.lock();
         try {
             currentNowMs = nowMs;
-            // TODO: hoist the loop invariant playout terms (the jitter estimate, the decode time margin,
-            //  and the RTT margin) out of the per frame renderTimeMs call: within one poll they do not
-            //  change, and only the NACK gate depends on frames.size(), so renderTimeMs recomputes the
-            //  three invariants on every iteration. Splitting them out needs a size parameterised entry on
-            //  VideoTimingController (an invariant prefix plus a size dependent NACK term); until
-            //  VideoTimingController gains that entry the whole render time is recomputed per frame.
+            // The target delay prefix (jitter, decode, and render delay) does not change within this poll,
+            // so it is hoisted out of the per frame renderTimeMs call, which then adds only the size
+            // dependent NACK gated round trip margin per frame.
+            var delayPrefixMs = timingController.targetDelayPrefixMs();
             var iterator = frames.entrySet().iterator();
             while (iterator.hasNext()) {
                 var buffered = iterator.next().getValue();
                 var renderTimeMs = timingController.renderTimeMs(
-                        buffered.captureRtpTimestamp(), buffered.arrivalMs(), frames.size());
+                        buffered.captureRtpTimestamp(), buffered.arrivalMs(), delayPrefixMs, frames.size());
 
                 if (renderTimeMs - nowMs > MAX_VIDEO_DELAY_MS) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "video jitter buffer: render time implausibly far in future, renderTimeMs={0} nowMs={1}, resetting",
+                                renderTimeMs, nowMs);
+                    }
                     resetLocked();
                     return null;
                 }
                 if (nowMs - renderTimeMs > MAX_VIDEO_DELAY_MS) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "video jitter buffer: dropping stale frame, ageMs={0}", nowMs - renderTimeMs);
+                    }
                     iterator.remove();
                     lastReleasedCaptureTimestamp = buffered.captureRtpTimestamp();
                     continue;
@@ -272,21 +293,25 @@ public final class VideoJitterBuffer {
                 lastReleasedCaptureTimestamp = buffered.captureRtpTimestamp();
                 var audioPlayout = audioPlayoutMs;
                 if (audioPlayout >= 0) {
-                    // TODO: compute the A/V sync correction under the lock and push it to the sink after
-                    //  release, to avoid holding the video lock across the audio sink notification (a
-                    //  video to audio lock order hop). VideoTimingController.updateAvSync both computes the
-                    //  correction and pushes it into avSyncSink in one call, so deferring the push needs a
-                    //  compute only variant on VideoTimingController (returning the correction) that this
-                    //  buffer then forwards to avSyncSink after unlock; until VideoTimingController gains
-                    //  that variant the notification stays inside the lock.
-                    timingController.updateAvSync(renderTimeMs, audioPlayout, avSyncSink, nowMs);
+                    // Compute the A/V sync correction under the lock but push it to the sink after release,
+                    // so the video lock is not held across the audio sink notification (a video to audio
+                    // lock order hop).
+                    pendingAvSync = timingController.computeAvSync(renderTimeMs, audioPlayout);
                 }
-                return new ReleasedFrame(buffered.frame(), renderTimeMs);
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "video jitter buffer: releasing frame, renderTimeMs={0} buffered={1}",
+                            renderTimeMs, frames.size());
+                }
+                released = new ReleasedFrame(buffered.frame(), renderTimeMs);
+                break;
             }
-            return null;
         } finally {
             lock.unlock();
         }
+        if (pendingAvSync != null) {
+            avSyncSink.applyAvSyncFeedback(pendingAvSync);
+        }
+        return released;
     }
 
     /**
@@ -379,6 +404,7 @@ public final class VideoJitterBuffer {
     public void reset() {
         lock.lock();
         try {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "video jitter buffer: reset, buffered={0}", frames.size());
             resetLocked();
         } finally {
             lock.unlock();
@@ -404,6 +430,7 @@ public final class VideoJitterBuffer {
         }
         var gap = sequenceDistance(sequenceNumber, highestSequenceNumber);
         if (gap > 1) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "video jitter buffer: sequence gap detected, lost={0}", gap - 1);
             lostFrames.update(nowMs, gap - 1);
         }
         if (gap > 0) {

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.receive.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -7,6 +8,7 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,16 +26,20 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebHandleMsgParser")
 public final class MessageReceiveStanzaParser {
+    /**
+     * The logger for {@link MessageReceiveStanzaParser}.
+     */
+    private static final System.Logger LOGGER = Log.get(MessageReceiveStanzaParser.class);
 
     /**
      * Prevents instantiation of this utility class.
      *
      * <p>All entry points are {@code static}, so instances would carry no state.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private MessageReceiveStanzaParser() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -178,6 +184,11 @@ public final class MessageReceiveStanzaParser {
             hsmCategory = hsmNode.getAttributeAsString("category", null);
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "parsed message stanza id={0} type={1} from={2} participant={3}",
+                    id, messageType, fromJid, participant);
+        }
+
         return new MessageReceiveStanza(
                 id,
                 timestamp,
@@ -260,6 +271,10 @@ public final class MessageReceiveStanzaParser {
     private static Jid resolveSender(Jid fromJid, Jid participant) {
         if (fromJid.hasGroupOrCommunityServer() || fromJid.hasBroadcastServer()) {
             if (participant == null) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "group/broadcast/status message from {0} missing participant attribute", fromJid);
+                }
                 throw new IllegalArgumentException(
                         "Group/broadcast/status message from " + fromJid
                                 + " missing participant attribute");
@@ -316,6 +331,9 @@ public final class MessageReceiveStanzaParser {
         if (fromJid.hasBroadcastServer()) {
             var isStatus = fromJid.isStatusBroadcastAccount();
             var isSelf = isMeAccount(participant, selfPnJid, selfLidJid);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "broadcast message classification: status={0} self={1}", isStatus, isSelf);
+            }
             if (!isStatus) {
                 return isSelf ? MessageType.PEER_BROADCAST : MessageType.OTHER_BROADCAST;
             }
@@ -392,6 +410,10 @@ public final class MessageReceiveStanzaParser {
                     encNode.getAttributeAsString("decrypt-fail").orElse(null));
             payloads.add(new MessageReceiveEncryptedPayload(
                     e2eType, encMediaType, ciphertext, retryCount, hideFail));
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "parsed {0} encrypted payload(s) from {1} enc node(s)",
+                    payloads.size(), encNodes.size());
         }
         return payloads;
     }

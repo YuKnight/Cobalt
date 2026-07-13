@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.socket.datagram;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.socket.websocket.WebSocketFrameOutputStream;
 import com.github.auties00.cobalt.stanza.binary.StanzaWriter;
 import com.github.auties00.cobalt.util.AesGcmStreamCipher;
@@ -10,6 +11,7 @@ import javax.crypto.ShortBufferException;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.System.Logger.Level;
 import java.nio.ByteOrder;
 import java.security.GeneralSecurityException;
 import java.util.Objects;
@@ -58,6 +60,11 @@ import java.util.Objects;
  * the matching {@link #flush()} call.
  */
 public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
+
+    /**
+     * The logger for {@link WhatsAppDatagramOutputStream}.
+     */
+    private static final System.Logger LOGGER = Log.get(WhatsAppDatagramOutputStream.class);
 
     /**
      * Holds the size in bytes of the AES-GCM authentication tag.
@@ -172,6 +179,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
     public void setWriteKey(SecretKey key) {
         this.writeKey = Objects.requireNonNull(key, "key");
         this.writeCounter = 0;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "datagram output stream write key installed");
     }
 
     /**
@@ -211,6 +219,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
             throw new IllegalArgumentException("plaintextSize must be non-negative: " + plaintextSize);
         }
         if (textRemaining != NO_ACTIVE_DATAGRAM) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot begin datagram, {0} byte(s) still pending", textRemaining);
             throw new IllegalStateException("Cannot begin a new datagram: "
                     + textRemaining + " plaintext byte(s) still pending in the current datagram");
         }
@@ -229,10 +238,12 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
                         nonce
                 );
             } catch (GeneralSecurityException exception) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to initialise datagram cipher", exception);
                 throw new IOException("Failed to initialise AES-GCM cipher", exception);
             }
         }
         if (wireLen > MAX_DATAGRAM_LENGTH) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "datagram length {0} exceeds maximum {1}", wireLen, MAX_DATAGRAM_LENGTH);
             throw new IOException("Datagram length " + wireLen + " exceeds " + MAX_DATAGRAM_LENGTH);
         }
 
@@ -250,6 +261,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
         out.write(header, 0, INT24_BYTE_SIZE);
 
         textRemaining = plaintextSize;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "datagram begin wire={0} plaintext={1} prologue={2}", wireLen, plaintextSize, prologueLen > 0);
     }
 
     /**
@@ -285,6 +297,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
             return;
         }
         if (len > textRemaining) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "datagram overflow, tried to write {0} byte(s) but only {1} remain", len, textRemaining);
             throw new IOException("Streaming datagram overflow: tried to write " + len
                     + " bytes but only " + textRemaining + " remain");
         }
@@ -303,6 +316,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
                     out.write(ciphertextChunk, 0, produced);
                 }
             } catch (ShortBufferException exception) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "datagram cipher update overflowed ciphertext buffer", exception);
                 throw new IOException("AES-GCM update produced more bytes than the ciphertext chunk buffer allowed", exception);
             }
             i += chunk;
@@ -326,6 +340,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
             return;
         }
         if (textRemaining != 0) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot flush datagram, {0} byte(s) still expected", textRemaining);
             throw new IOException("Streaming datagram underflow: " + textRemaining
                     + " plaintext byte(s) still expected before flush");
         }
@@ -337,6 +352,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
                     out.write(ciphertextChunk, 0, produced);
                 }
             } catch (GeneralSecurityException exception) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "datagram encryption finalisation failed", exception);
                 throw new IOException("AES-GCM encryption failed", exception);
             }
         }
@@ -352,6 +368,7 @@ public final class WhatsAppDatagramOutputStream extends FilterOutputStream {
      */
     @Override
     public void close() throws IOException {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing datagram output stream");
         out.close();
     }
 }

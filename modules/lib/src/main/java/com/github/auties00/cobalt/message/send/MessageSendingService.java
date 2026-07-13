@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.ack.AckResult;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;

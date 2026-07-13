@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.document;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
 import com.github.auties00.cobalt.model.media.MediaProvider;
@@ -18,6 +19,7 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
@@ -42,6 +44,9 @@ import java.nio.file.StandardOpenOption;
  * reached.
  */
 public final class DocumentPipeline {
+    /** The logger for {@link DocumentPipeline}. */
+    private static final System.Logger LOGGER = Log.get(DocumentPipeline.class);
+
     /**
      * Holds the MIME type reported when the source is identifiably a PDF document.
      */
@@ -129,12 +134,16 @@ public final class DocumentPipeline {
         try {
             length = Files.size(source);
         } catch (IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to size document source", e);
             throw new WhatsAppMediaException.Processing("failed to size document source", e);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "document transcode start: bytes={0}", length);
         provider.setMediaSize(length);
         if (isPdf(source)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "document is pdf, rendering page 0 thumbnail");
             applyPdfMetadata(provider, source);
         } else if (provider instanceof DocumentMessage document) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "document pass-through, no thumbnail");
             document.setMimetype(DEFAULT_MIMETYPE);
         }
         return new MediaPayload.OfPath(source, length, false);
@@ -160,7 +169,12 @@ public final class DocumentPipeline {
             pageCount = document.getNumberOfPages();
             thumbnail = pageCount > 0 ? renderThumbnail(document) : null;
         } catch (IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to render pdf page 0 thumbnail", e);
             throw new WhatsAppMediaException.Processing("failed to render PDF page 0 thumbnail", e);
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "pdf metadata: pages={0} thumbnailBytes={1}",
+                    pageCount, thumbnail == null ? 0 : thumbnail.length);
         }
         if (provider instanceof DocumentMessage document) {
             document.setMimetype(PDF_MIMETYPE);
@@ -250,6 +264,10 @@ public final class DocumentPipeline {
         if (last == null) {
             throw new IOException("no JPEG writer available");
         }
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "document thumbnail exceeds size budget: bytes={0} budgetBytes={1}",
+                    last.length, MICRO_THUMBNAIL_MAX_FILE_SIZE_BYTES);
+        }
         return last;
     }
 
@@ -329,6 +347,7 @@ public final class DocumentPipeline {
             }
             return true;
         } catch (IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to probe document source", e);
             throw new WhatsAppMediaException.Processing("failed to probe document source", e);
         }
     }

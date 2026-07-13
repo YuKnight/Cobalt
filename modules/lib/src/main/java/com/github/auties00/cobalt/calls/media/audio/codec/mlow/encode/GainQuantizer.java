@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.EncoderTables;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Jointly quantizes the adaptive codebook and fixed codebook gains of one analysis by synthesis (AbS) subframe
@@ -44,6 +47,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables
  * maps to the correct cumulative mass function row.
  */
 public final class GainQuantizer {
+    /**
+     * The logger for {@link GainQuantizer}.
+     */
+    private static final System.Logger LOGGER = Log.get(GainQuantizer.class);
+
     /**
      * Number of adaptive codebook gain taps.
      */
@@ -247,6 +255,10 @@ public final class GainQuantizer {
         }
 
         int fcbIdx = Math.min(Math.max(bestFcbgIdx, 0), maxGainIdx);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "voiced gain quantize: subfrlen={0} lowRate={1} acbIdx={2} fcbIdx={3}",
+                    fcbSubfrlen, lowRate, bestAcbgIdx, fcbIdx);
+        }
         return new VoicedGains(bestAcbgIdx, fcbIdx, fcbgainsV[fcbIdx]);
     }
 
@@ -262,7 +274,11 @@ public final class GainQuantizer {
     public static int quantizeUnvoiced(float gainFromSearch) {
         float gainDb = 20.0f * log10f(gainFromSearch + 1.0e-16f);
         gainDb = Math.min(Math.max(gainDb, UV_GAIN_MIN_DB), UV_GAIN_MAX_DB);
-        return Math.round((gainDb - UV_GAIN_MIN_DB) / UV_GAIN_STEP_DB);
+        int fcbIdx = Math.round((gainDb - UV_GAIN_MIN_DB) / UV_GAIN_STEP_DB);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "unvoiced gain quantize: fcbIdx={0}", fcbIdx);
+        }
+        return fcbIdx;
     }
 
     /**

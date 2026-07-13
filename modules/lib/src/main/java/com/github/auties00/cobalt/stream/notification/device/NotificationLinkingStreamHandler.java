@@ -5,9 +5,10 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppIntegrityChallengeException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppIntegrityChallengeException;
 import com.github.auties00.cobalt.listener.linked.LinkedNewContactListener;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -34,6 +35,7 @@ import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.ChatMessageCountsEventBuilder;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -72,9 +74,9 @@ import java.util.function.Consumer;
 final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
-     * Logs warnings about parse failures and debug messages about ignored sub-types.
+     * The logger for {@link NotificationLinkingStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(NotificationLinkingStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationLinkingStreamHandler.class);
 
     /**
      * Holds the notification {@code type} values routed to this handler by the dispatcher.
@@ -229,11 +231,11 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
                 }
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot handle notification {0}/{1}: {2}",
-                    type,
-                    stanza.getAttributeAsString("id", "<missing>"),
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "cannot handle notification type=" + type + " id=" + stanza.getAttributeAsString("id", "<missing>"),
+                        throwable);
+            }
         } finally {
             sendNotificationAck(stanza);
         }
@@ -288,20 +290,19 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
                         .flatMap(Stanza::toContentBytes)
                         .orElse(null);
                 if (wrappedPrimaryEphemeralPub == null || primaryIdentityPublic == null || ref == null) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "Rejecting primary_hello notification missing required fields");
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "rejecting primary_hello notification, missing required fields");
                     return;
                 }
                 try {
                     deviceLinkingService.handlePrimaryHello(wrappedPrimaryEphemeralPub, primaryIdentityPublic, ref);
                 } catch (Throwable throwable) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "Cannot complete alt-device-linking handshake: {0}", throwable.getMessage());
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot complete alt-device-linking handshake", throwable);
                 }
             }
             case "refresh_code" -> deviceLinkingService.handleRefreshCode(ref);
-            default -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring link_code_companion_reg notification with stage {0}", stage);
+            default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring link_code_companion_reg notification, stage={0}", stage);
+            }
         }
     }
 
@@ -322,15 +323,13 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
                 .flatMap(Stanza::toContentBytes)
                 .orElse(null);
         if (primaryEphemeralIdentity == null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Rejecting crsc_continuation notification missing primary_ephemeral_identity");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "rejecting crsc_continuation notification, missing primary_ephemeral_identity");
             return;
         }
         try {
             shortcakePairingService.handlePrimaryEphemeralIdentity(primaryEphemeralIdentity);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot complete Shortcake passkey linking: {0}", throwable.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot complete shortcake passkey linking", throwable);
         }
     }
 
@@ -355,8 +354,7 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
         try {
             shortcakePairingService.start();
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot start Shortcake passkey linking: {0}", throwable.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot start shortcake passkey linking", throwable);
         }
     }
 
@@ -381,14 +379,17 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
     private void handleWaffle(Stanza stanza) {
         var metadata = stanza.getChild("notification_metadata").orElse(null);
         if (metadata == null) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring waffle notification without notification_metadata: {0}",
-                    stanza.getAttributeAsString("id", "<missing>"));
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "ignoring waffle notification, no notification_metadata id={0}",
+                        stanza.getAttributeAsString("id", "<missing>"));
+            }
             return;
         }
 
         var event = metadata.getAttributeAsInt("event", -1);
         var clientResync = "true".equals(metadata.getAttributeAsString("client_resync", null));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "waffle notification event={0} clientResync={1}", event, clientResync);
 
         switch (event) {
             case WAFFLE_EVENT_STATE_SUSPENDED ->
@@ -407,9 +408,9 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
                     whatsapp.store().accountStore().setLinkedMetaAccountState(WaffleAccountLinkStateAction.AccountLinkState.ACTIVE);
                 }
             }
-            default -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring unhandled waffle notification event {0}",
-                    event);
+            default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring unhandled waffle notification event {0}", event);
+            }
         }
     }
 
@@ -441,6 +442,7 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
                     && "automation".equals(onboardingStatus.onboardingStatusProductSurface())) {
                 whatsapp.store().businessStore().setHostedAutomationOnboarded(true);
                 whatsapp.store().businessStore().setDetectedOutcomesEnabled(true);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "hosted automation onboarding completed");
             }
             return;
         }
@@ -450,13 +452,16 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
             if (offboarding != null && "automation".equals(offboarding.offboardingProductSurface())) {
                 whatsapp.store().businessStore().setHostedAutomationOnboarded(false);
                 whatsapp.store().businessStore().setDetectedOutcomesEnabled(false);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "hosted automation offboarded");
             }
             return;
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Ignoring unsupported hosted notification: {0}",
-                firstChildDescription(stanza));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "ignoring unsupported hosted notification child={0}",
+                    firstChildDescription(stanza));
+        }
     }
 
     /**
@@ -496,10 +501,11 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
         try {
             whatsapp.queryName(receiver).ifPresent(contact::setChosenName);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Cannot refresh invited contact metadata for {0}: {1}",
-                    receiver,
-                    throwable.getMessage());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "cannot refresh invited contact metadata for " + Log.jid(String.valueOf(receiver)),
+                        throwable);
+            }
         }
         whatsapp.store().contactStore().addContact(contact);
 
@@ -511,6 +517,11 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
             wamService.commit(new ChatMessageCountsEventBuilder()
                     .isInviteCreatedThread(true)
                     .build());
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "growth invite processed receiver={0} newContact={1} newChat={2}",
+                    receiver, !existed, chatCreated);
         }
     }
 
@@ -532,9 +543,11 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
     private void handlePsa(Stanza stanza) {
         var from = stanza.getAttributeAsJid("from").orElse(null);
         if (from == null || !from.equals(Jid.announcementsAccount())) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring psa notification: {0}",
-                    firstChildDescription(stanza));
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "ignoring psa notification, unexpected sender child={0}",
+                        firstChildDescription(stanza));
+            }
         }
 
         var firstChild = stanza.getChild().orElse(null);
@@ -542,21 +555,23 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
         switch (firstChildTag) {
             case "surfaces" -> {
                 // TODO: implement the quick-promotion surfaces pipeline once Cobalt has the in-app QP model.
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Ignoring QP surfaces psa notification: {0}",
-                        stanza.getAttributeAsString("id", "<missing>"));
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "ignoring qp surfaces psa notification {0}",
+                            stanza.getAttributeAsString("id", "<missing>"));
+                }
             }
             case "reset_smb_last_qp_prefetch_timestamp" -> {
                 // TODO: implement the QP prefetch timestamp reset once Cobalt has the in-app QP model.
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Ignoring QP prefetch timestamp psa notification: {0}",
-                        stanza.getAttributeAsString("id", "<missing>"));
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "ignoring qp prefetch timestamp psa notification {0}",
+                            stanza.getAttributeAsString("id", "<missing>"));
+                }
             }
             case null, default -> {
                 // TODO: implement the in-app PSA campaign / wa_chat message pipeline.
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Ignoring wa_chat/psa notification from PSA_JID: {0}",
-                        firstChildTag);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring wa_chat/psa notification from psa_jid, child={0}", firstChildTag);
             }
         }
     }
@@ -616,6 +631,11 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
         var updateTimestamp = Instant.ofEpochSecond(notificationTimestamp.getAsLong());
 
         var newsletter = ensureNewsletter(newsletterJid);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "applying newsletter live_updates, newsletter={0} messages={1}",
+                    newsletterJid, response.messages().size());
+        }
         for (var message : response.messages()) {
             applyLiveUpdate(newsletter, newsletterJid, message, updateTimestamp);
         }
@@ -824,8 +844,7 @@ final class NotificationLinkingStreamHandler extends SocketStreamHandler.Concurr
         try {
             return MessageContainerSpec.decode(plaintext);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Cannot decode newsletter live-update payload: {0}", throwable.getMessage());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cannot decode newsletter live-update payload", throwable);
             return null;
         }
     }

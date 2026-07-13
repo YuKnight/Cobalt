@@ -1,4 +1,6 @@
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientPasskeyAuthenticator;
+import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.MessageContainer;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
@@ -14,7 +16,17 @@ void main() throws IOException {
     LinkedWhatsAppClient.builder()
             .webClient(LinkedWhatsAppStoreFactory.temporary())
             .createConnection()
-            .unregistered(phoneNumber, code -> System.out.println("COBALT_PAIRING_CODE=" + code))
+            .unregistered(phoneNumber, new LinkedWhatsAppClientVerificationHandler.Web.PairingCode() {
+                @Override
+                public void handle(String code) {
+                    System.out.println("COBALT_PAIRING_CODE=" + code);
+                }
+
+                @Override
+                public LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator() {
+                    return LinkedWhatsAppClientPasskeyAuthenticator.toTerminal();
+                }
+            })
             .addNodeReceivedListener((_, incoming) -> System.out.printf("Received stanza %s%n", incoming))
             .addNodeSentListener((_, outgoing) -> System.out.printf("Sent stanza %s%n", outgoing))
             .addLoggedInListener(api -> {

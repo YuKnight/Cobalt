@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.NewsletterSavedInterestsAction;
@@ -8,6 +9,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies {@link NewsletterSavedInterestsAction} sync mutations carrying the
@@ -34,6 +37,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * registered handler.
  */
 public final class NewsletterSavedInterestsHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link NewsletterSavedInterestsHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(NewsletterSavedInterestsHandler.class);
 
     /**
      * Constructs a stateless {@link NewsletterSavedInterestsHandler} for
@@ -90,15 +97,20 @@ public final class NewsletterSavedInterestsHandler implements WebAppStateActionH
     @Override
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "newsletter saved interests: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof NewsletterSavedInterestsAction action)
                 || action.newsletterSavedInterests().isEmpty()) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "newsletter saved interests mutation malformed: missing token");
             return MutationApplicationResult.malformed();
         }
 
         client.store().settingsStore().setNewsletterSavedInterests(action.newsletterSavedInterests().get());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "newsletter saved interests: token updated");
         return MutationApplicationResult.success();
     }
 }

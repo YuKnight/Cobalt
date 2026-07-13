@@ -15,8 +15,8 @@ import java.nio.file.Path;
  *
  * @implNote
  * This implementation is not a protobuf message; its {@link #save()}, {@link #await()} and
- * {@link #delete()} are no-ops because there is no disk surface, and the in-memory chat sub-store is
- * discarded with the store instance.
+ * {@link #delete()} are no-ops because there is no disk surface, and the in-memory chat and WAM
+ * sub-stores are discarded with the store instance.
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 final class TemporaryStore extends ProtobufWhatsAppStore {
@@ -24,6 +24,11 @@ final class TemporaryStore extends ProtobufWhatsAppStore {
      * The in-memory chat sub-store.
      */
     private final TemporaryLinkedWhatsAppChatStore chatStore;
+
+    /**
+     * The in-memory WAM sub-store, whose staged buffers live in RAM for the process lifetime.
+     */
+    private final TemporaryLinkedWhatsAppWamStore wamStore;
 
     /**
      * Constructs an in-memory store from its composed sub-stores.
@@ -35,18 +40,23 @@ final class TemporaryStore extends ProtobufWhatsAppStore {
      * @param settingsStore         the settings sub-store
      * @param directory             the session directory path; unused for the transient variant
      * @param webSessionStore       the web-GraphQL credential sub-store, or {@code null} for an empty one
-     * @param wamStore              the WAM telemetry sub-store, or {@code null} for an empty one
+     * @param wamStore              the in-memory WAM sub-store
      * @param chatStore             the in-memory chat sub-store
      */
-    TemporaryStore(ProtobufLinkedWhatsAppSignalStore signalStore, ProtobufLinkedWhatsAppAccountStore accountStore, ProtobufLinkedWhatsAppContactStore contactStore, ProtobufLinkedWhatsAppSyncStore syncStore, ProtobufLinkedWhatsAppSettingsStore settingsStore, Path directory, ProtobufLinkedWebSessionStore webSessionStore, ProtobufLinkedWhatsAppWamStore wamStore, TemporaryLinkedWhatsAppChatStore chatStore) {
-        super(signalStore, accountStore, contactStore, syncStore, settingsStore, directory, webSessionStore, wamStore);
+    TemporaryStore(ProtobufLinkedWhatsAppSignalStore signalStore, ProtobufLinkedWhatsAppAccountStore accountStore, ProtobufLinkedWhatsAppContactStore contactStore, ProtobufLinkedWhatsAppSyncStore syncStore, ProtobufLinkedWhatsAppSettingsStore settingsStore, Path directory, ProtobufLinkedWebSessionStore webSessionStore, TemporaryLinkedWhatsAppWamStore wamStore, TemporaryLinkedWhatsAppChatStore chatStore) {
+        super(signalStore, accountStore, contactStore, syncStore, settingsStore, directory, webSessionStore, chatStore);
         this.chatStore = chatStore;
-        this.chatStore.bindContacts(contactStore());
+        this.wamStore = wamStore;
     }
 
     @Override
     public TemporaryLinkedWhatsAppChatStore chatStore() {
         return chatStore;
+    }
+
+    @Override
+    public TemporaryLinkedWhatsAppWamStore wamStore() {
+        return wamStore;
     }
 
     /**

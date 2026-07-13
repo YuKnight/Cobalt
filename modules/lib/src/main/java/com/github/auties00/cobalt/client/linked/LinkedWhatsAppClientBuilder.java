@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.client.linked;
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.MobileClientRegistration;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
@@ -13,6 +14,7 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +40,10 @@ import java.util.function.Supplier;
  */
 
 public sealed class LinkedWhatsAppClientBuilder {
+    /**
+     * The logger for {@link LinkedWhatsAppClientBuilder}.
+     */
+    private static final System.Logger LOGGER = Log.get(LinkedWhatsAppClientBuilder.class);
     /**
      * The default error handler: prints stack traces to stderr.
      */
@@ -257,9 +263,11 @@ public sealed class LinkedWhatsAppClientBuilder {
             public Options.Web loadLatestOrCreateConnection() throws IOException {
                 var existingStore = factory.loadLatest(LinkedWhatsAppClientType.WEB);
                 if (existingStore.isPresent()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded latest web connection from store");
                     return new Options.Web(existingStore.get());
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no existing web connection found, creating new store");
                 var newStore = factory.create(LinkedWhatsAppClientType.WEB, UUID.randomUUID());
                 return new Options.Web(newStore);
             }
@@ -267,30 +275,36 @@ public sealed class LinkedWhatsAppClientBuilder {
             @Override
             public Optional<Options> loadConnection(UUID uuid) throws IOException {
                 if (uuid == null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loadConnection(uuid) called with null uuid, skipping lookup");
                     return Optional.empty();
                 }
 
                 var store = factory.loadLatest(LinkedWhatsAppClientType.WEB);
                 if (store.isEmpty()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no web connection found for uuid {0}", uuid);
                     return Optional.empty();
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded web connection for uuid {0}", uuid);
                 var result = new Options.Web(store.get());
                 return Optional.of(result);
             }
-            
+
             @Override
             public Options.Web loadOrCreateConnection(UUID uuid) throws IOException {
                 if (uuid == null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loadOrCreateConnection(uuid) called with null uuid, creating new store");
                     var store = factory.create(LinkedWhatsAppClientType.WEB, UUID.randomUUID());
                     return new Options.Web(store);
                 }
 
                 var existingStore = factory.load(LinkedWhatsAppClientType.WEB, uuid);
                 if (existingStore.isPresent()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded existing web connection for uuid {0}", uuid);
                     return new Options.Web(existingStore.get());
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no web connection found for uuid {0}, creating new store", uuid);
                 var newStore = factory.create(LinkedWhatsAppClientType.WEB, uuid);
                 return new Options.Web(newStore);
             }
@@ -298,42 +312,50 @@ public sealed class LinkedWhatsAppClientBuilder {
             @Override
             public Optional<Options> loadConnection(Long phoneNumber) throws IOException {
                 if (phoneNumber == null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loadConnection(phoneNumber) called with null phoneNumber, skipping lookup");
                     return Optional.empty();
                 }
 
                 var existingStore = factory.load(LinkedWhatsAppClientType.WEB, phoneNumber);
                 if (existingStore.isEmpty()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no web connection found for phone {0}", Log.phone(phoneNumber));
                     return Optional.empty();
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded web connection for phone {0}", Log.phone(phoneNumber));
                 var result = new Options.Web(existingStore.get());
                 return Optional.of(result);
             }
-            
+
             @Override
             public Options.Web loadOrCreateConnection(Long phoneNumber) throws IOException {
                 if (phoneNumber == null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loadOrCreateConnection(phoneNumber) called with null phoneNumber, creating new store");
                     var store = factory.create(LinkedWhatsAppClientType.WEB, UUID.randomUUID());
                     return new Options.Web(store);
                 }
 
                 var existingStore = factory.load(LinkedWhatsAppClientType.WEB, phoneNumber);
                 if (existingStore.isPresent()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded existing web connection for phone {0}", Log.phone(phoneNumber));
                     return new Options.Web(existingStore.get());
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no web connection found for phone {0}, creating new store", Log.phone(phoneNumber));
                 var newStore = factory.create(LinkedWhatsAppClientType.WEB, phoneNumber);
                 return new Options.Web(newStore);
             }
-            
+
             @Override
             public Options.Web createConnection(LinkedWhatsAppClientSixPartsKeys sixParts) throws IOException {
                 Objects.requireNonNull(sixParts, "sixParts must not be null");
                 var existingStore = factory.load(LinkedWhatsAppClientType.WEB, sixParts.phoneNumber());
                 if(existingStore.isPresent()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded existing web connection for phone {0} from six-parts keys", Log.phone(sixParts.phoneNumber()));
                     return new Options.Web(existingStore.get());
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating new web connection for phone {0} from six-parts keys", Log.phone(sixParts.phoneNumber()));
                 var freshStore = factory.create(LinkedWhatsAppClientType.WEB, sixParts);
                 return new Options.Web(freshStore);
             }
@@ -342,9 +364,11 @@ public sealed class LinkedWhatsAppClientBuilder {
             public Optional<Options> loadLatestConnection() throws IOException {
                 var store = factory.loadLatest(LinkedWhatsAppClientType.WEB);
                 if (store.isEmpty()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no latest web connection found");
                     return Optional.empty();
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded latest web connection");
                 var result = new Options.Web(store.get());
                 return Optional.of(result);
             }
@@ -379,9 +403,11 @@ public sealed class LinkedWhatsAppClientBuilder {
             public Options.Mobile loadLatestOrCreateConnection() throws IOException {
                 var existingStore = factory.loadLatest(LinkedWhatsAppClientType.MOBILE);
                 if (existingStore.isPresent()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded latest mobile connection from store");
                     return new Options.Mobile(existingStore.get());
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no existing mobile connection found, creating new store");
                 var newStore = factory.create(LinkedWhatsAppClientType.MOBILE, UUID.randomUUID());
                 return new Options.Mobile(newStore);
             }
@@ -389,14 +415,17 @@ public sealed class LinkedWhatsAppClientBuilder {
             @Override
             public Optional<Options> loadConnection(UUID uuid) throws IOException {
                 if (uuid == null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loadConnection(uuid) called with null uuid, skipping lookup");
                     return Optional.empty();
                 }
 
                 var store = factory.loadLatest(LinkedWhatsAppClientType.MOBILE);
                 if (store.isEmpty()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no mobile connection found for uuid {0}", uuid);
                     return Optional.empty();
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded mobile connection for uuid {0}", uuid);
                 var result = new Options.Mobile(store.get());
                 return Optional.of(result);
             }
@@ -404,15 +433,18 @@ public sealed class LinkedWhatsAppClientBuilder {
             @Override
             public Options.Mobile loadOrCreateConnection(UUID uuid) throws IOException {
                 if (uuid == null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loadOrCreateConnection(uuid) called with null uuid, creating new store");
                     var store = factory.create(LinkedWhatsAppClientType.MOBILE, UUID.randomUUID());
                     return new Options.Mobile(store);
                 }
 
                 var existingStore = factory.load(LinkedWhatsAppClientType.MOBILE, uuid);
                 if (existingStore.isPresent()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded existing mobile connection for uuid {0}", uuid);
                     return new Options.Mobile(existingStore.get());
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no mobile connection found for uuid {0}, creating new store", uuid);
                 var newStore = factory.create(LinkedWhatsAppClientType.MOBILE, uuid);
                 return new Options.Mobile(newStore);
             }
@@ -420,14 +452,17 @@ public sealed class LinkedWhatsAppClientBuilder {
             @Override
             public Optional<Options> loadConnection(Long phoneNumber) throws IOException {
                 if (phoneNumber == null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loadConnection(phoneNumber) called with null phoneNumber, skipping lookup");
                     return Optional.empty();
                 }
 
                 var existingStore = factory.load(LinkedWhatsAppClientType.MOBILE, phoneNumber);
                 if (existingStore.isEmpty()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no mobile connection found for phone {0}", Log.phone(phoneNumber));
                     return Optional.empty();
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded mobile connection for phone {0}", Log.phone(phoneNumber));
                 var result = new Options.Mobile(existingStore.get());
                 return Optional.of(result);
             }
@@ -435,15 +470,18 @@ public sealed class LinkedWhatsAppClientBuilder {
             @Override
             public Options.Mobile loadOrCreateConnection(Long phoneNumber) throws IOException {
                 if (phoneNumber == null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loadOrCreateConnection(phoneNumber) called with null phoneNumber, creating new store");
                     var store = factory.create(LinkedWhatsAppClientType.MOBILE, UUID.randomUUID());
                     return new Options.Mobile(store);
                 }
 
                 var existingStore = factory.load(LinkedWhatsAppClientType.MOBILE, phoneNumber);
                 if (existingStore.isPresent()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded existing mobile connection for phone {0}", Log.phone(phoneNumber));
                     return new Options.Mobile(existingStore.get());
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no mobile connection found for phone {0}, creating new store", Log.phone(phoneNumber));
                 var newStore = factory.create(LinkedWhatsAppClientType.MOBILE, phoneNumber);
                 return new Options.Mobile(newStore);
             }
@@ -453,9 +491,11 @@ public sealed class LinkedWhatsAppClientBuilder {
                 Objects.requireNonNull(sixParts, "sixParts must not be null");
                 var existingStore = factory.load(LinkedWhatsAppClientType.WEB, sixParts.phoneNumber());
                 if(existingStore.isPresent()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded existing mobile connection for phone {0} from six-parts keys", Log.phone(sixParts.phoneNumber()));
                     return new Options.Mobile(existingStore.get());
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating new mobile connection for phone {0} from six-parts keys", Log.phone(sixParts.phoneNumber()));
                 var freshStore = factory.create(LinkedWhatsAppClientType.WEB, sixParts);
                 return new Options.Mobile(freshStore);
             }
@@ -464,9 +504,11 @@ public sealed class LinkedWhatsAppClientBuilder {
             public Optional<Options> loadLatestConnection() throws IOException {
                 var store = factory.loadLatest(LinkedWhatsAppClientType.MOBILE);
                 if (store.isEmpty()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no latest mobile connection found");
                     return Optional.empty();
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loaded latest mobile connection");
                 var result = new Options.Mobile(store.get());
                 return Optional.of(result);
             }
@@ -681,6 +723,7 @@ public sealed class LinkedWhatsAppClientBuilder {
             public Web releaseChannel(ClientPayload.ClientReleaseChannel releaseChannel) {
                 if (releaseChannel != null) {
                     var beta = releaseChannel == ClientPayload.ClientReleaseChannel.BETA;
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "setting web release channel, beta={0}", beta);
                     store.syncStore().setExternalWebBeta(beta);
                     store.accountStore().setReleaseChannel(beta ? ClientPayload.ClientReleaseChannel.BETA : ClientPayload.ClientReleaseChannel.RELEASE);
                 }
@@ -800,6 +843,7 @@ public sealed class LinkedWhatsAppClientBuilder {
              * @param maxMessagesPerChat the per-chat message cap, or {@code null}
              */
             private void applyHistory(boolean requireFullSync, boolean discard, boolean newsletters, Integer fullSyncDays, Integer storageQuotaMb, Integer recentSyncDays, Integer thumbnailSyncDays, Integer maxMessagesPerChat) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "applying history sync options: fullSync={0} discard={1} newsletters={2}", requireFullSync, discard, newsletters);
                 var sync = store.syncStore();
                 sync.setFullHistorySyncRequired(requireFullSync);
                 sync.setHistoryDiscarded(discard);
@@ -822,6 +866,7 @@ public sealed class LinkedWhatsAppClientBuilder {
              */
             public LinkedWhatsAppClient unregistered(LinkedWhatsAppClientVerificationHandler.Web.QrCode qrHandler) {
                 Objects.requireNonNull(qrHandler, "qrHandler must not be null");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building unregistered web client with qr code verification");
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
                 return new LiveLinkedWhatsAppClient(store, qrHandler, errorHandler);
             }
@@ -842,6 +887,7 @@ public sealed class LinkedWhatsAppClientBuilder {
              */
             public LinkedWhatsAppClient unregistered(LinkedWhatsAppClientVerificationHandler.Web.Passkey passkeyHandler) {
                 Objects.requireNonNull(passkeyHandler, "passkeyHandler must not be null");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building unregistered web client with passkey verification");
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
                 return new LiveLinkedWhatsAppClient(store, passkeyHandler, errorHandler);
             }
@@ -859,6 +905,7 @@ public sealed class LinkedWhatsAppClientBuilder {
              */
             public LinkedWhatsAppClient unregistered(long phoneNumber, LinkedWhatsAppClientVerificationHandler.Web.PairingCode pairingCodeHandler) {
                 Objects.requireNonNull(pairingCodeHandler, "pairingCodeHandler must not be null");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building unregistered web client with pairing code verification for phone {0}", Log.phone(phoneNumber));
                 store.accountStore().setPhoneNumber(phoneNumber);
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
                 return new LiveLinkedWhatsAppClient(store, pairingCodeHandler, errorHandler);
@@ -873,9 +920,11 @@ public sealed class LinkedWhatsAppClientBuilder {
              */
             public Optional<LinkedWhatsAppClient> registered() {
                 if (!store.accountStore().registered()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "web store is not registered, cannot build client");
                     return Optional.empty();
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building web client from registered store");
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
                 var result = new LiveLinkedWhatsAppClient(store, null, errorHandler);
                 return Optional.of(result);
@@ -1208,6 +1257,7 @@ public sealed class LinkedWhatsAppClientBuilder {
                     case LinkedWhatsAppClientDeviceAttestor.Android ignored -> {
                         if (platform != ClientPlatformType.ANDROID
                                 && platform != ClientPlatformType.ANDROID_BUSINESS) {
+                            if (Log.WARNING) LOGGER.log(Level.WARNING, "android attestor requires an android device, got platform {0}", platform);
                             throw new IllegalArgumentException(
                                     "Android attestor requires an Android device, got platform: " + platform);
                         }
@@ -1215,6 +1265,7 @@ public sealed class LinkedWhatsAppClientBuilder {
                     case LinkedWhatsAppClientDeviceAttestor.Ios ignored -> {
                         if (platform != ClientPlatformType.IOS
                                 && platform != ClientPlatformType.IOS_BUSINESS) {
+                            if (Log.WARNING) LOGGER.log(Level.WARNING, "ios attestor requires an ios device, got platform {0}", platform);
                             throw new IllegalArgumentException(
                                     "iOS attestor requires an iOS device, got platform: " + platform);
                         }
@@ -1247,6 +1298,7 @@ public sealed class LinkedWhatsAppClientBuilder {
                 var platform = device.platform();
                 var supported = pushClient.supportedPlatforms();
                 if (!supported.contains(platform)) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "push client does not support device platform {0}", platform);
                     throw new IllegalArgumentException(
                             "Push client does not support device platform: " + platform
                                     + " (supported: " + supported + ")");
@@ -1410,9 +1462,11 @@ public sealed class LinkedWhatsAppClientBuilder {
                 validateAttestorMatchesDevice();
                 validatePushClientMatchesDevice();
                 if (!store.accountStore().registered()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mobile store is not registered, cannot build client");
                     return Optional.empty();
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building mobile client from registered store");
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
                 var result = new LiveLinkedWhatsAppClient(store, null, errorHandler);
                 return Optional.of(result);
@@ -1442,12 +1496,14 @@ public sealed class LinkedWhatsAppClientBuilder {
 
                 var oldPhoneNumber = store.accountStore().phoneNumber();
                 if(oldPhoneNumber.isPresent() && oldPhoneNumber.getAsLong() != phoneNumber) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "phone number mismatch for mobile registration, requested {0}", Log.phone(phoneNumber));
                     throw new IllegalArgumentException("The phone number(" + phoneNumber + ") must match the existing phone number(" + oldPhoneNumber.getAsLong() + ")");
                 }else {
                     store.accountStore().setPhoneNumber(phoneNumber);
                 }
 
                 if (!store.accountStore().registered()) {
+                    if (Log.INFO) LOGGER.log(Level.INFO, "starting mobile registration for phone {0}", Log.phone(phoneNumber));
                     if (pushClientSupplier != null) {
                         try (var ownedPushClient = pushClientSupplier.get()) {
                             requirePushClientSupportsDevice(store.accountStore().device(), ownedPushClient);
@@ -1460,6 +1516,9 @@ public sealed class LinkedWhatsAppClientBuilder {
                             registration.register();
                         }
                     }
+                    if (Log.INFO) LOGGER.log(Level.INFO, "mobile registration complete for phone {0}", Log.phone(phoneNumber));
+                } else if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "mobile store already registered for phone {0}, skipping registration ceremony", Log.phone(phoneNumber));
                 }
 
                 var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
@@ -1556,6 +1615,7 @@ public sealed class LinkedWhatsAppClientBuilder {
                 case MOBILE -> null;
             };
             var errorHandler = Objects.requireNonNullElse(this.errorHandler, DEFAULT_ERROR_HANDLER);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building custom linked client, type={0}", store.accountStore().clientType());
             return new LiveLinkedWhatsAppClient(store, webVerificationHandler, errorHandler);
         }
     }

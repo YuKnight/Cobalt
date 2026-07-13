@@ -22,9 +22,8 @@ import java.util.Optional;
  * to adjust; its structure is defined by the server and is carried
  * verbatim as a string. The {@link #regulatedCategory() regulated
  * category} names which category applies, taken from Meta's standard
- * regulated-category catalog. The {@link #tuningOptionsJson() tuning
- * options} are a JSON-encoded object whose field set is defined by the
- * server and are carried verbatim. The {@link #adAccountId() ad account}
+ * regulated-category catalog. The {@link #tuningOptions() tuning options}
+ * control how the spec is rewritten. The {@link #adAccountId() ad account}
  * scopes the adjustment.
  */
 @ProtobufMessage(name = "BusinessAdRegulatedCategoryTuning")
@@ -55,11 +54,11 @@ public final class BusinessAdRegulatedCategoryTuning {
     final String regulatedCategory;
 
     /**
-     * JSON-encoded tuning options. The field set is defined by the server
-     * and is carried verbatim. Unset omits the variable.
+     * Tuning options controlling how the spec is rewritten. Unset omits the
+     * variable.
      */
-    @ProtobufProperty(index = 4, type = ProtobufType.STRING)
-    final String tuningOptionsJson;
+    @ProtobufProperty(index = 4, type = ProtobufType.MESSAGE)
+    final TuningOptions tuningOptions;
 
     /**
      * Constructs a new {@code BusinessAdRegulatedCategoryTuning}. Every
@@ -70,15 +69,14 @@ public final class BusinessAdRegulatedCategoryTuning {
      *                          {@code null}
      * @param targetingSpec     the audience targeting, or {@code null}
      * @param regulatedCategory the applicable category, or {@code null}
-     * @param tuningOptionsJson the JSON-encoded tuning options, or
-     *                          {@code null}
+     * @param tuningOptions     the tuning options, or {@code null}
      */
     public BusinessAdRegulatedCategoryTuning(String adAccountId, String targetingSpec,
-                                             String regulatedCategory, String tuningOptionsJson) {
+                                             String regulatedCategory, TuningOptions tuningOptions) {
         this.adAccountId = adAccountId;
         this.targetingSpec = targetingSpec;
         this.regulatedCategory = regulatedCategory;
-        this.tuningOptionsJson = tuningOptionsJson;
+        this.tuningOptions = tuningOptions;
     }
 
     /**
@@ -112,12 +110,12 @@ public final class BusinessAdRegulatedCategoryTuning {
     }
 
     /**
-     * Returns the JSON-encoded tuning options.
+     * Returns the tuning options controlling how the spec is rewritten.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an {@link Optional} carrying the tuning options, or empty when unset
      */
-    public Optional<String> tuningOptionsJson() {
-        return Optional.ofNullable(tuningOptionsJson);
+    public Optional<TuningOptions> tuningOptions() {
+        return Optional.ofNullable(tuningOptions);
     }
 
     @Override
@@ -128,12 +126,12 @@ public final class BusinessAdRegulatedCategoryTuning {
         return Objects.equals(adAccountId, that.adAccountId)
                 && Objects.equals(targetingSpec, that.targetingSpec)
                 && Objects.equals(regulatedCategory, that.regulatedCategory)
-                && Objects.equals(tuningOptionsJson, that.tuningOptionsJson);
+                && Objects.equals(tuningOptions, that.tuningOptions);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(adAccountId, targetingSpec, regulatedCategory, tuningOptionsJson);
+        return Objects.hash(adAccountId, targetingSpec, regulatedCategory, tuningOptions);
     }
 
     @Override
@@ -142,6 +140,6 @@ public final class BusinessAdRegulatedCategoryTuning {
                 "adAccountId=" + adAccountId + ", " +
                 "targetingSpec=" + targetingSpec + ", " +
                 "regulatedCategory=" + regulatedCategory + ", " +
-                "tuningOptionsJson=" + tuningOptionsJson + ']';
+                "tuningOptions=" + tuningOptions + ']';
     }
 }

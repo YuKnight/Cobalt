@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.message.send.crypto;
 
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
@@ -18,6 +19,7 @@ import com.github.auties00.libsignal.groups.SignalGroupCipher;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;
 import com.github.auties00.libsignal.protocol.SignalSenderKeyDistributionMessage;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -37,9 +39,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WASignalGroupCipher")
 public final class MessageEncryption {
     /**
-     * Holds the logger used for encryption diagnostics.
+     * The logger for {@link MessageEncryption}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MessageEncryption.class.getName());
+    private static final System.Logger LOGGER = Log.get(MessageEncryption.class);
 
     /**
      * Holds the ciphertext format version stamped on every outgoing {@code <enc>} stanza.
@@ -153,9 +155,9 @@ public final class MessageEncryption {
                 var ciphertextMessage = sessionCipher.encrypt(address, paddedPlaintext);
                 var encryptionType = MessageEncryptionType.fromSignalCiphertext(ciphertextMessage);
 
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Encrypted message for {0}, type={1}",
-                        recipientJid, encryptionType);
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "encrypted message for {0}, type={1}", recipientJid, encryptionType);
+                }
 
                 return new MessageEncryptedPayload(
                         encryptionType,
@@ -163,19 +165,19 @@ public final class MessageEncryption {
                         recipientJid
                 );
             } catch (Exception e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "encryptMsgProtobuf: encryption fail for {0}: {1}",
-                        recipientJid, e.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "encryptMsgProtobuf: encryption fail for " + Log.jid(String.valueOf(recipientJid)), e);
+                }
 
                 try {
                     store.signalStore().removeSession(address);
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "Removed stale session for {0} after encryption failure",
-                            recipientJid);
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "removed stale session for {0} after encryption failure", recipientJid);
+                    }
                 } catch (Exception cleanupError) {
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "Failed to cleanup session for {0}: {1}",
-                            recipientJid, cleanupError.getMessage());
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "session cleanup failed for " + Log.jid(String.valueOf(recipientJid)), cleanupError);
+                    }
                 }
 
                 throw new WhatsAppMessageException.Send.Unknown(
@@ -231,9 +233,9 @@ public final class MessageEncryption {
             try {
                 var ciphertextMessage = groupCipher.encrypt(senderKeyName, paddedPlaintext);
 
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Encrypted group message for {0}, sender={1}",
-                        groupJid, senderJid);
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "encrypted group message for {0}, sender={1}", groupJid, senderJid);
+                }
 
                 return new MessageEncryptedPayload(
                         MessageEncryptionType.SKMSG,
@@ -241,9 +243,9 @@ public final class MessageEncryption {
                         null
                 );
             } catch (Exception e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "encryptMsgSenderKey: encryption fail for {0}: {1}",
-                        groupJid, e.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "encryptMsgSenderKey: encryption fail for " + Log.jid(String.valueOf(groupJid)), e);
+                }
                 throw new WhatsAppMessageException.Send.Unknown(
                         "Failed to encrypt group message for group: " + groupJid, e
                 );
@@ -355,9 +357,9 @@ public final class MessageEncryption {
         cryptoLocks.withSenderKey(senderKeyName, () -> {
             store.signalStore().removeSenderKeys(senderKeyName);
 
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Rotated sender key for group {0}, sender {1}",
-                    groupJid, senderJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "rotated sender key for group {0}, sender {1}", groupJid, senderJid);
+            }
         });
     }
 

@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.net;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.vigil.ConnectivityMonitor;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 import java.util.random.RandomGenerator;
@@ -35,6 +37,11 @@ import java.util.random.RandomGenerator;
  */
 @WhatsAppWebModule(moduleName = "WAWebOpenSocket")
 public final class ReconnectSupervisor {
+    /**
+     * The logger for {@link ReconnectSupervisor}.
+     */
+    private static final System.Logger LOGGER = Log.get(ReconnectSupervisor.class);
+
     /**
      * The connection attempt invoked once per iteration.
      */
@@ -123,6 +130,8 @@ public final class ReconnectSupervisor {
      */
     public void requestReconnect() {
         if (cancelled || terminated.getAsBoolean()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reconnect request ignored, cancelled={0} terminated={1}",
+                    cancelled, terminated.getAsBoolean());
             return;
         }
         synchronized (lock) {
@@ -136,9 +145,11 @@ public final class ReconnectSupervisor {
                     thread = Thread.ofVirtual()
                             .name("cobalt-reconnect-supervisor")
                             .start(this::loop);
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reconnect supervisor thread started");
                 }
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reconnect requested");
     }
 
     /**
@@ -149,6 +160,7 @@ public final class ReconnectSupervisor {
      * fires when connectivity returns.
      */
     public void onConnectivityRegained() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "connectivity regained, resetting backoff");
         backoff.reset();
         var current = thread;
         if (current != null) {
@@ -165,6 +177,7 @@ public final class ReconnectSupervisor {
      * idles the loop while keeping its thread alive for a later reconnect.
      */
     public void cancel() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reconnect supervisor cancelled");
         cancelled = true;
         synchronized (lock) {
             lock.notifyAll();
@@ -239,8 +252,10 @@ public final class ReconnectSupervisor {
             try {
                 attempt.run();
                 backoff.reset();
+                if (Log.INFO) LOGGER.log(Level.INFO, "reconnect attempt succeeded");
                 return;
-            } catch (IOException _) {
+            } catch (IOException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "reconnect attempt failed", e);
                 if (cancelled || terminated.getAsBoolean()) {
                     return;
                 }
@@ -255,7 +270,9 @@ public final class ReconnectSupervisor {
      */
     private void sleepBackoff() {
         try {
-            Thread.sleep(backoff.nextDelayMillis());
+            var delayMillis = backoff.nextDelayMillis();
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "backing off {0}ms before next reconnect attempt", delayMillis);
+            Thread.sleep(delayMillis);
         } catch (InterruptedException _) {
             // Interrupted by onConnectivityRegained (backoff already reset) or cancel(); the
             // enclosing loop re-checks its conditions and either retries now or exits

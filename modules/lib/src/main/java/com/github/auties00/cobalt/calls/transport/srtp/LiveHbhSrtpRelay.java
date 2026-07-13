@@ -1,12 +1,14 @@
 package com.github.auties00.cobalt.calls.transport.srtp;
 
 import com.github.auties00.cobalt.calls.crypto.CallE2eKeyDerivation;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.SrtpAfbStreams;
 import com.github.auties00.srtp.SrtpErrorStatus;
 import com.github.auties00.srtp.SrtpPacket;
 import com.github.auties00.srtp.SrtpTransformer;
 
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.transport.subscription.RtcpRxSubscriptionTable;
@@ -33,6 +35,11 @@ import com.github.auties00.cobalt.calls.transport.subscription.RtcpRxSubscriptio
  * transport thread that owns the relay leg.
  */
 public final class LiveHbhSrtpRelay implements HbhSrtpRelay {
+    /**
+     * The logger for {@link LiveHbhSrtpRelay}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveHbhSrtpRelay.class);
+
     /**
      * Length, in bytes, of the {@code AES-128} master key at the front of each
      * {@value SrtpCryptoSuite#SUITE_MASTER_LENGTH} byte hop by hop master.
@@ -139,10 +146,16 @@ public final class LiveHbhSrtpRelay implements HbhSrtpRelay {
             this.rtcpOutbound = rtcpOut;
             this.rtcpInbound = new SrtpTransformer(mediaKey, mediaSalt, libSuite);
         } catch (RuntimeException e) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "hbh srtp relay leg creation failed, suite=" + suite, e);
+            }
             closeQuietly(rtpOut);
             closeQuietly(rtpIn);
             closeQuietly(rtcpOut);
             throw e;
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "hbh srtp relay leg created, suite={0}", suite);
         }
     }
 
@@ -206,6 +219,9 @@ public final class LiveHbhSrtpRelay implements HbhSrtpRelay {
             return;
         }
         closed = true;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "hbh srtp relay leg closed");
+        }
         closeQuietly(rtpOutbound);
         closeQuietly(rtpInbound);
         closeQuietly(rtcpOutbound);
@@ -242,6 +258,9 @@ public final class LiveHbhSrtpRelay implements HbhSrtpRelay {
      */
     private static void ensureOk(SrtpErrorStatus status) {
         if (status != SrtpErrorStatus.OK) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "srtp transform failed, status={0}", status);
+            }
             throw new WhatsAppCallException.Srtp("SRTP transform failed with status " + status);
         }
     }

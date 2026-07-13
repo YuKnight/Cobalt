@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code pnForLidChat} app-state action that registers a
@@ -44,6 +47,11 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebPnForLidChatSync")
 public final class PnForLidChatHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link PnForLidChatHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(PnForLidChatHandler.class);
+
     /**
      * Holds the AB-props service consulted before applying any mutation.
      */
@@ -108,6 +116,7 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebPnForLidChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!abPropsService.getBool(ABProp.PNH_PN_FOR_LID_CHAT_SYNC)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pn for lid chat: unsupported, ab-prop gate closed");
             return MutationApplicationResult.unsupported();
         }
 
@@ -118,24 +127,29 @@ public final class PnForLidChatHandler implements WebAppStateActionHandler {
         var indexArray = JSON.parseArray(mutation.index());
         var lidJidString = indexArray != null && indexArray.size() > 1 ? indexArray.getString(1) : null;
         if (lidJidString == null || lidJidString.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "pn for lid chat mutation malformed: missing lid index");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PnForLidChatAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "pn for lid chat mutation malformed: missing action value");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var pnJid = action.pnJid().orElse(null);
         if (pnJid == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "pn for lid chat mutation malformed: missing pn jid");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "pn for lid chat mutation malformed: index is not a lid");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         client.store().contactStore().registerLidMapping(pnJid, lidJid);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pn for lid chat: registered mapping pn={0} lid={1}", pnJid, lidJid);
         return MutationApplicationResult.success();
     }
 }

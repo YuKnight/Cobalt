@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Per subframe analysis by synthesis code excited linear prediction (CELP) encoder for the MLow speech codec.
@@ -149,6 +152,11 @@ public final class CelpEncoder {
      * The linear congruential increment of the seeded random word generator.
      */
     private static final long RAND_INC = 2531011L;
+
+    /**
+     * The logger for {@link CelpEncoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(CelpEncoder.class);
 
     /**
      * The closed loop adaptive codebook gain search.
@@ -354,6 +362,10 @@ public final class CelpEncoder {
         this.excLpc = new float[fcbSubfrlen];
         this.sgntrs = seedSignatures();
         this.subfrCnt = 0;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "celp encoder constructed: fcbSubfrlen={0} subfrPerPacket={1} lowRate={2}",
+                    fcbSubfrlen, subfrPerPacket, lowRate);
+        }
     }
 
     /**
@@ -371,6 +383,9 @@ public final class CelpEncoder {
         prevAcbIdx[IDX_FEC] = prevAcbIdx[IDX_MAIN] = -1;
         prevFcbIdx[IDX_FEC] = prevFcbIdx[IDX_MAIN] = -1;
         subfrCnt = 0;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "celp encoder reset");
+        }
     }
 
     /**
@@ -453,6 +468,10 @@ public final class CelpEncoder {
                 int pos = (signed * sign) - 1;
                 pulses[sf * fcbSubfrlen + pos] += (short) sign;
             }
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "celp encode frame: voiced={0} numsubfrs={1} nPulses={2}",
+                    voiced, numsubfrs, nPulsesTotal);
         }
         return new FrameExcitation(nPulsesTotal, pulses, sfPulses, acbgIdx, fcbgIdx);
     }
@@ -687,6 +706,10 @@ public final class CelpEncoder {
             }
         }
 
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "celp encode subframe: voiced={0} nPulses={1} acbIdx={2} fcbIdx={3}",
+                    voiced, fcb.nPulses()[IDX_MAIN], acbIdxOut[IDX_MAIN], gainIdxOut[IDX_MAIN]);
+        }
         return new SubframeExcitation(fcb.nPulses()[IDX_MAIN], fcb.pulses()[IDX_MAIN],
                 acbIdxOut[IDX_MAIN], gainIdxOut[IDX_MAIN]);
     }

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,10 +15,10 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 /**
  * Mirrors the paid-business subscriptions and feature flags across linked
@@ -47,9 +48,9 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
     private static final SyncPatchType COLLECTION_NAME = SyncPatchType.REGULAR;
 
     /**
-     * The logger used for the batch-level {@code REMOVE} diagnostic.
+     * The logger for {@link SubscriptionHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(SubscriptionHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(SubscriptionHandler.class);
 
     /**
      * Constructs the handler.
@@ -112,6 +113,7 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
         try {
             if (mutation.operation() == SyncdOperation.SET) {
                 if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof SubscriptionsSyncV2Action action)) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "subscriptions sync: malformed mutation value");
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
@@ -141,6 +143,8 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
                     client.store().businessStore().putBusinessSubscription(builder.build());
                 }
 
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "subscriptions sync: rewrote {0} feature flags, {1} subscriptions", action.paidFeatures().size(), action.subscriptions().size());
                 return MutationApplicationResult.success();
             }
 
@@ -148,8 +152,11 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
                 return MutationApplicationResult.success();
             }
 
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "subscriptions sync: unsupported operation={0}", mutation.operation());
             return MutationApplicationResult.failed();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "subscriptions sync mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -181,7 +188,8 @@ public final class SubscriptionHandler implements WebAppStateActionHandler {
             results.add(result);
         }
         if (removeCount > 0) {
-            LOGGER.warning("[SubscriptionsSyncV2Sync] " + removeCount + " REMOVE ops (singleton)");
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "subscriptions sync: {0} REMOVE ops (singleton)", removeCount);
         }
         return results;
     }

@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,13 +14,13 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that tests whether a WhatsApp Business catalog exposes any product
+ * Builds the graph.whatsapp.com GraphQL query that tests whether a WhatsApp Business catalog exposes any product
  * categories.
  *
  * <p>The single {@code request} GraphQL variable nests a {@code categories} object that
  * {@code WAWebQueryCatalogHasCategories} fills with the catalog-owning business {@link Jid}, an
  * optional direct-connection blob, the image dimensions to request (defaulting to one hundred pixels
- * square), and an optional catalog session id. The relay returns the categories under
+ * square), and an optional catalog session id. The graph.whatsapp.com endpoint returns the categories under
  * {@code xwa_product_catalog_get_categories}; WhatsApp Web reduces the reply to a single boolean
  * "has any category" verdict. The reply is consumed through
  * {@link QueryCatalogHasCategoriesWhatsAppGraphQlResponse}.
@@ -28,10 +30,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebQueryCatalogHasCategoriesQuery")
 public final class QueryCatalogHasCategoriesWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryCatalogHasCategoriesQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -101,7 +103,7 @@ public final class QueryCatalogHasCategoriesWhatsAppGraphQlRequest implements Wh
      *                                      used
      */
     public QueryCatalogHasCategoriesWhatsAppGraphQlRequest(Jid bizJid, String directConnectionEncryptedInfo,
-                                                           Integer imageWidth, Integer imageHeight, String catalogSessionId) {
+                                                              Integer imageWidth, Integer imageHeight, String catalogSessionId) {
         this.bizJid = bizJid;
         this.directConnectionEncryptedInfo = directConnectionEncryptedInfo;
         this.imageWidth = imageWidth;
@@ -191,5 +193,21 @@ public final class QueryCatalogHasCategoriesWhatsAppGraphQlRequest implements Wh
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

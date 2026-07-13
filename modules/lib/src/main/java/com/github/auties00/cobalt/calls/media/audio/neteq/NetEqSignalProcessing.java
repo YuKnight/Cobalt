@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * The fixed point signal processing leaf kernels the NetEq time stretch and concealment operations are
  * built from, a faithful Java transcription of WhatsApp's fixed point audio signal processing primitives.
@@ -19,6 +23,11 @@ package com.github.auties00.cobalt.calls.media.audio.neteq;
  * the Q12 down shift. Each kernel's exact shift amounts and rounding constants are documented on its method.
  */
 public final class NetEqSignalProcessing {
+    /**
+     * The logger for {@link NetEqSignalProcessing}.
+     */
+    private static final System.Logger LOGGER = Log.get(NetEqSignalProcessing.class);
+
     /**
      * The internal analysis sample rate the lag search runs at, in hertz.
      *
@@ -155,6 +164,9 @@ public final class NetEqSignalProcessing {
             case 32_000 -> { coefficients = DECIMATE_32K; factor = 8; warmupIndex = 4; }
             case 48_000 -> { coefficients = DECIMATE_48K; factor = 12; warmupIndex = 4; }
             default -> {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "unsupported decimation sample rate {0} hz", sampleRateHz);
+                }
                 return -1;
             }
         }
@@ -824,6 +836,10 @@ public final class NetEqSignalProcessing {
     static int weightedAdd(short[] out, int outPos, short[] a, int aPos, int weightA, short[] b, int bPos,
                            int weightB, int shift, int length) {
         if (out == null || a == null || b == null || shift < 0 || length == 0) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "weighted add received degenerate arguments, shift={0} length={1}",
+                        shift, length);
+            }
             return -1;
         }
         int round = (1 << shift) >> 1;
@@ -940,6 +956,9 @@ public final class NetEqSignalProcessing {
 
                 int kmHiCheck = km >> 16;
                 if (((kmHiCheck ^ (kmHiCheck >> 31)) - (kmHiCheck >> 31)) > 32750) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "levinson-durbin unstable at order {0} of {1}", m, order);
+                    }
                     return 0;
                 }
 

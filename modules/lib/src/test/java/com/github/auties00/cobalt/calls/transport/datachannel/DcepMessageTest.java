@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.transport.datachannel;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -16,6 +17,7 @@ import com.github.auties00.cobalt.wam.event.HatchUserJourneyEventBuilder;
 import com.github.auties00.cobalt.wam.type.BotEntryPointType;
 import com.github.auties00.cobalt.wam.type.HatchActionType;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -35,6 +37,11 @@ import java.util.UUID;
  * fires from the same {@code bot_request_welcome} send path.
  */
 public final class BotWelcomeRequestMutationFactory {
+    /**
+     * The logger for {@link BotWelcomeRequestMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(BotWelcomeRequestMutationFactory.class);
+
     /**
      * Telemetry sink used to emit the Hatch (Meta AI bot) user-journey beacon on a welcome-request send.
      */
@@ -78,6 +85,7 @@ public final class BotWelcomeRequestMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getBotWelcomeRequestSetMutation(Jid chatJid, boolean isSent) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building bot welcome request mutation chat={0} sent={1}", chatJid, isSent);
         var action = new BotWelcomeRequestActionBuilder()
                 .isSent(isSent)
                 .build();
@@ -119,6 +127,7 @@ public final class BotWelcomeRequestMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebHatchLogging", exports = "logHatchRequestWelcomeMsgSent", adaptation = WhatsAppAdaptation.ADAPTED)
     private void emitHatchWelcomeRequestSent() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "committing hatch welcome request sent journey event");
         var event = new HatchUserJourneyEventBuilder()
                 .hatchActionType(HatchActionType.REQUEST_WELCOME_MSG_SENT)
                 .botEntryPoint(BotEntryPointType.WA_CHAT)

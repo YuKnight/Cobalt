@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.privacy;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Objects;
 
@@ -15,6 +17,11 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebTrustedContactsUtils")
 public final class LiveTrustedContactTokenService implements TrustedContactTokenService {
+    /**
+     * The logger for {@link LiveTrustedContactTokenService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveTrustedContactTokenService.class);
+
     /**
      * Caps {@code tctoken_duration} at 180 days expressed in seconds.
      *
@@ -64,7 +71,9 @@ public final class LiveTrustedContactTokenService implements TrustedContactToken
         var durationProp = mode == TcTokenMode.RECEIVER
                 ? ABProp.TCTOKEN_DURATION
                 : ABProp.TCTOKEN_DURATION_SENDER;
-        return Math.min(abPropsService.getInt(durationProp), MAX_TC_TOKEN_DURATION_SECONDS);
+        var duration = Math.min(abPropsService.getInt(durationProp), MAX_TC_TOKEN_DURATION_SECONDS);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "tc token duration for {0}: {1}s", mode, duration);
+        return duration;
     }
 
     /**
@@ -102,14 +111,18 @@ public final class LiveTrustedContactTokenService implements TrustedContactToken
 
         var currentBucket = Math.floorDiv(Instant.now().getEpochSecond(), duration);
         var cutoffBucket = currentBucket - (numBuckets - 1);
-        return cutoffBucket * duration;
+        var cutoff = cutoffBucket * duration;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "tc token cutoff for {0}: {1}", mode, cutoff);
+        return cutoff;
     }
 
     @Override
     @WhatsAppWebExport(moduleName = "WAWebTrustedContactsUtils", exports = "isTokenExpired",
             adaptation = WhatsAppAdaptation.DIRECT)
     public boolean hasTokenExpired(Instant tokenTimestamp, TcTokenMode mode) {
-        return tokenTimestamp.getEpochSecond() < tokenExpirationCutoff(mode);
+        var expired = tokenTimestamp.getEpochSecond() < tokenExpirationCutoff(mode);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tc token expired check for {0}: {1}", mode, expired);
+        return expired;
     }
 
     /**
@@ -124,14 +137,18 @@ public final class LiveTrustedContactTokenService implements TrustedContactToken
             adaptation = WhatsAppAdaptation.DIRECT)
     public boolean shouldSendNewToken(Instant tokenTimestamp) {
         if (tokenTimestamp == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no prior tc token, issuing a new one");
             return true;
         }
         var duration = abPropsService.getInt(ABProp.TCTOKEN_DURATION_SENDER);
         if (duration <= 0) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "tctoken_duration_sender prop is non-positive: {0}", duration);
             return true;
         }
         var nowBucket = Math.floorDiv(Instant.now().getEpochSecond(), duration);
         var tokenBucket = Math.floorDiv(tokenTimestamp.getEpochSecond(), duration);
-        return nowBucket > tokenBucket;
+        var shouldSend = nowBucket > tokenBucket;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "should send new tc token: {0}", shouldSend);
+        return shouldSend;
     }
 }

@@ -8,7 +8,9 @@ import java.lang.foreign.MemorySegment;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -277,6 +279,25 @@ public interface VoipHostApi {
             private static final Format[] VALUES = values();
 
             /**
+             * Resolves a native format code to its constant, backing {@link #ofCode(int)}.
+             *
+             * <p>Built once at class initialization from each constant's {@link #code}, so a code resolves
+             * to its constant in constant time rather than by scanning {@link #VALUES}. A code with no
+             * entry falls back to {@link #UNKNOWN} in {@link #ofCode(int)}.
+             */
+            private static final Map<Integer, Format> BY_CODE;
+
+            static {
+                var byCode = new HashMap<Integer, Format>();
+                for (var format : VALUES) {
+                    if (byCode.put(format.code, format) != null) {
+                        throw new AssertionError("Conflict");
+                    }
+                }
+                BY_CODE = Map.copyOf(byCode);
+            }
+
+            /**
              * Holds the integer format code the native render boundary uses for this layout.
              */
             private final int code;
@@ -306,16 +327,14 @@ public interface VoipHostApi {
              * no constant matches, so a caller decoding a raw code from the engine boundary never fails on
              * an unexpected value and instead drops the frame.
              *
+             * @implNote This implementation resolves through the prebuilt {@link #BY_CODE} map rather than
+             * scanning {@link #VALUES}.
              * @param code the native format code to resolve
              * @return the matching constant, or {@link #UNKNOWN} when none matches
              */
             public static Format ofCode(int code) {
-                for (var format : VALUES) {
-                    if (format.code == code) {
-                        return format;
-                    }
-                }
-                return UNKNOWN;
+                var format = BY_CODE.get(code);
+                return format != null ? format : UNKNOWN;
             }
         }
     }

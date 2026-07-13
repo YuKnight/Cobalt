@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -15,6 +16,8 @@ import com.github.auties00.cobalt.model.sync.action.chat.ClearChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.ClearChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Clears the message history of a chat in response to a {@code clearChat} sync mutation.
@@ -40,6 +43,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebClearChatSync")
 public final class ClearChatHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link ClearChatHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(ClearChatHandler.class);
 
     /**
      * The zero-based index slot of the chat JID inside a {@code clearChat} mutation index array.
@@ -97,6 +104,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebClearChatSync", exports = {"applyMutations", "getMessageRange"}, adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clear chat mutation unsupported: operation={0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
@@ -109,6 +117,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
             if (chatJidString == null || chatJidString.isEmpty()
                     || deleteStarredString == null || deleteStarredString.isEmpty()
                     || deleteMediaString == null || deleteMediaString.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "clear chat mutation malformed: incomplete index");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
@@ -116,31 +125,38 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
             try {
                 chatJid = Jid.of(chatJidString);
             } catch (Exception e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "clear chat mutation malformed: chat jid parse failed");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (chatJid == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "clear chat mutation malformed: chat jid resolved to null");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ClearChatAction clearChatAction)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "clear chat mutation malformed: missing action value");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var messageRange = clearChatAction.messageRange().orElse(null);
             if (messageRange == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "clear chat mutation malformed: missing message range");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clear chat mutation orphaned: chat not found {0}", chatJid);
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
             chat.get().removeMessages();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clear chat applied: chat={0}", chatJid);
 
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "clear chat mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -180,6 +196,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
                 .orElse(null);
 
         if (localAction == null || remoteAction == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clear chat conflict resolved: missing action, applying remote");
             return ConflictResolution.of(MutationConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
         }
 
@@ -187,18 +204,25 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
         var remoteRange = remoteAction.messageRange().orElse(null);
 
         if (localRange == null || remoteRange == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clear chat conflict resolved: missing message range, applying remote");
             return ConflictResolution.of(MutationConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
         }
 
         return switch (MessageRangeUtils.compareMessageRanges(remoteRange, localRange)) {
-            case RANGE_A_ENCLOSES_RANGE_B ->
-                    ConflictResolution.of(MutationConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
-            case RANGE_B_ENCLOSES_RANGE_A ->
-                    ConflictResolution.of(MutationConflictResolutionState.SKIP_REMOTE);
-            case RANGES_ARE_EQUAL ->
-                    localMutation.timestamp().compareTo(remoteMutation.timestamp()) <= 0
-                            ? ConflictResolution.of(MutationConflictResolutionState.APPLY_REMOTE_DROP_LOCAL)
-                            : ConflictResolution.of(MutationConflictResolutionState.SKIP_REMOTE);
+            case RANGE_A_ENCLOSES_RANGE_B -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clear chat conflict resolved: remote range encloses local, applying remote");
+                yield ConflictResolution.of(MutationConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
+            }
+            case RANGE_B_ENCLOSES_RANGE_A -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clear chat conflict resolved: local range encloses remote, skipping remote");
+                yield ConflictResolution.of(MutationConflictResolutionState.SKIP_REMOTE);
+            }
+            case RANGES_ARE_EQUAL -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clear chat conflict resolved: ranges equal, tiebreak by timestamp");
+                yield localMutation.timestamp().compareTo(remoteMutation.timestamp()) <= 0
+                        ? ConflictResolution.of(MutationConflictResolutionState.APPLY_REMOTE_DROP_LOCAL)
+                        : ConflictResolution.of(MutationConflictResolutionState.SKIP_REMOTE);
+            }
             case RANGES_NOT_ENCLOSING -> {
                 var mergedRange = MessageRangeUtils.mergeMessageRanges(remoteRange, localRange);
                 var mergedAction = new ClearChatActionBuilder()
@@ -215,6 +239,7 @@ public final class ClearChatHandler implements WebAppStateActionHandler {
                         localMutation.timestamp(),
                         localMutation.actionVersion()
                 );
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clear chat conflict resolved: ranges partially overlap, merging");
                 yield ConflictResolution.merged(merged);
             }
         };

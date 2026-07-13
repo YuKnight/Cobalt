@@ -150,10 +150,9 @@ public final class TerminateStanza implements CallMessage {
     private final String hint;
 
     /**
-     * The raw {@code <call_summary>} subtree, or {@code null} when absent.
+     * The parsed {@code <call_summary>} of the ended call, or {@code null} when absent.
      */
-    // TODO: parse the <call_summary> participant and duration layout into a typed model instead of retaining the raw subtree
-    private final Stanza callSummary;
+    private final CallSummary callSummary;
 
     /**
      * The peer device JIDs the terminate fans out to; never {@code null}, possibly empty.
@@ -172,7 +171,7 @@ public final class TerminateStanza implements CallMessage {
      * @param firstWave     whether this is the first terminate wave of a fanout
      * @param transactionId the terminate transaction id, or {@code -1} when absent
      * @param hint          the terminate hint, or {@code null} when absent
-     * @param callSummary   the raw {@code <call_summary>} subtree, or {@code null} when absent
+     * @param callSummary   the parsed {@code <call_summary>} of the ended call, or {@code null} when absent
      * @param destination   the peer device JIDs the terminate fans out to; never {@code null}, possibly
      *                      empty
      * @throws NullPointerException if {@code callId}, {@code callCreator}, {@code reason},
@@ -180,7 +179,7 @@ public final class TerminateStanza implements CallMessage {
      *                              {@code destination} contains a {@code null} element
      */
     public TerminateStanza(String callId, Jid callCreator, CallEndReason reason, String reasonWire, int count,
-                           boolean firstWave, int transactionId, String hint, Stanza callSummary,
+                           boolean firstWave, int transactionId, String hint, CallSummary callSummary,
                            List<Jid> destination) {
         this.callId = Objects.requireNonNull(callId, "callId cannot be null");
         this.callCreator = Objects.requireNonNull(callCreator, "callCreator cannot be null");
@@ -297,11 +296,11 @@ public final class TerminateStanza implements CallMessage {
     }
 
     /**
-     * Returns the raw {@code <call_summary>} subtree, if present.
+     * Returns the parsed {@code <call_summary>} of the ended call, if present.
      *
-     * @return an {@link Optional} holding the call summary stanza, or empty when absent
+     * @return an {@link Optional} holding the call summary, or empty when absent
      */
-    public Optional<Stanza> callSummaryNode() {
+    public Optional<CallSummary> callSummary() {
         return Optional.ofNullable(callSummary);
     }
 
@@ -334,7 +333,7 @@ public final class TerminateStanza implements CallMessage {
                 .attribute(HINT_ATTRIBUTE, hint);
         var children = new ArrayList<Stanza>(2);
         if (callSummary != null) {
-            children.add(callSummary);
+            children.add(callSummary.toStanza());
         }
         if (!destination.isEmpty()) {
             var toNodes = new ArrayList<Stanza>(destination.size());
@@ -361,8 +360,8 @@ public final class TerminateStanza implements CallMessage {
      * <p>The reason is read from {@code reason}, falling back to the alternate
      * {@code terminate_reason} spelling, retained verbatim, and classified into a
      * {@link CallEndReason}. The
-     * {@code <call_summary>} subtree is retained unchanged, and the {@code <destination>} block's
-     * {@code <to>} children supply the fanout device JIDs.
+     * {@code <call_summary>} subtree is parsed into a typed {@link CallSummary}, and the
+     * {@code <destination>} block's {@code <to>} children supply the fanout device JIDs.
      *
      * @param stanza the {@code <terminate>} stanza
      * @return the decoded terminate signal
@@ -381,7 +380,7 @@ public final class TerminateStanza implements CallMessage {
         var firstWave = FLAG_TRUE.equals(stanza.getAttributeAsString(FIRST_WAVE_ATTRIBUTE, FLAG_FALSE));
         var transactionId = stanza.getAttributeAsInt(TRANSACTION_ID_ATTRIBUTE, -1);
         var hint = stanza.getAttributeAsString(HINT_ATTRIBUTE, null);
-        var callSummary = stanza.getChild(CALL_SUMMARY_ELEMENT).orElse(null);
+        var callSummary = stanza.getChild(CALL_SUMMARY_ELEMENT).flatMap(CallSummary::of).orElse(null);
         var destination = stanza.getChild(DESTINATION_ELEMENT)
                 .stream()
                 .flatMap(d -> d.streamChildren(TO_ELEMENT))

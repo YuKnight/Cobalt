@@ -303,6 +303,15 @@ class SignalingWireFormatTest {
     class Routing {
         private final CallSignalingRouter router = new CallSignalingRouter();
 
+        // Feeds router.classify by extracting its fields (tag, call-id, call-creator) off a rendered payload
+        //  stanza, the same way CallReceiver reads them from the wire.
+        private CallSignalingRouter.Verdict classify(Stanza payload, Jid senderLid, boolean callExists) {
+            var description = payload.description();
+            var callId = payload.getAttributeAsString("call-id", null);
+            var callCreator = payload.getAttributeAsJid("call-creator", null);
+            return router.classify(description, callId, callCreator, senderLid, callExists);
+        }
+
         @Test
         @DisplayName("a LID-addressed <offer> for an existing call routes to PROCESS and parses to OfferStanza")
         void offerRoutesToOfferStanza() {
@@ -310,7 +319,7 @@ class SignalingWireFormatTest {
             var call = callChild(offer.toStanza()).build();
             var payload = call.getChild().orElseThrow();
 
-            var verdict = router.classify(payload, PEER_USER_LID, true);
+            var verdict = classify(payload, PEER_USER_LID, true);
             assertEquals(CallSignalingRouter.Disposition.PROCESS, verdict.disposition());
             assertSame(SignalingType.OFFER, verdict.type().orElseThrow());
 
@@ -324,7 +333,7 @@ class SignalingWireFormatTest {
         void inboundRoutesToRecord(SignalingFixtures.Kind kind) {
             var payload = kind.build(CALL_ID, CALL_CREATOR).toStanza();
 
-            var verdict = router.classify(payload, PEER_USER_LID, true);
+            var verdict = classify(payload, PEER_USER_LID, true);
             assertEquals(CallSignalingRouter.Disposition.PROCESS, verdict.disposition(),
                     () -> kind + " should route to PROCESS");
             assertSame(kind.expectedType(), verdict.type().orElse(null),
@@ -339,7 +348,7 @@ class SignalingWireFormatTest {
         @DisplayName("an offer for a not-yet-existing call is BUFFERed rather than processed")
         void offerBuffersWhenNoCall() {
             var offer = SignalingFixtures.minimalOffer(CALL_ID, CALL_CREATOR);
-            var verdict = router.classify(offer.toStanza(), PEER_USER_LID, false);
+            var verdict = classify(offer.toStanza(), PEER_USER_LID, false);
             assertEquals(CallSignalingRouter.Disposition.BUFFER, verdict.disposition());
             assertEquals(CALL_ID, verdict.callId().orElseThrow());
         }
@@ -348,7 +357,7 @@ class SignalingWireFormatTest {
         @DisplayName("a payload with no call-id is DROPped with an empty type")
         void missingCallIdDrops() {
             var bad = new StanzaBuilder().description("offer").attribute("call-creator", CALL_CREATOR).build();
-            var verdict = router.classify(bad, PEER_USER_LID, true);
+            var verdict = classify(bad, PEER_USER_LID, true);
             assertEquals(CallSignalingRouter.Disposition.DROP, verdict.disposition());
             assertTrue(verdict.type().isEmpty());
         }
@@ -358,7 +367,7 @@ class SignalingWireFormatTest {
         void nonLidDrops() {
             var pnCreator = Jid.of("44444444", JidServer.user(), 7, 0);
             var node = CallMessagesTestSupport.stamp("offer", CALL_ID, pnCreator).build();
-            var verdict = router.classify(node, null, true);
+            var verdict = classify(node, null, true);
             assertEquals(CallSignalingRouter.Disposition.DROP, verdict.disposition());
             // the type still resolves; only the LID context gate fails
             assertSame(SignalingType.OFFER, verdict.type().orElseThrow());
@@ -374,7 +383,7 @@ class SignalingWireFormatTest {
             // action carries no taxonomy ordinal.
             var ringing = new RingingStanza(CALL_ID, CALL_CREATOR).toStanza();
             assertTrue(CallStanza.parse(ringing).isPresent(), "parser decodes <ringing>");
-            var verdict = router.classify(ringing, PEER_USER_LID, true);
+            var verdict = classify(ringing, PEER_USER_LID, true);
             assertEquals(CallSignalingRouter.Disposition.PROCESS, verdict.disposition(),
                     "router routes <ringing> via the parser-known tag fallback");
             assertTrue(verdict.type().isEmpty(), "ringing carries no taxonomy ordinal");
@@ -390,7 +399,7 @@ class SignalingWireFormatTest {
             // parser-known tag set rather than dropping it.
             var raiseHand = new RaiseHandStanza(CALL_ID, CALL_CREATOR, true, false).toStanza();
             assertTrue(CallStanza.parse(raiseHand).isPresent(), "parser decodes <raise_hand>");
-            var verdict = router.classify(raiseHand, PEER_USER_LID, true);
+            var verdict = classify(raiseHand, PEER_USER_LID, true);
             assertEquals(CallSignalingRouter.Disposition.PROCESS, verdict.disposition(),
                     "router routes <raise_hand> via the parser-known tag fallback");
             assertTrue(verdict.type().isEmpty(), "raise_hand carries no taxonomy ordinal");
@@ -402,7 +411,7 @@ class SignalingWireFormatTest {
         void ringingBuffersWhenNoCall() {
             // the ordinal-less fallback honours the same buffer-before-call gate as a taxonomy action
             var ringing = new RingingStanza(CALL_ID, CALL_CREATOR).toStanza();
-            var verdict = router.classify(ringing, PEER_USER_LID, false);
+            var verdict = classify(ringing, PEER_USER_LID, false);
             assertEquals(CallSignalingRouter.Disposition.BUFFER, verdict.disposition());
             assertEquals(CALL_ID, verdict.callId().orElseThrow());
             assertTrue(verdict.type().isEmpty());
@@ -412,7 +421,7 @@ class SignalingWireFormatTest {
         @DisplayName("a tag that is neither a taxonomy type nor a known decoder is still DROPped")
         void trulyUnknownTagDrops() {
             var unknown = CallMessagesTestSupport.stamp("not_a_call_action", CALL_ID, CALL_CREATOR).build();
-            var verdict = router.classify(unknown, PEER_USER_LID, true);
+            var verdict = classify(unknown, PEER_USER_LID, true);
             assertEquals(CallSignalingRouter.Disposition.DROP, verdict.disposition());
             assertTrue(verdict.type().isEmpty());
         }

@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.calls.engine.participant;
 
 import com.github.auties00.cobalt.model.call.CallPeerState;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -46,6 +48,13 @@ import java.util.Optional;
  *   <li>{@code 10} = {@code cancel_offer}</li>
  *   <li>{@code 11} = {@code invited}</li>
  * </ul>
+ *
+ * @implNote This implementation names the constants; only code {@code 0}'s name is confirmed against the
+ * engine binary, which logs it as the string {@code kParticipantStateInvalid}. Every other state is logged
+ * numerically (the engine emits no name string for codes {@code 2}, {@code 5}, {@code 0xb}, or {@code 0xc}),
+ * so the {@link #INVITED}, {@link #CONNECTING}, and {@link #LEFT} names are reconstructions from the
+ * participant lifecycle rather than recovered strings and cannot be confirmed against WhatsApp. The numeric
+ * codes are load bearing and correct; the names are Cobalt's.
  */
 public enum CallParticipantState {
     /**
@@ -70,8 +79,6 @@ public enum CallParticipantState {
      * <p>This is the state of a freshly allocated participant filled from an inbound
      * membership stanza before it has connected.
      */
-    // TODO: the INVITED name is reconstructed from the participant lifecycle, not a
-    //  confirmed string; code 2 is provisional and is never used in a numeric bitmask test.
     INVITED(2),
 
     /**
@@ -81,16 +88,11 @@ public enum CallParticipantState {
      * peer or relay transport; the {@code 5} code additionally appears as one half of the
      * transitional pair the engine uses during a peer to peer to relay handoff.
      */
-    // TODO: the companion code 0xb of the transitional pair has no dedicated constant; only
-    //  the numeric handoff semantics are load bearing and the exact name is unconfirmed.
     CONNECTING(5),
 
     /**
      * A participant that has left the call or whose device set has been removed.
      */
-    // TODO: the LEFT name is reconstructed from the leave and destroy lifecycle, not a
-    //  confirmed string; code 12 (0xc) is provisional and sits at the top of the active
-    //  bitmask range.
     LEFT(12);
 
     /**
@@ -98,6 +100,24 @@ public enum CallParticipantState {
      * defensive clone cost of {@link #values()} on every membership state lookup.
      */
     private static final CallParticipantState[] VALUES = values();
+
+    /**
+     * Resolves an engine code to its membership state, backing {@link #ofCode(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #code}, so a code resolves to its
+     * state in constant time rather than by scanning {@link #VALUES}.
+     */
+    private static final Map<Integer, CallParticipantState> BY_CODE;
+
+    static {
+        var byCode = new HashMap<Integer, CallParticipantState>();
+        for (var state : VALUES) {
+            if (byCode.put(state.code, state) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_CODE = Map.copyOf(byCode);
+    }
 
     /**
      * The integer code the engine stores for this membership state.
@@ -152,16 +172,13 @@ public enum CallParticipantState {
      * <p>An unmapped code yields {@link Optional#empty()} rather than a sentinel, so a
      * caller can distinguish a recognized state from an unknown engine value.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_CODE} map rather than
+     * scanning {@link #VALUES}.
      * @param code the engine code to resolve
      * @return the matching membership state, or {@link Optional#empty()} if no state
      *         matches
      */
     public static Optional<CallParticipantState> ofCode(int code) {
-        for (var state : VALUES) {
-            if (state.code == code) {
-                return Optional.of(state);
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(BY_CODE.get(code));
     }
 }

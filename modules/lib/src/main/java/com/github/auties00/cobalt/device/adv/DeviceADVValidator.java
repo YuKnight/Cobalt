@@ -4,7 +4,8 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.DeviceConstants;
-import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppAdvValidationException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.device.identity.*;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -20,6 +21,7 @@ import it.auties.protobuf.exception.ProtobufDeserializationException;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -45,6 +47,11 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebHandleAdvDeviceNotificationUtils")
 @WhatsAppWebModule(moduleName = "WAWebAdvSignatureConstants")
 public final class DeviceADVValidator {
+    /**
+     * The logger for {@link DeviceADVValidator}.
+     */
+    private static final System.Logger LOGGER = Log.get(DeviceADVValidator.class);
+
     /**
      * Holds the domain-separation header {@code [6, 0]} for the E2EE device-identity account
      * signature.
@@ -188,6 +195,8 @@ public final class DeviceADVValidator {
             throw new IllegalArgumentException("advSecretKey must be 32 bytes, got " + advSecretKey.length);
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "validating local device identity for {0}", localJid);
+
         try {
             var deviceIdentityHmacBytes = deviceIdentityStanza.getChild("device-identity")
                     .orElseThrow(() -> new WhatsAppAdvValidationException.MissingDeviceIdentity(localJid))
@@ -216,6 +225,7 @@ public final class DeviceADVValidator {
             mac.init(secretKey);
             var computedHmac = mac.doFinal(hmacInput);
             if (!Arrays.equals(hmac, computedHmac)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "adv hmac validation failed for {0}", localJid);
                 throw new WhatsAppAdvValidationException.HmacValidationFailed(localJid);
             }
 
@@ -237,13 +247,16 @@ public final class DeviceADVValidator {
                         accountSignatureHeader = HOSTED_ACCOUNT_SIGNATURE_HEADER;
                     }
                 } catch (ProtobufDeserializationException e) {
-                    // Fall back to the E2EE header on decode failure.
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "failed to decode inner device identity for {0}, falling back to e2ee header", localJid);
+                    }
                 }
             }
 
             var localIdentityKey = localIdentityKeyPair.publicKey().toEncodedPoint();
             var message = DataUtils.concatByteArrays(accountSignatureHeader, deviceIdentityDetails, localIdentityKey);
             if (!Curve25519.verifySignature(deviceIdentityAccountSignatureKey, message, deviceIdentityAccountSignature)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "adv account signature validation failed for {0}", localJid);
                 throw new WhatsAppAdvValidationException.AccountSignatureFailed(localJid);
             }
 
@@ -254,6 +267,8 @@ public final class DeviceADVValidator {
                     deviceIdentityAccountSignatureKey
             );
             var deviceSignature = Curve25519.sign(localIdentityKeyPair.privateKey().toEncodedPoint(), deviceSignatureMessage);
+
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "validated local device identity for {0}", localJid);
 
             return new ADVSignedDeviceIdentityBuilder()
                     .details(deviceIdentityDetails)
@@ -310,8 +325,11 @@ public final class DeviceADVValidator {
 
         var storedDeviceIdentityKey = findStoredDeviceIdentityKey(remoteJid);
         if (storedDeviceIdentityKey.isPresent() && Arrays.equals(storedDeviceIdentityKey.get(), remoteIdentityKey)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "remote device identity unchanged for {0}, skipping validation", remoteJid);
             return Optional.empty();
         }
+
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "validating remote device identity for {0}, hosted={1}", remoteJid, isHostedFromJid);
 
         var storedUserIdentityKey = findStoredUserIdentityKey(remoteJid);
 
@@ -334,7 +352,9 @@ public final class DeviceADVValidator {
                     accountSignatureHeader = HOSTED_ACCOUNT_SIGNATURE_HEADER;
                 }
             } catch (ProtobufDeserializationException e) {
-                // Fall back to the E2EE header on decode failure.
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "failed to decode remote device identity for {0}, falling back to e2ee header", remoteJid);
+                }
             }
         }
 
@@ -362,6 +382,7 @@ public final class DeviceADVValidator {
                 .orElseThrow(() -> new NullPointerException("accountSignature cannot be null"));
         var accountMessage = DataUtils.concatByteArrays(accountSignatureHeader, remoteIdentityDetails, remoteIdentityKey);
         if (!Curve25519.verifySignature(remoteIdentityAccountSignatureKey, accountMessage, remoteIdentityAccountSignature)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "remote adv account signature validation failed for {0}", remoteJid);
             throw new WhatsAppAdvValidationException.AccountSignatureFailed(remoteJid);
         }
 
@@ -369,8 +390,11 @@ public final class DeviceADVValidator {
                 .orElseThrow(() -> new NullPointerException("deviceSignature cannot be null"));
         var deviceMessage = DataUtils.concatByteArrays(deviceSignatureHeader, remoteIdentityDetails, remoteIdentityKey, remoteIdentityAccountSignatureKey);
         if (!Curve25519.verifySignature(remoteIdentityKey, deviceMessage, remoteIdentityDeviceSignature)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "remote adv device signature validation failed for {0}", remoteJid);
             throw new WhatsAppAdvValidationException.DeviceSignatureFailed(remoteJid);
         }
+
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "validated remote device identity for {0}", remoteJid);
 
         return Optional.of(remoteIdentity);
     }
@@ -400,6 +424,9 @@ public final class DeviceADVValidator {
 
         var localPrimaryIdentity = findStoredUserIdentityKey(userJid).orElse(null);
         if (localPrimaryIdentity == null) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "no local primary identity for {0}, skipping key-index list validation", userJid);
+            }
             return Optional.empty();
         }
 
@@ -436,6 +463,7 @@ public final class DeviceADVValidator {
             }
             return verifyAndBuildResult(signedKeyIndexList, accountSignatureKey, accountSignatureKey);
         } catch (ProtobufDeserializationException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to decode signed key-index list envelope", e);
             return Optional.empty();
         }
     }
@@ -465,6 +493,7 @@ public final class DeviceADVValidator {
             var signedKeyIndexList = ADVSignedKeyIndexListSpec.decode(signedKeyIndexBytes);
             return verifyAndBuildResult(signedKeyIndexList, verificationKey, resultAccountSignatureKey);
         } catch (ProtobufDeserializationException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to decode signed key-index list envelope", e);
             return Optional.empty();
         }
     }
@@ -505,6 +534,7 @@ public final class DeviceADVValidator {
 
         var message = DataUtils.concatByteArrays(KEY_INDEX_LIST_SIGNATURE_HEADER, details);
         if (!Curve25519.verifySignature(verificationKey, message, accountSignature)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "key-index list account signature verification failed");
             return Optional.empty();
         }
 
@@ -520,6 +550,11 @@ public final class DeviceADVValidator {
             var keyIndexListCurrentIndex = keyIndexList.currentIndex().orElse(0);
             var keyIndexListAccountType = keyIndexList.accountType().orElse(ADVEncryptionType.E2EE);
 
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "verified key-index list rawId={0}, currentIndex={1}, validIndexes={2}, accountType={3}",
+                        keyIndexListRawId.getAsInt(), keyIndexListCurrentIndex, keyIndexListValidIndexesSet.size(), keyIndexListAccountType);
+            }
+
             return Optional.of(new ValidatedKeyIndexListResult(
                     keyIndexListRawId.getAsInt(),
                     keyIndexListTimestamp.get(),
@@ -529,6 +564,7 @@ public final class DeviceADVValidator {
                     resultAccountSignatureKey
             ));
         } catch (ProtobufDeserializationException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to decode inner key-index list", e);
             return Optional.empty();
         }
     }

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -28,6 +30,11 @@ import java.util.List;
  * Web handler's behaviour where the pushname is part of the critical bootstrap data sync stage.
  */
 public final class PushNameSettingMutationFactory {
+    /**
+     * The logger for {@link PushNameSettingMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(PushNameSettingMutationFactory.class);
+
     /**
      * Constructs a push-name-setting mutation factory.
      *
@@ -58,6 +65,7 @@ public final class PushNameSettingMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebPushNameSync", exports = "getPushnameMutation", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getPushnameMutation(Instant timestamp, String name) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building pushname mutation nameLength={0}", name == null ? 0 : name.length());
         var setting = new PushNameSettingBuilder()
                 .name(name)
                 .build();

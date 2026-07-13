@@ -1,12 +1,15 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.WamoUserIdentifierAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Persists the server-issued WAMO (WhatsApp Newsletter Subscription) user identifier when the
@@ -27,6 +30,11 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * it. Cobalt's handler captures the identifier today so it is not lost once a real consumer ships.
  */
 public final class WamoUserIdentifierHandler implements WebAppStateActionHandler {
+
+    /**
+     * The logger for {@link WamoUserIdentifierHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(WamoUserIdentifierHandler.class);
 
     /**
      * Constructs the handler.
@@ -81,16 +89,19 @@ public final class WamoUserIdentifierHandler implements WebAppStateActionHandler
     @Override
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wamo user identifier: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof WamoUserIdentifierAction action)
                 || action.identifier().isEmpty()
                 || action.identifier().get().isBlank()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "wamo user identifier: malformed mutation, missing or blank identifier");
             return MutationApplicationResult.malformed();
         }
 
         client.store().settingsStore().setNewsletterSubscriptionUserIdentifier(action.identifier().get());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wamo user identifier: stored newsletter subscription user identifier");
         return MutationApplicationResult.success();
     }
 }

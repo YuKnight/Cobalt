@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode.LsfQuantizer.QuantizedLsf;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Short term analysis front end of the MLow speech encoder, chaining the linear prediction analysis and the
@@ -55,6 +58,11 @@ public final class EncodeFrontEnd {
      * <p>The window stage reads exactly this many samples from the supplied lookback buffer.
      */
     private static final int LPC_BUF_LEN_20MS = 448;
+
+    /**
+     * The logger for {@link EncodeFrontEnd}.
+     */
+    private static final System.Logger LOGGER = Log.get(EncodeFrontEnd.class);
 
     /**
      * The short term linear prediction analysis stage, shared and immutable.
@@ -115,6 +123,9 @@ public final class EncodeFrontEnd {
      */
     public void reset() {
         java.util.Arrays.fill(previousLsf, 0.0f);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "encode front end reset");
+        }
     }
 
     /**
@@ -154,6 +165,10 @@ public final class EncodeFrontEnd {
         // coefficient is 0.95, so the true carry is the blended last subframe vector, which that path threads
         // through its own committed candidate rather than this field.
         System.arraycopy(quant.lsf(), 0, previousLsf, 0, LPC_ORDER);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "encode front end process: condCoding={0} voiced={1} lowRate={2}",
+                    condCoding, voiced, lowRate);
+        }
         return new FrameResult(lpc, quant);
     }
 }

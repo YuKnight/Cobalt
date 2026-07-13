@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.device.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import com.github.auties00.cobalt.util.RandomIdUtils;
 
+import java.lang.System.Logger.Level;
 import java.util.*;
 
 /**
@@ -36,6 +38,10 @@ import java.util.*;
 @WhatsAppWebModule(moduleName = "WAWebUsyncUsername")
 @WhatsAppWebModule(moduleName = "WAWebUsyncLid")
 public final class DeviceUSyncQueryBuilder {
+    /**
+     * The logger for {@link DeviceUSyncQueryBuilder}.
+     */
+    private static final System.Logger LOGGER = Log.get(DeviceUSyncQueryBuilder.class);
 
     /**
      * Caps the number of {@code <user>} entries that fit in a single USync IQ.
@@ -86,10 +92,10 @@ public final class DeviceUSyncQueryBuilder {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private DeviceUSyncQueryBuilder() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -129,6 +135,7 @@ public final class DeviceUSyncQueryBuilder {
 
         var userJidsCount = userJids.size();
         if (userJidsCount <= MAX_USERS_PER_QUERY) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building usync device query: users={0}, context={1}, batches=1", userJidsCount, context);
             return List.of(buildEntry(userJids, context, hashInfos, includeUsernameProtocol));
         } else {
             var iterator = userJids.iterator();
@@ -144,6 +151,7 @@ public final class DeviceUSyncQueryBuilder {
             if (!batch.isEmpty()) {
                 batches.add(buildEntry(batch, context, hashInfos, includeUsernameProtocol));
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building usync device query: users={0}, context={1}, batches={2}", userJidsCount, context, batches.size());
             return batches;
         }
     }
@@ -175,6 +183,8 @@ public final class DeviceUSyncQueryBuilder {
     public static StanzaBuilder buildLidQuery(Jid userJid, String context) {
         Objects.requireNonNull(userJid, "userJid cannot be null");
         Objects.requireNonNull(context, "context cannot be null");
+
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building usync lid query for {0}, context={1}", userJid, context);
 
         var sessionId = RandomIdUtils.newId();
 

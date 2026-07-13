@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -27,6 +28,7 @@ import com.github.auties00.cobalt.wam.type.WaffleLifecycleTraceActionType;
 import com.github.auties00.cobalt.wam.type.WaffleLifecycleTraceSourceType;
 import com.github.auties00.cobalt.wam.WamService;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -45,6 +47,11 @@ import java.util.Optional;
  */
 @WhatsAppWebModule(moduleName = "WAWebWaffleAccountLinkStateSync")
 public final class WaffleAccountLinkStateHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link WaffleAccountLinkStateHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(WaffleAccountLinkStateHandler.class);
+
     /**
      * The AB-props service consulted on every mutation to enforce the {@link ABProp#WEB_WAFFLE}
      * gate.
@@ -130,6 +137,10 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
     @WhatsAppWebExport(moduleName = "WAWebWaffleAccountLinkStateSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         var accountLinkingEnabled = abPropsService.getBool(ABProp.WEB_WAFFLE);
+        if (!accountLinkingEnabled) {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "waffle account link state: WEB_WAFFLE disabled, {0} mutations unsupported", mutations.size());
+        }
         DecryptedMutation.Trusted latest = null;
         var results = new ArrayList<MutationApplicationResult>(mutations.size());
         for (var mutation : mutations) {
@@ -160,6 +171,8 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
             var previousState = client.store().accountStore().linkedMetaAccountState();
             client.store().accountStore().setLinkedMetaAccountState(linkState);
             client.store().accountStore().setLinkedMetaAccountStateTimestamp(latest.timestamp());
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "waffle account link state: {0} -> {1}", previousState.orElse(null), linkState);
             if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
                 emitSyncdReceived(previousState);
                 if (previousState.orElse(null) != WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
@@ -200,6 +213,8 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
         var previousState = client.store().accountStore().linkedMetaAccountState();
         client.store().accountStore().setLinkedMetaAccountState(linkState);
         client.store().accountStore().setLinkedMetaAccountStateTimestamp(mutation.timestamp());
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "waffle account link state: {0} -> {1}", previousState.orElse(null), linkState);
         if (linkState == WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
             emitSyncdReceived(previousState);
             if (previousState.orElse(null) != WaffleAccountLinkStateAction.AccountLinkState.ACTIVE) {
@@ -238,6 +253,8 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
     private void requestNonceFromPrimary(LinkedWhatsAppClient client) {
         var me = client.store().accountStore().jid().orElse(null);
         if (me == null) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "waffle nonce fetch: no current jid, skipping request to primary");
             return;
         }
 
@@ -262,6 +279,7 @@ public final class WaffleAccountLinkStateHandler implements WebAppStateActionHan
                 .peerDataRequestSessionId(sessionId)
                 .build());
         client.sendMessage(me.withDevice(0), container);
+        if (Log.INFO) LOGGER.log(Level.INFO, "waffle nonce fetch: requested linking nonce from primary device");
     }
 
     /**

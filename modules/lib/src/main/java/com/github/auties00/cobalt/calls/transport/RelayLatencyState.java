@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.transport;
 
 import com.github.auties00.cobalt.calls.signaling.relay.RelayEndpoint;
 import com.github.auties00.cobalt.calls.signaling.relay.RelayLatencyEntry;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,6 +40,11 @@ import java.util.Optional;
  *           peer's, and the relay both reported is elected.
  */
 public final class RelayLatencyState {
+    /**
+     * The logger for {@link RelayLatencyState}.
+     */
+    private static final System.Logger LOGGER = Log.get(RelayLatencyState.class);
+
     /**
      * The transport protocol index reported for a relay seeded from signaling rather than a live probe.
      *
@@ -105,6 +112,10 @@ public final class RelayLatencyState {
         Objects.requireNonNull(relayName, "relayName cannot be null");
         if (localLatencies.containsKey(relayName)) {
             localLatencies.put(relayName, latencyMillis);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "calls relay probe latency recorded: relay={0}, latency={1}ms",
+                        relayName, latencyMillis);
+            }
         }
     }
 
@@ -120,12 +131,18 @@ public final class RelayLatencyState {
      */
     public void recordPeerLatencies(List<RelayLatencyEntry> entries) {
         Objects.requireNonNull(entries, "entries cannot be null");
+        var recorded = 0;
         for (var entry : entries) {
             Objects.requireNonNull(entry, "entry cannot be null");
             var relayName = entry.relayName();
             if (relayName != null && entry.isReachable()) {
                 peerLatencies.put(relayName, RelayLatencyEntry.unpackLatencyMillis(entry.latency()));
+                recorded++;
             }
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "calls relay peer latencies recorded: {0} of {1} entries reachable",
+                    recorded, entries.size());
         }
     }
 
@@ -175,7 +192,12 @@ public final class RelayLatencyState {
             relayNames.add(relayName);
             candidates.add(new RelayElection.Candidate(relayId++, self, List.of(peer)));
         }
-        return RelayElection.findBestRelay(candidates, RelayElection.SELF_PARTY, mode)
+        var elected = RelayElection.findBestRelay(candidates, RelayElection.SELF_PARTY, mode)
                 .map(result -> relayNames.get(result.index()));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "calls relay latency election result: relay={0}",
+                    elected.isPresent() ? elected.get() : "NONE");
+        }
+        return elected;
     }
 }

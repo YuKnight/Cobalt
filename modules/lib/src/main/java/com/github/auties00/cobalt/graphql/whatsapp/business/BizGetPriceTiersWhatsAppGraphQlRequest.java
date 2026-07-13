@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,13 +13,13 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that fetches the localised commerce price tiers available to a WhatsApp
+ * Builds the graph.whatsapp.com GraphQL query that fetches the localised commerce price tiers available to a WhatsApp
  * Business catalog.
  *
  * <p>The single {@code request} GraphQL variable is the
  * {@code XWAWhatsAppGetPricingTiersRequest} input object. WhatsApp Web's
  * {@code WAWebBizGetPriceTiersQuery} fills it with a single {@code locale} field naming the locale to
- * localise the tier descriptions and currency symbols. The relay returns the tier catalog under
+ * localise the tier descriptions and currency symbols. The graph.whatsapp.com endpoint returns the tier catalog under
  * {@code xwa_whatsapp_get_pricing_tiers}; the reply is consumed through
  * {@link BizGetPriceTiersWhatsAppGraphQlResponse}.
  *
@@ -26,10 +28,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebBizGetPriceTiersQuery")
 public final class BizGetPriceTiersWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebBizGetPriceTiersQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -109,5 +111,21 @@ public final class BizGetPriceTiersWhatsAppGraphQlRequest implements WhatsAppGra
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

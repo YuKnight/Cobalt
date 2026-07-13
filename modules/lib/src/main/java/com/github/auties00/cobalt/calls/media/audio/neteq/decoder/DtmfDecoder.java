@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq.decoder;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -26,6 +29,11 @@ import java.util.Objects;
  * and the recursion memory carries across frames so a sustained tone is continuous.
  */
 public final class DtmfDecoder implements AudioDecoder {
+    /**
+     * The logger for {@link DtmfDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(DtmfDecoder.class);
+
     /**
      * The minimum telephone event payload length, the four byte event header.
      *
@@ -229,19 +237,29 @@ public final class DtmfDecoder implements AudioDecoder {
         Objects.requireNonNull(payload, "payload cannot be null");
         requireOpen();
         if (payload.length < EVENT_HEADER_BYTES) {
-            throw new com.github.auties00.cobalt.exception.WhatsAppCallException.Rtp(
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "dtmf payload too short, length={0}", payload.length);
+            }
+            throw new com.github.auties00.cobalt.exception.linked.WhatsAppCallException.Rtp(
                     "DTMF telephone-event payload too short: " + payload.length);
         }
         var event = payload[0] & 0xFF;
         var endFlag = (payload[1] & 0x80) != 0;
         var volume = payload[1] & 0x3F;
         if (endFlag || event >= MAX_TONE_EVENT) {
+            if (currentEvent >= 0 && Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "dtmf tone stopped, event={0}", Log.code(String.valueOf(currentEvent)));
+            }
             currentEvent = -1;
             currentVolume = -1;
             return new short[frameSamples];
         }
         if (event != currentEvent || volume != currentVolume) {
             initTone(event, volume);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "dtmf tone started, event={0} volume={1}",
+                        Log.code(String.valueOf(event)), volume);
+            }
         }
         return synthesize(frameSamples);
     }
@@ -288,6 +306,7 @@ public final class DtmfDecoder implements AudioDecoder {
         historyLow[1] = 0;
         historyHigh[0] = 0;
         historyHigh[1] = 0;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dtmf decoder reset");
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -9,6 +10,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -29,10 +31,15 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebSendGroupSkmsgJob")
 public final class GroupSkmsgFanoutStanza {
     /**
+     * The logger for {@link GroupSkmsgFanoutStanza}.
+     */
+    private static final System.Logger LOGGER = Log.get(GroupSkmsgFanoutStanza.class);
+
+    /**
      * Prevents instantiation; this is a static composer.
      */
     private GroupSkmsgFanoutStanza() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -103,6 +110,11 @@ public final class GroupSkmsgFanoutStanza {
                         .content(skmsgCiphertext)
                         .build()
                 : null;
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "building skmsg fanout stanza id={0} group={1} type={2} hasEnc={3}",
+                    messageId, groupJid, type, skmsgEncNode != null);
+        }
 
         return new StanzaBuilder()
                 .description("message")

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.bot;
 
-import com.github.auties00.cobalt.exception.WhatsAppBotSignatureException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppBotSignatureException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,6 +15,7 @@ import com.github.auties00.cobalt.wam.event.CertificateValidationEventEventBuild
 import com.github.auties00.cobalt.wam.type.CertVerificationResultType;
 
 import java.io.ByteArrayInputStream;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.PublicKey;
 import java.security.Signature;
@@ -40,6 +42,11 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebBotSignatureCertificateManager")
 @WhatsAppWebModule(moduleName = "WAWebBotSignatureVerificationGating")
 public final class LiveBotSignatureVerificationService implements BotSignatureVerificationService {
+    /**
+     * The logger for {@link LiveBotSignatureVerificationService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveBotSignatureVerificationService.class);
+
     /**
      * The supported signature version; WA Web rejects any proof whose version is not {@code 1}.
      */
@@ -140,12 +147,14 @@ public final class LiveBotSignatureVerificationService implements BotSignatureVe
         var builder = new CertificateValidationEventEventBuilder().startVerificationLatency();
         var level = enforcementLevel();
         if (level == BotSignatureEnforcementLevel.NONE) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "bot signature verification skipped, enforcement level is none");
             commit(builder, 0, CertVerificationResultType.SKIPPED_AB_DISABLED, null);
             return true;
         }
         var blocking = level == BotSignatureEnforcementLevel.ENFORCE_BLOCKING;
         try {
             if (metadata == null || messageDigest == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "bot signature verification failed, metadata or digest missing, blocking={0}", blocking);
                 commit(builder, 0, CertVerificationResultType.FAILED_SIGNATURE_DATA_MISSING, null);
                 return !blocking;
             }
@@ -154,11 +163,15 @@ public final class LiveBotSignatureVerificationService implements BotSignatureVe
                     .findFirst()
                     .orElse(null);
             if (proof == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "bot signature verification failed, no wa_bot_msg proof, blocking={0}", blocking);
                 commit(builder, 0, CertVerificationResultType.FAILED_SIGNATURE_DATA_MISSING, null);
                 return !blocking;
             }
-            return verifyProof(builder, proof, botFbid, messageDigest) || !blocking;
+            var allowed = verifyProof(builder, proof, botFbid, messageDigest) || !blocking;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "bot signature verification result, allowed={0}, level={1}", allowed, level);
+            return allowed;
         } catch (RuntimeException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "bot signature verification threw unexpectedly", exception);
             commit(builder, 0, CertVerificationResultType.FAILED_UNKNOWN_ERROR, null);
             return !blocking;
         }
@@ -178,18 +191,22 @@ public final class LiveBotSignatureVerificationService implements BotSignatureVe
         var chain = proof.certificateChain();
         var signature = proof.signature().orElse(null);
         if (signature == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "bot signature proof missing signature bytes, chain_length={0}", chain.size());
             commit(builder, chain.size(), CertVerificationResultType.FAILED_SIGNATURE_DATA_MISSING, null);
             return false;
         }
         if (proof.version().isEmpty() || proof.version().getAsInt() != 1) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "bot signature proof has unsupported version {0}", proof.version().isPresent() ? proof.version().getAsInt() : null);
             commit(builder, chain.size(), CertVerificationResultType.FAILED_SIGNATURE_DATA_MALFORMED, null);
             return false;
         }
         if (chain.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "bot signature proof has an empty certificate chain");
             commit(builder, 0, CertVerificationResultType.FAILED_CHAIN_INCOMPLETE, null);
             return false;
         }
         if (rootCertificate == null) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "bot signature verification unavailable, embedded root certificate failed to parse");
             commit(builder, chain.size(), CertVerificationResultType.FAILED_CHAIN_INCOMPLETE, null);
             return false;
         }
@@ -200,10 +217,12 @@ public final class LiveBotSignatureVerificationService implements BotSignatureVe
             leaf = certificates.getFirst();
             validateChain(certificates);
         } catch (WhatsAppBotSignatureException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "bot certificate chain validation failed, result={0}", exception.result());
             commit(builder, chain.size(), exception.result(), null);
             return false;
         }
         var valid = verifyEd25519(signature, constructSignaturePayload(botFbid, messageDigest), leaf.getPublicKey());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "bot signature ed25519 check valid={0}, chain_length={1}", valid, chain.size());
         commit(builder, chain.size(),
                 valid ? CertVerificationResultType.SUCCESS : CertVerificationResultType.FAILED_SIGNATURE_INVALID, leaf);
         return valid;
@@ -316,6 +335,7 @@ public final class LiveBotSignatureVerificationService implements BotSignatureVe
             }
             return certificates;
         } catch (Exception exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to parse bot certificate chain", exception);
             throw new WhatsAppBotSignatureException(CertVerificationResultType.FAILED_INVALID_CERT);
         }
     }
@@ -331,6 +351,7 @@ public final class LiveBotSignatureVerificationService implements BotSignatureVe
             var bytes = ROOT_CERTIFICATE_PEM.getBytes(StandardCharsets.UTF_8);
             return (X509Certificate) factory.generateCertificate(new ByteArrayInputStream(bytes));
         } catch (Exception exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to parse embedded bot feature root certificate", exception);
             return null;
         }
     }

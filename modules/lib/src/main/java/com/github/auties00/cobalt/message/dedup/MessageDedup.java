@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.dedup;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveEncryptedPayload;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -41,9 +43,9 @@ import java.util.concurrent.ConcurrentMap;
 @WhatsAppWebModule(moduleName = "WAWebMessageDedupUtils")
 public final class MessageDedup {
     /**
-     * Records the dedup add, pending-hit, and clear events.
+     * The logger for {@link MessageDedup}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MessageDedup.class.getName());
+    private static final System.Logger LOGGER = Log.get(MessageDedup.class);
 
     /**
      * Maps each composite dedup key to its outstanding reference count.
@@ -109,8 +111,9 @@ public final class MessageDedup {
 
         var newCount = pending.merge(key, 1, Integer::sum);
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "[message-dedup] add message: {0}, total: {1}", key, newCount);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "dedup add message key={0} total={1}", Log.jid(key), newCount);
+        }
 
         return newCount;
     }
@@ -159,8 +162,9 @@ public final class MessageDedup {
             return false;
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "[message-dedup] message {0} is pending, total: {1}", key, count);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "dedup pending hit key={0} total={1}", Log.jid(key), count);
+        }
         return true;
     }
 
@@ -202,9 +206,8 @@ public final class MessageDedup {
             adaptation = WhatsAppAdaptation.DIRECT)
     public void maybeClear(int count) {
         if (count == 0) {
-            if (!pending.isEmpty()) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "[message-dedup] message cache cleared, total: {0}", pending.size());
+            if (!pending.isEmpty() && Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "dedup cache cleared entries={0}", pending.size());
             }
             pending.clear();
         }
@@ -236,13 +239,17 @@ public final class MessageDedup {
     public void remove(String key) {
         Objects.requireNonNull(key, "key");
 
-        pending.compute(key, (_, count) -> {
+        var remaining = pending.compute(key, (_, count) -> {
             if (count == null) {
                 return null;
             }
             var decremented = count - 1;
             return decremented <= 0 ? null : decremented;
         });
+
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "dedup remove key={0} remaining={1}", Log.jid(key), remaining);
+        }
     }
 
     /**

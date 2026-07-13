@@ -4,7 +4,8 @@ import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
@@ -31,6 +32,7 @@ import com.github.auties00.cobalt.wam.type.MessageType;
 import com.github.auties00.cobalt.wam.type.PrekeysFetchContext;
 import com.github.auties00.cobalt.wam.type.SizeBucket;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -76,11 +78,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebBatchUpdateBroadcastAck")
 final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
     /**
-     * Surfaces broadcast-send diagnostics, including the no-fanout-keys and
-     * missing-clones cases WA Web logs via
-     * {@code sendLogs("broadcast-batch-ack-...")}.
+     * The logger for {@link BroadcastMessageSender}.
      */
-    private static final System.Logger LOGGER = System.getLogger(BroadcastMessageSender.class.getName());
+    private static final System.Logger LOGGER = Log.get(BroadcastMessageSender.class);
 
     /**
      * Performs the SKMSG group encryption and per-device sender-key
@@ -187,6 +187,11 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
         var allDevices = deviceService.getBroadcastFanout(broadcastJid, recipients);
         var phash = deviceService.computeGroupPhash(allDevices, selfLidOrPn(), false, false);
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "broadcast send: {0} recipients, {1} fanout device(s) for {2}",
+                    recipients.size(), allDevices.size(), broadcastJid);
+        }
+
         store.chatStore().createOrMergeReceiptRecords(messageId, allDevices);
 
         var skDistribDevices = new ArrayList<Jid>();
@@ -201,6 +206,9 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
 
         var rotateKey = store.signalStore().clearKeyRotation(broadcastJid);
         if (rotateKey) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "broadcast send: rotating sender key for {0}", broadcastJid);
+            }
             encryption.rotateSenderKey(broadcastJid, selfJid);
             skDistribDevices.addAll(skExistingDevices);
             skExistingDevices.clear();
@@ -217,6 +225,10 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
             var depletedPrekeyCount = deviceService.ensureSessions(skDistribDevices);
             emitPrekeysDepletionEvents(depletedPrekeyCount, allDevices.size());
             skDistPayloads = senderKeyDistribution.encrypt(broadcastJid, senderKeyBytes, skDistribDevices);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "broadcast send: distributing sender key to {0} device(s) for {1}",
+                        skDistribDevices.size(), broadcastJid);
+            }
         }
 
         var participantsNode = buildParticipantsNode(skDistPayloads, skExistingDevices);
@@ -259,9 +271,16 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
                 store.signalStore().markSenderKeyDistributed(broadcastJid, device);
             }
             if (allDevices.isEmpty()) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "[broadcast:ack] no fanout devices for {0}", broadcastJid);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "broadcast send: no fanout devices for {0}", broadcastJid);
+                }
             }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "broadcast send: ack success for {0} id={1}", broadcastJid, messageId);
+            }
+        } else if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "broadcast send: ack failed for {0} id={1} error={2}",
+                    broadcastJid, messageId, ack.error().orElse(-1));
         }
 
         return ack;
@@ -302,11 +321,19 @@ final class BroadcastMessageSender extends MessageSender<ChatMessageInfo> {
     private List<Jid> resolveRecipients(Jid broadcastJid) {
         var listId = broadcastJid.user();
         var list = store.businessStore().findBusinessBroadcastList(listId)
-                .orElseThrow(() -> new WhatsAppMessageException.Send.InvalidRecipient(
-                        broadcastJid,
-                        "Broadcast list " + listId + " is not in the local store"));
+                .orElseThrow(() -> {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "broadcast send: list {0} not found in local store", listId);
+                    }
+                    return new WhatsAppMessageException.Send.InvalidRecipient(
+                            broadcastJid,
+                            "Broadcast list " + listId + " is not in the local store");
+                });
         var participants = list.participants();
         if (participants.isEmpty()) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "broadcast send: list {0} has no participants", listId);
+            }
             throw new WhatsAppMessageException.Send.InvalidRecipient(
                     broadcastJid,
                     "Broadcast list " + listId + " has no participants");

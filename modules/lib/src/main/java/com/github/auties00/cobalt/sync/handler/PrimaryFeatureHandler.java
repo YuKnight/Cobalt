@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedWebAppPrimaryFeaturesListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,6 +11,8 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.PrimaryFeatureAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,6 +41,10 @@ import java.util.List;
  */
 @WhatsAppWebModule(moduleName = "WAWebPrimaryFeatureSync")
 public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link PrimaryFeatureHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(PrimaryFeatureHandler.class);
 
     /**
      * Constructs the singleton primary-feature sync handler.
@@ -106,6 +113,8 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
 
             var action = mutation.value().flatMap(sav -> sav.action()).orElse(null);
             if (!(action instanceof PrimaryFeatureAction)) {
+                if (Log.WARNING)
+                    LOGGER.log(Level.WARNING, "primary feature mutation malformed: missing action value");
                 results.add(SyncdIndexUtils.malformedActionValue(collectionName().name()));
                 continue;
             }
@@ -118,6 +127,8 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
         if (latest != null) {
             var pfa = (PrimaryFeatureAction) latest.value().flatMap(sav -> sav.action()).orElseThrow();
             client.store().syncStore().setPrimaryFeatures(pfa.flags());
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "primary feature: batch persisted {0} flags", pfa.flags().size());
             notifyPrimaryFeatures(client, pfa.flags());
         }
 
@@ -145,10 +156,12 @@ public final class PrimaryFeatureHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrimaryFeatureAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "primary feature mutation malformed: missing action value");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().syncStore().setPrimaryFeatures(action.flags());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "primary feature: persisted {0} flags", action.flags().size());
         notifyPrimaryFeatures(client, action.flags());
         return MutationApplicationResult.success();
     }

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.delay;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -31,6 +34,11 @@ import java.util.Deque;
  * the defaults apply.
  */
 public final class TrendlineEstimator {
+    /**
+     * The logger for {@link TrendlineEstimator}.
+     */
+    private static final System.Logger LOGGER = Log.get(TrendlineEstimator.class);
+
     /**
      * Number of samples the least squares regression operates over.
      *
@@ -221,6 +229,7 @@ public final class TrendlineEstimator {
      */
     @SuppressWarnings("unused")
     public BandwidthUsage update(double sendDeltaMs, double arrivalDeltaMs, int payloadBytes, long nowMs) {
+        var previousState = state;
         var oneWayDelayDelta = arrivalDeltaMs - sendDeltaMs;
         accumulatedDelayMs += oneWayDelayDelta;
         smoothedDelayMs = SMOOTHING_COEFFICIENT * smoothedDelayMs
@@ -245,6 +254,13 @@ public final class TrendlineEstimator {
         classify(modifiedTrend, dtMs);
         adaptThreshold(modifiedTrend, dtMs);
         prevModifiedTrend = modifiedTrend;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "trendline estimator: trend={0} modifiedTrend={1} threshold={2} state={3}",
+                    trend, modifiedTrend, threshold, state);
+        }
+        if (Log.DEBUG && state != previousState) {
+            LOGGER.log(Level.DEBUG, "trendline estimator: bandwidth usage {0} -> {1}", previousState, state);
+        }
         return state;
     }
 
@@ -367,6 +383,7 @@ public final class TrendlineEstimator {
         prevModifiedTrend = 0.0;
         state = BandwidthUsage.NORMAL;
         lastUpdateMs = -1;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "trendline estimator: reset");
     }
 
     /**

@@ -12,9 +12,10 @@ import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.ack.NackReason;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientPasskeyAuthenticator;
-import com.github.auties00.cobalt.exception.WhatsAppIntegrityChallengeException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppIntegrityChallengeException;
 import com.github.auties00.cobalt.listener.linked.LinkedContactTextStatusListener;
 import com.github.auties00.cobalt.listener.linked.LinkedIntegrityChallengeListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.integrity.IntegrityChallenge;
 import com.github.auties00.cobalt.stanza.mex.json.misc.IntegrityChallengeResponseMexRequest;
 import com.github.auties00.cobalt.stanza.mex.json.misc.IntegrityChallengeResponseMexResponse;
@@ -35,6 +36,7 @@ import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MessageCappingEventBuilder;
 import com.github.auties00.cobalt.wam.type.MessageCappingActionType;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -64,9 +66,9 @@ import java.util.Set;
 @WhatsAppWebModule(moduleName = "WAWebHandleMexNotification")
 final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * Logs warnings about parse failures and debug messages about UI-only operations that Cobalt explicitly drops.
+     * The logger for {@link NotificationMexStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(NotificationMexStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationMexStreamHandler.class);
 
     /**
      * Names the operations WhatsApp Web recognises but Cobalt has no consumer for.
@@ -166,23 +168,32 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
         var operationName = updateNode.getAttributeAsString("op_name", "");
         var payload = parsePayload(updateNode);
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "[mex] handling notification id={0} op={1}", stanzaId, operationName);
+        }
+
         try {
             dispatch(operationName, stanzaId, stanzaFrom, payload);
         } catch (MissingMexNotificationHandlerException e) {
             if (KNOWN_UNSUPPORTED_OPS.contains(e.operationName())) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "[mex] handleMexNotification: {0} unsupported, nack", e.operationName());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "[mex] handleMexNotification: {0} unsupported, nack", e.operationName());
+                }
                 sendNotificationNack(stanzaId, stanzaFrom, NackReason.PARSING_ERROR);
             } else {
-                LOGGER.log(System.Logger.Level.ERROR,
-                        "[mex] handleMexNotification: {0} unknown op, nack", e.operationName());
+                if (Log.ERROR) {
+                    LOGGER.log(Level.ERROR,
+                            "[mex] handleMexNotification: {0} unknown op, nack", e.operationName());
+                }
                 sendNotificationNack(stanzaId, stanzaFrom, NackReason.UNRECOGNIZED_STANZA);
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot handle mex notification {0}: {1}",
-                    stanzaId != null ? stanzaId : "<missing>",
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "cannot handle mex notification id=" + (stanzaId != null ? stanzaId : "<missing>"),
+                        throwable);
+            }
             sendNotificationNack(stanzaId, stanzaFrom, NackReason.PARSING_ERROR);
         }
     }
@@ -207,16 +218,20 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
     private void dispatch(String operationName, String stanzaId, Jid stanzaFrom, JSONObject payload) {
         var errors = payload.getJSONArray("errors");
         if (hasFatalExtensionError(errors)) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "[mex] Fatal extension error in mex notification for operation {0}", operationName);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "[mex] fatal extension error in mex notification for operation {0}", operationName);
+            }
             sendNotificationNack(stanzaId, stanzaFrom, NackReason.PARSING_ERROR);
             return;
         }
 
         var data = payload.get("data");
         if (data == null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "[mex] null data in parsed json for operation {0}", operationName);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "[mex] null data in parsed json for operation {0}", operationName);
+            }
             sendNotificationNack(stanzaId, stanzaFrom, NackReason.PARSING_ERROR);
             return;
         }
@@ -254,15 +269,21 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
                  "UsernameUpdateNotification",
                  "AccountSyncUsernameNotification",
                  "LidChangeNotification" -> handleUserOperation(operationName, payload);
-            case "NotificationUserBrigadingUpdate" ->
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "Ignoring brigading update mex operation (UI-only feature)");
-            case "NotificationGroupLimitSharingPropertyUpdate" ->
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "Ignoring limit sharing update mex operation (UI-only feature)");
-            case "NotificationUserReachoutTimelockUpdate" ->
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "Ignoring reachout timelock update mex operation (UI-only feature)");
+            case "NotificationUserBrigadingUpdate" -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "ignoring brigading update mex operation (UI-only feature)");
+                }
+            }
+            case "NotificationGroupLimitSharingPropertyUpdate" -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "ignoring limit sharing update mex operation (UI-only feature)");
+                }
+            }
+            case "NotificationUserReachoutTimelockUpdate" -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "ignoring reachout timelock update mex operation (UI-only feature)");
+                }
+            }
             case "NotificationIntegrityChallengeRequest" -> handleIntegrityChallenge(payload);
             case "MessageCappingInfoNotification" -> handleMessageCappingInfo(payload);
             default -> throw new MissingMexNotificationHandlerException(operationName);
@@ -292,8 +313,9 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
                 return jsonObject;
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Cannot parse mex JSON payload: {0}", throwable.getMessage());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "cannot parse mex JSON payload", throwable);
+            }
         }
 
         return new JSONObject();
@@ -417,10 +439,11 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
                 var statusText = whatsapp.queryAbout(jid).orElse(null);
                 upsertContactTextStatus(jid.toUserJid(), statusText, null, null, null);
             } catch (Throwable throwable) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Cannot refresh text-status data for {0}: {1}",
-                        jid,
-                        throwable.getMessage());
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "cannot refresh text-status data for " + Log.jid(jid.toString()),
+                            throwable);
+                }
             }
         }
     }
@@ -547,10 +570,16 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
         }
 
         if (phoneJid != null) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "migrating lid {0} -> {1} for phone {2}", oldLid, newLid, phoneJid);
+            }
             lidMigrationService.changeLid(phoneJid, newLid.toUserJid(), oldLid.toUserJid());
             return;
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rewriting lid {0} -> {1} in place, no phone mapping found", oldLid, newLid);
+        }
         whatsapp.store().contactStore().findContactByJid(oldLid)
                 .ifPresent(contact -> contact.setLid(newLid.toUserJid()));
         whatsapp.store().chatStore().findChatByJid(oldLid)
@@ -616,7 +645,9 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
             var challengeUrl = captchaChallenge != null ? captchaChallenge.getString("challenge_url") : null;
             return new IntegrityChallenge(IntegrityChallenge.Type.CAPTCHA, null, siteKey, challengeUrl);
         }
-        LOGGER.log(System.Logger.Level.WARNING, "Unknown integrity challenge type {0}", type);
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "unknown integrity challenge type {0}", type);
+        }
         return null;
     }
 
@@ -761,11 +792,12 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
             try {
                 whatsapp.queryChatMetadata(jid);
             } catch (Throwable throwable) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Cannot refresh group metadata for {0}: {1}",
-                        jid,
-                        throwable.getMessage());
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "cannot refresh group metadata for " + Log.jid(jid.toString()),
+                            throwable);
                 }
+            }
         }
     }
 
@@ -806,10 +838,11 @@ final class NotificationMexStreamHandler extends SocketStreamHandler.Concurrent 
             try {
                 whatsapp.queryName(userJid).ifPresent(contact::setChosenName);
             } catch (Throwable throwable) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Cannot refresh username metadata for {0}: {1}",
-                        userJid,
-                        throwable.getMessage());
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "cannot refresh username metadata for " + Log.jid(userJid.toString()),
+                            throwable);
+                }
             }
         }
     }

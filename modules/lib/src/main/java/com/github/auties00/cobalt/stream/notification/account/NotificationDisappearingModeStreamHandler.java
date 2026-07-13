@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
@@ -21,6 +22,7 @@ import com.github.auties00.cobalt.wam.type.EphemeralityTriggerActionType;
 import com.github.auties00.cobalt.wam.type.EsrFailureReasonType;
 import com.github.auties00.cobalt.wam.type.EsrSendResultType;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 
 /**
@@ -41,7 +43,7 @@ final class NotificationDisappearingModeStreamHandler extends SocketStreamHandle
     /**
      * Logs diagnostics for this handler.
      */
-    private static final System.Logger LOGGER = System.getLogger(NotificationDisappearingModeStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationDisappearingModeStreamHandler.class);
 
     /**
      * Holds the client used for store reads and chat mutations.
@@ -138,6 +140,7 @@ final class NotificationDisappearingModeStreamHandler extends SocketStreamHandle
         var chat = whatsapp.store().chatStore().findChatByJid(from)
                 .orElse(null);
         if (chat == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping disappearing_mode notification for unknown chat {0}", from);
             return;
         }
 
@@ -154,9 +157,13 @@ final class NotificationDisappearingModeStreamHandler extends SocketStreamHandle
             }
             chat.setEphemeralExpiration(ChatEphemeralTimer.of(duration));
             chat.setEphemeralSettingTimestamp(settingTimestamp);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "applied disappearing_mode duration {0}s -> {1}s for {2}", localDurationSeconds, duration, from);
             emitEphemeralSyncResponseReceive(from, duration, newTimestampSeconds,
                     existingTimestamp != null ? localDurationSeconds : null, existingTimestamp, null);
         } else if (existingTimestamp != null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "rejected stale disappearing_mode notification for {0}, local setting is newer", from);
             emitEphemeralSyncResponseReceive(from, duration, newTimestampSeconds,
                     localDurationSeconds, existingTimestamp, EsrFailureReasonType.OLDER_EPHEMERAL_SETTING_TIMESTAMP);
             emitEphemeralSyncResponseSend(from, duration, newTimestampSeconds, localDurationSeconds, existingTimestamp);

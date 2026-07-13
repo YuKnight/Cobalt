@@ -109,6 +109,20 @@ public sealed interface VideoCaptureDriver permits LiveVideoCaptureDriver {
          * @return {@code 0} if the engine accepted the frame, or a nonzero engine error code
          */
         int accept(VideoFrame frame);
+
+        /**
+         * Notifies the engine that the driver lost its capture device mid capture and entered
+         * {@link State#INTERRUPTED}.
+         *
+         * <p>Invoked once by the driver's capture pump when the operating system revokes the device under a
+         * running capture (a hot unplugged, preempted, or privacy revoked camera, or a screen share surface
+         * the user stopped) rather than the engine calling {@link #stop()}. The default does nothing, so a
+         * sink that only consumes frames is unaffected; an engine sink overrides it to react, for example by
+         * ending its outbound video and broadcasting the local video state to the peer. It is called off the
+         * driver's lock on the capture pump thread, so an implementation may block.
+         */
+        default void onInterrupted() {
+        }
     }
 
     /**

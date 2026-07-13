@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -20,6 +21,7 @@ import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -43,6 +45,11 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebSendMsgMetaNode")
 public final class MetaStanza {
+    /**
+     * The logger for {@link MetaStanza}.
+     */
+    private static final System.Logger LOGGER = Log.get(MetaStanza.class);
+
     /**
      * Holds the store consulted for chat LID origin and verified business name lookup.
      */
@@ -138,7 +145,13 @@ public final class MetaStanza {
                 && senderIntent == null && appdata == null
                 && threadMsgId == null && hashedAiThreadId == null
                 && tagReason == null && statusSetting == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "meta build skipped for chat {0}: no signals present", chatJid);
             return null;
+        }
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "meta stanza built for chat {0} polltype={1} eventType={2} appdata={3}",
+                    chatJid, polltype, eventType, appdata);
         }
 
         return new StanzaBuilder()

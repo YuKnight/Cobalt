@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.listener.linked.LinkedWebAppStateActionListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.action.SyncActionEntry;
 import com.github.auties00.cobalt.model.sync.action.SyncActionEntryBuilder;
 import com.github.auties00.cobalt.model.sync.action.SyncActionMessageRange;
@@ -18,8 +19,8 @@ import com.github.auties00.cobalt.sync.key.LiveSyncKeyRotationService;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
@@ -99,8 +100,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.*;
 import java.util.function.BooleanSupplier;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.lang.System.Logger.Level;
 
 
 /**
@@ -179,9 +179,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebSyncdWamAppState")
 public final class LiveWebAppStateService implements WebAppStateService {
     /**
-     * The class-scoped logger used for sync-pipeline diagnostics.
+     * The logger for {@link LiveWebAppStateService}.
      */
-    private static final Logger LOGGER = Logger.getLogger(LiveWebAppStateService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveWebAppStateService.class);
 
     /**
      * The debounce window after the last mutation-processing activity before
@@ -460,6 +460,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
     @WhatsAppWebExport(moduleName = "WAWebSyncd", exports = "markCollectionsForSync", adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public void pushPatches(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pushing {0} pending mutations for collection {1}", patches.size(), patchType);
         syncKeyRotationService.ensureActiveKey(true);
         coordinator.runLocked(() -> {
             store.syncStore().markWebAppStateDirty(patchType);
@@ -488,6 +489,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         var allCollections = new LinkedHashSet<SyncPatchType>();
         Collections.addAll(allCollections, patchTypes);
         if (!allCollections.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pulling patches for {0} collections", allCollections.size());
             return syncCollectionsBatched(allCollections);
         }
         return false;
@@ -530,6 +532,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
             }
         });
         if (!blockedCollections.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unblocking {0} collections after key replenishment", blockedCollections.size());
             pullPatches(blockedCollections.toArray(SyncPatchType[]::new));
         }
     }
@@ -670,6 +673,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                 }
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "batched sync round complete for {0} collections, changes={1}, retrigger={2}", admitted.size(), result, retrigger.size());
         if (!retrigger.isEmpty()) {
             pullPatches(retrigger.toArray(SyncPatchType[]::new));
         }
@@ -708,10 +712,12 @@ public final class LiveWebAppStateService implements WebAppStateService {
 
             var batchedRequest = coordinator.runWithMonitorReleased(() -> requestBuilder.buildBatchedSyncRequest(collectionPatches));
             logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.REQUEST_BUILT);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending batched sync iq for {0} collections", patchTypes.size());
             var responseNode = coordinator.runWithMonitorReleased(() -> whatsapp.sendNode(batchedRequest.node()));
             logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.RESPONSE_RECEIVED);
             var responses = responseParser.parseBatchedSyncResponse(responseNode);
             logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.RESPONSE_PARSED_VALID);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "batched sync response received, {0} collection responses", responses.size());
 
             for (var response : responses) {
                 if (response.collectionError().isPresent()) {
@@ -1138,6 +1144,8 @@ public final class LiveWebAppStateService implements WebAppStateService {
             }
         });
 
+        if (Log.INFO) LOGGER.log(Level.INFO, "resuming app-state sync after restart, {0} collections need syncing", collectionsToSync.size());
+
         retryAllOrphanMutations();
         retryUnsupportedMutations();
 
@@ -1265,7 +1273,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         var iterations = 0;
         while(store.syncStore().findWebAppState(patchType).state() != SyncCollectionState.UP_TO_DATE) {
             if (++iterations > MAX_SYNC_ITERATIONS) {
-                LOGGER.warning("Iteration cap reached for collection " + patchType + " after " + MAX_SYNC_ITERATIONS + " iterations");
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "iteration cap reached for collection {0} after {1} iterations", patchType, MAX_SYNC_ITERATIONS);
                 store.syncStore().markWebAppStateErrorRetry(patchType);
                 break;
             }
@@ -1336,7 +1344,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         var skippedPendingUpload = false;
 
         if (!pendingMutations.isEmpty() && !store.syncStore().findWebAppState(patchType).bootstrapped()) {
-            LOGGER.fine("Skipping pending mutations for unbootstrapped collection " + patchType);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "skipping pending mutations for unbootstrapped collection {0}", patchType);
             skippedPendingUpload = true;
             pendingMutations = List.of();
         }
@@ -1347,11 +1355,13 @@ public final class LiveWebAppStateService implements WebAppStateService {
         store.syncStore().markWebAppStateInFlight(patchType);
 
         logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.REQUEST_BUILT);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending sync iq for collection {0}", patchType);
         var response = coordinator.runWithMonitorReleased(() -> whatsapp.sendNode(syncRequest.node()));
         logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.RESPONSE_RECEIVED);
 
         var parsedResponse = responseParser.parseSyncResponse(response);
         logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.RESPONSE_PARSED_VALID);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sync response for collection {0}: patches={1}, hasMore={2}", patchType, parsedResponse.patches().size(), parsedResponse.hasMore());
         return new SyncRoundResult(parsedResponse, syncRequest.uploadInfo(), skippedPendingUpload);
     }
 
@@ -1452,6 +1462,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         var snapshotAppliedFromServer = syncResponse.snapshotReference().isPresent();
         var patchesPresent = !syncResponse.patches().isEmpty();
         var recoveredFromSnapshot = false;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "applying sync response for {0}: bootstrapped={1}, snapshot={2}, patches={3}", collectionName, wasBootstrapped, snapshotAppliedFromServer, syncResponse.patches().size());
         if (syncResponse.snapshotReference().isPresent()) {
             store.syncStore().clearSyncActionEntries(collectionName);
 
@@ -1515,6 +1526,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                     throw e;
                 }
 
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "snapshot mac validation failed for " + collectionName + ", requesting peer recovery", e);
                 var recoveredSnapshot = coordinator.runWithMonitorReleased(() -> snapshotRecoveryService.requestRecovery(collectionName));
                 if (recoveredSnapshot == null) {
                     throw e;
@@ -1642,7 +1654,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                 var snapshotMacValid = integrityVerifier.verifyPatchIntegrity(collectionName, patch, newHash.newHash(), patchValueMacs);
                 if (!snapshotMacValid) {
                     store.syncStore().markWebAppStateMacMismatch(collectionName);
-                    LOGGER.warning("Patch snapshot MAC mismatch for " + collectionName + " at version " + patchVersion + ", marking mac-mismatch");
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "patch snapshot mac mismatch for {0} at version {1}, marking mac-mismatch", collectionName, patchVersion);
                 }
             }
 
@@ -2108,8 +2120,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
 
         var currentVersion = getCurrentVersion(patchType);
         if (expectedVersion != currentVersion + 1) {
-            LOGGER.warning("Unexpected version after upload for " + patchType
-                    + ": expected " + (currentVersion + 1) + " but computed " + expectedVersion);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "unexpected version after upload for {0}: expected {1} but computed {2}", patchType, currentVersion + 1, expectedVersion);
             syncdDailyStats.uploadConflictCount.incrementAndGet();
             scheduleAppStateSyncDailyFlush();
             return;
@@ -2119,6 +2130,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         if (!uploadApplied) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "upload acknowledged for {0}: version={1}, mutations={2}", patchType, expectedVersion, uploadInfo.mutations().size());
 
         for (var mutation : uploadInfo.mutations()) {
             if (mutation.operation() == SyncdOperation.SET) {
@@ -2236,7 +2248,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                 if (fatal) {
                     throw new WhatsAppWebAppStateSyncException.DuplicateIndexInPatch(collectionName);
                 } else {
-                    LOGGER.warning("Duplicate index in snapshot for collection " + collectionName + ": " + index);
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "duplicate index in snapshot for collection {0}", collectionName);
                 }
             }
         }
@@ -2352,6 +2364,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
 
         var downloadStart = Instant.now();
         try {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "downloading app-state snapshot blob");
             var downloadedData = mediaConnectionService.download(snapshotRef);
             try (var protobufStream = new BufferedProtobufInputStream(downloadedData)) {
                 var decoded = SyncdSnapshotSpec.decode(protobufStream);
@@ -3242,6 +3255,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
     @WhatsAppWebExport(moduleName = "WAWebSyncdCollectionHandler", exports = "Xe", adaptation = WhatsAppAdaptation.ADAPTED)
     private void applyMutations(SyncPatchType collectionName, SequencedCollection<DecryptedMutation.Trusted> remoteMutations) {
         logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.ABOUT_TO_APPLY_MUTATIONS);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "applying {0} mutations for collection {1}", remoteMutations.size(), collectionName);
         syncdDailyStats.mutationCount.addAndGet(remoteMutations.size());
         var mutationsToApply = resolveConflicts(remoteMutations, collectionName);
 
@@ -3290,13 +3304,13 @@ public final class LiveWebAppStateService implements WebAppStateService {
                     throw exception;
                 }
                 handlerFailed = true;
-                LOGGER.warning("Error during _applySetMutations for " + entry.getKey() + " in " + collectionName + ": " + exception.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "handler failed for action " + entry.getKey() + " in " + collectionName, exception);
             } catch (Throwable throwable) {
                 if (collectionName == SyncPatchType.CRITICAL_BLOCK) {
                     throw new WhatsAppWebAppStateSyncException.UnexpectedError(throwable);
                 }
                 handlerFailed = true;
-                LOGGER.warning("Error during _applySetMutations for " + entry.getKey() + " in " + collectionName + ": " + throwable.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "handler failed for action " + entry.getKey() + " in " + collectionName, throwable);
             }
             for (var i = 0; i < versionGated.size(); i++) {
                 var mutation = versionGated.get(i);
@@ -3400,7 +3414,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                     recordMutationState(collectionName, mutation, actionName, result);
                 }
             } catch (Throwable throwable) {
-                LOGGER.warning("Failed to retry orphan mutation: " + throwable.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "orphan mutation retry failed for action " + actionName + " in " + collectionName, throwable);
             }
         }
     }
@@ -3746,7 +3760,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                     ));
                 }
             } catch (Throwable throwable) {
-                LOGGER.warning("Failed to retry unsupported mutation: " + throwable.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "unsupported mutation retry failed for action " + actionName + " in " + collectionName, throwable);
             }
         }
     }
@@ -3909,8 +3923,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                     toRemove.add(removedEntry.get().valueMac());
                     updates.add(new SyncActionEntryUpdate(indexMac, null, true));
                 } else {
-                    LOGGER.warning("REMOVE mutation has no local entry for indexMac in " + patchType
-                            + ", skipping from LT-Hash computation");
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "remove mutation has no local entry for index mac in {0}, skipping from lt-hash computation", patchType);
                 }
             }
         }
@@ -3980,7 +3993,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
     private boolean updateCollectionState(SyncPatchType collectionName, long version, byte[] ltHash) {
         var currentVersion = getCurrentVersion(collectionName);
         if (version > 0 && currentVersion > 0 && version <= currentVersion) {
-            LOGGER.warning("Skipping state update for " + collectionName + ": version " + version + " is not newer than current " + currentVersion);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "skipping state update for {0}: version {1} is not newer than current {2}", collectionName, version, currentVersion);
             return false;
         }
 
@@ -4030,6 +4043,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         if (error instanceof WhatsAppWebAppStateSyncException.MissingKey missingKeyEx) {
             store.syncStore().markWebAppStateBlocked(collectionName);
             var keyIds = missingKeyEx.keyIds();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "collection {0} blocked, requesting {1} missing sync keys", collectionName, keyIds.size());
 
             coordinator.runWithMonitorReleased(() -> {
                 missingSyncKeyRequestService.requestMissingKeys(keyIds);
@@ -4037,6 +4051,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
             });
         } else if (error instanceof WhatsAppWebAppStateSyncException syncEx && syncEx.isFatal()) {
             store.syncStore().markWebAppStateErrorFatal(collectionName);
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "app-state sync fatal error for collection " + collectionName, syncEx);
 
             var collectionNames = List.of(String.valueOf(collectionName));
 
@@ -4050,7 +4065,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                 try {
                     sendAppStateFatalExceptionNotification(collectionNames);
                 } catch (Throwable notifyError) {
-                    LOGGER.log(Level.SEVERE, "syncd: error when sending fatal message to primary", notifyError);
+                    if (Log.ERROR) LOGGER.log(Level.ERROR, "syncd: error when sending fatal message to primary", notifyError);
                 }
                 whatsapp.handleFailure(syncEx);
             });
@@ -4072,9 +4087,11 @@ public final class LiveWebAppStateService implements WebAppStateService {
             );
             if (result) {
                 store.syncStore().markWebAppStateErrorRetry(collectionName);
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "collection " + collectionName + " sync failed, scheduled for retry", error);
                 logCriticalBootstrapStageIfNecessary(BootstrapAppStateDataStageCode.ENTERED_RETRY_MODE);
             } else {
                 store.syncStore().markWebAppStateErrorFatal(collectionName);
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "collection " + collectionName + " exhausted retries, marking fatal", error);
             }
         }
     }
@@ -4104,7 +4121,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
     private void sendAppStateFatalExceptionNotification(List<String> collectionNames) {
         var myJid = whatsapp.store().accountStore().jid().orElse(null);
         if (myJid == null) {
-            LOGGER.warning("Cannot send fatal exception notification: own JID not available");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot send fatal exception notification: own jid not available");
             return;
         }
 
@@ -4134,6 +4151,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                 .message(messageContainer)
                 .build();
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending app-state fatal exception notification for {0} collections", collectionNames.size());
         whatsapp.sendPeerMessage(primaryDeviceJid, messageInfo);
     }
 
@@ -4191,10 +4209,11 @@ public final class LiveWebAppStateService implements WebAppStateService {
         for (var patchType : SyncPatchType.values()) {
             var metadata = store.syncStore().findWebAppState(patchType);
             if (metadata.state() == SyncCollectionState.DIRTY) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "flushing dirty collection {0} before disconnect", patchType);
                 try {
                     syncCollection(patchType);
                 } catch (Exception e) {
-                    LOGGER.warning("Failed to flush dirty collection " + patchType + " on disconnect: " + e.getMessage());
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "flush failed for dirty collection " + patchType + " on disconnect", e);
                 }
             }
         }
@@ -4219,6 +4238,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      */
     @Override
     public void startPeriodicSyncJob() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting periodic app-state sync jobs");
         stopPeriodicSyncJob();
         scheduleNextPeriodicSync();
 
@@ -4255,7 +4275,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
                     try {
                         pullPatches(SyncPatchType.values());
                     } catch (Exception e) {
-                        LOGGER.warning("Periodic sync job failed: " + e.getMessage());
+                        if (Log.WARNING) LOGGER.log(Level.WARNING, "periodic sync job failed", e);
                     } finally {
                         scheduleNextPeriodicSync();
                     }
@@ -4318,7 +4338,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         try {
             reportSyncdStats();
         } catch (Exception e) {
-            LOGGER.warning("Periodic syncd stats reporting job failed: " + e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "periodic syncd stats reporting job failed", e);
         }
     }
 
@@ -4444,7 +4464,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         try {
             reportSyncdKeyStats();
         } catch (Exception e) {
-            LOGGER.warning("Periodic syncd key stats reporting job failed: " + e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "periodic syncd key stats reporting job failed", e);
         }
     }
 
@@ -4731,7 +4751,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
         try {
             flushAppStateSyncDaily();
         } catch (Exception e) {
-            LOGGER.warning("App-state sync daily aggregate flush failed: " + e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "app-state sync daily aggregate flush failed", e);
         }
     }
 
@@ -4931,6 +4951,7 @@ public final class LiveWebAppStateService implements WebAppStateService {
      */
     @Override
     public void reset() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resetting app-state sync service");
         stopPeriodicSyncJob();
         stopPeriodicReportSyncdStatsJob();
         stopPeriodicReportSyncdKeyStatsJob();

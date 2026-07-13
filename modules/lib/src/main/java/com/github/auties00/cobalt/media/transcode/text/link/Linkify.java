@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.media.transcode.text.link;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 
+import java.lang.System.Logger.Level;
 import java.net.IDN;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -36,6 +38,9 @@ import java.util.regex.Pattern;
 @WhatsAppWebModule(moduleName = "WAWebLinkify")
 @WhatsAppWebModule(moduleName = "WATopLevelDomains")
 public final class Linkify {
+    /** The logger for {@link Linkify}. */
+    private static final System.Logger LOGGER = Log.get(Linkify.class);
+
     /**
      * Holds the atomic character class shared by host labels, paths, queries, and anchors.
      *
@@ -357,10 +362,10 @@ public final class Linkify {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private Linkify() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -396,6 +401,7 @@ public final class Linkify {
                 out.add(match);
             }
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "linkify scan complete, matches={0}", out.size());
         return out;
     }
 
@@ -424,7 +430,9 @@ public final class Linkify {
         if (!matcher.find()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(build(matcher, text, requireExplicitScheme));
+        var result = build(matcher, text, requireExplicitScheme);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "linkify find complete, matched={0}", result != null);
+        return Optional.ofNullable(result);
     }
 
     /**
@@ -527,6 +535,7 @@ public final class Linkify {
                     return null;
                 }
             } catch (IllegalArgumentException malformed) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "linkify punycode tld decode failed", malformed);
                 return null;
             }
         } else if (tld != null && !TLD.contains(tld.toLowerCase())) {

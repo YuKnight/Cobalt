@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,13 +15,13 @@ import java.io.UncheckedIOException;
 import java.util.List;
 
 /**
- * Builds the relay query that re-fetches the current state of a WhatsApp Business shopping cart.
+ * Builds the graph.whatsapp.com GraphQL query that re-fetches the current state of a WhatsApp Business shopping cart.
  *
  * <p>The single {@code request} GraphQL variable is the refresh-cart request object. WhatsApp Web's
  * {@code WAWebBizRefreshCartJob.refreshCart} fills it with a {@code cart} sub-object carrying the
  * business {@link Jid}, the list of retailer product ids in the cart, the requested image dimensions,
  * an opaque direct-connection encrypted-info token, and the {@code variant_info_fields} projection
- * selector (always {@code "variant_properties"} on WhatsApp Web). The relay returns the refreshed
+ * selector (always {@code "variant_properties"} on WhatsApp Web). The graph.whatsapp.com endpoint returns the refreshed
  * product list and price breakdown under {@code xwa_checkout_refresh_cart}; the reply is consumed
  * through {@link BizGraphQlRefreshCartJobWhatsAppGraphQlResponse}.
  *
@@ -33,10 +35,10 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebBizGraphQLRefreshCartJobQuery")
 public final class BizGraphQlRefreshCartJobWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body. The compiled document
+     * <p>Emitted as the {@code doc_id} field of the JSON request body. The compiled document
      * exposes its name rather than a numeric id, so the document name itself is the persisted-query
      * identifier (see the class {@code @implNote}).
      */
@@ -215,5 +217,21 @@ public final class BizGraphQlRefreshCartJobWhatsAppGraphQlRequest implements Wha
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.socket.websocket;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Optional;
 
 /**
@@ -30,6 +33,11 @@ import java.util.Optional;
  */
  sealed abstract class WebSocketMasker
         permits ScalarWebSocketMasker, VectorWebSocketMasker {
+    /**
+     * The logger for {@link WebSocketMasker}.
+     */
+    private static final System.Logger LOGGER = Log.get(WebSocketMasker.class);
+
     /**
      * Holds the name of the incubator module that
      * {@link VectorWebSocketMasker} depends on.
@@ -90,6 +98,9 @@ import java.util.Optional;
      */
     private static WebSocketMasker lookup() {
         if (System.getProperty(NATIVE_IMAGE_PROPERTY) != null) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "selected scalar websocket masker: native image detected");
+            }
             return new ScalarWebSocketMasker();
         }
 
@@ -98,13 +109,23 @@ import java.util.Optional;
                 .orElse(ModuleLayer.boot());
         var vectorModule = layer.findModule(VECTOR_MODULE_NAME);
         if (vectorModule.isEmpty()) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "selected scalar websocket masker: {0} module not present", VECTOR_MODULE_NAME);
+            }
             return new ScalarWebSocketMasker();
         }
         module.addReads(vectorModule.get());
 
         try {
-            return new VectorWebSocketMasker();
-        } catch (Throwable _) {
+            var masker = new VectorWebSocketMasker();
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "selected vector websocket masker");
+            }
+            return masker;
+        } catch (Throwable e) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "vector websocket masker initialization failed, falling back to scalar", e);
+            }
             return new ScalarWebSocketMasker();
         }
     }

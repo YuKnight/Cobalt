@@ -1,14 +1,16 @@
 package com.github.auties00.cobalt.graphql.whatsapp.misc;
 
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 
 /**
- * Builds the relay mutation that updates the caller's Waffle FX WAMO universal opt-out (UOOM) state.
+ * Builds the graph.whatsapp.com GraphQL mutation that updates the caller's Waffle FX WAMO universal opt-out (UOOM) state.
  *
- * <p>The operation takes no variables; it instructs the relay to propagate the caller's current
+ * <p>The operation takes no variables; it instructs the graph.whatsapp.com endpoint to propagate the caller's current
  * Global Privacy Control opt-out into the linked Meta advertising (Waffle FX) surfaces and returns
  * the outcome as the boolean scalar {@code xfb_waffle_fx_wamo_update_uoom}. WhatsApp Web treats a
  * {@code true} outcome as the signal to mark the local GPC-completed user preference. The reply is
@@ -19,10 +21,10 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 @WhatsAppWebModule(moduleName = "WAWebWaffleFXWAMOUpdateUOOMMutation")
 public final class WaffleFxwamoUpdateUoomWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebWaffleFXWAMOUpdateUOOMMutation.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -70,5 +72,21 @@ public final class WaffleFxwamoUpdateUoomWhatsAppGraphQlRequest implements Whats
     @Override
     public String variables() {
         return "{}";
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

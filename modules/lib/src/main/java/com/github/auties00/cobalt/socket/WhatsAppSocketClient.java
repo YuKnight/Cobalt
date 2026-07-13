@@ -3,8 +3,9 @@ package com.github.auties00.cobalt.socket;
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
 import com.github.auties00.cobalt.exception.WhatsAppException;
-import com.github.auties00.cobalt.exception.WhatsAppSessionException;
-import com.github.auties00.cobalt.exception.WhatsAppStreamException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppSessionException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppStreamException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -44,6 +45,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -116,6 +118,11 @@ import java.util.OptionalInt;
 @WhatsAppWebModule(moduleName = "WANoiseSocket")
 @WhatsAppWebModule(moduleName = "WAFrameSocket")
 public sealed abstract class WhatsAppSocketClient {
+
+    /**
+     * The logger for {@link WhatsAppSocketClient}.
+     */
+    private static final System.Logger LOGGER = Log.get(WhatsAppSocketClient.class);
 
     /**
      * The 32-byte Ed25519 public key of the WhatsApp Noise root CA.
@@ -370,12 +377,27 @@ public sealed abstract class WhatsAppSocketClient {
         this.listener = listener;
         this.closed = false;
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "connecting socket client, platform={0}", store.accountStore().device().platform());
         var socketOpenStart = Instant.now();
-        openTransport();
+        try {
+            openTransport();
+        } catch (IOException failure) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "socket transport open failed", failure);
+            throw failure;
+        }
         this.socketConnectDuration = Duration.between(socketOpenStart, Instant.now());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "socket transport open in {0}", socketConnectDuration);
 
-        performNoiseHandshake();
+        try {
+            performNoiseHandshake();
+        } catch (IOException failure) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "noise handshake failed", failure);
+            throw failure;
+        }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "noise handshake complete in {0}", authHandshakeDuration);
+
         startReaderThread();
+        if (Log.INFO) LOGGER.log(Level.INFO, "socket connected");
     }
 
     /**
@@ -468,11 +490,17 @@ public sealed abstract class WhatsAppSocketClient {
      * @throws IOException if the certificate is malformed or invalid
      */
     private void verifyCertificateChain(byte[] decryptedCertificate, byte[] serverStaticKey) throws IOException {
-        if (isWebHandshakeShape()) {
-            verifyWebCertificateChain(decryptedCertificate, serverStaticKey);
-        } else {
-            verifyMobileCertificate(decryptedCertificate, serverStaticKey);
+        try {
+            if (isWebHandshakeShape()) {
+                verifyWebCertificateChain(decryptedCertificate, serverStaticKey);
+            } else {
+                verifyMobileCertificate(decryptedCertificate, serverStaticKey);
+            }
+        } catch (IOException failure) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "certificate chain verification failed", failure);
+            throw failure;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "certificate chain verified");
     }
 
     /**
@@ -929,6 +957,7 @@ public sealed abstract class WhatsAppSocketClient {
      */
     @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     public final void disconnect() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "disconnecting socket client");
         this.closed = true;
 
         if (readKey != null) {
@@ -951,6 +980,7 @@ public sealed abstract class WhatsAppSocketClient {
             closeTransport();
         } catch (IOException _) {
         }
+        if (Log.INFO) LOGGER.log(Level.INFO, "socket disconnected");
     }
 
     /**
@@ -987,10 +1017,16 @@ public sealed abstract class WhatsAppSocketClient {
     @WhatsAppWebExport(moduleName = "WANoiseSocket", exports = "NoiseSocket", adaptation = WhatsAppAdaptation.ADAPTED)
     public final void sendNode(Stanza stanza) throws IOException {
         Objects.requireNonNull(stanza, "stanza cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending stanza {0}", stanza);
         synchronized (writeLock) {
-            out.beginDatagram(null, StanzaSizer.sizeOf(stanza));
-            try (var encoder = StanzaWriter.toStream(out)) {
-                encoder.writeStanza(stanza);
+            try {
+                out.beginDatagram(null, StanzaSizer.sizeOf(stanza));
+                try (var encoder = StanzaWriter.toStream(out)) {
+                    encoder.writeStanza(stanza);
+                }
+            } catch (IOException failure) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to send stanza", failure);
+                throw failure;
             }
         }
     }
@@ -1076,6 +1112,7 @@ public sealed abstract class WhatsAppSocketClient {
         } catch (IOException e) {
             throw e;
         } catch (Throwable e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "noise handshake failed with unexpected exception", e);
             throw new IOException("Noise handshake failure", e);
         }
     }
@@ -1181,21 +1218,27 @@ public sealed abstract class WhatsAppSocketClient {
                     try {
                         stanza = decoder.decode();
                     } catch (WhatsAppSessionException.BadMac fatal) {
+                        if (Log.ERROR) LOGGER.log(Level.ERROR, "datagram authentication failed, tearing down session", fatal);
                         throw fatal;
                     } catch (IOException | RuntimeException malformed) {
                         decoder.drain();
+                        if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to decode inbound stanza", malformed);
                         listener.onError(new WhatsAppStreamException.MalformedNode("Failed to decode inbound stanza", malformed));
                         continue;
                     }
                     decoder.drain();
                 }
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received stanza {0}", stanza);
                 listener.onNode(stanza);
             }
         } catch (Exception failure) {
             if (!closed) {
                 var surfaced = classifyReaderFailure(failure);
                 if (surfaced != null) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "socket reader loop terminated with error", failure);
                     listener.onError(surfaced);
+                } else if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "socket reader loop reached orderly end of stream");
                 }
                 // A bad MAC leaves the Noise cipher unusable, so the socket is torn down here; every
                 // other surfaced fault is reconnect-worthy and the client's failure handler drives
@@ -1206,6 +1249,7 @@ public sealed abstract class WhatsAppSocketClient {
             }
         } finally {
             if (!closed) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "socket reader loop closed, notifying listener");
                 listener.onClose();
             }
         }
@@ -1277,6 +1321,7 @@ public sealed abstract class WhatsAppSocketClient {
                 ? target
                 : new InetSocketAddress(proxy.host(), proxy.port());
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opening tcp socket to {0}:{1}", firstHop.getHostString(), firstHop.getPort());
         var raw = new Socket();
         raw.setTcpNoDelay(true);
         raw.setKeepAlive(true);
@@ -1286,14 +1331,18 @@ public sealed abstract class WhatsAppSocketClient {
             return raw;
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tunneling through proxy to {0}:{1}", target.getHostString(), target.getPort());
         try {
-            return switch (proxy) {
+            var tunneled = switch (proxy) {
                 case WhatsAppClientProxy.Http http -> HttpTunnel.tunnel(raw,
                         target.getHostString(), target.getPort(), http, sslContextFactory);
                 case WhatsAppClientProxy.Socks socks -> SocksTunnel.tunnel(raw,
                         target.getHostString(), target.getPort(), socks);
             };
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "proxy tunnel established to {0}:{1}", target.getHostString(), target.getPort());
+            return tunneled;
         } catch (IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "proxy tunnel failed", e);
             try {
                 raw.close();
             } catch (IOException _) {
@@ -1355,6 +1404,7 @@ public sealed abstract class WhatsAppSocketClient {
          */
         @Override
         void openTransport() throws IOException {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opening tcp transport");
             this.socket = openTunneledSocket(TCP_ENDPOINT);
             this.in = new WhatsAppDatagramInputStream(socket.getInputStream());
             this.out = new WhatsAppDatagramOutputStream(socket.getOutputStream());
@@ -1366,6 +1416,7 @@ public sealed abstract class WhatsAppSocketClient {
         @Override
         void closeTransport() throws IOException {
             if (socket != null) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing tcp transport");
                 socket.close();
             }
         }
@@ -1449,6 +1500,7 @@ public sealed abstract class WhatsAppSocketClient {
          */
         @Override
         void openTransport() throws IOException {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opening websocket transport to {0}:{1}", WEB_HOST, WEB_ENDPOINT.getPort());
             var raw = openTunneledSocket(WEB_ENDPOINT);
             SSLSocket ssl = null;
             try {
@@ -1457,9 +1509,11 @@ public sealed abstract class WhatsAppSocketClient {
                         .createSocket(raw, WEB_HOST, WEB_ENDPOINT.getPort(), true);
                 ssl.setSSLParameters(sslContextFactory.sslParameters());
                 ssl.startHandshake();
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tls handshake complete, protocol={0}", ssl.getSession().getProtocol());
 
                 var leftover = WebSocketUpgrade.upgrade(ssl, WEB_PATH, WEB_HOST,
                         WEB_ENDPOINT.getPort(), WEB_USER_AGENT);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "websocket upgrade complete");
 
                 this.socket = ssl;
                 var wsOut = new WebSocketFrameOutputStream(ssl.getOutputStream());
@@ -1467,6 +1521,7 @@ public sealed abstract class WhatsAppSocketClient {
                 this.in = new WhatsAppDatagramInputStream(wsIn);
                 this.out = new WhatsAppDatagramOutputStream(wsOut);
             } catch (IOException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "websocket transport open failed", e);
                 if (ssl != null) {
                     try {
                         ssl.close();
@@ -1488,6 +1543,7 @@ public sealed abstract class WhatsAppSocketClient {
         @Override
         void closeTransport() throws IOException {
             if (socket != null) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing websocket transport");
                 socket.close();
             }
         }

@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the report-product mutation built by
+ * Parses the graph.whatsapp.com GraphQL response of the report-product mutation built by
  * {@link ReportProductJobWhatsAppGraphQlRequest} into the report-accepted flag.
  *
  * <p>Reads the linked {@code xwa_whatsapp_catalog_report_product} root and projects its
@@ -38,7 +38,7 @@ public final class ReportProductJobWhatsAppGraphQlResponse implements WhatsAppGr
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_whatsapp_catalog_report_product} and projects its
      * {@code success} flag; the returned {@link Optional} is empty when {@code data} is {@code null}.
@@ -61,7 +61,7 @@ public final class ReportProductJobWhatsAppGraphQlResponse implements WhatsAppGr
     /**
      * Returns whether the report was accepted.
      *
-     * @return {@code true} when the relay reported the report accepted, {@code false} otherwise
+     * @return {@code true} when the graph.whatsapp.com endpoint reported the report accepted, {@code false} otherwise
      */
     public boolean accepted() {
         return accepted;

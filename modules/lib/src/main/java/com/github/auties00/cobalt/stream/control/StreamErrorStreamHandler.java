@@ -3,11 +3,14 @@ package com.github.auties00.cobalt.stream.control;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppSessionException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppSessionException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.stream.NodeStreamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Handles {@code <stream:error>} stanzas that report protocol-level failures requiring the socket to close.
@@ -29,9 +32,9 @@ import com.github.auties00.cobalt.stream.NodeStreamService;
 public final class StreamErrorStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
-     * The system logger used to surface unrecognised stream errors at {@code WARNING} severity before dispatch.
+     * The logger for {@link StreamErrorStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(StreamErrorStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(StreamErrorStreamHandler.class);
 
     /**
      * The {@code code=515} stream error code that asks the client to tear down the current socket and re-login.
@@ -88,9 +91,11 @@ public final class StreamErrorStreamHandler extends SocketStreamHandler.Concurre
 
         var ack = stanza.getChild("ack").orElse(null);
         if (ack != null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Received stream:error ack for id={0}",
-                    ack.getAttributeAsString("id", null));
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "received stream:error ack for id={0}",
+                        ack.getAttributeAsString("id", null));
+            }
             whatsapp.handleFailure(new WhatsAppSessionException.Closed("Stream error: ack"));
             return;
         }
@@ -100,7 +105,9 @@ public final class StreamErrorStreamHandler extends SocketStreamHandler.Concurre
             return;
         }
 
-        LOGGER.log(System.Logger.Level.WARNING, "Received unrecognized stream:error stanza: {0}", stanza);
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "received unrecognized stream:error stanza {0}", stanza);
+        }
         whatsapp.handleFailure(new WhatsAppSessionException.Closed("Stream error: unrecognized"));
     }
 
@@ -118,6 +125,9 @@ public final class StreamErrorStreamHandler extends SocketStreamHandler.Concurre
      * @param type the {@code type} attribute of the {@code <conflict/>} child, or {@code null} when absent
      */
     private void handleConflict(String type) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "stream:error conflict type={0}", type);
+        }
         if ("replaced".equals(type)) {
             whatsapp.handleFailure(new WhatsAppSessionException.Conflict("Stream replaced by another active session"));
             return;
@@ -142,7 +152,9 @@ public final class StreamErrorStreamHandler extends SocketStreamHandler.Concurre
      * @param code the {@code code} attribute on the stanza
      */
     private void handleCode(int code) {
-        LOGGER.log(System.Logger.Level.WARNING, "Received stream:error code={0}", code);
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "received stream:error code={0}", code);
+        }
         switch (code) {
             case STREAM_ERROR_RESTART_LOGIN -> whatsapp.handleFailure(new WhatsAppSessionException.Reconnect("Server requested reconnect"));
             case STREAM_ERROR_LOGOUT -> whatsapp.handleFailure(new WhatsAppSessionException.LoggedOut("Server requested logout"));

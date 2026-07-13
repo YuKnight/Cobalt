@@ -16,6 +16,9 @@ import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadAction;
 import com.github.auties00.cobalt.model.sync.action.chat.MarkChatAsReadActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code markChatAsRead} app-state sync action that flips a
@@ -44,6 +47,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebMarkChatAsReadSync")
 public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link MarkChatAsReadHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(MarkChatAsReadHandler.class);
 
     /**
      * Constructs a new {@link MarkChatAsReadHandler} for registration in the
@@ -107,6 +114,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
 
         try {
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MarkChatAsReadAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "mark chat as read mutation has malformed action value");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
@@ -122,6 +130,7 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
 
             var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mark chat as read mutation orphaned, chat {0} not found", chatJid);
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
@@ -133,8 +142,10 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
                 chat.get().setUnreadCount(-1);
             }
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat read state applied, chat={0} read={1}", chatJid, action.read());
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "mark chat as read mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -182,7 +193,9 @@ public final class MarkChatAsReadHandler implements WebAppStateActionHandler {
             return ConflictResolution.of(MutationConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
         }
 
-        return switch (MessageRangeUtils.compareMessageRanges(remoteRange, localRange)) {
+        var comparison = MessageRangeUtils.compareMessageRanges(remoteRange, localRange);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mark chat as read conflict comparison={0}", comparison);
+        return switch (comparison) {
             case RANGE_A_ENCLOSES_RANGE_B ->
                     ConflictResolution.of(MutationConflictResolutionState.APPLY_REMOTE_DROP_LOCAL);
             case RANGE_B_ENCLOSES_RANGE_A ->

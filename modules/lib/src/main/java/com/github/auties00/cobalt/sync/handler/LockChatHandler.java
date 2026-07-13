@@ -11,6 +11,9 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.LockChatAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code lock} app-state sync action that locks or unlocks a chat
@@ -33,6 +36,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebLockChatSync")
 public final class LockChatHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link LockChatHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(LockChatHandler.class);
 
     /**
      * Constructs a new singleton {@link LockChatHandler}.
@@ -93,6 +100,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LockChatAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "lock chat mutation has malformed action value");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
@@ -110,6 +118,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
 
         var chat = client.store().chatStore().findChatByJid(chatJid);
         if (chat.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lock chat mutation orphaned, chat {0} not found", chatJid);
             return MutationApplicationResult.orphan(chatJidString, "Chat");
         }
 
@@ -118,6 +127,7 @@ public final class LockChatHandler implements WebAppStateActionHandler {
             chat.get().setArchived(false);
             chat.get().setPinnedTimestamp(null);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat lock state applied, chat={0} locked={1}", chatJid, action.locked());
         return MutationApplicationResult.success();
     }
 

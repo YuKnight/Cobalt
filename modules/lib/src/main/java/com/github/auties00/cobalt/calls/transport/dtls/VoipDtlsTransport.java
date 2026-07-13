@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.calls.transport.dtls;
 
+import com.github.auties00.cobalt.log.Log;
+
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
@@ -32,6 +35,11 @@ import java.util.concurrent.locks.ReentrantLock;
  *           retransmitting forever.
  */
 public final class VoipDtlsTransport {
+    /**
+     * The logger for {@link VoipDtlsTransport}.
+     */
+    private static final System.Logger LOGGER = Log.get(VoipDtlsTransport.class);
+
     /**
      * The per read timeout, in milliseconds, the handshake waits for an inbound flight before retransmitting.
      */
@@ -141,6 +149,9 @@ public final class VoipDtlsTransport {
      * @throws IOException if the handshake fails, the peer certificate does not pin, or the deadline passes
      */
     public void handshake(long timeoutMillis) throws IOException {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "dtls handshake starting, timeout={0}ms", timeoutMillis);
+        }
         outboundLock.lock();
         inboundLock.lock();
         try {
@@ -150,6 +161,9 @@ public final class VoipDtlsTransport {
                 var status = engine.getHandshakeStatus();
                 switch (status) {
                     case FINISHED, NOT_HANDSHAKING -> {
+                        if (Log.DEBUG) {
+                            LOGGER.log(Level.DEBUG, "dtls handshake completed, status={0}", status);
+                        }
                         return;
                     }
                     case NEED_TASK -> runDelegatedTasks();
@@ -158,6 +172,9 @@ public final class VoipDtlsTransport {
                     case NEED_UNWRAP -> {
                         var datagram = datagrams.receive(HANDSHAKE_READ_TIMEOUT_MILLIS);
                         if (datagram == null) {
+                            if (Log.DEBUG) {
+                                LOGGER.log(Level.DEBUG, "dtls handshake read timed out, retransmitting last flight");
+                            }
                             retransmitFlight();
                         } else {
                             var source = ByteBuffer.wrap(datagram);
@@ -170,6 +187,9 @@ public final class VoipDtlsTransport {
                     }
                 }
                 if (System.nanoTime() > deadline) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "dtls handshake timed out, timeout={0}ms", timeoutMillis);
+                    }
                     throw new IOException("DTLS handshake timed out");
                 }
             }
@@ -205,6 +225,9 @@ public final class VoipDtlsTransport {
                 var result = engine.wrap(source, netBuffer);
                 if (result.getStatus() == SSLEngineResult.Status.CLOSED) {
                     closed = true;
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "dtls send found engine closed, length={0}", length);
+                    }
                     return;
                 }
                 flushNetBuffer();
@@ -286,6 +309,9 @@ public final class VoipDtlsTransport {
             return;
         }
         closed = true;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "dtls transport closing");
+        }
         outboundLock.lock();
         try {
             engine.closeOutbound();
@@ -293,6 +319,9 @@ public final class VoipDtlsTransport {
         } catch (IOException exception) {
             // A failure to flush the close_notify is best effort on teardown and must not mask the caller's
             // own close path.
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "dtls close_notify flush failed", exception);
+            }
         } finally {
             outboundLock.unlock();
         }
@@ -316,6 +345,9 @@ public final class VoipDtlsTransport {
             netBuffer.clear();
             var result = engine.wrap(EMPTY, netBuffer);
             if (result.getStatus() == SSLEngineResult.Status.CLOSED && !closed) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "dtls engine closed unexpectedly while producing handshake output");
+                }
                 throw new IOException("DTLS engine closed while producing handshake output");
             }
             flushNetBuffer();
@@ -337,6 +369,9 @@ public final class VoipDtlsTransport {
             netBuffer.clear();
             var result = engine.wrap(EMPTY, netBuffer);
             if (result.getStatus() == SSLEngineResult.Status.CLOSED && !closed) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "dtls engine closed unexpectedly while retransmitting");
+                }
                 throw new IOException("DTLS engine closed while producing handshake output");
             }
             if (result.bytesProduced() == 0) {
@@ -359,6 +394,9 @@ public final class VoipDtlsTransport {
         var result = engine.unwrap(source, appBuffer);
         if (result.getStatus() == SSLEngineResult.Status.CLOSED) {
             closed = true;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "dtls peer sent close_notify");
+            }
             return -1;
         }
         if (result.getHandshakeStatus() == SSLEngineResult.HandshakeStatus.NEED_TASK) {

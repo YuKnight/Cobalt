@@ -1,12 +1,13 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.calls.capability.VideoDecoderCapability;
 import com.github.auties00.cobalt.calls.media.sframe.SFrameKeyProvider;
 import com.github.auties00.cobalt.calls.signaling.group.GroupInfoStanza;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -65,9 +66,9 @@ import com.github.auties00.cobalt.calls.crypto.CallE2eKeyDerivation;
  */
 public final class CallMembership {
     /**
-     * Logs membership allocations, removals, and reconcile diffs.
+     * The logger for {@link CallMembership}.
      */
-    private static final System.Logger LOGGER = System.getLogger(CallMembership.class.getName());
+    private static final System.Logger LOGGER = Log.get(CallMembership.class);
 
     /**
      * The maximum number of members a call's slot array may hold.
@@ -179,16 +180,22 @@ public final class CallMembership {
             if (existing != null) {
                 existing.identity(identity);
                 deriveSlotCrypto(existing.participant());
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "refreshed call participant slot for {0}", key);
                 return Optional.of(existing);
             }
             if (slots.size() >= MAX_PARTICIPANTS) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Cannot allocate call participant: slot array is full ({0})", MAX_PARTICIPANTS);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "cannot allocate call participant: slot array is full ({0})", MAX_PARTICIPANTS);
+                }
                 return Optional.empty();
             }
             var slot = new CallMembershipSlot(callId, key, identity, new CallParticipant(key, isExtension(identity)));
             slots.put(key, slot);
             deriveSlotCrypto(slot.participant());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "allocated call participant slot for {0}, totalSlots={1}", key, slots.size());
+            }
             return Optional.of(slot);
         } finally {
             lock.unlock();
@@ -272,6 +279,9 @@ public final class CallMembership {
                 return Optional.empty();
             }
             removed.markRemoved();
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "removed call participant slot for {0}, remainingSlots={1}", key, slots.size());
+            }
             return Optional.of(removed);
         } finally {
             lock.unlock();
@@ -377,8 +387,10 @@ public final class CallMembership {
                     continue;
                 }
                 if (slots.size() >= MAX_PARTICIPANTS) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "Skipping roster member {0}: slot array is full ({1})", key, MAX_PARTICIPANTS);
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "skipping roster member {0}: slot array is full ({1})", key, MAX_PARTICIPANTS);
+                    }
                     continue;
                 }
                 var slot = new CallMembershipSlot(callId, key, identity,
@@ -399,6 +411,10 @@ public final class CallMembership {
                 slot.markRemoved();
                 removed.add(slot.identity());
                 iterator.remove();
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "reconciled call roster: added={0}, updated={1}, removed={2}",
+                        added.size(), updated.size(), removed.size());
             }
             return new Reconciliation(added, updated, removed);
         } finally {
@@ -421,6 +437,7 @@ public final class CallMembership {
         lock.lock();
         try {
             this.selfUserJid = selfUserJid == null ? null : selfUserJid.toUserJid();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "self participant jid set to {0}", this.selfUserJid);
         } finally {
             lock.unlock();
         }
@@ -475,6 +492,10 @@ public final class CallMembership {
             for (var slot : slots.values()) {
                 deriveSlotCrypto(slot.participant());
             }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "installed call key: keygenVersion={0}, rekeyedSlots={1}",
+                        keygenVersion, slots.size());
+            }
         } finally {
             lock.unlock();
         }
@@ -515,10 +536,10 @@ public final class CallMembership {
      * its inbound demux.
      * @return a map from each ready member's active device JID to its SFrame key provider, possibly empty
      */
-    public SequencedMap<CallDeviceJid, SFrameKeyProvider> sframeProvidersByDevice() {
+    public SequencedMap<Jid, SFrameKeyProvider> sframeProvidersByDevice() {
         lock.lock();
         try {
-            var result = new LinkedHashMap<CallDeviceJid, SFrameKeyProvider>();
+            var result = new LinkedHashMap<Jid, SFrameKeyProvider>();
             for (var slot : slots.values()) {
                 var participant = slot.participant();
                 var deviceJid = participant.activeDeviceJid().orElse(null);
@@ -624,6 +645,38 @@ public final class CallMembership {
             }
             var slot = slots.get(selfUserJid);
             return slot == null ? ParticipantView.invalid() : slot.participant().toView();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Returns the first active peer participant, scanning the self slot and every member slot under a single
+     * acquisition of {@link #lock}.
+     *
+     * <p>An active peer is a snapshot that is {@linkplain ParticipantView#valid() valid},
+     * {@linkplain ParticipantView#active() active}, and not an {@linkplain ParticipantView#extension()
+     * extension}, excluding the self participant matched by user JID. This is the single lock equivalent of
+     * {@link ParticipantProvider#firstActivePeer()}, whose default runs the self lookup and the member scan as
+     * two separate lock acquisitions; folding both into one acquisition here closes the window in which a
+     * membership reconcile can land between the self snapshot and the member scan and surface a peer the self
+     * snapshot has already superseded.
+     *
+     * @return an {@code Optional} holding the first active peer view, or empty if none is active
+     */
+    Optional<ParticipantView> firstActivePeerView() {
+        lock.lock();
+        try {
+            var selfSlot = selfUserJid == null ? null : slots.get(selfUserJid);
+            var self = selfSlot == null ? ParticipantView.invalid() : selfSlot.participant().toView();
+            for (var slot : slots.values()) {
+                var view = slot.participant().toView();
+                var sameAsSelf = view.userJid() != null && view.userJid().equals(self.userJid());
+                if (view.valid() && view.active() && !view.extension() && !sameAsSelf) {
+                    return Optional.of(view);
+                }
+            }
+            return Optional.empty();
         } finally {
             lock.unlock();
         }
@@ -823,10 +876,10 @@ public final class CallMembership {
         //  code unconditionally overwrites those media/device SSRC fields every reconcile, so gating is only
         //  behavior preserving if no other writer (the media plane) ever mutates them between reconciles;
         //  that invariant is not proven here, and a divergence would be a silent wire SSRC change.
-        var seen = new ArrayList<CallDeviceJid>(devices.size());
-        CallDeviceJid first = null;
+        var seen = new ArrayList<Jid>(devices.size());
+        Jid first = null;
         for (var device : devices) {
-            var deviceJid = CallDeviceJid.of(device.jid());
+            var deviceJid = device.jid();
             seen.add(deviceJid);
             if (first == null) {
                 first = deviceJid;
@@ -867,7 +920,7 @@ public final class CallMembership {
      * again on every reconcile.
      *
      * @implNote This implementation derives the audio primary and the two simulcast video triples for stream
-     * ids {@code 0} and {@code 1} through {@link CallSecureSsrcGenerator#videoTriple(String, CallDeviceJid, int)},
+     * ids {@code 0} and {@code 1} through {@link CallSecureSsrcGenerator#videoTriple(String, Jid, int)},
      * whose audio and video values are verified against a live capture. The screenshare simulcast triple is not
      * pre derived here; it is recorded on {@link CallParticipantMedia#screenShareSsrcs(int, int, int)} by the
      * media plane when the participant starts sharing rather than seeded from the roster.
@@ -875,7 +928,7 @@ public final class CallMembership {
      * @param media     the participant media object the stream SSRCs are recorded on
      * @param deviceJid the active device whose stream SSRCs are generated
      */
-    private static void populateStreamSsrcs(String callId, CallParticipantMedia media, CallDeviceJid deviceJid) {
+    private static void populateStreamSsrcs(String callId, CallParticipantMedia media, Jid deviceJid) {
         media.audioSsrc(CallSecureSsrcGenerator.audioMainSsrc(callId, deviceJid));
         for (var streamId = 0; streamId < CallSecureSsrcGenerator.VIDEO_STREAM_COUNT; streamId++) {
             var triple = CallSecureSsrcGenerator.videoTriple(callId, deviceJid, streamId);

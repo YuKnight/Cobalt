@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.util.List;
@@ -137,22 +136,6 @@ public interface ParticipantProvider {
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     * Returns the view of the active participant using the given call layer device JID.
-     *
-     * <p>This is the {@link CallDeviceJid} overload of
-     * {@link #activeParticipantByDeviceJid(Jid)}; it matches on the wrapped JID.
-     *
-     * @param deviceJid the active device JID to look up; never {@code null}
-     * @return an {@code Optional} holding the matching view, or empty if no active
-     *         participant uses that device JID
-     * @throws NullPointerException if {@code deviceJid} is {@code null}
-     */
-    default Optional<ParticipantView> activeParticipantByDeviceJid(CallDeviceJid deviceJid) {
-        Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
-        return activeParticipantByDeviceJid(deviceJid.jid());
     }
 
     /**

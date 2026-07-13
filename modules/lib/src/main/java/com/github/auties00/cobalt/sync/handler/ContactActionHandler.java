@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -18,8 +19,8 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 /**
@@ -50,11 +51,9 @@ import java.util.regex.Pattern;
 @WhatsAppWebModule(moduleName = "WAWebContactSync")
 public final class ContactActionHandler implements WebAppStateActionHandler {
     /**
-     * The handler-scoped {@link Logger} used to record orphan-retry failures.
-     *
-     * <p>Records a warning when the orphan-retry pass throws.
+     * The logger for {@link ContactActionHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(ContactActionHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(ContactActionHandler.class);
 
     /**
      * The {@link ABPropsService} consulted before writing the username field.
@@ -144,10 +143,12 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() <= 1) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "contact mutation malformed: index size={0}", indexArray.size());
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
         var contactJidString = indexArray.getString(1);
         if (contactJidString == null || contactJidString.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "contact mutation malformed: missing contact jid");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
@@ -158,10 +159,12 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
         switch (mutation.operation()) {
             case SET -> {
                 if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ContactAction action)) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "contact mutation malformed: missing action value");
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
                 if (contactJid.hasLidServer()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "contact mutation skipped: lid jid {0}", contactJid);
                     return MutationApplicationResult.skipped();
                 }
 
@@ -189,25 +192,30 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
 
                 retryOrphanStatusMutes(client, contactJidString);
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "contact upserted: jid={0}", contactJid);
                 return MutationApplicationResult.success();
             }
             case REMOVE -> {
                 if (contactJid.hasLidServer() || contactJid.hasBotServer()) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "contact remove mutation skipped: lid or bot jid {0}", contactJid);
                     return MutationApplicationResult.skipped();
                 }
 
                 var contact = client.store().contactStore().findContactByJid(contactJid);
                 if (contact.isPresent()) {
                     if (usernameEnabled && contact.get().isAddedByUsername()) {
+                        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "contact remove mutation skipped: username contact {0}", contactJid);
                         return MutationApplicationResult.success();
                     }
                     contact.get().setFullName(null);
                     contact.get().setShortName(null);
                     contact.get().setUsername(null);
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "contact address-book fields cleared: jid={0}", contactJid);
                 }
                 return MutationApplicationResult.success();
             }
             default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "contact mutation unsupported: operation={0}", mutation.operation());
                 return MutationApplicationResult.unsupported();
             }
         }
@@ -225,10 +233,9 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
      * This implementation walks
      * {@link LinkedWhatsAppSyncStore#findOrphanMutationsByModel(SyncPatchType, String)}
      * and dispatches each entry through {@link UserStatusMuteHandler}.
-     * Any thrown exception is caught and reported via
-     * {@link Logger#warning(String)}, replacing WA Web's
-     * {@code WALogger.ERROR(...).sendLogs(...)} pair (Cobalt has no
-     * server-side log-uploading channel here).
+     * Any thrown exception is caught and logged at {@link Level#WARNING},
+     * replacing WA Web's {@code WALogger.ERROR(...).sendLogs(...)} pair
+     * (Cobalt has no server-side log-uploading channel here).
      *
      * @param client the {@link LinkedWhatsAppClient} whose store hosts the orphan entries
      * @param contactJidString the contact JID string used to look up the orphan entries
@@ -258,9 +265,10 @@ public final class ContactActionHandler implements WebAppStateActionHandler {
 
             if (!applied.isEmpty()) {
                 client.store().syncStore().removeOrphanMutations(UserStatusMuteAction.COLLECTION_NAME, applied);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "orphan status mutes reapplied: count={0}", applied.size());
             }
         } catch (Exception e) {
-            LOGGER.warning("[syncd] contact: orphan status mutes check failed: " + e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "orphan status mutes retry failed for contact " + Log.jid(contactJidString), e);
         }
     }
 

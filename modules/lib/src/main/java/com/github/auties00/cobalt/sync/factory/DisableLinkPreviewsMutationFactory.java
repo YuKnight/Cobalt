@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -21,6 +23,11 @@ import java.util.List;
  * counterpart of {@link com.github.auties00.cobalt.sync.handler.DisableLinkPreviewsHandler}.
  */
 public final class DisableLinkPreviewsMutationFactory {
+    /**
+     * The logger for {@link DisableLinkPreviewsMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(DisableLinkPreviewsMutationFactory.class);
+
     /**
      * Creates an instance with no collaborators.
      *
@@ -53,6 +60,7 @@ public final class DisableLinkPreviewsMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebDisableLinkPreviewsSync", exports = "getMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getDisableLinkPreviewsMutation(Instant timestamp, boolean isPreviewsDisabled) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building disable link previews mutation disabled={0}", isPreviewsDisabled);
         var action = new PrivacySettingDisableLinkPreviewsActionBuilder()
                 .isPreviewsDisabled(isPreviewsDisabled)
                 .build();

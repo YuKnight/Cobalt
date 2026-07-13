@@ -30,6 +30,7 @@ import type {
 import type { WasmAnalysis, WasmCrossReference } from "../types/wasm.js";
 import { ModuleSearchService } from "./search.js";
 import { LruCache } from "./lru-cache.js";
+import { nativePath } from "../storage/snapshot-utils.js";
 import { analyzeWasm } from "../analysis/wasm-analyzer.js";
 import { buildWasmIndex, type WasmIndex } from "../analysis/wasm-index.js";
 import { createLogger } from "../utils/logger.js";
@@ -508,6 +509,11 @@ export class SnapshotCatalog {
     return record;
   }
 
+  getNativeModulePath(name: string): string {
+    const record = this.getNativeModuleRecord(name);
+    return nativePath(this.manifest.platform, this.snapshotId, record.filePath);
+  }
+
   async getNativeModuleAnalysis(name: string): Promise<WasmAnalysis> {
     const cached = this.nativeAnalysisCache.get(name);
     if (cached) return cached;
@@ -569,17 +575,14 @@ export class SnapshotCatalog {
 
   async getNativeModuleWat(name: string, functionIndex?: number): Promise<string> {
     const record = this.getNativeModuleRecord(name);
-    if (!this.loadNativeBinaryByPath) {
-      throw new Error("Native module binary loading not configured");
-    }
-    const binary = await this.loadNativeBinaryByPath(record.filePath);
 
-    const { disassembleWasm, disassembleWasmFunction } = await import(
-      "../analysis/wasm-analyzer.js"
-    );
+    const { watFileForModule, extractFunctionFromWatFile, disassembleWasm } =
+      await import("../analysis/wasm-analyzer.js");
 
     if (functionIndex != null) {
-      const result = await disassembleWasmFunction(binary, functionIndex);
+      const wasmPath = this.getNativeModulePath(name);
+      const watFile = await watFileForModule(wasmPath, `${wasmPath}.wat`);
+      const result = await extractFunctionFromWatFile(watFile, functionIndex);
       if (result == null) {
         throw new Error(
           `Function index ${functionIndex} not found in native module "${name}"`
@@ -588,6 +591,10 @@ export class SnapshotCatalog {
       return result;
     }
 
+    if (!this.loadNativeBinaryByPath) {
+      throw new Error("Native module binary loading not configured");
+    }
+    const binary = await this.loadNativeBinaryByPath(record.filePath);
     return await disassembleWasm(binary);
   }
 

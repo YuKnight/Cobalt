@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.engine.mediaplane;
 
 import com.github.auties00.cobalt.calls.platform.LiveVoipHostApi;
+import com.github.auties00.cobalt.log.Log;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
@@ -25,9 +27,9 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class LiveMediaDatagramSink implements LiveVoipHostApi.MediaDatagramSink {
     /**
-     * Records datagram send and channel lifecycle failures at {@link System.Logger.Level#DEBUG}.
+     * The logger for {@link LiveMediaDatagramSink}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveMediaDatagramSink.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveMediaDatagramSink.class);
 
     /**
      * Holds the datagram channel, {@code null} until the first send opens it.
@@ -53,18 +55,22 @@ public final class LiveMediaDatagramSink implements LiveVoipHostApi.MediaDatagra
             try {
                 open = DatagramChannel.open();
             } catch (IOException exception) {
-                LOGGER.log(System.Logger.Level.DEBUG, "calls host datagram channel open failed", exception);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls host datagram channel open failed", exception);
                 return 0;
             }
             if (!channel.compareAndSet(null, open)) {
                 closeQuietly(open);
                 open = channel.get();
+            } else if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "calls host datagram channel opened");
             }
         }
         try {
-            return open.send(ByteBuffer.wrap(payload), destination);
+            var sent = open.send(ByteBuffer.wrap(payload), destination);
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls host datagram sent {0} of {1} bytes", sent, payload.length);
+            return sent;
         } catch (IOException exception) {
-            LOGGER.log(System.Logger.Level.DEBUG, "calls host datagram send failed", exception);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls host datagram send failed", exception);
             return 0;
         }
     }
@@ -81,7 +87,7 @@ public final class LiveMediaDatagramSink implements LiveVoipHostApi.MediaDatagra
         try {
             toClose.close();
         } catch (IOException exception) {
-            LOGGER.log(System.Logger.Level.DEBUG, "calls host datagram channel close failed", exception);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls host datagram channel close failed", exception);
         }
     }
 }

@@ -19,10 +19,10 @@ public final class DeviceConstants {
      *
      * <p>This class exposes only static constants and must never be constructed.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private DeviceConstants() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

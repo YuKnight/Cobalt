@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.calls.engine;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -21,6 +23,11 @@ import java.util.Objects;
  *                 ack
  */
 public record LiveOfferAckSender(LinkedWhatsAppClient whatsapp) implements OfferAckSender {
+    /**
+     * The logger for {@link LiveOfferAckSender}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveOfferAckSender.class);
+
     /**
      * Validates the client backing this sender.
      *
@@ -49,9 +56,13 @@ public record LiveOfferAckSender(LinkedWhatsAppClient whatsapp) implements Offer
                 .description(offerEnvelope.description())
                 .attribute("to", to)
                 .content(child);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending call offer to {0}", to);
         try {
-            return whatsapp.sendNode(builder);
+            var ack = whatsapp.sendNode(builder);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received call offer ack from {0}", to);
+            return ack;
         } catch (RuntimeException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to send call offer", exception);
             throw new WhatsAppCallException.DataChannel("could not send call offer", exception);
         }
     }

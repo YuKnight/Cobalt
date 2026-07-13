@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.platform;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
@@ -41,6 +44,11 @@ import java.util.Objects;
  */
 public final class WaCallMemoryArena implements AutoCloseable {
     /**
+     * The logger for {@link WaCallMemoryArena}.
+     */
+    private static final System.Logger LOGGER = Log.get(WaCallMemoryArena.class);
+
+    /**
      * Holds the diagnostic name of this pool.
      */
     private final String name;
@@ -73,6 +81,7 @@ public final class WaCallMemoryArena implements AutoCloseable {
      */
     public static WaCallMemoryArena create(String name) {
         Objects.requireNonNull(name, "name cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating memory pool {0}", name);
         return new WaCallMemoryArena(name, Arena.ofConfined());
     }
 
@@ -110,6 +119,7 @@ public final class WaCallMemoryArena implements AutoCloseable {
      * @throws IllegalStateException    if this pool has been closed or is accessed from another thread
      */
     public MemorySegment allocate(long byteSize) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "pool {0} allocating {1} bytes", name, byteSize);
         return arena.allocate(byteSize);
     }
 
@@ -125,6 +135,7 @@ public final class WaCallMemoryArena implements AutoCloseable {
      */
     public MemorySegment allocate(MemoryLayout layout) {
         Objects.requireNonNull(layout, "layout cannot be null");
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "pool {0} allocating {1} bytes for layout", name, layout.byteSize());
         return arena.allocate(layout);
     }
 
@@ -140,6 +151,7 @@ public final class WaCallMemoryArena implements AutoCloseable {
      */
     @Override
     public void close() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing memory pool {0}", name);
         arena.close();
     }
 }

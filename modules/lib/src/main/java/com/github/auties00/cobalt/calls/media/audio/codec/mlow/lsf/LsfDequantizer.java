@@ -6,6 +6,9 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.LsfCodeboo
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.LsfCodebooks.Codebook;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.LsfCodebooks.Stage1;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.LsfCodebooks.Stage2;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Two stage line spectral frequency (LSF) inverse vector quantizer for the MLow speech codec.
@@ -45,6 +48,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.LsfCodeboo
  * for the same reason.
  */
 public final class LsfDequantizer {
+    /**
+     * The logger for {@link LsfDequantizer}.
+     */
+    private static final System.Logger LOGGER = Log.get(LsfDequantizer.class);
+
     /**
      * Linear prediction order of the MLow short term filter.
      *
@@ -335,6 +343,9 @@ public final class LsfDequantizer {
                 }
                 return;
             }
+        }
+        if (Log.ERROR) {
+            LOGGER.log(Level.ERROR, "mlow lsf dequantize: minimum-distance relaxation did not converge");
         }
         throw new AssertionError("LSF minimum-distance relaxation did not converge");
     }

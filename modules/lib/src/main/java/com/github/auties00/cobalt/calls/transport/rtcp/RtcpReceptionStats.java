@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.rtcp;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,6 +34,11 @@ import java.util.Map;
  *           or Mobile source export.
  */
 public final class RtcpReceptionStats {
+    /**
+     * The logger for {@link RtcpReceptionStats}.
+     */
+    private static final System.Logger LOGGER = Log.get(RtcpReceptionStats.class);
+
     /**
      * Holds the number of distinct values a sixteen bit RTP sequence number takes, the wrap around modulus.
      */
@@ -81,7 +89,12 @@ public final class RtcpReceptionStats {
      * @param clockRateHz  the stream's RTP timestamp clock rate, in hertz, used to scale the jitter estimate
      */
     public synchronized void onRtpReceived(int ssrc, int sequence, long rtpTimestamp, long arrivalNanos, int clockRateHz) {
+        var newStream = !streams.containsKey(ssrc);
         var stream = streams.computeIfAbsent(ssrc, _ -> new Stream(ssrc, sequence & 0xFFFF, clockRateHz));
+        if (newStream && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rtcp reception stats tracking new stream, ssrc={0} clockRateHz={1}",
+                    ssrc, clockRateHz);
+        }
         stream.onRtp(sequence & 0xFFFF, rtpTimestamp & 0xFFFFFFFFL, arrivalNanos);
     }
 
@@ -102,6 +115,11 @@ public final class RtcpReceptionStats {
         var stream = streams.get(ssrc);
         if (stream != null) {
             stream.recordSr(ntpTimestamp, arrivalNanos);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "rtcp inbound sender report recorded, ssrc={0}", ssrc);
+            }
+        } else if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rtcp inbound sender report ignored, no rtp yet for ssrc={0}", ssrc);
         }
     }
 
@@ -121,6 +139,9 @@ public final class RtcpReceptionStats {
         var blocks = new ArrayList<RtcpReportBuilder.ReportBlock>(streams.size());
         for (var stream : streams.values()) {
             blocks.add(stream.toBlock(nowNanos));
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "rtcp report blocks computed, count={0}", blocks.size());
         }
         return blocks;
     }

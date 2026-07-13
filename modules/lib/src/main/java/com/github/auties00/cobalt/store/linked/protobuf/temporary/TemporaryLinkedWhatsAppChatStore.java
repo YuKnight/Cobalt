@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf.temporary;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMute;
@@ -13,6 +14,7 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.store.linked.protobuf.ProtobufLinkedWhatsAppChatStore;
 import com.github.auties00.collections.ConcurrentLinkedHashMap;
 
+import java.lang.System.Logger.Level;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -30,6 +32,11 @@ import java.util.concurrent.ConcurrentMap;
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public final class TemporaryLinkedWhatsAppChatStore extends ProtobufLinkedWhatsAppChatStore {
+    /**
+     * The logger for {@link TemporaryLinkedWhatsAppChatStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(TemporaryLinkedWhatsAppChatStore.class);
+
     /**
      * The map of chat JIDs to their in-memory {@link TemporaryChat} entries.
      */
@@ -140,6 +147,7 @@ public final class TemporaryLinkedWhatsAppChatStore extends ProtobufLinkedWhatsA
         Objects.requireNonNull(chatJid, "chatJid cannot be null");
         var chat = new TemporaryChat(chatJid);
         chats.put(chatJid, chat);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "added new chat {0}", chatJid);
         return chat;
     }
 
@@ -149,6 +157,7 @@ public final class TemporaryLinkedWhatsAppChatStore extends ProtobufLinkedWhatsA
             return Optional.empty();
         }
         var targetJid = chatJid.toJid();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing chat {0}", targetJid);
         if (targetJid.hasUserServer()) {
             var jidChat = chats.remove(targetJid);
             if (jidChat != null) {
@@ -200,11 +209,13 @@ public final class TemporaryLinkedWhatsAppChatStore extends ProtobufLinkedWhatsA
         Objects.requireNonNull(newsletterJid, "newsletterJid cannot be null");
         var newsletter = new TemporaryNewsletter(newsletterJid);
         newsletters.put(newsletterJid, newsletter);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "added new newsletter {0}", newsletterJid);
         return newsletter;
     }
 
     @Override
     public Optional<Newsletter> removeNewsletter(JidProvider newsletterJid) {
+        if (Log.DEBUG && newsletterJid != null) LOGGER.log(Level.DEBUG, "removing newsletter {0}", newsletterJid.toJid());
         return newsletterJid == null
                 ? Optional.empty()
                 : Optional.ofNullable(newsletters.remove(newsletterJid.toJid()));

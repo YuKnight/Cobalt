@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.calls.transport.congestion.bwe.delay;
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.BandwidthEstimator;
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.combine.BitrateCombiner;
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.signal.CongestionSignalDetector;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * The GoogCC delay based bandwidth estimator: groups received packets by send burst, fits an
@@ -30,6 +33,11 @@ import com.github.auties00.cobalt.calls.transport.congestion.bwe.signal.Congesti
  * pushed voip settings enable the delay based estimator but do not carry these window lengths.
  */
 public final class GccDelayBasedEstimator implements BandwidthEstimator {
+    /**
+     * The logger for {@link GccDelayBasedEstimator}.
+     */
+    private static final System.Logger LOGGER = Log.get(GccDelayBasedEstimator.class);
+
     /**
      * Maximum send time spacing, in milliseconds, within which consecutive packets are coalesced into
      * one packet group.
@@ -149,6 +157,10 @@ public final class GccDelayBasedEstimator implements BandwidthEstimator {
         this.trendline = new TrendlineEstimator();
         this.rateControl = new AimdRateControl(minBitrateBps, maxBitrateBps);
         seedStart(startBitrateBps, minBitrateBps, maxBitrateBps);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "gcc delay based estimator: constructed, min={0} max={1} start={2}",
+                    minBitrateBps, maxBitrateBps, startBitrateBps);
+        }
     }
 
     /**
@@ -182,6 +194,10 @@ public final class GccDelayBasedEstimator implements BandwidthEstimator {
      * @param payloadBytes  the packet's payload size, in bytes
      */
     public void onPacketReceived(long sendTimeMs, long arrivalTimeMs, int payloadBytes) {
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "gcc delay based estimator: packet received, sendTimeMs={0} arrivalTimeMs={1} payloadBytes={2}",
+                    sendTimeMs, arrivalTimeMs, payloadBytes);
+        }
         updateThroughput(arrivalTimeMs, payloadBytes);
         if (currentGroupSendMs < 0) {
             openGroup(sendTimeMs, arrivalTimeMs, payloadBytes);
@@ -213,6 +229,10 @@ public final class GccDelayBasedEstimator implements BandwidthEstimator {
             lastArrivalDeltaMs = currentGroupArrivalMs - previousGroupArrivalMs;
             var usage = trendline.update(sendDeltaMs, arrivalDeltaMs, currentGroupBytes, nowMs);
             rateControl.update(usage, ackedThroughputBps, nowMs);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "gcc delay based estimator: group closed, usage={0} sendDeltaMs={1} arrivalDeltaMs={2} target={3}",
+                        usage, sendDeltaMs, arrivalDeltaMs, rateControl.currentBitrateBps());
+            }
         }
         previousGroupSendMs = currentGroupSendMs;
         previousGroupArrivalMs = currentGroupArrivalMs;
@@ -251,6 +271,10 @@ public final class GccDelayBasedEstimator implements BandwidthEstimator {
             ackedThroughputBps = throughputWindowBytes * 8 * 1000 / elapsed;
             throughputWindowBytes = 0;
             throughputWindowStartMs = arrivalTimeMs;
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "gcc delay based estimator: throughput window closed, ackedThroughputBps={0}",
+                        ackedThroughputBps);
+            }
         }
     }
 
@@ -344,6 +368,7 @@ public final class GccDelayBasedEstimator implements BandwidthEstimator {
         ackedThroughputBps = 0;
         lastArrivalDeltaMs = -1;
         lastSendDeltaMs = -1;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "gcc delay based estimator: reset");
     }
 
     /**

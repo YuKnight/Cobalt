@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.graphql.whatsapp.business;
 
+import com.github.auties00.cobalt.graphql.whatsappWeb.business.CatalogProductInfoParser;
+
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.graphql.WhatsAppGraphQlClient;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
@@ -12,7 +14,7 @@ import com.github.auties00.cobalt.model.business.catalog.BusinessProductCollecti
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the public single-collection query built by
+ * Parses the graph.whatsapp.com GraphQL response of the public single-collection query built by
  * {@link QueryProductSingleCollectionWhatsAppGraphQlRequest} into a {@link BusinessProductCollection}.
  *
  * <p>Reads the linked root {@code xwa_product_catalog_get_single_collection}, projecting the
@@ -33,14 +35,14 @@ public final class QueryProductSingleCollectionWhatsAppGraphQlResponse implement
      *
      * <p>Reserved for the static parser.
      *
-     * @param collection the parsed collection, or {@code null} when the relay omitted the field
+     * @param collection the parsed collection, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private QueryProductSingleCollectionWhatsAppGraphQlResponse(BusinessProductCollection collection) {
         this.collection = collection;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_product_catalog_get_single_collection} and its
      * {@code collection} and {@code paging} children, projecting them onto a

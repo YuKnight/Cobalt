@@ -1,12 +1,12 @@
 package com.github.auties00.cobalt.registration.push.apns;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.activation.ApnsActivationCrypto;
 import com.github.auties00.cobalt.registration.push.apns.activation.ApnsActivationInfo;
 import com.github.auties00.cobalt.registration.push.apns.plist.Plist;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDictionaryValue;
 
 import java.io.IOException;
-import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.net.ProxySelector;
@@ -41,10 +41,9 @@ import java.util.regex.Pattern;
  */
 final class ApnsActivation {
     /**
-     * Holds the shared logger, named {@code cobalt.apns} so consumers can configure verbosity
-     * uniformly across the APNS client.
+     * The logger for {@link ApnsActivation}.
      */
-    private static final Logger LOG = System.getLogger("cobalt.apns");
+    private static final System.Logger LOGGER = Log.get(ApnsActivation.class);
 
     /**
      * Holds the URL that signs the device CSR.
@@ -126,9 +125,10 @@ final class ApnsActivation {
         if (session.deviceCertificate().length > 0
                 && session.privateKeyDer().length > 0
                 && session.publicKeyDer().length > 0) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns activation skipped, session already populated");
             return;
         }
-        LOG.log(Level.INFO, () -> "APNS activation -> " + ACTIVATION_URL);
+        if (Log.INFO) LOGGER.log(Level.INFO, "apns activation starting");
         var keyPair = ApnsActivationCrypto.newRsaKeyPair();
         var csr = ApnsActivationCrypto.generateCsr(keyPair);
         var activationXml = buildActivationInfoXml(csr);
@@ -146,10 +146,12 @@ final class ApnsActivation {
         try {
             var response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() / 100 != 2) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "apns activation http failed, status={0}", response.statusCode());
                 throw new IOException("APNS activation HTTP " + response.statusCode() + ": " + response.body());
             }
             var matcher = PROTOCOL_PATTERN.matcher(response.body());
             if (!matcher.find()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "apns activation response missing protocol block");
                 throw new IOException("activation response missing <Protocol> block: " + response.body());
             }
             var protocol = matcher.group(1).getBytes(StandardCharsets.UTF_8);
@@ -157,8 +159,10 @@ final class ApnsActivation {
             session.setPrivateKeyDer(keyPair.getPrivate().getEncoded());
             session.setPublicKeyDer(keyPair.getPublic().getEncoded());
             session.setDeviceCertificate(info.deviceCertificate());
+            if (Log.INFO) LOGGER.log(Level.INFO, "apns activation complete");
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apns activation interrupted", ie);
             throw new IOException("APNS activation interrupted", ie);
         }
     }

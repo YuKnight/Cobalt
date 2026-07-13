@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.util;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -36,9 +39,9 @@ import java.util.function.Consumer;
  */
 public final class ScheduledTask {
     /**
-     * Holds the diagnostic logger used to report runtime exceptions thrown by scheduled tasks.
+     * The logger for {@link ScheduledTask}.
      */
-    private static final System.Logger LOGGER = System.getLogger(ScheduledTask.class.getName());
+    private static final System.Logger LOGGER = Log.get(ScheduledTask.class);
 
     /**
      * Whether {@link #cancel()} has been called; polled by the worker thread between its sleep and run
@@ -78,6 +81,7 @@ public final class ScheduledTask {
     public static ScheduledTask scheduleDelayed(Duration delay, Runnable task) {
         Objects.requireNonNull(delay, "delay cannot be null");
         Objects.requireNonNull(task, "task cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "scheduling delayed task, delay={0}", delay);
         return start("cobalt-scheduler-delayed", handle -> runOnce(delay, task, handle));
     }
 
@@ -127,6 +131,7 @@ public final class ScheduledTask {
         if (period.isZero() || period.isNegative()) {
             throw new IllegalArgumentException("period must be positive");
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "scheduling periodic task, initialDelay={0} period={1}", initialDelay, period);
         return start("cobalt-scheduler-periodic", handle -> runPeriodic(initialDelay, period, task, handle));
     }
 
@@ -151,6 +156,7 @@ public final class ScheduledTask {
         if (current != null && current != Thread.currentThread()) {
             current.interrupt();
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "scheduled task cancelled");
     }
 
     /**
@@ -257,7 +263,7 @@ public final class ScheduledTask {
         try {
             task.run();
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING, "Scheduled task threw an exception", exception);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "scheduled task threw an exception", exception);
         }
     }
 }

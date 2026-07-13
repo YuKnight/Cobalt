@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
@@ -21,6 +22,7 @@ import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.GroupJoinCEventBuilder;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -55,10 +57,9 @@ import java.util.List;
 public final class NotificationGroupStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
-     * Logs warnings about unhandled actions and debug messages about actions
-     * deferred to the post-loop metadata refresh.
+     * The logger for {@link NotificationGroupStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(NotificationGroupStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationGroupStreamHandler.class);
 
     /**
      * Provides store reads and group metadata queries.
@@ -115,10 +116,11 @@ public final class NotificationGroupStreamHandler extends SocketStreamHandler.Co
         try {
             handleNotification(stanza);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot handle w:gp2 notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "<missing>"),
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "cannot handle w:gp2 notification " + stanza.getAttributeAsString("id", "<missing>"),
+                        throwable);
+            }
         } finally {
             sendNotificationAck(stanza);
         }
@@ -155,6 +157,7 @@ public final class NotificationGroupStreamHandler extends SocketStreamHandler.Co
                     .map(SmaxGroupsGroupsDirtyNotificationResponse::dirtyGroups)
                     .filter(groups -> !groups.isEmpty())
                     .orElseGet(() -> List.of(groupJid));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "w:gp2 groups_dirty notification, refreshing {0} group(s)", dirtyGroups.size());
             for (var dirtyGroup : dirtyGroups) {
                 refreshGroup(dirtyGroup);
             }
@@ -247,11 +250,16 @@ public final class NotificationGroupStreamHandler extends SocketStreamHandler.Co
                  "revoked_sub_group_suggestions",
                  "change_number",
                  "missing_participant_identification"
-                 -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Handling w:gp2 action {0} conservatively via metadata refresh",
-                    action.description());
-            default -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring unsupported w:gp2 action {0}", action.description());
+                 -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "handling w:gp2 action {0} conservatively via metadata refresh",
+                            action.description());
+                }
+            }
+            default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring unsupported w:gp2 action {0}", action.description());
+            }
         }
     }
 
@@ -1242,10 +1250,11 @@ public final class NotificationGroupStreamHandler extends SocketStreamHandler.Co
         try {
             whatsapp.queryChatMetadata(groupJid);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Cannot refresh group metadata for {0}: {1}",
-                    groupJid,
-                    throwable.getMessage());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "cannot refresh group metadata for " + Log.jid(String.valueOf(groupJid)),
+                        throwable);
+            }
         }
     }
 

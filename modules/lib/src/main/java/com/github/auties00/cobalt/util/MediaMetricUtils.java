@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.util;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,6 +15,7 @@ import com.github.auties00.cobalt.wam.type.MediaUploadResultType;
 import com.github.auties00.cobalt.wam.type.WebcMediaOperationCode;
 import com.github.auties00.cobalt.wam.WamService;
 
+import java.lang.System.Logger.Level;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
@@ -32,6 +34,11 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 @WhatsAppWebModule(moduleName = "WAWebWamMediaMetricUtils")
 public final class MediaMetricUtils {
+    /**
+     * The logger for {@link MediaMetricUtils}.
+     */
+    private static final System.Logger LOGGER = Log.get(MediaMetricUtils.class);
+
     /**
      * Holds the message prefix produced by Cobalt's
      * {@code MediaDownloadInputStream} when the downloaded ciphertext SHA-256
@@ -205,7 +212,10 @@ public final class MediaMetricUtils {
             case "thumbnail-link", "newsletter-thumbnail-link" -> MediaType.URL;
             case "music-artwork", "newsletter-music-artwork" -> MediaType.MUSIC_ARTWORK;
             case "payment-bg-image", "biz-cover-photo", "ads-image", "ads-video", "group-history" -> MediaType.NONE;
-            default -> throw new IllegalArgumentException("webMediaType is invalid: " + webMediaType);
+            default -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "unknown media type: {0}", webMediaType);
+                throw new IllegalArgumentException("webMediaType is invalid: " + webMediaType);
+            }
         };
     }
 
@@ -266,6 +276,10 @@ public final class MediaMetricUtils {
                 }
                 return MediaUploadResultType.ERROR_UPLOAD;
             }
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "media upload error classified as unknown, cause={0}",
+                    throwable == null ? "none" : throwable.getClass().getSimpleName());
         }
         return MediaUploadResultType.ERROR_UNKNOWN;
     }
@@ -335,6 +349,10 @@ public final class MediaMetricUtils {
                     return MediaDownloadResultType.ERROR_HASH_MISMATCH;
                 }
             }
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "media download error classified as unknown, cause={0}",
+                    throwable == null ? "none" : throwable.getClass().getSimpleName());
         }
         return MediaDownloadResultType.ERROR_UNKNOWN;
     }
@@ -489,6 +507,10 @@ public final class MediaMetricUtils {
         if (mediaId != null) {
             // FIXME: mediaId is a JS double in [1, MAX_SAFE_INTEGER] but the WAM property is INTEGER; values above Integer.MAX_VALUE silently truncate.
             builder.mediaId((int) (long) mediaId);
+        }
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "committing media error unknown-details event, operation={0}, error={1}",
+                    operation, throwable.getClass().getSimpleName());
         }
         wamService.commit(builder.build());
     }

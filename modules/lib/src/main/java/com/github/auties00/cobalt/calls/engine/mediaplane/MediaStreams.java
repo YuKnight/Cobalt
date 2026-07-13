@@ -17,11 +17,11 @@ import com.github.auties00.cobalt.calls.stream.VideoOutput;
  * the playback sinks. The fields are named for the direction of media flow:
  * <ul>
  *   <li>{@link #audioCapture()} and {@link #videoCapture()} are the sources the engine pulls local media
- *       from and encodes ({@link AudioOutput#take()} / {@link VideoOutput#take()}); they correspond to the
+ *       from and encodes ({@link AudioOutput#takeAudio()} / {@link VideoOutput#takeVideo()}); they correspond to the
  *       public {@code audioOut} / {@code videoOut} parameters.</li>
  *   <li>{@link #audioPlayback()} and {@link #videoPlayback()} are the sinks the engine delivers decoded
- *       remote media to ({@link AudioInput#offer(com.github.auties00.cobalt.calls.stream.AudioFrame)} /
- *       {@link VideoInput#offer(com.github.auties00.cobalt.calls.stream.VideoFrame)}); they correspond to
+ *       remote media to ({@link AudioInput#offerAudio(com.github.auties00.cobalt.calls.stream.AudioFrame)} /
+ *       {@link VideoInput#offerVideo(com.github.auties00.cobalt.calls.stream.VideoFrame)}); they correspond to
  *       the public {@code audioIn} / {@code videoIn} parameters.</li>
  * </ul>
  *

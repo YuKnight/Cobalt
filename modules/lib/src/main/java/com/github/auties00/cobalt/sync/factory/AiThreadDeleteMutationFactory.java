@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.sync.handler.AiThreadDeleteHandler;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -30,6 +32,11 @@ import java.util.List;
  * are expected to skip the factory call when the surface is gated off.
  */
 public final class AiThreadDeleteMutationFactory {
+    /**
+     * The logger for {@link AiThreadDeleteMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(AiThreadDeleteMutationFactory.class);
+
     /**
      * Creates a stateless factory with no collaborators.
      *
@@ -63,6 +70,7 @@ public final class AiThreadDeleteMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebAiThreadDeleteSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getAiThreadDeleteMutation(Jid chatJid, String threadId) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building ai thread delete mutation chat={0} thread={1}", chatJid, threadId);
         var timestamp = Instant.now();
         var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)

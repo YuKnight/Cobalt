@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.sync;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.util.ScheduledTask;
 
 import java.io.Closeable;
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,6 +36,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * is shared across every collection rather than being tracked per collection.
  */
 public final class WebAppStateBackoffScheduler implements Closeable {
+    /**
+     * The logger for {@link WebAppStateBackoffScheduler}.
+     */
+    private static final System.Logger LOGGER = Log.get(WebAppStateBackoffScheduler.class);
+
     /**
      * The base delay applied at attempt zero, in milliseconds.
      */
@@ -112,6 +119,9 @@ public final class WebAppStateBackoffScheduler implements Closeable {
     public boolean scheduleRetry(SyncPatchType collectionName, long firstFailureTimestamp, Long serverBackoffMs, Runnable retryAction) {
         if (serverBackoffMs != null) {
             stickyServerBackoffMs.set(serverBackoffMs);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "sync retry backoff floor updated to {0} ms for {1}", serverBackoffMs, collectionName);
+            }
         }
         return scheduleRetry(collectionName, firstFailureTimestamp, retryAction);
     }
@@ -142,6 +152,9 @@ public final class WebAppStateBackoffScheduler implements Closeable {
     public boolean scheduleRetry(SyncPatchType collectionName, long firstFailureTimestamp, Runnable retryAction) {
         var elapsed = System.currentTimeMillis() - firstFailureTimestamp;
         if (elapsed > FINITE_FAILURE_EXPIRY_MS) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "sync retry window expired for {0} after {1} ms, giving up", collectionName, elapsed);
+            }
             return false;
         }
 
@@ -149,6 +162,9 @@ public final class WebAppStateBackoffScheduler implements Closeable {
 
         var attempt = globalAttemptCounter.getAndIncrement();
         var delayMs = calculateBackoff(attempt, stickyServerBackoffMs.get());
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "scheduling sync retry for {0}: attempt={1} delay={2} ms", collectionName, attempt, delayMs);
+        }
 
         var handle = ScheduledTask.scheduleDelayed(Duration.ofMillis(delayMs), () -> {
             pendingRetries.remove(collectionName);
@@ -174,6 +190,9 @@ public final class WebAppStateBackoffScheduler implements Closeable {
     public void updateServerBackoff(long serverBackoffMs) {
         stickyServerBackoffMs.set(serverBackoffMs);
         globalAttemptCounter.set(0);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sync server backoff floor reset to {0} ms", serverBackoffMs);
+        }
     }
 
     /**
@@ -210,6 +229,9 @@ public final class WebAppStateBackoffScheduler implements Closeable {
         var handle = pendingRetries.remove(collectionName);
         if (handle != null) {
             handle.cancel();
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "cancelled pending sync retry for {0}", collectionName);
+            }
             return true;
         }
         return false;
@@ -239,6 +261,9 @@ public final class WebAppStateBackoffScheduler implements Closeable {
      */
     @Override
     public void close() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "closing sync backoff scheduler: {0} pending retries cancelled", pendingRetries.size());
+        }
         for (var handle : pendingRetries.values()) {
             handle.cancel();
         }

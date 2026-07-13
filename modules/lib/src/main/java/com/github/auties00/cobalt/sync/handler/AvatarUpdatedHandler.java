@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,8 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Updates the local user's avatar-presence state in response to {@code avatar_updated_action} sync mutations.
@@ -30,6 +33,11 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebStickersAvatarUpdatedSyncAction")
 public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link AvatarUpdatedHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(AvatarUpdatedHandler.class);
+
     /**
      * The {@link ABPropsService} consulted before applying any mutation.
      *
@@ -94,23 +102,28 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebStickersAvatarUpdatedSyncAction", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!abPropsService.getBool(ABProp.ENABLE_AVATARS_ON_WEB_COMPANION)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "avatar updated mutation unsupported: avatars ab-prop disabled");
             return MutationApplicationResult.unsupported();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "avatar updated mutation unsupported: operation={0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof AvatarUpdatedAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "avatar updated mutation malformed: missing action value");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
         var eventType = action.eventType().orElse(null);
         if (eventType == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "avatar updated mutation malformed: missing event type");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         var pairingTimestamp = client.store().accountStore().pairingTimestamp().orElse(null);
         if (pairingTimestamp != null && !mutation.timestamp().isAfter(pairingTimestamp)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "avatar updated mutation skipped: predates pairing timestamp");
             return MutationApplicationResult.skipped();
         }
 
@@ -118,6 +131,7 @@ public final class AvatarUpdatedHandler implements WebAppStateActionHandler {
             case CREATED, UPDATED -> client.store().accountStore().setHasAvatar(true);
             case DELETED -> client.store().accountStore().setHasAvatar(false);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "avatar updated: hasAvatar updated via event={0}", eventType);
 
         client.store().settingsStore().removeAllRecentAvatarStickers();
         return MutationApplicationResult.success();

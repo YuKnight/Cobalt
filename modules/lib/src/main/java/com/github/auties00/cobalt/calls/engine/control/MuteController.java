@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
 import com.github.auties00.cobalt.calls.signaling.incall.MuteV2Stanza;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.util.ScheduledTask;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
@@ -39,6 +41,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.MuteStateChanged;
  * {@link ScheduledTask} recurrence and the native info mutex with a {@link ReentrantLock}.
  */
 public final class MuteController implements AutoCloseable {
+    /**
+     * The logger for {@link MuteController}.
+     */
+    private static final System.Logger LOGGER = Log.get(MuteController.class);
+
     /**
      * The window after a local unmute during which an inbound peer mute request is ignored.
      *
@@ -147,6 +154,7 @@ public final class MuteController implements AutoCloseable {
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "self mute state changed to {0}", muted);
         sender.send(MuteV2Stanza.ofSelfState(context.callId(), context.callCreator(), muted, context.group()));
         events.emit(new MuteStateChanged(context.selfJid(), muted, true));
     }
@@ -192,6 +200,7 @@ public final class MuteController implements AutoCloseable {
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "requesting peer mute for {0}", target);
         sender.send(MuteV2Stanza.ofPeerRequest(context.callId(), context.callCreator(), context.group()));
     }
 
@@ -211,6 +220,7 @@ public final class MuteController implements AutoCloseable {
         try {
             if (peerMuteRetry != null && peerMuteRetry.target.equals(target)) {
                 cancelPeerMuteRetry();
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "peer mute request cancelled for {0}", target);
             }
         } finally {
             lock.unlock();
@@ -232,6 +242,7 @@ public final class MuteController implements AutoCloseable {
         try {
             if (peerMuteRetry != null && peerMuteRetry.target.equals(participant)) {
                 cancelPeerMuteRetry();
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "peer mute request satisfied for {0}", participant);
             }
         } finally {
             lock.unlock();
@@ -259,11 +270,15 @@ public final class MuteController implements AutoCloseable {
         lock.lock();
         try {
             if (unmuteLockoutUntilNanos != 0 && System.nanoTime() < unmuteLockoutUntilNanos) {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "peer mute request from {0} suppressed by unmute lockout", requester);
+                }
                 return false;
             }
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "peer mute request from {0} surfaced", requester);
         events.emit(new MuteByAnotherParticipant(requester));
         return true;
     }
@@ -285,6 +300,7 @@ public final class MuteController implements AutoCloseable {
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mute controller closed");
     }
 
     /**
@@ -315,6 +331,7 @@ public final class MuteController implements AutoCloseable {
         } finally {
             lock.unlock();
         }
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "peer mute request timed out for {0}", target);
         events.emit(new MuteRequestFailed(target));
     }
 

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -29,6 +31,11 @@ import java.util.List;
  * level and invoke {@link #createChatAssignmentMutation} once per pair.
  */
 public final class ChatAssignmentMutationFactory {
+    /**
+     * The logger for {@link ChatAssignmentMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(ChatAssignmentMutationFactory.class);
+
     /**
      * Creates a stateless factory with no collaborators.
      *
@@ -65,6 +72,7 @@ public final class ChatAssignmentMutationFactory {
             String agentId,
             Instant timestamp
     ) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building chat assignment mutation chat={0} agent={1}", chatJid, agentId);
         var action = new ChatAssignmentActionBuilder()
                 .deviceAgentID(agentId)
                 .build();

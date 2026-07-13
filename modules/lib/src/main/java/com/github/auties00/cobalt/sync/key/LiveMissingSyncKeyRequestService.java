@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.key;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -26,6 +27,7 @@ import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
 import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.*;
 
@@ -55,13 +57,9 @@ import java.util.*;
 @WhatsAppWebModule(moduleName = "WAWebSyncdStoreMissingKeys")
 public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyRequestService {
     /**
-     * Holds the diagnostic logger for the syncd missing-key request flow.
-     *
-     * @implNote This implementation uses {@link System.Logger} so the bridged handler installed
-     * by the {@code modules/lib} bootstrap surfaces the {@code [syncd] ...} lines under the
-     * same handler chain as the rest of the syncd subsystem.
+     * The logger for {@link LiveMissingSyncKeyRequestService}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveMissingSyncKeyRequestService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveMissingSyncKeyRequestService.class);
 
     /**
      * Holds the injected client used to dispatch peer messages and to resolve the shared store.
@@ -166,6 +164,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
             return;
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "re-requesting {0} missing sync key(s)", keyIds.size());
         var keyIdList = keyIds.stream()
                 .filter(Objects::nonNull)
                 .map(id -> new AppStateSyncKeyIdBuilder()
@@ -188,8 +187,8 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
      * missing or fails to load the result falls back to the primary device (device id
      * {@code 0}).
      *
-     * @implNote This implementation logs a {@code Key reqs->primary only} warning before
-     * returning the singleton primary-only fallback list, matching WA Web's catch branch.
+     * @implNote This implementation logs a warning before returning the singleton primary-only
+     * fallback list, matching WA Web's catch branch.
      *
      * @return the companion device {@link Jid}s, or a singleton primary device on lookup failure
      */
@@ -206,8 +205,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
         try {
             var myDeviceList = store.contactStore().findDeviceList(myJid.toUserJid());
             if (myDeviceList.isEmpty()) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "[syncd] getPeerDevices: no device list. Key reqs->primary only");
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "getPeerDevices: no device list, falling back to primary device only");
                 return List.of(Jid.of(myJid.user(), myJid.server(), 0, 0));
             }
 
@@ -218,8 +216,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
                     .map(device -> device.toDeviceJid(myJid.user(), myJid.server()))
                     .toList();
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "[syncd] getPeerDevices: {0}. Key reqs->primary only", e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "getPeerDevices: device list lookup failed, falling back to primary device only", e);
             return List.of(Jid.of(myJid.user(), myJid.server(), 0, 0));
         }
     }
@@ -250,7 +247,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
 
         var requestedKeyIds = coordinator.runLocked(() -> {
             if (!store.connectionStore().isResumeFromRestartComplete()) {
-                LOGGER.log(System.Logger.Level.DEBUG, "syncd: _handleMissingKeys: skip, resume in progress");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "handleMissingKeys: skip, resume in progress");
                 return List.<byte[]>of();
             }
             return keyIds.stream()
@@ -262,6 +259,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
         if (requestedKeyIds.isEmpty()) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "handleMissingKeys: requesting {0} new missing key(s)", requestedKeyIds.size());
 
         var keyIdList = requestedKeyIds.stream()
                 .map(id -> new AppStateSyncKeyIdBuilder()
@@ -315,8 +313,7 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
         var deviceIds = companionDevices.stream()
                 .map(Jid::device)
                 .toList();
-        LOGGER.log(System.Logger.Level.INFO,
-                "syncd: send key request key id {0} to peer deviceIds {1}", keyIdHexes, deviceIds);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "send key request: keyIds={0} deviceIds={1}", keyIdHexes, deviceIds);
 
         for (var entry : messages.entrySet()) {
             var msgId = entry.getValue().key().id().orElse(null);
@@ -334,21 +331,18 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
                 client.sendPeerMessage(device, messageInfo);
                 successfulDeviceIds.add(device.device());
             } catch (Exception e) {
-                LOGGER.log(System.Logger.Level.WARNING, "Failed to send key request to device {0}: {1}",
-                        device, e.getMessage());
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "send key request failed for device {0}: {1}", device, e.getMessage());
                 failureMessages.add(e.getMessage());
             }
         }
 
         var failureCount = failureMessages.size();
         if (failureCount > 0 && failureCount < companionDevices.size()) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "syncd: sendAppStateSyncKeyRequest: {0}/{1} peer device(s) failed",
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sendAppStateSyncKeyRequest: {0}/{1} peer device(s) failed",
                     failureCount, companionDevices.size());
         } else if (failureCount == companionDevices.size()) {
             var errorDetails = String.join(", ", failureMessages);
-            LOGGER.log(System.Logger.Level.ERROR,
-                    "[syncd] sendAppStateSyncKeyRequest: all {0} peers failed: {1}", companionDevices.size(), errorDetails);
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sendAppStateSyncKeyRequest: all {0} peers failed: {1}", companionDevices.size(), errorDetails);
             throw new IllegalStateException(
                     "syncd: sendAppStateSyncKeyRequest failed for all " + companionDevices.size() + " peer device(s): " + errorDetails);
         }
@@ -469,6 +463,8 @@ public final class LiveMissingSyncKeyRequestService implements MissingSyncKeyReq
                     .build();
             store.syncStore().addMissingSyncKey(missingKey);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tracked {0} missing sync key(s), asked {1} device(s)",
+                keyIds.size(), successfulDeviceIds.size());
 
         if (timeoutScheduler != null) {
             timeoutScheduler.scheduleTimeoutCheck();

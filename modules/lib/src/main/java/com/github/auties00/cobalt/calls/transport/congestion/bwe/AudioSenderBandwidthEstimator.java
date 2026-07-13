@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe;
 
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping.FastRampController;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Estimates WhatsApp's audio send bitrate with a sender side AIMD control loop, ramping the bitrate up
@@ -31,6 +34,11 @@ import com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping.FastRam
  * {@code sbwe_loss_high} (30 percent) and {@code sbwe_loss_low} (10 percent).
  */
 public final class AudioSenderBandwidthEstimator {
+    /**
+     * The logger for {@link AudioSenderBandwidthEstimator}.
+     */
+    private static final System.Logger LOGGER = Log.get(AudioSenderBandwidthEstimator.class);
+
     /**
      * Increase factor applied when the remote estimate is absent or below the minimum remote bitrate.
      */
@@ -197,6 +205,11 @@ public final class AudioSenderBandwidthEstimator {
         if (congested) {
             var factor = Math.max(DECREASE_FLOOR, 1.0 - DECREASE_LOSS_SLOPE * plr);
             senderBweBps = (long) (senderBweBps * factor);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "audio sender bwe congested: plr={0}, rttNs={1}, decreaseFactor={2}, newEstimate={3}bps",
+                        plr, rttNs, factor, senderBweBps);
+            }
         } else {
             // TODO: wire FastRampController: instantiate it with the aboveMin, slope, and loss thresholds, call onRxRtp(rttMs, lossRatio, nowMs) per received RTP, and let isRampActive() extend the additive ramp here
             var factor = remoteBweBps == 0 || remoteBweBps < minRemoteBweBps
@@ -205,6 +218,10 @@ public final class AudioSenderBandwidthEstimator {
             senderBweBps = (long) (factor * (senderBweBps + ADDITIVE_FLOOR_BPS));
         }
         senderBweBps = Math.clamp(senderBweBps, minBitrateBps, maxBitrateBps);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "audio sender bwe update: congested={0}, remoteBweBps={1}, newEstimate={2}bps",
+                    congested, remoteBweBps, senderBweBps);
+        }
         return senderBweBps;
     }
 

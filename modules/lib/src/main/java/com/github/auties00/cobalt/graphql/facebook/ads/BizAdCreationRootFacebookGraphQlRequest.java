@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.ads.BusinessAdCreationRootInput;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -13,11 +14,10 @@ import java.io.UncheckedIOException;
 /**
  * Builds the Facebook GraphQL query that bootstraps the entire WhatsApp Business ad-creation root view.
  *
- * <p>The query takes six GraphQL variables. The {@code input} object is the
- * {@code CTWABoostedComponentInput} WhatsApp Web passes to
+ * <p>The query takes six GraphQL variables. The {@code input} is the {@link BusinessAdCreationRootInput}
+ * WhatsApp Web passes to
  * {@code lwi.boosted_component_wrapper(caller: "CTWA_SMB_WEB_AD_CREATE_FLOW", draft_id: $draftID,
- * input: $input)}; it is declared opaquely in the compiled document and no caller building it is
- * present in the analysed bundle, so the caller supplies it already JSON-encoded. The {@code draftID}
+ * input: $input)}: the ad account, boost, flow, page, and product being created. The {@code draftID}
  * and {@code pageID} variables are Facebook stanza ids (the ad draft and the page), so each is kept as a
  * {@link String} rather than a {@link com.github.auties00.cobalt.model.jid.Jid}. The
  * {@code isFBAccount} and {@code isWAAccount} variables are include-condition booleans gating the
@@ -29,11 +29,8 @@ import java.io.UncheckedIOException;
  * the optional Facebook/WhatsApp account context; the reply is consumed through
  * {@link BizAdCreationRootFacebookGraphQlResponse}.
  *
- * @implNote This implementation accepts the {@code input} object as a caller-supplied, already
- * JSON-encoded object literal because the {@code CTWABoostedComponentInput} field names are not
- * present in the JS bundle of snapshot {@code 1040120866}; the value is emitted verbatim as the
- * {@code input} variable. Once a caller that builds the object surfaces, replace this with typed
- * scalar fields mirroring that construction.
+ * @implNote This implementation maps the typed {@code input} object to its snake_case JSON shape by
+ * {@link BizAdInputJson}.
  *
  * @see BizAdCreationRootFacebookGraphQlResponse
  */
@@ -70,10 +67,9 @@ public final class BizAdCreationRootFacebookGraphQlRequest implements FacebookGr
             "__relay_internal__pv__LWICometIGUserIdDoubleWriteEnabledrelayprovider";
 
     /**
-     * The pre-encoded JSON of the {@code input} GraphQL object identifying the boosted component, or
-     * {@code null} to omit it.
+     * The {@code input} GraphQL object identifying the boost being created, or {@code null} to omit it.
      */
-    private final String inputJson;
+    private final BusinessAdCreationRootInput input;
 
     /**
      * The {@code draftID} GraphQL variable carrying the Facebook ad-draft stanza id, or {@code null} to
@@ -109,18 +105,15 @@ public final class BizAdCreationRootFacebookGraphQlRequest implements FacebookGr
     /**
      * Constructs an ad-creation root query request.
      *
-     * <p>The {@code inputJson} is the already-JSON-encoded {@code input} object identifying the
-     * boosted component; its field names are defined by the server-side
-     * {@code CTWABoostedComponentInput} type and are not modelled here (see the class
-     * {@code @implNote}). The {@code draftId} and {@code pageId} are Facebook stanza ids. The
-     * {@code isFbAccount} and {@code isWaAccount} flags gate the optional account-context
-     * sub-selections. The {@code igUserIdDoubleWriteEnabled} flag toggles the Instagram user-id
-     * double-write sub-selections and is serialized under
-     * {@value #IG_USER_ID_DOUBLE_WRITE_ENABLED_KEY}. Each value that is {@code null} omits its
-     * variable from the serialized object.
+     * <p>The {@code input} identifies the boost being created. The {@code draftId} and {@code pageId}
+     * are Facebook stanza ids. The {@code isFbAccount} and {@code isWaAccount} flags gate the optional
+     * account-context sub-selections. The {@code igUserIdDoubleWriteEnabled} flag toggles the Instagram
+     * user-id double-write sub-selections and is serialized under
+     * {@value #IG_USER_ID_DOUBLE_WRITE_ENABLED_KEY}. Each value that is {@code null} omits its variable
+     * from the serialized object.
      *
-     * @param inputJson                  the already-JSON-encoded {@code input} object, or {@code null}
-     *                                   to omit the variable
+     * @param input                      the ad-creation-root input, or {@code null} to omit the
+     *                                   variable
      * @param draftId                    the Facebook ad-draft stanza id, or {@code null} to omit the
      *                                   variable
      * @param isFbAccount                whether the linked account is a Facebook account, or
@@ -132,8 +125,8 @@ public final class BizAdCreationRootFacebookGraphQlRequest implements FacebookGr
      * @param igUserIdDoubleWriteEnabled whether the Instagram user-id double-write sub-selections are
      *                                   enabled, or {@code null} to omit the variable
      */
-    public BizAdCreationRootFacebookGraphQlRequest(String inputJson, String draftId, Boolean isFbAccount, Boolean isWaAccount, String pageId, Boolean igUserIdDoubleWriteEnabled) {
-        this.inputJson = inputJson;
+    public BizAdCreationRootFacebookGraphQlRequest(BusinessAdCreationRootInput input, String draftId, Boolean isFbAccount, Boolean isWaAccount, String pageId, Boolean igUserIdDoubleWriteEnabled) {
+        this.input = input;
         this.draftId = draftId;
         this.isFbAccount = isFbAccount;
         this.isWaAccount = isWaAccount;
@@ -160,21 +153,21 @@ public final class BizAdCreationRootFacebookGraphQlRequest implements FacebookGr
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"input": <inputJson>, "draftID": <draftId>,
+     * @implNote This implementation emits {@code {"input": {...}, "draftID": <draftId>,
      * "isFBAccount": <isFbAccount>, "isWAAccount": <isWaAccount>, "pageID": <pageId>,
      * "__relay_internal__pv__LWICometIGUserIdDoubleWriteEnabledrelayprovider":
      * <igUserIdDoubleWriteEnabled>}}, writing each variable only when its value is non-null and
-     * emitting {@code "{}"} when all are {@code null}. The {@code input} value is spliced in as a raw
-     * JSON value via {@link JSONWriter#writeRaw(String)} because it is supplied already encoded.
+     * emitting {@code "{}"} when all are {@code null}. The {@code input} object is mapped by
+     * {@link BizAdInputJson#writeCreationRootInput(JSONWriter, BusinessAdCreationRootInput)}.
      */
     @Override
     public String variables() {
         try (var writer = JSONWriter.ofUTF8()) {
             writer.startObject();
-            if (inputJson != null) {
+            if (input != null) {
                 writer.writeName("input");
                 writer.writeColon();
-                writer.writeRaw(inputJson);
+                BizAdInputJson.writeCreationRootInput(writer, input);
             }
 
             if (draftId != null) {

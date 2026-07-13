@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -14,6 +15,7 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -34,6 +36,11 @@ import java.util.List;
  * convert seconds to milliseconds.
  */
 public final class MuteChatMutationFactory {
+    /**
+     * The logger for {@link MuteChatMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(MuteChatMutationFactory.class);
+
     /**
      * The AB-props service consulted for the {@link ABProp#ENABLE_MENTION_EVERYONE_SYNCD_SENDER}
      * gate when building the outgoing mute mutation.
@@ -96,6 +103,7 @@ public final class MuteChatMutationFactory {
     ) {
         var now = Instant.now();
         var muted = muteEndSeconds != 0L;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building mute chat mutation chat={0} muted={1}", chatJid, muted);
         var muteEndInstant = muteEndSeconds == -1L
                 ? Instant.ofEpochMilli(-1L)
                 : Instant.ofEpochMilli(muteEndSeconds * 1000L);
@@ -105,6 +113,7 @@ public final class MuteChatMutationFactory {
         if (chatJid.hasGroupOrCommunityServer()
                 && mentionAllSeconds != null
                 && abPropsService.getBool(ABProp.ENABLE_MENTION_EVERYONE_SYNCD_SENDER)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "applying mention-everyone mute gate chat={0}", chatJid);
             var mentionMillis = mentionAllSeconds > 0
                     ? mentionAllSeconds * 1000L
                     : mentionAllSeconds;

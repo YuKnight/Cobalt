@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.quarantine;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.listener.linked.LinkedMessageQuarantinedListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -44,6 +45,7 @@ import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.DefenseModeQuarantineEventBuilder;
 import com.github.auties00.cobalt.wam.type.DefenseModeQuarantineAction;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -61,6 +63,11 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @WhatsAppWebModule(moduleName = "WAWebQuarantineActionUtils")
 public final class LiveQuarantineService implements QuarantineService {
+    /**
+     * The logger for {@link LiveQuarantineService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveQuarantineService.class);
+
     /**
      * The bound client, used to read Defense Mode state, the account identity and the contact
      * roster.
@@ -132,6 +139,10 @@ public final class LiveQuarantineService implements QuarantineService {
                 .quarantineAction(DefenseModeQuarantineAction.QUARANTINED_MSG)
                 .defenseModeQuarantineEventCount(1)
                 .build());
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "quarantined message id={0} sender={1}",
+                    info.key().id().orElse(null), info.senderJid().orElse(null));
+        }
         for (var listener : client.store().listeners()) {
             if (listener instanceof LinkedMessageQuarantinedListener typed) {
                 Thread.startVirtualThread(() -> typed.onMessageQuarantined(client, info));
@@ -151,6 +162,9 @@ public final class LiveQuarantineService implements QuarantineService {
             restored = reinject(info);
         } catch (RuntimeException exception) {
             restored = false;
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "quarantine restore failed for id=" + info.key().id().orElse(null), exception);
+            }
         }
         wamService.commit(new DefenseModeQuarantineEventBuilder()
                 .quarantineAction(restored
@@ -184,6 +198,7 @@ public final class LiveQuarantineService implements QuarantineService {
                 }
             } catch (RuntimeException exception) {
                 // a single failed restore does not abort the bulk pass
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "quarantine restore failed during bulk restore", exception);
             }
         }
         if (restored > 0) {
@@ -191,6 +206,7 @@ public final class LiveQuarantineService implements QuarantineService {
                     .quarantineAction(DefenseModeQuarantineAction.QUARANTINE_RESTORE_AUTO)
                     .defenseModeQuarantineEventCount(restored)
                     .build());
+            if (Log.INFO) LOGGER.log(Level.INFO, "restored {0} quarantined messages", restored);
         }
     }
 

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.util;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 
 /**
@@ -30,6 +33,11 @@ import java.util.Arrays;
  * overflow.
  */
 public final class RateCalculator {
+    /**
+     * The logger for {@link RateCalculator}.
+     */
+    private static final System.Logger LOGGER = Log.get(RateCalculator.class);
+
     /**
      * Number of buckets the sliding window is divided into.
      *
@@ -147,6 +155,9 @@ public final class RateCalculator {
             var elapsed = nowMillis - windowStartMillis;
             var advance = elapsed / bucketMillis;
             if (advance >= BUCKET_COUNT) {
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "rate calculator window fully elapsed, resetting after {0}ms", elapsed);
+                }
                 reset(nowMillis);
             } else if (advance > 0) {
                 for (var i = 0; i < advance; i++) {

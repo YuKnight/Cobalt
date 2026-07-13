@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.sync.key;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncdCoordinator;
 import com.github.auties00.cobalt.util.ScheduledTask;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -42,9 +44,9 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebSyncdRequestAllSyncdMissingKeysJob")
 public final class MissingSyncKeyTimeoutScheduler {
     /**
-     * Holds the diagnostic logger for the missing-key timeout flow.
+     * The logger for {@link MissingSyncKeyTimeoutScheduler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MissingSyncKeyTimeoutScheduler.class.getName());
+    private static final System.Logger LOGGER = Log.get(MissingSyncKeyTimeoutScheduler.class);
 
     /**
      * Holds the interval, in hours, between two periodic re-broadcasts of the missing key
@@ -173,11 +175,11 @@ public final class MissingSyncKeyTimeoutScheduler {
                 });
 
         if (delay.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys, timeout check not scheduled");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no missing sync keys, timeout check not scheduled");
             return;
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG, "Scheduling missing sync key timeout check in {0}ms", delay.get().toMillis());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "scheduling missing sync key timeout check in {0}ms", delay.get().toMillis());
 
         scheduledCheck = ScheduledTask.scheduleDelayed(delay.get(), this::checkForExpiredKeys);
     }
@@ -202,7 +204,7 @@ public final class MissingSyncKeyTimeoutScheduler {
         var expiredMissingSyncKeys = coordinator.runLocked(() -> {
             var currentMissingKeys = store.syncStore().missingSyncKeys();
             if (currentMissingKeys.isEmpty()) {
-                LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys remain, timeout check skipped");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no missing sync keys remain, timeout check skipped");
                 return List.<MissingDeviceSyncKey>of();
             }
 
@@ -210,7 +212,7 @@ public final class MissingSyncKeyTimeoutScheduler {
                     .filter(key -> store.syncStore().findWebAppStateKeyById(key.keyId()).isEmpty())
                     .toList();
             if (actuallyMissing.isEmpty()) {
-                LOGGER.log(System.Logger.Level.DEBUG, "All tracked missing keys have been received");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "all tracked missing keys have been received");
                 return List.<MissingDeviceSyncKey>of();
             }
 
@@ -221,7 +223,7 @@ public final class MissingSyncKeyTimeoutScheduler {
                     .filter(key -> Duration.between(key.timestamp(), now).compareTo(timeout) > 0)
                     .toList();
             if (expired.isEmpty()) {
-                LOGGER.log(System.Logger.Level.DEBUG, "No expired missing sync keys");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no expired missing sync keys");
                 scheduleTimeoutCheck();
             }
             return expired;
@@ -231,7 +233,7 @@ public final class MissingSyncKeyTimeoutScheduler {
             return;
         }
 
-        LOGGER.log(System.Logger.Level.ERROR, "Fatal sync error: timeout while waiting for {0} missing sync key(s)",
+        if (Log.ERROR) LOGGER.log(Level.ERROR, "fatal sync error: timeout while waiting for {0} missing sync key(s)",
                 expiredMissingSyncKeys.size());
         client.handleFailure(new WhatsAppWebAppStateSyncException.TimeoutWhileWaitingForMissingKey(
                 expiredMissingSyncKeys.getFirst().keyId()));
@@ -256,7 +258,7 @@ public final class MissingSyncKeyTimeoutScheduler {
         var missingOnAllDevices = coordinator.runLocked(() -> {
             var currentMissingKeys = store.syncStore().missingSyncKeys();
             if (currentMissingKeys.isEmpty()) {
-                LOGGER.log(System.Logger.Level.DEBUG, "No missing sync keys remain, all-devices-responded check skipped");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no missing sync keys remain, all-devices-responded check skipped");
                 return List.<MissingDeviceSyncKey>of();
             }
 
@@ -265,7 +267,7 @@ public final class MissingSyncKeyTimeoutScheduler {
                     .filter(MissingDeviceSyncKey::isMissingOnAllDevices)
                     .toList();
             if (result.isEmpty()) {
-                LOGGER.log(System.Logger.Level.DEBUG, "No missing sync key has exhausted all device responses");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no missing sync key has exhausted all device responses");
                 scheduleTimeoutCheck();
             }
             return result;
@@ -275,7 +277,7 @@ public final class MissingSyncKeyTimeoutScheduler {
             return;
         }
 
-        LOGGER.log(System.Logger.Level.ERROR, "Fatal sync error: all asked devices responded without the requested sync key");
+        if (Log.ERROR) LOGGER.log(Level.ERROR, "fatal sync error: all asked devices responded without the requested sync key");
         client.handleFailure(new WhatsAppWebAppStateSyncException.MissingKeyOnAllDevices(
                 missingOnAllDevices.getFirst().keyId()
         ));
@@ -324,8 +326,10 @@ public final class MissingSyncKeyTimeoutScheduler {
             var keyIds = missingKeys.stream()
                     .map(MissingDeviceSyncKey::keyId)
                     .toList();
-            LOGGER.log(System.Logger.Level.INFO, "syncd: requestAllMissingKeys: missing keys: [{0}]",
-                    missingKeys.stream().map(MissingDeviceSyncKey::keyId).map(SyncKeyUtils::syncKeyIdToHex).toList());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "requestAllMissingKeys: missing keys: [{0}]",
+                        missingKeys.stream().map(MissingDeviceSyncKey::keyId).map(SyncKeyUtils::syncKeyIdToHex).toList());
+            }
             if (keyIds.isEmpty()) {
                 return;
             }
@@ -351,7 +355,7 @@ public final class MissingSyncKeyTimeoutScheduler {
             allDevicesCheck.cancel();
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG, "Scheduling 5-second grace period before missing key fatal");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "scheduling 5-second grace period before missing key fatal");
         allDevicesCheck = ScheduledTask.scheduleDelayed(Duration.ofSeconds(5), this::checkForAllDevicesRespondedWithoutKey);
     }
 

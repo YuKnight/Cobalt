@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.crypto;
 
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,7 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -38,6 +40,11 @@ import java.util.SequencedCollection;
 @WhatsAppWebModule(moduleName = "WAWebSyncdAntiTampering")
 @WhatsAppWebModule(moduleName = "WAWebSyncdEncryptionManager")
 public final class MutationIntegrityVerifier {
+    /**
+     * The logger for {@link MutationIntegrityVerifier}.
+     */
+    private static final System.Logger LOGGER = Log.get(MutationIntegrityVerifier.class);
+
     /**
      * The store backing key-id resolution and collection-state lookups.
      */
@@ -92,12 +99,14 @@ public final class MutationIntegrityVerifier {
 
         var mac = snapshot.mac();
         if(mac.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "snapshot mac missing for {0} at version {1}", collectionName, version);
             throw new WhatsAppWebAppStateSyncException.SnapshotMacMismatch(collectionName, version);
         }
 
         var keyId = snapshot.keyId()
                 .flatMap(KeyId::id);
         if(keyId.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "snapshot missing key id for {0} at version {1}", collectionName, version);
             throw new WhatsAppWebAppStateSyncException.UnexpectedError(
                     "Snapshot missing key id for " + collectionName + " at version " + version,
                     null
@@ -105,19 +114,27 @@ public final class MutationIntegrityVerifier {
         }
 
         var keyData = store.syncStore().findWebAppStateKeyById(keyId.get())
-                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.MissingKey(keyId.get()))
+                .orElseThrow(() -> {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "missing sync key {0} for snapshot on {1}", keyId.get(), collectionName);
+                    return new WhatsAppWebAppStateSyncException.MissingKey(keyId.get());
+                })
                 .keyData()
                 .flatMap(AppStateSyncKeyData::keyData)
-                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
-                        "Snapshot sync key had no key data for " + collectionName + " at version " + version,
-                        null
-                ));
+                .orElseThrow(() -> {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "snapshot sync key {0} has no key data for {1} at version {2}", keyId.get(), collectionName, version);
+                    return new WhatsAppWebAppStateSyncException.UnexpectedError(
+                            "Snapshot sync key had no key data for " + collectionName + " at version " + version,
+                            null
+                    );
+                });
 
         try (var keys = MutationKeys.ofSyncKey(keyData)) {
             var expectedMac = computeSnapshotMac(keys.snapshotMacKey(), expectedHash, version, collectionName);
             if (!MessageDigest.isEqual(mac.get(), expectedMac)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "snapshot mac mismatch for {0} at version {1}", collectionName, version);
                 throw new WhatsAppWebAppStateSyncException.SnapshotMacMismatch(collectionName, version);
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "snapshot mac verified for {0} at version {1}", collectionName, version);
             return expectedMac;
         }
     }
@@ -161,6 +178,7 @@ public final class MutationIntegrityVerifier {
         var keyId = patch.keyId()
                 .flatMap(KeyId::id);
         if (keyId.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "patch missing key id for {0}", collectionName);
             throw new WhatsAppWebAppStateSyncException.UnexpectedError(
                     "Patch missing key id for " + collectionName,
                     null
@@ -168,13 +186,19 @@ public final class MutationIntegrityVerifier {
         }
 
         var keyData = store.syncStore().findWebAppStateKeyById(keyId.get())
-                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.MissingKey(keyId.get()))
+                .orElseThrow(() -> {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "missing sync key {0} for patch on {1}", keyId.get(), collectionName);
+                    return new WhatsAppWebAppStateSyncException.MissingKey(keyId.get());
+                })
                 .keyData()
                 .flatMap(AppStateSyncKeyData::keyData)
-                .orElseThrow(() -> new WhatsAppWebAppStateSyncException.UnexpectedError(
-                        "Patch sync key had no key data for " + collectionName,
-                        null
-                ));
+                .orElseThrow(() -> {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "patch sync key {0} has no key data for {1}", keyId.get(), collectionName);
+                    return new WhatsAppWebAppStateSyncException.UnexpectedError(
+                            "Patch sync key had no key data for " + collectionName,
+                            null
+                    );
+                });
 
         long patchVersion = patch.version()
                 .map(version -> version.version().orElse(0L))
@@ -187,22 +211,26 @@ public final class MutationIntegrityVerifier {
             if (wirePatchMac != null) {
                 var expectedPatchMac = computePatchMac(keys.patchMacKey(), wireSnapshotMac, patchValueMacs, patchVersion, collectionName);
                 if (!MessageDigest.isEqual(wirePatchMac, expectedPatchMac)) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "patch mac mismatch for {0} at version {1}", collectionName, patchVersion);
                     throw new WhatsAppWebAppStateSyncException.PatchMacMismatch(collectionName, patchVersion);
                 }
             }
 
             var alreadyInMacMismatch = store.syncStore().findWebAppState(collectionName).macMismatch();
             if (alreadyInMacMismatch) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "skipping snapshot mac check for {0}: already in mac-mismatch state", collectionName);
                 return true;
             }
 
             if (wireSnapshotMac != null) {
                 var expectedSnapshotMac = computeSnapshotMac(keys.snapshotMacKey(), computedLtHash, patchVersion, collectionName);
                 if (!MessageDigest.isEqual(wireSnapshotMac, expectedSnapshotMac)) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "snapshot mac mismatch while verifying patch for {0} at version {1}", collectionName, patchVersion);
                     return false;
                 }
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "patch integrity verified for {0} at version {1}", collectionName, patchVersion);
         return true;
     }
 
@@ -251,6 +279,7 @@ public final class MutationIntegrityVerifier {
     ) {
         var snapshotMac = computeSnapshotMac(snapshotMacKey, newLtHash, newVersion, collectionName);
         var patchMac = computePatchMac(patchMacKey, snapshotMac, valueMacs, newVersion, collectionName);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "computed outgoing macs for {0} at version {1}", collectionName, newVersion);
         return new OutgoingMacs(snapshotMac, patchMac);
     }
 
@@ -296,6 +325,7 @@ public final class MutationIntegrityVerifier {
 
             return mac.doFinal();
         } catch (GeneralSecurityException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "snapshot mac computation failed for " + type, exception);
             throw new WhatsAppWebAppStateSyncException.MacComputationFailed(exception);
         }
     }
@@ -351,6 +381,7 @@ public final class MutationIntegrityVerifier {
 
             return mac.doFinal();
         } catch (GeneralSecurityException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "patch mac computation failed for " + type, exception);
             throw new WhatsAppWebAppStateSyncException.MacComputationFailed(exception);
         }
     }

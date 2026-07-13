@@ -405,7 +405,7 @@ class InboundRoutingWiringTest {
 
     private static final class NoopTimers implements CallTimerScheduler {
         @Override
-        public void arm(String callId, CallTimerKind kind) {
+        public void arm(String callId, CallTimerKind kind, Runnable action) {
         }
 
         @Override
@@ -430,7 +430,8 @@ class InboundRoutingWiringTest {
                                com.github.auties00.cobalt.calls.engine.participant.CallMembership membership,
                                com.github.auties00.cobalt.calls.engine.mediaplane.MediaStreams streams,
                                com.github.auties00.cobalt.model.jid.Jid peerDeviceJid,
-                               Optional<String> electedRelayName) {
+                               Optional<String> electedRelayName,
+                               com.github.auties00.cobalt.calls.engine.mediaplane.MediaSessionListener listener) {
             return () -> {
             };
         }

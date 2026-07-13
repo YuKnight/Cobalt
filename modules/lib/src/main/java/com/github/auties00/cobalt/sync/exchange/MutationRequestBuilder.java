@@ -1,8 +1,9 @@
 package com.github.auties00.cobalt.sync.exchange;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -33,11 +34,11 @@ import com.github.auties00.cobalt.wam.type.MediaUploadModeType;
 import com.github.auties00.cobalt.wam.type.MediaUploadResultType;
 import com.github.auties00.cobalt.wam.type.UploadOriginType;
 
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.logging.Logger;
 
 /**
  * Builds the outgoing {@code <iq xmlns="w:sync:app:state">} stanza that pushes encrypted app
@@ -68,9 +69,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebSyncdMMSUpload")
 public final class MutationRequestBuilder {
     /**
-     * Holds the diagnostic logger for the syncd outgoing request build path.
+     * The logger for {@link MutationRequestBuilder}.
      */
-    private static final Logger LOGGER = Logger.getLogger(MutationRequestBuilder.class.getName());
+    private static final System.Logger LOGGER = Log.get(MutationRequestBuilder.class);
 
     /**
      * Holds the injected {@link LinkedWhatsAppClient} used for store access (sync keys, hash state,
@@ -138,6 +139,8 @@ public final class MutationRequestBuilder {
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilder", exports = "buildAppStateSyncRequest", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderBuild", exports = "buildSyncIqNode", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncRequest buildSyncRequest(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building sync request for {0}: {1} pending mutations", patchType, patches.size());
+
         var collectionState = whatsapp.store().syncStore().findWebAppState(patchType);
 
         var bootstrapped = collectionState.bootstrapped();
@@ -158,6 +161,7 @@ public final class MutationRequestBuilder {
             }
 
             var compacted = compactPatch(patches);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "compacted {0} mutations to {1} for collection {2}", patches.size(), compacted.size(), patchType);
             if (!compacted.isEmpty()) {
                 var buildResult = buildPatchProtobuf(patchType, compacted, collectionState, List.copyOf(allMutationIds));
                 var patchNode = new StanzaBuilder()
@@ -168,8 +172,7 @@ public final class MutationRequestBuilder {
                 uploadInfo = buildResult.uploadInfo();
             }
         } else if (!patches.isEmpty()) {
-            LOGGER.info("syncd: skipping mutations for collection " + patchType
-                    + " because initial full sync is incomplete");
+            if (Log.INFO) LOGGER.log(Level.INFO, "skipping mutations for collection {0}: initial sync incomplete", patchType);
         }
 
         var collectionNode = collectionBuilder.build();
@@ -251,6 +254,8 @@ public final class MutationRequestBuilder {
     @WhatsAppWebExport(moduleName = "WAWebSyncdMMSUpload", exports = "exceedInlineMutationCount", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdMMSUpload", exports = "exceedPatchProtobufSize", adaptation = WhatsAppAdaptation.ADAPTED)
     private PatchBuildResult buildPatchProtobuf(SyncPatchType patchType, SequencedCollection<SyncPendingMutation> patches, SyncCollectionMetadata collectionState, List<String> allMutationIds) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building patch protobuf for {0}: {1} mutations", patchType, patches.size());
+
         var keys = whatsapp.store().syncStore().appStateKeys();
         if (keys.isEmpty()) {
             throw new IllegalStateException("No app state sync keys available");
@@ -279,8 +284,7 @@ public final class MutationRequestBuilder {
             for (var patch : patches) {
                 if (patch.mutation().operation() == SyncdOperation.REMOVE
                         && !storedIndices.contains(patch.mutation().index())) {
-                    LOGGER.warning("syncd: dropping orphaned REMOVE mutation (no corresponding SET in SyncActionStore) for collection "
-                            + patchType + ", action: " + patch.mutation().index());
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "dropping orphaned remove mutation for collection {0}, action {1}", patchType, Log.secret(patch.mutation().index()));
                     continue;
                 }
                 filteredPatches.add(patch);
@@ -374,6 +378,7 @@ public final class MutationRequestBuilder {
             var maxInlineCount = Math.min(2000, Math.max(100, SyncKeyUtils.getSyncdInlineMutationsMaxCount(abPropsService)));
             var externalRef = (ExternalBlobReference) null;
             if (syncdMutations.size() > maxInlineCount) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "collection {0} exceeds inline mutation count ({1} > {2}), uploading externally", patchType, syncdMutations.size(), maxInlineCount);
                 externalRef = uploadExternalMutations(syncdMutations);
             } else {
                 var inlinePatch = new SyncdPatchBuilder()
@@ -387,8 +392,10 @@ public final class MutationRequestBuilder {
                 var inlineBytes = encodeSyncdPatch(inlinePatch);
                 var maxSizeBytes = Math.min(100, Math.max(10, SyncKeyUtils.getSyncdPatchProtobufMaxSize(abPropsService))) * 1000L;
                 if (inlineBytes.length > maxSizeBytes) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "collection {0} patch size {1} exceeds max {2}, uploading externally", patchType, inlineBytes.length, maxSizeBytes);
                     externalRef = uploadExternalMutations(syncdMutations);
                 } else {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "collection {0} patch built inline: {1} bytes, {2} mutations, version {3}", patchType, inlineBytes.length, syncdMutations.size(), newVersion);
                     return new PatchBuildResult(inlineBytes, uploadInfo);
                 }
             }
@@ -401,8 +408,10 @@ public final class MutationRequestBuilder {
                     .deviceIndex(deviceIndex)
                     .build();
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "collection {0} patch built externally: {1} mutations, version {2}", patchType, syncdMutations.size(), newVersion);
             return new PatchBuildResult(encodeSyncdPatch(syncdPatch), uploadInfo);
         } catch (GeneralSecurityException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to build outgoing patch for " + patchType, exception);
             throw new IllegalStateException("Failed to build outgoing patch", exception);
         }
     }
@@ -443,16 +452,22 @@ public final class MutationRequestBuilder {
 
             if (mutation.operation() == SyncdOperation.REMOVE) {
                 var originalEntry = whatsapp.store().syncStore().findSyncActionEntryByActionIndex(patchType, mutation.index())
-                        .orElseThrow(() -> new IllegalStateException(
-                                "Cannot find original key for REMOVE operation on index: " + mutation.index()
-                        ));
+                        .orElseThrow(() -> {
+                            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot find original key for remove operation on index {0} in {1}", Log.secret(mutation.index()), patchType);
+                            return new IllegalStateException(
+                                    "Cannot find original key for REMOVE operation on index: " + mutation.index()
+                            );
+                        });
 
                 var originalKeyData = whatsapp.store().syncStore().findWebAppStateKeyById(originalEntry.keyId())
                         .flatMap(AppStateSyncKey::keyData)
                         .flatMap(AppStateSyncKeyData::keyData)
-                        .orElseThrow(() -> new IllegalStateException(
-                                "Original sync key not found for REMOVE operation"
-                        ));
+                        .orElseThrow(() -> {
+                            if (Log.WARNING) LOGGER.log(Level.WARNING, "original sync key {0} not found for remove operation in {1}", originalEntry.keyId(), patchType);
+                            return new IllegalStateException(
+                                    "Original sync key not found for REMOVE operation"
+                            );
+                        });
 
                 try (var originalDerivedKeys = MutationKeys.ofSyncKey(originalKeyData)) {
                     encrypted = EncryptedMutation.of(patch, originalDerivedKeys, originalEntry.keyId());
@@ -577,14 +592,18 @@ public final class MutationRequestBuilder {
             var originalKeyData = whatsapp.store().syncStore().findWebAppStateKeyById(entry.keyId())
                     .flatMap(AppStateSyncKey::keyData)
                     .flatMap(AppStateSyncKeyData::keyData)
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Original sync key not found for key rotation REMOVE"
-                    ));
+                    .orElseThrow(() -> {
+                        if (Log.WARNING) LOGGER.log(Level.WARNING, "original sync key {0} not found for key rotation remove in {1}", entry.keyId(), patchType);
+                        return new IllegalStateException(
+                                "Original sync key not found for key rotation REMOVE"
+                        );
+                    });
             try (var originalDerivedKeys = MutationKeys.ofSyncKey(originalKeyData)) {
                 result.add(EncryptedMutation.of(removePending, originalDerivedKeys, entry.keyId()));
             }
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "generated {0} key rotation mutations for {1}", result.size(), patchType);
         return result;
     }
 
@@ -613,6 +632,8 @@ public final class MutationRequestBuilder {
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilder", exports = "buildAppStateSyncRequest", adaptation = WhatsAppAdaptation.ADAPTED)
     @WhatsAppWebExport(moduleName = "WAWebSyncdRequestBuilderBuild", exports = "buildSyncIqNode", adaptation = WhatsAppAdaptation.ADAPTED)
     public BatchedSyncRequest buildBatchedSyncRequest(Map<SyncPatchType, SequencedCollection<SyncPendingMutation>> collectionPatches) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building batched sync request for {0} collections", collectionPatches.size());
+
         var collectionNodes = new ArrayList<Stanza>();
         var uploadInfos = new LinkedHashMap<SyncPatchType, SyncRequest.UploadedPatchInfo>();
         var skippedUploads = new LinkedHashSet<SyncPatchType>();
@@ -651,11 +672,11 @@ public final class MutationRequestBuilder {
                     }
                 } else if (!patches.isEmpty()) {
                     skippedUploads.add(patchType);
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "collection {0} patches compacted to empty, skipping", patchType);
                 }
             } else if (!patches.isEmpty()) {
                 skippedUploads.add(patchType);
-                LOGGER.info("syncd: skipping mutations for collection " + patchType
-                        + " because initial full sync is incomplete");
+                if (Log.INFO) LOGGER.log(Level.INFO, "skipping mutations for collection {0}: initial sync incomplete", patchType);
             }
 
             collectionNodes.add(collectionBuilder.build());
@@ -665,6 +686,8 @@ public final class MutationRequestBuilder {
                 .description("sync")
                 .content(collectionNodes)
                 .build();
+
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "batched sync request built: {0} collections uploaded, {1} skipped", uploadInfos.size(), skippedUploads.size());
 
         return new BatchedSyncRequest(
                 new StanzaBuilder()
@@ -709,25 +732,30 @@ public final class MutationRequestBuilder {
         var encoded = encodeSyncdMutations(syncdMutations);
         var externalRef = new ExternalBlobReferenceBuilder().build();
         var uploadStart = Instant.now();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "uploading {0} mutations as external patch, {1} bytes", mutations.size(), encoded.length);
         try {
             boolean uploaded;
             try (var payload = new MediaPayload.OfBytes(encoded)) {
                 uploaded = mediaConnectionService.upload(externalRef, payload);
             }
             if (!uploaded) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "missing handle after uploading external patch to mms4");
                 throw new IllegalStateException("Missing handle after uploading external patch to mms4");
             }
             commitMediaUpload2Success(uploadStart);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "external patch upload succeeded, {0} mutations", mutations.size());
             return externalRef;
         } catch (InterruptedException exception) {
             commitMediaUpload2Failure(uploadStart, exception);
             Thread.currentThread().interrupt();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "interrupted while uploading external mutations", exception);
             throw new IllegalStateException("Interrupted while uploading external mutations", exception);
         } catch (IllegalStateException exception) {
             commitMediaUpload2Failure(uploadStart, exception);
             throw exception;
         } catch (Throwable throwable) {
             commitMediaUpload2Failure(uploadStart, throwable);
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to upload external mutations", throwable);
             throw new IllegalStateException("Failed to upload external mutations", throwable);
         }
     }
@@ -764,6 +792,7 @@ public final class MutationRequestBuilder {
                 .overallAttemptCount(1)
                 .overallRetryCount(0)
                 .build());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "media upload2 success beacon committed, duration={0}ms", overallT.toEpochMilli());
     }
 
     /**
@@ -801,6 +830,7 @@ public final class MutationRequestBuilder {
             builder.finalizeHttpCode(statusCode);
         }
         wamService.commit(builder.build());
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "media upload2 failure beacon committed, statusCode={0}", statusCode);
     }
 
     /**
@@ -933,6 +963,7 @@ public final class MutationRequestBuilder {
         try {
             return SyncdPatchSpec.encode(patch);
         } catch (Exception exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "patch protobuf serialization failed", exception);
             throw new WhatsAppWebAppStateSyncException.UnexpectedError(
                     "patch protobuf serialization failed", exception
             );
@@ -955,6 +986,7 @@ public final class MutationRequestBuilder {
         try {
             return SyncdMutationsSpec.encode(mutations);
         } catch (Exception exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "mutations protobuf serialization failed", exception);
             throw new WhatsAppWebAppStateSyncException.UnexpectedError(
                     "mutations protobuf serialization failed", exception
             );

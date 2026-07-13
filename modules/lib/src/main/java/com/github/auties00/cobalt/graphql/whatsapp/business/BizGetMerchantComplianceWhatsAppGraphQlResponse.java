@@ -8,7 +8,7 @@ import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the merchant-compliance query built by
+ * Parses the graph.whatsapp.com GraphQL response of the merchant-compliance query built by
  * {@link BizGetMerchantComplianceWhatsAppGraphQlRequest}.
  *
  * <p>Exposes the linked {@code xfb_whatsapp_biz_merchant_compliance_info} root, whose single linked
@@ -29,14 +29,14 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
      *
      * <p>Reserved for the static parser.
      *
-     * @param merchantInfo the parsed merchant info, or {@code null} when the relay omitted the field
+     * @param merchantInfo the parsed merchant info, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private BizGetMerchantComplianceWhatsAppGraphQlResponse(MerchantInfo merchantInfo) {
         this.merchantInfo = merchantInfo;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xfb_whatsapp_biz_merchant_compliance_info} and projects its
      * {@code merchant_info} child; the returned {@link Optional} is empty when {@code data} is
@@ -59,7 +59,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
     /**
      * Returns the parsed merchant info.
      *
-     * @return the parsed {@link MerchantInfo}, or empty when the relay omitted the field
+     * @return the parsed {@link MerchantInfo}, or empty when the graph.whatsapp.com endpoint omitted the field
      */
     public Optional<MerchantInfo> merchantInfo() {
         return Optional.ofNullable(merchantInfo);
@@ -132,7 +132,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
         /**
          * Returns the legal entity name.
          *
-         * @return the entity name, or empty when the relay omitted the field
+         * @return the entity name, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> entityName() {
             return Optional.ofNullable(entityName);
@@ -141,7 +141,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
         /**
          * Returns the legal entity type.
          *
-         * @return the entity type, or empty when the relay omitted the field
+         * @return the entity type, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> entityType() {
             return Optional.ofNullable(entityType);
@@ -150,7 +150,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
         /**
          * Returns whether the merchant is a registered legal entity.
          *
-         * @return {@code true} when the relay reported the merchant as registered, {@code false} when
+         * @return {@code true} when the graph.whatsapp.com endpoint reported the merchant as registered, {@code false} when
          *         it did not or omitted the field
          */
         public boolean isRegistered() {
@@ -160,7 +160,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
         /**
          * Returns the free-text custom entity type.
          *
-         * @return the custom entity type, or empty when the relay omitted the field
+         * @return the custom entity type, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> entityTypeCustom() {
             return Optional.ofNullable(entityTypeCustom);
@@ -169,7 +169,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
         /**
          * Returns the customer-care contact block.
          *
-         * @return the parsed {@link CustomerCareDetails}, or empty when the relay omitted the field
+         * @return the parsed {@link CustomerCareDetails}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<CustomerCareDetails> customerCareDetails() {
             return Optional.ofNullable(customerCareDetails);
@@ -178,7 +178,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
         /**
          * Returns the grievance-officer contact block.
          *
-         * @return the parsed {@link GrievanceOfficerDetails}, or empty when the relay omitted the
+         * @return the parsed {@link GrievanceOfficerDetails}, or empty when the graph.whatsapp.com endpoint omitted the
          *         field
          */
         public Optional<GrievanceOfficerDetails> grievanceOfficerDetails() {
@@ -249,7 +249,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
             /**
              * Returns the customer-care email address.
              *
-             * @return the email address, or empty when the relay omitted the field
+             * @return the email address, or empty when the graph.whatsapp.com endpoint omitted the field
              */
             public Optional<String> email() {
                 return Optional.ofNullable(email);
@@ -258,7 +258,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
             /**
              * Returns the customer-care landline number.
              *
-             * @return the landline number, or empty when the relay omitted the field
+             * @return the landline number, or empty when the graph.whatsapp.com endpoint omitted the field
              */
             public Optional<String> landlineNumber() {
                 return Optional.ofNullable(landlineNumber);
@@ -267,7 +267,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
             /**
              * Returns the customer-care mobile number.
              *
-             * @return the mobile number, or empty when the relay omitted the field
+             * @return the mobile number, or empty when the graph.whatsapp.com endpoint omitted the field
              */
             public Optional<String> mobileNumber() {
                 return Optional.ofNullable(mobileNumber);
@@ -343,7 +343,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
             /**
              * Returns the grievance officer's name.
              *
-             * @return the name, or empty when the relay omitted the field
+             * @return the name, or empty when the graph.whatsapp.com endpoint omitted the field
              */
             public Optional<String> name() {
                 return Optional.ofNullable(name);
@@ -352,7 +352,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
             /**
              * Returns the grievance officer's email address.
              *
-             * @return the email address, or empty when the relay omitted the field
+             * @return the email address, or empty when the graph.whatsapp.com endpoint omitted the field
              */
             public Optional<String> email() {
                 return Optional.ofNullable(email);
@@ -361,7 +361,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
             /**
              * Returns the grievance officer's landline number.
              *
-             * @return the landline number, or empty when the relay omitted the field
+             * @return the landline number, or empty when the graph.whatsapp.com endpoint omitted the field
              */
             public Optional<String> landlineNumber() {
                 return Optional.ofNullable(landlineNumber);
@@ -370,7 +370,7 @@ public final class BizGetMerchantComplianceWhatsAppGraphQlResponse implements Wh
             /**
              * Returns the grievance officer's mobile number.
              *
-             * @return the mobile number, or empty when the relay omitted the field
+             * @return the mobile number, or empty when the graph.whatsapp.com endpoint omitted the field
              */
             public Optional<String> mobileNumber() {
                 return Optional.ofNullable(mobileNumber);

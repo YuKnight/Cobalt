@@ -84,15 +84,26 @@ public record VideoCodecParams(
     public static final int DEFAULT_FRAME_RATE = 30;
 
     /**
-     * The default lowest quantization parameter, the OpenH264 and libvpx low bound.
+     * The default lowest quantization parameter for the OpenH264 encoder, its {@code CAMERA_VIDEO_REAL_TIME}
+     * compiled default.
      *
-     * <p>WhatsApp pushes no minimum quantizer, so the operative value is the upstream encoder default;
-     * {@code 10} is carried until the upstream OpenH264 {@code iMinQp} and libvpx
-     * {@code rc_min_quantizer} defaults are confirmed.
+     * <p>WhatsApp pushes no minimum quantizer, so the operative floor is the encoder's own default. OpenH264
+     * fills {@code iMinQp} with {@code 0}, then clamps it to {@code 12} for the {@code CAMERA_VIDEO_REAL_TIME}
+     * usage type a realtime call selects (with a matching upper bound of {@code 42}); H.265 reuses this value.
      */
-    // TODO: confirm the OpenH264 iMinQp / libvpx rc_min_quantizer upstream default; WhatsApp pushes no
-    //  minimum quantizer, so the compiled in encoder default applies
-    public static final int DEFAULT_MIN_QUANTIZER = 10;
+    public static final int OPENH264_MIN_QUANTIZER = 12;
+
+    /**
+     * The default lowest quantization parameter for the libvpx VP8 encoder, its {@code rc_min_quantizer}
+     * compiled default.
+     */
+    public static final int VP8_MIN_QUANTIZER = 4;
+
+    /**
+     * The default lowest quantization parameter for the libvpx VP9 encoder, its {@code rc_min_quantizer}
+     * compiled default; also used for AV1, whose rav1e encoder ignores this bound.
+     */
+    public static final int VP9_MIN_QUANTIZER = 0;
 
     /**
      * The default highest quantization parameter.
@@ -260,8 +271,8 @@ public record VideoCodecParams(
      * {@link #DEFAULT_MIN_BITRATE}, and the ceiling is {@link #DEFAULT_MAX_BITRATE}. WhatsApp
      * initializes the video bitrate from the bandwidth estimator rather than the picture size and drives
      * it at runtime, so the geometry sets only the encoded {@link #width()}, {@link #height()}, and
-     * {@link #frameRate()} here, not the bitrate. The quantizer window ({@link #DEFAULT_MIN_QUANTIZER},
-     * {@link #DEFAULT_MAX_QUANTIZER}), keyframe interval ({@link #DEFAULT_KEY_FRAME_INTERVAL_SECONDS}),
+     * {@link #frameRate()} here, not the bitrate. The quantizer window (each codec's compiled default low
+     * bound, {@link #DEFAULT_MAX_QUANTIZER}), keyframe interval ({@link #DEFAULT_KEY_FRAME_INTERVAL_SECONDS}),
      * and IDR bitrate ratio ({@link #DEFAULT_IDR_BITRATE_RATIO}) take their defaults, the layer count is
      * a single temporal layer, frame skip is enabled, complexity is the codec neutral mid level
      * ({@code 0}), and long term references are disabled.
@@ -281,6 +292,14 @@ public record VideoCodecParams(
         if (frameRate <= 0) {
             throw new IllegalArgumentException("frameRate must be positive, got " + frameRate);
         }
+        // WhatsApp pushes no minimum quantizer, so each codec takes its own encoder default: OpenH264
+        // (H.264/H.265) its realtime iMinQp, libvpx VP8/VP9 their rc_min_quantizer, and AV1 a bound rav1e
+        // ignores.
+        var minQuantizer = switch (codec) {
+            case H264, H265 -> OPENH264_MIN_QUANTIZER;
+            case VP8 -> VP8_MIN_QUANTIZER;
+            case VP9, AV1 -> VP9_MIN_QUANTIZER;
+        };
         // TODO: drive the per frame bitrate from the runtime bandwidth estimator bounded by the WhatsApp
         //  dynamic rate control rules (per condition target, key frame interval, IDR ratio, and encode
         //  width caps keyed on bitrate range, network medium, round trip time, and packet loss); this
@@ -293,7 +312,7 @@ public record VideoCodecParams(
                 DEFAULT_INIT_TARGET_BITRATE,
                 DEFAULT_MIN_BITRATE,
                 DEFAULT_MAX_BITRATE,
-                DEFAULT_MIN_QUANTIZER,
+                minQuantizer,
                 DEFAULT_MAX_QUANTIZER,
                 DEFAULT_KEY_FRAME_INTERVAL_SECONDS,
                 0,

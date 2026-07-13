@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.delay;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Drives the delay based send bitrate with WebRTC's additive increase and multiplicative decrease rate
  * control, decreasing the estimate on overuse and increasing it otherwise.
@@ -25,6 +29,11 @@ package com.github.auties00.cobalt.calls.transport.congestion.bwe.delay;
  * additive increase sits {@link #CAPACITY_DEVIATIONS} deviations below the tracked link capacity.
  */
 public final class AimdRateControl {
+    /**
+     * The logger for {@link AimdRateControl}.
+     */
+    private static final System.Logger LOGGER = Log.get(AimdRateControl.class);
+
     /**
      * Multiplicative decrease factor applied to the estimate on overuse.
      *
@@ -201,10 +210,15 @@ public final class AimdRateControl {
      * @return the updated rate estimate, in bits per second
      */
     public long update(BandwidthUsage usage, long ackedThroughputBps, long nowMs) {
+        var previousState = rateControlState;
         switch (usage) {
             case OVERUSING -> rateControlState = RateControlState.DECREASE;
             case NORMAL -> rateControlState = RateControlState.INCREASE;
             case UNDERUSING -> rateControlState = RateControlState.HOLD;
+        }
+        if (Log.DEBUG && rateControlState != previousState) {
+            LOGGER.log(Level.DEBUG, "aimd rate control: state {0} -> {1}, usage={2}",
+                    previousState, rateControlState, usage);
         }
         switch (rateControlState) {
             case DECREASE -> applyDecrease(ackedThroughputBps);
@@ -212,6 +226,10 @@ public final class AimdRateControl {
             case HOLD -> lastIncreaseMs = nowMs;
         }
         currentBitrateBps = clampCandidate(currentBitrateBps, ackedThroughputBps);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "aimd rate control: usage={0} acked={1} bitrate={2}",
+                    usage, ackedThroughputBps, currentBitrateBps);
+        }
         return currentBitrateBps;
     }
 
@@ -231,6 +249,10 @@ public final class AimdRateControl {
             updateLinkCapacity(ackedThroughputBps);
         }
         lastIncreaseMs = -1;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "aimd rate control: decrease applied, bitrate={0} linkCapacity={1}",
+                    currentBitrateBps, linkCapacityEstimateBps);
+        }
     }
 
     /**
@@ -366,5 +388,6 @@ public final class AimdRateControl {
         linkCapacityEstimateBps = -1.0;
         linkCapacityDeviationBps = 0.0;
         lastIncreaseMs = -1;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "aimd rate control: reset");
     }
 }

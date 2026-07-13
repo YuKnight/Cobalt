@@ -8,8 +8,9 @@ import com.github.auties00.cobalt.listener.linked.LinkedStatusListener;
 import com.github.auties00.cobalt.listener.linked.LinkedWebHistorySyncMessagesListener;
 import com.github.auties00.cobalt.listener.linked.LinkedWebHistorySyncPastParticipantsListener;
 import com.github.auties00.cobalt.listener.linked.LinkedWebHistorySyncProgressListener;
-import com.github.auties00.cobalt.exception.WhatsAppHistorySyncException;
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppHistorySyncException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
@@ -38,6 +39,7 @@ import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -95,10 +97,9 @@ import java.util.zip.InflaterInputStream;
 @WhatsAppWebModule(moduleName = "WAWebGroupHistoryReceiverUserJourneyLogger")
 public final class LiveWebHistorySyncService implements WebHistorySyncService {
     /**
-     * The logger used to record non-fatal download and decode failures
-     * without propagating them into the stanza dispatch loop.
+     * The logger for {@link LiveWebHistorySyncService}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveWebHistorySyncService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveWebHistorySyncService.class);
 
     /**
      * The {@link LinkedWhatsAppClient} the service is bound to; used to reach
@@ -163,6 +164,11 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         if (notification == null) {
             return;
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "history sync notification received: type={0} chunk={1}",
+                    notification.syncType().orElse(null),
+                    notification.chunkOrder().isPresent() ? notification.chunkOrder().getAsInt() : -1);
+        }
         Thread.startVirtualThread(() -> processSync(notification));
     }
 
@@ -191,6 +197,9 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
                 .map(HistorySyncMessageAccessStatus::completeAccessGranted)
                 .orElse(false);
         store.syncStore().setCompleteHistoryAccessGranted(granted);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "history message access status updated: granted={0}", granted);
+        }
     }
 
     /**
@@ -225,8 +234,9 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         try {
             historySync = decode(notification);
         } catch (WhatsAppHistorySyncException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "History sync chunk processing failed: {0}", exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "history sync chunk processing failed: {0}", exception.getMessage());
+            }
             emitHistoryDataDownloaded(notification, null, applyStartTs,
                     MdBootstrapStepResult.FAILURE, exception.getMessage());
             emitHistoryDataApplied(notification, null, sentViaMms, applyStartTs,
@@ -235,8 +245,9 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
                     MdHistorySyncStatusResult.FAIL_TO_DOWNLOAD);
             return;
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "History sync chunk processing failed", exception);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "history sync chunk processing failed", exception);
+            }
             emitHistoryDataDownloaded(notification, null, applyStartTs,
                     MdBootstrapStepResult.FAILURE, exception.getMessage());
             emitHistoryDataApplied(notification, null, sentViaMms, applyStartTs,
@@ -258,9 +269,14 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
                     ? MdHistorySyncStatusResult.SUCCESS
                     : MdHistorySyncStatusResult.IN_PROGRESS;
             emitBootstrapHistorySyncStatusAfterPairing(notification, historySync, recentSyncStatus);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "history sync chunk applied: type={0} progress={1}",
+                        historySync.syncType(), historySync.progress().orElse(0));
+            }
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "History sync chunk dispatch failed", exception);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "history sync chunk dispatch failed", exception);
+            }
             emitHistoryDataApplied(notification, historySync, sentViaMms, applyStartTs,
                     MdBootstrapStepResult.FAILURE, exception.getMessage());
             emitBootstrapHistorySyncStatusAfterPairing(notification, historySync,
@@ -773,10 +789,17 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
             return null;
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "downloading history sync chunk from cdn");
+        }
         var downloadStart = Instant.now();
         try (var stream = mediaConnectionService.download(notification)) {
             var decoded = decodeHistorySync(stream);
             commitMediaDownload2Success(downloadStart);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "history sync chunk downloaded in {0} ms",
+                        Duration.between(downloadStart, Instant.now()).toMillis());
+            }
             return decoded;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -1033,6 +1056,10 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         }
 
         var historyChats = historySync.chats();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "dispatching history sync chunk: type={0} progress={1} chats={2}",
+                    syncType, progressValue, historyChats.size());
+        }
         var createdRegularUserChats = 0L;
         for (var historyChat : historyChats) {
             if (applyChat(historyChat, store) && isRegularUserChat(historyChat.jid())) {
@@ -1101,6 +1128,9 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         if (syncType == HistorySyncType.INITIAL_BOOTSTRAP && !store.syncStore().syncedChats()) {
             store.syncStore().setSyncedChats(true);
             var chats = store.chatStore().chats();
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "initial chat history sync complete: {0} chats", chats.size());
+            }
             for (var listener : listeners) {
                 if (listener instanceof LinkedChatsListener typed) {
                     Thread.startVirtualThread(() -> typed.onChats(whatsapp, chats));
@@ -1111,6 +1141,9 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         if (syncType == HistorySyncType.PUSH_NAME && !store.syncStore().syncedContacts()) {
             store.syncStore().setSyncedContacts(true);
             var contacts = store.contactStore().contacts();
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "initial contact history sync complete: {0} contacts", contacts.size());
+            }
             for (var listener : listeners) {
                 if (listener instanceof LinkedContactsListener typed) {
                     Thread.startVirtualThread(() -> typed.onContacts(whatsapp, contacts));
@@ -1121,6 +1154,9 @@ public final class LiveWebHistorySyncService implements WebHistorySyncService {
         if (syncType == HistorySyncType.INITIAL_STATUS_V3 && !store.syncStore().syncedStatus()) {
             store.syncStore().setSyncedStatus(true);
             var status = store.chatStore().status();
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "initial status history sync complete: {0} statuses", status.size());
+            }
             for (var listener : listeners) {
                 if (listener instanceof LinkedStatusListener typed) {
                     Thread.startVirtualThread(() -> typed.onStatus(whatsapp, status));

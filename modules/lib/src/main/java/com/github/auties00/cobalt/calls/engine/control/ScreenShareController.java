@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
 import com.github.auties00.cobalt.calls.signaling.incall.ScreenShareStanza;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 import com.github.auties00.cobalt.calls.engine.control.event.ScreenShareEvent;
@@ -24,6 +26,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.ScreenShareEvent;
  * construction; it owns no timers, so it needs no explicit shutdown.
  */
 public final class ScreenShareController {
+    /**
+     * The logger for {@link ScreenShareController}.
+     */
+    private static final System.Logger LOGGER = Log.get(ScreenShareController.class);
+
     /**
      * The screen share protocol version for the single stream port swap path.
      *
@@ -151,6 +158,9 @@ public final class ScreenShareController {
     public void onPeerScreenShare(Jid peer, ScreenShareState state, int version) {
         Objects.requireNonNull(peer, "peer cannot be null");
         Objects.requireNonNull(state, "state cannot be null");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "peer {0} screen share state {1}, version={2}", peer, state, version);
+        }
         events.emit(new ScreenShareEvent(peer, state, version));
     }
 
@@ -163,12 +173,15 @@ public final class ScreenShareController {
      * @param next the new local screen share state
      */
     private void transition(ScreenShareState next) {
+        ScreenShareState previous;
         lock.lock();
         try {
+            previous = this.state;
             this.state = next;
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "screen share state {0} -> {1}", previous, next);
         sender.send(new ScreenShareStanza(context.callId(), context.callCreator(), next.code(), version));
         events.emit(new ScreenShareEvent(context.selfJid(), next, version));
     }

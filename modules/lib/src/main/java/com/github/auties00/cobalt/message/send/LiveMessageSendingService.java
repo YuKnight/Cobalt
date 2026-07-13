@@ -2,7 +2,8 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.dedup.MessageDedup;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.message.send.bot.BotProtobufTransform;
@@ -61,6 +62,7 @@ import com.github.auties00.cobalt.wam.type.StatusReplyMessageType;
 import com.github.auties00.cobalt.wam.type.StatusReplyResult;
 import com.github.auties00.cobalt.wam.type.TsSurface;
 
+import java.lang.System.Logger.Level;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -104,6 +106,11 @@ import java.util.concurrent.ThreadLocalRandom;
 @WhatsAppWebModule(moduleName = "WAWebMessageSendReporter")
 @WhatsAppWebModule(moduleName = "WAWebLogStatusReply")
 public final class LiveMessageSendingService implements MessageSendingService {
+    /**
+     * The logger for {@link LiveMessageSendingService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveMessageSendingService.class);
+
     /**
      * Holds the fixed mapping from lower-case file extensions (without the
      * leading dot) to the corresponding WAM {@link DocumentType} bucket
@@ -381,7 +388,15 @@ public final class LiveMessageSendingService implements MessageSendingService {
                     document.mediaSize().orElse(0L));
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sending message id={0} to {1} kind={2}",
+                    messageId, parentJid, messageInfo.getClass().getSimpleName());
+        }
+
         if (messageDedup.isPending(messageId)) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "duplicate send rejected for message id={0}", messageId);
+            }
             throw new WhatsAppMessageException.Send.Unknown(
                     "Duplicate send for message ID: " + messageId, null);
         }
@@ -401,9 +416,15 @@ public final class LiveMessageSendingService implements MessageSendingService {
                     broadcastSender.send(parentJid, chatMessage);
                 case NewsletterMessageInfo newsletterMessage when parentJid.hasNewsletterServer() ->
                     newsletterSender.send(parentJid, newsletterMessage);
-                default -> throw new WhatsAppMessageException.Send.InvalidRecipient(
-                    parentJid, "Unsupported combination: " + messageInfo.getClass().getSimpleName()
-                            + " with JID type " + parentJid.server());
+                default -> {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "unsupported send combination {0} for {1}",
+                                messageInfo.getClass().getSimpleName(), parentJid);
+                    }
+                    throw new WhatsAppMessageException.Send.InvalidRecipient(
+                        parentJid, "Unsupported combination: " + messageInfo.getClass().getSimpleName()
+                                + " with JID type " + parentJid.server());
+                }
             };
             // Hand the local user's own trusted-contact token to a one-to-one peer after a non-protocol
             // message, matching WAWebSendMsgJob, so the peer keeps a current token across identity
@@ -428,6 +449,9 @@ public final class LiveMessageSendingService implements MessageSendingService {
             if (messageInfo instanceof ChatMessageInfo chatMessage) {
                 emitStatusReplyEvent(chatMessage);
                 emitGroupMemberTagUpdateEvent(parentJid, chatMessage);
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "message id={0} sent to {1}", messageId, parentJid);
             }
             return result;
         } finally {
@@ -919,10 +943,16 @@ public final class LiveMessageSendingService implements MessageSendingService {
                         "messageId is required for key distribution"));
 
         if (!groupJid.hasGroupOrCommunityServer()) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "key distribution rejected: {0} is not a group", groupJid);
+            }
             throw new WhatsAppMessageException.Send.InvalidRecipient(
                     groupJid, "Key distribution is only supported for group chats");
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "dispatching key distribution id={0} for {1}", messageId, groupJid);
+        }
         groupSender.sendKeyDistribution(groupJid, messageId);
     }
 
@@ -932,6 +962,9 @@ public final class LiveMessageSendingService implements MessageSendingService {
     public AckResult sendPeer(Jid targetDevice, ChatMessageInfo messageInfo) {
         Objects.requireNonNull(targetDevice, "targetDevice");
         Objects.requireNonNull(messageInfo, "messageInfo");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sending peer message to {0}", targetDevice);
+        }
         return peerSender.send(targetDevice, messageInfo);
     }
 }

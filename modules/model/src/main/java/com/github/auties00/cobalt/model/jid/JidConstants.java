@@ -15,10 +15,10 @@ final class JidConstants {
     /**
      * Constructs a new {@code JidConstants}.
      *
-     * @throws UnsupportedOperationException always, because this is a utility class
+     * @throws AssertionError always, because this is a utility class
      */
     private JidConstants() {
-        throw new UnsupportedOperationException("JidConstants is a utility class and should not be initialized");
+        throw new AssertionError();
     }
 
     /**

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.ml;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -30,6 +33,11 @@ import java.util.function.Function;
  * transport thread.
  */
 public final class LiveMlBweEngine implements MlBweEngine {
+    /**
+     * The logger for {@link LiveMlBweEngine}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveMlBweEngine.class);
+
     /**
      * The number of slide window columns the feature writer pushes each round.
      *
@@ -131,7 +139,12 @@ public final class LiveMlBweEngine implements MlBweEngine {
                 var handle = loadHandle(type, resolver);
                 models.put(type, new LoadedModel(config, ring, handle));
             }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "ml bwe engine: constructed, configuredModels={0} loadedModels={1}",
+                        configs.size(), loadedModels().size());
+            }
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "ml bwe engine: construction failed", e);
             freeHandles();
             arena.close();
             throw e;
@@ -164,6 +177,7 @@ public final class LiveMlBweEngine implements MlBweEngine {
     private MemorySegment loadHandle(MlBweModelType type, Function<MlBweModelType, String> resolver) {
         var path = resolver.apply(type);
         if (path == null || path.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ml bwe engine: no model path provisioned for {0}", type);
             return MemorySegment.NULL;
         }
         var pathSegment = arena.allocateFrom(path);
@@ -172,8 +186,10 @@ public final class LiveMlBweEngine implements MlBweEngine {
             if (!handle.equals(MemorySegment.NULL)) {
                 ml_shim_free(handle);
             }
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "ml bwe engine: model create failed for {0}", type);
             return MemorySegment.NULL;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ml bwe engine: model loaded for {0}", type);
         return handle;
     }
 
@@ -276,9 +292,14 @@ public final class LiveMlBweEngine implements MlBweEngine {
         //  wired into the output today.
         var cong = models.get(MlBweModelType.CONG);
         if (cong == null || cong.handle().equals(MemorySegment.NULL)) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "ml bwe engine: infer skipped, congestion model not loaded");
             return MlBweOutputs.DISABLED;
         }
-        return runCongestion(cong, signals);
+        var outputs = runCongestion(cong, signals);
+        if (Log.DEBUG && outputs.congestionDetected()) {
+            LOGGER.log(Level.DEBUG, "ml bwe engine: congestion detected, probability={0}", outputs.congestionProbability());
+        }
+        return outputs;
     }
 
     /**
@@ -339,6 +360,10 @@ public final class LiveMlBweEngine implements MlBweEngine {
         var rounds = config.historyDepth();
         var features = selectedSlots.length;
         if (features != config.featureCount()) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "ml bwe engine: congestion model feature count mismatch, expected={0} actual={1}",
+                        config.featureCount(), features);
+            }
             return MlBweOutputs.DISABLED;
         }
 
@@ -347,6 +372,10 @@ public final class LiveMlBweEngine implements MlBweEngine {
         var output = arena.allocate((long) CONGESTION_OUTPUT_LEN * Float.BYTES);
         var written = ml_shim_forward(model.handle(), input, rounds * features, output, CONGESTION_OUTPUT_LEN);
         if (written != CONGESTION_OUTPUT_LEN) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "ml bwe engine: congestion model forward pass incomplete, written={0} expected={1}",
+                        written, CONGESTION_OUTPUT_LEN);
+            }
             return MlBweOutputs.DISABLED;
         }
         var raw = output.getAtIndex(ValueLayout.JAVA_FLOAT, CONGESTION_OUTPUT_INDEX);
@@ -500,6 +529,7 @@ public final class LiveMlBweEngine implements MlBweEngine {
         closed = true;
         freeHandles();
         arena.close();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ml bwe engine: closed");
     }
 
     /**
@@ -510,7 +540,8 @@ public final class LiveMlBweEngine implements MlBweEngine {
             if (!model.handle().equals(MemorySegment.NULL)) {
                 try {
                     ml_shim_free(model.handle());
-                } catch (Throwable _) {
+                } catch (Throwable t) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "ml bwe engine: model free failed", t);
                 }
             }
         }

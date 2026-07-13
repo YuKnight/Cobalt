@@ -58,10 +58,10 @@ public final class SyntheticTelemetryUtils {
     /**
      * Prevents instantiation of this static-helper holder.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private SyntheticTelemetryUtils() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -26,6 +28,11 @@ import java.util.List;
  * this layer.
  */
 public final class VoipRelayAllCallsMutationFactory {
+    /**
+     * The logger for {@link VoipRelayAllCallsMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(VoipRelayAllCallsMutationFactory.class);
+
     /**
      * Constructs a VoIP relay-all-calls mutation factory.
      *
@@ -55,6 +62,7 @@ public final class VoipRelayAllCallsMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebVoipRelayAllCallsSettingSync", exports = "getMutation", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getVoipRelayAllCallsMutation(Instant timestamp, boolean isEnabled) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building voip relay-all-calls mutation, isEnabled={0}", isEnabled);
         var action = new PrivacySettingRelayAllCallsBuilder()
                 .isEnabled(isEnabled)
                 .build();

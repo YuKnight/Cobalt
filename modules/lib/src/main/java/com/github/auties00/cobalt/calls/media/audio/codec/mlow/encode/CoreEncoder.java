@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowRangeEncoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.EncoderTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Turns one packet of 16 kHz mono speech into a range coded MLow payload, the per packet PCM to bitstream
@@ -244,6 +247,11 @@ public final class CoreEncoder {
     private static final int DTX_NO_CANDIDATES = 3;
 
     /**
+     * The logger for {@link CoreEncoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(CoreEncoder.class);
+
+    /**
      * The high pass moving average coefficients, the native {@code hp_b2}, computed once at construction.
      */
     private final float[] hpB2;
@@ -459,6 +467,10 @@ public final class CoreEncoder {
         this.prevVoicedCarry = 0;
         java.util.Arrays.fill(candidateEnergy, Float.MAX_VALUE);
         this.candidateInsertIdx = 0;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "core encoder constructed: bitRate={0} lowRate={1} subfrlen={2} numsubfrs={3}",
+                    bitRate, lowRate, subfrlen, numsubfrs);
+        }
     }
 
     /**
@@ -481,6 +493,9 @@ public final class CoreEncoder {
      * @param bps the new target bitrate in bits per second, the native {@code mainBitRate}
      */
     public void updateTargetBitrate(int bps) {
+        if (Log.DEBUG && bps != bitRate) {
+            LOGGER.log(Level.DEBUG, "core encoder bitrate retarget: {0} -> {1}", bitRate, bps);
+        }
         this.bitRate = bps;
     }
 
@@ -509,6 +524,9 @@ public final class CoreEncoder {
         java.util.Arrays.fill(candidateLowRate, 0);
         java.util.Arrays.fill(candidateParams, null);
         candidateInsertIdx = 0;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "core encoder reset");
+        }
     }
 
     /**
@@ -540,6 +558,12 @@ public final class CoreEncoder {
         boolean sendPacket = !sidFrame || vad.sendSidFrame();
         packetMs = framesPerPacket == 1 ? 20 : framesPerPacket == 3 ? 60 : framesPerPacket == 6 ? 120 : 10;
         int frameMs = packetMs == 10 ? 10 : 20;
+
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "core encode packet: packetMs={0} framesPerPacket={1} bitRate={2} "
+                    + "codedAsActiveVoice={3} sidFrame={4} sendPacket={5}",
+                    packetMs, framesPerPacket, bitRate, codedAsActiveVoice, sidFrame, sendPacket);
+        }
 
         float[] x = new float[xLen];
         for (int i = 0; i < xLen; i++) {
@@ -693,6 +717,9 @@ public final class CoreEncoder {
                 if (minIdx >= 0) {
                     paramEncoder.encodeFrame(encoder, candidateParams[minIdx], framelen, numsubfrs, false, false,
                             lowRate, numframe, prevVoiced, true);
+                } else if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "core encode: sid frame due but no comfort noise candidate for lowRate={0}",
+                            lowRate);
                 }
             }
 
@@ -700,6 +727,10 @@ public final class CoreEncoder {
             int bitsThisFrame = encoder.tell() - bitsBefore;
             float[] bitsUsed = {0.0f, bitsThisFrame};
             rateCtrl.updateScale(frameMs, framesPerPacket, bitsUsed, 0, bitRate, codedAsActiveVoice);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "core encode frame: numframe={0} voiced={1} bits={2}",
+                        numframe, voiced, bitsThisFrame);
+            }
 
             // Reset pitch lag carry after unvoiced frames and at the last frame of the packet.
             if (voiced == 0 || numframe == (framesPerPacket - 1)) {
@@ -793,6 +824,10 @@ public final class CoreEncoder {
             }
         }
         lsfInterp.commit(chosen);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "core encode base: voiced={0} condCoding={1} lsfInterpolIdx={2}",
+                    voiced, condCoding, lsfInterpolIdx);
+        }
 
         // Perceptual weighting responses for the analysis by synthesis search. The perceptual emphasis is
         // selected by rate class and by the voiced or unvoiced decision.

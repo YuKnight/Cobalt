@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 
 /**
@@ -26,6 +29,11 @@ import java.time.Instant;
  */
 @WhatsAppWebModule(moduleName = "WAWebStickersRemoveRecentSyncAction")
 public final class RemoveRecentStickerHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link RemoveRecentStickerHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(RemoveRecentStickerHandler.class);
+
     /**
      * The primary-feature gate name that enables recent-sticker sync.
      *
@@ -106,6 +114,8 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!client.store().syncStore().primaryFeatures().contains(RECENT_STICKER_FEATURE)) {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "remove recent sticker: unsupported, {0} feature not advertised", RECENT_STICKER_FEATURE);
             return MutationApplicationResult.unsupported();
         }
 
@@ -115,10 +125,12 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
 
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() <= 1) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "remove recent sticker mutation malformed: missing hash");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
         var stickerHash = indexArray.getString(1);
         if (stickerHash == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "remove recent sticker mutation malformed: null hash");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
@@ -127,12 +139,17 @@ public final class RemoveRecentStickerHandler implements WebAppStateActionHandle
 
         var sticker = client.store().settingsStore().findRecentSticker(stickerHash);
         if (sticker.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "remove recent sticker: orphan hash={0}", stickerHash);
             return MutationApplicationResult.orphan();
         }
 
         var stickerTimestamp = sticker.get().timestamp().orElse(0L);
         if (lastStickerSentTs == null || stickerTimestamp <= toEpochComparable(lastStickerSentTs)) {
             client.store().settingsStore().removeRecentSticker(stickerHash);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "remove recent sticker: removed hash={0}", stickerHash);
+        } else {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "remove recent sticker: kept hash={0}, sent after last-sent watermark", stickerHash);
         }
 
         return MutationApplicationResult.success();

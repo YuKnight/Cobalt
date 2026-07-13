@@ -7,9 +7,12 @@ import com.github.auties00.cobalt.cloud.CloudApiClient;
 import com.github.auties00.cobalt.cloud.CloudMessageEncoder;
 import com.github.auties00.cobalt.cloud.CloudWebhookDecoder;
 import com.github.auties00.cobalt.cloud.CloudWebhookServer;
-import com.github.auties00.cobalt.exception.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudUnsupportedVersionException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudApiException;
 import com.github.auties00.cobalt.listener.*;
 import com.github.auties00.cobalt.listener.cloud.*;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.business.profile.BusinessProfile;
 import com.github.auties00.cobalt.model.business.profile.BusinessProfileBuilder;
 import com.github.auties00.cobalt.model.cloud.*;
@@ -33,6 +36,7 @@ import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.file.Files;
@@ -54,6 +58,11 @@ import java.util.function.Consumer;
  * registered listeners.
  */
 public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
+    /**
+     * The logger for {@link LiveCloudWhatsAppClient}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveCloudWhatsAppClient.class);
+
     /**
      * The minimum Cloud API version required to query a consumer's call permissions.
      */
@@ -171,6 +180,8 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                     this::fireError);
             server.start();
             this.webhookServer = server;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cloud webhook receiver started on port {0}",
+                    store.webhookPort().orElse(-1));
         }
         if (shutdownHook == null) {
             this.shutdownHook = Thread.ofPlatform()
@@ -179,6 +190,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             Runtime.getRuntime().addShutdownHook(shutdownHook);
         }
         forEach(LoggedInListener.class, listener -> listener.onLoggedIn(this));
+        if (Log.INFO) LOGGER.log(Level.INFO, "cloud client connected");
         return this;
     }
 
@@ -222,6 +234,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         if (latch != null) {
             latch.countDown();
         }
+        if (Log.INFO) LOGGER.log(Level.INFO, "cloud client disconnected, reason {0}", reason);
     }
 
     /**
@@ -229,6 +242,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      */
     @Override
     public CloudWhatsAppClient reconnect() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cloud client reconnecting");
         disconnect(WhatsAppClientDisconnectReason.RECONNECTING, true);
         connect();
         return this;
@@ -294,11 +308,13 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     public MessageKey sendMessage(JidProvider recipient, MessageContainer message) {
         var body = CloudMessageEncoder.encode(recipient, message);
         var response = api.post(store.phoneNumberId() + "/messages", body);
-        return new MessageKeyBuilder()
+        var key = new MessageKeyBuilder()
                 .id(firstMessageId(response))
                 .parentJid(recipient.toJid())
                 .fromMe(true)
                 .build();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent message to {0}, id {1}", recipient.toJid(), key.id().orElse(null));
+        return key;
     }
 
     /**
@@ -347,6 +363,8 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         reaction.put("emoji", emoji);
         body.put("reaction", reaction);
         api.post(store.phoneNumberId() + "/messages", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent reaction to {0}, message id {1}", recipient,
+                messageKey.id().orElse(null));
     }
 
     /**
@@ -403,6 +421,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             body.put("typing_indicator", indicator);
         }
         api.post(store.phoneNumberId() + "/messages", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "marked message {0} read, indicator {1}", messageId, indicatorType);
     }
 
     /**
@@ -410,8 +429,11 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      */
     @Override
     public String uploadMedia(byte[] data, String mimeType, String fileName) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "uploading media, size {0}, mime type {1}", data.length, mimeType);
         var response = api.uploadMedia(store.phoneNumberId(), data, mimeType, fileName);
-        return response.getString("id");
+        var mediaId = response.getString("id");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "uploaded media, id {0}", mediaId);
+        return mediaId;
     }
 
     /**
@@ -423,6 +445,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             var data = Files.readAllBytes(file);
             return uploadMedia(data, mimeType, file.getFileName().toString());
         } catch (java.io.IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to read media file", exception);
             throw new IllegalArgumentException("failed to read media file: " + file, exception);
         }
     }
@@ -436,6 +459,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         try {
             mimeType = Files.probeContentType(file);
         } catch (java.io.IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to probe media MIME type", exception);
             throw new IllegalArgumentException("failed to probe the MIME type of " + file, exception);
         }
         if (mimeType == null) {
@@ -459,7 +483,10 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      */
     @Override
     public String createResumableUploadSession(long fileLength, String fileType, String fileName) {
-        return api.createUploadSession(requireApp(), fileLength, fileType, fileName);
+        var sessionId = api.createUploadSession(requireApp(), fileLength, fileType, fileName);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created resumable upload session, file length {0}, type {1}",
+                fileLength, fileType);
+        return sessionId;
     }
 
     /**
@@ -467,6 +494,8 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      */
     @Override
     public String uploadToResumableSession(String uploadSessionId, long fileOffset, byte[] data) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "uploading to resumable session, offset {0}, size {1}",
+                fileOffset, data.length);
         return api.uploadToSession(uploadSessionId, fileOffset, data);
     }
 
@@ -483,7 +512,9 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      */
     @Override
     public byte[] downloadMedia(String mediaId) {
-        return api.download(queryMediaUrl(mediaId));
+        var data = api.download(queryMediaUrl(mediaId));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "downloaded media {0}, size {1}", mediaId, data.length);
+        return data;
     }
 
     /**
@@ -501,6 +532,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void deleteMedia(String mediaId) {
         api.delete(mediaId, Map.of());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deleted media {0}", mediaId);
     }
 
     /**
@@ -535,6 +567,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             body.put("websites", websites);
         }
         api.post(store.phoneNumberId() + "/whatsapp_business_profile", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "edited business profile");
     }
 
     /**
@@ -543,6 +576,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void blockContact(JidProvider contact) {
         api.post(store.phoneNumberId() + "/block_users", blockUsersBody(contact));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "blocked contact {0}", contact.toJid());
     }
 
     /**
@@ -551,6 +585,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void unblockContact(JidProvider contact) {
         api.delete(store.phoneNumberId() + "/block_users", blockUsersBody(contact));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unblocked contact {0}", contact.toJid());
     }
 
     /**
@@ -585,8 +620,11 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             body.put("components", CloudMessageEncoder.encodeTemplateComponents(template.components()));
         }
         var response = api.post(requireWaba() + "/message_templates", body);
-        return new CloudMessageTemplate(response.getString("id"), template.name(), template.language(),
+        var created = new CloudMessageTemplate(response.getString("id"), template.name(), template.language(),
                 template.category(), CloudTemplateStatus.of(response.getString("status")), template.components());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created message template {0}, status {1}",
+                created.id().orElse(null), created.status().orElse(null));
+        return created;
     }
 
     /**
@@ -649,6 +687,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             body.put("components", CloudMessageEncoder.encodeTemplateComponents(template.components()));
         }
         api.post(templateId, body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "edited message template {0}", templateId);
     }
 
     /**
@@ -657,6 +696,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void deleteMessageTemplate(String name) {
         api.delete(requireWaba() + "/message_templates", Map.of("name", name));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deleted message template {0}", name);
     }
 
     /**
@@ -691,10 +731,11 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             JSONObject response;
             try {
                 response = api.get(waba + "/message_templates", parameters);
-            } catch (WhatsAppCloudException.CloudApiException exception) {
+            } catch (WhatsAppCloudApiException exception) {
                 // A stale cursor cannot be recovered in place; Graph cursors are not durable. Restart
                 // once from the first page rather than propagating the rejection.
                 if (after != null && !restarted && exception.code().orElse(0) == 100) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "stale template listing cursor, restarting from first page");
                     collected.clear();
                     after = null;
                     restarted = true;
@@ -712,6 +753,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             var cursors = paging == null ? null : paging.getJSONObject("cursors");
             var nextAfter = cursors == null ? null : cursors.getString("after");
             if (paging == null || paging.getString("next") == null || nextAfter == null || nextAfter.equals(after)) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "listed all message templates, count {0}", collected.size());
                 return collected;
             }
             after = nextAfter;
@@ -726,6 +768,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         Objects.requireNonNull(name, "name must not be null");
         Objects.requireNonNull(languageTemplateId, "languageTemplateId must not be null");
         api.delete(requireWaba() + "/message_templates", Map.of("name", name, "hsm_id", languageTemplateId));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deleted message template {0} language {1}", name, languageTemplateId);
     }
 
     /**
@@ -741,6 +784,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         var ids = new JSONArray();
         ids.addAll(templateIds);
         api.delete(requireWaba() + "/message_templates", Map.of("hsm_ids", ids.toString()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deleted {0} message templates", templateIds.size());
     }
 
     /**
@@ -765,6 +809,8 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 result.add(parseTemplate(data.getJSONObject(index)));
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "migrated {0} message templates from waba {1}",
+                result.size(), sourceWabaId);
         return result;
     }
 
@@ -817,6 +863,8 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 result.add(parseUpsertedTemplate(data.getJSONObject(index)));
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "upserted authentication template {0}, {1} languages",
+                template.name(), result.size());
         return result;
     }
 
@@ -850,9 +898,12 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         }
         var response = api.post(requireWaba() + "/message_templates", body);
         var responseCategory = response.getString("category");
-        return new CloudMessageTemplate(response.getString("id"), adoption.name(), adoption.language(),
+        var created = new CloudMessageTemplate(response.getString("id"), adoption.name(), adoption.language(),
                 responseCategory != null ? CloudTemplateCategory.of(responseCategory) : category,
                 CloudTemplateStatus.of(response.getString("status")), null);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created template {0} from library template {1}",
+                created.id().orElse(null), adoption.libraryTemplateName());
+        return created;
     }
 
     /**
@@ -890,7 +941,9 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             body.put("backup", backupJson);
         }
         var response = api.post(store.phoneNumberId() + "/register", body);
-        return new CloudRegistrationResult(!response.containsKey("success") || response.getBooleanValue("success"), null);
+        var result = new CloudRegistrationResult(!response.containsKey("success") || response.getBooleanValue("success"), null);
+        if (Log.INFO) LOGGER.log(Level.INFO, "phone number registration completed, success {0}", result.success());
+        return result;
     }
 
     /**
@@ -899,6 +952,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void deregisterPhoneNumber() {
         api.post(store.phoneNumberId() + "/deregister", new JSONObject());
+        if (Log.INFO) LOGGER.log(Level.INFO, "phone number deregistered");
     }
 
     /**
@@ -910,6 +964,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         Objects.requireNonNull(language, "language must not be null");
         api.postForm(store.phoneNumberId() + "/request_code",
                 Map.of("code_method", method.name(), "language", language.toString()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "requested verification code, method {0}", method);
     }
 
     /**
@@ -918,6 +973,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void verifyCode(String code) {
         api.postForm(store.phoneNumberId() + "/verify_code", Map.of("code", code));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "verified code {0}", Log.code(code));
     }
 
     /**
@@ -928,6 +984,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         var body = new JSONObject();
         body.put("pin", pin);
         api.post(store.phoneNumberId(), body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "edited two-step verification pin");
     }
 
     /**
@@ -958,6 +1015,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         Objects.requireNonNull(encryption, "encryption must not be null");
         api.postForm(store.phoneNumberId() + "/whatsapp_business_encryption",
                 Map.of("business_public_key", encryption.businessPublicKey()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "edited business encryption public key");
     }
 
     /**
@@ -1016,7 +1074,10 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         body.put("phone_number", add.phoneNumber());
         body.put("verified_name", add.verifiedName());
         var response = api.post(requireWaba() + "/phone_numbers", body);
-        return response.getString("id");
+        var phoneNumberId = response.getString("id");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "added phone number {0}, id {1}",
+                Log.phone(add.phoneNumber()), phoneNumberId);
+        return phoneNumberId;
     }
 
     /**
@@ -1055,6 +1116,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         settings.retentionMinutes().ifPresent(minutes -> storage.put("retention_minutes", minutes));
         body.put("storage_configuration", storage);
         api.post(store.phoneNumberId() + "/settings", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "updated local storage settings");
     }
 
     /**
@@ -1091,9 +1153,12 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         var response = api.post(store.phoneNumberId() + "/calls", body);
         var calls = response.getJSONArray("calls");
         if (calls == null || calls.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "call connect request to {0} returned no call id", recipient.toJid());
             return Optional.empty();
         }
-        return Optional.ofNullable(calls.getJSONObject(0).getString("id"));
+        var callId = calls.getJSONObject(0).getString("id");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "started call {0} to {1}", callId, recipient.toJid());
+        return Optional.ofNullable(callId);
     }
 
     /**
@@ -1109,6 +1174,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         body.put("action", "pre_accept");
         body.put("session", sessionJson(session));
         api.post(store.phoneNumberId() + "/calls", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} state -> pre_accept", callId);
     }
 
     /**
@@ -1127,6 +1193,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             body.put("biz_opaque_callback_data", callbackData);
         }
         api.post(store.phoneNumberId() + "/calls", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} state -> accept", callId);
     }
 
     /**
@@ -1140,6 +1207,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         body.put("call_id", callId);
         body.put("action", "reject");
         api.post(store.phoneNumberId() + "/calls", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} state -> reject", callId);
     }
 
     /**
@@ -1153,6 +1221,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         body.put("call_id", callId);
         body.put("action", "terminate");
         api.post(store.phoneNumberId() + "/calls", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} state -> terminate", callId);
     }
 
     /**
@@ -1177,11 +1246,14 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         interactive.put("body", text);
         body.put("interactive", interactive);
         var response = api.post(store.phoneNumberId() + "/messages", body);
-        return new MessageKeyBuilder()
+        var key = new MessageKeyBuilder()
                 .id(firstMessageId(response))
                 .parentJid(recipient.toJid())
                 .fromMe(true)
                 .build();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent call permission request to {0}, id {1}",
+                recipient.toJid(), key.id().orElse(null));
+        return key;
     }
 
     /**
@@ -1210,7 +1282,10 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 actions.add(parseCallPermissionAction(array.getJSONObject(index)));
             }
         }
-        return new CloudCallPermission(status == null ? "no_permission" : status, expiration, actions);
+        var result = new CloudCallPermission(status == null ? "no_permission" : status, expiration, actions);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "queried call permission for {0}, status {1}",
+                user.toJid(), result.status());
+        return result;
     }
 
     /**
@@ -1281,6 +1356,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         settings.sip().ifPresent(sip -> calling.put("sip", sipBody(sip)));
         body.put("calling", calling);
         api.post(store.phoneNumberId() + "/settings", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "updated call settings");
     }
 
     /**
@@ -1289,6 +1365,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void subscribeApp() {
         api.post(requireWaba() + "/subscribed_apps", new JSONObject());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "subscribed app to waba webhooks");
     }
 
     /**
@@ -1319,6 +1396,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void unsubscribeApp() {
         api.delete(requireWaba() + "/subscribed_apps", Map.of());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unsubscribed app from waba webhooks");
     }
 
     /**
@@ -1334,7 +1412,9 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             body.put("categories", categories);
         }
         var response = api.post(requireWaba() + "/flows", body);
-        return new CloudFlow(response.getString("id"), flow.name(), CloudFlowStatus.DRAFT, flow.categories());
+        var created = new CloudFlow(response.getString("id"), flow.name(), CloudFlowStatus.DRAFT, flow.categories());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created flow {0}", created.id().orElse(null));
+        return created;
     }
 
     /**
@@ -1389,10 +1469,11 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             JSONObject response;
             try {
                 response = api.get(waba + "/flows", parameters);
-            } catch (WhatsAppCloudException.CloudApiException exception) {
+            } catch (WhatsAppCloudApiException exception) {
                 // A stale cursor cannot be recovered in place; Graph cursors are not durable. Restart
                 // once from the first page rather than propagating the rejection.
                 if (after != null && !restarted && exception.code().orElse(0) == 100) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "stale flow listing cursor, restarting from first page");
                     collected.clear();
                     after = null;
                     restarted = true;
@@ -1410,6 +1491,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             var cursors = paging == null ? null : paging.getJSONObject("cursors");
             var nextAfter = cursors == null ? null : cursors.getString("after");
             if (paging == null || paging.getString("next") == null || nextAfter == null || nextAfter.equals(after)) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "listed all flows, count {0}", collected.size());
                 return collected;
             }
             after = nextAfter;
@@ -1422,6 +1504,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void publishFlow(String flowId) {
         api.post(flowId + "/publish", new JSONObject());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "published flow {0}", flowId);
     }
 
     /**
@@ -1430,6 +1513,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void deprecateFlow(String flowId) {
         api.post(flowId + "/deprecate", new JSONObject());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deprecated flow {0}", flowId);
     }
 
     /**
@@ -1460,6 +1544,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         edit.endpointUri().ifPresent(endpointUri -> body.put("endpoint_uri", endpointUri));
         edit.applicationId().ifPresent(applicationId -> body.put("application_id", applicationId));
         api.post(edit.flowId(), body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "edited flow metadata {0}", edit.flowId());
     }
 
     /**
@@ -1468,6 +1553,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void deleteFlow(String flowId) {
         api.delete(flowId, Map.of());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deleted flow {0}", flowId);
     }
 
     /**
@@ -1489,6 +1575,12 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             for (var index = 0; index < errors.size(); index++) {
                 validationErrors.add(parseFlowValidationError(errors.getJSONObject(index)));
             }
+        }
+        if (success) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "uploaded flow json for {0}, size {1}", flowId, flowJson.length);
+        } else if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "flow json upload for {0} failed validation, {1} errors",
+                    flowId, validationErrors.size());
         }
         return new CloudFlowJsonUploadResult(success, validationErrors);
     }
@@ -1558,6 +1650,8 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                         node.getString("error_message")));
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "migrated flows from waba {0}, {1} migrated, {2} failed",
+                sourceWabaId, migrated.size(), failed.size());
         return new CloudFlowMigrationResult(migrated, failed);
     }
 
@@ -1570,7 +1664,9 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         body.put("prefilled_message", prefilledMessage);
         body.put("generate_qr_image", "PNG");
         var response = api.post(store.phoneNumberId() + "/message_qrdls", body);
-        return parseQrCode(response);
+        var qrCode = parseQrCode(response);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created qr code {0}", qrCode.code());
+        return qrCode;
     }
 
     /**
@@ -1595,6 +1691,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void deleteQrCode(String code) {
         api.delete(store.phoneNumberId() + "/message_qrdls/" + code, Map.of());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deleted qr code {0}", code);
     }
 
     /**
@@ -1771,6 +1868,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             body.put("commands", commands);
         }
         api.post(store.phoneNumberId() + "/conversational_automation", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "edited conversational automation");
     }
 
     /**
@@ -1840,6 +1938,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         configuration.providerName().ifPresent(value -> body.put("provider_name", value));
         configuration.providerMerchantId().ifPresent(value -> body.put("provider_mid", value));
         api.post(requireWaba() + "/payment_configuration", body);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created payment configuration {0}", configuration.configurationName());
     }
 
     /**
@@ -1850,6 +1949,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         Objects.requireNonNull(name, "name must not be null");
         api.delete(requireWaba() + "/payment_configuration",
                 Map.of("configuration_name", name));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deleted payment configuration {0}", name);
     }
 
     /**
@@ -1909,6 +2009,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             throw new IllegalArgumentException("settings must carry at least one field to update");
         }
         api.postForm(store.phoneNumberId() + "/whatsapp_commerce_settings", parameters);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "edited commerce settings");
     }
 
     /**
@@ -1955,11 +2056,13 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         });
         body.put("interactive", interactive);
         var response = api.post(store.phoneNumberId() + "/messages", body);
-        return new MessageKeyBuilder()
+        var key = new MessageKeyBuilder()
                 .id(firstMessageId(response))
                 .parentJid(recipient.toJid())
                 .fromMe(true)
                 .build();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent product to {0}, id {1}", recipient.toJid(), key.id().orElse(null));
+        return key;
     }
 
     /**
@@ -2007,11 +2110,13 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         });
         body.put("interactive", interactive);
         var response = api.post(store.phoneNumberId() + "/messages", body);
-        return new MessageKeyBuilder()
+        var key = new MessageKeyBuilder()
                 .id(firstMessageId(response))
                 .parentJid(recipient.toJid())
                 .fromMe(true)
                 .build();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent product list to {0}, id {1}", recipient.toJid(), key.id().orElse(null));
+        return key;
     }
 
     /**
@@ -2046,11 +2151,13 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         });
         body.put("interactive", interactive);
         var response = api.post(store.phoneNumberId() + "/messages", body);
-        return new MessageKeyBuilder()
+        var key = new MessageKeyBuilder()
                 .id(firstMessageId(response))
                 .parentJid(recipient.toJid())
                 .fromMe(true)
                 .build();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent catalog to {0}, id {1}", recipient.toJid(), key.id().orElse(null));
+        return key;
     }
 
     /**
@@ -2286,8 +2393,10 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         forEach(CloudWebhookReceivedListener.class, listener -> listener.onWebhookReceived(this, envelope));
         var entries = envelope.getJSONArray("entry");
         if (entries == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "webhook envelope carried no entries");
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dispatching webhook envelope, {0} entries", entries.size());
         for (var entryIndex = 0; entryIndex < entries.size(); entryIndex++) {
             var changes = entries.getJSONObject(entryIndex).getJSONArray("changes");
             if (changes == null) {
@@ -2310,6 +2419,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         if (field == null || value == null) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dispatching webhook change, field {0}", field);
         switch (field) {
             case "messages" -> dispatchMessages(value);
             case "smb_message_echoes" -> dispatchEchoes(value);
@@ -2385,6 +2495,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             }
             default -> {
                 // Unmodelled field; the raw envelope was already delivered to the webhook listeners.
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unmodelled webhook change field {0}", field);
             }
         }
     }
@@ -2399,13 +2510,17 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         for (var info : CloudWebhookDecoder.decodeMessages(value)) {
             info.key().parentJid().ifPresent(chat ->
                     info.key().id().ifPresent(id -> store.recordLastInboundMessageId(chat.toString(), id)));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received message {0} from {1}",
+                    info.key().id().orElse(null), info.key().parentJid().orElse(null));
             forEach(NewMessageListener.class, listener -> listener.onNewMessage(this, info));
         }
         for (var status : CloudWebhookDecoder.decodeStatuses(value)) {
             if (status.deleted()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "message {0} deleted", status.info().key().id().orElse(null));
                 forEach(MessageDeletedListener.class,
                         listener -> listener.onMessageDeleted(this, status.info(), true));
             } else {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "message {0} status update", status.info().key().id().orElse(null));
                 forEach(MessageStatusListener.class,
                         listener -> listener.onMessageStatus(this, status.info()));
             }
@@ -2442,6 +2557,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             // TODO: an unmapped inbound content type is delivered with an empty container; add its decode
             //       in CloudWebhookDecoder.decodeContent (and its mapped type) when the type is modelled.
             if (!CloudWebhookDecoder.isMappedContentType(type)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "unmapped inbound message content type {0}", type);
                 fireError(new IllegalStateException("Unmapped inbound message content type: " + type));
             }
         }
@@ -2454,6 +2570,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      */
     private void dispatchEchoes(JSONObject value) {
         for (var info : CloudWebhookDecoder.decodeMessageEchoes(value)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received message echo {0}", info.key().id().orElse(null));
             forEach(CloudMessageEchoListener.class, listener -> listener.onMessageEcho(this, info));
         }
     }
@@ -2465,9 +2582,13 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      */
     private void dispatchCalls(JSONObject value) {
         for (var event : CloudWebhookDecoder.decodeCalls(value)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received call signaling {0} from {1}",
+                    event.callId(), Log.phone(event.from()));
             forEach(CloudCallListener.class, listener -> listener.onCall(this, event));
         }
         for (var event : CloudWebhookDecoder.decodeCallStatuses(value)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received call status {0} for call {1}",
+                    event.status(), event.callId());
             forEach(CloudCallStatusListener.class, listener -> listener.onCallStatus(this, event));
         }
     }
@@ -2486,6 +2607,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 try {
                     action.accept(type.cast(listener));
                 } catch (RuntimeException exception) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "listener of type " + type.getSimpleName() + " failed", exception);
                     fireError(exception);
                 }
             }
@@ -2549,6 +2671,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         }
         api.postForm(requireWaba() + "/assigned_users",
                 Map.of("user", businessUserId, "tasks", taskArray.toString()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "added business account user {0}, {1} tasks", businessUserId, tasks.size());
     }
 
     /**
@@ -2558,6 +2681,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     public void removeBusinessAccountUser(String businessUserId) {
         Objects.requireNonNull(businessUserId, "businessUserId must not be null");
         api.delete(requireWaba() + "/assigned_users", Map.of("user", businessUserId));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removed business account user {0}", businessUserId);
     }
 
     /**
@@ -2597,7 +2721,10 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 "client_secret", credentials.appSecret(),
                 "redirect_uri", exchange.redirectUri(),
                 "code", exchange.code()));
-        return parseOAuthToken(response);
+        var token = parseOAuthToken(response);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "exchanged signup code for access token {0}",
+                Log.token(token.accessToken()));
+        return token;
     }
 
     /**
@@ -2612,7 +2739,10 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 "client_id", credentials.appId(),
                 "client_secret", credentials.appSecret(),
                 "fb_exchange_token", shortLivedToken));
-        return parseOAuthToken(response);
+        var token = parseOAuthToken(response);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "exchanged short-lived token for access token {0}",
+                Log.token(token.accessToken()));
+        return token;
     }
 
     /**
@@ -2627,7 +2757,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 "access_token", appAccessToken));
         var data = response.getJSONObject("data");
         if (data == null) {
-            throw new WhatsAppCloudException.CloudApiException("debug_token returned no data");
+            throw new WhatsAppCloudApiException("debug_token returned no data");
         }
         var scopesArray = data.getJSONArray("scopes");
         var scopes = new ArrayList<String>();
@@ -2640,7 +2770,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 ? Instant.ofEpochSecond(data.getLong("issued_at")) : null;
         var expiresAt = data.containsKey("expires_at") && data.getLong("expires_at") != 0
                 ? Instant.ofEpochSecond(data.getLong("expires_at")) : null;
-        return new CloudTokenInspection(
+        var inspection = new CloudTokenInspection(
                 data.getString("app_id"),
                 data.getString("type"),
                 data.getString("application"),
@@ -2649,6 +2779,8 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 expiresAt,
                 scopes,
                 data.getString("user_id"));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "inspected token {0}, valid {1}", Log.token(token), inspection.valid());
+        return inspection;
     }
 
     /**
@@ -2663,9 +2795,11 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         body.put("waba_id", businessAccountId);
         body.put("waba_currency", currency.getCurrencyCode());
         var response = api.post(extendedCreditId + "/whatsapp_credit_sharing_and_attach", body);
-        return new CloudCreditAllocation(
+        var allocation = new CloudCreditAllocation(
                 response.getString("allocation_config_id"),
                 response.getString("waba_id"));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "shared credit line to waba {0}", businessAccountId);
+        return allocation;
     }
 
     /**
@@ -2725,11 +2859,13 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         body.put("type", "interactive");
         body.put("interactive", interactive);
         var response = api.post(store.phoneNumberId() + "/messages", body);
-        return new MessageKeyBuilder()
+        var key = new MessageKeyBuilder()
                 .id(firstMessageId(response))
                 .parentJid(recipient.toJid())
                 .fromMe(true)
                 .build();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent order details to {0}, id {1}", recipient.toJid(), key.id().orElse(null));
+        return key;
     }
 
     /**
@@ -2766,11 +2902,13 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         body.put("type", "interactive");
         body.put("interactive", interactive);
         var response = api.post(store.phoneNumberId() + "/messages", body);
-        return new MessageKeyBuilder()
+        var key = new MessageKeyBuilder()
                 .id(firstMessageId(response))
                 .parentJid(recipient.toJid())
                 .fromMe(true)
                 .build();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent order status to {0}, id {1}", recipient.toJid(), key.id().orElse(null));
+        return key;
     }
 
     /**
@@ -2956,6 +3094,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         calling.put("status", status);
         settings.put("calling", calling);
         api.post(store.phoneNumberId() + "/settings", settings);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calling status -> {0}", status);
     }
 
     /**
@@ -2963,12 +3102,14 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      *
      * @param minimum   the minimum version the operation requires
      * @param operation the operation name surfaced on the thrown exception
-     * @throws WhatsAppCloudException.CloudUnsupportedVersionException if the configured version is older
+     * @throws WhatsAppCloudUnsupportedVersionException if the configured version is older
      *                                                                 than {@code minimum}
      */
     private void requireVersion(CloudApiVersion minimum, String operation) {
         if (!apiVersion.isAtLeast(minimum)) {
-            throw new WhatsAppCloudException.CloudUnsupportedVersionException(operation, minimum, apiVersion);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "operation {0} requires api version {1}, configured {2}",
+                    operation, minimum, apiVersion);
+            throw new WhatsAppCloudUnsupportedVersionException(operation, minimum, apiVersion);
         }
     }
 

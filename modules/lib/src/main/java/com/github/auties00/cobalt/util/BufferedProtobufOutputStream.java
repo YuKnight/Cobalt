@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.util;
 
+import com.github.auties00.cobalt.log.Log;
 import it.auties.protobuf.stream.ProtobufOutputStream;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,6 +45,11 @@ import java.util.Objects;
  */
 // TODO: Delete me when we migrate to Daedalus
 public final class BufferedProtobufOutputStream extends ProtobufOutputStream<OutputStream> implements Closeable {
+    /**
+     * The logger for {@link BufferedProtobufOutputStream}.
+     */
+    private static final System.Logger LOGGER = Log.get(BufferedProtobufOutputStream.class);
+
     /**
      * The buffer size used by {@link #BufferedProtobufOutputStream(OutputStream)} and {@link #BufferedProtobufOutputStream(Path)} when no
      * explicit size is given, matching the conventional 8 KiB block size of the JDK stream decorators.
@@ -89,6 +96,7 @@ public final class BufferedProtobufOutputStream extends ProtobufOutputStream<Out
         }
         this.outputStream = outputStream;
         this.buffer = new byte[bufferSize];
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opening buffered protobuf output stream, bufferSize={0}", bufferSize);
     }
 
     /**
@@ -131,6 +139,7 @@ public final class BufferedProtobufOutputStream extends ProtobufOutputStream<Out
             }
             buffer[position++] = entry;
         } catch (IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "buffered protobuf output stream write failed", exception);
             throw new UncheckedIOException(exception);
         }
     }
@@ -169,6 +178,7 @@ public final class BufferedProtobufOutputStream extends ProtobufOutputStream<Out
             System.arraycopy(entry, offset, buffer, position, length);
             position += length;
         } catch (IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "buffered protobuf output stream write failed for length=" + length, exception);
             throw new UncheckedIOException(exception);
         }
     }
@@ -196,6 +206,7 @@ public final class BufferedProtobufOutputStream extends ProtobufOutputStream<Out
                 written += chunk;
             }
         } catch (IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "buffered protobuf output stream write failed", exception);
             throw new UncheckedIOException(exception);
         }
     }
@@ -218,8 +229,14 @@ public final class BufferedProtobufOutputStream extends ProtobufOutputStream<Out
      */
     @Override
     public void close() throws IOException {
-        flushBuffer();
-        outputStream.close();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing buffered protobuf output stream");
+        try {
+            flushBuffer();
+            outputStream.close();
+        } catch (IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "buffered protobuf output stream close failed", exception);
+            throw exception;
+        }
     }
 
     /**
@@ -229,6 +246,7 @@ public final class BufferedProtobufOutputStream extends ProtobufOutputStream<Out
      */
     private void flushBuffer() throws IOException {
         if (position > 0) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "flushing buffered protobuf output stream, bytes={0}", position);
             outputStream.write(buffer, 0, position);
             position = 0;
         }

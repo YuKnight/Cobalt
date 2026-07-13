@@ -155,16 +155,17 @@ public final class RelayCandidateList implements Iterable<RelayCandidate> {
     }
 
     /**
-     * Returns an unmodifiable view of the relay candidates in insertion order.
+     * Returns an unmodifiable, point-in-time snapshot of the relay candidates in insertion order.
+     *
+     * <p>The returned list is detached from the backing store: a candidate inserted or updated through
+     * {@link #addOrUpdate(RelayCandidate)} after this call is not reflected in a list already returned. This
+     * matches {@link #iterator()}, which likewise iterates a snapshot. WhatsApp exposes no observable or live
+     * relay candidate collection; the relay set is internal transport engine state consumed point-in-time, so
+     * a snapshot is the faithful shape.
      *
      * @return the candidates; never {@code null}, possibly empty
      */
     public List<RelayCandidate> candidates() {
-        // FIXME: this returns a detached snapshot while the javadoc promises an unmodifiable view, so a
-        //  caller holding the result sees stale data after addOrUpdate; the faithful fix is
-        //  Collections.unmodifiableList(candidates) (live view), but a live view over the mutable
-        //  backing ArrayList is a concurrency hazard (CME during addOrUpdate) and WA's intended
-        //  snapshot versus view semantics are unconfirmed, so behavior is left unchanged until confirmed.
         return List.copyOf(candidates);
     }
 

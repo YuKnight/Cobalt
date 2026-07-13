@@ -3,9 +3,6 @@ package com.github.auties00.cobalt.store.linked;
 import com.github.auties00.cobalt.wam.model.WamChannel;
 import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingCounters;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Optional;
@@ -17,8 +14,9 @@ import java.util.OptionalInt;
  * <p>This is the sub-store that owns the bookkeeping the telemetry pipeline needs to survive a
  * restart: the per-channel sequence numbers written into every uploaded WAM buffer header, and the
  * staging area for WAM event buffers that have been encoded but not yet uploaded. The sequence numbers
- * are persisted inline with the aggregate; the staged buffers live as files under the session
- * directory and are therefore only available on a disk-backed store.
+ * are persisted inline with the aggregate; the staged buffers are backed per persistence strategy (the
+ * disk-backed store offloads them to the embedded message store, the transient store holds them in
+ * memory), so a buffer staged on a transient store does not survive a restart.
  *
  * @apiNote
  * Embedders reach this through {@link LinkedWhatsAppStore#wamStore()} and rarely call it directly; the
@@ -145,44 +143,41 @@ public interface LinkedWhatsAppWamStore {
     LinkedWhatsAppWamStore removeThreadLoggingCounters(Collection<ThreadLoggingCounters> counters);
 
     /**
-     * Returns the save keys of the WAM event buffers staged on disk.
+     * Returns the save keys of every staged WAM event buffer.
      *
-     * @return an unmodifiable copy of the buffer save keys
+     * <p>The telemetry pipeline enumerates these once at startup to restore buffers that were encoded
+     * but not uploaded before the previous shutdown.
+     *
+     * @return an unmodifiable copy of the staged buffer save keys, never {@code null}
      */
     Collection<String> pendingBufferKeys();
 
     /**
-     * Opens an atomic writer for a WAM event buffer.
+     * Stages a WAM event buffer under the given save key, replacing any buffer already staged under it.
      *
-     * @param saveKey the buffer save key
-     * @return an output stream that publishes the buffer on close
-     * @throws IOException if the buffer file cannot be created
+     * @param saveKey the save key identifying the buffer, never {@code null}
+     * @param buffer  the encoded buffer bytes, never {@code null}
      */
-    OutputStream openPendingBufferWriter(String saveKey) throws IOException;
+    void putPendingBuffer(String saveKey, byte[] buffer);
 
     /**
-     * Opens a reader for a staged WAM event buffer.
+     * Returns the staged WAM event buffer for the given save key.
      *
-     * @param saveKey the buffer save key
-     * @return a reader for the buffer, or empty if none is staged
-     * @throws IOException if the buffer file cannot be opened
+     * @param saveKey the save key identifying the buffer, never {@code null}
+     * @return the encoded buffer bytes, or empty if no buffer is staged under that key
      */
-    Optional<InputStream> openPendingBufferReader(String saveKey) throws IOException;
+    Optional<byte[]> findPendingBuffer(String saveKey);
 
     /**
-     * Removes a staged WAM event buffer.
+     * Removes the staged WAM event buffer for the given save key.
      *
-     * @param saveKey the buffer save key
-     * @return {@code true} if a buffer was removed
-     * @throws IOException if the buffer file cannot be deleted
+     * @param saveKey the save key identifying the buffer, never {@code null}
+     * @return {@code true} if a buffer was removed, {@code false} if none was staged under that key
      */
-    boolean removePendingBuffer(String saveKey) throws IOException;
+    boolean removePendingBuffer(String saveKey);
 
     /**
      * Removes every staged WAM event buffer.
-     *
-     * @return this store instance for method chaining
-     * @throws IOException if a buffer file cannot be deleted
      */
-    LinkedWhatsAppWamStore clearPendingBuffers() throws IOException;
+    void clearPendingBuffers();
 }

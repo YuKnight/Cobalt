@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,7 +14,8 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import java.util.logging.Logger;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Removes a Meta-AI conversation thread from the local store in response to an {@code ai_thread_delete} sync mutation.
@@ -35,12 +37,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebAiThreadDeleteSync")
 public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
     /**
-     * The handler-scoped {@link Logger} used to record failed mutation attempts.
-     *
-     * <p>Records the {@link Exception} message of a mutation that threw before
-     * completing.
+     * The logger for {@link AiThreadDeleteHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(AiThreadDeleteHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(AiThreadDeleteHandler.class);
 
     /**
      * The wire string {@code "ai_thread_delete"} that identifies this action in the sync collection.
@@ -151,18 +150,23 @@ public final class AiThreadDeleteHandler implements WebAppStateActionHandler {
                     .filter(level -> level != DeviceCapabilities.AiThread.SupportLevel.NONE)
                     .isPresent();
             if (!aiThreadSupported) {
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "ai thread delete: ai-thread support disabled for chat={0}", chatJid);
                 return MutationApplicationResult.unsupported();
             }
 
             var key = chatJidString + "|" + threadId;
             if (client.store().businessStore().findAiThreadTitle(key).isEmpty()) {
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "ai thread delete: orphan thread for chat={0}, thread={1}", chatJid, threadId);
                 return MutationApplicationResult.orphan(key, "Thread");
             }
 
             client.store().businessStore().removeAiThreadTitle(key);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ai thread delete: removed thread for chat={0}, thread={1}", chatJid, threadId);
             return MutationApplicationResult.success();
         } catch (Exception e) {
-            LOGGER.warning("AI thread delete mutation failed: " + e.getMessage());
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "ai thread delete mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

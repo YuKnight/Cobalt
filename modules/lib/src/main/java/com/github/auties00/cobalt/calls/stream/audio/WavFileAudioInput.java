@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.calls.stream.audio;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.io.BufferedOutputStream;
@@ -7,6 +8,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
@@ -26,7 +28,7 @@ import com.github.auties00.cobalt.calls.stream.AudioInput;
  *
  * <p>This is the device backed {@link AudioInput} returned by {@link AudioInput#toWav(Path)}. Its
  * constructor records incoming frames as a canonical RIFF/WAVE PCM file: the header of 44 bytes is emitted
- * up front with its two size fields zeroed. Each {@link #offer(AudioFrame)} appends the frame's samples
+ * up front with its two size fields zeroed. Each {@link #offerAudio(AudioFrame)} appends the frame's samples
  * little endian to the body, and {@link #shutdown()} seeks back to patch the size fields with the final
  * byte counts and closes the file. Because the call media format is already 16 kHz mono signed 16 bit PCM,
  * the samples map directly onto the WAVE payload and no FFmpeg dependency or re encoding is involved.
@@ -40,6 +42,11 @@ import com.github.auties00.cobalt.calls.stream.AudioInput;
  */
 public final class WavFileAudioInput implements AudioInput {
     /**
+     * The logger for {@link WavFileAudioInput}.
+     */
+    private static final System.Logger LOGGER = Log.get(WavFileAudioInput.class);
+
+    /**
      * Names the sample rate written into the WAV header, matching the call media rate of 16 kHz.
      */
     private static final int SAMPLE_RATE = 16_000;
@@ -50,7 +57,7 @@ public final class WavFileAudioInput implements AudioInput {
     private final AtomicBoolean closed = new AtomicBoolean();
 
     /**
-     * Released by {@link #shutdown()} so a pending {@link #read()} returns.
+     * Released by {@link #shutdown()} so a pending {@link #readAudio()} returns.
      */
     private final CountDownLatch done = new CountDownLatch(1);
 
@@ -87,7 +94,7 @@ public final class WavFileAudioInput implements AudioInput {
      * Holds the reusable little endian byte scratch that one frame's samples are encoded into before being
      * appended to the WAV body, grown on demand when a larger frame arrives.
      *
-     * <p>Confined to the single call render thread that drives {@link #offer(AudioFrame)}, so reuse across
+     * <p>Confined to the single call render thread that drives {@link #offerAudio(AudioFrame)}, so reuse across
      * frames does not race.
      */
     private byte[] scratch;
@@ -120,8 +127,10 @@ public final class WavFileAudioInput implements AudioInput {
             this.out = new BufferedOutputStream(Channels.newOutputStream(channel));
             writeHeaderPlaceholder();
         } catch (IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to open WAV sink", e);
             throw new IllegalStateException("failed to open WAV sink at " + path, e);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "WAV recording started");
     }
 
     /**
@@ -135,7 +144,7 @@ public final class WavFileAudioInput implements AudioInput {
      * @throws UncheckedIOException  if the underlying write fails
      */
     @Override
-    public void offer(AudioFrame frame) {
+    public void offerAudio(AudioFrame frame) {
         Objects.requireNonNull(frame, "frame cannot be null");
         if (closed.get()) {
             return;
@@ -154,6 +163,7 @@ public final class WavFileAudioInput implements AudioInput {
             out.write(buf, 0, needed);
             sampleBytes += needed;
         } catch (IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to write WAV samples", e);
             throw new UncheckedIOException("failed to write WAV samples", e);
         }
     }
@@ -168,7 +178,7 @@ public final class WavFileAudioInput implements AudioInput {
      * @throws InterruptedException if the calling thread is interrupted while waiting
      */
     @Override
-    public AudioFrame read() throws InterruptedException {
+    public AudioFrame readAudio() throws InterruptedException {
         done.await();
         return null;
     }
@@ -176,7 +186,7 @@ public final class WavFileAudioInput implements AudioInput {
     /**
      * {@inheritDoc}
      *
-     * <p>Marks the sink ended, wakes a pending {@link #read()}, flushes the buffered body, rewrites the two
+     * <p>Marks the sink ended, wakes a pending {@link #readAudio()}, flushes the buffered body, rewrites the two
      * placeholder size fields with the final byte counts, and closes the file even if the patch fails.
      * Idempotent.
      *
@@ -191,12 +201,15 @@ public final class WavFileAudioInput implements AudioInput {
         try {
             out.flush();
             patchHeaderSizes();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "WAV recording finalised: bytes={0}", sampleBytes);
         } catch (IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to finalise WAV file", e);
             throw new UncheckedIOException("failed to finalise WAV file", e);
         } finally {
             try {
                 raf.close();
-            } catch (IOException _) {
+            } catch (IOException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to close WAV file", e);
             }
         }
     }

@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.stream.ffmpeg;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.ffmpeg.AVFormatContext;
 import com.github.auties00.cobalt.util.ffmpeg.AVIOInterruptCB;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.time.Duration;
@@ -27,6 +29,11 @@ import java.util.Objects;
  * decode work.
  */
 public final class FfmpegIoWatchdog {
+    /**
+     * The logger for {@link FfmpegIoWatchdog}.
+     */
+    private static final System.Logger LOGGER = Log.get(FfmpegIoWatchdog.class);
+
     /**
      * A custom byte source backing a demuxer through a Java side {@code AVIOContext}, whose blocking reads
      * this watchdog must be able to unblock and free.
@@ -147,6 +154,9 @@ public final class FfmpegIoWatchdog {
         AVIOInterruptCB.callback.Function function = opaque -> {
             if (cancelled
                     || (deadlineNanos != NO_DEADLINE && System.nanoTime() - deadlineNanos >= 0)) {
+                if (!fired && Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "interrupt callback aborting operation, cancelled={0}", cancelled);
+                }
                 fired = true;
                 return 1;
             }
@@ -200,6 +210,7 @@ public final class FfmpegIoWatchdog {
         fired = false;
         readFailure = null;
         deadlineNanos = System.nanoTime() + armTimeoutNanos;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "watchdog armed, timeout={0}ms", timeout.toMillis());
     }
 
     /**
@@ -232,6 +243,7 @@ public final class FfmpegIoWatchdog {
      * {@code av_read_frame} until its own deadline.
      */
     public void cancel() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cancelling io watchdog");
         cancelled = true;
         var attached = io;
         if (attached != null) {
@@ -258,6 +270,7 @@ public final class FfmpegIoWatchdog {
      * timeout the same way a native side abort would.
      */
     void markTimedOut() {
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "blocking read timed out inside read_packet upcall");
         fired = true;
     }
 
@@ -273,6 +286,7 @@ public final class FfmpegIoWatchdog {
      * @param message the transport failure reason
      */
     void markReadFailed(String message) {
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "read failed mid stream: {0}", message);
         readFailure = message;
     }
 

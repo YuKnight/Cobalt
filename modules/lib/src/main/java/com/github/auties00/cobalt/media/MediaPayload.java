@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.media;
 
+import com.github.auties00.cobalt.log.Log;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -134,6 +137,9 @@ public sealed interface MediaPayload extends AutoCloseable {
      * {@link #close()}) from caller-provided files (left alone).
      */
     final class OfPath implements MediaPayload {
+        /** The logger for {@link OfPath}. */
+        private static final System.Logger LOGGER = Log.get(OfPath.class);
+
         /**
          * The path to the plaintext content.
          */
@@ -225,7 +231,8 @@ public sealed interface MediaPayload extends AutoCloseable {
             if (ownsFile) {
                 try {
                     Files.deleteIfExists(path);
-                } catch (IOException ignored) {
+                } catch (IOException e) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to delete temp media file", e);
                 }
             }
         }

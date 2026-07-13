@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.store.linked.protobuf;
 
 import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.mixin.PathMixin;
 import com.github.auties00.cobalt.store.linked.*;
 import it.auties.protobuf.annotation.ProtobufMessage;
@@ -10,6 +11,7 @@ import it.auties.protobuf.builtin.ProtobufLazyMixin;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -44,6 +46,11 @@ import java.util.concurrent.ConcurrentHashMap.KeySetView;
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 @ProtobufMessage
 public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
+    /**
+     * The logger for {@link ProtobufWhatsAppStore}, used by this class's static members.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufWhatsAppStore.class);
+
     /**
      * The time-to-live for a cached device-list entry before it is considered stale.
      *
@@ -96,12 +103,6 @@ public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
     private final ProtobufLinkedWebSessionStore webSessionStore;
 
     /**
-     * The WAM telemetry sub-store holding the per-channel sequence numbers and staged event buffers.
-     */
-    @ProtobufProperty(index = 11, type = ProtobufType.MESSAGE)
-    private final ProtobufLinkedWhatsAppWamStore wamStore;
-
-    /**
      * The WhatsApp Business and payments sub-store; not persisted (all-transient state).
      */
     private final ProtobufLinkedWhatsAppBusinessStore businessStore;
@@ -117,7 +118,12 @@ public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
     private final KeySetView<WhatsAppListener, Boolean> listeners;
 
     /**
-     * The logger instance for this store; not persisted.
+     * The per-concrete-class logger instance for this store; not persisted.
+     *
+     * @implNote
+     * This implementation resolves the logger from {@link #getClass()} rather than sharing
+     * {@link #LOGGER}, so log lines from a concrete subclass (for example {@code PersistentStore})
+     * carry that subclass's name rather than this abstract class's name.
      */
     protected final System.Logger logger;
 
@@ -126,8 +132,12 @@ public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
      *
      * @implNote
      * This implementation wires the account sub-store into the signal and contact sub-stores (for
-     * self-address resolution), binds the WAM sub-store to the session directory and account identity
-     * (for staged-buffer path resolution), and allocates the business and connection sub-stores.
+     * self-address resolution), wires the contact sub-store into the chat sub-store (for
+     * phone-number/LID chat resolution), and allocates the business and connection sub-stores. The chat
+     * and WAM sub-stores are not retained here; each concrete subclass owns the variant-typed field
+     * backing {@link #chatStore()} and {@link #wamStore()}. The chat sub-store is taken as an argument
+     * only so this constructor can wire its contact reference; the WAM sub-store needs no super-side
+     * wiring, so it is not passed here.
      *
      * @param signalStore     the signal sub-store, never {@code null}
      * @param accountStore    the account sub-store, never {@code null}
@@ -136,24 +146,24 @@ public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
      * @param settingsStore   the settings sub-store, never {@code null}
      * @param directory       the session directory, or {@code null} for in-memory
      * @param webSessionStore the web-GraphQL credential sub-store, or {@code null} for an empty one
-     * @param wamStore        the WAM telemetry sub-store, or {@code null} for an empty one
+     * @param chatStore       the persistence-variant chat sub-store, never {@code null}
      */
-    protected ProtobufWhatsAppStore(ProtobufLinkedWhatsAppSignalStore signalStore, ProtobufLinkedWhatsAppAccountStore accountStore, ProtobufLinkedWhatsAppContactStore contactStore, ProtobufLinkedWhatsAppSyncStore syncStore, ProtobufLinkedWhatsAppSettingsStore settingsStore, Path directory, ProtobufLinkedWebSessionStore webSessionStore, ProtobufLinkedWhatsAppWamStore wamStore) {
+    protected ProtobufWhatsAppStore(ProtobufLinkedWhatsAppSignalStore signalStore, ProtobufLinkedWhatsAppAccountStore accountStore, ProtobufLinkedWhatsAppContactStore contactStore, ProtobufLinkedWhatsAppSyncStore syncStore, ProtobufLinkedWhatsAppSettingsStore settingsStore, Path directory, ProtobufLinkedWebSessionStore webSessionStore, ProtobufLinkedWhatsAppChatStore chatStore) {
         this.signalStore = Objects.requireNonNull(signalStore, "signalStore cannot be null");
         this.accountStore = Objects.requireNonNull(accountStore, "accountStore cannot be null");
         this.contactStore = Objects.requireNonNull(contactStore, "contactStore cannot be null");
         this.syncStore = Objects.requireNonNull(syncStore, "syncStore cannot be null");
         this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore cannot be null");
+        Objects.requireNonNull(chatStore, "chatStore cannot be null");
         this.directory = directory;
         this.webSessionStore = Objects.requireNonNullElseGet(webSessionStore, () -> new ProtobufLinkedWebSessionStore(null, null));
-        this.wamStore = Objects.requireNonNullElseGet(wamStore, () -> new ProtobufLinkedWhatsAppWamStore(null, null, null, null, null, null));
         this.businessStore = new ProtobufLinkedWhatsAppBusinessStore();
         this.connectionStore = new ProtobufLinkedWhatsAppConnectionStore();
-        this.signalStore.bindAccount(accountStore);
-        this.contactStore.bindAccount(accountStore);
-        this.wamStore.bind(directory, accountStore);
+        this.signalStore.setAccount(accountStore);
+        this.contactStore.setAccount(accountStore);
+        chatStore.setContacts(contactStore);
         this.listeners = ConcurrentHashMap.newKeySet();
-        this.logger = System.getLogger(this.getClass().getName());
+        this.logger = Log.get(this.getClass());
     }
 
     @Override
@@ -197,9 +207,7 @@ public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
     }
 
     @Override
-    public ProtobufLinkedWhatsAppWamStore wamStore() {
-        return wamStore;
-    }
+    public abstract ProtobufLinkedWhatsAppWamStore wamStore();
 
     @Override
     public abstract ProtobufLinkedWhatsAppChatStore chatStore();
@@ -216,12 +224,18 @@ public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
     @Override
     public WhatsAppListener addListener(WhatsAppListener listener) {
         listeners.add(listener);
+        if (Log.DEBUG) logger.log(Level.DEBUG, "listener registered: {0}", listener.getClass().getSimpleName());
         return listener;
     }
 
     @Override
     public boolean removeListener(WhatsAppListener listener) {
-        return listeners.remove(listener);
+        var removed = listeners.remove(listener);
+        if (Log.DEBUG) {
+            logger.log(Level.DEBUG, "listener removed: {0}, was registered={1}",
+                    listener.getClass().getSimpleName(), removed);
+        }
+        return removed;
     }
 
     @Override
@@ -288,6 +302,7 @@ public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
         if (Files.notExists(path)) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "recursively deleting session directory tree");
         Files.walkFileTree(path, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
@@ -314,12 +329,12 @@ public abstract class ProtobufWhatsAppStore implements LinkedWhatsAppStore {
                             && Objects.equals(chatStore(), that.chatStore())
                             && Objects.equals(directory, that.directory)
                             && Objects.equals(webSessionStore, that.webSessionStore)
-                            && Objects.equals(wamStore, that.wamStore);
+                            && Objects.equals(wamStore(), that.wamStore());
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(signalStore, accountStore, contactStore, syncStore, settingsStore, chatStore(),
-                directory, webSessionStore, wamStore);
+                directory, webSessionStore, wamStore());
     }
 }

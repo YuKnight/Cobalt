@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -9,6 +10,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +29,15 @@ import java.util.Map;
 @WhatsAppWebModule(moduleName = "WAWebSendGroupSkmsgJob")
 public final class ParticipantsStanza {
     /**
+     * The logger for {@link ParticipantsStanza}.
+     */
+    private static final System.Logger LOGGER = Log.get(ParticipantsStanza.class);
+
+    /**
      * Prevents instantiation; this is a static composer.
      */
     private ParticipantsStanza() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -83,6 +90,7 @@ public final class ParticipantsStanza {
             children.add(toNode);
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sk distribution participants built count={0}", children.size());
         return new StanzaBuilder()
                 .description("participants")
                 .content(children)
@@ -127,7 +135,12 @@ public final class ParticipantsStanza {
             children.add(toNode);
         }
 
-        return children.isEmpty() ? null : new StanzaBuilder()
+        if (children.isEmpty()) {
+            return null;
+        }
+
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "content binding participants built count={0}", children.size());
+        return new StanzaBuilder()
                 .description("participants")
                 .content(children)
                 .build();

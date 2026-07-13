@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.chat.ChatEphemeralTimer;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.preference.Label;
@@ -23,6 +24,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.lang.System.Logger.Level;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -55,6 +57,11 @@ import static java.util.Objects.requireNonNullElseGet;
 @ProtobufMessage
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public final class ProtobufLinkedWhatsAppSettingsStore implements LinkedWhatsAppSettingsStore {
+    /**
+     * The logger for {@link ProtobufLinkedWhatsAppSettingsStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufLinkedWhatsAppSettingsStore.class);
+
     /**
      * The value of every configured privacy setting.
      *
@@ -549,6 +556,7 @@ public final class ProtobufLinkedWhatsAppSettingsStore implements LinkedWhatsApp
     @Override
     public synchronized void addPrivacySetting(PrivacySettingValue value) {
         Objects.requireNonNull(value, "value cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "setting privacy setting {0}", value.type());
         privacySettingsValues.removeIf(existing -> existing.type().equals(value.type()));
         privacySettingsValues.add(value);
     }
@@ -685,6 +693,7 @@ public final class ProtobufLinkedWhatsAppSettingsStore implements LinkedWhatsApp
                 removed++;
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removed {0} recent avatar stickers", removed);
         return removed;
     }
 
@@ -802,6 +811,7 @@ public final class ProtobufLinkedWhatsAppSettingsStore implements LinkedWhatsApp
             optOutListHashes.put(category, hash);
         }
         optOutListEntries.put(category, List.copyOf(entries));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opt-out list updated for category {0}, entries={1}", category, entries.size());
         return this;
     }
 
@@ -826,6 +836,7 @@ public final class ProtobufLinkedWhatsAppSettingsStore implements LinkedWhatsApp
             contactBlacklistHashes.put(category, hash);
         }
         contactBlacklistEntries.put(category, List.copyOf(entries));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "contact blacklist updated for category {0}, entries={1}", category, entries.size());
         return this;
     }
 

@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.EncoderTables;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Searches the closed loop adaptive codebook gain (long term prediction gain) for one voiced analysis by
@@ -34,6 +37,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables
  * precision to mirror the reference codec arithmetic. This type is stateless and thread safe.
  */
 public final class AcbSearch {
+    /**
+     * The logger for {@link AcbSearch}.
+     */
+    private static final System.Logger LOGGER = Log.get(AcbSearch.class);
+
     /**
      * Number of adaptive codebook gain taps evaluated jointly, fixed at two for the low band voiced path.
      */
@@ -160,6 +168,10 @@ public final class AcbSearch {
             dLtp[i] += g * acbBasisPhi[fcbSubfrlen + i];
         }
 
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "acb search: subframeLen={0} lowRate={1} prevIdx={2} chosenIdx={3}",
+                    fcbSubfrlen, lowRate, prevAcbIdx, bestAcbgIdx);
+        }
         return new Result(bestAcbgIdx, dLtp, new AcbParams(werrIn, phiAcb, dAcbLpc, acbBasisPhi));
     }
 

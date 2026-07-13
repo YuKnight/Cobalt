@@ -5,6 +5,8 @@ import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
@@ -117,6 +119,26 @@ public final class ExtensionStanza implements InCallActionStanza {
         TERMINATED("terminated");
 
         /**
+         * Resolves a wire literal to its state, backing {@link #ofWire(String)}.
+         *
+         * <p>Built once at class initialization from each constant's {@link #wire}, so a literal resolves
+         * to its state in constant time rather than by scanning {@link #values()}. Keys are the raw
+         * literals, so matching is case sensitive, preserving the {@link String#equals(Object)} semantics
+         * this lookup replaces.
+         */
+        private static final Map<String, State> BY_WIRE;
+
+        static {
+            var byWire = new HashMap<String, State>();
+            for (var state : values()) {
+                if (byWire.put(state.wire, state) != null) {
+                    throw new AssertionError("Conflict");
+                }
+            }
+            BY_WIRE = Map.copyOf(byWire);
+        }
+
+        /**
          * The wire literal for this state.
          */
         private final String wire;
@@ -142,16 +164,13 @@ public final class ExtensionStanza implements InCallActionStanza {
         /**
          * Returns the state whose wire literal equals the given value.
          *
+         * @implNote This implementation resolves through the prebuilt {@link #BY_WIRE} map rather than
+         * scanning {@link #values()}; a {@code null} literal maps to no entry and yields an empty result.
          * @param wire the wire literal to resolve
          * @return an {@link Optional} holding the matching state, or empty when no state matches
          */
         public static Optional<State> ofWire(String wire) {
-            for (var state : values()) {
-                if (state.wire.equals(wire)) {
-                    return Optional.of(state);
-                }
-            }
-            return Optional.empty();
+            return Optional.ofNullable(BY_WIRE.get(wire));
         }
     }
 

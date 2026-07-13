@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.calls.platform;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 
 import javax.crypto.KDF;
 import javax.crypto.Mac;
 import javax.crypto.spec.HKDFParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Objects;
@@ -38,6 +40,11 @@ import java.util.Objects;
  * counter bound.
  */
 public final class VoipCryptoNative {
+    /**
+     * The logger for {@link VoipCryptoNative}.
+     */
+    private static final System.Logger LOGGER = Log.get(VoipCryptoNative.class);
+
     /**
      * Holds the output length, in bytes, of HMAC SHA256 and of one HKDF SHA256 hash block.
      *
@@ -110,11 +117,15 @@ public final class VoipCryptoNative {
             mac.init(new SecretKeySpec(key, HMAC_ALGORITHM));
             var tag = mac.doFinal(data);
             if (tag.length != SHA256_LENGTH) {
+                if (Log.ERROR) {
+                    LOGGER.log(Level.ERROR, "hmac-sha256 produced unexpected length " + tag.length);
+                }
                 throw new WhatsAppCallException.Srtp(
                         "HMAC-SHA256 produced " + tag.length + " bytes, expected " + SHA256_LENGTH);
             }
             return tag;
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "hmac-sha256 computation failed", e);
             throw new WhatsAppCallException.Srtp("Cannot compute HMAC-SHA256", e);
         }
     }
@@ -149,6 +160,7 @@ public final class VoipCryptoNative {
             }
             return kdf.deriveData(extract.thenExpand(info, length));
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "hkdf-sha256 extract-then-expand failed", e);
             throw new WhatsAppCallException.Srtp("Cannot compute HKDF-SHA256", e);
         }
     }
@@ -177,6 +189,7 @@ public final class VoipCryptoNative {
             }
             return kdf.deriveData(extract.extractOnly());
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "hkdf-sha256 extract failed", e);
             throw new WhatsAppCallException.Srtp("Cannot compute HKDF-SHA256 extract", e);
         }
     }
@@ -206,6 +219,7 @@ public final class VoipCryptoNative {
             var params = HKDFParameterSpec.expandOnly(new SecretKeySpec(prk, HKDF_KEY_ALGORITHM), info, length);
             return kdf.deriveData(params);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "hkdf-sha256 expand failed", e);
             throw new WhatsAppCallException.Srtp("Cannot compute HKDF-SHA256 expand", e);
         }
     }

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.device.fanout;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -30,9 +32,9 @@ import java.util.*;
 public final class DevicePhashCalculator {
 
     /**
-     * Logger that emits the {@code [phashV1] / [phashV2] calculating phash for ...} trace.
+     * The logger for {@link DevicePhashCalculator}.
      */
-    private static final System.Logger LOGGER = System.getLogger(DevicePhashCalculator.class.getName());
+    private static final System.Logger LOGGER = Log.get(DevicePhashCalculator.class);
 
     /**
      * Number of leading digest bytes retained before base64 encoding.
@@ -159,10 +161,9 @@ public final class DevicePhashCalculator {
                 .sorted(Comparator.naturalOrder())
                 .toList();
 
-        LOGGER.log(System.Logger.Level.TRACE,
-                "[{0}] calculating phash for {1}",
-                version.prefix(),
-                String.join(",", legacyJids));
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "[{0}] calculating phash for {1} jids", version.prefix(), legacyJids.size());
+        }
 
         var digest = MessageDigest.getInstance(version.algorithm());
         for (var legacyJid : legacyJids) {

@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.wam;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 
+import java.lang.System.Logger.Level;
 import java.util.Map;
 import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +32,11 @@ import java.util.concurrent.ConcurrentHashMap;
 @WhatsAppWebModule(moduleName = "WAWebEventSamplingCache")
 @WhatsAppWebModule(moduleName = "WAWebEventSampling")
 final class WamSamplingOverride {
+    /**
+     * The logger for {@link WamSamplingOverride}.
+     */
+    private static final System.Logger LOGGER = Log.get(WamSamplingOverride.class);
+
     /**
      * Maps each WAM event id to its overridden sampling weight; absent keys
      * signal the caller should fall back to the static {@code @WamEvent}
@@ -65,6 +72,7 @@ final class WamSamplingOverride {
     )
     void put(int eventId, int weight) {
         overrides.put(eventId, weight);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wam sampling override set: event={0} weight={1}", eventId, weight);
     }
 
     /**
@@ -80,6 +88,7 @@ final class WamSamplingOverride {
      */
     void remove(int eventId) {
         overrides.remove(eventId);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wam sampling override removed: event={0}", eventId);
     }
 
     /**
@@ -111,6 +120,7 @@ final class WamSamplingOverride {
     void replaceAll(Map<Integer, Integer> newOverrides) {
         overrides.clear();
         overrides.putAll(newOverrides);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wam sampling overrides replaced: count={0}", newOverrides.size());
     }
 
     /**

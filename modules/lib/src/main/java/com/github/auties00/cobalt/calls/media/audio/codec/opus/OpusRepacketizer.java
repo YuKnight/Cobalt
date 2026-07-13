@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.opus;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.bindings.CobaltOpus;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.NativeLibLoader;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -59,6 +61,11 @@ public final class OpusRepacketizer implements AutoCloseable {
     private static final int MAX_FRAMES = OpusCodecParams.MAX_FRAMES_PER_PACKET;
 
     /**
+     * The logger for {@link OpusRepacketizer}.
+     */
+    private static final System.Logger LOGGER = Log.get(OpusRepacketizer.class);
+
+    /**
      * Per instance arena owning the native repacketizer state and the reusable scratch buffers.
      */
     private final Arena arena;
@@ -100,10 +107,12 @@ public final class OpusRepacketizer implements AutoCloseable {
             this.outBuf = arena.allocate(MAX_PACKET_BYTES);
             this.inBuf = arena.allocate(MAX_PACKET_BYTES);
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus repacketizer create failed", e);
             destroyState();
             arena.close();
             throw e;
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus repacketizer allocation failed", t);
             destroyState();
             arena.close();
             throw new WhatsAppCallException.Opus("cobalt_opus_repacketizer allocation failed", t);
@@ -154,10 +163,15 @@ public final class OpusRepacketizer implements AutoCloseable {
             }
             var out = new byte[written];
             MemorySegment.copy(outBuf, ValueLayout.JAVA_BYTE, 0, out, 0, written);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "calls opus repacketizer combine: frames={0} bytes={1}", frames.size(), written);
+            }
             return out;
         } catch (WhatsAppCallException.Opus e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus repacketizer combine failed: frames=" + frames.size(), e);
             throw e;
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus repacketizer combine failed: frames=" + frames.size(), t);
             throw new WhatsAppCallException.Opus("cobalt_opus_repacketizer combine failed", t);
         }
     }
@@ -199,10 +213,15 @@ public final class OpusRepacketizer implements AutoCloseable {
                 MemorySegment.copy(outBuf, ValueLayout.JAVA_BYTE, 0, frame, 0, written);
                 frames.add(frame);
             }
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "calls opus repacketizer split: bytes={0} frames={1}", packet.length, frames.size());
+            }
             return frames;
         } catch (WhatsAppCallException.Opus e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus repacketizer split failed: bytes=" + packet.length, e);
             throw e;
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls opus repacketizer split failed: bytes=" + packet.length, t);
             throw new WhatsAppCallException.Opus("cobalt_opus_repacketizer split failed", t);
         }
     }
@@ -232,6 +251,7 @@ public final class OpusRepacketizer implements AutoCloseable {
         }
         destroyState();
         arena.close();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls opus repacketizer closed");
     }
 
     /**
@@ -246,7 +266,8 @@ public final class OpusRepacketizer implements AutoCloseable {
         }
         try {
             CobaltOpus.cobalt_opus_repacketizer_destroy(state);
-        } catch (Throwable _) {
+        } catch (Throwable t) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls opus repacketizer destroy failed", t);
         }
         state = MemorySegment.NULL;
     }

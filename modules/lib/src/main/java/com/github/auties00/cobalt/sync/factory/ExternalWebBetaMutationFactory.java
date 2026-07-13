@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -30,6 +32,11 @@ import java.util.List;
  * appending a new one.
  */
 public final class ExternalWebBetaMutationFactory {
+    /**
+     * The logger for {@link ExternalWebBetaMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(ExternalWebBetaMutationFactory.class);
+
     /**
      * Constructs an external-web-beta mutation factory.
      *
@@ -54,6 +61,7 @@ public final class ExternalWebBetaMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebExternalBetaOptInAction", exports = "setOptInBetaAction", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getExternalWebBetaMutation(boolean enrolled) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building external web beta mutation enrolled={0}", enrolled);
         var timestamp = Instant.now();
         var action = new ExternalWebBetaActionBuilder()
                 .isOptIn(enrolled)

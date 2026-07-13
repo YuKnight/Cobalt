@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.image;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecContext;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecParameters;
@@ -20,6 +21,7 @@ import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.model.message.media.ImageMessage;
 import com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -50,6 +52,9 @@ import java.nio.channels.SeekableByteChannel;
  * the {@value #MICRO_THUMBNAIL_MAX_FILE_SIZE_BYTES}-byte WhatsApp wire budget.
  */
 public final class ImagePipeline {
+    /** The logger for {@link ImagePipeline}. */
+    private static final System.Logger LOGGER = Log.get(ImagePipeline.class);
+
     /**
      * Maximum edge in pixels for the {@code STANDARD} quality preset.
      *
@@ -177,6 +182,7 @@ public final class ImagePipeline {
         var qscale = quality == SettingsSyncAction.MediaQualitySetting.HD
                 ? QSCALE_HD
                 : QSCALE_STANDARD;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "image transcode start: quality={0}", quality);
         try (var arena = Arena.ofShared();
              var decoded = decodeFirstFrame(arena, source)) {
             var orientation = readOrientation(decoded.stream);
@@ -205,7 +211,15 @@ public final class ImagePipeline {
                 image.setHeight(mainDims.height);
                 image.setJpegThumbnail(thumbnail);
             }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "image transcode done: width={0} height={1} encodedBytes={2} thumbnailBytes={3} orientation={4}",
+                        mainDims.width, mainDims.height, mainJpeg.length, thumbnail.length, orientation);
+            }
             return new MediaPayload.OfBytes(mainJpeg);
+        } catch (WhatsAppMediaException.Processing e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "image transcode failed", e);
+            throw e;
         }
     }
 
@@ -458,6 +472,10 @@ public final class ImagePipeline {
         } finally {
             freeFrame(scaled);
         }
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "image thumbnail exceeds size budget: bytes={0} budgetBytes={1} qscaleCap={2}",
+                    last.length, MICRO_THUMBNAIL_MAX_FILE_SIZE_BYTES, QSCALE_THUMB_CAP);
+        }
         return last;
     }
 
@@ -543,6 +561,7 @@ public final class ImagePipeline {
                     Ffmpeg.avformat_find_stream_info(formatCtx, MemorySegment.NULL));
             var streamIndex = pickVideoStream(formatCtx);
             if (streamIndex < 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "no video stream in image source");
                 throw new WhatsAppMediaException.Processing("no video stream in source");
             }
             var stream = streamPointer(formatCtx, streamIndex);

@@ -22,8 +22,9 @@ import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import com.github.auties00.cobalt.stanza.usync.UsyncContext;
 import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
-import com.github.auties00.cobalt.exception.WhatsAppAdvValidationException;
-import com.github.auties00.cobalt.exception.WhatsAppDeviceSyncException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppAdvValidationException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppDeviceSyncException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -52,6 +53,7 @@ import com.github.auties00.cobalt.wam.type.CoexSysMsgStateTransitionAttempt;
 import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 
+import java.lang.System.Logger.Level;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.*;
@@ -90,13 +92,8 @@ import java.util.stream.Stream;
 @WhatsAppWebModule(moduleName = "WAWebIcdcHandlerApi")
 @WhatsAppWebModule(moduleName = "WAWebApiDeviceList")
 public final class LiveDeviceService implements DeviceService {
-    /**
-     * The {@link System.Logger} used for every device-service diagnostic.
-     *
-     * <p>This channels the {@code WALogger} calls that WA Web emits from the ADV modules into a
-     * single Java logger so embedders can route them via {@code java.util.logging}.
-     */
-    private static final System.Logger LOGGER = System.getLogger(LiveDeviceService.class.getName());
+    /** The logger for {@link LiveDeviceService}. */
+    private static final System.Logger LOGGER = Log.get(LiveDeviceService.class);
 
     /**
      * The {@link LinkedWhatsAppClient} this service is bound to.
@@ -399,7 +396,7 @@ public final class LiveDeviceService implements DeviceService {
                 var localPhash = phashCalculator.calculate(allDeviceJids, DevicePhashVersion.V2, true);
 
                 if (localPhash.equals(expectedPhash)) {
-                    LOGGER.log(System.Logger.Level.DEBUG, "Phash pre-check passed, skipping device sync");
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "Phash pre-check passed, skipping device sync");
                     var nonNullLists = cachedLists.stream()
                             .filter(Objects::nonNull)
                             .toList();
@@ -603,9 +600,11 @@ public final class LiveDeviceService implements DeviceService {
 
         if (!missingMappings.isEmpty()) {
             var resolvedCaller = caller != null ? caller : "unknown";
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "LID null - {0} PNs, missing: {1}, caller: {2}",
-                    phoneNumberJids.size(), missingMappings.size(), resolvedCaller);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "LID null - {0} PNs, missing: {1}, caller: {2}",
+                        phoneNumberJids.size(), missingMappings.size(), resolvedCaller);
+            }
         }
     }
 
@@ -730,8 +729,10 @@ public final class LiveDeviceService implements DeviceService {
 
                         if (newList.advAccountType() == ADVEncryptionType.HOSTED) {
                             store.contactStore().addToInteropHostedVerificationCache(newList.userJid());
-                            LOGGER.log(System.Logger.Level.DEBUG,
-                                    "Added {0} to interop hosted verification cache", newList.userJid());
+                            if (Log.DEBUG) {
+                                LOGGER.log(Level.DEBUG,
+                                        "Added {0} to interop hosted verification cache", newList.userJid());
+                            }
                         }
 
                         full.accountSignatureKey()
@@ -740,13 +741,17 @@ public final class LiveDeviceService implements DeviceService {
                                     if (hostedOverrideEnabled && full.hasHostedDevice()) {
                                         try {
                                             preKeyHandler.storeIdentityFromAccountSignatureKey(newList.userJid(), accountSignatureKey);
-                                            LOGGER.log(System.Logger.Level.DEBUG,
-                                                    "Saved identity key from accountSignatureKey for hosted user {0}",
-                                                    newList.userJid());
+                                            if (Log.DEBUG) {
+                                                LOGGER.log(Level.DEBUG,
+                                                        "Saved identity key from accountSignatureKey for hosted user {0}",
+                                                        newList.userJid());
+                                            }
                                         } catch (Exception e) {
-                                            LOGGER.log(System.Logger.Level.WARNING,
-                                                    "Failed to save identity key from accountSignatureKey for {0}: {1}",
-                                                    newList.userJid(), e.getMessage());
+                                            if (Log.WARNING) {
+                                                LOGGER.log(Level.WARNING,
+                                                        "Failed to save identity key from accountSignatureKey for {0}: {1}",
+                                                        newList.userJid(), e.getMessage());
+                                            }
                                         }
                                     } else {
                                         try {
@@ -754,13 +759,17 @@ public final class LiveDeviceService implements DeviceService {
                                                     newList.userJid().toSignalAddress(),
                                                     SignalIdentityPublicKey.ofDirect(accountSignatureKey)
                                             );
-                                            LOGGER.log(System.Logger.Level.DEBUG,
-                                                    "Saved identity key from accountSignatureKey for user {0}",
-                                                    newList.userJid());
+                                            if (Log.DEBUG) {
+                                                LOGGER.log(Level.DEBUG,
+                                                        "Saved identity key from accountSignatureKey for user {0}",
+                                                        newList.userJid());
+                                            }
                                         } catch (Exception e) {
-                                            LOGGER.log(System.Logger.Level.WARNING,
-                                                    "Failed to save identity key for {0}: {1}",
-                                                    newList.userJid(), e.getMessage());
+                                            if (Log.WARNING) {
+                                                LOGGER.log(Level.WARNING,
+                                                        "Failed to save identity key for {0}: {1}",
+                                                        newList.userJid(), e.getMessage());
+                                            }
                                         }
                                     }
                                 });
@@ -950,14 +959,18 @@ public final class LiveDeviceService implements DeviceService {
                     store.contactStore().addDeviceList(fallback);
                     entry.getValue().complete(fallback);
                     result.add(fallback);
-                    LOGGER.log(System.Logger.Level.DEBUG, "Device list not found for {0}, falling back to primary device", entry.getKey());
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "Device list not found for {0}, falling back to primary device", entry.getKey());
+                    }
                 }
             }
 
             if (!usersWithValidatedKeyIndex.isEmpty()) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Device sync completed for {0} users with validated key index info",
-                        usersWithValidatedKeyIndex.size());
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "Device sync completed for {0} users with validated key index info",
+                            usersWithValidatedKeyIndex.size());
+                }
             }
 
             if (ownDevicesRemoved) {
@@ -969,6 +982,10 @@ public final class LiveDeviceService implements DeviceService {
 
             return result;
         } catch (Exception e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "device sync failed for " + toFetch.size() + " jids, context=" + context, e);
+            }
+
             var pending = PendingDeviceSync.of(toFetch, context);
             store.syncStore().addPendingDeviceSync(pending);
 
@@ -1191,8 +1208,10 @@ public final class LiveDeviceService implements DeviceService {
                             var response = client.sendNode(batch);
                             return usyncResponseParser.parse(response);
                         } catch (Throwable throwable) {
-                            LOGGER.log(System.Logger.Level.WARNING,
-                                    "getDevicesFetchedResults: cannot fetch device list", throwable);
+                            if (Log.WARNING) {
+                                LOGGER.log(Level.WARNING,
+                                        "getDevicesFetchedResults: cannot fetch device list", throwable);
+                            }
                             return List.of();
                         }
                     })
@@ -1238,7 +1257,7 @@ public final class LiveDeviceService implements DeviceService {
             exports = "isMeOrCurrentContactHosted",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void handleAccountTypeTransition(Jid userJid, ADVEncryptionType oldType, ADVEncryptionType newType, DeviceList oldList) {
-        LOGGER.log(System.Logger.Level.INFO, "Account type changed for {0}: {1} -> {2}", userJid, oldType, newType);
+        if (Log.INFO) LOGGER.log(Level.INFO, "Account type changed for {0}: {1} -> {2}", userJid, oldType, newType);
 
         if (newType == ADVEncryptionType.HOSTED) {
             if(!store.contactStore().isInInteropHostedVerificationCache(userJid)) {
@@ -1289,8 +1308,10 @@ public final class LiveDeviceService implements DeviceService {
         }
 
         if (newType == ADVEncryptionType.HOSTED && shouldDedupInitialHostedSystemMsg(userJid)) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Skipping duplicate hosted system message for {0}", userJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "Skipping duplicate hosted system message for {0}", userJid);
+            }
             return;
         }
 
@@ -1458,9 +1479,11 @@ public final class LiveDeviceService implements DeviceService {
      * @param newRawId   the new {@code rawId} (logged for diagnostics)
      */
     private void handleListReset(Jid userJid, DeviceList cachedList, String oldRawId, String newRawId) {
-        LOGGER.log(System.Logger.Level.INFO,
-                "Device list rawId changed for {0}: {1} -> {2}, triggering full reset (handleListReset)",
-                userJid, oldRawId, newRawId);
+        if (Log.INFO) {
+            LOGGER.log(Level.INFO,
+                    "Device list rawId changed for {0}: {1} -> {2}, triggering full reset (handleListReset)",
+                    userJid, oldRawId, newRawId);
+        }
         cleanupAllSessionsForUser(userJid, cachedList);
     }
 
@@ -1498,10 +1521,12 @@ public final class LiveDeviceService implements DeviceService {
                         || cachedValidIndexes.contains(keyIndex)
                         || keyIndex > cachedCurrentIndex;
                 if (!isValid) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "handleNoListReset: out-of-order timestamp detected for {0}: " +
-                                    "incomingTs={1}, cachedTs={2}, keyIndex={3} not in validIndexes={4}",
-                            userJid, newList.timestamp(), cachedList.timestamp(), keyIndex, cachedValidIndexes);
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "handleNoListReset: out-of-order timestamp detected for {0}: " +
+                                        "incomingTs={1}, cachedTs={2}, keyIndex={3} not in validIndexes={4}",
+                                userJid, newList.timestamp(), cachedList.timestamp(), keyIndex, cachedValidIndexes);
+                    }
                     throw new IllegalStateException(
                             "handleNoListReset: out-of-order timestamp detected for " + userJid);
                 }
@@ -1511,9 +1536,11 @@ public final class LiveDeviceService implements DeviceService {
         var changes = newList.mismatch(cachedList);
 
         if (!changes.addedDevices().isEmpty() || !changes.removedDevices().isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Device list incrementally updated for {0}: +{1} -{2} devices (handleNoListReset)",
-                    userJid, changes.addedDevices().size(), changes.removedDevices().size());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "Device list incrementally updated for {0}: +{1} -{2} devices (handleNoListReset)",
+                        userJid, changes.addedDevices().size(), changes.removedDevices().size());
+            }
         }
 
         return newList;
@@ -1581,8 +1608,10 @@ public final class LiveDeviceService implements DeviceService {
                 continue;
             }
 
-            LOGGER.log(System.Logger.Level.DEBUG, "Backfilling device list for {0} from LID {1}",
-                    requestedJid, lidJid.get());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "Backfilling device list for {0} from LID {1}",
+                        requestedJid, lidJid.get());
+            }
 
             var backfilledResult = switch (lidResult) {
                 case DeviceListResult.Full full -> {
@@ -1761,8 +1790,14 @@ public final class LiveDeviceService implements DeviceService {
                 var retried = sync.nextRetry();
                 store.syncStore().removePendingDeviceSync(sync);
                 if (retried.shouldRetry()) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "pending device sync retry failed for context=" + sync.context(), e);
+                    }
                     store.syncStore().addPendingDeviceSync(retried);
                 } else {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "pending device sync abandoned for context=" + sync.context(), e);
+                    }
                     flushDeferredAck(sync);
                 }
             }
@@ -1800,8 +1835,10 @@ public final class LiveDeviceService implements DeviceService {
         try {
             ackSender.ack(AckClass.NOTIFICATION, ackTarget).type("account_sync").send();
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Could not flush deferred account_sync ack for {0}; the server will replay it", notificationId);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "Could not flush deferred account_sync ack for {0}; the server will replay it", notificationId);
+            }
         }
     }
 
@@ -1852,8 +1889,10 @@ public final class LiveDeviceService implements DeviceService {
                 missingKey.retainDevices(currentDeviceIds);
 
                 if (missingKey.isMissingOnAllDevices()) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "All devices responded without missing sync key, scheduling grace period check");
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "All devices responded without missing sync key, scheduling grace period check");
+                    }
                     webAppStateService.scheduleAllDevicesRespondedCheck();
                 }
             }
@@ -2219,13 +2258,13 @@ public final class LiveDeviceService implements DeviceService {
         var deviceListNode = stanza.getChild("device-list", null);
         var keyIndexListNode = stanza.getChild("key-index-list");
         if (keyIndexListNode.isEmpty()) {
-            LOGGER.log(System.Logger.Level.WARNING, "Device notification missing key-index-list for {0}", userJid);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "Device notification missing key-index-list for {0}", userJid);
             return;
         }
 
         var timestamp = keyIndexListNode.get().getAttributeAsLong("ts", null);
         if (timestamp == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "Device notification missing timestamp for {0}", userJid);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "Device notification missing timestamp for {0}", userJid);
             return;
         }
 
@@ -2233,7 +2272,9 @@ public final class LiveDeviceService implements DeviceService {
             switch (action) {
                 case "add" -> handleDeviceAddNotification(userJid, deviceListNode, keyIndexListNode.get(), timestamp);
                 case "remove" -> handleDeviceRemoveNotification(userJid, deviceListNode, keyIndexListNode.get(), timestamp);
-                default -> LOGGER.log(System.Logger.Level.WARNING, "Unknown device action: {0}", action);
+                default -> {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "Unknown device action: {0}", action);
+                }
             }
         });
     }
@@ -2395,8 +2436,10 @@ public final class LiveDeviceService implements DeviceService {
         var cachedList = store.contactStore().findDeviceList(userJid);
 
         if (cachedList.isEmpty() || cachedList.get().deleted()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Device add notification for {0} without cached record, queueing for USync", userJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "Device add notification for {0} without cached record, queueing for USync", userJid);
+            }
 
             triggerUsyncForCoexDeviceAdd(deviceListStanza, userJid);
 
@@ -2405,20 +2448,24 @@ public final class LiveDeviceService implements DeviceService {
 
         var signedKeyIndexBytes = keyIndexListStanza.toContentBytes();
         if (signedKeyIndexBytes.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Device add notification missing signedKeyIndexBytes for {0}, ignoring", userJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "Device add notification missing signedKeyIndexBytes for {0}, ignoring", userJid);
+            }
             return;
         }
 
         if (timestamp < cachedList.get().timestamp().getEpochSecond()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Device add notification timestamp {0} < cached {1} for {2}, ignoring",
-                    timestamp, cachedList.get().timestamp().getEpochSecond(), userJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "Device add notification timestamp {0} < cached {1} for {2}, ignoring",
+                        timestamp, cachedList.get().timestamp().getEpochSecond(), userJid);
+            }
             return;
         }
 
         if (deviceListStanza == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "Device add notification missing device-list for {0}", userJid);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "Device add notification missing device-list for {0}", userJid);
             return;
         }
 
@@ -2427,9 +2474,11 @@ public final class LiveDeviceService implements DeviceService {
         var validatedKeyIndexInfo = validateKeyIndexList(userJid, deviceListStanza, keyIndexListStanza);
 
         if (validatedKeyIndexInfo != null && validatedKeyIndexInfo.timestamp().getEpochSecond() != timestamp) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Device add notification timestamp mismatch for {0}: protobuf={1}, notification={2}, ignoring",
-                    userJid, validatedKeyIndexInfo.timestamp().getEpochSecond(), timestamp);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "Device add notification timestamp mismatch for {0}: protobuf={1}, notification={2}, ignoring",
+                        userJid, validatedKeyIndexInfo.timestamp().getEpochSecond(), timestamp);
+            }
             return;
         }
 
@@ -2450,8 +2499,10 @@ public final class LiveDeviceService implements DeviceService {
 
         if (advAccountType == ADVEncryptionType.HOSTED) {
             store.contactStore().addToInteropHostedVerificationCache(userJid);
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Added {0} to interop hosted verification cache via notification", userJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "Added {0} to interop hosted verification cache via notification", userJid);
+            }
         }
 
         var currentIndex = validatedKeyIndexInfo != null ? validatedKeyIndexInfo.currentIndex() : 0;
@@ -2463,8 +2514,10 @@ public final class LiveDeviceService implements DeviceService {
         var clearRecord = false;
         var oldRawId = oldCachedList.rawId();
         if (oldRawId != null && !oldRawId.equals(rawId)) {
-            LOGGER.log(System.Logger.Level.INFO, "Device list rawId changed via notification for {0}: {1} -> {2}, triggering full reset",
-                    userJid, oldRawId, rawId);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "Device list rawId changed via notification for {0}: {1} -> {2}, triggering full reset",
+                        userJid, oldRawId, rawId);
+            }
             clearRecord = true;
             for (var device : oldCachedList.devices()) {
                 var deviceJid = device.toDeviceJid(userJid.user(), userJid.server());
@@ -2474,8 +2527,10 @@ public final class LiveDeviceService implements DeviceService {
 
         if (advAccountType != null && oldCachedList.advAccountType() != null
                 && advAccountType != oldCachedList.advAccountType()) {
-            LOGGER.log(System.Logger.Level.INFO, "Account type changed via notification for {0}: {1} -> {2}",
-                    userJid, oldCachedList.advAccountType(), advAccountType);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "Account type changed via notification for {0}: {1} -> {2}",
+                        userJid, oldCachedList.advAccountType(), advAccountType);
+            }
             clearRecord = true;
             handleAccountTypeTransition(userJid, oldCachedList.advAccountType(), advAccountType, oldCachedList);
         }
@@ -2569,7 +2624,7 @@ public final class LiveDeviceService implements DeviceService {
 
         store.contactStore().addDeviceList(newDeviceList);
 
-        LOGGER.log(System.Logger.Level.DEBUG, "Device added for {0}: {1} devices", userJid, devices.size());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "Device added for {0}: {1} devices", userJid, devices.size());
     }
 
     /**
@@ -2615,9 +2670,11 @@ public final class LiveDeviceService implements DeviceService {
             var isInValidIndexes = validatedKeyIndexInfo.validIndexes().contains(keyIndex);
 
             if (keyIndex != 0 && !isInValidIndexes) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Device {0} has keyIndex {1} not in validIndexes {2}, excluding from notification",
-                        deviceId, keyIndex, validatedKeyIndexInfo.validIndexes());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "Device {0} has keyIndex {1} not in validIndexes {2}, excluding from notification",
+                            deviceId, keyIndex, validatedKeyIndexInfo.validIndexes());
+                }
                 return Stream.empty();
             }
         }
@@ -2661,15 +2718,17 @@ public final class LiveDeviceService implements DeviceService {
     private void handleDeviceRemoveNotification(Jid userJid, Stanza deviceListStanza, Stanza keyIndexListStanza, long timestamp) {
         var cachedList = store.contactStore().findDeviceList(userJid);
         if (cachedList.isEmpty() || cachedList.get().deleted()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "No cached device list for {0}, ignoring remove", userJid);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "No cached device list for {0}, ignoring remove", userJid);
             return;
         }
 
         var oldList = cachedList.get();
 
         if (timestamp < oldList.timestamp().getEpochSecond()) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Device remove notification timestamp {0} < cached {1}, ignoring",
-                    timestamp, oldList.timestamp().getEpochSecond());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "Device remove notification timestamp {0} < cached {1}, ignoring",
+                        timestamp, oldList.timestamp().getEpochSecond());
+            }
             return;
         }
 
@@ -2722,7 +2781,7 @@ public final class LiveDeviceService implements DeviceService {
 
         store.contactStore().addDeviceList(updatedList);
 
-        LOGGER.log(System.Logger.Level.DEBUG, "Devices removed for {0}: {1} remaining", userJid, remainingDevices.size());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "Devices removed for {0}: {1} remaining", userJid, remainingDevices.size());
     }
 
     /**
@@ -2833,7 +2892,7 @@ public final class LiveDeviceService implements DeviceService {
                 ? advValidator.verifySKeyIndexWithAccSigKey(signedKeyIndexBytes.get())
                 : advValidator.decodeSignedKeyIndexBytes(userJid, signedKeyIndexBytes.get());
         if (validated.isEmpty()) {
-            LOGGER.log(System.Logger.Level.WARNING, "Key index list signature verification failed in notification");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "Key index list signature verification failed in notification");
             return null;
         }
 
@@ -2869,14 +2928,16 @@ public final class LiveDeviceService implements DeviceService {
 
         if (store.connectionStore().isResumeFromRestartComplete()) {
             getDeviceLists(List.of(userJid), UsyncContext.NOTIFICATION.wireValue(), null, false);
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Triggered immediate USync for device notification from {0}", userJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "Triggered immediate USync for device notification from {0}", userJid);
+            }
         } else {
             var pendingSync = PendingDeviceSync.of(List.of(userJid), UsyncContext.NOTIFICATION.wireValue());
             store.syncStore().addPendingDeviceSync(pendingSync);
 
-            if (isHostedDevice) {
-                LOGGER.log(System.Logger.Level.DEBUG,
+            if (isHostedDevice && Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
                         "Queued coex USync for hosted device notification from {0} (during resume)", userJid);
             }
         }
@@ -2984,7 +3045,9 @@ public final class LiveDeviceService implements DeviceService {
             var query = DeviceUSyncQueryBuilder.buildLidQuery(user, UsyncContext.VOIP.wireValue());
             response = client.sendNode(query);
         } catch (RuntimeException throwable) {
-            LOGGER.log(System.Logger.Level.WARNING, "queryUserLid: cannot resolve LID for " + user, throwable);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "queryUserLid: cannot resolve LID for " + Log.jid(String.valueOf(user)), throwable);
+            }
             return Optional.empty();
         }
 
@@ -3319,8 +3382,10 @@ public final class LiveDeviceService implements DeviceService {
         var isMe = (ownPn != null && ownPn.equals(owner.toUserJid()))
                 || (ownLid != null && ownLid.equals(owner.toUserJid()));
         if (isMe) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "syncd: trying to delete own device list");
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "syncd: trying to delete own device list");
+            }
         }
     }
 
@@ -3439,9 +3504,11 @@ public final class LiveDeviceService implements DeviceService {
         var isPnDeleted = pnRecord != null && pnRecord.deleted();
         var hasLid = lidRecord != null;
         var isLidDeleted = lidRecord != null && lidRecord.deleted();
-        LOGGER.log(System.Logger.Level.WARNING,
-                "[syncd] no device list pn={0}/{1} lid={2}/{3}",
-                hasPn, isPnDeleted, hasLid, isLidDeleted);
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING,
+                    "[syncd] no device list pn={0}/{1} lid={2}/{3}",
+                    hasPn, isPnDeleted, hasLid, isLidDeleted);
+        }
         throw new IllegalStateException("syncd: cannot find my device list");
     }
 
@@ -3460,9 +3527,11 @@ public final class LiveDeviceService implements DeviceService {
         var start = System.nanoTime();
         var lists = store.contactStore().deviceLists();
         var elapsedMs = Math.round((System.nanoTime() - start) / 1_000_000.0);
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "getAllDeviceLists: got {0} devices, took {1}ms",
-                lists.size(), elapsedMs);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "getAllDeviceLists: got {0} devices, took {1}ms",
+                    lists.size(), elapsedMs);
+        }
         return lists;
     }
 
@@ -3561,9 +3630,11 @@ public final class LiveDeviceService implements DeviceService {
         }
 
         if (!updatedRecords.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "handleICDCData: updated expected timestamp for {0} records",
-                    updatedRecords.size());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "handleICDCData: updated expected timestamp for {0} records",
+                        updatedRecords.size());
+            }
             for (var record : updatedRecords) {
                 store.contactStore().addDeviceList(record);
             }
@@ -3711,14 +3782,18 @@ public final class LiveDeviceService implements DeviceService {
         }
 
         if (offlineBizHostedSenderICDCProcessedCache.contains(relevantJid)) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "[handleHostedIcdcMetadataInline] skip, already processed {0}", relevantJid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "[handleHostedIcdcMetadataInline] skip, already processed {0}", relevantJid);
+            }
             return new HostedIcdcResult(false, true);
         }
 
         offlineBizHostedSenderICDCProcessedCache.add(relevantJid);
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "handleIcdcMetadataInline: add to interop cache for {0}", relevantJid);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "handleIcdcMetadataInline: add to interop cache for {0}", relevantJid);
+        }
 
         store.contactStore().addToInteropHostedVerificationCache(relevantJid);
 
@@ -3741,8 +3816,10 @@ public final class LiveDeviceService implements DeviceService {
                         try {
                             getDeviceLists(List.of(relevantJid), UsyncContext.NOTIFICATION.wireValue(), null, false);
                         } catch (Exception e) {
-                            LOGGER.log(System.Logger.Level.WARNING,
-                                    "Failed to sync device list for hosted transition: {0}", e.getMessage());
+                            if (Log.WARNING) {
+                                LOGGER.log(Level.WARNING,
+                                        "Failed to sync device list for hosted transition: {0}", e.getMessage());
+                            }
                         }
                     });
                 } else {
@@ -3750,8 +3827,10 @@ public final class LiveDeviceService implements DeviceService {
                     store.syncStore().addPendingDeviceSync(pendingSync);
                 }
 
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "handleHostedIcdcMetadataInline: update ADV type for {0}", relevantJid);
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "handleHostedIcdcMetadataInline: update ADV type for {0}", relevantJid);
+                }
 
                 var mismatch = (existingRecord != null && existingRecord.advAccountType() == ADVEncryptionType.E2EE)
                         || (existingRecord == null || !existingRecord.deletedChangedToHost());
@@ -3843,9 +3922,11 @@ public final class LiveDeviceService implements DeviceService {
 
         if (existingRecord == null || existingRecord.deleted()
                 || !rawId.equals(existingRecord.rawId()) || isNewPrimaryIdentity) {
-            LOGGER.log(System.Logger.Level.INFO,
-                    "ADV device update for message: list reset for {0} (rawId={1}, isNewPrimary={2})",
-                    userJid, rawId, isNewPrimaryIdentity);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO,
+                        "ADV device update for message: list reset for {0} (rawId={1}, isNewPrimary={2})",
+                        userJid, rawId, isNewPrimaryIdentity);
+            }
 
             if (existingRecord != null && !existingRecord.deleted()) {
                 cleanupAllSessionsForUser(userJid, existingRecord);
@@ -3882,8 +3963,10 @@ public final class LiveDeviceService implements DeviceService {
                             SignalIdentityPublicKey.ofDirect(storedIdentityKey)
                     );
                 } catch (Exception e) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "Failed to save identity for {0}: {1}", userJid, e.getMessage());
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "Failed to save identity for {0}: {1}", userJid, e.getMessage());
+                    }
                 }
             }
 
@@ -3898,10 +3981,12 @@ public final class LiveDeviceService implements DeviceService {
             if (!cachedValidIndexes.isEmpty()
                     && existingRecord.timestamp().getEpochSecond() >= timestamp
                     && !cachedValidIndexes.contains(keyIndex)) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "handleADVDeviceIdentity:handleNoListReset: out-of-order timestamp detected " +
-                                "for {0}: incomingTs={1}, cachedTs={2}, keyIndex={3}, validIndexes={4}",
-                        userJid, timestamp, existingRecord.timestamp(), keyIndex, cachedValidIndexes);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "handleADVDeviceIdentity:handleNoListReset: out-of-order timestamp detected " +
+                                    "for {0}: incomingTs={1}, cachedTs={2}, keyIndex={3}, validIndexes={4}",
+                            userJid, timestamp, existingRecord.timestamp(), keyIndex, cachedValidIndexes);
+                }
                 throw new IllegalStateException(
                         "handleADVDeviceIdentity:handleNoListReset: out-of-order timestamp detected");
             }
@@ -3948,8 +4033,10 @@ public final class LiveDeviceService implements DeviceService {
                                 SignalIdentityPublicKey.ofDirect(identityKey)
                         );
                     } catch (Exception e) {
-                        LOGGER.log(System.Logger.Level.WARNING,
-                                "Failed to save identity for {0}: {1}", deviceJid, e.getMessage());
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING,
+                                    "Failed to save identity for {0}: {1}", deviceJid, e.getMessage());
+                        }
                     }
                 }
             }
@@ -4018,9 +4105,11 @@ public final class LiveDeviceService implements DeviceService {
         try {
             preKeyHandler.storeIdentityFromAccountSignatureKey(deviceJid, accountSignatureKey);
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to persist local identity from pair-success accountSignatureKey for {0}: {1}",
-                    deviceJid, exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "Failed to persist local identity from pair-success accountSignatureKey for {0}: {1}",
+                        deviceJid, exception.getMessage());
+            }
         }
     }
 }

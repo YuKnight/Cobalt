@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.crypto;
 
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValue;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatActionBuilder;

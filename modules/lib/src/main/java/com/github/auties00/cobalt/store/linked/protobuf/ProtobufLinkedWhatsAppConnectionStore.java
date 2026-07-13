@@ -2,8 +2,10 @@ package com.github.auties00.cobalt.store.linked.protobuf;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientOfflineResumeState;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppConnectionStore;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -24,6 +26,11 @@ import java.util.concurrent.TimeUnit;
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 final class ProtobufLinkedWhatsAppConnectionStore implements LinkedWhatsAppConnectionStore {
+    /**
+     * The logger for {@link ProtobufLinkedWhatsAppConnectionStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufLinkedWhatsAppConnectionStore.class);
+
     /**
      * The optional HTTP/SOCKS proxy configuration.
      */
@@ -76,7 +83,10 @@ final class ProtobufLinkedWhatsAppConnectionStore implements LinkedWhatsAppConne
 
     @Override
     public LinkedWhatsAppConnectionStore setOfflineResumeState(LinkedWhatsAppClientOfflineResumeState state) {
-        this.offlineResumeState = Objects.requireNonNull(state, "state cannot be null");
+        Objects.requireNonNull(state, "state cannot be null");
+        var previous = this.offlineResumeState;
+        this.offlineResumeState = state;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "offline resume state {0} -> {1}", previous, state);
         if (state == LinkedWhatsAppClientOfflineResumeState.COMPLETE) {
             offlineDeliveryLatch.countDown();
         } else if (state == LinkedWhatsAppClientOfflineResumeState.INIT) {
@@ -97,8 +107,12 @@ final class ProtobufLinkedWhatsAppConnectionStore implements LinkedWhatsAppConne
             return;
         }
         try {
-            offlineDeliveryLatch.await(5, TimeUnit.MINUTES);
+            var completed = offlineDeliveryLatch.await(5, TimeUnit.MINUTES);
+            if (!completed && Log.WARNING) {
+                LOGGER.log(Level.WARNING, "offline delivery wait timed out after 5 minutes");
+            }
         } catch (InterruptedException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "offline delivery wait interrupted", e);
             Thread.currentThread().interrupt();
         }
     }

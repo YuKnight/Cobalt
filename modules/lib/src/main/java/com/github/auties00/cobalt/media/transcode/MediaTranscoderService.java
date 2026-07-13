@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.media.transcode;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.model.jid.Jid;

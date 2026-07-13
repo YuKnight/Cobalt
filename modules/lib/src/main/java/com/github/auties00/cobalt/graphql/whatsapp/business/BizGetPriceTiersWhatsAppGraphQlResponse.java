@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the price-tiers query built by {@link BizGetPriceTiersWhatsAppGraphQlRequest}
+ * Parses the graph.whatsapp.com GraphQL response of the price-tiers query built by {@link BizGetPriceTiersWhatsAppGraphQlRequest}
  * into a list of {@link BusinessPriceTier}.
  *
  * <p>Reads the linked {@code xwa_whatsapp_get_pricing_tiers} root and projects its {@code price_tiers}
@@ -43,7 +43,7 @@ public final class BizGetPriceTiersWhatsAppGraphQlResponse implements WhatsAppGr
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_whatsapp_get_pricing_tiers} and projects its
      * {@code price_tiers} list onto {@link BusinessPriceTier} entries; the returned {@link Optional} is
@@ -95,7 +95,7 @@ public final class BizGetPriceTiersWhatsAppGraphQlResponse implements WhatsAppGr
      * <p>Each {@link BusinessPriceTier} pairs a tier id with a localised description and currency
      * symbol.
      *
-     * @return the parsed tiers, empty when the relay returned none
+     * @return the parsed tiers, empty when the graph.whatsapp.com endpoint returned none
      */
     public List<BusinessPriceTier> priceTiers() {
         return priceTiers;

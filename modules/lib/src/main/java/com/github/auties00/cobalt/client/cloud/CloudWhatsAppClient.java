@@ -2,10 +2,10 @@ package com.github.auties00.cobalt.client.cloud;
 
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
-import com.github.auties00.cobalt.exception.WhatsAppCloudException;
-import com.github.auties00.cobalt.exception.WhatsAppCloudException.CloudApiException;
-import com.github.auties00.cobalt.exception.WhatsAppCloudException.CloudAuthException;
-import com.github.auties00.cobalt.exception.WhatsAppCloudException.CloudUnsupportedVersionException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudApiException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudAuthException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudUnsupportedVersionException;
 import com.github.auties00.cobalt.listener.*;
 import com.github.auties00.cobalt.listener.cloud.*;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppCloudMethod;

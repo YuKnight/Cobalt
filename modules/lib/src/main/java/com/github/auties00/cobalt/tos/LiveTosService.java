@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.tos;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.device.pairing.LinkedPrimaryPlatform;
 import com.github.auties00.cobalt.model.tos.TosNotice;
 import com.github.auties00.cobalt.props.ABPropsService;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -38,6 +40,11 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebTos")
 @WhatsAppWebModule(moduleName = "WAWebTosGatingUtils")
 public final class LiveTosService implements TosService {
+    /**
+     * The logger for {@link LiveTosService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveTosService.class);
+
     /**
      * The bound client used to read the store and to issue the {@code w:tos}
      * acceptance query.
@@ -90,6 +97,7 @@ public final class LiveTosService implements TosService {
             value = notice.defaultId() != null ? notice.defaultId() : "";
         }
         if (value.isBlank()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tos notice {0} resolved to no id", notice);
             return List.of();
         }
         if (!notice.multiValued()) {
@@ -122,7 +130,9 @@ public final class LiveTosService implements TosService {
         if (ids.isEmpty()) {
             return false;
         }
-        return client.store().settingsStore().acknowledgedTosNotices().containsAll(ids);
+        var acknowledged = client.store().settingsStore().acknowledgedTosNotices().containsAll(ids);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tos notice {0} acknowledged={1}", notice, acknowledged);
+        return acknowledged;
     }
 
     /**
@@ -144,8 +154,10 @@ public final class LiveTosService implements TosService {
             ids.addAll(resolveIds(notice));
         }
         if (ids.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tos refresh: no ids resolved, skipping query");
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tos refresh: querying {0} notice id(s)", ids.size());
         client.refreshTosNotices(ids);
     }
 

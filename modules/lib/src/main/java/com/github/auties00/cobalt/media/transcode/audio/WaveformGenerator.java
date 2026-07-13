@@ -45,10 +45,10 @@ final class WaveformGenerator {
     /**
      * Prevents instantiation; the type exposes only static entry points.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private WaveformGenerator() {
-        throw new UnsupportedOperationException();
+        throw new AssertionError();
     }
 
     /**

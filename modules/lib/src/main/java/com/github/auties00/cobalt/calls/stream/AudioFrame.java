@@ -17,11 +17,11 @@ import java.util.Objects;
  * commonly delivers, downsamples to 16 kHz mono before publishing a frame to an {@link AudioOutput};
  * likewise a sink draining an {@link AudioInput} that renders at another rate resamples on its side.
  * The sample buffer is referenced as supplied and never copied. A frame the call engine delivers to a
- * consumer through {@link AudioInput#read()} borrows a pooled buffer owned by the producing input: the
+ * consumer through {@link AudioInput#readAudio()} borrows a pooled buffer owned by the producing input: the
  * buffer is valid only until the consumer reads the next frame from that same input, at which point
  * the producer may refill and re offer it, so the consumer must neither retain a reference to it past
  * that point nor mutate it. A device backed {@link AudioOutput} may likewise lend a buffer it reuses
- * across {@link AudioOutput#take()} calls, subject to the same rule against retention.
+ * across {@link AudioOutput#takeAudio()} calls, subject to the same rule against retention.
  *
  * @apiNote The call API does not negotiate alternate audio formats; a source or sink operating at a
  * native rate other than 16 kHz mono is responsible for resampling, and a mismatched rate is
@@ -39,7 +39,7 @@ public record AudioFrame(short[] pcm, long ptsMicros) {
      * <p>The buffer reference is retained as supplied; the array is neither copied nor defensively
      * cloned. When the engine produces the frame from its pooled playback path the buffer is borrowed
      * and reused for a later frame, so a consumer must neither retain nor mutate it past the next
-     * {@link AudioInput#read()}. No constraint is placed on the sample count: an empty buffer is a
+     * {@link AudioInput#readAudio()}. No constraint is placed on the sample count: an empty buffer is a
      * legal zero length frame, and any positive length is accepted because the engine rechunks to its
      * fixed block size.
      *

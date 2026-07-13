@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.calls.transport.datachannel;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.AppDataMessage;
 import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloads;
 import com.github.auties00.cobalt.model.call.datachannel.AppDataPayloadsBuilder;
@@ -9,6 +10,7 @@ import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayloadSpec;
 import com.github.auties00.cobalt.model.call.datachannel.PeerFeedback;
 import com.github.auties00.cobalt.model.call.datachannel.PeerFeedbackSpec;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -35,6 +37,11 @@ import java.util.function.Consumer;
  * with no direct transport dependency.
  */
 public final class AppDataChannel {
+    /**
+     * The logger for {@link AppDataChannel}.
+     */
+    private static final System.Logger LOGGER = Log.get(AppDataChannel.class);
+
     /**
      * Sink writing one serialized application data message to the SCTP data channel, reporting success.
      *
@@ -217,6 +224,9 @@ public final class AppDataChannel {
         ready = true;
         var backlog = List.copyOf(pendingSctp);
         pendingSctp.clear();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "app data channel ready, flushing {0} buffered payloads", backlog.size());
+        }
         for (var bytes : backlog) {
             writeOrDrop(bytes);
         }
@@ -250,6 +260,10 @@ public final class AppDataChannel {
     private void dispatch(byte[] bytes) {
         if (!ready) {
             pendingSctp.add(bytes);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "app data payload buffered, sctp not ready, pending={0}",
+                        pendingSctp.size());
+            }
             return;
         }
         writeOrDrop(bytes);
@@ -266,9 +280,17 @@ public final class AppDataChannel {
         try {
             if (!sctpSink.send(bytes)) {
                 droppedPayloads++;
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "app data payload rejected by sctp sink, total dropped={0}",
+                            droppedPayloads);
+                }
             }
-        } catch (RuntimeException _) {
+        } catch (RuntimeException exception) {
             droppedPayloads++;
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "app data payload send failed, total dropped=" + droppedPayloads,
+                        exception);
+            }
         }
     }
 }

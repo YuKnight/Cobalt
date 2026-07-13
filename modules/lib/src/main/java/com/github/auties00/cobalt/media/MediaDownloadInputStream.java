@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.net.http.HttpClient;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -54,6 +56,9 @@ import java.util.zip.Inflater;
 @WhatsAppWebModule(moduleName = "WAMediaCrypto")
 @WhatsAppWebModule(moduleName = "WAWebCryptoDecryptMedia")
 final class MediaDownloadInputStream extends MediaInputStream {
+    /** The logger for {@link MediaDownloadInputStream}. */
+    private static final System.Logger LOGGER = Log.get(MediaDownloadInputStream.class);
+
     /**
      * The HTTP client backing the download connection.
      *
@@ -284,6 +289,11 @@ final class MediaDownloadInputStream extends MediaInputStream {
         }
 
         this.state = State.READ_DATA;
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "media download stream opened: encrypted={0} inflatable={1} payloadLength={2}",
+                    hasMediaKey, isInflatable(), payloadLength);
+        }
     }
 
     /**
@@ -387,6 +397,9 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                 var toRead = (int) Math.min(buffer.length, remainingText);
                                 var read = rawInputStream.read(buffer, 0, toRead);
                                 if (read == -1) {
+                                    if (Log.WARNING) {
+                                        LOGGER.log(Level.WARNING, "download stream ended early: expected {0} more bytes", remainingText);
+                                    }
                                     throw new WhatsAppMediaException.Download("Unexpected end of stream: expected " + remainingText + " more bytes");
                                 }
                                 remainingText -= read;
@@ -445,6 +458,9 @@ final class MediaDownloadInputStream extends MediaInputStream {
                             if (toRead > 0) {
                                 var read = rawInputStream.read(macBuffer, macBufferOffset, toRead);
                                 if (read == -1) {
+                                    if (Log.WARNING) {
+                                        LOGGER.log(Level.WARNING, "download stream ended early while reading mac: expected {0} more bytes", toRead);
+                                    }
                                     throw new WhatsAppMediaException.Download("Unexpected end of stream: expected " + toRead + " more bytes");
                                 }
                                 macBufferOffset += read;
@@ -467,6 +483,7 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                 if (ciphertextDigest != null) {
                                     var actualCiphertextSha256 = ciphertextDigest.digest();
                                     if (!MessageDigest.isEqual(expectedCiphertextSha256, actualCiphertextSha256)) {
+                                        if (Log.ERROR) LOGGER.log(Level.ERROR, "download ciphertext hash mismatch");
                                         throw new WhatsAppMediaException.Download("Ciphertext SHA256 hash doesn't match the expected value");
                                     }
                                 }
@@ -475,6 +492,7 @@ final class MediaDownloadInputStream extends MediaInputStream {
                                 if (!MessageDigest.isEqual(
                                         Arrays.copyOf(macBuffer, MAC_LENGTH),
                                         Arrays.copyOf(actualCiphertextMac, MAC_LENGTH))) {
+                                    if (Log.ERROR) LOGGER.log(Level.ERROR, "download mac verification failed");
                                     throw new WhatsAppMediaException.Download("Mac doesn't match the expected value");
                                 }
                             }
@@ -482,6 +500,7 @@ final class MediaDownloadInputStream extends MediaInputStream {
                             if (plaintextDigest != null) {
                                 var actualPlaintextSha256 = plaintextDigest.digest();
                                 if (!MessageDigest.isEqual(expectedPlaintextSha256, actualPlaintextSha256)) {
+                                    if (Log.ERROR) LOGGER.log(Level.ERROR, "download plaintext hash mismatch");
                                     throw new WhatsAppMediaException.Download("Plaintext SHA256 hash doesn't match the expected value");
                                 }
                             }
@@ -494,10 +513,13 @@ final class MediaDownloadInputStream extends MediaInputStream {
 
             return state == State.DONE;
         } catch (IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "download read failed", exception);
             throw new WhatsAppMediaException.Download("Cannot read data", exception);
         } catch (GeneralSecurityException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "download decrypt failed", exception);
             throw new WhatsAppMediaException.Download("Cannot decrypt data", exception);
         } catch (DataFormatException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "download inflate failed", exception);
             throw new WhatsAppMediaException.Download("Cannot inflate data", exception);
         }
     }

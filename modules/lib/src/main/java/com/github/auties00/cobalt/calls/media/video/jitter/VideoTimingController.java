@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.media.video.jitter;
 
 import com.github.auties00.cobalt.calls.util.RttEstimator;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Computes the render time of each video frame from the jitter estimate plus decode, render, and round
@@ -134,6 +137,11 @@ public final class VideoTimingController {
     private static final double AV_SYNC_TOLERANCE_MS = 100.0;
 
     /**
+     * The logger for {@link VideoTimingController}.
+     */
+    private static final System.Logger LOGGER = Log.get(VideoTimingController.class);
+
+    /**
      * The jitter estimator whose allowance feeds the target playout delay.
      */
     private final VideoJitterEstimator jitterEstimator;
@@ -185,7 +193,7 @@ public final class VideoTimingController {
      * timestamp into the local clock and adds the target playout delay. The frame should be held until the
      * returned instant.
      *
-     * @param captureRtpTimestamp the frame's 90 kHz capture RTP timestamp
+     * @param captureRtpTimestamp the frame's capture RTP timestamp
      * @param nowMs               the local arrival time of the frame in milliseconds, from a monotonic
      *                            source
      * @param pendingNackCount    the number of frames currently awaiting retransmission, gating the round
@@ -193,32 +201,87 @@ public final class VideoTimingController {
      * @return the local clock render instant in milliseconds
      */
     public long renderTimeMs(long captureRtpTimestamp, long nowMs, int pendingNackCount) {
+        return renderTimeMs(captureRtpTimestamp, nowMs, targetDelayPrefixMs(), pendingNackCount);
+    }
+
+    /**
+     * Returns the local clock render instant, in milliseconds, using a precomputed target delay prefix.
+     *
+     * <p>Seeds the capture to local clock mapping from the first frame, maps the frame's capture timestamp
+     * into the local clock, and adds the target playout delay formed from {@code delayPrefixMs} plus the size
+     * dependent {@linkplain #rttMarginMs(int) round trip margin}, clamped to the playout bounds. The
+     * {@code delayPrefixMs} is {@link #targetDelayPrefixMs()}, hoisted out of a poll's per frame loop so it is
+     * computed once per poll rather than once per frame.
+     *
+     * @param captureRtpTimestamp the frame's capture RTP timestamp
+     * @param nowMs               the local arrival time of the frame in milliseconds, from a monotonic
+     *                            source
+     * @param delayPrefixMs       the poll invariant {@link #targetDelayPrefixMs()} prefix
+     * @param pendingNackCount    the number of frames currently awaiting retransmission, gating the round
+     *                            trip margin
+     * @return the local clock render instant in milliseconds
+     */
+    public long renderTimeMs(long captureRtpTimestamp, long nowMs, double delayPrefixMs, int pendingNackCount) {
         var captureMs = captureRtpTimestamp * 1000.0 / RTP_CLOCK_HZ;
         if (!clockMapped) {
             captureToLocalOffsetMs = nowMs - captureMs;
             clockMapped = true;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "video timing controller: clock mapping seeded, offsetMs={0}", captureToLocalOffsetMs);
+            }
         }
         var localCaptureMs = captureMs + captureToLocalOffsetMs;
-        return Math.round(localCaptureMs + targetDelayMs(pendingNackCount));
+        var target = clamp(delayPrefixMs + rttMarginMs(pendingNackCount), MIN_PLAYOUT_DELAY_MS, MAX_PLAYOUT_DELAY_MS);
+        var renderTimeMs = Math.round(localCaptureMs + target);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "video timing controller: renderTimeMs={0} pendingNack={1}", renderTimeMs, pendingNackCount);
+        }
+        return renderTimeMs;
+    }
+
+    /**
+     * Returns the poll invariant prefix of the target playout delay, in milliseconds.
+     *
+     * <p>The jitter allowance plus the decode time estimate plus the fixed render delay, without the size
+     * dependent round trip margin and before the playout clamp. It does not change while a single
+     * {@link VideoJitterBuffer} poll walks its frames, so the caller computes it once per poll and passes it
+     * to {@link #renderTimeMs(long, long, double, int)} for each frame rather than recomputing it per frame.
+     *
+     * @return the jitter, decode, and render delay prefix in milliseconds
+     */
+    public double targetDelayPrefixMs() {
+        return jitterEstimator.jitterEstimateMs() + decodeTimeMs + RENDER_DELAY_MS;
+    }
+
+    /**
+     * Returns the bounded round trip retransmission margin, in milliseconds, for a pending NACK count.
+     *
+     * <p>The smoothed round trip estimate scaled by {@link #RTT_MULTIPLIER} and capped at
+     * {@link #RTT_MULT_ADD_CAP_MS}, or {@code 0} when the pending NACK count exceeds the jitter estimator's
+     * limit. This is the size dependent term the invariant {@link #targetDelayPrefixMs()} omits.
+     *
+     * @param pendingNackCount the number of frames currently awaiting retransmission
+     * @return the round trip margin in milliseconds
+     */
+    private double rttMarginMs(int pendingNackCount) {
+        return jitterEstimator.frameNackCount(pendingNackCount)
+                ? Math.min(rttEstimator.estimate() * RTT_MULTIPLIER, RTT_MULT_ADD_CAP_MS)
+                : 0.0;
     }
 
     /**
      * Returns the current target playout delay, in milliseconds.
      *
-     * <p>The jitter allowance plus the decode time estimate plus the fixed render delay plus the bounded
-     * round trip margin, clamped to {@link #MIN_PLAYOUT_DELAY_MS} and {@link #MAX_PLAYOUT_DELAY_MS}. The
-     * round trip margin is suppressed when the pending NACK count exceeds the jitter estimator's limit.
+     * <p>The {@linkplain #targetDelayPrefixMs() invariant prefix} plus the bounded
+     * {@linkplain #rttMarginMs(int) round trip margin}, clamped to {@link #MIN_PLAYOUT_DELAY_MS} and
+     * {@link #MAX_PLAYOUT_DELAY_MS}.
      *
      * @param pendingNackCount the number of frames currently awaiting retransmission
      * @return the clamped target playout delay in milliseconds
      */
     public double targetDelayMs(int pendingNackCount) {
-        var jitterMs = jitterEstimator.jitterEstimateMs();
-        var rttMs = jitterEstimator.frameNackCount(pendingNackCount)
-                ? Math.min(rttEstimator.estimate() * RTT_MULTIPLIER, RTT_MULT_ADD_CAP_MS)
-                : 0.0;
-        var target = jitterMs + decodeTimeMs + RENDER_DELAY_MS + rttMs;
-        return clamp(target, MIN_PLAYOUT_DELAY_MS, MAX_PLAYOUT_DELAY_MS);
+        return clamp(targetDelayPrefixMs() + rttMarginMs(pendingNackCount),
+                MIN_PLAYOUT_DELAY_MS, MAX_PLAYOUT_DELAY_MS);
     }
 
     /**
@@ -272,6 +335,31 @@ public final class VideoTimingController {
      * @return the feedback emitted, carrying the measured relative delay and the bounded correction
      */
     public AvSyncFeedback updateAvSync(long videoRenderMs, long audioPlayoutMs, AvSyncFeedbackSink sink, long nowMs) {
+        var feedback = computeAvSync(videoRenderMs, audioPlayoutMs);
+        sink.applyAvSyncFeedback(feedback);
+        if (feedback.correctionMs() != 0.0 && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "video timing controller: av sync correction, relativeDelayMs={0} correctionMs={1}",
+                    feedback.relativeDelayMs(), feedback.correctionMs());
+        }
+        return feedback;
+    }
+
+    /**
+     * Computes the bounded audio and video synchronization correction without delivering it.
+     *
+     * <p>Measures the offset between the video frame about to render and the audio sample playing at the same
+     * local clock as the difference of their playout instants. When the offset is within
+     * {@link #AV_SYNC_TOLERANCE_MS} the correction is zero (a heartbeat); otherwise it is weighted by
+     * {@link #AV_SYNC_WEIGHT} and clamped to {@link #MAX_AUDIO_SYNC_DELAY_MS}. The caller delivers the
+     * returned feedback to the audio buffer; {@link VideoJitterBuffer} computes it under its lock and pushes
+     * it after the frame is released, so the audio sink is not notified while the video lock is held.
+     *
+     * @param videoRenderMs  the local clock render instant of the next video frame, in milliseconds
+     * @param audioPlayoutMs the local clock playout instant of the audio sample currently playing, in
+     *                       milliseconds
+     * @return the feedback carrying the measured relative delay and the bounded correction
+     */
+    public AvSyncFeedback computeAvSync(long videoRenderMs, long audioPlayoutMs) {
         var relativeDelayMs = (double) (videoRenderMs - audioPlayoutMs);
         double correctionMs;
         if (Math.abs(relativeDelayMs) < AV_SYNC_TOLERANCE_MS) {
@@ -279,9 +367,7 @@ public final class VideoTimingController {
         } else {
             correctionMs = clamp(relativeDelayMs * AV_SYNC_WEIGHT, -MAX_AUDIO_SYNC_DELAY_MS, MAX_AUDIO_SYNC_DELAY_MS);
         }
-        var feedback = new AvSyncFeedback(relativeDelayMs, correctionMs);
-        sink.applyAvSyncFeedback(feedback);
-        return feedback;
+        return new AvSyncFeedback(relativeDelayMs, correctionMs);
     }
 
     /**
@@ -312,6 +398,7 @@ public final class VideoTimingController {
         decodeTimeMs = 0.0;
         captureToLocalOffsetMs = 0.0;
         clockMapped = false;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "video timing controller: reset");
     }
 
     /**

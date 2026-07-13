@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
@@ -12,6 +13,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code payment_tos} app-state action that records acceptance of
@@ -38,6 +41,11 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebPaymentTosSync")
 public final class PaymentTosHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link PaymentTosHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(PaymentTosHandler.class);
+
     /**
      * Holds the AB-props service consulted before applying any mutation.
      */
@@ -102,22 +110,27 @@ public final class PaymentTosHandler implements WebAppStateActionHandler {
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var platform = client.store().accountStore().device().platform();
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "payment tos: unsupported, platform {0} is not smb", platform);
             return MutationApplicationResult.unsupported();
         }
 
         if (!abPropsService.getBool(ABProp.PAYMENTS_BR_PIX_ON_WEB)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "payment tos: unsupported, pix ab-prop disabled");
             return MutationApplicationResult.unsupported();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "payment tos: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PaymentTosAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "payment tos mutation malformed: missing action value");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().businessStore().setPaymentTos(action);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "payment tos: acceptance recorded");
         return MutationApplicationResult.success();
     }
 

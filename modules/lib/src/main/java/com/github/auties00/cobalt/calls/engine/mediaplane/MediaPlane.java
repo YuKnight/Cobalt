@@ -91,20 +91,25 @@ public interface MediaPlane {
      *                         selection to that relay so both ends bind the relay they share; an
      *                         {@linkplain Optional#empty() empty} value leaves the implementer on its local
      *                         lowest latency pick, the fallback before the peer's latency report has arrived
+     * @param listener         the per call listener the plane reports the media connected and local capture
+     *                         interrupted events to; the controller supplies it so the plane holds no
+     *                         reference to the controller
      * @return the live media plane session; never {@code null}
      * @throws NullPointerException                                                if {@code callId},
      *                                                                             {@code relay},
      *                                                                             {@code voipSettings},
-     *                                                                             {@code callKey}, or
-     *                                                                             {@code streams} is
+     *                                                                             {@code callKey},
+     *                                                                             {@code streams}, or
+     *                                                                             {@code listener} is
      *                                                                             {@code null}
-     * @throws com.github.auties00.cobalt.exception.WhatsAppCallException.DataChannel if the transport or
+     * @throws com.github.auties00.cobalt.exception.linked.WhatsAppCallException.DataChannel if the transport or
      *                                                                             media plane cannot be
      *                                                                             brought up
      */
     Session bringUp(String callId, Stanza relay, List<Stanza> voipSettings, byte[] callKey, boolean isCaller,
                     boolean video, int participantCount, CallMembership membership,
-                    MediaStreams streams, Jid peerDeviceJid, Optional<String> electedRelayName);
+                    MediaStreams streams, Jid peerDeviceJid, Optional<String> electedRelayName,
+                    MediaSessionListener listener);
 
     /**
      * A live media plane session the controller holds for a call's lifetime.

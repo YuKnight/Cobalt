@@ -1,10 +1,12 @@
 
 package com.github.auties00.cobalt.client.linked;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 import com.github.auties00.libsignal.key.SignalIdentityPrivateKey;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Objects;
@@ -33,6 +35,11 @@ import java.util.Objects;
  * @see SignalIdentityKeyPair
  */
 public final class LinkedWhatsAppClientSixPartsKeys {
+    /**
+     * The logger for {@link LinkedWhatsAppClientSixPartsKeys}.
+     */
+    private static final System.Logger LOGGER = Log.get(LinkedWhatsAppClientSixPartsKeys.class);
+
     /**
      * The account phone number stored as an unsigned long without the
      * leading {@code +}.
@@ -109,6 +116,7 @@ public final class LinkedWhatsAppClientSixPartsKeys {
                 .replaceAll("\n", "")
                 .split(",", 6);
         if (parts.length != 6) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "malformed six-parts credentials, expected 6 fields got {0}", parts.length);
             throw new IllegalArgumentException("Malformed six parts: " + sixParts);
         }
         var phoneNumber = parsePhoneNumber(parts);
@@ -119,6 +127,7 @@ public final class LinkedWhatsAppClientSixPartsKeys {
         var identityId = Base64.getDecoder().decode(parts[5]);
         var noiseKeyPair = new SignalIdentityKeyPair(noisePublicKey, noisePrivateKey);
         var identityKeyPair = new SignalIdentityKeyPair(identityPublicKey, identityPrivateKey);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsed six-parts credentials for {0}", Log.phone(phoneNumber));
         return new LinkedWhatsAppClientSixPartsKeys(phoneNumber, noiseKeyPair, identityKeyPair, identityId);
     }
 
@@ -141,11 +150,13 @@ public final class LinkedWhatsAppClientSixPartsKeys {
     private static long parsePhoneNumber(String[] parts) {
         var rawPhoneNumber = parts[0];
         if(rawPhoneNumber.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "six-parts credentials: empty phone number field");
             throw new IllegalArgumentException("Invalid phone number: " + rawPhoneNumber);
         }
         try {
             return Long.parseUnsignedLong(rawPhoneNumber, rawPhoneNumber.charAt(0) == '+' ? 1 : 0, rawPhoneNumber.length(), 10);
         }catch (NumberFormatException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "six-parts credentials: malformed phone number {0}", Log.phone(rawPhoneNumber));
             throw new IllegalArgumentException("Invalid phone number: " + rawPhoneNumber);
         }
     }

@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.model.jid.Jid;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -21,8 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  */
 public class CallSecureSsrcGeneratorTest {
     private static final String CALL_ID = "007498E578A915C0F9814AC2CB48D28F";
-    private static final CallDeviceJid CALLER = CallDeviceJid.of(Jid.of("258252122116273:94@lid"));
-    private static final CallDeviceJid PEER = CallDeviceJid.of(Jid.of("39110693621863:0@lid"));
+    private static final Jid CALLER = Jid.of("258252122116273:94@lid");
+    private static final Jid PEER = Jid.of("39110693621863:0@lid");
 
     @Nested
     @DisplayName("audio stream (media-type 0/1/4)")

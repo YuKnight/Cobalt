@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.newsletter.Newsletter;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterState;
 import com.github.auties00.cobalt.model.newsletter.NewsletterViewerMetadata;
 import it.auties.protobuf.annotation.ProtobufMessage;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,6 +33,11 @@ import java.util.stream.Stream;
  */
 @ProtobufMessage
 final class PersistentNewsletter extends Newsletter {
+    /**
+     * The logger for {@link PersistentNewsletter}.
+     */
+    private static final System.Logger LOGGER = Log.get(PersistentNewsletter.class);
+
     /**
      * The MVStore facade backing every message accessor.
      *
@@ -70,10 +77,10 @@ final class PersistentNewsletter extends Newsletter {
     }
 
     /**
-     * Binds the given MVStore facade to this newsletter and reseeds the cached message count.
+     * Sets the given MVStore facade on this newsletter and reseeds the cached message count.
      *
      * @apiNote
-     * Invoked by {@link PersistentStore#attachMessageStore(PersistentMessageStore)} immediately
+     * Invoked by {@link PersistentStore#setMessageStore(PersistentMessageStore)} immediately
      * after construction or deserialisation. Until this call returns, every message accessor
      * throws because {@link #messageStore} is still {@code null}.
      *
@@ -83,9 +90,11 @@ final class PersistentNewsletter extends Newsletter {
      *
      * @param messageStore the MVStore facade owned by the parent store
      */
-    void attach(PersistentMessageStore messageStore) {
+    void setMessageStore(PersistentMessageStore messageStore) {
         this.messageStore = messageStore;
-        this.messageCount.set(messageStore.countNewsletterMessages(jid()));
+        var count = messageStore.countNewsletterMessages(jid());
+        this.messageCount.set(count);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "newsletter {0} message store set with {1} cached messages", jid(), count);
     }
 
     /**
@@ -103,6 +112,9 @@ final class PersistentNewsletter extends Newsletter {
         Objects.requireNonNull(info, "info cannot be null");
         if (messageStore.putNewsletterMessage(jid(), info)) {
             messageCount.incrementAndGet();
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "added newsletter message serverId={0} for {1}", info.serverId(), jid());
+        } else if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "overwrote newsletter message serverId={0} for {1}", info.serverId(), jid());
         }
     }
 
@@ -125,8 +137,10 @@ final class PersistentNewsletter extends Newsletter {
             if (removed) {
                 messageCount.decrementAndGet();
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "remove newsletter message {0} for {1} -> removed {2}", serverId, jid(), removed);
             return removed;
         } catch (NumberFormatException _) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "non-numeric newsletter message id {0}, ignoring remove", messageId);
             return false;
         }
     }
@@ -140,6 +154,7 @@ final class PersistentNewsletter extends Newsletter {
      */
     @Override
     public void removeMessages() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "removing all newsletter messages for {0}", jid());
         messageStore.removeNewsletterMessages(jid());
         messageCount.set(0);
     }

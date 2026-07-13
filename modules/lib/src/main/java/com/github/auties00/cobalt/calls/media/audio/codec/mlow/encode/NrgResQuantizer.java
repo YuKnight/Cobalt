@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.NrgResTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Quantizes the per subframe residual energy of one MLow unvoiced low band frame into the frame gain, shape,
@@ -78,6 +81,11 @@ public final class NrgResQuantizer {
     private static final float Q10_SCALE = 1.0f / (1 << 10);
 
     /**
+     * The logger for {@link NrgResQuantizer}.
+     */
+    private static final System.Logger LOGGER = Log.get(NrgResQuantizer.class);
+
+    /**
      * Constructs a residual energy quantizer.
      *
      * <p>The quantizer is stateless, so the instance exists only to group the encode entry point; it holds no
@@ -136,6 +144,9 @@ public final class NrgResQuantizer {
         int[] dbqQ14 = new int[numSubfr];
         if (numSubfr == 1) {
             dbqQ14[0] = frameDbqQ14;
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "nrgres quant result: numSubfr=1 frameQi={0} shapeQi=0", frameQi);
+            }
             return new Result(frameQi, 0, dbqQ14);
         }
 
@@ -157,6 +168,10 @@ public final class NrgResQuantizer {
 
         for (int i = 0; i < numSubfr; i++) {
             dbqQ14[i] = frameDbqQ14 + cb[shapeQi * numSubfr + i] * 16;
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "nrgres quant result: numSubfr={0} frameQi={1} shapeQi={2}",
+                    numSubfr, frameQi, shapeQi);
         }
         return new Result(frameQi, shapeQi, dbqQ14);
     }

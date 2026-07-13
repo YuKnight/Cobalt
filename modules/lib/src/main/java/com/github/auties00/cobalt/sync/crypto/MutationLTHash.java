@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.crypto;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -9,11 +10,11 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
 import javax.crypto.KDF;
 import javax.crypto.spec.HKDFParameterSpec;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.GeneralSecurityException;
 import java.util.*;
-import java.util.logging.Logger;
 
 /**
  * The 128-byte lattice-hash accumulator that WhatsApp uses as the anti-tampering
@@ -36,9 +37,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebSyncdAntiTamperingLtHash")
 public final class MutationLTHash {
     /**
-     * The logger for LT-Hash consistency-check diagnostics.
+     * The logger for {@link MutationLTHash}.
      */
-    private static final Logger LOGGER = Logger.getLogger(MutationLTHash.class.getName());
+    private static final System.Logger LOGGER = Log.get(MutationLTHash.class);
 
     /**
      * The fixed byte length of every LT-Hash buffer.
@@ -307,6 +308,7 @@ public final class MutationLTHash {
         }
 
         if (maxMutations != null && totalMutations > maxMutations) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ltHash check skipped: {0} mutations exceeds threshold {1}", totalMutations, maxMutations);
             return new LtHashCheckResult(null, null, null);
         }
 
@@ -329,10 +331,10 @@ public final class MutationLTHash {
             }
         }
 
-        if (!inconsistentCollections.isEmpty()) {
-            LOGGER.warning("[" + context + "] syncd: failed LtHash check for "
-                    + inconsistentCollections.size() + " collections => "
-                    + inconsistentCollections.subList(0, Math.min(3, inconsistentCollections.size())));
+        if (!inconsistentCollections.isEmpty() && Log.WARNING) {
+            LOGGER.log(Level.WARNING, "ltHash check failed for {0} collections in context {1}: {2}",
+                    inconsistentCollections.size(), context,
+                    inconsistentCollections.subList(0, Math.min(3, inconsistentCollections.size())));
         }
 
         return new LtHashCheckResult(consistent, scratchLtHash, cachedLtHash);
@@ -380,23 +382,23 @@ public final class MutationLTHash {
                 : hexPaddedSuffix(result.cachedLtHash(), 16);
 
         if (result.isLtHashConsistent() != null && !result.isLtHashConsistent()) {
-            LOGGER.warning("[" + checkContext + "] lthash first time inconsistent."
-                    + " scratchLtHash: " + scratchSuffix
-                    + ", cachedLtHash: " + cachedSuffix
-                    + ", context: " + diagnosticContext);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "lthash inconsistent in context {0}: scratch={1}, cached={2}, diagnostic={3}",
+                        checkContext, scratchSuffix, cachedSuffix, diagnosticContext);
+            }
             return true;
         } else if (result.isLtHashConsistent() != null && result.isLtHashConsistent()) {
-            LOGGER.fine("lthash consistent."
-                    + " scratchLtHash: " + scratchSuffix
-                    + ", cachedLtHash: " + cachedSuffix
-                    + ", context: " + diagnosticContext);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "lthash consistent in context {0}: scratch={1}, cached={2}, diagnostic={3}",
+                        checkContext, scratchSuffix, cachedSuffix, diagnosticContext);
+            }
             return false;
         }
 
-        LOGGER.fine("lthash unknown if consistent."
-                + " scratchLtHash: " + scratchSuffix
-                + ", cachedLtHash: " + cachedSuffix
-                + ", context: " + diagnosticContext);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "lthash consistency unknown in context {0}: scratch={1}, cached={2}, diagnostic={3}",
+                    checkContext, scratchSuffix, cachedSuffix, diagnosticContext);
+        }
         return null;
     }
 

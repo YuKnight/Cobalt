@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -16,6 +17,7 @@ import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.PinnedChatsEventBuilder;
 import com.github.auties00.cobalt.wam.type.PinnedChatsPremiumStatusType;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -38,6 +40,11 @@ import java.util.List;
  * {@link #emitPinnedChats(LinkedWhatsAppClient, Jid)}, driven from the client's pin path.
  */
 public final class PinChatMutationFactory {
+    /**
+     * The logger for {@link PinChatMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(PinChatMutationFactory.class);
+
     /**
      * Holds the WAM telemetry service used to commit the {@code WAWebPinnedChatsWamEvent}
      * pinned-chats beacon after a pin gesture completes.
@@ -85,6 +92,7 @@ public final class PinChatMutationFactory {
      * @return the pending mutation for the pin action
      */
     public SyncPendingMutation getPinMutation(Instant timestamp, boolean pinned, Jid chatJid) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building pin mutation chat={0} pinned={1}", chatJid, pinned);
         var pinAction = new PinActionBuilder()
                 .pinned(pinned)
                 .build();
@@ -137,6 +145,7 @@ public final class PinChatMutationFactory {
                         .filter(chat -> chat.pinnedTimestamp().isPresent())
                         .filter(chat -> !chat.jid().equals(chatJid))
                         .count() + 1L;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "committing pinned chats beacon chat={0} pinnedCount={1}", chatJid, pinnedChatNumber);
         wamService.commit(new PinnedChatsEventBuilder()
                 .pinnedChatNumber(pinnedChatNumber)
                 .pinnedChatsPremiumStatus(PinnedChatsPremiumStatusType.DISABLED)

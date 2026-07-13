@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -9,6 +10,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -27,6 +29,11 @@ import java.util.List;
  * {@code WAWebMobilePlatforms.isSMB()}.
  */
 public final class PaymentTosMutationFactory {
+    /**
+     * The logger for {@link PaymentTosMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(PaymentTosMutationFactory.class);
+
     /**
      * Constructs a payment-TOS mutation factory.
      *
@@ -55,6 +62,7 @@ public final class PaymentTosMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebPaymentTosSync", exports = "getPaymentTosSetMutation", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getPaymentTosSetMutation(PaymentTosAction action) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building payment tos set mutation");
         var timestamp = Instant.now();
         var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)

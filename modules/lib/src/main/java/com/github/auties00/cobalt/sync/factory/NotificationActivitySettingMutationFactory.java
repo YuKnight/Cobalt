@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
 import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingActionBuilder;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -27,6 +29,11 @@ import java.util.Objects;
  * used by every sibling {@code AccountSyncdActionBase} subclass.
  */
 public final class NotificationActivitySettingMutationFactory {
+    /**
+     * The logger for {@link NotificationActivitySettingMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(NotificationActivitySettingMutationFactory.class);
+
     /**
      * Constructs a notification-activity-setting mutation factory.
      *
@@ -59,6 +66,7 @@ public final class NotificationActivitySettingMutationFactory {
     public SyncPendingMutation getNotificationActivityMutation(Instant timestamp, NotificationActivitySettingAction.NotificationActivitySetting setting) {
         Objects.requireNonNull(timestamp, "timestamp cannot be null");
         Objects.requireNonNull(setting, "setting cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building notification activity setting mutation setting={0}", setting);
         var action = new NotificationActivitySettingActionBuilder()
                 .notificationActivitySetting(setting)
                 .build();

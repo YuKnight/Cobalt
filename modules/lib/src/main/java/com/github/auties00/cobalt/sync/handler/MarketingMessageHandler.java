@@ -12,6 +12,9 @@ import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageAct
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 
 /**
@@ -40,6 +43,10 @@ import java.time.Instant;
  */
 @WhatsAppWebModule(moduleName = "WAWebPremiumMessageSync")
 public final class MarketingMessageHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link MarketingMessageHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(MarketingMessageHandler.class);
 
     /**
      * Constructs a new {@link MarketingMessageHandler} for registration in
@@ -113,10 +120,12 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MarketingMessageAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "marketing message mutation has malformed action value, template={0}", messageId);
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         if (action.type().isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "marketing message mutation missing type, template={0}", messageId);
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
@@ -130,6 +139,7 @@ public final class MarketingMessageHandler implements WebAppStateActionHandler {
                 .deleted(action.isDeleted())
                 .mediaId(action.mediaId().orElse(null))
                 .build());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "marketing message template applied, template={0} type={1} deleted={2}", messageId, action.type().orElse(null), action.isDeleted());
         return MutationApplicationResult.success();
     }
 }

@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.pipeline;
 
 import com.github.auties00.cobalt.calls.platform.audio.AudioReaderPump;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -48,6 +50,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.MLowRedPacker;
  * {@link StreamPacketCache} this sender populates rather than from the send path here.
  */
 public final class AudioEncoderSender implements AudioReaderPump.AudioBlockSink {
+    /**
+     * The logger for {@link AudioEncoderSender}.
+     */
+    private static final System.Logger LOGGER = Log.get(AudioEncoderSender.class);
+
     /**
      * Lowest legal frames per packet count.
      *
@@ -317,9 +324,11 @@ public final class AudioEncoderSender implements AudioReaderPump.AudioBlockSink 
             // ordinary send path.
             flush();
             if (callStartFrames <= additionalDtxFramesAtCallStart && !frame.isEmpty()) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "audio dtx frame sent during call start window, count={0}", callStartFrames);
                 pending.add(frame);
                 flush();
             } else {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "audio dtx frame dropped");
                 silenceSink.onSilenceFrame();
             }
             return;
@@ -354,6 +363,10 @@ public final class AudioEncoderSender implements AudioReaderPump.AudioBlockSink 
         var sequence = nextExtendedSequence++;
         packetCache.store(sequence, payload, true);
         // TODO: wire MLowRedPacker - when enable_mlow_red is set, instantiate MLowRedPacker (from server pushed mlow_red_redundancy_level/stream_mtu/samplesPerFrame) and call pack(packetCache, payload, sequence) here in the group seal/send path, using its output as the RTP payload passed to sink.send
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "audio packet sent seq={0} frames={1} len={2} sealed={3} voiceActive={4}",
+                    sequence, pending.size(), payload.length, sframe != null, level.voiceActive());
+        }
         sink.send(payload, sequence, level);
         pending.clear();
     }
@@ -375,8 +388,12 @@ public final class AudioEncoderSender implements AudioReaderPump.AudioBlockSink 
      * @return the audio level extension to attach to the combined packet
      */
     private AudioLevelRtpExtension levelFor(List<EncodedAudioFrame> frames) {
-        // TODO: apply the num_lsb_to_zero low bit masking to the selected level once its default is known;
-        //  the level is currently left unmasked (default assumed 0)
+        // TODO: apply the audio_level_num_lsb_to_zero low-bit masking to the selected level when it is set.
+        //  RE (re/calls): this is the WA voip param audio_level_num_lsb_to_zero, a privacy toggle that zeroes
+        //  the low N bits of the 7-bit level in the value octet; WebRTC ships no such masking, so the baseline
+        //  default is 0 (no masking) and the current unmasked level is faithful for that default. When a
+        //  nonzero value is server-pushed, mask as level & ~((1 << n) - 1) here after selecting the group
+        //  level; the param is not yet plumbed from the voip settings into this sender.
         var voiceActive = false;
         var level = AudioLevelRtpExtension.SILENCE_LEVEL;
         for (var frame : frames) {

@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.util;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Accumulates timestamped samples into a sixty slot ring at one second granularity,
  * the rolling last minute window used for short horizon call telemetry.
@@ -29,6 +33,11 @@ package com.github.auties00.cobalt.calls.util;
  * {@link #sum()} never rescans the ring.
  */
 public final class LastMinuteBuffer {
+    /**
+     * The logger for {@link LastMinuteBuffer}.
+     */
+    private static final System.Logger LOGGER = Log.get(LastMinuteBuffer.class);
+
     /**
      * Number of slots in the ring, one per second of the trailing minute.
      */
@@ -163,6 +172,7 @@ public final class LastMinuteBuffer {
         } else {
             runningTotal += amount - samples[slot];
             head = (head + 1) % SLOT_COUNT;
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "last minute buffer wrapped, oldest slot overwritten");
         }
         samples[slot] = amount;
         timestamps[slot] = nowMillis;

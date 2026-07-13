@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.device.fanout;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
+import java.lang.System.Logger.Level;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,9 +30,9 @@ import java.util.stream.Collectors;
 public final class DeviceFanoutCalculator {
 
     /**
-     * Logger that emits the {@code [getFanOutList] no device for ...} fallback diagnostic.
+     * The logger for {@link DeviceFanoutCalculator}.
      */
-    private static final System.Logger LOGGER = System.getLogger(DeviceFanoutCalculator.class.getName());
+    private static final System.Logger LOGGER = Log.get(DeviceFanoutCalculator.class);
 
     /**
      * The {@link ABPropsService} consulted for the hosted-device gating flag.
@@ -115,11 +117,17 @@ public final class DeviceFanoutCalculator {
             }
         }
 
-        if (!fallbackWids.isEmpty()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
+        if (Log.DEBUG && !fallbackWids.isEmpty()) {
+            var redactedWids = fallbackWids.stream().map(Log::jid).toList();
+            LOGGER.log(Level.DEBUG,
                     "[getFanOutList] no device for {0} wids => primary {1}",
                     fallbackWids.size(),
-                    fallbackWids);
+                    redactedWids);
+        }
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "computed fanout of {0} devices from {1} user lists, includeHosted={2}",
+                    results.size(), deviceLists.size(), includeHosted);
         }
 
         return Collections.unmodifiableSet(results);
@@ -234,6 +242,11 @@ public final class DeviceFanoutCalculator {
     public Set<Jid> filterIdentityChanges(Set<Jid> devices, Set<Jid> changedIdentities) {
         if (changedIdentities.isEmpty()) {
             return devices;
+        }
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "filtering {0} changed identities out of {1} fanout devices",
+                    changedIdentities.size(), devices.size());
         }
 
         return devices.stream()

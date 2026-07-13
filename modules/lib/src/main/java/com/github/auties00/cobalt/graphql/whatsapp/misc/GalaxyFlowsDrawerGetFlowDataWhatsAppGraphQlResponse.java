@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the flow-metadata query built by
+ * Parses the graph.whatsapp.com GraphQL response of the flow-metadata query built by
  * {@link GalaxyFlowsDrawerGetFlowDataWhatsAppGraphQlRequest} into a {@link BusinessFlowMetadata}.
  *
  * <p>Reads the linked root {@code xwa_extensions_get_flow_data} and flattens its nested
@@ -39,14 +39,14 @@ public final class GalaxyFlowsDrawerGetFlowDataWhatsAppGraphQlResponse implement
      *
      * <p>Reserved for the static parser.
      *
-     * @param metadata the parsed flow metadata, or {@code null} when the relay omitted the field
+     * @param metadata the parsed flow metadata, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private GalaxyFlowsDrawerGetFlowDataWhatsAppGraphQlResponse(BusinessFlowMetadata metadata) {
         this.metadata = metadata;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_extensions_get_flow_data} and projects it onto a
      * {@link BusinessFlowMetadata}; the returned {@link Optional} is empty when {@code data} or the

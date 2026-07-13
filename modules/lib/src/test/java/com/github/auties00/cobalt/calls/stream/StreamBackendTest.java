@@ -53,8 +53,8 @@ class StreamBackendTest {
         void silenceFramesAreZeroAndClocked() throws InterruptedException {
             var source = AudioOutput.fromSilence();
             try {
-                var first = source.take();
-                var second = source.take();
+                var first = source.takeAudio();
+                var second = source.takeAudio();
                 assertEquals(FRAME_SAMPLES, first.pcm().length);
                 assertEquals(0, energy(first.pcm()), "silence is true digital zero, not comfort noise");
                 assertEquals(0L, first.ptsMicros());
@@ -70,8 +70,8 @@ class StreamBackendTest {
         void silenceCustomGeometry() throws InterruptedException {
             var source = new SilenceAudioOutput(320, 20_000);
             try {
-                var first = source.take();
-                var second = source.take();
+                var first = source.takeAudio();
+                var second = source.takeAudio();
                 assertEquals(320, first.pcm().length);
                 assertEquals(20_000L, second.ptsMicros(), "a 20 ms frame steps the clock by 20000 us");
             } finally {
@@ -97,8 +97,8 @@ class StreamBackendTest {
             try {
                 var pcm = ramp(FRAME_SAMPLES);
                 var sink = AudioInput.toWav(path);
-                sink.offer(new AudioFrame(pcm, 0L));
-                sink.offer(new AudioFrame(pcm, FRAME_MICROS));
+                sink.offerAudio(new AudioFrame(pcm, 0L));
+                sink.offerAudio(new AudioFrame(pcm, FRAME_MICROS));
                 sink.shutdown();
 
                 var bytes = Files.readAllBytes(path);
@@ -131,10 +131,10 @@ class StreamBackendTest {
             var path = Files.createTempFile("calls-stream-verify-idem", ".wav");
             try {
                 var sink = AudioInput.toWav(path);
-                sink.offer(new AudioFrame(ramp(FRAME_SAMPLES), 0L));
+                sink.offerAudio(new AudioFrame(ramp(FRAME_SAMPLES), 0L));
                 sink.shutdown();
                 var sizeAfterFirst = Files.size(path);
-                sink.offer(new AudioFrame(ramp(FRAME_SAMPLES), FRAME_MICROS));
+                sink.offerAudio(new AudioFrame(ramp(FRAME_SAMPLES), FRAME_MICROS));
                 sink.shutdown(); // second shutdown must not throw
                 assertEquals(sizeAfterFirst, Files.size(path),
                         "a frame offered after shutdown must not be appended");

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.device.key;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,7 @@ import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.state.SignalPreKeyBundle;
 import com.github.auties00.libsignal.state.SignalPreKeyBundleBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -37,6 +39,11 @@ import java.util.concurrent.Future;
 @WhatsAppWebModule(moduleName = "WAWebManageE2ESessionsJob")
 @WhatsAppWebModule(moduleName = "WAWebGetIdentityKeysJob")
 public final class DevicePreKeyHandler {
+    /**
+     * The logger for {@link DevicePreKeyHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(DevicePreKeyHandler.class);
+
     /**
      * Maximum number of devices included in a single pre-key IQ batch.
      *
@@ -174,6 +181,11 @@ public final class DevicePreKeyHandler {
             return new PreKeyFetchResult(Map.of(), 0);
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "fetching prekey bundles for {0} devices, identityReason={1}",
+                    deviceJids.size(), hasUserReasonIdentity);
+        }
+
         var devicesNeedingFetch = new ArrayList<Jid>();
         var existingFutures = new HashMap<Jid, CompletableFuture<SignalPreKeyBundle>>();
 
@@ -234,6 +246,7 @@ public final class DevicePreKeyHandler {
                     }
                 }
             } catch (InterruptedException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "interrupted while fetching prekey bundles", e);
                 for (var future : newFutures.values()) {
                     future.completeExceptionally(e);
                 }
@@ -275,6 +288,10 @@ public final class DevicePreKeyHandler {
             sessionCipher.process(deviceJid.toSignalAddress(), bundle);
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "resolved {0} prekey bundles, depleted={1}", allBundles.size(), depletedPrekeyCount);
+        }
+
         return new PreKeyFetchResult(allBundles, depletedPrekeyCount);
     }
 
@@ -306,9 +323,15 @@ public final class DevicePreKeyHandler {
             exports = "fetchPrekeys",
             adaptation = WhatsAppAdaptation.DIRECT)
     private PreKeyBatchResult fetchPreKeyBatch(List<Jid> deviceJids, boolean hasUserReasonIdentity) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending prekey query for {0} devices", deviceJids.size());
         var query = buildPreKeyQuery(deviceJids, hasUserReasonIdentity);
         var response = client.sendNode(query);
-        return parsePreKeyResponse(response);
+        var result = parsePreKeyResponse(response);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "prekey query returned {0} bundles, depleted={1}",
+                    result.bundles().size(), result.depletedPrekeyCount());
+        }
+        return result;
     }
 
     /**
@@ -419,6 +442,7 @@ public final class DevicePreKeyHandler {
 
         var listNode = response.getChild("list");
         if (listNode.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "prekey response missing list node");
             return new PreKeyBatchResult(result, 0);
         }
 
@@ -435,8 +459,10 @@ public final class DevicePreKeyHandler {
                     result.put(deviceJid, bundle);
                 }
             } catch (Exception e) {
-                var jid = userNode.getAttribute("jid").map(Object::toString).orElse("unknown");
-                System.err.println("Failed to parse prekey bundle for " + jid + ": " + e.getMessage());
+                if (Log.WARNING) {
+                    var jid = userNode.getAttribute("jid").map(Object::toString).orElse("unknown");
+                    LOGGER.log(Level.WARNING, "failed to parse prekey bundle for " + Log.jid(jid), e);
+                }
             }
         }
 
@@ -624,6 +650,7 @@ public final class DevicePreKeyHandler {
     public int ensureSessions(Collection<Jid> deviceJids, boolean force) {
         Collection<Jid> targets;
         if (force) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "forcing session re-establishment for {0} devices", deviceJids.size());
             var signalStore = client.store().signalStore();
             for (var deviceJid : deviceJids) {
                 signalStore.removeSession(deviceJid.toSignalAddress());
@@ -635,6 +662,7 @@ public final class DevicePreKeyHandler {
         if (targets.isEmpty()) {
             return 0;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ensuring sessions for {0} devices", targets.size());
 
         return fetchAndProcessPreKeyBundles(targets).depletedPrekeyCount();
     }
@@ -690,6 +718,11 @@ public final class DevicePreKeyHandler {
             return;
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "prefetching identity keys for {0} of {1} users",
+                    usersNeedingKeys.size(), userJids.size());
+        }
+
         var batches = batchUsers(usersNeedingKeys, MAX_DEVICES_PER_QUERY);
 
         // TODO: Use https://openjdk.org/jeps/505 when it comes out of preview
@@ -702,6 +735,7 @@ public final class DevicePreKeyHandler {
                     .toList();
             executor.invokeAll(tasks);
         } catch (InterruptedException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "interrupted while fetching identity keys", e);
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while fetching identity keys", e);
         }
@@ -719,6 +753,7 @@ public final class DevicePreKeyHandler {
             exports = "getAndStoreIdentityKeys",
             adaptation = WhatsAppAdaptation.DIRECT)
     private void fetchAndStoreIdentityKeyBatch(List<Jid> userJids) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending identity key query for {0} users", userJids.size());
         var query = buildIdentityKeyQuery(userJids);
         var response = client.sendNode(query);
         parseAndStoreIdentityKeyResponse(response);
@@ -784,6 +819,7 @@ public final class DevicePreKeyHandler {
 
         var store = client.store();
 
+        var storedCount = 0;
         for (var userNode : listNode.get().getChildren("user")) {
             try {
                 var errorNode = userNode.getChild("error");
@@ -798,18 +834,26 @@ public final class DevicePreKeyHandler {
                         .orElse(null);
 
                 if (identityKeyBytes == null || identityKeyBytes.length != 32) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "malformed identity key for {0}", deviceJid);
+                    }
                     continue;
                 }
 
                 var address = deviceJid.toSignalAddress();
                 var identityKey = SignalIdentityPublicKey.ofDirect(identityKeyBytes);
                 store.signalStore().saveIdentity(address, identityKey);
+                storedCount++;
 
             } catch (Exception e) {
-                var jid = userNode.getAttribute("jid").map(Object::toString).orElse("unknown");
-                System.err.println("Failed to store identity key for " + jid + ": " + e.getMessage());
+                if (Log.WARNING) {
+                    var jid = userNode.getAttribute("jid").map(Object::toString).orElse("unknown");
+                    LOGGER.log(Level.WARNING, "failed to store identity key for " + Log.jid(jid), e);
+                }
             }
         }
+
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stored {0} identity keys", storedCount);
     }
 
     /**
@@ -869,6 +913,8 @@ public final class DevicePreKeyHandler {
         if (accountSignatureKey.length != 32) {
             throw new IllegalArgumentException("Account signature key must be 32 bytes");
         }
+
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "storing identity from account signature key for {0}", userJid);
 
         var store = client.store();
         var primaryDeviceJid = userJid.toUserJid().withDevice(0);

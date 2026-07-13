@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -34,6 +36,9 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAMediaCrypto")
 abstract class MediaInputStream extends InputStream {
+    /** The logger for {@link MediaInputStream}. */
+    private static final System.Logger LOGGER = Log.get(MediaInputStream.class);
+
     /**
      * The streaming buffer size in bytes used for chunked reads and cipher
      * operations.
@@ -156,6 +161,7 @@ abstract class MediaInputStream extends InputStream {
                     .thenExpand(mediaKeyName.getBytes(StandardCharsets.UTF_8), EXPANDED_SIZE);
             return hkdf.deriveData(params);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "media key derivation failed for " + mediaKeyName, e);
             throw new WhatsAppMediaException("Cannot derive media key data", e);
         }
     }
@@ -179,6 +185,7 @@ abstract class MediaInputStream extends InputStream {
         try {
             return MessageDigest.getInstance("SHA-256");
         } catch (GeneralSecurityException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sha-256 digest unavailable", exception);
             throw new WhatsAppMediaException("Cannot create new hash", exception);
         }
     }
@@ -207,6 +214,7 @@ abstract class MediaInputStream extends InputStream {
             cipher.init(mode, key, iv);
             return cipher;
         } catch (GeneralSecurityException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "aes-cbc cipher init failed for mode " + mode, exception);
             throw new WhatsAppMediaException("Cannot create new cipher", exception);
         }
     }
@@ -232,6 +240,7 @@ abstract class MediaInputStream extends InputStream {
             mac.init(key);
             return mac;
         } catch (GeneralSecurityException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "hmac-sha256 init failed", exception);
             throw new WhatsAppMediaException("Cannot create new mac", exception);
         }
     }

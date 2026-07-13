@@ -22,7 +22,7 @@ public final class WamAnnotations {
     static final String WAM_ENUM_CONSTANT = WamEnumConstant.class.getName();
 
     private WamAnnotations() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.misc;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,7 +14,7 @@ import java.io.UncheckedIOException;
 import java.util.List;
 
 /**
- * Builds the relay query that fetches Meta AI search null-state suggestions, the suggested queries
+ * Builds the graph.whatsapp.com GraphQL query that fetches Meta AI search null-state suggestions, the suggested queries
  * shown before the user has typed anything into the AI search box.
  *
  * <p>The operation takes three top-level GraphQL variables, mapped directly without an enclosing
@@ -20,7 +22,7 @@ import java.util.List;
  * {@code WAWebGetMetaAISearchSuggestionsAction}: the current {@code locale}, a
  * {@code null_state_source} naming the surface that requested the suggestions (observed value
  * {@code "SEARCH"}), and the optional {@code exp_config} experiment-bucket list derived from the
- * {@code ai_experiment_graphql_config} AB property. The relay returns the suggestions under
+ * {@code ai_experiment_graphql_config} AB property. The graph.whatsapp.com endpoint returns the suggestions under
  * {@code xwa_genai_meta_ai_search_null_state}; the reply is consumed through
  * {@link FetchMetaAiSearchNullStateSuggestionsWhatsAppGraphQlResponse}.
  *
@@ -29,10 +31,10 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebFetchMetaAISearchNullStateSuggestionsQuery")
 public final class FetchMetaAiSearchNullStateSuggestionsWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchMetaAISearchNullStateSuggestionsQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -148,5 +150,21 @@ public final class FetchMetaAiSearchNullStateSuggestionsWhatsAppGraphQlRequest i
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.WWW;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

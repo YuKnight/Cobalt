@@ -2,12 +2,15 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.chat.UsernameChatStartModeAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Mirrors the user's preferred addressing scheme for chats started from a username (LID versus
@@ -27,6 +30,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * action as unsupported. Cobalt's handler ingests it today so the wire payload is not lost.
  */
 public final class UsernameChatStartModeHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link UsernameChatStartModeHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(UsernameChatStartModeHandler.class);
 
     /**
      * Constructs the handler.
@@ -94,10 +101,13 @@ public final class UsernameChatStartModeHandler implements WebAppStateActionHand
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof UsernameChatStartModeAction action)
                 || action.chatStartMode().isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "username chat start mode: malformed mutation");
             return MutationApplicationResult.malformed();
         }
 
         client.store().settingsStore().setUsernameChatStartMode(action.chatStartMode().get());
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "username chat start mode: set mode={0}", action.chatStartMode().get());
 
         return MutationApplicationResult.success();
     }

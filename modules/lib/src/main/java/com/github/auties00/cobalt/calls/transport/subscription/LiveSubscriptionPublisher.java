@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.calls.engine.participant.ParticipantProvider;
 import com.github.auties00.cobalt.calls.engine.participant.ParticipantView;
 import com.github.auties00.cobalt.calls.util.TimerEntry;
 import com.github.auties00.cobalt.calls.util.TimerHeap;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.RxSubscriptions;
 import com.github.auties00.cobalt.model.call.datachannel.RxSubscriptionsBuilder;
 import com.github.auties00.cobalt.model.call.datachannel.RxSubscriptionsSpec;
@@ -17,6 +18,7 @@ import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptors;
 import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptorsBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,6 +64,11 @@ import com.github.auties00.cobalt.calls.transport.LiveRelayTransport;
  * following resend so the periodic callback continues on its own.
  */
 public final class LiveSubscriptionPublisher {
+    /**
+     * The logger for {@link LiveSubscriptionPublisher}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveSubscriptionPublisher.class);
+
     /**
      * The default interval between resends of the cached receive subscription.
      *
@@ -382,6 +389,9 @@ public final class LiveSubscriptionPublisher {
     public SubscriptionStunAttribute buildSenderAttribute(SenderSubscriptions senderSubscriptions) {
         Objects.requireNonNull(senderSubscriptions, "senderSubscriptions cannot be null");
         var bytes = SenderSubscriptionsSpec.encode(senderSubscriptions);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "sender subscription framed, {0} bytes", bytes.length);
+        }
         return new SubscriptionStunAttribute(SubscriptionStunAttribute.SENDER_SUBSCRIPTIONS_TYPE, bytes);
     }
 
@@ -401,6 +411,9 @@ public final class LiveSubscriptionPublisher {
     public SubscriptionStunAttribute buildReceiverAttribute(RxSubscriptions rxSubscriptions) {
         Objects.requireNonNull(rxSubscriptions, "rxSubscriptions cannot be null");
         var bytes = RxSubscriptionsSpec.encode(rxSubscriptions);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "receiver subscription framed, {0} bytes", bytes.length);
+        }
         return new SubscriptionStunAttribute(SubscriptionStunAttribute.RECEIVER_SUBSCRIPTION_TYPE, bytes);
     }
 
@@ -465,10 +478,15 @@ public final class LiveSubscriptionPublisher {
                 }
             }
         }
-        return new RxSubscriptionsBuilder()
+        var result = new RxSubscriptionsBuilder()
                 .vidRxPids(pids)
                 .vidSubscriptions(subscriptions)
                 .build();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rx subscription computed, {0} pid(s), {1} quality entrie(s)",
+                    pids.size(), subscriptions.size());
+        }
+        return result;
     }
 
     /**
@@ -494,12 +512,18 @@ public final class LiveSubscriptionPublisher {
         // TODO: emit the leading 0x4000 WARP rate control report the live capture carries ahead of the
         //  subscription; it is hop by hop SRTP sealed and the seal is not reproducible from captures yet.
         if (!rxState.shouldPublish(rxSubscriptions)) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "rx subscription unchanged, resend suppressed");
+            }
             return Optional.empty();
         }
         rxState.record(rxSubscriptions);
         var attribute = buildReceiverAttribute(rxSubscriptions);
         cachedReceiverAttribute = attribute;
         armResendTimer(nowNanos);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rx subscription published, {0} pid(s)", rxSubscriptions.vidRxPids().size());
+        }
         return Optional.of(attribute);
     }
 
@@ -521,6 +545,9 @@ public final class LiveSubscriptionPublisher {
             resendTimer.cancel();
         }
         resendTimer = timerHeap.schedule(nowNanos, resendInterval, this::onResendTimer);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "rx subscription resend timer armed, interval={0}", resendInterval);
+        }
     }
 
     /**
@@ -542,6 +569,9 @@ public final class LiveSubscriptionPublisher {
             return;
         }
         rxResender.accept(cached);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "rx subscription resent");
+        }
         armResendTimer(clock.getAsLong());
     }
 
@@ -577,5 +607,8 @@ public final class LiveSubscriptionPublisher {
         rxState.clear();
         cachedReceiverAttribute = null;
         rtcpRxTable.clear();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "subscription publisher closed");
+        }
     }
 }

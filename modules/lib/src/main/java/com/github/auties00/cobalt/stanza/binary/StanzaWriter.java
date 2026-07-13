@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stanza.binary;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,7 @@ import com.github.auties00.cobalt.util.DataUtils;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.System.Logger.Level;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
@@ -77,6 +79,11 @@ import static com.github.auties00.cobalt.stanza.binary.StanzaTokens.*;
  */
 @WhatsAppWebModule(moduleName = "WAWap")
 public abstract class StanzaWriter implements AutoCloseable {
+
+    /**
+     * The logger for {@link StanzaWriter}.
+     */
+    private static final System.Logger LOGGER = Log.get(StanzaWriter.class);
 
     /**
      * Holds the exclusive upper bound for values that fit in an unsigned byte.
@@ -288,6 +295,7 @@ public abstract class StanzaWriter implements AutoCloseable {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public void writeStanza(Stanza stanza) throws IOException {
         Objects.requireNonNull(stanza, "stanza");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "encoding stanza {0}", stanza);
         writeByte(0);
         writeStanzaBody(stanza);
     }
@@ -567,6 +575,7 @@ public abstract class StanzaWriter implements AutoCloseable {
      */
     private void writeStreamBlob(SizedInputStream content) throws IOException {
         var declared = Math.toIntExact(content.length());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "writing stream blob, declared length {0}", declared);
         writeBinary(declared);
         try (var stream = Objects.requireNonNull(content.openStream(), "content stream supplier yielded null")) {
             var chunk = new byte[8192];
@@ -577,8 +586,10 @@ public abstract class StanzaWriter implements AutoCloseable {
                 total += read;
             }
             if (total != declared) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "stream blob length mismatch, wrote {0} bytes, declared {1}", total, declared);
                 throw new IOException("content stream yielded " + total + " bytes but advertised " + declared);
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wrote stream blob, {0} bytes", total);
         }
     }
 

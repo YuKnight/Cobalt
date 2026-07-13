@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the Meta AI search type-ahead query built by
+ * Parses the graph.whatsapp.com GraphQL response of the Meta AI search type-ahead query built by
  * {@link FetchMetaAiSearchTypeAheadSuggestionsWhatsAppGraphQlRequest} into a {@link MetaAiSearchSuggestions}.
  *
  * <p>Reads the linked root {@code xwa_genai_meta_ai_search_typeahead} and projects its
@@ -37,7 +37,7 @@ public final class FetchMetaAiSearchTypeAheadSuggestionsWhatsAppGraphQlResponse 
      *
      * <p>Reserved for the static parser.
      *
-     * @param suggestions the parsed suggestions bundle, or {@code null} when the relay omitted the
+     * @param suggestions the parsed suggestions bundle, or {@code null} when the graph.whatsapp.com endpoint omitted the
      *                    field
      */
     private FetchMetaAiSearchTypeAheadSuggestionsWhatsAppGraphQlResponse(MetaAiSearchSuggestions suggestions) {
@@ -45,7 +45,7 @@ public final class FetchMetaAiSearchTypeAheadSuggestionsWhatsAppGraphQlResponse 
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_genai_meta_ai_search_typeahead} and projects it onto a
      * {@link MetaAiSearchSuggestions}; the returned {@link Optional} is empty when {@code data} or

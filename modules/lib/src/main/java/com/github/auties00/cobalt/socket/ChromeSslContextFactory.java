@@ -1,7 +1,10 @@
 package com.github.auties00.cobalt.socket;
 
+import com.github.auties00.cobalt.log.Log;
+
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
+import java.lang.System.Logger.Level;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 
@@ -27,6 +30,9 @@ import java.security.NoSuchAlgorithmException;
  * cipher list is laid down byte-for-byte and must never be sorted.
  */
 final class ChromeSslContextFactory implements WhatsAppSslContextFactory {
+    /** The logger for {@link ChromeSslContextFactory}. */
+    private static final System.Logger LOGGER = Log.get(ChromeSslContextFactory.class);
+
     /**
      * The Chrome 147 cipher suite ordering, captured from
      * {@code https://www.howsmyssl.com/a/check}, with the four
@@ -108,7 +114,9 @@ final class ChromeSslContextFactory implements WhatsAppSslContextFactory {
             var context = SSLContext.getInstance("TLS");
             context.init(null, null, null);
             this.sslContext = context;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chrome ssl context initialized");
         } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to initialize chrome ssl context", e);
             throw new IllegalStateException("Failed to create SSL context", e);
         }
     }

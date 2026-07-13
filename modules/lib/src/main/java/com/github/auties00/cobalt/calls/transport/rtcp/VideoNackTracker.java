@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.rtcp;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.SortedMap;
@@ -34,6 +37,11 @@ import java.util.TreeMap;
  * behaviour.
  */
 public final class VideoNackTracker {
+    /**
+     * The logger for {@link VideoNackTracker}.
+     */
+    private static final System.Logger LOGGER = Log.get(VideoNackTracker.class);
+
     /**
      * The number of distinct values a sixteen bit RTP sequence number takes, the wrap around modulus.
      */
@@ -202,11 +210,17 @@ public final class VideoNackTracker {
         }
         if (forward < 0) {
             missing.remove(candidate);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "video nack tracker late arrival, sequence={0}", sequenceNumber);
+            }
             return;
         }
         if (forward > DISCONTINUITY_THRESHOLD) {
             missing.clear();
             highestExtended = masked;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "video nack tracker stream restart detected, forward={0}", forward);
+            }
             return;
         }
         for (var extended = highestExtended + 1; extended < candidate; extended++) {
@@ -239,6 +253,10 @@ public final class VideoNackTracker {
      */
     public List<Integer> nackList(long nowMillis, long rttMillis) {
         if (rttMillis > VIDEO_NACK_RTT_LIMIT_MS) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "video nack list suppressed, rttMillis={0} limit={1}",
+                        rttMillis, VIDEO_NACK_RTT_LIMIT_MS);
+            }
             return List.of();
         }
         var renackInterval = Math.max(RENACK_MIN_INTERVAL_MILLIS, (long) (rttMillis * RENACK_RTT_MULTIPLIER));
@@ -266,6 +284,9 @@ public final class VideoNackTracker {
                 }
             }
         }
+        if (!due.isEmpty() && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "video nack list due, count={0} tracked={1}", due.size(), missing.size());
+        }
         return due;
     }
 
@@ -288,6 +309,9 @@ public final class VideoNackTracker {
         missing.clear();
         highestExtended = 0;
         seeded = false;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "video nack tracker reset");
+        }
     }
 
     /**
@@ -301,6 +325,10 @@ public final class VideoNackTracker {
         var cutoff = highestExtended - MAX_NACK_DISTANCE;
         if (!missing.isEmpty() && missing.firstKey() < cutoff) {
             missing.headMap(cutoff).clear();
+        }
+        if (missing.size() > MAX_NACK_LIST_SIZE && Log.WARNING) {
+            LOGGER.log(Level.WARNING, "video nack tracker list overflow, size={0} cap={1}",
+                    missing.size(), MAX_NACK_LIST_SIZE);
         }
         while (missing.size() > MAX_NACK_LIST_SIZE) {
             missing.remove(missing.firstKey());

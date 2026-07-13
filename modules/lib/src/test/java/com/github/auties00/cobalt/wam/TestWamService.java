@@ -21,7 +21,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * the scheduling hooks are no-ops because tests invoke any scheduled
  * task directly.
  */
-public final class TestWamService extends WamService {
+public final class TestWamService extends LiveWamService {
     private final List<WamEventSpec> committed = new CopyOnWriteArrayList<>();
 
     private volatile Instant now = Instant.ofEpochSecond(1_780_000_000L);

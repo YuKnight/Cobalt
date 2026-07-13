@@ -24,12 +24,14 @@ import com.github.auties00.cobalt.model.message.text.CommentMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.ProtobufValidationErrorEventBuilder;
 import com.github.auties00.cobalt.wam.type.ProtobufValidationFlow;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,9 +54,9 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebAddonEncryptAddonMsgData")
 final class MessagePreparer {
     /**
-     * Surfaces preparation diagnostics.
+     * The logger for {@link MessagePreparer}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MessagePreparer.class.getName());
+    private static final System.Logger LOGGER = Log.get(MessagePreparer.class);
 
     /**
      * Defines the byte length of the per-message {@code messageSecret}
@@ -176,6 +178,10 @@ final class MessagePreparer {
                 .senderJid(localJid)
                 .build();
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "prepared chat message {0} for {1}", messageId, chatJid);
+        }
+
         return new ChatMessageInfoBuilder()
                 .status(MessageStatus.PENDING)
                 .senderJid(localJid)
@@ -213,8 +219,13 @@ final class MessagePreparer {
         var localJid = store.accountStore().jid()
                 .orElseThrow(() -> new IllegalStateException("Not logged in"));
         var newsletter = store.chatStore().findNewsletterByJid(newsletterJid)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Cannot send to a newsletter that you didn't join: " + newsletterJid));
+                .orElseThrow(() -> {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "send rejected: newsletter {0} not joined", newsletterJid);
+                    }
+                    return new IllegalArgumentException(
+                            "Cannot send to a newsletter that you didn't join: " + newsletterJid);
+                });
         var oldServerId = newsletter.newestMessage()
                 .map(NewsletterMessageInfo::serverId)
                 .orElse(0);
@@ -223,6 +234,9 @@ final class MessagePreparer {
                 .parentJid(newsletterJid)
                 .fromMe(true)
                 .build();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "prepared newsletter message for {0}, serverId={1}", newsletterJid, oldServerId + 1);
+        }
         return new NewsletterMessageInfoBuilder()
                 .key(key)
                 .serverId(oldServerId + 1)
@@ -297,7 +311,13 @@ final class MessagePreparer {
             case ReactionMessage reaction when requiresEncryptedReaction(chatJid) -> {
                 var parentMessage = resolveParentMessage(chatJid, reaction.key().orElse(null));
                 if (parentMessage.isEmpty()) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "cannot encrypt reaction for {0}: parent message not found", chatJid);
+                    }
                     throw new IllegalArgumentException("Cannot encrypt reaction: parent message not found");
+                }
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "promoting reaction to encrypted addon for {0}", chatJid);
                 }
                 var encrypted = EncMessageFactory.encryptReaction(reaction, parentMessage.get(), selfJid);
                 yield MessageContainer.of(encrypted);
@@ -330,7 +350,13 @@ final class MessagePreparer {
             case CommentMessage comment when requiresEncryptedReaction(chatJid) -> {
                 var parentMessage = resolveParentMessage(chatJid, comment.targetMessageKey().orElse(null));
                 if (parentMessage.isEmpty()) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "cannot encrypt comment for {0}: parent message not found", chatJid);
+                    }
                     throw new IllegalArgumentException("Cannot encrypt comment: parent message not found");
+                }
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "promoting comment to encrypted addon for {0}", chatJid);
                 }
                 var encrypted = EncMessageFactory.encryptComment(comment, parentMessage.get(), selfJid);
                 yield MessageContainer.of(encrypted);
@@ -445,8 +471,9 @@ final class MessagePreparer {
             adaptation = WhatsAppAdaptation.ADAPTED)
     private Optional<String> findMessageSecretViolation(MessageContainer node, int depth, String path) {
         if (depth >= MESSAGE_SECRET_MAX_DEPTH) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "messageSecret location check exceeded max depth: path: " + path);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "messageSecret location check exceeded max depth at path {0}", path);
+            }
             return Optional.empty();
         }
 
@@ -485,6 +512,9 @@ final class MessagePreparer {
     @WhatsAppWebExport(moduleName = "WAWebMessageSecretLocationUtils", exports = "verifyTopLevelMessageSecret",
             adaptation = WhatsAppAdaptation.ADAPTED)
     private void emitProtobufValidationError(String violationPath) {
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "outgoing message carries a nested messageSecret at path {0}", violationPath);
+        }
         wamService.commit(new ProtobufValidationErrorEventBuilder()
                 .protobufValidationDropped(false)
                 .protobufLegacyValidationDropped(false)

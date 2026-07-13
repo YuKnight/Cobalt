@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.socket;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -18,6 +19,7 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.DestroyFailedException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
@@ -64,6 +66,11 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WANoiseHandshake")
 final class WhatsAppSocketHandshake implements AutoCloseable {
+
+    /**
+     * The logger for {@link WhatsAppSocketHandshake}.
+     */
+    private static final System.Logger LOGGER = Log.get(WhatsAppSocketHandshake.class);
 
     /**
      * The empty IKM passed to HKDF when {@link #finish()} expands the
@@ -198,6 +205,7 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
         this.cryptoKey = new SecretKeySpec(NOISE_PROTOCOL, 0, 32, "AES");
         this.counter = 0;
         updateHash(prologue);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "noise handshake initialized, prologue={0}", prologue);
     }
 
     /**
@@ -220,6 +228,7 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
         Objects.requireNonNull(message, "message");
         var firstPrologue = prologueSent ? null : prologue;
         prologueSent = true;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "writing client handshake message, prologue={0}", firstPrologue != null);
         outputStream.beginDatagram(firstPrologue, HandshakeMessageSpec.sizeOf(message));
         HandshakeMessageSpec.encode(message, ProtobufOutputStream.toStream(outputStream));
         outputStream.flush();
@@ -250,8 +259,10 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
     HandshakeMessage readServerHandshake() throws IOException {
         var plaintextLength = inputStream.readDatagramLength();
         if (plaintextLength < 0) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "server closed connection before next handshake message");
             throw new IOException("Server closed the connection before sending the next Noise handshake message");
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "reading server handshake message, length={0}", plaintextLength);
         var bounded = new InputStream() {
             private int remaining = plaintextLength;
 
@@ -347,6 +358,7 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
         cipher.updateAAD(hash);
         var result = cipher.doFinal(text);
         updateHash(encrypt ? result : text);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "handshake cipher step encrypt={0} inLen={1} outLen={2}", encrypt, text.length, result.length);
         return result;
     }
 
@@ -370,7 +382,9 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
                 .addSalt(salt)
                 .addIKM(FINISH_KEY)
                 .thenExpand(null, 64);
-        return kdf.deriveData(params);
+        var derived = kdf.deriveData(params);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "noise handshake key material derived");
+        return derived;
     }
 
     /**
@@ -401,6 +415,7 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
         this.salt = new SecretKeySpec(expanded, 0, 32, "AES");
         this.cryptoKey = new SecretKeySpec(expanded, 32, 32, "AES");
         this.counter = 0;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "handshake key material mixed, salt and cipher key rotated");
     }
 
     /**
@@ -418,6 +433,7 @@ final class WhatsAppSocketHandshake implements AutoCloseable {
      */
     @Override
     public void close() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing noise handshake state");
         this.hash = null;
         this.salt = null;
         try {

@@ -19,10 +19,9 @@ import java.util.OptionalLong;
  * duration, plus the merchant's reusable saved audiences. This input
  * carries the parameters that select which suggestions the server returns.
  *
- * <p>The {@link #inputJson() boosted-component reference} is a
- * JSON-encoded object identifying the boosted component being targeted;
- * its field set is defined by the server-side input type and is therefore
- * carried as a raw string. The {@link #objective() campaign objective},
+ * <p>The {@link #input() boosted-component input} identifies the boost being
+ * targeted, carried as an {@link LwiBoostedComponentInput}. The
+ * {@link #objective() campaign objective},
  * {@link #budgetMicros() budget}, {@link #budgetType() budget cadence},
  * {@link #durationSeconds() run duration}, {@link #adAccountId() ad
  * account}, and {@link #savedAudienceCount() saved-audience page size}
@@ -32,13 +31,11 @@ import java.util.OptionalLong;
 @ProtobufMessage(name = "BusinessAdAudienceSectionQuery")
 public final class BusinessAdAudienceSectionQuery {
     /**
-     * JSON-encoded boosted-component reference identifying which component
-     * the audience suggestions are computed for. The field set is defined
-     * by the server-side input type and is carried verbatim. Unset omits
-     * the reference.
+     * Boosted-component input identifying which boost the audience
+     * suggestions are computed for. Unset omits the reference.
      */
-    @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    final String inputJson;
+    @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
+    final LwiBoostedComponentInput input;
 
     /**
      * Campaign objective the audience suggestions are tailored for.
@@ -89,8 +86,7 @@ public final class BusinessAdAudienceSectionQuery {
      * argument may be {@code null} to omit the corresponding variable from
      * the request.
      *
-     * @param inputJson          the JSON-encoded boosted-component reference,
-     *                           or {@code null}
+     * @param input              the boosted-component input, or {@code null}
      * @param objective          the campaign objective, or {@code null}
      * @param budgetMicros       the budget in micros, or {@code null}
      * @param budgetType         the budget cadence, or {@code null}
@@ -100,10 +96,10 @@ public final class BusinessAdAudienceSectionQuery {
      * @param savedAudienceCount the saved-audience page size, or
      *                           {@code null}
      */
-    public BusinessAdAudienceSectionQuery(String inputJson, String objective, Long budgetMicros,
+    public BusinessAdAudienceSectionQuery(LwiBoostedComponentInput input, String objective, Long budgetMicros,
                                           String budgetType, Long durationSeconds, String adAccountId,
                                           Integer savedAudienceCount) {
-        this.inputJson = inputJson;
+        this.input = input;
         this.objective = objective;
         this.budgetMicros = budgetMicros;
         this.budgetType = budgetType;
@@ -113,13 +109,12 @@ public final class BusinessAdAudienceSectionQuery {
     }
 
     /**
-     * Returns the JSON-encoded boosted-component reference.
+     * Returns the boosted-component input.
      *
-     * @return an {@link Optional} carrying the reference, or empty when
-     *         unset
+     * @return an {@link Optional} carrying the input, or empty when unset
      */
-    public Optional<String> inputJson() {
-        return Optional.ofNullable(inputJson);
+    public Optional<LwiBoostedComponentInput> input() {
+        return Optional.ofNullable(input);
     }
 
     /**
@@ -187,7 +182,7 @@ public final class BusinessAdAudienceSectionQuery {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (BusinessAdAudienceSectionQuery) obj;
-        return Objects.equals(inputJson, that.inputJson)
+        return Objects.equals(input, that.input)
                 && Objects.equals(objective, that.objective)
                 && Objects.equals(budgetMicros, that.budgetMicros)
                 && Objects.equals(budgetType, that.budgetType)
@@ -198,14 +193,14 @@ public final class BusinessAdAudienceSectionQuery {
 
     @Override
     public int hashCode() {
-        return Objects.hash(inputJson, objective, budgetMicros, budgetType, durationSeconds,
+        return Objects.hash(input, objective, budgetMicros, budgetType, durationSeconds,
                 adAccountId, savedAudienceCount);
     }
 
     @Override
     public String toString() {
         return "BusinessAdAudienceSectionQuery[" +
-                "inputJson=" + inputJson + ", " +
+                "input=" + input + ", " +
                 "objective=" + objective + ", " +
                 "budgetMicros=" + budgetMicros + ", " +
                 "budgetType=" + budgetType + ", " +

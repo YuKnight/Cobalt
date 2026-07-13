@@ -3,8 +3,10 @@ package com.github.auties00.cobalt.registration;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDeviceAttestor;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevicePushClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpRequest;
@@ -58,6 +60,11 @@ import java.util.UUID;
  * @see MobileClientRegistration
  */
 final class AndroidClientRegistration extends MobileClientRegistration {
+    /**
+     * The logger for {@link AndroidClientRegistration}.
+     */
+    private static final System.Logger LOGGER = Log.get(AndroidClientRegistration.class);
+
     /**
      * The Android device attestor consulted before each outgoing
      * request.
@@ -129,6 +136,10 @@ final class AndroidClientRegistration extends MobileClientRegistration {
      */
     @Override
     protected HttpRequest createRequest(String path, String body, String authorizationHeader) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "android registration request path={0} attested={1}",
+                    path, authorizationHeader != null);
+        }
         var builder = HttpRequest.newBuilder()
                 .uri(URI.create("%s%s".formatted(MOBILE_REGISTRATION_ENDPOINT, path)))
                 .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -169,12 +180,18 @@ final class AndroidClientRegistration extends MobileClientRegistration {
         var signature = signed.signature();
         var chain = signed.certificateChain();
         if (signature.length == 0) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "android body attestation empty, falling back to unsigned request");
+            }
             return BodyAttestation.EMPTY;
         }
         var hex = HexFormat.of().formatHex(signature);
         var auth = chain.length == 0
                 ? null
                 : Base64.getUrlEncoder().withoutPadding().encodeToString(chain);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "android body attestation produced signature={0} chain={1}", signature, chain);
+        }
         return new BodyAttestation(hex, auth);
     }
 
@@ -206,6 +223,9 @@ final class AndroidClientRegistration extends MobileClientRegistration {
      */
     @Override
     protected String[] getRequestVerificationCodeParameters(String method) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "android verification code request method={0}", method);
+        }
         return new String[]{
                 "method", method,
                 "sim_mcc", "000",
@@ -263,6 +283,11 @@ final class AndroidClientRegistration extends MobileClientRegistration {
     @Override
     protected String[] attestationFields() {
         var attestation = attestor.attest(store);
+        var pushToken = pushClient.getPushToken();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "android attestation fields gpia_present={0} push_token_present={1}",
+                    !attestation.gpia().isEmpty(), !pushToken.isEmpty());
+        }
         return new String[]{
                 "gpia", attestation.gpia(),
                 "_gg", attestation.gg(),
@@ -270,7 +295,7 @@ final class AndroidClientRegistration extends MobileClientRegistration {
                 "_gp", attestation.gp(),
                 "_ge", attestation.ge(),
                 "_ga", attestation.ga(),
-                "push_token", pushClient.getPushToken()
+                "push_token", pushToken
         };
     }
 
@@ -308,6 +333,7 @@ final class AndroidClientRegistration extends MobileClientRegistration {
         var json = "{\"attempts\":" + attempt
                 + ",\"app_campaign_download_source\":\"" + attestor.downloadSource().wireValue() + "\""
                 + ",\"is_sim_absent\":false}";
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "android client metrics attempt={0}", attempt);
         return URLEncoder.encode(json, StandardCharsets.UTF_8);
     }
 }

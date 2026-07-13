@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.transport.warp;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.transport.LiveRelayTransport;
@@ -39,6 +41,11 @@ import com.github.auties00.cobalt.calls.transport.LiveRelayTransport;
  * {@link #appendTag(byte[], byte[], int)} carries the per relay truncation as a caller supplied parameter.
  */
 public final class WarpMessageIntegrity {
+    /**
+     * The logger for {@link WarpMessageIntegrity}.
+     */
+    private static final System.Logger LOGGER = Log.get(WarpMessageIntegrity.class);
+
     /**
      * Holds the HKDF info label naming the hop by hop WARP authentication key in the SFU key schedule.
      */
@@ -116,6 +123,9 @@ public final class WarpMessageIntegrity {
         var tag = VoipCryptoNative.hmacSha256(warpAuthKey, warpBytes);
         var out = Arrays.copyOf(warpBytes, warpBytes.length + tagLength);
         System.arraycopy(tag, 0, out, warpBytes.length, tagLength);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "warp integrity tag appended len={0} totalBytes={1}", tagLength, out.length);
+        }
         return out;
     }
 
@@ -151,7 +161,11 @@ public final class WarpMessageIntegrity {
         var expected = VoipCryptoNative.hmacSha256(warpAuthKey, prefix);
         var expectedTruncated = Arrays.copyOf(expected, tagLength);
         var actual = Arrays.copyOfRange(taggedWarpBytes, prefixLength, taggedWarpBytes.length);
-        return java.security.MessageDigest.isEqual(expectedTruncated, actual);
+        var matches = java.security.MessageDigest.isEqual(expectedTruncated, actual);
+        if (Log.WARNING && !matches) {
+            LOGGER.log(Level.WARNING, "warp integrity tag mismatch len={0}", tagLength);
+        }
+        return matches;
     }
 
     /**

@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.calls.stream.audio;
 
+import com.github.auties00.cobalt.log.Log;
+
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.Mixer;
 import javax.sound.sampled.SourceDataLine;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
@@ -20,7 +23,7 @@ import com.github.auties00.cobalt.calls.stream.AudioInput;
  *
  * <p>This is the device backed {@link AudioInput} returned by {@link AudioInput#toSpeaker()}. Its
  * constructor acquires a {@link SourceDataLine} for signed 16 bit mono PCM, defaulting to the 16 kHz call
- * media rate, opens it, and starts it. Each {@link #offer(AudioFrame)} converts the frame's samples to
+ * media rate, opens it, and starts it. Each {@link #offerAudio(AudioFrame)} converts the frame's samples to
  * little endian bytes and pushes them to the line, blocking while the line's buffer is full so playback
  * paces the call. {@link #shutdown()} drains and releases the line. The stream is mono only; the operating
  * system spreads the single channel across whatever channels the physical speaker has.
@@ -30,6 +33,11 @@ import com.github.auties00.cobalt.calls.stream.AudioInput;
  * plays at the wrong pitch.
  */
 public final class SpeakerAudioInput implements AudioInput {
+    /**
+     * The logger for {@link SpeakerAudioInput}.
+     */
+    private static final System.Logger LOGGER = Log.get(SpeakerAudioInput.class);
+
     /**
      * Names the default playback sample rate, matching the WhatsApp call media profile of 16 kHz.
      */
@@ -41,7 +49,7 @@ public final class SpeakerAudioInput implements AudioInput {
     private final AtomicBoolean closed = new AtomicBoolean();
 
     /**
-     * Released by {@link #shutdown()} so a pending {@link #read()} returns.
+     * Released by {@link #shutdown()} so a pending {@link #readAudio()} returns.
      */
     private final CountDownLatch done = new CountDownLatch(1);
 
@@ -54,7 +62,7 @@ public final class SpeakerAudioInput implements AudioInput {
      * Holds the reusable little endian byte scratch that one frame's samples are encoded into before being
      * written to the line, grown on demand when a larger frame arrives.
      *
-     * <p>Confined to the single call render thread that drives {@link #offer(AudioFrame)}, so reuse across
+     * <p>Confined to the single call render thread that drives {@link #offerAudio(AudioFrame)}, so reuse across
      * frames is race free.
      */
     private byte[] scratch;
@@ -97,8 +105,10 @@ public final class SpeakerAudioInput implements AudioInput {
         try {
             this.line = openLine(sampleRate, preferredMixer);
         } catch (LineUnavailableException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot open speaker playback line", e);
             throw new IllegalStateException("cannot open speaker", e);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "speaker playback opened: sampleRate={0}", sampleRate);
     }
 
     /**
@@ -109,10 +119,20 @@ public final class SpeakerAudioInput implements AudioInput {
      *                       device
      * @return the started playback line
      * @throws LineUnavailableException if no compatible line is available on the running platform
+     * @implNote This implementation opens the line at the call media rate and relies on
+     * {@code javax.sound.sampled} to convert to the device's native rate implicitly, rather than opening the
+     * line at the device's native rate and resampling the decoder output itself. Relying on the JDK converter
+     * is deliberate: it keeps this the pure Java, dependency free playback path and is sufficient for the
+     * fixed call media profile. WhatsApp instead drives a WebRTC {@code PushSincResampler} (a windowed sinc
+     * resampler) explicitly on both the playback path (after NetEq or the decoder) and, symmetrically, the
+     * capture path (before the encoder); the ffmpeg backed path mirrors that with {@code libswresample}.
+     * Porting that resampler here, to open the line at the device native rate and resample explicitly, would
+     * gain deterministic resampling quality independent of the platform and JDK default converter, robustness
+     * on a mixer that cannot open a line at the call rate at all, and fidelity parity with the ffmpeg and
+     * WhatsApp paths; it is left unimplemented because the JDK conversion is good enough for this profile.
      */
     private static SourceDataLine openLine(int sampleRate, Mixer.Info preferredMixer)
             throws LineUnavailableException {
-        // TODO: construct and drive PushSincResampler when the NetEq or decoder output rate differs from the device playback rate (and symmetrically on capture before the encoder), replacing the ffmpeg swr path on the pure Java path
         var format = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED,
                 sampleRate, 16, 1, 2, sampleRate, false);
         var info = new DataLine.Info(SourceDataLine.class, format);
@@ -139,7 +159,7 @@ public final class SpeakerAudioInput implements AudioInput {
      * @throws NullPointerException if {@code frame} is {@code null}
      */
     @Override
-    public void offer(AudioFrame frame) {
+    public void offerAudio(AudioFrame frame) {
         Objects.requireNonNull(frame, "frame cannot be null");
         if (closed.get()) {
             return;
@@ -160,7 +180,8 @@ public final class SpeakerAudioInput implements AudioInput {
         scratchView.put(pcm);
         try {
             l.write(bytes, 0, needed);
-        } catch (RuntimeException _) {
+        } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "speaker playback line write failed", e);
         }
     }
 
@@ -174,7 +195,7 @@ public final class SpeakerAudioInput implements AudioInput {
      * @throws InterruptedException if the calling thread is interrupted while waiting
      */
     @Override
-    public AudioFrame read() throws InterruptedException {
+    public AudioFrame readAudio() throws InterruptedException {
         done.await();
         return null;
     }
@@ -182,7 +203,7 @@ public final class SpeakerAudioInput implements AudioInput {
     /**
      * {@inheritDoc}
      *
-     * <p>Marks the sink ended, wakes a pending {@link #read()}, then drains so buffered audio finishes
+     * <p>Marks the sink ended, wakes a pending {@link #readAudio()}, then drains so buffered audio finishes
      * playing, stops the line, and closes it. Each device step ignores failures so a fault in one does not
      * leak the line, making the call idempotent.
      */
@@ -191,6 +212,7 @@ public final class SpeakerAudioInput implements AudioInput {
         if (!closed.compareAndSet(false, true)) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "speaker playback shutdown");
         done.countDown();
         var l = line;
         line = null;
@@ -199,15 +221,18 @@ public final class SpeakerAudioInput implements AudioInput {
         }
         try {
             l.drain();
-        } catch (Throwable _) {
+        } catch (Throwable t) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "speaker playback line drain failed", t);
         }
         try {
             l.stop();
-        } catch (Throwable _) {
+        } catch (Throwable t) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "speaker playback line stop failed", t);
         }
         try {
             l.close();
-        } catch (Throwable _) {
+        } catch (Throwable t) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "speaker playback line close failed", t);
         }
     }
 }

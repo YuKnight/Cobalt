@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.registration.push.fcm;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevicePushClient;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.util.Objects;
 import java.util.Set;
@@ -44,6 +46,11 @@ import java.util.concurrent.atomic.AtomicReference;
  * }
  */
 public final class FcmClient implements LinkedWhatsAppClientDevicePushClient, AutoCloseable {
+    /**
+     * The logger for {@link FcmClient}.
+     */
+    private static final System.Logger LOGGER = Log.get(FcmClient.class);
+
     /**
      * Cached unmodifiable set of supported platforms.
      *
@@ -200,12 +207,14 @@ public final class FcmClient implements LinkedWhatsAppClientDevicePushClient, Au
      */
     public static FcmClient loadSession(FcmSession session, URI proxy) throws IOException {
         Objects.requireNonNull(session, "session");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "loading fcm session");
         var client = new FcmClient(proxy);
         client.session = session;
         client.registration.ensureCredentials(session);
         client.state.set(State.AUTHENTICATED);
         client.connection = new FcmMcsConnection(session, client.pushCode);
         client.connection.start();
+        if (Log.INFO) LOGGER.log(Level.INFO, "fcm client authenticated from saved session");
         return client;
     }
 
@@ -255,16 +264,20 @@ public final class FcmClient implements LinkedWhatsAppClientDevicePushClient, Au
         if (!state.compareAndSet(State.UNAUTHENTICATED, State.AUTHENTICATING)) {
             throw new IllegalStateException("FcmClient already " + state.get());
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "authenticating fcm client (platform={0})", platform);
         try {
             this.session = FcmSession.newSession(config);
             registration.ensureCredentials(session);
             this.connection = new FcmMcsConnection(session, pushCode);
             this.connection.start();
             state.set(State.AUTHENTICATED);
+            if (Log.INFO) LOGGER.log(Level.INFO, "fcm client authenticated (platform={0})", platform);
         } catch (IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "fcm authentication failed", e);
             rollbackAuthentication();
             throw new UncheckedIOException(e);
         } catch (RuntimeException | Error e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "fcm authentication failed unexpectedly", e);
             rollbackAuthentication();
             throw e;
         }
@@ -281,6 +294,7 @@ public final class FcmClient implements LinkedWhatsAppClientDevicePushClient, Au
         this.session = null;
         this.connection = null;
         state.set(State.UNAUTHENTICATED);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fcm client state -> UNAUTHENTICATED");
     }
 
     /**
@@ -347,11 +361,15 @@ public final class FcmClient implements LinkedWhatsAppClientDevicePushClient, Au
     public String getPushCode() {
         requireAuthenticated();
         try {
-            return pushCode.waitForCode();
+            var code = pushCode.waitForCode();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fcm push code received");
+            return code;
         } catch (IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "fcm push code wait failed", e);
             throw new UncheckedIOException(e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "fcm push code wait interrupted", e);
             throw new RuntimeException("FcmClient.getPushCode interrupted", e);
         }
     }
@@ -386,6 +404,7 @@ public final class FcmClient implements LinkedWhatsAppClientDevicePushClient, Au
         if (prev == State.CLOSED) {
             return;
         }
+        if (Log.INFO) LOGGER.log(Level.INFO, "closing fcm client");
         var c = connection;
         if (c != null) {
             c.close();

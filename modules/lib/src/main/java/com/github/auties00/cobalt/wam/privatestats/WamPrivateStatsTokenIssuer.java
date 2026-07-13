@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.wam.privatestats;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppPrivateStatsTokenIssuerException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppPrivateStatsTokenIssuerException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,7 @@ import com.github.auties00.cobalt.wam.event.SignCredentialEventBuilder;
 import com.github.auties00.cobalt.wam.type.ApplicationState;
 import com.github.auties00.cobalt.wam.type.SignCredentialResult;
 
+import java.lang.System.Logger.Level;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -51,6 +53,11 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAACSTokenUtils")
 @WhatsAppWebModule(moduleName = "WAWebSignCredentialWamEvent")
 public final class WamPrivateStatsTokenIssuer {
+    /**
+     * The logger for {@link WamPrivateStatsTokenIssuer}.
+     */
+    private static final System.Logger LOGGER = Log.get(WamPrivateStatsTokenIssuer.class);
+
     /**
      * The XMPP namespace under which the private-stats issuance IQ is routed.
      *
@@ -234,12 +241,15 @@ public final class WamPrivateStatsTokenIssuer {
         try {
             response = client.sendNode(iq);
         } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sign_credential iq failed", e);
             emitSignCredential(telemetry, SignCredentialResult.ERROR_CLIENT_NETWORK, false);
             throw e;
         }
 
         if (!"result".equals(response.getAttributeAsString("type", ""))) {
-            emitSignCredential(telemetry, classifyErrorResult(response), true);
+            var errorResult = classifyErrorResult(response);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sign_credential iq rejected result={0}", errorResult);
+            emitSignCredential(telemetry, errorResult, true);
             throw new WhatsAppPrivateStatsTokenIssuerException(
                     "sign_credential IQ failed: " + response);
         }
@@ -277,8 +287,10 @@ public final class WamPrivateStatsTokenIssuer {
 
             var sharedSecret = deriveSharedSecret(token, unblindedSignedToken);
             emitSignCredential(telemetry, SignCredentialResult.SUCCESS, true);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sign_credential token issued");
             return new WamPrivateStatsToken(token, sharedSecret);
         } catch (WhatsAppPrivateStatsTokenIssuerException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sign_credential token issuance failed", e);
             emitSignCredential(telemetry, SignCredentialResult.ERROR_OTHER, true);
             throw e;
         }

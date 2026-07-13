@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.registration.push.apns.plist.binary;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistArrayValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistBooleanValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDataValue;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistString
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistValue;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -38,6 +40,11 @@ import java.util.LinkedHashMap;
  *           no zero-copy view over arbitrary-encoding bytes.
  */
 public final class PlistBinaryParser {
+    /**
+     * The logger for {@link PlistBinaryParser}.
+     */
+    private static final System.Logger LOGGER = Log.get(PlistBinaryParser.class);
+
     /**
      * Holds the byte length of the trailer that closes every binary plist.
      *
@@ -98,6 +105,7 @@ public final class PlistBinaryParser {
      */
     private PlistBinaryParser(byte[] src) throws IOException {
         if (src.length < MAGIC.length + TRAILER_SIZE) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "binary plist too short, bytes={0}", src.length);
             throw new IOException("binary plist too short: " + src.length);
         }
         this.src = src;
@@ -105,6 +113,7 @@ public final class PlistBinaryParser {
         this.offsetSize = src[trailer + 6] & 0xFF;
         this.refSize = src[trailer + 7] & 0xFF;
         if (offsetSize < 1 || offsetSize > 8 || refSize < 1 || refSize > 8) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "invalid plist trailer widths, offset={0}, ref={1}", offsetSize, refSize);
             throw new IOException("invalid trailer widths: offset=" + offsetSize + " ref=" + refSize);
         }
         var numObjects = readUnsignedBigEndian(trailer + 8, 8);
@@ -112,6 +121,7 @@ public final class PlistBinaryParser {
         this.offsetTableOffset = (int) readUnsignedBigEndian(trailer + 24, 8);
         if (offsetTableOffset < 0 || offsetTableOffset > src.length
                 || (long) offsetTableOffset + numObjects * offsetSize > src.length) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "plist offset table escapes source, offset={0}, objects={1}", offsetTableOffset, numObjects);
             throw new IOException("offset table escapes source: at " + offsetTableOffset
                     + " for " + numObjects + " objects of " + offsetSize + " bytes");
         }
@@ -193,7 +203,10 @@ public final class PlistBinaryParser {
             case 0x0 -> switch (info) {
                 case 0x8 -> new PlistBooleanValue(false);
                 case 0x9 -> new PlistBooleanValue(true);
-                default -> throw new IOException("unsupported singleton 0x0/" + info);
+                default -> {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "unsupported plist singleton, info=0x{0}", Integer.toHexString(info));
+                    throw new IOException("unsupported singleton 0x0/" + info);
+                }
             };
             case 0x1 -> readInteger(offset, info);
             case 0x2 -> readReal(offset, info);
@@ -204,7 +217,10 @@ public final class PlistBinaryParser {
             case 0x7 -> readString(offset, info, StandardCharsets.UTF_8, 1);
             case 0xA -> readArray(offset, info);
             case 0xD -> readDict(offset, info);
-            default -> throw new IOException("unsupported plist marker 0x" + Integer.toHexString(marker));
+            default -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "unsupported plist marker, tag=0x{0}", Integer.toHexString(marker));
+                throw new IOException("unsupported plist marker 0x" + Integer.toHexString(marker));
+            }
         };
     }
 
@@ -225,6 +241,7 @@ public final class PlistBinaryParser {
     private PlistIntegerValue readInteger(int offset, int info) throws IOException {
         var byteCount = 1 << info;
         if (byteCount > 8) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "16-byte plist integer not supported");
             throw new IOException("16-byte plist integer not supported");
         }
         return new PlistIntegerValue(readUnsignedBigEndian(offset + 1, byteCount));
@@ -250,7 +267,10 @@ public final class PlistBinaryParser {
         return switch (byteCount) {
             case 4 -> new PlistFloatingPointValue(Float.intBitsToFloat((int) readUnsignedBigEndian(offset + 1, 4)));
             case 8 -> new PlistFloatingPointValue(Double.longBitsToDouble(readUnsignedBigEndian(offset + 1, 8)));
-            default -> throw new IOException("unsupported real width: " + byteCount);
+            default -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "unsupported plist real width, bytes={0}", byteCount);
+                throw new IOException("unsupported real width: " + byteCount);
+            }
         };
     }
 
@@ -360,6 +380,7 @@ public final class PlistBinaryParser {
             var valueRef = (int) readUnsignedBigEndian(valuesOffset + i * refSize, refSize);
             var key = readObject(keyRef);
             if (!(key instanceof PlistStringValue s)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "plist dictionary key is not a string, type={0}", key.getClass().getSimpleName());
                 throw new IOException("dictionary key is not a string: " + key);
             }
             entries.put(s.value(), readObject(valueRef));
@@ -386,11 +407,13 @@ public final class PlistBinaryParser {
         }
         var nextMarker = src[markerOffset + 1] & 0xFF;
         if ((nextMarker >>> 4) != 0x1) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "expected integer marker for extended plist length, marker=0x{0}", Integer.toHexString(nextMarker));
             throw new IOException("expected integer marker for extended length, got 0x"
                     + Integer.toHexString(nextMarker));
         }
         var byteCount = 1 << (nextMarker & 0x0F);
         if (byteCount > 8) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "extended plist length exceeds 8 bytes, bytes={0}", byteCount);
             throw new IOException("extended length exceeds 8 bytes");
         }
         var length = (int) readUnsignedBigEndian(markerOffset + 2, byteCount);

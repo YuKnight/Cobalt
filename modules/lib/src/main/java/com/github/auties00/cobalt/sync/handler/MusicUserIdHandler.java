@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.MusicUserIdAction;
@@ -8,6 +9,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies {@link MusicUserIdAction} sync mutations carrying the user's
@@ -35,6 +38,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * identifier-style handlers and from the protobuf shape itself.
  */
 public final class MusicUserIdHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link MusicUserIdHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(MusicUserIdHandler.class);
 
     /**
      * Constructs a stateless {@link MusicUserIdHandler} for registration in
@@ -93,18 +100,23 @@ public final class MusicUserIdHandler implements WebAppStateActionHandler {
     @Override
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "music user id: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MusicUserIdAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "music user id mutation malformed: missing action value");
             return MutationApplicationResult.malformed();
         }
 
         if (action.musicUserId().isEmpty() && action.musicUserIdMap().isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "music user id mutation malformed: empty identifiers");
             return MutationApplicationResult.malformed();
         }
 
         client.store().businessStore().setMusicUserIdState(action);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "music user id: state updated");
         return MutationApplicationResult.success();
     }
 }

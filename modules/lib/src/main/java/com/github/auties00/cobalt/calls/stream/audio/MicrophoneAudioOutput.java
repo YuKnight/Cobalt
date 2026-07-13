@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.calls.stream.audio;
 
+import com.github.auties00.cobalt.log.Log;
+
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.Mixer;
 import javax.sound.sampled.TargetDataLine;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
@@ -26,16 +29,21 @@ import com.github.auties00.cobalt.calls.stream.AudioOutput;
  * caller is then responsible for downsampling before the frames reach the call, as {@link AudioFrame}
  * documents.
  *
- * <p>Each {@link #take()} blocks until a full frame's worth of samples has been read from the line, then
+ * <p>Each {@link #takeAudio()} blocks until a full frame's worth of samples has been read from the line, then
  * returns it with a presentation timestamp that never decreases; this hardware blocking is what paces the
  * outbound stream to real time. {@link #shutdown()} releases the capture line, which unblocks a
- * {@link #take()} parked on the line so it returns {@code null}.
+ * {@link #takeAudio()} parked on the line so it returns {@code null}.
  *
  * @implNote This implementation captures a single channel intentionally, because most platforms expose
  * the default microphone as mono and downmix or select one channel of a stereo device. The timestamp it
  * advances on each frame is denominated in the {@link AudioFrame#ptsMicros()} microsecond clock.
  */
 public final class MicrophoneAudioOutput implements AudioOutput {
+    /**
+     * The logger for {@link MicrophoneAudioOutput}.
+     */
+    private static final System.Logger LOGGER = Log.get(MicrophoneAudioOutput.class);
+
     /**
      * Holds the default capture sample rate, in Hz, matching the call media profile.
      *
@@ -85,22 +93,22 @@ public final class MicrophoneAudioOutput implements AudioOutput {
 
     /**
      * Holds the little endian {@link ShortBuffer} view over {@link #readBuffer}, reused across
-     * {@link #take()} calls so each frame decodes by rewinding this view instead of wrapping the byte
+     * {@link #takeAudio()} calls so each frame decodes by rewinding this view instead of wrapping the byte
      * buffer anew.
      *
-     * @implNote This implementation is confined to the single consumer thread that drains {@link #take()},
+     * @implNote This implementation is confined to the single consumer thread that drains {@link #takeAudio()},
      * the same confinement {@link #readBuffer} already relies on, so reusing the view is race free.
      */
     private final ShortBuffer sampleView;
 
     /**
      * Holds the reusable PCM sample buffer each frame decodes into and is lent out over, reused across
-     * {@link #take()} calls under the {@link AudioOutput#take()} borrow contract rather than allocated per
+     * {@link #takeAudio()} calls under the {@link AudioOutput#takeAudio()} borrow contract rather than allocated per
      * frame.
      *
-     * <p>Confined to the single consumer thread that drains {@link #take()}, the same confinement
+     * <p>Confined to the single consumer thread that drains {@link #takeAudio()}, the same confinement
      * {@link #readBuffer} and {@link #sampleView} rely on. The engine's capture pump copies each frame's
-     * samples into its ring before the next {@link #take()}, so lending one reused buffer is safe.
+     * samples into its ring before the next {@link #takeAudio()}, so lending one reused buffer is safe.
      */
     private final short[] pcmBuffer;
 
@@ -158,7 +166,12 @@ public final class MicrophoneAudioOutput implements AudioOutput {
         try {
             this.line = openLine(sampleRate, frameSize, preferredMixer);
         } catch (LineUnavailableException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot open microphone capture line", e);
             throw new IllegalStateException("cannot open microphone", e);
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "microphone capture opened: sampleRate={0} frameSize={1}",
+                    sampleRate, frameSize);
         }
     }
 
@@ -191,13 +204,13 @@ public final class MicrophoneAudioOutput implements AudioOutput {
     /**
      * {@inheritDoc}
      *
-     * <p>A microphone bound source fills itself from the capture line inside {@link #take()} and ignores
+     * <p>A microphone bound source fills itself from the capture line inside {@link #takeAudio()} and ignores
      * application writes, so this is a no op.
      *
      * @param frame the frame that would be written; ignored
      */
     @Override
-    public void write(AudioFrame frame) {
+    public void writeAudio(AudioFrame frame) {
     }
 
     /**
@@ -207,14 +220,14 @@ public final class MicrophoneAudioOutput implements AudioOutput {
      * little endian signed 16 bit samples into the reusable {@link #pcmBuffer}, and returns them with the
      * next presentation timestamp. Returns {@code null} once the line reports end of input, which is how
      * {@link #shutdown()} ends the stream by closing the line. The decoded samples are lent from
-     * {@link #pcmBuffer} per the {@link AudioOutput#take()} borrow contract, so a caller that retains the
+     * {@link #pcmBuffer} per the {@link AudioOutput#takeAudio()} borrow contract, so a caller that retains the
      * frame past the next call copies them out first.
      *
      * @return {@inheritDoc}
      * @throws InterruptedException if the calling thread is interrupted while reading the line
      */
     @Override
-    public AudioFrame take() throws InterruptedException {
+    public AudioFrame takeAudio() throws InterruptedException {
         var l = line;
         if (l == null) {
             return null;
@@ -224,7 +237,8 @@ public final class MicrophoneAudioOutput implements AudioOutput {
             int n;
             try {
                 n = l.read(readBuffer, total, readBuffer.length - total);
-            } catch (RuntimeException _) {
+            } catch (RuntimeException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "microphone capture line read failed", e);
                 return null;
             }
             if (n < 0) {
@@ -246,22 +260,25 @@ public final class MicrophoneAudioOutput implements AudioOutput {
      * {@inheritDoc}
      *
      * <p>Marks the source ended, then stops and closes the capture line so the device is released back to
-     * the operating system and a {@link #take()} parked on a blocking read returns {@code null}. Any
+     * the operating system and a {@link #takeAudio()} parked on a blocking read returns {@code null}. Any
      * failure while stopping or closing is swallowed, so the call is idempotent and never throws.
      */
     @Override
     public void shutdown() {
         if (closed.compareAndSet(false, true)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "microphone capture shutdown");
             var l = line;
             line = null;
             if (l != null) {
                 try {
                     l.stop();
-                } catch (Throwable _) {
+                } catch (Throwable t) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "microphone capture line stop failed", t);
                 }
                 try {
                     l.close();
-                } catch (Throwable _) {
+                } catch (Throwable t) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "microphone capture line close failed", t);
                 }
             }
         }

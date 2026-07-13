@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.transcode.text.link.DeepLinkParser;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.business.catalog.BusinessReviewStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 
+import java.lang.System.Logger.Level;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
@@ -29,13 +31,16 @@ import java.util.Locale;
  */
 @WhatsAppWebModule(moduleName = "WAWebBizLinkPreviewCatalogUtils")
 public final class CatalogPreviewResolver {
+    /** The logger for {@link CatalogPreviewResolver}. */
+    private static final System.Logger LOGGER = Log.get(CatalogPreviewResolver.class);
+
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private CatalogPreviewResolver() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -86,14 +91,17 @@ public final class CatalogPreviewResolver {
         try {
             wid = Jid.of(ownerJid);
         } catch (RuntimeException malformed) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "catalog preview owner jid malformed: {0}", Log.jid(ownerJid));
             return false;
         }
         var catalog = safeQueryCatalog(client, wid);
         if (catalog.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "catalog preview skipped, empty catalog for {0}", wid);
             return false;
         }
         var product = pickProduct(catalog, productId);
         if (product == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "catalog preview skipped, no eligible product for {0}", wid);
             return false;
         }
         var ownerName = ownerDisplayName(client, wid);
@@ -115,6 +123,7 @@ public final class CatalogPreviewResolver {
                 message.setJpegThumbnail(thumbnailBytes);
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "catalog preview resolved for {0}, productFocus={1}", wid, hasProductFocus);
         return true;
     }
 
@@ -134,7 +143,8 @@ public final class CatalogPreviewResolver {
     private static List<BusinessCatalogEntry> safeQueryCatalog(LinkedWhatsAppClient client, Jid wid) {
         try {
             return client.queryBusinessCatalog(wid);
-        } catch (RuntimeException _) {
+        } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "catalog query failed for " + Log.jid(String.valueOf(wid)), e);
             return List.of();
         }
     }
@@ -211,7 +221,8 @@ public final class CatalogPreviewResolver {
             if (refreshed != null && !refreshed.isEmpty()) {
                 return refreshed;
             }
-        } catch (RuntimeException _) {
+        } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "business profile query failed for " + Log.jid(String.valueOf(wid)), e);
         }
         return wid.user();
     }

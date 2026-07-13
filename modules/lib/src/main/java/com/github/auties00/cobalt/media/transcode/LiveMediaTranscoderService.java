@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.media.transcode;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.media.MediaConnectionService;
@@ -38,6 +39,7 @@ import com.github.auties00.cobalt.wam.type.VideoTranscoderTargetFormatType;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -64,6 +66,9 @@ import java.util.Objects;
  * dispatch, so no source spill occurs for the common file-backed case.
  */
 public final class LiveMediaTranscoderService implements MediaTranscoderService {
+    /** The logger for {@link LiveMediaTranscoderService}. */
+    private static final System.Logger LOGGER = Log.get(LiveMediaTranscoderService.class);
+
     /**
      * Filename prefix for the source-spill temp file created when an
      * {@link InputStream} entry point is taken and the stream is not already
@@ -213,6 +218,9 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
             throws WhatsAppMediaException.Processing {
         Objects.requireNonNull(provider, "provider");
         Objects.requireNonNull(source, "source");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "transcoding media provider={0} from path source", provider.getClass().getSimpleName());
+        }
         return switch (provider) {
             case DocumentMessage _ -> documentPipeline.run(provider, source);
             case ExtendedTextMessage _,
@@ -243,12 +251,16 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
             throws WhatsAppMediaException.Processing {
         Objects.requireNonNull(provider, "provider");
         Objects.requireNonNull(source, "source");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "transcoding media provider={0} from input stream", provider.getClass().getSimpleName());
+        }
         try (source) {
             if (source instanceof FileInputStream fis) {
                 return transcodeFromChannel(provider, fis.getChannel());
             }
             return transcodeFromStream(provider, source);
         } catch (IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to consume media source stream", e);
             throw new WhatsAppMediaException.Processing("failed to consume source stream", e);
         }
     }
@@ -278,6 +290,7 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
             try (var out = Files.newOutputStream(spill, StandardOpenOption.WRITE)) {
                 source.transferTo(out);
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "spilled media source to temp file");
             if (provider instanceof DocumentMessage) {
                 var raw = documentPipeline.run(provider, spill);
                 keepSpill = true;
@@ -320,14 +333,21 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
     private MediaPayload transcodeFromChannel(MediaProvider provider, FileChannel channel)
             throws WhatsAppMediaException.Processing {
         return switch (provider) {
-            case DocumentMessage _ ->
-                    throw new IllegalStateException(
-                            "DocumentMessage must dispatch through the path form");
+            case DocumentMessage _ -> {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "unreachable: DocumentMessage routed through channel dispatch");
+                throw new IllegalStateException(
+                        "DocumentMessage must dispatch through the path form");
+            }
             case ExtendedTextMessage _,
                  ExternalBlobReference _,
-                 HistorySyncNotification _ ->
-                    throw new IllegalStateException(
-                            "pass-through providers must dispatch through the path form");
+                 HistorySyncNotification _ -> {
+                if (Log.ERROR) {
+                    LOGGER.log(Level.ERROR, "unreachable: pass-through provider={0} routed through channel dispatch",
+                            provider.getClass().getSimpleName());
+                }
+                throw new IllegalStateException(
+                        "pass-through providers must dispatch through the path form");
+            }
             case ImageMessage _,
                  VideoMessage _,
                  AudioMessage _,
@@ -352,6 +372,9 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
         try (var channel = FileChannel.open(source, StandardOpenOption.READ)) {
             return dispatchToChannel(provider, channel);
         } catch (IOException e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "failed to open media source for " + provider.getClass().getSimpleName(), e);
+            }
             throw new WhatsAppMediaException.Processing("failed to open media source", e);
         }
     }
@@ -379,6 +402,10 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
             throws WhatsAppMediaException.Processing {
         var quality = client.store().settingsStore().mediaUploadQuality()
                 .orElse(SettingsSyncAction.MediaQualitySetting.STANDARD);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "dispatching media provider={0} to pipeline, quality={1}",
+                    provider.getClass().getSimpleName(), quality);
+        }
         return switch (provider) {
             case ImageMessage _ -> imagePipeline.run(provider, channel, quality);
             case VideoMessage video -> transcodeVideo(video, channel, quality);
@@ -389,9 +416,14 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
             case DocumentMessage _,
                  ExtendedTextMessage _,
                  ExternalBlobReference _,
-                 HistorySyncNotification _ ->
-                    throw new IllegalStateException(
-                            "channel dispatch does not apply to " + provider.getClass());
+                 HistorySyncNotification _ -> {
+                if (Log.ERROR) {
+                    LOGGER.log(Level.ERROR, "unreachable: channel dispatch invoked for {0}",
+                            provider.getClass().getSimpleName());
+                }
+                throw new IllegalStateException(
+                        "channel dispatch does not apply to " + provider.getClass());
+            }
         };
     }
 
@@ -433,6 +465,9 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
                                         SettingsSyncAction.MediaQualitySetting quality)
             throws WhatsAppMediaException.Processing {
         var hd = quality == SettingsSyncAction.MediaQualitySetting.HD;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "starting video transcode, quality={0}, gifPlayback={1}", quality, video.gifPlayback());
+        }
         var builder = new VideoTranscoderEventBuilder()
                 .transcoderAlgorithm(VideoTranscoderAlgorithmType.WEB_MEDIA_WORKER)
                 .transcoderIsPassthrough(false)
@@ -457,6 +492,7 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
         try {
             payload = videoPipeline.run(video, channel, quality);
         } catch (WhatsAppMediaException.Processing failure) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "video transcode failed", failure);
             builder.stopTranscoderT();
             preWidth.ifPresent(w -> builder.sourceWidth((double) w));
             preHeight.ifPresent(h -> builder.sourceHeight((double) h));
@@ -481,6 +517,7 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
                 .ifPresent(s -> builder.sourceDuration(durationInstant(s)));
         builder.transcoderResult(VideoTranscoderResultType.SUCCEEDED);
         wamService.commit(builder.build());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "video transcode complete, outputSize={0} bytes", payload.length());
         return payload;
     }
 
@@ -538,6 +575,7 @@ public final class LiveMediaTranscoderService implements MediaTranscoderService 
         try {
             length = Files.size(source);
         } catch (IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to size pass-through media source", e);
             throw new WhatsAppMediaException.Processing("failed to size pass-through source", e);
         }
         return new MediaPayload.OfPath(source, length, false);

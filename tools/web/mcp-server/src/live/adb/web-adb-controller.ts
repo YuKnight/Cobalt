@@ -1,4 +1,4 @@
-import {execFile, type ExecFileException} from "stanza:child_process";
+import {execFile, type ExecFileException} from "node:child_process";
 import type {
   AdbDeviceInfo,
   AdbLinkOptions,
@@ -278,8 +278,55 @@ export class WebAdbController {
     );
     if (byText) return byText;
 
+    // Newer WhatsApp builds do not tag the overflow menu rows with a known title
+    // resource-id, so the id/index lookups above find nothing. Fall back to matching
+    // any tappable node by its visible "Linked devices" label; its bounds land on the row.
+    const byAnyText = this.findLinkedDevicesNodeByText(nodes);
+    if (byAnyText) return byAnyText;
+
     if (titles.length <= OVERFLOW_LINKED_DEVICES_INDEX) return null;
     return titles[OVERFLOW_LINKED_DEVICES_INDEX];
+  }
+
+  private findLinkedDevicesNodeByText(nodes: UiNode[]): UiNode | null {
+    return this.findNodeByText(nodes, /^linked\s*devices?$/i, 24);
+  }
+
+  private findNodeByText(
+    nodes: UiNode[],
+    pattern: RegExp,
+    maxLen = 64
+  ): UiNode | null {
+    const matches = nodes.filter((stanza) => {
+      const text = (stanza.text ?? "").trim();
+      return (
+        text.length > 0 &&
+        text.length <= maxLen &&
+        pattern.test(text) &&
+        parseBounds(stanza.bounds) != null
+      );
+    });
+    if (!matches.length) return null;
+    const interactive = matches.find((stanza) => isInteractive(stanza));
+    return interactive ?? matches[0];
+  }
+
+  async tapByText(
+    serial: string,
+    pattern: RegExp,
+    timeoutMs: number,
+    maxLen = 64
+  ): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() <= deadline) {
+      const nodes = await this.dumpUiHierarchy(serial);
+      const node = this.findNodeByText(nodes, pattern, maxLen);
+      if (node && (await this.tapNode(serial, node))) {
+        return true;
+      }
+      await sleep(DEFAULT_POLL_INTERVAL_MS);
+    }
+    return false;
   }
 
   private async tapBounds(serial: string, bounds: ParsedBounds): Promise<void> {
@@ -933,10 +980,20 @@ export class WebAdbController {
           PHONE_LINK_BUTTON_IDS,
           Math.min(6_000, stepTimeoutMs)
       );
+      if (!selectedPhoneNumberLinking) {
+        // The "Link with phone number instead" banner is not reliably tagged with a
+        // known resource-id on newer builds, so fall back to matching it by text.
+        selectedPhoneNumberLinking = await this.tapByText(
+          serial,
+          /link\s*with\s*phone\s*number/i,
+          Math.min(4_000, stepTimeoutMs),
+          40
+        );
+      }
       details.push(
         selectedPhoneNumberLinking
           ? "Selected phone-number linking."
-          : "Could not select phone-number linking by resource-id."
+          : "Could not select phone-number linking."
       );
     } else {
       details.push("Pairing code input already visible.");

@@ -57,7 +57,7 @@ public class DecompileWasmFuncsToJson extends GhidraScript {
         w.println("[");
         boolean first = true;
         for (int funcIndex : indices) {
-            String name = "", signature = "", code = "", addrStr = "";
+            String name = "", signature = "", code = "", addrStr = "", error = "";
             boolean ok = false;
             try {
                 Address addr = WasmLoader.getFunctionAddress(
@@ -67,7 +67,11 @@ public class DecompileWasmFuncsToJson extends GhidraScript {
                 addrStr = addr == null ? "" : addr.toString();
                 Function func = addr == null ? null
                         : currentProgram.getFunctionManager().getFunctionAt(addr);
-                if (func != null) {
+                if (addr == null) {
+                    error = "no address mapped for wasm function index " + funcIndex;
+                } else if (func == null) {
+                    error = "no function defined at " + addr + " (index out of range or an import)";
+                } else {
                     name = func.getName();
                     signature = func.getSignature().getPrototypeString();
                     if (currentProgram.getListing().getInstructionAt(addr) == null) {
@@ -80,10 +84,14 @@ public class DecompileWasmFuncsToJson extends GhidraScript {
                     if (res != null && res.decompileCompleted()) {
                         DecompiledFunction df = res.getDecompiledFunction();
                         if (df != null) { code = df.getC(); ok = true; }
+                        else error = "decompiler produced no C output";
+                    } else {
+                        String msg = res == null ? null : res.getErrorMessage();
+                        error = msg != null && !msg.isEmpty() ? msg.trim() : "decompilation did not complete";
                     }
                 }
             } catch (Exception e) {
-                code = "/* decompile failed for fn" + funcIndex + ": " + e + " */";
+                error = e.toString();
             }
 
             if (!first) w.println(",");
@@ -94,6 +102,7 @@ public class DecompileWasmFuncsToJson extends GhidraScript {
             w.print("\"address\": \"" + esc(addrStr) + "\", ");
             w.print("\"signature\": \"" + esc(signature) + "\", ");
             w.print("\"decompiled\": " + ok + ", ");
+            w.print("\"error\": \"" + esc(error) + "\", ");
             w.print("\"code\": \"" + esc(code) + "\"");
             w.print("}");
         }

@@ -1,4 +1,6 @@
 package com.github.auties00.cobalt.exception;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudUnsupportedVersionException;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
 import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
@@ -14,7 +16,7 @@ class CloudUnsupportedVersionExceptionTest {
     @Test
     @DisplayName("Carries the operation and the required/configured versions")
     void carriesContext() {
-        var exception = new WhatsAppCloudException.CloudUnsupportedVersionException(
+        var exception = new WhatsAppCloudUnsupportedVersionException(
                 "startCall", CloudApiVersion.V22_0, CloudApiVersion.V19_0);
         assertEquals("startCall", exception.operation());
         assertEquals(CloudApiVersion.V22_0, exception.requiredVersion());
@@ -27,7 +29,7 @@ class CloudUnsupportedVersionExceptionTest {
     @Test
     @DisplayName("Discards as a non-fatal Cloud exception in the sealed hierarchy")
     void nonFatalCloudException() {
-        var exception = new WhatsAppCloudException.CloudUnsupportedVersionException(
+        var exception = new WhatsAppCloudUnsupportedVersionException(
                 "deleteMessageTemplates", CloudApiVersion.V25_0, CloudApiVersion.V24_0);
         assertEquals(WhatsAppLinkedClientErrorResult.DISCARD, exception.toErrorResult());
         assertInstanceOf(WhatsAppCloudException.class, exception);

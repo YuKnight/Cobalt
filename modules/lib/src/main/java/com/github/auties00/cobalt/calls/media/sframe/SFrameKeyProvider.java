@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.calls.media.sframe;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,6 +30,11 @@ import java.util.Objects;
  * decode path of one stream, and holds no internal lock.
  */
 public final class SFrameKeyProvider {
+    /**
+     * The logger for {@link SFrameKeyProvider}.
+     */
+    private static final System.Logger LOGGER = Log.get(SFrameKeyProvider.class);
+
     /**
      * Holds the ratchet/window depth the native provider is created with.
      */
@@ -139,12 +146,16 @@ public final class SFrameKeyProvider {
                     "chainKey must be " + CHAIN_KEY_LENGTH + " bytes, got " + chainKey.length);
         }
         if (chainKeysByTransaction.containsKey(transactionId)) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "sframe chain key install skipped, duplicate transaction {0}", transactionId);
+            }
             return false;
         }
         var stored = chainKey.clone();
         chainKeysByTransaction.put(transactionId, stored);
         this.chainKey = stored;
         ciphersByKeyId.clear();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sframe chain key installed, transaction {0}", transactionId);
         return true;
     }
 
@@ -180,10 +191,12 @@ public final class SFrameKeyProvider {
             return cached;
         }
         if (chainKey == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe cipher requested for key id {0} with no chain key installed", keyId);
             return null;
         }
         var cipher = deriveCipher(chainKey);
         ciphersByKeyId.put(keyId, cipher);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "sframe cipher derived for key id {0}", keyId);
         return cipher;
     }
 
@@ -205,9 +218,18 @@ public final class SFrameKeyProvider {
      * @return the cipher keyed for the stream
      */
     private SFrameCipher deriveCipher(byte[] key) {
-        // TODO: the native key store derives the AES key, HMAC key, and 12 byte counter mask salt per
-        //  key id from the chain key; that derivation and its salt value are not yet recovered, so this
-        //  expands the chain key with one HKDF SHA256 expand and installs an all zero counter mask.
+        // TODO: recover the native chain-key -> cipher-key ratchet so the counter mask salt matches WA.
+        //  RE so far (re/calls decompile; the stack is facebook::sframe + wa::sframe::{cipher,crypto}): the
+        //  native WASframeAESCipher consumes a 28-byte cipher key laid out as the 16-byte AES key immediately
+        //  followed by the 12-byte counter mask salt (initCipher rejects keySize != 0x1c, and initCounterMask
+        //  copies 12 bytes from key+16), plus a separate 32-byte HMAC-SHA256 auth key. So the salt is a
+        //  derived value contiguous with the AES key, not zero. Still unrecovered: the exact HKDF (info label
+        //  and output layout) the facebook::sframe SFrameKeyProvider ratchet uses to expand the 32-byte chain
+        //  key into that 28 + 32 material. The participant base key uses info "e2e sframe key", but the
+        //  ratchet's cipher-key label is internal to facebook::sframe and does not surface as a data string,
+        //  so it cannot be reproduced byte for byte yet. Until it is, this expands the chain key with one
+        //  HKDF-SHA256 expand (Cobalt's own "e2e sframe key-material" label) and installs an all-zero mask,
+        //  which is Cobalt-self-consistent but not byte-compatible with native WhatsApp.
         var material = VoipCryptoNative.hkdfExpand(key, CIPHER_EXPAND_INFO, CIPHER_MATERIAL_LENGTH);
         var aesKey = new byte[SFrameCipherSuite.AES_KEY_LENGTH];
         var authKey = new byte[SFrameCipherSuite.HMAC_KEY_LENGTH];
@@ -230,6 +252,10 @@ public final class SFrameKeyProvider {
             return;
         }
         var oldest = newestCounter - EVICTION_DISTANCE;
+        var sizeBefore = ciphersByKeyId.size();
         ciphersByKeyId.keySet().removeIf(keyId -> Long.compareUnsigned(keyId, oldest) < 0);
+        if (Log.DEBUG && ciphersByKeyId.size() != sizeBefore) {
+            LOGGER.log(Level.DEBUG, "sframe evicted {0} stale ciphers", sizeBefore - ciphersByKeyId.size());
+        }
     }
 }

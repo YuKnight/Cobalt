@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the custom-label-to-conversion-event query built by
+ * Parses the graph.whatsapp.com GraphQL response of the custom-label-to-conversion-event query built by
  * {@link CustomLabel3PdEventWhatsAppGraphQlRequest} into a list of {@link CtwaConversionEvent}.
  *
  * <p>Reads the plural linked {@code xwa_get_3pd_event} field and projects each entry onto the Cobalt
@@ -41,7 +41,7 @@ public final class CustomLabel3PdEventWhatsAppGraphQlResponse implements WhatsAp
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the plural linked root {@code xwa_get_3pd_event} and projects each entry onto a
      * {@link CtwaConversionEvent}; the returned {@link Optional} is empty when {@code data} is
@@ -91,7 +91,7 @@ public final class CustomLabel3PdEventWhatsAppGraphQlResponse implements WhatsAp
     /**
      * Returns the parsed conversion events.
      *
-     * @return the parsed events, empty when the relay returned none
+     * @return the parsed events, empty when the graph.whatsapp.com endpoint returned none
      */
     public List<CtwaConversionEvent> events() {
         return events;

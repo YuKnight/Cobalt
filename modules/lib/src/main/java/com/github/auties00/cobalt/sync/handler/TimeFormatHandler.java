@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,6 +11,8 @@ import com.github.auties00.cobalt.model.sync.action.device.TimeFormatAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Mirrors the user's 12/24-hour clock preference across linked devices.
@@ -23,6 +26,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebTimeFormatSync")
 public final class TimeFormatHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link TimeFormatHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(TimeFormatHandler.class);
 
     /**
      * Constructs the handler.
@@ -90,6 +97,8 @@ public final class TimeFormatHandler implements WebAppStateActionHandler {
         }
 
         client.store().settingsStore().setTwentyFourHourFormat(action.isTwentyFourHourFormatEnabled());
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "time format: set twentyFourHour={0}", action.isTwentyFourHourFormatEnabled());
 
         return MutationApplicationResult.success();
     }

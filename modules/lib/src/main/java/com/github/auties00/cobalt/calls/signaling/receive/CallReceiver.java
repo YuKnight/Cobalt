@@ -2,10 +2,12 @@ package com.github.auties00.cobalt.calls.signaling.receive;
 
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -53,9 +55,9 @@ import com.github.auties00.cobalt.calls.signaling.session.OfferNoticeStanza;
  */
 public final class CallReceiver extends SocketStreamHandler.Ordered {
     /**
-     * Logs traces for malformed stanzas and dropped payloads.
+     * The logger for {@link CallReceiver}.
      */
-    private static final System.Logger LOGGER = System.getLogger(CallReceiver.class.getName());
+    private static final System.Logger LOGGER = Log.get(CallReceiver.class);
 
     /**
      * The stream tag this handler is registered under.
@@ -76,6 +78,11 @@ public final class CallReceiver extends SocketStreamHandler.Ordered {
      * The wire attribute naming the call identifier on a {@code <call>} child element.
      */
     private static final String CALL_ID_ATTRIBUTE = "call-id";
+
+    /**
+     * The wire attribute naming the call creator's device JID on a {@code <call>} child element.
+     */
+    private static final String CALL_CREATOR_ATTRIBUTE = "call-creator";
 
     /**
      * The fallback {@code call-id} used as the ordering key when a payload carries none, so a malformed
@@ -193,7 +200,7 @@ public final class CallReceiver extends SocketStreamHandler.Ordered {
         var from = stanza.getAttributeAsJid(FROM_ATTRIBUTE, null);
         var payload = stanza.getChild().orElse(null);
         if (from == null || payload == null) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring malformed call stanza: {0}", stanza);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring malformed call stanza: {0}", stanza);
             return;
         }
 
@@ -203,20 +210,21 @@ public final class CallReceiver extends SocketStreamHandler.Ordered {
         }
 
         var senderLid = stanza.getAttributeAsJid(SENDER_LID_ATTRIBUTE, null);
-        // TODO: pass the call-id read here into CallSignalingRouter.classify so the router does not read
-        //  the call-id attribute again; blocked because unowned tests call the three argument classify.
-        var verdict = router.classify(payload, senderLid,
-                payload.getAttributeAsString(CALL_ID_ATTRIBUTE)
-                        .map(callExists::test)
-                        .orElse(false));
+        var callId = payload.getAttributeAsString(CALL_ID_ATTRIBUTE, null);
+        var callCreator = payload.getAttributeAsJid(CALL_CREATOR_ATTRIBUTE, null);
+        var verdict = router.classify(payload.description(), callId, callCreator, senderLid,
+                callId != null && callExists.test(callId));
 
         acknowledger.acknowledge(stanza, payload, verdict.callId().orElse(null), from,
                 verdict.callCreator().orElse(null));
 
         switch (verdict.disposition()) {
-            case DROP -> LOGGER.log(System.Logger.Level.DEBUG,
-                    "Dropping call payload {0}: {1}", payload.description(), stanza);
-            case BUFFER -> verdict.callId().ifPresent(callId -> bufferAndMaybeReplay(callId, payload, from));
+            case DROP -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "dropping call payload {0}: {1}", payload.description(), stanza);
+                }
+            }
+            case BUFFER -> verdict.callId().ifPresent(id -> bufferAndMaybeReplay(id, payload, from));
             case PROCESS -> forward(payload, from);
         }
     }
@@ -239,8 +247,9 @@ public final class CallReceiver extends SocketStreamHandler.Ordered {
     private void handleOfferNotice(Stanza stanza, Stanza payload, Jid from) {
         acknowledger.acknowledge(stanza, payload, payload.getAttributeAsString(CALL_ID_ATTRIBUTE).orElse(null),
                 from, null);
-        OfferNoticeStanza.of(stanza).ifPresentOrElse(offerNoticeSink, () ->
-                LOGGER.log(System.Logger.Level.DEBUG, "Could not decode offer_notice: {0}", stanza));
+        OfferNoticeStanza.of(stanza).ifPresentOrElse(offerNoticeSink, () -> {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "could not decode offer_notice: {0}", stanza);
+        });
     }
 
     /**
@@ -271,11 +280,16 @@ public final class CallReceiver extends SocketStreamHandler.Ordered {
      */
     private void bufferAndMaybeReplay(String callId, Stanza payload, Jid from) {
         if (CALL_CREATING_TAGS.contains(payload.description())) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} created by offer, replaying buffered messages", callId);
             forward(payload, from);
             if (buffer.hasBufferedMessages(callId)) {
                 buffer.drainBufferedMessages(callId).forEach(drained -> forward(drained, from));
             }
             return;
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "buffering call payload {0} for call {1} pending creation",
+                    payload.description(), callId);
         }
         buffer.buffer(callId, payload);
     }
@@ -295,8 +309,13 @@ public final class CallReceiver extends SocketStreamHandler.Ordered {
      */
     private void forward(Stanza payload, Jid from) {
         CallStanza.parse(payload).ifPresentOrElse(
-                message -> sink.accept(message, from),
-                () -> LOGGER.log(System.Logger.Level.DEBUG, "Could not decode call payload: {0}", payload));
+                message -> {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "forwarding call message type={0}", message.type());
+                    sink.accept(message, from);
+                },
+                () -> {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "could not decode call payload: {0}", payload);
+                });
     }
 
     /**
@@ -309,6 +328,7 @@ public final class CallReceiver extends SocketStreamHandler.Ordered {
      */
     @Override
     public void reset() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resetting call receiver state");
         buffer.reset();
         super.reset();
     }

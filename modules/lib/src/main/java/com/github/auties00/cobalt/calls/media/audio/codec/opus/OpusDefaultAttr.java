@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.opus;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Enumerates the four per sample rate default Opus configurations the call engine seeds an encoder
  * from, the typed form of the native {@code opus_default_attr} table.
@@ -42,6 +45,24 @@ public enum OpusDefaultAttr {
      * {@code 4}.
      */
     FB(48000, 40000, 6000, 40000, 4);
+
+    /**
+     * Resolves an input sample rate to its default attribute row, backing {@link #ofSampleRate(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #sampleRate}, so a sample rate
+     * resolves to its row in constant time rather than by scanning {@link #values()}.
+     */
+    private static final Map<Integer, OpusDefaultAttr> BY_SAMPLE_RATE;
+
+    static {
+        var bySampleRate = new HashMap<Integer, OpusDefaultAttr>();
+        for (var attr : values()) {
+            if (bySampleRate.put(attr.sampleRate, attr) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_SAMPLE_RATE = Map.copyOf(bySampleRate);
+    }
 
     /**
      * The minimum bitrate floor, in bits per second, shared by every row of the table.
@@ -163,17 +184,18 @@ public enum OpusDefaultAttr {
     /**
      * Returns the default attribute row keyed on the given sample rate.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_SAMPLE_RATE} map rather than
+     * scanning {@link #values()}.
      * @param sampleRate the input sample rate in Hz; one of {@code 8000}, {@code 16000},
      *                   {@code 24000}, {@code 48000}
      * @return the matching row
      * @throws IllegalArgumentException if no row is keyed on {@code sampleRate}
      */
     public static OpusDefaultAttr ofSampleRate(int sampleRate) {
-        for (var attr : values()) {
-            if (attr.sampleRate == sampleRate) {
-                return attr;
-            }
+        var attr = BY_SAMPLE_RATE.get(sampleRate);
+        if (attr == null) {
+            throw new IllegalArgumentException("No Opus default-attr row for sample rate: " + sampleRate);
         }
-        throw new IllegalArgumentException("No Opus default-attr row for sample rate: " + sampleRate);
+        return attr;
     }
 }

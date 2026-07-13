@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.notification;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
@@ -20,6 +21,8 @@ import com.github.auties00.cobalt.stream.notification.group.NotificationGroupStr
 import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.wam.WamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Dispatches inbound {@code <notification>} stanzas to the appropriate
@@ -64,6 +67,9 @@ import com.github.auties00.cobalt.wam.WamService;
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class NotificationStreamHandler extends SocketStreamHandler.Concurrent {
+    /** The logger for {@link NotificationStreamHandler}. */
+    private static final System.Logger LOGGER = Log.get(NotificationStreamHandler.class);
+
     /**
      * Holds the sub-dispatcher for notifications that affect the current
      * account's contact list, privacy settings, profile picture, or status
@@ -189,17 +195,26 @@ public final class NotificationStreamHandler extends SocketStreamHandler.Concurr
         }
 
         switch (type) {
-            case "account_sync", "contacts", "disappearing_mode", "picture", "privacy_token", "status" ->
-                    accountHandler.handle(stanza);
-            case "business", "digital_commerce_subscription", "fb:update", "mex", "pay" ->
-                    businessHandler.handle(stanza);
+            case "account_sync", "contacts", "disappearing_mode", "picture", "privacy_token", "status" -> {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "routing notification type {0} to account dispatcher", type);
+                accountHandler.handle(stanza);
+            }
+            case "business", "digital_commerce_subscription", "fb:update", "mex", "pay" -> {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "routing notification type {0} to business dispatcher", type);
+                businessHandler.handle(stanza);
+            }
             case "companion_reg_refresh", "crsc_continuation", "devices", "encrypt", "hosted",
                     "link_code_companion_reg", "mediaretry", "newsletter", "passkey_prologue_request",
-                    "psa", "registration", "server", "server_sync", "w:growth", "waffle" ->
-                    deviceHandler.handle(stanza);
-            case "w:gp2" ->
-                    groupHandler.handle(stanza);
+                    "psa", "registration", "server", "server_sync", "w:growth", "waffle" -> {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "routing notification type {0} to device dispatcher", type);
+                deviceHandler.handle(stanza);
+            }
+            case "w:gp2" -> {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "routing notification type {0} to group handler", type);
+                groupHandler.handle(stanza);
+            }
             default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping notification with unrecognized type {0}", type);
             }
         }
     }

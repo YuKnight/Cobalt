@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAction;
 import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlActionBuilder;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -28,6 +30,11 @@ import java.util.Objects;
  * every sibling {@code AccountSyncdActionBase} subclass.
  */
 public final class MaibaAIFeaturesControlMutationFactory {
+    /**
+     * The logger for {@link MaibaAIFeaturesControlMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(MaibaAIFeaturesControlMutationFactory.class);
+
     /**
      * Constructs a Maiba-AI-features-control mutation factory.
      *
@@ -59,6 +66,7 @@ public final class MaibaAIFeaturesControlMutationFactory {
     public SyncPendingMutation getMaibaAiFeatureStatusMutation(Instant timestamp, MaibaAIFeaturesControlAction.MaibaAIFeatureStatus status) {
         Objects.requireNonNull(timestamp, "timestamp cannot be null");
         Objects.requireNonNull(status, "status cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building maiba ai features control mutation status={0}", status);
         var action = new MaibaAIFeaturesControlActionBuilder()
                 .aiFeatureStatus(status)
                 .build();

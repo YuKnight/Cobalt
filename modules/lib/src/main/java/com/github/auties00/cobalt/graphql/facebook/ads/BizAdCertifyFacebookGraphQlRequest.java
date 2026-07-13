@@ -14,17 +14,10 @@ import java.io.UncheckedIOException;
  * Builds the comet mutation that submits the caller's ads-integrity self-certification.
  *
  * <p>The mutation takes a single {@code input} GraphQL object carrying the self-certification
- * payload. The relay returns the certification outcome under
- * {@code ads_integrity_self_certification_certify}, whose {@code certified_user_name} and
- * {@code create_time} scalars record who certified and when; the reply is consumed through
- * {@link BizAdCertifyFacebookGraphQlResponse}.
- *
- * @implNote This implementation accepts the {@code input} object as a caller-supplied, already
- * JSON-encoded object literal because the {@code useWAWebBizAdCertifyMutation} hook module and its
- * input type are not present in the static bundle of snapshot {@code 1040120866}; it is one of the
- * Comet ad-creation documents loaded on demand. The value is emitted verbatim as the {@code input}
- * variable. Once a caller that builds the object surfaces, replace this with typed scalar fields
- * mirroring that construction.
+ * payload, whose {@code source} field names the surface the certification was made from. The relay
+ * returns the certification outcome under {@code ads_integrity_self_certification_certify}, whose
+ * {@code certified_user_name} and {@code create_time} scalars record who certified and when; the reply
+ * is consumed through {@link BizAdCertifyFacebookGraphQlResponse}.
  *
  * @see BizAdCertifyFacebookGraphQlResponse
  */
@@ -50,24 +43,21 @@ public final class BizAdCertifyFacebookGraphQlRequest implements FacebookGraphQl
     public static final String OPERATION_NAME = "useWAWebBizAdCertifyMutation";
 
     /**
-     * The pre-encoded JSON of the {@code input} GraphQL object carrying the self-certification
-     * payload, or {@code null} to omit it.
+     * The {@code source} field of the {@code input} object naming the surface the certification was
+     * made from, or {@code null} to omit it.
      */
-    private final String inputJson;
+    private final String source;
 
     /**
      * Constructs an ads-integrity self-certification mutation request.
      *
-     * <p>The {@code inputJson} is the already-JSON-encoded {@code input} object holding the
-     * self-certification payload; its field names are defined by the server-side input type and are
-     * not modelled here (see the class {@code @implNote}). A {@code null} value omits the variable
-     * from the serialized object.
+     * <p>The {@code source} names the surface the certification was made from. A {@code null} value
+     * omits the field from the serialized {@code input} object.
      *
-     * @param inputJson the already-JSON-encoded {@code input} object, or {@code null} to omit the
-     *                  variable
+     * @param source the certification source surface, or {@code null} to omit the field
      */
-    public BizAdCertifyFacebookGraphQlRequest(String inputJson) {
-        this.inputJson = inputJson;
+    public BizAdCertifyFacebookGraphQlRequest(String source) {
+        this.source = source;
     }
 
     /**
@@ -89,20 +79,22 @@ public final class BizAdCertifyFacebookGraphQlRequest implements FacebookGraphQl
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"input": <inputJson>}}, writing the variable only
-     * when its value is non-null and emitting {@code "{}"} when it is {@code null}. The {@code input}
-     * value is spliced in as a raw JSON value via {@link JSONWriter#writeRaw(String)} because it is
-     * supplied already encoded.
+     * @implNote This implementation emits {@code {"input": {"source": <source>}}}, writing
+     * {@code source} only when it is non-null and emitting {@code {"input": {}}} otherwise.
      */
     @Override
     public String variables() {
         try (var writer = JSONWriter.ofUTF8()) {
             writer.startObject();
-            if (inputJson != null) {
-                writer.writeName("input");
+            writer.writeName("input");
+            writer.writeColon();
+            writer.startObject();
+            if (source != null) {
+                writer.writeName("source");
                 writer.writeColon();
-                writer.writeRaw(inputJson);
+                writer.writeString(source);
             }
+            writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {
                 writer.flushTo(output);

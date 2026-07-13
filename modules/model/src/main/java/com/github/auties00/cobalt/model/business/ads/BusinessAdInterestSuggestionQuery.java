@@ -4,6 +4,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -18,12 +19,10 @@ import java.util.OptionalInt;
  * input carries the parameters the server uses to compute the
  * suggestions.
  *
- * <p>The {@link #detailedTargetingItemsJson() chosen interests} is a
- * JSON-encoded list of the interests the merchant has already selected;
- * its structure is defined by the server and is carried verbatim as a
- * string. The {@link #adAccountId() ad account} scopes the suggestion and
- * the {@link #count() count} caps how many to return; both may be left
- * unset.
+ * <p>The {@link #detailedTargetingItems() chosen interests} is the list of
+ * interests the merchant has already selected, used as the seed. The
+ * {@link #adAccountId() ad account} scopes the suggestion and the
+ * {@link #count() count} caps how many to return; both may be left unset.
  */
 @ProtobufMessage(name = "BusinessAdInterestSuggestionQuery")
 public final class BusinessAdInterestSuggestionQuery {
@@ -35,12 +34,11 @@ public final class BusinessAdInterestSuggestionQuery {
     final String adAccountId;
 
     /**
-     * JSON-encoded chosen interests the suggestion is computed from. The
-     * field set is defined by the server and is carried verbatim. Unset
-     * omits the variable.
+     * Chosen interests the suggestion is computed from, in the order they
+     * are sent. Never {@code null}, possibly empty.
      */
-    @ProtobufProperty(index = 2, type = ProtobufType.STRING)
-    final String detailedTargetingItemsJson;
+    @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
+    final List<DetailedTargetingItem> detailedTargetingItems;
 
     /**
      * Maximum number of suggestions to return. Unset omits the variable
@@ -50,21 +48,19 @@ public final class BusinessAdInterestSuggestionQuery {
     final Integer count;
 
     /**
-     * Constructs a new {@code BusinessAdInterestSuggestionQuery}. Every
-     * argument may be {@code null} to omit the corresponding variable from
-     * the request.
+     * Constructs a new {@code BusinessAdInterestSuggestionQuery}. A
+     * {@code null} {@code detailedTargetingItems} is coerced to an empty
+     * list; every other argument may be {@code null} to omit the
+     * corresponding variable from the request.
      *
-     * @param adAccountId                the advertising-account identifier,
-     *                                   or {@code null}
-     * @param detailedTargetingItemsJson the JSON-encoded chosen interests,
-     *                                   or {@code null}
-     * @param count                      the maximum number of suggestions,
-     *                                   or {@code null}
+     * @param adAccountId            the advertising-account identifier, or {@code null}
+     * @param detailedTargetingItems the chosen interests; {@code null} treated as empty
+     * @param count                  the maximum number of suggestions, or {@code null}
      */
-    public BusinessAdInterestSuggestionQuery(String adAccountId, String detailedTargetingItemsJson,
+    public BusinessAdInterestSuggestionQuery(String adAccountId, List<DetailedTargetingItem> detailedTargetingItems,
                                              Integer count) {
         this.adAccountId = adAccountId;
-        this.detailedTargetingItemsJson = detailedTargetingItemsJson;
+        this.detailedTargetingItems = detailedTargetingItems == null ? List.of() : List.copyOf(detailedTargetingItems);
         this.count = count;
     }
 
@@ -79,12 +75,12 @@ public final class BusinessAdInterestSuggestionQuery {
     }
 
     /**
-     * Returns the JSON-encoded chosen interests.
+     * Returns the chosen interests the suggestion is computed from.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an unmodifiable view of the chosen interests; never {@code null}, possibly empty
      */
-    public Optional<String> detailedTargetingItemsJson() {
-        return Optional.ofNullable(detailedTargetingItemsJson);
+    public List<DetailedTargetingItem> detailedTargetingItems() {
+        return detailedTargetingItems;
     }
 
     /**
@@ -103,20 +99,20 @@ public final class BusinessAdInterestSuggestionQuery {
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (BusinessAdInterestSuggestionQuery) obj;
         return Objects.equals(adAccountId, that.adAccountId)
-                && Objects.equals(detailedTargetingItemsJson, that.detailedTargetingItemsJson)
+                && Objects.equals(detailedTargetingItems, that.detailedTargetingItems)
                 && Objects.equals(count, that.count);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(adAccountId, detailedTargetingItemsJson, count);
+        return Objects.hash(adAccountId, detailedTargetingItems, count);
     }
 
     @Override
     public String toString() {
         return "BusinessAdInterestSuggestionQuery[" +
                 "adAccountId=" + adAccountId + ", " +
-                "detailedTargetingItemsJson=" + detailedTargetingItemsJson + ", " +
+                "detailedTargetingItems=" + detailedTargetingItems + ", " +
                 "count=" + count + ']';
     }
 }

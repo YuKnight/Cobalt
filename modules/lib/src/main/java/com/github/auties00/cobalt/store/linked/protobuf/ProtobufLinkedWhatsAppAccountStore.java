@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.store.linked.protobuf;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
 import com.github.auties00.cobalt.client.linked.info.LinkedWhatsAppClientInfo;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.business.profile.BusinessCategory;
 import com.github.auties00.cobalt.model.contact.ContactTextStatus;
 import com.github.auties00.cobalt.model.contact.UsernameState;
@@ -18,6 +19,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -51,6 +53,11 @@ import static java.util.Objects.requireNonNullElseGet;
 @ProtobufMessage
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public final class ProtobufLinkedWhatsAppAccountStore implements LinkedWhatsAppAccountStore {
+    /**
+     * The logger for {@link ProtobufLinkedWhatsAppAccountStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufLinkedWhatsAppAccountStore.class);
+
     /**
      * The stable per-account identifier scoping on-disk state, log tags and the pairing handshake.
      */
@@ -619,6 +626,9 @@ public final class ProtobufLinkedWhatsAppAccountStore implements LinkedWhatsAppA
             synchronized (clientVersionLock) {
                 if (clientVersion == null) {
                     clientVersion = LinkedWhatsAppClientInfo.of(device.platform()).version();
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "derived client version {0} for platform {1}", clientVersion, device.platform());
+                    }
                 }
             }
         }
@@ -650,6 +660,7 @@ public final class ProtobufLinkedWhatsAppAccountStore implements LinkedWhatsAppA
     @Override
     public void updateAdvCheckTime() {
         this.lastAdvCheckTime = Instant.now();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "adv revalidation succeeded");
     }
 
     @Override

@@ -1,10 +1,13 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.bwe;
 
+import com.github.auties00.cobalt.log.Log;
+
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,6 +42,11 @@ import java.util.Map;
  * unsigned range carries without sign extension, exactly as the entropy decoder reads them.
  */
 final class MlowHbTables {
+    /**
+     * The logger for {@link MlowHbTables}.
+     */
+    private static final System.Logger LOGGER = Log.get(MlowHbTables.class);
+
     /**
      * The high band linear prediction order ({@code 4}); the LSF vector length of every high band codebook
      * entry.
@@ -294,6 +302,9 @@ final class MlowHbTables {
             }
             System.arraycopy(floats.get("GAIN_PWRS"), 0, GAIN_PWRS, 0, GAIN_PWRS.length);
         } catch (IOException e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "mlow high-band table load failed", e);
+            }
             throw new UncheckedIOException("failed to load MLow high-band tables", e);
         }
     }

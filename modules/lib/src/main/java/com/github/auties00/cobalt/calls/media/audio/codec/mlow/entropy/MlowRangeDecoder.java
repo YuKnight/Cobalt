@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Bit exact range decoder for the MLow speech codec bitstream.
  *
@@ -33,6 +37,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy;
  * multiply.
  */
 public final class MlowRangeDecoder {
+    /**
+     * The logger for {@link MlowRangeDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(MlowRangeDecoder.class);
+
     /**
      * Number of bits emitted or consumed at a time by the range coder.
      *
@@ -251,6 +260,9 @@ public final class MlowRangeDecoder {
             throw new IndexOutOfBoundsException(
                     "window [" + offset + ", " + (offset + length) + ") out of bounds for length " + data.length);
         }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "range decoder reset offset={0} length={1}", offset, length);
+        }
         this.buf = data;
         this.bufBase = offset;
         this.storage = length;
@@ -451,6 +463,9 @@ public final class MlowRangeDecoder {
             long result = ((s << ftb) | tail) & U32;
             if (Long.compareUnsigned(result, ftMinus) <= 0) {
                 return result;
+            }
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "range decoder uint overflow, clamping to {0}", ftMinus);
             }
             error = 1;
             return ftMinus;

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.net.SocketAddress;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -42,6 +45,11 @@ import java.util.function.Consumer;
  * feedback path rather than the media depacketizer.
  */
 public final class InboundPacketDemux {
+    /**
+     * The logger for {@link InboundPacketDemux}.
+     */
+    private static final System.Logger LOGGER = Log.get(InboundPacketDemux.class);
+
     /**
      * Receives one inbound STUN datagram together with the transport address it arrived from.
      *
@@ -252,6 +260,7 @@ public final class InboundPacketDemux {
      */
     public PacketClass accept(byte[] packet, SocketAddress source) {
         var packetClass = classify(packet);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "classified datagram as {0}, {1} bytes", packetClass, packet.length);
         switch (packetClass) {
             case STUN -> dispatchStun(packet, source);
             case DTLS -> dispatch(dtlsHandler, packet);
@@ -299,7 +308,8 @@ public final class InboundPacketDemux {
         }
         try {
             stunHandler.accept(packet, source);
-        } catch (Throwable _) {
+        } catch (Throwable throwable) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "stun handler threw", throwable);
         }
     }
 
@@ -315,7 +325,8 @@ public final class InboundPacketDemux {
         }
         try {
             handler.accept(packet);
-        } catch (Throwable _) {
+        } catch (Throwable throwable) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "packet handler threw", throwable);
         }
     }
 }

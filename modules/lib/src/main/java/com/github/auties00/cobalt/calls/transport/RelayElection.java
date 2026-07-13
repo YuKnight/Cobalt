@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -34,6 +37,11 @@ import java.util.Optional;
  *           {@link com.github.auties00.cobalt.calls.signaling.relay.RelayLatencyEntry}.
  */
 public final class RelayElection {
+    /**
+     * The logger for {@link RelayElection}.
+     */
+    private static final System.Logger LOGGER = Log.get(RelayElection.class);
+
     /**
      * The party index that elects on behalf of the local endpoint itself rather than a specific peer.
      *
@@ -148,10 +156,11 @@ public final class RelayElection {
                     continue;
                 }
             }
-            // FIXME: this updates bestMaxLatency unconditionally, before the election branch below, so
-            //  Result.maxLatencyMillis (the electing party's own max latency) can report a relay that did not
-            //  win. maxLatencyMillis is telemetry only, so the reported value is left unchanged until the
-            //  intended behavior is confirmed.
+            // Matches find_best_relay (wa_transport_relay_election.cc, voip WASM func 5419): the max latency
+            // is folded as a running minimum over every candidate tied at the top party count and applied
+            // before the latency election below, so the reported value can come from a relay that did not
+            // win. This is WA behavior, not a defect; every find_best_relay caller reads only the elected and
+            // alternate relay indices and discards this value, so it is diagnostic only.
             if (entryMaxLatency < bestMaxLatency) {
                 bestMaxLatency = entryMaxLatency;
             }
@@ -166,9 +175,19 @@ public final class RelayElection {
             }
         }
         if (bestRelayIndex < 0) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "calls relay election found no relay reachable by more than one party "
+                        + "for party={0} among {1} candidate(s)", party, relays.size());
+            }
             return Optional.empty();
         }
         var alternateRelayId = alternateRelayIndex < 0 ? -1 : relays.get(alternateRelayIndex).relayId();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "calls relay election elected relayId={0} (partyCount={1}, latencySum={2}ms) for party={3}, "
+                            + "alternate relayId={4}",
+                    relays.get(bestRelayIndex).relayId(), bestPartyCount, bestLatencySum, party, alternateRelayId);
+        }
         return Optional.of(new Result(bestRelayIndex, relays.get(bestRelayIndex).relayId(),
                 alternateRelayIndex, alternateRelayId, bestLatencySum, bestMaxLatency));
     }
@@ -251,14 +270,17 @@ public final class RelayElection {
     }
 
     /**
-     * The result of an election: the elected relay, an alternate relay, and the elected relay's latency.
+     * The result of an election: the elected relay, an alternate relay, and a diagnostic latency.
      *
      * @param index            the index of the elected candidate in the candidate list
      * @param relayId          the identifier of the elected relay
      * @param alternateIndex   the index of the alternate candidate, or {@code -1} when none was recorded
      * @param alternateRelayId the identifier of the alternate relay, or {@code -1} when none was recorded
      * @param latencySumMillis the summed party latency of the elected relay, in milliseconds
-     * @param maxLatencyMillis the electing party's own latency to the elected relay, in milliseconds
+     * @param maxLatencyMillis the running minimum of the electing party's per-relay latency across the
+     *                         candidates tied at the top party count, in milliseconds; because it is folded
+     *                         before the latency election it need not equal the elected relay's own latency,
+     *                         and it is diagnostic only
      */
     public record Result(int index,
                          int relayId,

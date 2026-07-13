@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.stream.control;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientOfflineResumeState;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,6 +15,7 @@ import com.github.auties00.cobalt.wam.event.OfflineResumeStageEventBuilder;
 import com.github.auties00.cobalt.wam.type.OfflineResumeModes;
 import com.github.auties00.cobalt.wam.type.OfflineResumeStages;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,6 +45,11 @@ import java.util.concurrent.ThreadLocalRandom;
 @WhatsAppWebModule(moduleName = "WAWebHandleReportServerSyncNotification")
 @WhatsAppWebModule(moduleName = "WAWebWamOfflineResumeReporter")
 public final class OfflineNotificationsReporter {
+    /**
+     * The logger for {@link OfflineNotificationsReporter}.
+     */
+    private static final System.Logger LOGGER = Log.get(OfflineNotificationsReporter.class);
+
     /**
      * The number of milliseconds after the notional offline-resume start at which the {@code SOCKET_CONNECT} stage is
      * reported.
@@ -154,6 +161,9 @@ public final class OfflineNotificationsReporter {
     public void increment(SyncPatchType collection) {
         Objects.requireNonNull(collection, "collection cannot be null");
         offlineNotificationsCount.merge(collection, 1, Integer::sum);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "offline server_sync notification counted for {0}", collection);
+        }
     }
 
     /**
@@ -184,6 +194,12 @@ public final class OfflineNotificationsReporter {
         wamService.commit(new MdAppStateOfflineNotificationsEventBuilder()
                 .redundantCount(redundantCount)
                 .build());
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "flushed offline notifications collectionCount={0} redundantCount={1}",
+                    offlineNotificationsCount.size(), redundantCount);
+        }
 
         offlineNotificationsCount.clear();
     }
@@ -255,6 +271,12 @@ public final class OfflineNotificationsReporter {
                 .currentOfflineStage(OfflineResumeStages.PROCESS_COMPLETE)
                 .offlineStageTimestampMs(processCompleteMillis)
                 .build());
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "emitted offline resume stages session={0} mode={1} chatThreadCount={2} drainMillis={3}",
+                    sessionId, resumeMode, chatThreadCount, drainMillis);
+        }
     }
 
     /**

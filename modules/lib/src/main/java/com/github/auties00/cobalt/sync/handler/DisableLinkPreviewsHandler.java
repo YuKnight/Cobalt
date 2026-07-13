@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,6 +11,8 @@ import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingDisabl
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,6 +30,10 @@ import java.util.List;
  */
 @WhatsAppWebModule(moduleName = "WAWebDisableLinkPreviewsSync")
 public final class DisableLinkPreviewsHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link DisableLinkPreviewsHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(DisableLinkPreviewsHandler.class);
 
     /**
      * Constructs a new singleton {@link DisableLinkPreviewsHandler}.
@@ -99,11 +106,13 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
                 lastValid = action.isPreviewsDisabled();
                 results.add(MutationApplicationResult.success());
             } else {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "disable link previews: malformed mutation in batch");
                 results.add(MutationApplicationResult.malformed());
             }
         }
 
         if (lastValid != null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "disable link previews: batch set disabled={0}", lastValid);
             client.store().settingsStore().setDisableLinkPreviews(lastValid);
         }
 
@@ -131,10 +140,12 @@ public final class DisableLinkPreviewsHandler implements WebAppStateActionHandle
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrivacySettingDisableLinkPreviewsAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "disable link previews: mutation value is not a PrivacySettingDisableLinkPreviewsAction");
             return MutationApplicationResult.malformed();
         }
 
         client.store().settingsStore().setDisableLinkPreviews(action.isPreviewsDisabled());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "disable link previews: set disabled={0}", action.isPreviewsDisabled());
         return MutationApplicationResult.success();
     }
 

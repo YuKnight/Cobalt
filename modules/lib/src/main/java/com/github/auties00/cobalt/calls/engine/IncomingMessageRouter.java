@@ -2,9 +2,11 @@ package com.github.auties00.cobalt.calls.engine;
 
 import com.github.auties00.cobalt.calls.signaling.CallMessage;
 import com.github.auties00.cobalt.calls.signaling.SignalingType;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -47,6 +49,11 @@ import java.util.function.Predicate;
  * pending holder before honouring a drop.
  */
 public final class IncomingMessageRouter<C> {
+    /**
+     * The logger for {@link IncomingMessageRouter}.
+     */
+    private static final System.Logger LOGGER = Log.get(IncomingMessageRouter.class);
+
     /**
      * The wire attribute naming the call identifier on a {@code <call>} child element.
      */
@@ -274,14 +281,13 @@ public final class IncomingMessageRouter<C> {
         Objects.requireNonNull(locator, "locator cannot be null");
         Objects.requireNonNull(pendingCall, "pendingCall cannot be null");
 
-        // TODO: thread this route()'s Verdict.context() handle through dispatchInbound and the per type
-        //  handlers so they stop resolving calls.get(callId) again. This requires holding the call's lock
-        //  across the dispatch (matching WA's held info mutex on signaling), because calls is a
-        //  ConcurrentHashMap a teardown thread may calls.remove() from: without the lock, threading a
-        //  snapshot context would process a message against a torn down call where a fresh lookup sees null.
         var callId = message.callId().orElse(null);
         var callCreator = message.callCreator().orElse(null);
         if (callId == null || callId.isEmpty() || callCreator == null || !isLidAddressed(senderLid, callCreator)) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "call message dropped: missing or non-lid-addressed header, type={0}",
+                        message.type());
+            }
             return drop();
         }
 
@@ -290,28 +296,49 @@ public final class IncomingMessageRouter<C> {
         var context = locator.apply(callId);
         if (context == null) {
             if (isOffer) {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "offer for unknown call {0} routed to create a new call context",
+                            callId);
+                }
                 return new Verdict<>(RoutingClass.PROCESS, Optional.empty());
             }
-            return pendingCall.test(callId)
-                    ? new Verdict<>(RoutingClass.BUFFER_PENDING, Optional.empty())
-                    : drop();
+            if (pendingCall.test(callId)) {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "call message buffered for pending call {0}, type={1}", callId, type);
+                }
+                return new Verdict<>(RoutingClass.BUFFER_PENDING, Optional.empty());
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "call message dropped: no context resolved for call {0}, type={1}",
+                        callId, type);
+            }
+            return drop();
         }
 
         if (dedup.rejected()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call message ignored: call {0} already rejected", callId);
             return new Verdict<>(RoutingClass.IGNORE_REJECTED, Optional.empty());
         }
 
         var transactionId = transactionId(message.toStanza());
         if (transactionId != NO_TRANSACTION_ID && transactionId < dedup.latestTransactionId()) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "call message ignored: stale transaction {0} < {1} for call {2}",
+                        transactionId, dedup.latestTransactionId(), callId);
+            }
             return new Verdict<>(RoutingClass.IGNORE, Optional.empty());
         }
 
         if (isOffer) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "offer re-rings existing call {0}", callId);
             return new Verdict<>(RoutingClass.OFFER_RERING, Optional.of(context));
         }
         if (type == SignalingType.ACCEPT) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "accept routed to accept handling for call {0}", callId);
             return new Verdict<>(RoutingClass.ACCEPT_HANDLE, Optional.of(context));
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "call message {0} routed for normal processing on call {1}",
+                type, callId);
         return new Verdict<>(RoutingClass.PROCESS, Optional.of(context));
     }
 

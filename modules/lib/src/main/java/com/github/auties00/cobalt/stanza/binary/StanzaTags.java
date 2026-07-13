@@ -18,10 +18,10 @@ public final class StanzaTags {
     /**
      * Prevents instantiation of this constants holder.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private StanzaTags() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

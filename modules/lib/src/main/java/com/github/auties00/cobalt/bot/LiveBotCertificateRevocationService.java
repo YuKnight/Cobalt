@@ -1,12 +1,14 @@
 package com.github.auties00.cobalt.bot;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.stanza.mex.json.bot.FetchBotCertificateRevocationListMexRequest;
 import com.github.auties00.cobalt.stanza.mex.json.bot.FetchBotCertificateRevocationListMexResponse;
 import com.github.auties00.cobalt.util.ScheduledTask;
 
 import java.io.ByteArrayInputStream;
+import java.lang.System.Logger.Level;
 import java.math.BigInteger;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
@@ -35,6 +37,11 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @WhatsAppWebModule(moduleName = "WAWebBotCertificateRevocationService")
 public final class LiveBotCertificateRevocationService implements BotCertificateRevocationService {
+    /**
+     * The logger for {@link LiveBotCertificateRevocationService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveBotCertificateRevocationService.class);
+
     /**
      * The CRL refresh interval, six hours, matching WA Web's {@code 216e5} ms timer.
      */
@@ -86,12 +93,16 @@ public final class LiveBotCertificateRevocationService implements BotCertificate
     public BotRevocationStatus checkRevocationStatus(BigInteger serial, long nowMs) {
         var current = state.get();
         if (current.lastFetchMs == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "revocation check skipped, crl never fetched");
             return BotRevocationStatus.CRL_UNAVAILABLE;
         }
         if (current.nextUpdateMs != null && nowMs > current.nextUpdateMs) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "revocation check skipped, crl stale, next_update={0}", current.nextUpdateMs);
             return BotRevocationStatus.CRL_STALE;
         }
-        return current.revokedSerials.contains(serial) ? BotRevocationStatus.REVOKED : BotRevocationStatus.VALID;
+        var status = current.revokedSerials.contains(serial) ? BotRevocationStatus.REVOKED : BotRevocationStatus.VALID;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "revocation check result {0}", status);
+        return status;
     }
 
     /**
@@ -105,8 +116,10 @@ public final class LiveBotCertificateRevocationService implements BotCertificate
     @Override
     public void startPeriodicRefresh() {
         if (!started.compareAndSet(false, true)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "crl periodic refresh already started");
             return;
         }
+        if (Log.INFO) LOGGER.log(Level.INFO, "starting crl periodic refresh, interval={0}", REFRESH_INTERVAL);
         refreshJob = ScheduledTask.schedule(Duration.ZERO, REFRESH_INTERVAL, this::refresh);
     }
 
@@ -120,6 +133,7 @@ public final class LiveBotCertificateRevocationService implements BotCertificate
         if (job != null) {
             job.cancel();
             refreshJob = null;
+            if (Log.INFO) LOGGER.log(Level.INFO, "stopped crl periodic refresh");
         }
     }
 
@@ -130,13 +144,16 @@ public final class LiveBotCertificateRevocationService implements BotCertificate
      * leaves the previous state untouched.
      */
     private void refresh() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fetching bot certificate revocation list");
         var response = client.sendNode(new FetchBotCertificateRevocationListMexRequest());
         var parsed = FetchBotCertificateRevocationListMexResponse.of(response).orElse(null);
         if (parsed == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "crl refresh response missing fetch envelope, keeping previous state");
             return;
         }
         var crl = parsed.crl().orElse(null);
         if (crl == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "crl refresh response missing crl scalar, keeping previous state");
             return;
         }
         var revoked = parseRevokedSerials(Base64.getDecoder().decode(crl));
@@ -144,6 +161,9 @@ public final class LiveBotCertificateRevocationService implements BotCertificate
                 .map(Instant::toEpochMilli)
                 .orElseGet(() -> System.currentTimeMillis() + DEFAULT_NEXT_UPDATE.toMillis());
         state.set(new CrlState(revoked, System.currentTimeMillis(), nextUpdateMs));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "crl refreshed, revoked_count={0}, next_update={1}", revoked.size(), nextUpdateMs);
+        }
     }
 
     /**
@@ -166,6 +186,7 @@ public final class LiveBotCertificateRevocationService implements BotCertificate
             }
             return serials;
         } catch (Exception exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to parse bot certificate revocation list", exception);
             return Set.of();
         }
     }

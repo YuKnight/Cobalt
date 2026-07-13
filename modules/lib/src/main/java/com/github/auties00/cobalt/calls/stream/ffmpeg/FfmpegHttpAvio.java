@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.calls.stream.ffmpeg;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.ffmpeg.AVFormatContext;
 import com.github.auties00.cobalt.util.ffmpeg.AVIOContext;
 import com.github.auties00.cobalt.util.ffmpeg.FFmpegError;
@@ -9,6 +10,7 @@ import com.github.auties00.cobalt.util.ffmpeg.avio_alloc_context$seek;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -32,6 +34,11 @@ import java.util.Set;
  * an instance of this type acting as the byte source.
  */
 public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
+    /**
+     * The logger for {@link FfmpegHttpAvio}.
+     */
+    private static final System.Logger LOGGER = Log.get(FfmpegHttpAvio.class);
+
     /**
      * The read buffer size in bytes, used for both the native buffer FFmpeg reads from and the array each
      * upcall reads into; larger than the 8 KiB default to cut the upcall count on a fast stream.
@@ -168,10 +175,15 @@ public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
         }
         var opened = Ffmpeg.avformat_open_input(formatPtr, urlSeg, MemorySegment.NULL, MemorySegment.NULL);
         if (opened < 0) {
-            throw new IllegalStateException("avformat_open_input(" + label + ") failed: "
-                    + describeFailure(watchdog, opened, ioTimeout));
+            var description = describeFailure(watchdog, opened, ioTimeout);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "avformat_open_input({0}) failed: {1}", label, description);
+            }
+            throw new IllegalStateException("avformat_open_input(" + label + ") failed: " + description);
         }
-        return probe(watchdog, formatPtr, label, ioTimeout);
+        var result = probe(watchdog, formatPtr, label, ioTimeout);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "native media input opened: {0}", label);
+        return result;
     }
 
     /**
@@ -206,8 +218,13 @@ public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
                         + describeFailure(watchdog, code, ioTimeout));
             }
             opened = true;
-            return probe(watchdog, formatPtr, uri.toString(), ioTimeout);
+            var result = probe(watchdog, formatPtr, uri.toString(), ioTimeout);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "http media bridge opened: host={0}", uri.getHost());
+            return result;
         } catch (RuntimeException e) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "http media bridge open failed for host " + uri.getHost(), e);
+            }
             if (opened) {
                 Ffmpeg.avformat_close_input(formatPtr);
             }
@@ -235,8 +252,11 @@ public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
         }
         var probed = Ffmpeg.avformat_find_stream_info(openedCtx, MemorySegment.NULL);
         if (probed < 0) {
-            throw new IllegalStateException("avformat_find_stream_info(" + label + ") failed: "
-                    + describeFailure(watchdog, probed, ioTimeout));
+            var description = describeFailure(watchdog, probed, ioTimeout);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "avformat_find_stream_info({0}) failed: {1}", label, description);
+            }
+            throw new IllegalStateException("avformat_find_stream_info(" + label + ") failed: " + description);
         }
         if (watchdog != null) {
             watchdog.disarm();
@@ -364,6 +384,9 @@ public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
         try {
             openStream(0);
         } catch (IOException e) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "http media open failed for host " + uri.getHost(), e);
+            }
             throw new IllegalStateException("open(" + uri + ") failed", e);
         }
         var buffer = FFmpegError.requireNonNull("av_malloc", Ffmpeg.av_malloc(READ_BUFFER_SIZE));
@@ -425,18 +448,30 @@ public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
             var location = connected.getHeaderField("Location");
             connected.disconnect();
             if (location == null || ++redirects > MAX_REDIRECTS) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "unfollowable redirect (HTTP {0}) after {1} hops", status, redirects);
+                }
                 throw new IOException("unfollowable redirect (HTTP " + status + ") from " + target);
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "following redirect: status={0} hop={1}", status, redirects);
             target = resolveRedirect(target, location);
         }
         var accepted = offset > 0 ? status == 206 : status / 100 == 2;
         if (!accepted) {
             connected.disconnect();
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "http media open rejected: host={0} status={1} offset={2}",
+                        uri.getHost(), status, offset);
+            }
             throw new IOException("open(" + uri + ") returned HTTP " + status);
         }
         if (offset == 0) {
             totalLength = connected.getContentLengthLong();
             seekable = "bytes".equalsIgnoreCase(connected.getHeaderField("Accept-Ranges"));
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "http media stream opened: host={0} offset={1} length={2} seekable={3}",
+                    uri.getHost(), offset, totalLength, seekable);
         }
         var body = connected.getInputStream();
         var previousStream = stream;
@@ -476,11 +511,17 @@ public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
             return n;
         } catch (SocketTimeoutException e) {
             if (!watchdog.cancelled()) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "http media read timed out: host={0}", uri.getHost());
+                }
                 watchdog.markTimedOut();
             }
             return Ffmpeg.AVERROR_EOF();
         } catch (IOException e) {
             if (!watchdog.cancelled()) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "http media read failed for host " + uri.getHost(), e);
+                }
                 watchdog.markReadFailed(e.getMessage() != null ? e.getMessage() : e.toString());
             }
             return Ffmpeg.AVERROR_EOF();
@@ -518,8 +559,12 @@ public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
         try {
             openStream(target);
             position = target;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "http media seek to {0}", target);
             return target;
         } catch (IOException e) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "http media seek to " + target + " failed for host " + uri.getHost(), e);
+            }
             return -1;
         }
     }
@@ -532,6 +577,7 @@ public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
      */
     @Override
     public void abort() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "http media source aborted: host={0}", uri.getHost());
         closed = true;
         closeStream(stream);
         disconnect(connection);
@@ -546,6 +592,7 @@ public final class FfmpegHttpAvio implements FfmpegIoWatchdog.Io {
      */
     @Override
     public void close() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "http media source closed: host={0}", uri.getHost());
         closed = true;
         try (var local = Arena.ofConfined()) {
             var buffer = AVIOContext.buffer(avioContext);

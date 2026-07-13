@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.calls.crypto;
 
 import com.github.auties00.cobalt.calls.signaling.session.CallKeyDistribution;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
@@ -16,6 +17,7 @@ import com.github.auties00.cobalt.model.message.call.CallOfferMessageBuilder;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -70,9 +72,9 @@ import java.util.Optional;
  */
 public final class LiveCallKeyExchange implements CallKeyExchange {
     /**
-     * Holds the logger used for call key crypto diagnostics.
+     * The logger for {@link LiveCallKeyExchange}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveCallKeyExchange.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveCallKeyExchange.class);
 
     /**
      * Holds the length, in bytes, of the raw end to end call key.
@@ -169,11 +171,7 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
     public byte[] mintCallKey() {
         var callKey = new byte[CALL_KEY_LENGTH];
         secureRandom.nextBytes(callKey);
-        var hex = new StringBuilder(callKey.length * 2);
-        for (var b : callKey) {
-            hex.append(String.format("%02x", b & 0xFF));
-        }
-        LOGGER.log(System.Logger.Level.INFO, "calls E2E call key minted ({0} bytes): {1}", callKey.length, hex);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call key minted {0}", callKey);
         return callKey;
     }
 
@@ -251,21 +249,23 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
 
         var slots = new ArrayList<CallKeyDistribution>(devices.size());
         var encryptionFailed = false;
-        // FIXME: after encryptionFailed is set this loop keeps calling encryptForDevice() for every
-        //  remaining device, each advancing that session's Signal ratchet counter, and then slots.clear()
-        //  discards all ciphertext for a bare fanout, leaving the local counter ahead of the peer on
-        //  sessions the message plane also uses (ratchet desync). WA's partial fanout failure semantics
-        //  (break early vs best effort encrypt all) are unconfirmed and this crosses into the shared
-        //  Signal session layer; do not change ratchet consumption (e.g. break out on first failure and
-        //  build the bare list post loop) until confirmed against the message encryption path.
+        // WA best effort encrypts every device and never breaks early: WAWebVoipSendSignalingXmpp fanOutOffer
+        // maps the per device encrypt over all <destination> children via Promise.all
+        // (WAWebVoipWapNodeUtils.mapVoipWapChildrenAsync), catches per device, and on any failure strips every
+        // <enc> for a bare fanout. Encrypting all devices here therefore matches WA; the wasted advances on the
+        // shared Signal sessions are WA faithful (WA does not roll them back, it only skips the disk flush) and
+        // are absorbed by Signal's skipped message key handling. Do not add an early break.
         for (var deviceJid : devices) {
             try {
                 var payload = encryption.encryptForDevice(deviceJid, plaintext);
                 slots.add(toFanoutSlot(payload));
             } catch (RuntimeException e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Call-key encryption failed for {0}; stripping all <enc> for a bare fanout: {1}",
-                        deviceJid, e.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "call key encryption failed for " + Log.jid(String.valueOf(deviceJid))
+                                    + "; stripping all <enc> for a bare fanout",
+                            e);
+                }
                 encryptionFailed = true;
             }
         }
@@ -274,6 +274,11 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
             for (var deviceJid : devices) {
                 slots.add(CallKeyDistribution.bare(deviceJid));
             }
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "offer fanout downgraded to bare for {0} devices", devices.size());
+            }
+        } else if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "offer fanout encrypted for {0} devices", slots.size());
         }
         return slots;
     }
@@ -325,10 +330,16 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
                 var identity = payload.isPreKeyMessage() ? deviceIdentity : null;
                 envelopes.add(new CallRekeyEnvelope(deviceJid, payload.type(), payload.ciphertext(), identity));
             } catch (RuntimeException e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Rekey encryption failed for {0}; skipping this recipient: {1}",
-                        deviceJid, e.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "rekey encryption failed for " + Log.jid(String.valueOf(deviceJid))
+                                    + "; skipping this recipient",
+                            e);
+                }
             }
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rekey fanout encrypted {0} of {1} devices", envelopes.size(), devices.size());
         }
         return envelopes;
     }
@@ -367,9 +378,12 @@ public final class LiveCallKeyExchange implements CallKeyExchange {
             }
             return Optional.empty();
         } catch (RuntimeException e) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Call-key decryption from {0} failed; treating as no end-to-end key: {1}",
-                    senderJid, e.getMessage());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "call key decryption from " + Log.jid(String.valueOf(senderJid))
+                                + " failed; treating as no end-to-end key",
+                        e);
+            }
             return Optional.empty();
         }
     }

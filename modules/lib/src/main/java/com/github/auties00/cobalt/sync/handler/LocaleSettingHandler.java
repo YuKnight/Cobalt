@@ -12,6 +12,9 @@ import com.github.auties00.cobalt.model.sync.action.setting.LocaleSetting;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code setting_locale} app-state sync action that propagates the
@@ -34,6 +37,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebLocaleSettingSync")
 public final class LocaleSettingHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link LocaleSettingHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(LocaleSettingHandler.class);
 
     /**
      * Constructs a new singleton {@link LocaleSettingHandler}.
@@ -91,16 +98,19 @@ public final class LocaleSettingHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LocaleSetting setting)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "locale setting mutation has malformed action value");
             return MutationApplicationResult.malformed();
         }
 
         var newLocale = setting.locale().orElse(null);
         if (newLocale == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "locale setting mutation skipped, no locale carried");
             return MutationApplicationResult.skipped();
         }
 
         var oldLocale = client.store().accountStore().locale().orElse(null);
         client.store().accountStore().setLocale(newLocale);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "locale changed {0} -> {1}", oldLocale, newLocale);
         for (var listener : client.store().listeners()) {
             if (listener instanceof LinkedLocaleChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onLocaleChanged(client, oldLocale, newLocale));

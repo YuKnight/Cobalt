@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.calls.telemetry;
 
 import com.github.auties00.cobalt.calls.engine.context.CallContext;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.CallEndReason;
 import com.github.auties00.cobalt.model.call.CallLog;
 import com.github.auties00.cobalt.model.call.CallLogBuilder;
@@ -13,6 +14,7 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.sync.factory.CallLogMutationFactory;
 import com.github.auties00.cobalt.sync.WebAppStateService;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,10 +61,9 @@ import java.util.Objects;
 //  data loss feature gap.
 public final class CallLogSync {
     /**
-     * Logs the rare non fatal failure of the outbound call log push so it never propagates into the call
-     * teardown path.
+     * The logger for {@link CallLogSync}.
      */
-    private static final System.Logger LOGGER = System.getLogger(CallLogSync.class.getName());
+    private static final System.Logger LOGGER = Log.get(CallLogSync.class);
 
     /**
      * The number of milliseconds in one second, used to convert the engine's millisecond duration
@@ -133,6 +134,10 @@ public final class CallLogSync {
         Objects.requireNonNull(reason, "reason cannot be null");
         var log = buildCallLog(context, reason);
         whatsapp.store().chatStore().addCallLog(log);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "recorded call log for call {0}, result {1}, duration {2}s",
+                    context.callId(), log.callResult().orElse(null), log.duration().orElse(0L));
+        }
         try {
             var callerJid = resolveCallerJid(context);
             var fromMe = context.outgoing();
@@ -140,8 +145,10 @@ public final class CallLogSync {
             var mutation = mutationFactory.getCallLogMutation(Instant.now(), callerJid, callId, fromMe, log);
             webAppStateService.pushPatches(CallLogAction.COLLECTION_NAME, List.of(mutation));
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to push call-log mutation for call " + context.callId(), exception);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "failed to push call-log mutation for call " + context.callId(),
+                        exception);
+            }
         }
     }
 
@@ -171,22 +178,16 @@ public final class CallLogSync {
     private CallLog buildCallLog(CallContext context, CallEndReason reason) {
         var result = resolveResult(context, reason);
         var durationSeconds = (context.activeDurationMillis() + context.lonelyDurationMillis()) / MILLIS_PER_SECOND;
-        // TODO: stamp the call's real offer/placement instant as CallLog.startTime instead of the teardown
-        //  instant. WhatsApp records the call start time, not the end time. The faithful source already
-        //  exists on the service runtime as CallStats.startedAt (set when the call is placed or accepted),
-        //  but it is not reachable here: the finished CallContext holds only elapsed duration accumulators
-        //  (no absolute offer time), and the call log sink is bound as BiConsumer<CallContext,
-        //  CallEndReason>, so no start instant is threaded in. Recovering it needs an out of lane change:
-        //  either carry an offer/start Instant on CallContext (stamped by the lifecycle controller at
-        //  offer/placement) or widen the sink to also pass startedAt; then use it for startTime below.
-        //  Until then startTime falls back to Instant.now() (the teardown instant).
+        // WhatsApp records the call start time, not the end time; use the placed/accepted instant the
+        // lifecycle controller stamped on the context, falling back to now (the teardown instant) only for a
+        // call that never reached the placing or accepted state.
         var builder = new CallLogBuilder()
                 .callId(context.callId())
                 .callResult(result)
                 .isIncoming(!context.outgoing())
                 .isVideo(context.video())
                 .duration(durationSeconds)
-                .startTime(Instant.now())
+                .startTime(context.startedAt().orElse(Instant.now()))
                 .callCreatorJid(context.creator());
         if (context.group()) {
             builder.groupJid(context.chatJid());

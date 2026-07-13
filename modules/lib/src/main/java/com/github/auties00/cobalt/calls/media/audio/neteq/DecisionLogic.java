@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -52,6 +55,11 @@ public final class DecisionLogic {
      * The denominator the lower limit scale percentage is taken over.
      */
     private static final int PERCENT = 100;
+
+    /**
+     * The logger for {@link DecisionLogic}.
+     */
+    private static final System.Logger LOGGER = Log.get(DecisionLogic.class);
 
     /**
      * The configuration carrying the warmup count, the decision limits, and the codec PLC preference.
@@ -133,18 +141,26 @@ public final class DecisionLogic {
         Objects.requireNonNull(input, "input cannot be null");
         if (!input.nextPacketAvailable() || !input.nextPacketContiguous()) {
             if (!input.nextPacketAvailable() && input.comfortNoiseActive()) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "calls neteq decision: {0}", NetEqOperation.RFC3389_CNG);
                 return NetEqOperation.RFC3389_CNG;
             }
             if (input.codecHasPlc() && config.enableCodecPlc()) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "calls neteq decision: {0}", NetEqOperation.CODEC_PLC);
                 return NetEqOperation.CODEC_PLC;
             }
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls neteq decision: {0}", NetEqOperation.EXPAND);
             return NetEqOperation.EXPAND;
         }
         if (decodesPerformed < config.numInitialPackets()) {
             decodesPerformed++;
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "calls neteq decision: {0} (warmup {1}/{2})",
+                        NetEqOperation.NORMAL, decodesPerformed, config.numInitialPackets());
+            }
             return NetEqOperation.NORMAL;
         }
         if (isConcealment(input.lastOperation())) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls neteq decision: {0}", NetEqOperation.MERGE);
             return NetEqOperation.MERGE;
         }
         var target = Math.max(input.targetLevelMillis(), 1);
@@ -158,20 +174,33 @@ public final class DecisionLogic {
         // TODO: apply the stable playout deceleration offset on top of the accelerate path
         // TODO: model the group decision logic variant used for bot and AI calls
         if (!timeStretchAllowed(span)) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls neteq decision: {0} (time stretch gated)", NetEqOperation.NORMAL);
             return NetEqOperation.NORMAL;
         }
         if (span >= highLimit) {
             if (!config.allowTimeStretchAcceleration()) {
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "calls neteq decision: {0} (accelerate disallowed)", NetEqOperation.NORMAL);
+                }
                 return NetEqOperation.NORMAL;
             }
             // TODO: recover the exact fast accelerate span multiple; this uses twice the high limit
-            return span >= highLimit * FAST_ACCELERATE_HIGH_LIMIT_MULTIPLE
+            var operation = span >= highLimit * FAST_ACCELERATE_HIGH_LIMIT_MULTIPLE
                     ? NetEqOperation.FAST_ACCELERATE
                     : NetEqOperation.ACCELERATE;
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "calls neteq decision: {0} (span={1}ms highLimit={2}ms)", operation, span, highLimit);
+            }
+            return operation;
         }
         if (span < lowLimit) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "calls neteq decision: {0} (span={1}ms lowLimit={2}ms)",
+                        NetEqOperation.PREEMPTIVE_EXPAND, span, lowLimit);
+            }
             return NetEqOperation.PREEMPTIVE_EXPAND;
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "calls neteq decision: {0}", NetEqOperation.NORMAL);
         return NetEqOperation.NORMAL;
     }
 
@@ -199,6 +228,7 @@ public final class DecisionLogic {
      */
     public void reset() {
         decodesPerformed = 0;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls neteq decision logic reset");
     }
 
     /**

@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.calls.media.sframe;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
@@ -45,6 +47,11 @@ import java.util.Objects;
  * {@code 409102bf2c1a3816c76a6d64819d0c901556e030d5f33da251c13cdfcf0b9353}.
  */
 public final class SFrameKeyDerivation {
+    /**
+     * The logger for {@link SFrameKeyDerivation}.
+     */
+    private static final System.Logger LOGGER = Log.get(SFrameKeyDerivation.class);
+
     /**
      * Holds the required length, in bytes, of the call key used as the HKDF input.
      *
@@ -122,7 +129,9 @@ public final class SFrameKeyDerivation {
         var salt = Arrays.copyOfRange(callKey, 0, HALF);
         var ikm = Arrays.copyOfRange(callKey, HALF, CALL_KEY_LENGTH);
         var info = buildInfo(deviceJid);
-        return VoipCryptoNative.hkdfSha256(ikm, salt, info, BASE_KEY_LENGTH);
+        var baseKey = VoipCryptoNative.hkdfSha256(ikm, salt, info, BASE_KEY_LENGTH);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "sframe base key derived for {0}", Log.jid(deviceJid));
+        return baseKey;
     }
 
     /**

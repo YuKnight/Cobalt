@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.signal;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Holds a per call ring of recent bandwidth estimate samples used to seed a new call's estimate and to
  * decide whether the selective forwarding unit fast probe mode should run.
@@ -21,14 +25,26 @@ package com.github.auties00.cobalt.calls.transport.congestion.bwe.signal;
  */
 public final class BweHistory {
     /**
+     * The logger for {@link BweHistory}.
+     */
+    private static final System.Logger LOGGER = Log.get(BweHistory.class);
+
+    /**
      * The number of recent samples the ring retains.
      */
-    // TODO: persist the history across calls and key it by endpoint. This fixed depth of 16 is a model
-    //  choice, not a value read from WhatsApp. The faithful design keeps past call records in a persistent
-    //  store keyed by a hash of the self and peer addresses, capped by a configured maximum with oldest
-    //  first eviction, and the in memory fast probe working set is an array of up to 32 records carried in
-    //  the call config rather than this transient ring. Both the persistence layer and the config array
-    //  bound are set at config build time and have no compiled in default to recover.
+    // TODO: the native design (wa_calling_history.cc) is not this per-call ring but a persistent key-value
+    //  record store (wa_storage) of about ten record types (detailed_transport, uaqc, video, group_call,
+    //  calling_audio, audio_device_restart, dial, offer_peek, call_state_v1), each keyed by
+    //  call_self_ip_str_hashed + call_peer_ip_str_hashed and matched on self-IP + peer-IP + p2p status,
+    //  trimmed oldest-first (by a 64-bit timestamp) on save to a max record count. That cap is a runtime
+    //  config field with no compiled-in default and no *_max_records voip param to recover, so this depth of
+    //  16 is a Cobalt stand-in, not a value read from WhatsApp. A faithful port is a whole persistent
+    //  QoE-history subsystem gated by the history_based_bwe_enabled voip setting (off for group calls) and
+    //  wired to roughly twenty history/ramp voip params (history_based_bwe_*, fr_hbwe_*, rbe_instant_ramp_*,
+    //  instant_ramp_up_min_bps/target_bps), so it also depends on the compressed voip_settings decode.
+    //  Deliberately unbuilt for a library: the payoff (faster bitrate convergence in the first seconds of a
+    //  repeat call over the same network path) does not justify a persistent per-endpoint store, and the
+    //  deciding constants (this cap and the two gate thresholds below) are not statically recoverable.
     public static final int CAPACITY = 16;
 
     /**
@@ -100,6 +116,9 @@ public final class BweHistory {
         if (count < CAPACITY) {
             count++;
         }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "bwe history sample recorded: {0}kbps count={1}", estimateKbps, count);
+        }
     }
 
     /**
@@ -125,7 +144,11 @@ public final class BweHistory {
         for (var index = 0; index < count; index++) {
             total += samples[index];
         }
-        return (int) (total / count * INSTANT_RAMP_UP_RATIO);
+        var seed = (int) (total / count * INSTANT_RAMP_UP_RATIO);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "bwe history seed estimate: {0}kbps from {1} samples", seed, count);
+        }
+        return seed;
     }
 
     /**
@@ -151,17 +174,28 @@ public final class BweHistory {
      * @return {@code true} when the selective forwarding unit should fast probe rather than slowly ramp
      *         the estimate
      */
-    // TODO: the native fast probe gate does not test a single kilobits per second ring against one
-    //  threshold; it walks an array of up to 32 per record structs and compares each record's gating
-    //  value against two float thresholds carried on the call instance. Those instance thresholds are
-    //  initialised at call setup and are not observable without a live memory dump of a connected call, so
-    //  this empty or weak history gate stands in for that walk as the closest reproducible behaviour and
-    //  is not byte faithful.
+    // TODO: the native fast-probe gate (call_bwe_history.cc maybe_process_history_based_bwe) does not test a
+    //  single kbps ring against one threshold; it walks up to 32 per-record structs drawn from the
+    //  persistent history store (see CAPACITY) and compares each record's gating value against two float
+    //  thresholds carried on the call instance. The history/ramp param family is known
+    //  (history_based_bwe_instant_ramp_up_{threshold,ratio}, instant_ramp_up_min_bps/target_bps, fr_hbwe_*),
+    //  but which two the walk uses and their per-call values are initialised at setup and only observable
+    //  from a live memory dump of a connected call, so this empty-or-weak history gate stands in for that
+    //  walk as the closest reproducible behaviour and is not byte faithful.
     public boolean shouldActivateSfuFastProbeMode() {
         if (count == 0) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "sfu fast probe mode activated: no history");
+            }
             return true;
         }
-        return mostRecentKbps() <= FAST_PROBE_THRESHOLD_KBPS;
+        var recent = mostRecentKbps();
+        var activate = recent <= FAST_PROBE_THRESHOLD_KBPS;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sfu fast probe decision: activate={0} recent={1}kbps threshold={2}kbps",
+                    activate, recent, FAST_PROBE_THRESHOLD_KBPS);
+        }
+        return activate;
     }
 
     /**

@@ -1,10 +1,6 @@
 package com.github.auties00.cobalt.calls.capability;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.EnumSet;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Enumerates the video decoder formats a device advertises in its video decode
@@ -69,9 +65,52 @@ public enum VideoDecoderCapability {
     AV1("AV1", 4, 0, "16");
 
     /**
-     * The codec selected by the engine when a capability descriptor fails to parse.
+     * The fallback codec set the engine assumes when a capability descriptor fails to parse, kept as a
+     * raw {@link EnumSet} for internal use.
+     *
+     * <p>Holds only {@link #H264}, the codec treated as universally available. As a raw {@link EnumSet}
+     * it is a {@code RegularEnumSet} backed by a single {@code long} bitmask, so feeding it into a bulk
+     * set operation ({@link EnumSet#addAll}, {@link EnumSet#retainAll}) stays on the bitwise fast path
+     * instead of degrading to element iteration, which an unmodifiable wrapper would force. This
+     * instance is never handed to callers; {@link #FALLBACK_UNMODIFIABLE} is exposed in its place.
      */
-    private static final VideoDecoderCapability FALLBACK = H264;
+    private static final Set<VideoDecoderCapability> FALLBACK = EnumSet.of(H264);
+
+    /**
+     * The immutable view of {@link #FALLBACK} returned to callers by {@link #parse(String)} on the
+     * parse failure path.
+     *
+     * <p>Wraps {@link #FALLBACK} with {@link Collections#unmodifiableSet(Set)} so the shared fallback
+     * instance the parser returns cannot be mutated through the reference callers receive.
+     */
+    private static final Set<VideoDecoderCapability> FALLBACK_UNMODIFIABLE = Collections.unmodifiableSet(FALLBACK);
+
+    /**
+     * Resolves a normalized wire token or alias to its codec, backing {@link #ofToken(String)}.
+     *
+     * <p>Populated once at class initialization from each constant's {@link #token} and
+     * {@link #aliases}, so every accepted spelling maps to its codec in constant time. Keys are
+     * lowercased with {@link Locale#ROOT} to keep matching locale independent, preserving the
+     * {@link String#equalsIgnoreCase(String)} semantics this lookup replaces (a plain
+     * {@link String#toLowerCase()} would fold, for example, {@code "I"} differently under a Turkish
+     * locale).
+     */
+    private static final Map<String, VideoDecoderCapability> BY_TOKEN;
+
+    static {
+        var byToken = new HashMap<String, VideoDecoderCapability>();
+        for (var codec : values()) {
+            if(byToken.put(codec.token.toLowerCase(Locale.ROOT), codec) != null) {
+                throw new AssertionError("Conflict");
+            }
+            for (var alias : codec.aliases) {
+                if(byToken.put(alias.toLowerCase(Locale.ROOT), codec) != null) {
+                    throw new AssertionError("Conflict");
+                }
+            }
+        }
+        BY_TOKEN = Map.copyOf(byToken);
+    }
 
     /**
      * The wire token used to name this codec in a video decode capability descriptor.
@@ -177,41 +216,38 @@ public enum VideoDecoderCapability {
         if (token == null) {
             return Optional.empty();
         }
-        var trimmed = token.trim();
-        for (var codec : values()) {
-            if (codec.token.equalsIgnoreCase(trimmed)) {
-                return Optional.of(codec);
-            }
-            for (var alias : codec.aliases) {
-                if (alias.equalsIgnoreCase(trimmed)) {
-                    return Optional.of(codec);
-                }
-            }
-        }
-        return Optional.empty();
+        var normalized = token.trim().toLowerCase(Locale.ROOT);
+        return Optional.ofNullable(BY_TOKEN.get(normalized));
     }
 
     /**
      * Parses a comma separated video decode capability descriptor into a set of codecs.
      *
-     * <p>Tokens are split on commas, trimmed, and resolved through {@link #ofToken(String)}, so each
-     * token matches case insensitively against a codec's canonical wire token or any of its aliases;
-     * unrecognized tokens are ignored. If the input is {@code null}, blank, or yields no recognized
-     * codec, the result is a set containing only {@link #H264}, matching the engine's parse failure
-     * fallback.
+     * <p>The descriptor is scanned for comma separated tokens, each resolved through
+     * {@link #ofToken(String)}, so every token matches case insensitively against a codec's canonical
+     * wire token or any of its aliases; unrecognized tokens are ignored. If the input is {@code null},
+     * blank, or yields no recognized codec, the result is a set containing only {@link #H264}, matching
+     * the engine's parse failure fallback.
      *
      * @param descriptor the comma separated capability descriptor, may be {@code null}
-     * @return the parsed set of codecs, never empty
+     * @return the parsed set of codecs, unmodifiable and never empty
+     * @implNote This implementation walks the descriptor with {@link String#indexOf(int, int)} rather
+     * than {@link String#split(String)} to avoid allocating the intermediate token array; only the
+     * per-token substrings the map lookup requires are allocated.
      */
     public static Set<VideoDecoderCapability> parse(String descriptor) {
         if (descriptor == null || descriptor.isBlank()) {
-            return EnumSet.of(FALLBACK);
+            return FALLBACK_UNMODIFIABLE;
         }
         var result = EnumSet.noneOf(VideoDecoderCapability.class);
-        for (var part : descriptor.split(",")) {
-            ofToken(part).ifPresent(result::add);
+        var start = 0;
+        int comma;
+        while ((comma = descriptor.indexOf(',', start)) >= 0) {
+            ofToken(descriptor.substring(start, comma)).ifPresent(result::add);
+            start = comma + 1;
         }
-        return result.isEmpty() ? EnumSet.of(FALLBACK) : result;
+        ofToken(descriptor.substring(start)).ifPresent(result::add);
+        return result.isEmpty() ? FALLBACK_UNMODIFIABLE : Collections.unmodifiableSet(result);
     }
 
     /**
@@ -226,7 +262,7 @@ public enum VideoDecoderCapability {
      * @return the comma separated capability descriptor, never empty
      */
     public static String toDescriptor(Set<VideoDecoderCapability> codecs) {
-        var ordered = new ArrayList<>(codecs.isEmpty() ? EnumSet.of(FALLBACK) : codecs);
+        var ordered = new ArrayList<>(codecs.isEmpty() ? FALLBACK : codecs);
         ordered.sort(Comparator.comparingInt(VideoDecoderCapability::priority).reversed());
         var builder = new StringBuilder();
         for (var codec : ordered) {
@@ -247,9 +283,15 @@ public enum VideoDecoderCapability {
      * @param self the local codec set
      * @param peer the peer's advertised codec set
      * @return the intersection of the two sets, possibly empty
+     * @implNote This implementation collects the result into a fresh {@link EnumSet} and narrows it with
+     * {@link EnumSet#retainAll(java.util.Collection)}; for this small enum both operands are backed by a
+     * single {@code long} bitmask, so the intersection resolves to a bitwise AND when the inputs are raw
+     * {@link EnumSet}s. The returned set is itself a raw {@link EnumSet}, so downstream set operations
+     * (such as {@link #negotiate(Set, Set)}) stay on that fast path.
      */
     public static Set<VideoDecoderCapability> intersect(Set<VideoDecoderCapability> self, Set<VideoDecoderCapability> peer) {
-        var result = EnumSet.copyOf(self.isEmpty() ? EnumSet.noneOf(VideoDecoderCapability.class) : self);
+        var result = EnumSet.noneOf(VideoDecoderCapability.class);
+        result.addAll(self);
         result.retainAll(peer);
         return result;
     }

@@ -2,16 +2,23 @@ package com.github.auties00.cobalt.exception;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppLinkedException;
 
 /**
  * Sealed root of every exception thrown by Cobalt while talking to WhatsApp.
  * <p>
- * Each concrete subtype names a single failure mode (a session conflict, a
- * media download failure, an account device verification mismatch, and so
- * on) and reports through {@link #toErrorResult()} the
- * {@link WhatsAppLinkedClientErrorResult} that mirrors WhatsApp Web's native
- * reaction to that failure. The permits list is closed, so a
- * {@code switch} over a {@code WhatsAppException} can be exhaustive.
+ * The two direct subtypes split the hierarchy by transport:
+ * {@link WhatsAppLinkedException} roots every failure of the Linked
+ * transport (WhatsApp Web/Desktop and Mobile over the encrypted
+ * binary-XMPP socket), and {@link WhatsAppCloudException} roots every
+ * failure of Meta's WhatsApp Cloud API transport. Each concrete leaf names
+ * a single failure mode (a session conflict, a media download failure, an
+ * account device verification mismatch, and so on) and reports through
+ * {@link #toErrorResult()} the {@link WhatsAppLinkedClientErrorResult} that
+ * mirrors WhatsApp Web's native reaction to that failure. The permits list
+ * is closed at every level, so a {@code switch} over a
+ * {@code WhatsAppException} can be exhaustive.
  * <p>
  * Cobalt does not pin a recovery action to any exception. When a subtype
  * is thrown, the configurable {@link WhatsAppLinkedClientErrorHandler} decides
@@ -38,7 +45,7 @@ import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorResult;
  * @see WhatsAppLinkedClientErrorHandler
  */
 public abstract sealed class WhatsAppException extends RuntimeException
-        permits WhatsAppABPropTypeMismatchException, WhatsAppAdvCheckException, WhatsAppAdvValidationException, WhatsAppBotSignatureException, WhatsAppCallException, WhatsAppCloudException, WhatsAppFacebookGraphQlException, WhatsAppConnectionException, WhatsAppCorruptedStoreException, WhatsAppDeviceSyncException, WhatsAppHistorySyncException, WhatsAppIntegrityChallengeException, WhatsAppLidMigrationException, WhatsAppMalformedJidException, WhatsAppMediaException, WhatsAppMessageException, WhatsAppOwnDeviceListExpiredException, WhatsAppPrivateStatsTokenIssuerException, WhatsAppReconnectionException, WhatsAppRegistrationException, WhatsAppWebGraphQlException, WhatsAppServerRuntimeException, WhatsAppSessionException, WhatsAppStreamException, WhatsAppWebAppStateSyncException {
+        permits WhatsAppLinkedException, WhatsAppCloudException {
 
     /**
      * Constructs a new WhatsApp exception with no detail message.

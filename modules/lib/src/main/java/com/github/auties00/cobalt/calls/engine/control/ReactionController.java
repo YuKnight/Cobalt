@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
 import com.github.auties00.cobalt.calls.transport.datachannel.AppDataController;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.ReactionInfo;
 import com.github.auties00.cobalt.model.call.datachannel.ReactionInfoBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Optional;
 import com.github.auties00.cobalt.calls.engine.control.event.ReactionStateChanged;
@@ -28,6 +30,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.ReactionStateChange
  * {@link AppDataController}) and holds no mutable state beyond the single send seam binding.
  */
 public final class ReactionController {
+    /**
+     * The logger for {@link ReactionController}.
+     */
+    private static final System.Logger LOGGER = Log.get(ReactionController.class);
+
     /**
      * The local device JID stamped as the participant on the local user's own reaction events.
      */
@@ -80,8 +87,9 @@ public final class ReactionController {
      * Broadcasts the local user's emoji reaction and emits its local state change.
      *
      * <p>Sends the reaction through the attached {@link AppDataController#sendReaction(String)}, which assigns
-     * it a transaction id and retains it for retransmission, and emits a {@link ReactionStateChanged} for the
-     * local user carrying the sent reaction so its own overlay appears. Returns the assigned transaction id, or
+     * it a transaction id and retains it for retransmission. Only when the send is accepted (a transaction id
+     * is assigned) does it emit a {@link ReactionStateChanged} for the local user carrying the sent reaction
+     * so its own overlay appears; a dropped send emits nothing. Returns the assigned transaction id, or
      * {@code -1} when no send seam is attached or the send was dropped.
      *
      * @param emoji the reaction emoji string to broadcast; never {@code null}
@@ -92,18 +100,23 @@ public final class ReactionController {
         Objects.requireNonNull(emoji, "emoji cannot be null");
         var current = appData;
         if (current == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "reaction send dropped, no app data channel attached");
             return -1;
         }
         var transactionId = current.sendReaction(emoji);
-        // FIXME: when current.sendReaction(emoji) returns -1 the application data controller dropped the reaction, yet this
-        //  still emits ReactionStateChanged(self=true) so the local overlay shows a reaction that was never sent;
-        //  the intended fix is to return -1 without emitting on the dropped send path, but whether WhatsApp emits
-        //  the local reaction event regardless of a send drop is unconfirmed (the drop path differs from the
-        //  seam absent path), so the emit is left in place until confirmed against WhatsApp.
+        // WA emits the local reaction state event only for an accepted send: a precondition or teardown abort
+        // (the analog of a closed controller here) surfaces no overlay, while a transport write failure is
+        // retained and retransmitted rather than dropped. AppDataController.sendReaction returns -1 only when
+        // closed, so suppress the optimistic emit on that dropped send.
+        if (transactionId == -1) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reaction send dropped by app data channel");
+            return -1;
+        }
         var reaction = new ReactionInfoBuilder()
                 .transactionId(transactionId)
                 .reaction(emoji)
                 .build();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reaction sent, transactionId={0}", transactionId);
         events.emit(new ReactionStateChanged(selfJid, Optional.of(reaction), true));
         return transactionId;
     }
@@ -120,6 +133,9 @@ public final class ReactionController {
      * @param reaction    the arrived reaction, or empty when the reaction expired
      */
     public void onReaction(Jid participant, Optional<ReactionInfo> reaction) {
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "reaction update from {0}, present={1}", participant, reaction.isPresent());
+        }
         events.emit(new ReactionStateChanged(participant, reaction, participant.equals(selfJid)));
     }
 }

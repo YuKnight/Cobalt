@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Performs the fixed codebook (FCB) algebraic pulse search for one analysis by synthesis (AbS) subframe of the
  * MLow speech codec.
@@ -45,6 +49,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
  * accumulations are single precision.
  */
 public final class FcbSearch {
+    /**
+     * The logger for {@link FcbSearch}.
+     */
+    private static final System.Logger LOGGER = Log.get(FcbSearch.class);
+
     /**
      * The forward error correction rate point index.
      */
@@ -353,6 +362,10 @@ public final class FcbSearch {
                 nPulses[r] = 0;
             }
         }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "fcb greedy search: subfrlen={0} pulsesMain={1} pulsesFec={2}",
+                    fcbSubfrlen, nPulses[IDX_MAIN], nPulses[IDX_FEC]);
+        }
         return new Result(pulses, nPulses, wnrg, gainFromSearch, fcbWnrg);
     }
 
@@ -542,6 +555,10 @@ public final class FcbSearch {
                 fcbWnrg[r] = 0.0f;
                 nPulses[r] = 0;
             }
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "fcb deldec search: subfrlen={0} pitchSharp={1} pulsesMain={2} pulsesFec={3}",
+                    fcbSubfrlen, pitchSharp, nPulses[IDX_MAIN], nPulses[IDX_FEC]);
         }
         return new Result(pulses, nPulses, wnrg, gainFromSearch, fcbWnrg);
     }

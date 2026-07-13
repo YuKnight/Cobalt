@@ -14,7 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.github.auties00.cobalt.calls.crypto.CallE2eKeyDerivation;
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 
 /**
  * Known-answer tests for {@link SFrameKeyDerivation}, pinning the per-participant SFrame base-key
@@ -65,12 +64,11 @@ public class SFrameKeyDerivationTest {
         @Test
         @DisplayName("agrees with the equivalent participant-package derivation on the same vector")
         public void agreesWithParticipantDeriver() {
-            // CallE2eKeyDerivation.deriveSframeBaseKey(callKey, CallDeviceJid) is the same schedule keyed
-            // off a typed JID; both must hit the identical live KAT.
+            // CallE2eKeyDerivation.deriveSframeBaseKey(callKey, Jid) is the same schedule keyed
+            // off a JID; both must hit the identical live KAT.
             var typed = com.github.auties00.cobalt.calls.crypto.CallE2eKeyDerivation
                     .deriveSframeBaseKey(SECRET,
-                            com.github.auties00.cobalt.calls.jid.CallDeviceJid.of(
-                                    com.github.auties00.cobalt.model.jid.Jid.of(PARTICIPANT_JID)));
+                            com.github.auties00.cobalt.model.jid.Jid.of(PARTICIPANT_JID));
             assertArrayEquals(EXPECTED_BASE_KEY, typed);
             assertArrayEquals(typed, SFrameKeyDerivation.deriveBaseKey(SECRET, PARTICIPANT_JID));
         }

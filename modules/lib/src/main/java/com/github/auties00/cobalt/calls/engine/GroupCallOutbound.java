@@ -7,9 +7,11 @@ import com.github.auties00.cobalt.calls.signaling.CallStanza;
 import com.github.auties00.cobalt.calls.signaling.group.GroupInfoStanza;
 import com.github.auties00.cobalt.calls.signaling.group.GroupUpdateStanza;
 import com.github.auties00.cobalt.calls.signaling.session.TerminateStanza;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.CallEndReason;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.List;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.engine.timer.CallTimers;
@@ -54,9 +56,9 @@ import com.github.auties00.cobalt.calls.engine.timer.CallTimers;
  */
 public final class GroupCallOutbound {
     /**
-     * Logs the membership update fanout, the unanswered offer sweep, and the per peer terminations.
+     * The logger for {@link GroupCallOutbound}.
      */
-    private static final System.Logger LOGGER = System.getLogger(GroupCallOutbound.class.getName());
+    private static final System.Logger LOGGER = Log.get(GroupCallOutbound.class);
 
     /**
      * The roster {@code state} attribute literal a connected group participant carries.
@@ -156,6 +158,10 @@ public final class GroupCallOutbound {
         var roster = GroupInfoStanza.ofUsers(null, -1, entries);
         var update = new GroupUpdateStanza(callId, creator, null, false, false, roster, List.of());
         host.sendSignaling(CallStanza.toCall(update, target, callId));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "group_update sent for call {0}: added={1} count={2}",
+                    callId, added, participants.size());
+        }
         reconcileLocalMembership(participants, added);
     }
 
@@ -262,8 +268,9 @@ public final class GroupCallOutbound {
             var deviceJid = device.jid();
             var terminate = TerminateStanza.of(callId, self, CallEndReason.TIMEOUT, List.of(deviceJid));
             host.sendSignaling(CallStanza.toCall(terminate, deviceJid, callId));
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Terminated unanswered group-call peer {0} on call {1}", deviceJid, callId);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "terminated unanswered group call peer {0} on call {1}", deviceJid, callId);
+            }
         }
     }
 

@@ -6,7 +6,8 @@ import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientPasskeyAuthenticator;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
-import com.github.auties00.cobalt.exception.WhatsAppRegistrationException;
+import com.github.auties00.cobalt.exception.linked.mobile.WhatsAppRegistrationException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.device.identity.CompanionCommitmentBuilder;
 import com.github.auties00.cobalt.model.device.identity.CompanionEphemeralIdentityBuilder;
 import com.github.auties00.cobalt.model.device.identity.CompanionEphemeralIdentitySpec;
@@ -31,6 +32,7 @@ import javax.crypto.KDF;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.HKDFParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -57,6 +59,11 @@ import java.util.Objects;
  * secret is not produced for a fresh link.
  */
 public final class LiveShortcakePairingService implements ShortcakePairingService {
+    /**
+     * The logger for {@link LiveShortcakePairingService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveShortcakePairingService.class);
+
     /**
      * Holds the pairing-code Crockford-style base32 alphabet, skipping ambiguous symbols.
      *
@@ -192,6 +199,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
             }
 
             clearLocked();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting shortcake passkey pairing");
             var optionsBytes = requestPasskeyRequestOptions();
             var assertion = passkeyAuthenticator.assertCredential(
                     LinkedWhatsAppClientPasskeyAuthenticator.Request.ofShortcakeOptions(
@@ -219,6 +227,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
 
             sendSetPasskeyPrologue(assertion, ProloguePayloadSpec.encode(prologuePayload));
             stage = ShortcakePairingStage.WAITING_FOR_PRIMARY_IDENTITY;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "shortcake prologue sent, ref={0}", Log.token(ref));
         }
     }
 
@@ -229,6 +238,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
     public void handlePrimaryEphemeralIdentity(byte[] primaryEphemeralIdentity) throws GeneralSecurityException {
         synchronized (lock) {
             if (stage != ShortcakePairingStage.WAITING_FOR_PRIMARY_IDENTITY) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "crsc_continuation received out of order, stage {0}", stage);
                 throw new IllegalStateException("crsc_continuation received while in stage " + stage);
             }
             if (companionEphemeralKeyPair == null || companionNonce == null || ref == null) {
@@ -249,9 +259,11 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
             var verificationCode = deriveVerificationCode(companionNonce, primaryPublicKey, primaryNonce);
             var encryptionKey = deriveEncryptionKey(primaryPublicKey);
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "shortcake verification code derived: {0}", Log.code(verificationCode));
             var passkeyHandler = (LinkedWhatsAppClientVerificationHandler.Web.Passkey) webVerificationHandler;
             passkeyHandler.handle(verificationCode);
             if (!passkeyHandler.confirmVerificationCode(verificationCode)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "shortcake verification code was not confirmed");
                 clearLocked();
                 throw new GeneralSecurityException("Shortcake verification code was not confirmed");
             }
@@ -260,6 +272,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
             var encryptedPairingRequest = encryptPairingRequest(pairingRequest, encryptionKey);
             sendSetEncryptedPairingRequest(encryptedPairingRequest);
             stage = ShortcakePairingStage.WAITING_FOR_PAIRING_COMPLETION;
+            if (Log.INFO) LOGGER.log(Level.INFO, "shortcake passkey pairing completed");
         }
     }
 
@@ -289,6 +302,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
                 .attribute("type", "get")
                 .attribute("xmlns", "md")
                 .content(request);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending get_passkey_request_options iq");
         var response = whatsapp.sendNode(iq);
         throwIfError(response, "get_passkey_request_options");
         return response.getChild("passkey_request_options")
@@ -312,6 +326,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
                 .attribute("type", "get")
                 .attribute("xmlns", "md")
                 .content(request);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending get_ref iq");
         var response = whatsapp.sendNode(iq);
         throwIfError(response, "get_ref");
         var refBytes = response.getChild("ref")
@@ -351,6 +366,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
                 .attribute("type", "set")
                 .attribute("xmlns", "md")
                 .content(passkeyPrologue);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending set_passkey_prologue iq");
         var response = whatsapp.sendNode(iq);
         throwIfError(response, "set_passkey_prologue");
     }
@@ -372,6 +388,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
                 .attribute("type", "set")
                 .attribute("xmlns", "md")
                 .content(companionNonceNode);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending set_companion_nonce iq");
         var response = whatsapp.sendNode(iq);
         throwIfError(response, "set_companion_nonce");
     }
@@ -393,6 +410,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
                 .attribute("type", "set")
                 .attribute("xmlns", "md")
                 .content(encryptedNode);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending set_encrypted_pairing_request iq");
         var response = whatsapp.sendNode(iq);
         throwIfError(response, "set_encrypted_pairing_request");
     }
@@ -527,6 +545,7 @@ public final class LiveShortcakePairingService implements ShortcakePairingServic
             var error = response.getChild("error").orElse(null);
             var code = error == null ? -1 : error.getAttributeAsInt("code", -1);
             var text = error == null ? null : error.getAttributeAsString("text", null);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "{0} rejected by server, code={1}", flow, code);
             throw new WhatsAppRegistrationException(
                     "shortcake: " + flow + " rejected by server (code=" + code + ", text=" + text + ")");
         }

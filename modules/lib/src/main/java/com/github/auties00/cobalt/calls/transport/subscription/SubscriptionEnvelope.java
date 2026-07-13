@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.subscription;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptions;
 import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptionsSpec;
 import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptors;
@@ -9,6 +10,7 @@ import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptorsSpec;
 import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptions;
 import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptionsSpec;
 
+import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +55,11 @@ import com.github.auties00.cobalt.calls.transport.warp.WarpMessage;
  * {@link StunAttributeType#FINGERPRINT}.
  */
 public final class SubscriptionEnvelope {
+    /**
+     * The logger for {@link SubscriptionEnvelope}.
+     */
+    private static final System.Logger LOGGER = Log.get(SubscriptionEnvelope.class);
+
     /**
      * The fixed total length, in bytes, of a {@code 0x0801} keepalive message: the STUN header with a
      * zero length attribute section.
@@ -103,6 +110,7 @@ public final class SubscriptionEnvelope {
      */
     public static byte[] keepalive(byte[] transactionId) {
         Objects.requireNonNull(transactionId, "transactionId cannot be null");
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "call keepalive built txid={0}", transactionId);
         return new StunMessage(StunMessage.TYPE_KEEPALIVE, StunMessage.MAGIC_COOKIE, transactionId, List.of())
                 .encode();
     }
@@ -503,6 +511,10 @@ public final class SubscriptionEnvelope {
         writeMessageIntegrityAttribute(out, prefix.length, integrity);
         var attributeSectionLength = out.length - StunMessage.HEADER_LENGTH;
         WarpCodecSupport.putU16(out, STUN_LENGTH_FIELD_OFFSET, attributeSectionLength);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "subscription envelope assembled attributes={0} bytes={1}",
+                    attributes.size(), out.length);
+        }
         return out;
     }
 

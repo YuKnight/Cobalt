@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.registration.push.apns.plist.xml;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistArrayValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistBooleanValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDataValue;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistIntege
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistStringValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistValue;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
@@ -31,6 +33,11 @@ import java.time.Instant;
  * Base64, decimal-integer, and indentation output is written directly into the destination buffer.
  */
 public final class PlistXmlWriter {
+    /**
+     * The logger for {@link PlistXmlWriter}.
+     */
+    private static final System.Logger LOGGER = Log.get(PlistXmlWriter.class);
+
     /**
      * Holds the canonical Apple XML preamble, comprising the XML prolog, the {@code PropertyList-1.0.dtd}
      * doctype declaration, and the opening {@code <plist version="1.0">} root, emitted at the head of every
@@ -168,6 +175,7 @@ public final class PlistXmlWriter {
         var pos = writeBytes(out, 0, PREAMBLE);
         pos = writeValue(out, pos, root, 0);
         writeBytes(out, pos, EPILOGUE);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "serialized xml plist ({0} bytes)", size);
         return out;
     }
 

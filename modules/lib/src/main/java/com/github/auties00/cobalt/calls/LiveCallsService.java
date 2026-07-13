@@ -7,8 +7,15 @@ import com.github.auties00.cobalt.calls.stream.VideoOutput;
 import com.github.auties00.cobalt.calls.engine.event.CallEvent;
 import com.github.auties00.cobalt.calls.engine.context.CallManager;
 import com.github.auties00.cobalt.calls.telemetry.CallResult;
-import com.github.auties00.cobalt.calls.engine.EngineAssembler;
+import com.github.auties00.cobalt.calls.engine.context.CallContext;
+import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
+import com.github.auties00.cobalt.props.ABPropsService;
+import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
+
+import com.github.auties00.cobalt.calls.engine.CallLifecycleObserver;
 import com.github.auties00.cobalt.calls.engine.LifecycleController;
+import com.github.auties00.cobalt.calls.telemetry.CallLogSync;
 import com.github.auties00.cobalt.calls.engine.mediaplane.MediaStreams;
 import com.github.auties00.cobalt.calls.engine.event.LiveCallEventBus;
 import com.github.auties00.cobalt.calls.signaling.receive.CallAckOutcome;
@@ -17,8 +24,8 @@ import com.github.auties00.cobalt.calls.signaling.session.OfferNoticeStanza;
 import com.github.auties00.cobalt.calls.signaling.session.OfferStanza;
 import com.github.auties00.cobalt.calls.signaling.session.TerminateStanza;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.listener.linked.LinkedCallEndedListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallOfferNoticeListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.ScheduledTask;
 import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.model.call.Call;
@@ -43,6 +50,7 @@ import com.github.auties00.cobalt.wam.type.CallTransportType;
 import com.github.auties00.cobalt.wam.type.PreCallActionType;
 import com.github.auties00.cobalt.wam.type.SubSurface;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -81,11 +89,11 @@ import com.github.auties00.cobalt.calls.telemetry.CallStats;
  * by the engine's {@link CallManager}, assembled into the controller rather than owned here; the listener
  * fan out, the registry, and the inline end of call WAM emission are pure Java.
  */
-public final class LiveCallsService implements CallsService {
+public final class LiveCallsService implements CallsService, CallLifecycleObserver {
     /**
-     * Logs call setup diagnostics and isolated telemetry or listener dispatch failures.
+     * The logger for {@link LiveCallsService}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveCallsService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveCallsService.class);
 
     /**
      * The window within which an {@code <offer_notice>} is still acted on; a notice whose original offer
@@ -143,6 +151,16 @@ public final class LiveCallsService implements CallsService {
     private final LifecycleController lifecycleController;
 
     /**
+     * The app state call log collaborator each ended call's finished context is pushed to, or {@code null}
+     * for a build without one (the unit tests, which observe no ended call outcome).
+     *
+     * <p>Fired from {@link #onEnded(String, CallContext, CallEndReason)} when the engine reports a call
+     * ended, so the {@code call_log} app state push runs at the same teardown moment the WAM stats drain
+     * does; the two are independent end of call outputs the service orchestrates from one observer callback.
+     */
+    private final CallLogSync callLogSync;
+
+    /**
      * Identifies the WAM app session this service runs under, stamped on every pre call user journey event.
      *
      * <p>WhatsApp tags each pre call funnel beacon with the app session identifier of the launch it was
@@ -198,29 +216,21 @@ public final class LiveCallsService implements CallsService {
     }
 
     /**
-     * Constructs a service over an assembled {@link LifecycleController} and a shared
+     * Constructs a service over a pre-built {@link LifecycleController} and a shared
      * {@link LiveCallEventBus}.
      *
-     * <p>This is the full dependency constructor the production client uses: it injects the controller the
-     * public call methods delegate to and the one event bus shared with the engine, so the host facing
-     * events the in call control units emit through the engine and the call ended events this service emits
-     * are gated and fanned out by the same bus. The client constructs the bus first and passes the same
-     * instance both here and into {@link EngineAssembler#assemble} so the engine binds it onto the
-     * controller.
-     *
-     * <p>When a controller is supplied, this constructor binds {@link #unregister(String)} onto the
-     * controller's teardown sink ({@link LifecycleController#bindTeardownSink}), so the controller
-     * drives the service level teardown and end of call WAM drain once at the ENDED transition of every call,
-     * regardless of which side ended it, and binds {@link #markCallConnected(String)} onto the controller's
-     * connected sink ({@link LifecycleController#bindConnectedSink}), so the call's connected instant is
-     * stamped once its media plane goes active. Binding from here, where the service and its controller are
-     * both in hand, keeps the service the owner of the call back into itself, mirroring how the engine
-     * assembler binds the result and call log sinks; a service without a controller binds nothing.
+     * <p>This is the seam the call API and inbound routing unit tests build the service through: the
+     * controller is built directly over recording fakes and passed in, and the bus is not shared with a
+     * live engine. The controller carries no service sinks in this path (a test controller reports its
+     * teardown, connected, and result outcomes to no ops), which the tests do not exercise. The production
+     * client instead uses
+     * {@link #LiveCallsService(LinkedWhatsAppClient, WamService, MessageService, MessageEncryption, DeviceService, LinkedWhatsAppStore, ABPropsService, LiveCallEventBus, CallLogSync)},
+     * which assembles the controller and threads this service's sinks into it at construction.
      *
      * @param whatsapp            the owning client
      * @param wamService          the WAM telemetry service, or {@code null} when telemetry is disabled
      * @param messageService      the {@link MessageService} used for offer encryption and key decryption
-     * @param lifecycleController the assembled engine lifecycle controller, or {@code null} when this service
+     * @param lifecycleController the pre-built engine lifecycle controller, or {@code null} when this service
      *                            is built without an engine
      * @param eventBus            the shared host event bus that gates and fans out the host facing call
      *                            events
@@ -234,10 +244,83 @@ public final class LiveCallsService implements CallsService {
         this.messageService = Objects.requireNonNull(messageService, "messageService cannot be null");
         this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
         this.lifecycleController = lifecycleController;
-        if (lifecycleController != null) {
-            lifecycleController.bindTeardownSink(this::unregister);
-            lifecycleController.bindConnectedSink(this::markCallConnected);
+        this.callLogSync = null;
+    }
+
+    /**
+     * Constructs the production service, assembling its own engine lifecycle controller.
+     *
+     * <p>This is the full dependency constructor the client uses: it builds the controller through
+     * {@link LifecycleController#create}, passing itself as the {@link CallLifecycleObserver}, so the engine
+     * reports its media connected, result, and ended outcomes back into this service as a plain constructor
+     * dependency with no post construction wiring step. The one {@link LiveCallEventBus} is shared with the
+     * engine so the host facing events the in call control units emit and the call ended events this service
+     * emits are gated and fanned out by the same bus. The {@code messageEncryption}, {@code deviceService},
+     * {@code store}, and {@code abPropsService} are used only to assemble the controller and are not
+     * retained.
+     *
+     * @param whatsapp          the owning client
+     * @param wamService        the WAM telemetry service, or {@code null} when telemetry is disabled
+     * @param messageService    the {@link MessageService} used for offer encryption and key decryption
+     * @param messageEncryption the encryption service the call key crypto wraps the key with
+     * @param deviceService     the device service the call key crypto ensures sessions through
+     * @param store             the store supplying the local ADV signed device identity
+     * @param abPropsService    the AB props service the engine feature gate reads its calling flags from
+     * @param eventBus          the shared host event bus that gates and fans out the host facing call events
+     * @param callLogSync       the app state call log collaborator each ended call's finished context is
+     *                          pushed to
+     * @throws NullPointerException if {@code whatsapp}, {@code messageService}, or {@code eventBus} is
+     *                              {@code null}
+     */
+    public LiveCallsService(LinkedWhatsAppClient whatsapp, WamService wamService, MessageService messageService,
+                             MessageEncryption messageEncryption, DeviceService deviceService,
+                             LinkedWhatsAppStore store, ABPropsService abPropsService, LiveCallEventBus eventBus,
+                             CallLogSync callLogSync) {
+        this.whatsapp = Objects.requireNonNull(whatsapp, "whatsapp cannot be null");
+        this.wamService = wamService;
+        this.messageService = Objects.requireNonNull(messageService, "messageService cannot be null");
+        this.eventBus = Objects.requireNonNull(eventBus, "eventBus cannot be null");
+        this.callLogSync = callLogSync;
+        this.lifecycleController = LifecycleController.create(whatsapp, messageEncryption, messageService,
+                deviceService, store, abPropsService, eventBus, this);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote This implementation stamps the connected instant through {@link #markCallConnected(String)}.
+     */
+    @Override
+    public void onConnected(String callId) {
+        markCallConnected(callId);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote This implementation records the result on the call's telemetry through
+     * {@link #recordCallResult(String, CallResult)}.
+     */
+    @Override
+    public void onResult(String callId, CallResult result) {
+        recordCallResult(callId, result);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @implNote This implementation pushes the app state call log first, when a context and a
+     * {@link CallLogSync} are both present, then frees the call's service level state and drains its end of
+     * call WAM telemetry through {@link #unregister(String)}. The two are independent end of call outputs the
+     * service orchestrates from this one callback; the order matches the former separate call log and
+     * teardown sinks.
+     */
+    @Override
+    public void onEnded(String callId, CallContext context, CallEndReason reason) {
+        if (context != null && callLogSync != null) {
+            callLogSync.recordEndOfCall(context, reason);
         }
+        unregister(callId);
     }
 
     /**
@@ -262,6 +345,7 @@ public final class LiveCallsService implements CallsService {
         var addressing = messageService.resolveCallPeerAddressing(peer);
         var streams = mediaStreams(audioOut, audioIn, videoOut, videoIn);
         var call = engine().startCall(self, addressing.peer(), addressing.peerDevices(), video, streams);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "placed 1:1 call {0}, video={1}, devices={2}", call.callId(), video, addressing.peerDevices().size());
         emitPreCallJourney(call.callId(), video ? PreCallActionType.CLICK_VIDEO_CALL
                         : PreCallActionType.CLICK_AUDIO_CALL, CallSizeType.ONE_TO_ONE, video,
                 SubSurface.CHAT_HEADER, 2L, null, null);
@@ -295,6 +379,7 @@ public final class LiveCallsService implements CallsService {
         }
         var call = engine().startGroupCall(self, participantDevices, groupJid, video, streams);
         var callSize = (long) (peers.size() + 1);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "placed group call {0}, video={1}, peer_count={2}", call.callId(), video, peers.size());
         emitPreCallJourney(call.callId(), PreCallActionType.CLICK_START_CALL, CallSizeType.LGC, video,
                 SubSurface.CHAT_HEADER, callSize, callSize, false);
         if (notifyIfEndedDuringPlacement(call, groupJid)) {
@@ -324,6 +409,7 @@ public final class LiveCallsService implements CallsService {
         var video = videoOut != null;
         var streams = mediaStreams(audioOut, audioIn, videoOut, videoIn);
         var call = engine().joinCallLink(self, token, media, video, streams);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "joined call link, call={0}, media={1}, video={2}", call.callId(), media, video);
         emitPreCallJourney(call.callId(), PreCallActionType.CLICK_CALL_LINK, CallSizeType.CALL_LINK, video,
                 null, null, null, null);
         registerRuntime(call, CallSide.CALLER, video, audioOut, audioIn, videoOut, videoIn);
@@ -349,6 +435,7 @@ public final class LiveCallsService implements CallsService {
         var video = videoOut != null;
         var streams = mediaStreams(audioOut, audioIn, videoOut, videoIn);
         var call = engine().joinGroupCall(offer.callId(), video, streams);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "joined group call {0}, video={1}", call.callId(), video);
         registerRuntime(call, CallSide.CALLEE, video, audioOut, audioIn, videoOut, videoIn);
         return call;
     }
@@ -365,6 +452,7 @@ public final class LiveCallsService implements CallsService {
         var video = videoOut != null;
         var streams = mediaStreams(audioOut, audioIn, videoOut, videoIn);
         var call = engine().acceptCall(offer.callId(), video, streams);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "accepted call {0}, video={1}", call.callId(), video);
         registerRuntime(call, CallSide.CALLEE, video, audioOut, audioIn, videoOut, videoIn);
         return call;
     }
@@ -376,6 +464,7 @@ public final class LiveCallsService implements CallsService {
     public void reject(IncomingCall offer, CallEndReason reason) {
         Objects.requireNonNull(offer, "offer cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "rejecting call {0}, reason={1}", offer.callId(), reason);
         engine().rejectCall(offer.callId(), offer.peer(), reason);
         whatsapp.store().chatStore().removeCall(offer.callId());
         notifyEnded(offer.callId(), offer.peer(), reason.wireValue());
@@ -400,8 +489,10 @@ public final class LiveCallsService implements CallsService {
         Objects.requireNonNull(reason, "reason cannot be null");
         var runtime = find(callId);
         if (runtime == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "terminate ignored, call {0} not tracked", callId);
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "terminating call {0}, reason={1}", callId, reason);
         var creator = runtime.call().creator();
         engine().endCall(callId, reason);
         // Fan the local hangup out to the application's onCallEnded listeners, matching reject() and the
@@ -417,8 +508,10 @@ public final class LiveCallsService implements CallsService {
     public void preaccept(String callId) {
         Objects.requireNonNull(callId, "callId cannot be null");
         if (!callExists(callId)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "preaccept ignored, call {0} not tracked", callId);
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending preaccept for call {0}", callId);
         engine().preaccept(callId);
     }
 
@@ -530,6 +623,7 @@ public final class LiveCallsService implements CallsService {
      */
     @Override
     public void sendMute(Jid peer, Jid creator, String callId, boolean muted) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} audio muted={1}", callId, muted);
         var runtime = find(callId);
         if (runtime != null) {
             runtime.call().setAudioMuted(muted);
@@ -542,6 +636,7 @@ public final class LiveCallsService implements CallsService {
      */
     @Override
     public void sendVideoState(Jid peer, Jid creator, String callId, boolean enabled) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} video enabled={1}", callId, enabled);
         var runtime = find(callId);
         if (runtime != null) {
             runtime.call().setVideoMuted(!enabled);
@@ -603,7 +698,10 @@ public final class LiveCallsService implements CallsService {
     @Override
     public CallLink createCallLink(CallLinkMedia media, boolean waitingRoomEnabled) {
         Objects.requireNonNull(media, "media cannot be null");
-        return engine().createCallLink(media, waitingRoomEnabled);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating call link, media={0}, waiting_room={1}", media, waitingRoomEnabled);
+        var link = engine().createCallLink(media, waitingRoomEnabled);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created call link {0}", Log.token(link.token()));
+        return link;
     }
 
     /**
@@ -616,6 +714,7 @@ public final class LiveCallsService implements CallsService {
     @Override
     public void setWaitingRoomEnabled(String callId, boolean enabled) {
         Objects.requireNonNull(callId, "callId cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} waiting room enabled={1}", callId, enabled);
         engine().setWaitingRoomEnabled(callId, enabled);
     }
 
@@ -630,6 +729,7 @@ public final class LiveCallsService implements CallsService {
     public void admitWaitingRoomParticipant(String callId, Jid userJid) {
         Objects.requireNonNull(callId, "callId cannot be null");
         Objects.requireNonNull(userJid, "userJid cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} admitting waiting room participant {1}", callId, userJid);
         engine().admitWaitingRoomParticipant(callId, userJid);
     }
 
@@ -643,6 +743,7 @@ public final class LiveCallsService implements CallsService {
     @Override
     public void admitAllWaitingRoomParticipants(String callId) {
         Objects.requireNonNull(callId, "callId cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} admitting all waiting room participants", callId);
         engine().admitAllWaitingRoomParticipants(callId);
     }
 
@@ -657,6 +758,7 @@ public final class LiveCallsService implements CallsService {
     public void denyWaitingRoomParticipant(String callId, Jid userJid) {
         Objects.requireNonNull(callId, "callId cannot be null");
         Objects.requireNonNull(userJid, "userJid cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} denying waiting room participant {1}", callId, userJid);
         engine().denyWaitingRoomParticipant(callId, userJid);
     }
 
@@ -700,6 +802,10 @@ public final class LiveCallsService implements CallsService {
                             offer.callCreator().orElseThrow().toUserJid()));
             engine().handleIncomingOffer(offer, senderJid)
                     .ifPresent(incoming -> {
+                        if (Log.DEBUG) {
+                            LOGGER.log(Level.DEBUG, "incoming call offer {0}, video={1}, group={2}",
+                                    incoming.callId(), incoming.videoOffered(), incoming.group());
+                        }
                         // Track the received offer in the call store so it can be joined from the ongoing call
                         // banner (joinGroupCall) after the ring is dismissed; it is dropped by removeCall when
                         // the call is accepted, joined, rejected, or ends.
@@ -708,6 +814,7 @@ public final class LiveCallsService implements CallsService {
                     });
             return;
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "handling inbound call message, type={0}", message.getClass().getSimpleName());
         engine().handleIncomingMessage(message, senderJid);
     }
 
@@ -726,13 +833,14 @@ public final class LiveCallsService implements CallsService {
     public void handleOfferNotice(OfferNoticeStanza notice) {
         Objects.requireNonNull(notice, "notice cannot be null");
         if (Duration.between(notice.offerTime(), Instant.now()).compareTo(OFFER_NOTICE_STALENESS) > 0) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Dropping stale offer_notice for call {0}", notice.callId());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping stale offer_notice for call {0}", notice.callId());
             return;
         }
         var peer = toListenerJid(notice.callCreator().toUserJid());
         var incoming = new IncomingCall(notice.callId(), peer, peer, notice.offerTime(),
                 notice.video(), notice.group(), null, true);
         whatsapp.store().chatStore().addCall(incoming);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "recorded offline offer notice for call {0}, video={1}, group={2}", notice.callId(), notice.video(), notice.group());
         notifyOfferNotice(incoming);
         ScheduledTask.scheduleDelayed(OFFER_NOTICE_STALENESS,
                 () -> whatsapp.store().chatStore().removeCall(notice.callId()));
@@ -745,23 +853,29 @@ public final class LiveCallsService implements CallsService {
      * swallowed rather than propagated, so one faulty listener neither stalls the signaling reader nor
      * blocks the fan out to the other listeners.
      *
+     * @implNote This implementation delivers the offer notice on a dedicated path rather than through
+     * {@link LiveCallEventBus}. In WhatsApp Web the offer notice is not part of the voip call event
+     * pipeline: {@code WAWebHandleVoipOfferNotice} fires
+     * {@code WAWebBackendApi.frontendFireAndForget("handleIncomingOfferNotice")}, which reaches
+     * {@code WAWebIncomingOfferNoticeVoipHandlerAction} and, past its own staleness and calling enabled
+     * gates, surfaces the notice through {@code WAWebCallNotificationBus.trigger("alert_call")} only when
+     * calling is disabled (when calling is enabled the notice is logged as an unexpected error and
+     * dropped), a separate notification bus from the general call event dispatch. Routing this notice
+     * through {@link LiveCallEventBus} and its host facing gate would therefore diverge from WA, so the
+     * direct fan out is intentional, not a shortcut around the bus.
+     *
      * @param call the offline offer descriptor to deliver
      */
     private void notifyOfferNotice(IncomingCall call) {
-        // FIXME: this hand rolls the per listener virtual thread fan out that LiveCallEventBus.emit performs.
-        //  Routing through eventBus.emit would need a new CallEvent variant for the offline offer notice
-        //  (LinkedCallOfferNoticeListener) plus a matching case in LiveCallEventBus.emit and a host facing
-        //  entry in its gate; no such event exists, so a faithful reroute is not possible without adding one.
-        //  Left as a direct fan out.
         for (var listener : whatsapp.store().listeners()) {
             if (listener instanceof LinkedCallOfferNoticeListener typed) {
                 Thread.startVirtualThread(() -> {
                     try {
                         typed.onCallOfferNotice(whatsapp, call);
                     } catch (RuntimeException exception) {
-                        LOGGER.log(System.Logger.Level.WARNING,
-                                "onCallOfferNotice listener threw " + exception.getClass().getSimpleName()
-                                        + ": " + exception.getMessage());
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING, "onCallOfferNotice listener threw for call " + call.callId(), exception);
+                        }
                     }
                 });
             }
@@ -787,7 +901,13 @@ public final class LiveCallsService implements CallsService {
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
         var torn = engine().handleIncomingMessage(terminate, senderJid);
         if (torn) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "inbound terminate tore down call {0}, wire_reason={1}",
+                        terminate.callId().orElse(null), terminate.reasonWire());
+            }
             notifyEnded(terminate.callId().orElseThrow(), terminate.callCreator().orElseThrow(), terminate.reasonWire());
+        } else if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "inbound terminate for call {0} suppressed or dropped", terminate.callId().orElse(null));
         }
     }
 
@@ -805,6 +925,7 @@ public final class LiveCallsService implements CallsService {
     public void handleInboundAck(CallAckOutcome outcome) {
         Objects.requireNonNull(outcome, "outcome cannot be null");
         if (outcome.isNack()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "call {0} accept ack nack, error={1}", outcome.id(), outcome.error().getAsInt());
             var runtime = activeCalls.get(outcome.id());
             if (runtime != null) {
                 CallResult.fromAcceptAckError(outcome.error().getAsInt())
@@ -852,8 +973,10 @@ public final class LiveCallsService implements CallsService {
         var runtime = activeCalls.remove(callId);
         whatsapp.store().chatStore().removeCall(callId);
         if (runtime == null) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "unregister ignored, call {0} not tracked", callId);
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unregistered call {0}", callId);
         // Own the runtime teardown here: this sink is fired once at the ENDED transition for every end path
         // (local hangup, peer terminate, reject, timeout, offer NACK, setup failure), so shutting the four
         // streams and the media session from here unblocks the application's blocked reads and writes and
@@ -882,6 +1005,7 @@ public final class LiveCallsService implements CallsService {
         var runtime = activeCalls.get(callId);
         if (runtime != null) {
             runtime.stats().markConnected();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} connected", callId);
         }
     }
 
@@ -894,26 +1018,12 @@ public final class LiveCallsService implements CallsService {
         // Call signaling is LID addressed on the wire; applications expect the peer's phone number, so
         // map the LID back to its PN through the learned mapping before fanning the event out.
         var from = toListenerJid(fromJid);
-        // FIXME: this hand rolls the per listener virtual thread fan out that LiveCallEventBus.emit already
-        //  performs for a CallEvent.Ended, duplicating its dispatch. The faithful route is
-        //  eventBus.emit(new CallEvent.Ended(callId, from, parsed)), but LiveCallEventBus gates every event
-        //  through shouldEmit(CallEventType) and this method is called from local hangup, reject,
-        //  placement NACK, and inbound terminate; rerouting would subject those ends to the host facing gate
-        //  the hand rolled path deliberately bypasses, which could suppress an onCallEnded the application
-        //  currently always receives. Not verified WA faithful, so left as a direct fan out.
-        for (var listener : whatsapp.store().listeners()) {
-            if (listener instanceof LinkedCallEndedListener typed) {
-                Thread.startVirtualThread(() -> {
-                    try {
-                        typed.onCallEnded(whatsapp, callId, from, parsed);
-                    } catch (RuntimeException exception) {
-                        LOGGER.log(System.Logger.Level.WARNING,
-                                "onCallEnded listener threw " + exception.getClass().getSimpleName()
-                                        + ": " + exception.getMessage());
-                    }
-                });
-            }
-        }
+        // Every end cause (local hangup, reject, placement NACK, inbound terminate) is a terminate, not a
+        // local fatal engine failure, so this reports CALL_TERMINATE_RECEIVED, which LiveCallEventBus admits;
+        // the gate can never suppress an Ended. WA likewise surfaces call ended for all causes with no
+        // per-cause gate: every JS end path drives the native state machine to terminal, forwarded to the
+        // host through one unconditional setCallState (WAWebVoipHandleNativeCallEvent).
+        eventBus.emit(new CallEvent.Ended(callId, from, parsed, false));
     }
 
     /**
@@ -1045,11 +1155,11 @@ public final class LiveCallsService implements CallsService {
     /**
      * Returns the engine lifecycle controller, requiring it to have been injected.
      *
-     * <p>The production client injects an assembled controller through the
-     * {@link #LiveCallsService(LinkedWhatsAppClient, WamService, MessageService, LifecycleController, LiveCallEventBus)
-     * full dependency constructor} ({@code LiveLinkedWhatsAppClient} assembles it through
-     * {@link EngineAssembler#assemble}), so this method returns it directly. A service built through
-     * the {@link #LiveCallsService(LinkedWhatsAppClient, WamService, MessageService) constructor without a
+     * <p>The production client builds this service through the
+     * {@link #LiveCallsService(LinkedWhatsAppClient, WamService, MessageService, MessageEncryption, DeviceService, LinkedWhatsAppStore, ABPropsService, LiveCallEventBus, CallLogSync)
+     * full dependency constructor}, which assembles the controller through {@link LifecycleController#create},
+     * so this method returns it directly. A service built through the
+     * {@link #LiveCallsService(LinkedWhatsAppClient, WamService, MessageService) constructor without a
      * controller} has no engine, and any call control method that reaches the engine through this accessor
      * fails fast rather than silently dropping the action.
      *
@@ -1113,9 +1223,10 @@ public final class LiveCallsService implements CallsService {
             if (group) {
                 emitJoinableCallEvent(runtime, resultType);
             }
-        } catch (RuntimeException _) {
+        } catch (RuntimeException exception) {
             // Telemetry is best effort and must never break the call path; a build or commit failure is
             // swallowed.
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to emit end of call telemetry for call " + runtime.callId(), exception);
         }
     }
 
@@ -1200,9 +1311,10 @@ public final class LiveCallsService implements CallsService {
                 builder.isCommunityGroup(isCommunityGroup);
             }
             wamService.commit(builder.build());
-        } catch (RuntimeException _) {
+        } catch (RuntimeException exception) {
             // Telemetry is best effort and must never break the call placement path; a build or commit
             // failure is swallowed.
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to emit pre call journey event for call " + callId, exception);
         }
     }
 

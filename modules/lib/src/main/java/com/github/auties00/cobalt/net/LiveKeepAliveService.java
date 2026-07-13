@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.net;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.Objects;
 
@@ -24,6 +26,11 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsSendPing")
 public final class LiveKeepAliveService implements KeepAliveService {
+    /**
+     * The logger for {@link LiveKeepAliveService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveKeepAliveService.class);
+
     /**
      * Delay between successive keepalive pings.
      */
@@ -113,6 +120,8 @@ public final class LiveKeepAliveService implements KeepAliveService {
                     .name("cobalt-keepalive")
                     .start(this::loop);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "keepalive service started, interval={0}ms timeout={1}ms",
+                interval.toMillis(), timeout.toMillis());
     }
 
     /**
@@ -133,6 +142,7 @@ public final class LiveKeepAliveService implements KeepAliveService {
         if (current != null) {
             current.interrupt();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "keepalive service stopped");
     }
 
     /**
@@ -149,7 +159,9 @@ public final class LiveKeepAliveService implements KeepAliveService {
             }
             try {
                 pinger.ping(timeout);
-            } catch (RuntimeException _) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "keepalive ping succeeded");
+            } catch (RuntimeException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "keepalive ping failed, treating link as dead", e);
                 onDeadLink.run();
                 return;
             }

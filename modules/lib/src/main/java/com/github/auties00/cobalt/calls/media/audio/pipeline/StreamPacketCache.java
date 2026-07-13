@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.pipeline;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,6 +38,11 @@ import java.util.Objects;
  * not in the cache itself.
  */
 public final class StreamPacketCache {
+    /**
+     * The logger for {@link StreamPacketCache}.
+     */
+    private static final System.Logger LOGGER = Log.get(StreamPacketCache.class);
+
     /**
      * One retained packet in the cache: its key, bytes, and whether it has been transmitted.
      *
@@ -210,6 +218,7 @@ public final class StreamPacketCache {
             }
         }
         Collections.reverse(selected);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "opus fec range acquired count={0} throughSeq={1}", selected.size(), throughExtendedSequence);
         return selected;
     }
 
@@ -249,6 +258,7 @@ public final class StreamPacketCache {
                 }
             }
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "mlow red range acquired count={0} beforeSeq={1}", selected.size(), beforeExtendedSequence);
         return selected;
     }
 
@@ -259,6 +269,7 @@ public final class StreamPacketCache {
      * stream incarnation. The store count is reset so the next store begins filling the ring afresh.
      */
     public void clear() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "packet cache cleared, discarded {0} packets", size());
         for (var i = 0; i < capacity; i++) {
             slots[i] = null;
         }

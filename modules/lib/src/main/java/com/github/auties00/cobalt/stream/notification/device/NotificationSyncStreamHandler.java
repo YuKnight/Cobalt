@@ -5,11 +5,13 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.stream.control.OfflineNotificationsReporter;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
@@ -33,10 +35,9 @@ import java.util.stream.Collectors;
 @WhatsAppWebModule(moduleName = "WAWebHandleServerSyncNotification")
 public final class NotificationSyncStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * Logs warnings about unknown collection names and errors during sync.
+     * The logger for {@link NotificationSyncStreamHandler}.
      */
-    private static final System.Logger LOGGER =
-            System.getLogger(NotificationSyncStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationSyncStreamHandler.class);
 
     /**
      * Provides store reads and app-state pulls.
@@ -89,8 +90,7 @@ public final class NotificationSyncStreamHandler extends SocketStreamHandler.Con
         }
 
         if (!stanza.hasChild("collection")) {
-            LOGGER.log(System.Logger.Level.ERROR,
-                    "Server sync notification does not contain any collections");
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "server sync notification does not contain any collections");
             sendNotificationAck(stanza);
             return;
         }
@@ -98,9 +98,11 @@ public final class NotificationSyncStreamHandler extends SocketStreamHandler.Con
         try {
             processNotification(stanza);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle server_sync notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "[missing-id]"), throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "failed to handle server_sync notification " + stanza.getAttributeAsString("id", "[missing-id]"),
+                        throwable);
+            }
         } finally {
             sendNotificationAck(stanza);
         }
@@ -127,8 +129,7 @@ public final class NotificationSyncStreamHandler extends SocketStreamHandler.Con
     private void processNotification(Stanza stanza) {
         var from = stanza.getAttributeAsString("from", null);
         if (from != null && !from.equals(JidServer.user().toString())) {
-            LOGGER.log(System.Logger.Level.ERROR,
-                    "handleServerSyncNotification: \"from\" is not domain jid \"s.whatsapp.net\"");
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "server_sync notification \"from\" is not domain jid \"s.whatsapp.net\"");
         }
 
         var changedCollections = new LinkedHashMap<SyncPatchType, Integer>();
@@ -145,9 +146,11 @@ public final class NotificationSyncStreamHandler extends SocketStreamHandler.Con
         }
 
         if (!unknownNames.isEmpty()) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "syncd: {0} unknown collection names in notification => {1}",
-                    unknownNames.size(), unknownNames);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "syncd: {0} unknown collection names in notification => {1}",
+                        unknownNames.size(), unknownNames);
+            }
         }
 
         var collectionsToSync = new ArrayList<>(changedCollections.keySet());
@@ -158,22 +161,27 @@ public final class NotificationSyncStreamHandler extends SocketStreamHandler.Con
                 offlineNotificationsReporter.increment(collection);
             }
         }
-        LOGGER.log(System.Logger.Level.INFO,
-                "syncd: incoming sync notification for collections\n    {0}",
-                changedCollections.entrySet().stream()
-                        .map(e -> e.getKey() + " v" + e.getValue())
-                        .collect(Collectors.joining("\n    ")));
+        if (Log.INFO) {
+            LOGGER.log(Level.INFO,
+                    "syncd: incoming sync notification for collections\n    {0}",
+                    changedCollections.entrySet().stream()
+                            .map(e -> e.getKey() + " v" + e.getValue())
+                            .collect(Collectors.joining("\n    ")));
+        }
 
         if (isCriticalDataSyncInProcess()) {
             collectionsToSync = collectionsToSync.stream()
                     .filter(SyncPatchType::isCritical)
                     .collect(Collectors.toCollection(ArrayList::new));
-            LOGGER.log(System.Logger.Level.INFO,
-                    "syncd: filtered non critical collections during bootstrap. new collections: {0}",
-                    collectionsToSync);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO,
+                        "syncd: filtered non critical collections during bootstrap. new collections: {0}",
+                        collectionsToSync);
+            }
         }
 
         if (!collectionsToSync.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "syncd: pulling app state for collections {0}", collectionsToSync);
             whatsapp.pullWebAppState(collectionsToSync.toArray(SyncPatchType[]::new));
         }
     }

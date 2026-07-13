@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * The MLow packet loss concealment (PLC) and comfort noise generation (CNG) state machine for the low band
@@ -29,6 +32,9 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables
  * tolerance carried from the synthesis and filter stages.
  */
 public final class MlowPlc {
+    /** The logger for {@link MlowPlc}. */
+    private static final System.Logger LOGGER = Log.get(MlowPlc.class);
+
     /** Linear prediction order of the low band short term filter. */
     private static final int LPC_ORDER = 16;
 
@@ -309,6 +315,7 @@ public final class MlowPlc {
         cngCandidatesTail = 1;
         cngNumCandidates = 1;
         lastNrgresQ14 = -90 * (1 << 14);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls mlow plc: stream state reset");
     }
 
     /**
@@ -438,6 +445,10 @@ public final class MlowPlc {
      */
     public ConcealedParams concealCelp(float[] aOut, float[] lsfsOut, float[] acbGainsOut, float[] lagsOut,
                                        int numSubframes, int subfrlen) {
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls mlow plc: concealing frame, subframes={0} voiced={1} lossCount={2}",
+                    numSubframes, voiced, lossCountSubfr);
+        }
         int lenBuffers = MAX_PITCH_LAG / subfrlen;
         int nPulses = lastSubfrPulses * numSubframes;
         float subfrlenComp = (float) subfrlen / MIN_SF_LEN;
@@ -603,6 +614,9 @@ public final class MlowPlc {
                 bweExpand(a[s], 0, LPC_ORDER, bwe);
             }
             recoveryLenMs += framelenMs;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "calls mlow plc: recovery smoothing, recoveryLenMs={0}", recoveryLenMs);
+            }
         }
     }
 
@@ -686,6 +700,10 @@ public final class MlowPlc {
      */
     public void addComfortNoise(float[] y, int yOff, int yLen, int lostFlag) {
         boolean isPlcFrame = lostFlag == FLAG_PACKET_LOST && !tocSid;
+
+        if (isPlcFrame != isPlcFramePrev && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "calls mlow plc: comfort noise {0} -> {1}", isPlcFramePrev, isPlcFrame);
+        }
 
         if (isPlcFrame || isPlcFramePrev) {
             float[] noiseBuf = new float[yLen + LPC_ORDER];

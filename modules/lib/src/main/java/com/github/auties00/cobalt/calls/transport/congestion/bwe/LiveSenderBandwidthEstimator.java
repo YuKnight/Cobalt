@@ -6,6 +6,9 @@ import com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping.BweHold
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping.ConservativeInitMode;
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.signal.CongestionSignalDetector;
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.signal.CongestionSignals;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * WhatsApp's sender side bandwidth estimator: runs an AIMD loss and round trip time controller, fuses
@@ -26,6 +29,11 @@ import com.github.auties00.cobalt.calls.transport.congestion.bwe.signal.Congesti
  * thread.
  */
 public final class LiveSenderBandwidthEstimator implements BandwidthEstimator {
+    /**
+     * The logger for {@link LiveSenderBandwidthEstimator}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveSenderBandwidthEstimator.class);
+
     /**
      * The sender side AIMD loss and round trip time estimator producing the sender estimate.
      */
@@ -183,6 +191,11 @@ public final class LiveSenderBandwidthEstimator implements BandwidthEstimator {
 
         targetBps = holdController.heldTargetBps(combined);
         previousTargetBps = combined;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE,
+                    "bwe feedback round: senderBwe={0}bps, combined={1}bps, target={2}bps, signals={3}",
+                    senderBwe, combined, targetBps, lastSignals);
+        }
         return targetBps;
     }
 
@@ -199,8 +212,16 @@ public final class LiveSenderBandwidthEstimator implements BandwidthEstimator {
      */
     private void applyHoldMachine(long combined, long nowMs) {
         if (combined < previousTargetBps) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "bwe congestion hold armed: previousTarget={0}bps, combined={1}bps",
+                        previousTargetBps, combined);
+            }
             holdController.startHold(BweHoldReason.CONGESTION, previousTargetBps, nowMs);
             if (combiner.recvDropDetected()) {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "bwe receive-drop hold armed: previousTarget={0}bps",
+                            previousTargetBps);
+                }
                 holdController.startHold(BweHoldReason.RECV_DROP, previousTargetBps, nowMs);
             }
         } else {
@@ -255,6 +276,9 @@ public final class LiveSenderBandwidthEstimator implements BandwidthEstimator {
      */
     @Override
     public void reset() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "bwe estimator reset: target={0}bps", targetBps);
+        }
         senderAimd.reset(targetBps);
         combiner.reset();
         holdController.reset();

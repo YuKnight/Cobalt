@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.message.send.id;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.util.DataUtils;
 
+import java.lang.System.Logger.Level;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -28,6 +30,11 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebMsgKey")
 @WhatsAppWebModule(moduleName = "WAWebMsgKeyNewId")
 public final class MessageIdGenerator {
+    /**
+     * The logger for {@link MessageIdGenerator}.
+     */
+    private static final System.Logger LOGGER = Log.get(MessageIdGenerator.class);
+
     /**
      * Holds the four-character prefix shared by every WhatsApp Web message id.
      * <p>
@@ -61,10 +68,10 @@ public final class MessageIdGenerator {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private MessageIdGenerator() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -94,7 +101,10 @@ public final class MessageIdGenerator {
             case V2 -> {
                 try {
                     yield generateV2(senderJid);
-                } catch (NoSuchAlgorithmException _) {
+                } catch (NoSuchAlgorithmException e) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "sha-256 unavailable, falling back to v1 message id", e);
+                    }
                     yield generateV1();
                 }
             }

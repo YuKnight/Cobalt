@@ -12,7 +12,7 @@ import com.github.auties00.cobalt.model.business.order.BusinessOrderBuilder;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the create-order mutation built by
+ * Parses the graph.whatsapp.com GraphQL response of the create-order mutation built by
  * {@link BizCreateOrderJobWhatsAppGraphQlRequest} into a {@link BusinessOrder}.
  *
  * <p>Reads the placed order returned under {@code xwa_checkout_place_order} and projects its
@@ -33,14 +33,14 @@ public final class BizCreateOrderJobWhatsAppGraphQlResponse implements WhatsAppG
      *
      * <p>Reserved for the static parser.
      *
-     * @param order the parsed placed order, or {@code null} when the relay omitted the field
+     * @param order the parsed placed order, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private BizCreateOrderJobWhatsAppGraphQlResponse(BusinessOrder order) {
         this.order = order;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_checkout_place_order} and its {@code order} child, projects
      * the {@code price} breakdown's currency, subtotal, and total onto a {@link BusinessOrder}; the

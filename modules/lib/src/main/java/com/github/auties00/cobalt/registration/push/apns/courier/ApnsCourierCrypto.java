@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.registration.push.apns.courier;
 
+import com.github.auties00.cobalt.log.Log;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -40,6 +43,11 @@ import java.security.spec.X509EncodedKeySpec;
  * JCA. The class is a stateless namespace and cannot be instantiated.
  */
 public final class ApnsCourierCrypto {
+    /**
+     * The logger for {@link ApnsCourierCrypto}.
+     */
+    private static final System.Logger LOGGER = Log.get(ApnsCourierCrypto.class);
+
     /**
      * Holds the total length in bytes of the connect-time nonce.
      *
@@ -85,8 +93,10 @@ public final class ApnsCourierCrypto {
             var keyFactory = KeyFactory.getInstance("RSA");
             var pub = keyFactory.generatePublic(new X509EncodedKeySpec(publicKeyDer));
             var priv = keyFactory.generatePrivate(new PKCS8EncodedKeySpec(privateKeyDer));
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "restored apns keypair");
             return new KeyPair(pub, priv);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "apns keypair restore failed", e);
             throw new IOException("APNS keypair restore failed", e);
         }
     }
@@ -111,7 +121,9 @@ public final class ApnsCourierCrypto {
         var rnd = new byte[8];
         random.nextBytes(rnd);
         buf.put(9, rnd);
-        return buf.array();
+        var nonce = buf.array();
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "created connect nonce, bytes={0}", nonce);
+        return nonce;
     }
 
     /**
@@ -141,8 +153,10 @@ public final class ApnsCourierCrypto {
             var out = new byte[raw.length + NONCE_SIGNATURE_TAG.length];
             System.arraycopy(NONCE_SIGNATURE_TAG, 0, out, 0, NONCE_SIGNATURE_TAG.length);
             System.arraycopy(raw, 0, out, NONCE_SIGNATURE_TAG.length, raw.length);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "signed connect nonce, bytes={0}", out.length);
             return out;
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "nonce signature failed", e);
             throw new IllegalStateException("nonce signature failed", e);
         }
     }
@@ -168,8 +182,11 @@ public final class ApnsCourierCrypto {
         try (var in = new ByteArrayInputStream(certificateBytes)) {
             var factory = CertificateFactory.getInstance("X.509");
             var cert = (X509Certificate) factory.generateCertificate(in);
-            return cert.getEncoded();
+            var encoded = cert.getEncoded();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reencoded device certificate, bytes={0}", encoded.length);
+            return encoded;
         } catch (IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "device certificate reencode failed", e);
             throw new CertificateException(e);
         }
     }
@@ -193,6 +210,7 @@ public final class ApnsCourierCrypto {
             var md = MessageDigest.getInstance("SHA-1");
             return md.digest(value.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sha-1 unavailable", e);
             throw new IllegalStateException("SHA-1 unavailable", e);
         }
     }

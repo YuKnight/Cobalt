@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.business;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
@@ -11,6 +12,8 @@ import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 import com.github.auties00.cobalt.wam.WamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Routes inbound {@code <notification>} stanzas whose category covers WhatsApp Business to the matching per-type handler.
@@ -28,6 +31,9 @@ import com.github.auties00.cobalt.wam.WamService;
  */
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleLoggedInStanza")
 public final class NotificationBusinessDispatcher extends SocketStreamHandler.Concurrent {
+    /** The logger for {@link NotificationBusinessDispatcher}. */
+    private static final System.Logger LOGGER = Log.get(NotificationBusinessDispatcher.class);
+
     /**
      * Handles {@code business}, {@code digital_commerce_subscription}, and {@code fb:update} notifications.
      */
@@ -88,6 +94,7 @@ public final class NotificationBusinessDispatcher extends SocketStreamHandler.Co
             case "mex" -> mexHandler.handle(stanza);
             case "pay" -> paymentHandler.handle(stanza);
             default -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping business notification with unrecognized type {0}", type);
             }
         }
     }

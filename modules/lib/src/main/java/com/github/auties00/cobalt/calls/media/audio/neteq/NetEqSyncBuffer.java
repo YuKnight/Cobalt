@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 
 /**
@@ -33,6 +36,11 @@ import java.util.Arrays;
  * a push equals the inserted length.
  */
 public final class NetEqSyncBuffer {
+    /**
+     * The logger for {@link NetEqSyncBuffer}.
+     */
+    private static final System.Logger LOGGER = Log.get(NetEqSyncBuffer.class);
+
     /**
      * The fixed sample capacity of the history window.
      *
@@ -233,5 +241,6 @@ public final class NetEqSyncBuffer {
     void reset() {
         Arrays.fill(samples, (short) 0);
         nextIndex = capacity;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sync buffer reset, capacity={0}", capacity);
     }
 }

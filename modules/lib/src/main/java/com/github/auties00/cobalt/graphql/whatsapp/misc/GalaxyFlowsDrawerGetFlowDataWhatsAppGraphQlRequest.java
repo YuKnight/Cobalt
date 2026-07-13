@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.misc;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,13 +14,13 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that fetches WhatsApp Flows (Galaxy) extension metadata for a business flow.
+ * Builds the graph.whatsapp.com GraphQL query that fetches WhatsApp Flows (Galaxy) extension metadata for a business flow.
  *
  * <p>The single {@code request} GraphQL variable wraps an {@code extensions} object. WhatsApp Web's
  * {@code WAWebGalaxyFlowsDrawerGetFlowData} fills it with the business account {@code biz_jid} (the
  * phone-number form of the contact, resolved from a LID through
  * {@code WAWebLidMigrationUtils.toPn}) and the {@code flow_id} naming the flow whose metadata is being
- * fetched. The relay returns the flow data and the endpoint public key under
+ * fetched. The graph.whatsapp.com endpoint returns the flow data and the endpoint public key under
  * {@code xwa_extensions_get_flow_data}; the reply is consumed through
  * {@link GalaxyFlowsDrawerGetFlowDataWhatsAppGraphQlResponse}.
  *
@@ -27,10 +29,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebGalaxyFlowsDrawerGetFlowDataQuery")
 public final class GalaxyFlowsDrawerGetFlowDataWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body. WhatsApp Web resolves the
+     * <p>Emitted as the {@code doc_id} field of the JSON request body. WhatsApp Web resolves the
      * live id from {@code WAWebGraphQLPersistedQueries}, which overrides the id compiled into the
      * {@code .graphql} document.
      */
@@ -132,5 +134,21 @@ public final class GalaxyFlowsDrawerGetFlowDataWhatsAppGraphQlRequest implements
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

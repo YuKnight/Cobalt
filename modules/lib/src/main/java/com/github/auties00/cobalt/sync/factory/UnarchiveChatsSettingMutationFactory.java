@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
 import com.github.auties00.cobalt.model.sync.action.setting.UnarchiveChatsSetting;
 import com.github.auties00.cobalt.model.sync.action.setting.UnarchiveChatsSettingBuilder;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -27,6 +29,11 @@ import java.util.Objects;
  * account-scoped syncd action.
  */
 public final class UnarchiveChatsSettingMutationFactory {
+    /**
+     * The logger for {@link UnarchiveChatsSettingMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(UnarchiveChatsSettingMutationFactory.class);
+
     /**
      * Constructs an unarchive-chats-setting mutation factory.
      *
@@ -58,6 +65,7 @@ public final class UnarchiveChatsSettingMutationFactory {
      */
     public SyncPendingMutation getUnarchiveChatsMutation(Instant timestamp, boolean unarchiveChats) {
         Objects.requireNonNull(timestamp, "timestamp cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building unarchive-chats-setting mutation, unarchiveChats={0}", unarchiveChats);
         var setting = new UnarchiveChatsSettingBuilder()
                 .unarchiveChats(unarchiveChats)
                 .build();

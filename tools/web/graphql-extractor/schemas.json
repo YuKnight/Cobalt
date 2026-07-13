@@ -1,7 +1,98 @@
 {
-  "extractedAt": "2026-05-26T13:33:21.427Z",
-  "count": 233,
+  "extractedAt": "2026-07-12T23:44:46.221Z",
+  "count": 243,
   "operations": [
+    {
+      "module": "BillingThirdPartyScreenQuery.graphql",
+      "id": "25515733154730868",
+      "name": "BillingThirdPartyScreenQuery",
+      "operationKind": "query",
+      "transports": [
+        "unknown"
+      ],
+      "variables": [
+        {
+          "name": "billing_token",
+          "defaultValue": null
+        },
+        {
+          "name": "eventContext",
+          "defaultValue": null
+        },
+        {
+          "name": "savingRecurringLPM",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "billing_third_party_request_record_from_token",
+          "type": "XFBBillingThirdPartyRequestRecord",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "request_status"
+            },
+            {
+              "kind": "scalar",
+              "name": "result_payload"
+            },
+            {
+              "kind": "linked",
+              "name": "payment_method",
+              "type": null,
+              "plural": false,
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "__typename"
+                },
+                {
+                  "kind": "inlineFragment",
+                  "onType": "LPMCredential",
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "consent_status"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "require_auto_reload"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "supports_auto_reload"
+                    }
+                  ]
+                },
+                {
+                  "kind": "scalar",
+                  "name": "id"
+                }
+              ]
+            },
+            {
+              "kind": "condition",
+              "variable": "savingRecurringLPM",
+              "passingValue": true,
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "charge_status"
+                }
+              ]
+            },
+            {
+              "kind": "scalar",
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "environments": []
+    },
     {
       "module": "LWICometCreateBoostedComponentMutation.graphql",
       "id": "9955578997835249",
@@ -157,6 +248,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -190,6 +284,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -223,6 +320,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -256,6 +356,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -289,6 +392,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -322,6 +428,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -371,6 +480,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -424,6 +536,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -484,7 +599,40 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
+    },
+    {
+      "module": "useBillingThirdPartyCheckWalletPaymentStatusMutation.graphql",
+      "id": "23868162299454318",
+      "name": "useBillingThirdPartyCheckWalletPaymentStatusMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "unknown"
+      ],
+      "variables": [
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "altpay2_check_payment_status",
+          "type": "Altpay2CheckPaymentStatusMutationResponse",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "payment_status"
+            }
+          ]
+        }
+      ],
+      "environments": []
     },
     {
       "module": "useWAWebBizAdCertifyMutation.graphql",
@@ -517,6 +665,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -546,6 +697,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -612,11 +766,14 @@
           ],
           "alias": "adAccount"
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
       "module": "useWAWebBizAdCreationAdAccountUpdate_BudgetQuery.graphql",
-      "id": "27196835776576294",
+      "id": "36574130378900036",
       "name": "useWAWebBizAdCreationAdAccountUpdate_BudgetQuery",
       "operationKind": "query",
       "transports": [
@@ -693,6 +850,29 @@
                         }
                       ],
                       "alias": "budgetOptions"
+                    },
+                    {
+                      "kind": "linked",
+                      "name": "budget_recommendation",
+                      "type": "AdsLWIBudgetRecommendation",
+                      "plural": false,
+                      "selections": [
+                        {
+                          "kind": "linked",
+                          "name": "budget_message_threshold",
+                          "type": "CurrencyQuantity",
+                          "plural": false,
+                          "selections": [
+                            {
+                              "kind": "scalar",
+                              "name": "offset_amount",
+                              "alias": "offsetAmount"
+                            }
+                          ],
+                          "alias": "budgetMessageThreshold"
+                        }
+                      ],
+                      "alias": "budgetRecommendation"
                     }
                   ],
                   "alias": "boostedComponentOptions"
@@ -716,6 +896,20 @@
                         }
                       ],
                       "alias": "minDailyBudget"
+                    },
+                    {
+                      "kind": "linked",
+                      "name": "max_daily_budget",
+                      "type": "CurrencyQuantity",
+                      "plural": false,
+                      "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "offset_amount",
+                          "alias": "offsetAmount"
+                        }
+                      ],
+                      "alias": "maxDailyBudget"
                     }
                   ]
                 },
@@ -728,6 +922,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -777,6 +974,49 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "useWAWebBizAdCreationBrowseRootsQuery.graphql",
+      "id": "27412404865060510",
+      "name": "useWAWebBizAdCreationBrowseRootsQuery",
+      "operationKind": "query",
+      "transports": [
+        "http_comet"
+      ],
+      "variables": [
+        {
+          "name": "adAccountID",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "detailed_targeting_browse",
+          "type": "DetailTargetingUnifiedNode",
+          "plural": true,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "name"
+            },
+            {
+              "kind": "scalar",
+              "name": "raw_name"
+            },
+            {
+              "kind": "scalar",
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -822,11 +1062,14 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
       "module": "useWAWebBizAdCreationMaybeOpenBillingWizardQuery.graphql",
-      "id": "32843053468676588",
+      "id": "26835553989404883",
       "name": "useWAWebBizAdCreationMaybeOpenBillingWizardQuery",
       "operationKind": "query",
       "transports": [
@@ -839,6 +1082,14 @@
         },
         {
           "name": "budget",
+          "defaultValue": null
+        },
+        {
+          "name": "boost_duration_in_days",
+          "defaultValue": null
+        },
+        {
+          "name": "daily_budget_payment_amount",
           "defaultValue": null
         }
       ],
@@ -891,6 +1142,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -915,6 +1169,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -948,6 +1205,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1037,6 +1297,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1110,6 +1373,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1175,6 +1441,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1208,6 +1477,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1277,6 +1549,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1298,6 +1573,9 @@
           "kind": "scalar",
           "name": "delete_ads_ctwa_draft"
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1327,6 +1605,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1356,6 +1637,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1385,6 +1669,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1414,6 +1701,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1651,6 +1941,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1724,6 +2017,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1753,6 +2049,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1862,6 +2161,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -1915,6 +2217,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -1984,11 +2289,14 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
       "module": "WAWebAiAgentAutoReplyControlMutation.graphql",
-      "id": "24541201322134132",
+      "id": "27338647792432014",
       "name": "WAWebAiAgentAutoReplyControlMutation",
       "operationKind": "mutation",
       "transports": [
@@ -2018,9 +2326,16 @@
             {
               "kind": "scalar",
               "name": "success"
+            },
+            {
+              "kind": "scalar",
+              "name": "update_timestamp_ms"
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2045,6 +2360,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2268,6 +2586,9 @@
           ],
           "alias": "adAccount"
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2325,6 +2646,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2374,6 +2698,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2423,6 +2750,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2464,6 +2794,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2525,11 +2858,14 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
       "module": "WAWebBizAdCreationPaymentSectionQuery.graphql",
-      "id": "25157292343950859",
+      "id": "27568373916080908",
       "name": "WAWebBizAdCreationPaymentSectionQuery",
       "operationKind": "query",
       "transports": [
@@ -2542,6 +2878,14 @@
         },
         {
           "name": "budget",
+          "defaultValue": null
+        },
+        {
+          "name": "boost_duration_in_days",
+          "defaultValue": null
+        },
+        {
+          "name": "daily_budget_payment_amount",
           "defaultValue": null
         }
       ],
@@ -2698,6 +3042,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2731,6 +3078,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2784,6 +3134,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -2817,11 +3170,14 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
       "module": "WAWebBizAdCreationRootQuery.graphql",
-      "id": "26390847997274475",
+      "id": "27939235912348668",
       "name": "WAWebBizAdCreationRootQuery",
       "operationKind": "query",
       "transports": [
@@ -4449,6 +4805,29 @@
                         }
                       ],
                       "alias": "budgetOptions"
+                    },
+                    {
+                      "kind": "linked",
+                      "name": "budget_recommendation",
+                      "type": "AdsLWIBudgetRecommendation",
+                      "plural": false,
+                      "selections": [
+                        {
+                          "kind": "linked",
+                          "name": "budget_message_threshold",
+                          "type": "CurrencyQuantity",
+                          "plural": false,
+                          "selections": [
+                            {
+                              "kind": "scalar",
+                              "name": "offset_amount",
+                              "alias": "offsetAmount"
+                            }
+                          ],
+                          "alias": "budgetMessageThreshold"
+                        }
+                      ],
+                      "alias": "budgetRecommendation"
                     }
                   ],
                   "alias": "boostedComponentOptions"
@@ -4698,11 +5077,14 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
       "module": "WAWebBizAdCreationSuccessModalQuery.graphql",
-      "id": "25629101233377520",
+      "id": "27387498720836331",
       "name": "WAWebBizAdCreationSuccessModalQuery",
       "operationKind": "query",
       "transports": [
@@ -4715,6 +5097,14 @@
         },
         {
           "name": "budget",
+          "defaultValue": null
+        },
+        {
+          "name": "boost_duration_in_days",
+          "defaultValue": null
+        },
+        {
+          "name": "daily_budget_payment_amount",
           "defaultValue": null
         }
       ],
@@ -4772,11 +5162,14 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
       "module": "WAWebBizAdCreationSummaryContentQuery.graphql",
-      "id": "33567643556217656",
+      "id": "27393056636966415",
       "name": "WAWebBizAdCreationSummaryContentQuery",
       "operationKind": "query",
       "transports": [
@@ -4789,6 +5182,14 @@
         },
         {
           "name": "budget",
+          "defaultValue": null
+        },
+        {
+          "name": "boost_duration_in_days",
+          "defaultValue": null
+        },
+        {
+          "name": "daily_budget_payment_amount",
           "defaultValue": null
         }
       ],
@@ -4821,6 +5222,10 @@
                       "type": "XFBBillableAccountEstimatedTaxLineItem",
                       "plural": true,
                       "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "__typename"
+                        },
                         {
                           "kind": "scalar",
                           "name": "tax_name",
@@ -4865,6 +5270,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -4886,6 +5294,9 @@
           "kind": "scalar",
           "name": "delete_saved_audience"
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -5002,7 +5413,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebBizAdManagementAdPaymentModalMutation.graphql",
@@ -5018,6 +5430,9 @@
           "kind": "scalar",
           "name": "xfb_wa_biz_send_payment_hub_notification"
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -5061,11 +5476,14 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
       "module": "WAWebBizAdManagementRootPaginationQuery.graphql",
-      "id": "26783559784633888",
+      "id": "26978242401843190",
       "name": "WAWebBizAdManagementRootPaginationQuery",
       "operationKind": "query",
       "transports": [
@@ -5316,6 +5734,10 @@
                                               "name": "id"
                                             }
                                           ]
+                                        },
+                                        {
+                                          "kind": "scalar",
+                                          "name": "regulated_categories"
                                         }
                                       ]
                                     },
@@ -5586,6 +6008,10 @@
                                               "name": "id"
                                             }
                                           ]
+                                        },
+                                        {
+                                          "kind": "scalar",
+                                          "name": "regulated_categories"
                                         }
                                       ]
                                     },
@@ -5719,11 +6145,12 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebBizAdManagementRootQuery.graphql",
-      "id": "26701127972903992",
+      "id": "36055344540747284",
       "name": "WAWebBizAdManagementRootQuery",
       "operationKind": "query",
       "transports": [
@@ -6138,6 +6565,10 @@
                                               "name": "id"
                                             }
                                           ]
+                                        },
+                                        {
+                                          "kind": "scalar",
+                                          "name": "regulated_categories"
                                         }
                                       ]
                                     },
@@ -6408,6 +6839,10 @@
                                               "name": "id"
                                             }
                                           ]
+                                        },
+                                        {
+                                          "kind": "scalar",
+                                          "name": "regulated_categories"
                                         }
                                       ]
                                     },
@@ -6541,6 +6976,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -6574,15 +7012,18 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
-      "module": "WAWebBizAiAbilitiesQuery.graphql",
-      "id": "35774632425517289",
-      "name": "WAWebBizAiAbilitiesQuery",
+      "module": "WAWebBizAIAbilityStatusQuery.graphql",
+      "id": "27855405457379489",
+      "name": "WAWebBizAIAbilityStatusQuery",
       "operationKind": "query",
       "transports": [
-        "http_relay"
+        "http_comet"
       ],
       "variables": [],
       "response": [
@@ -6610,73 +7051,61 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
-      "module": "WAWebBizAiChatHistoryCreateMutation.graphql",
-      "id": "27499829029619003",
-      "name": "WAWebBizAiChatHistoryCreateMutation",
-      "operationKind": "mutation",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [
-        {
-          "name": "input",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xfb_maiba_create_chat_history",
-          "type": "XFBMetaAIBizAgentWACreateChatHistoryReturn",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "success"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiExampleResponseDeleteMutation.graphql",
-      "id": "25766734919668692",
-      "name": "WAWebBizAiExampleResponseDeleteMutation",
-      "operationKind": "mutation",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [
-        {
-          "name": "input",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xfb_meta_ai_biz_agent_wa_delete_knowledge",
-          "type": "XFBMetaAIBizAgentWAKnowledgeUpdateResponse",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "success"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiExampleResponsesQuery.graphql",
-      "id": "26131148333230179",
-      "name": "WAWebBizAiExampleResponsesQuery",
+      "module": "WAWebBizAIBestsellersDrawerQuery.graphql",
+      "id": "28087310950870102",
+      "name": "WAWebBizAIBestsellersDrawerQuery",
       "operationKind": "query",
       "transports": [
-        "http_relay"
+        "http_comet"
+      ],
+      "variables": [],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_meta_ai_biz_agent_wa_ai_home",
+          "type": "XFBMetaAIBizAgentWAAIHome",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "linked",
+              "name": "knowledge",
+              "type": "XFBMetaAIBizAgentWAAbilityKnowledgeData",
+              "plural": false,
+              "selections": [
+                {
+                  "kind": "linked",
+                  "name": "bestsellers",
+                  "type": "ProductItem",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "id"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAIBusinessInfoDrawerQuery.graphql",
+      "id": "27955028940751325",
+      "name": "WAWebBizAIBusinessInfoDrawerQuery",
+      "operationKind": "query",
+      "transports": [
+        "http_comet"
       ],
       "variables": [],
       "response": [
@@ -6698,7 +7127,264 @@
                 },
                 {
                   "kind": "scalar",
-                  "name": "data_type"
+                  "name": "string_data"
+                }
+              ]
+            },
+            {
+              "kind": "linked",
+              "name": "knowledge",
+              "type": "XFBMetaAIBizAgentWAAbilityKnowledgeData",
+              "plural": false,
+              "selections": [
+                {
+                  "kind": "linked",
+                  "name": "websites",
+                  "type": "XFBMetaAIBizAgentWAWebsiteInfoOutput",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "website_type"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "website_url"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAiChatHistoryCreateMutation.graphql",
+      "id": "27499829029619003",
+      "name": "WAWebBizAiChatHistoryCreateMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "http_relay",
+        "http_comet"
+      ],
+      "variables": [
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_maiba_create_chat_history",
+          "type": "XFBMetaAIBizAgentWACreateChatHistoryReturn",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "success"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAiExampleResponseDeleteMutation.graphql",
+      "id": "25766734919668692",
+      "name": "WAWebBizAiExampleResponseDeleteMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "http_relay",
+        "http_comet"
+      ],
+      "variables": [
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_meta_ai_biz_agent_wa_delete_knowledge",
+          "type": "XFBMetaAIBizAgentWAKnowledgeUpdateResponse",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "success"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAIExampleResponsesDrawerQuery.graphql",
+      "id": "35817813771200593",
+      "name": "WAWebBizAIExampleResponsesDrawerQuery",
+      "operationKind": "query",
+      "transports": [
+        "http_comet"
+      ],
+      "variables": [],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_meta_ai_biz_agent_wa_ai_home",
+          "type": "XFBMetaAIBizAgentWAAIHome",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "linked",
+              "name": "ordered_knowledge",
+              "type": "XFBMetaAIBizAgentWAKnowlegeEntry",
+              "plural": true,
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "knowledge_type"
+                },
+                {
+                  "kind": "linked",
+                  "name": "faq_data",
+                  "type": "XFBMetaAIBizAgentWAAbilityKnowledgeFAQ",
+                  "plural": false,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "id"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "question"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "answer"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "linked",
+              "name": "knowledge",
+              "type": "XFBMetaAIBizAgentWAAbilityKnowledgeData",
+              "plural": false,
+              "selections": [
+                {
+                  "kind": "linked",
+                  "name": "websites",
+                  "type": "XFBMetaAIBizAgentWAWebsiteInfoOutput",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "website_type"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "website_url"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAiExampleResponseUpdateMutation.graphql",
+      "id": "36542743545312870",
+      "name": "WAWebBizAiExampleResponseUpdateMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "http_relay",
+        "http_comet"
+      ],
+      "variables": [
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_meta_ai_biz_agent_wa_update_knowledge",
+          "type": "XFBMetaAIBizAgentWAKnowledgeUpdateResponse",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "success"
+            },
+            {
+              "kind": "linked",
+              "name": "website_statuses",
+              "type": "MetaAIBizAgentWAWebsiteStatuses",
+              "plural": true,
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "is_valid"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "website_url"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "error_code"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAIKnowledgeDrawerQuery.graphql",
+      "id": "27046558284963667",
+      "name": "WAWebBizAIKnowledgeDrawerQuery",
+      "operationKind": "query",
+      "transports": [
+        "http_comet"
+      ],
+      "variables": [],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_meta_ai_biz_agent_wa_ai_home",
+          "type": "XFBMetaAIBizAgentWAAIHome",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "linked",
+              "name": "ordered_knowledge",
+              "type": "XFBMetaAIBizAgentWAKnowlegeEntry",
+              "plural": true,
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "knowledge_type"
                 },
                 {
                   "kind": "scalar",
@@ -6721,16 +7407,8 @@
                     {
                       "kind": "scalar",
                       "name": "answer"
-                    },
-                    {
-                      "kind": "scalar",
-                      "name": "faq_type"
                     }
                   ]
-                },
-                {
-                  "kind": "scalar",
-                  "name": "last_update_ts"
                 }
               ]
             },
@@ -6740,10 +7418,6 @@
               "type": "XFBMetaAIBizAgentWAAbilityKnowledgeData",
               "plural": false,
               "selections": [
-                {
-                  "kind": "scalar",
-                  "name": "website"
-                },
                 {
                   "kind": "linked",
                   "name": "websites",
@@ -6757,18 +7431,6 @@
                     {
                       "kind": "scalar",
                       "name": "website_url"
-                    }
-                  ]
-                },
-                {
-                  "kind": "linked",
-                  "name": "bestsellers",
-                  "type": "ProductItem",
-                  "plural": true,
-                  "selections": [
-                    {
-                      "kind": "scalar",
-                      "name": "id"
                     }
                   ]
                 }
@@ -6829,273 +7491,7 @@
                   "name": "eligible"
                 }
               ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiExampleResponseUpdateMutation.graphql",
-      "id": "36542743545312870",
-      "name": "WAWebBizAiExampleResponseUpdateMutation",
-      "operationKind": "mutation",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [
-        {
-          "name": "input",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xfb_meta_ai_biz_agent_wa_update_knowledge",
-          "type": "XFBMetaAIBizAgentWAKnowledgeUpdateResponse",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "success"
             },
-            {
-              "kind": "linked",
-              "name": "website_statuses",
-              "type": "MetaAIBizAgentWAWebsiteStatuses",
-              "plural": true,
-              "selections": [
-                {
-                  "kind": "scalar",
-                  "name": "is_valid"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "website_url"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "error_code"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiKnowledgeReviewCommitMutation.graphql",
-      "id": "24096216066682686",
-      "name": "WAWebBizAiKnowledgeReviewCommitMutation",
-      "operationKind": "mutation",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [
-        {
-          "name": "ids",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xfb_maiba_approve_potential_knowledge",
-          "type": "XFBMAIBAPotentialKnowledgeMutationResponse",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "success"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiKnowledgeReviewDeleteMutation.graphql",
-      "id": "24454985560765299",
-      "name": "WAWebBizAiKnowledgeReviewDeleteMutation",
-      "operationKind": "mutation",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [
-        {
-          "name": "id",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xfb_maiba_delete_potential_knowledge_mutation",
-          "type": "XFBMAIBAPotentialKnowledgeMutationResponse",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "success"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiKnowledgeReviewQuery.graphql",
-      "id": "24991295137127144",
-      "name": "WAWebBizAiKnowledgeReviewQuery",
-      "operationKind": "query",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [
-        {
-          "name": "timestamp",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xfb_maiba_load_potential_knowledge_for_review",
-          "type": "XFBMAIBALoadKnowledgeForReviewResponse",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "linked",
-              "name": "items",
-              "type": "XFBMAIBAPotentialKnowlege",
-              "plural": true,
-              "selections": [
-                {
-                  "kind": "scalar",
-                  "name": "id"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "type"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "faq_question"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "faq_answer"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "biz_info_attribute"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "biz_info_value"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiKnowledgeSourceDeleteMutation.graphql",
-      "id": "26730550573239991",
-      "name": "WAWebBizAiKnowledgeSourceDeleteMutation",
-      "operationKind": "mutation",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [
-        {
-          "name": "input",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xfb_maiba_trigger_file_deletion",
-          "type": "XFBMetaAIBizAgentWATriggerFileDeletionReturn",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "success"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiKnowledgeSourceDeleteMutationChatHistoryMutation.graphql",
-      "id": "26634033512955259",
-      "name": "WAWebBizAiKnowledgeSourceDeleteMutationChatHistoryMutation",
-      "operationKind": "mutation",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xfb_maiba_delete_chat_history",
-          "type": "XFBMetaAIBizAgentWADeleteChatHistoryReturn",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "success"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiKnowledgeSourceDeleteMutationWebsiteMutation.graphql",
-      "id": "26239208135750680",
-      "name": "WAWebBizAiKnowledgeSourceDeleteMutationWebsiteMutation",
-      "operationKind": "mutation",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [
-        {
-          "name": "input",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "maiba_trigger_website_deletion",
-          "type": "MetaAIBizAgentWATriggerWebsiteDeletionReturn",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "success"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebBizAiKnowledgeSourcesQuery.graphql",
-      "id": "26739372069027009",
-      "name": "WAWebBizAiKnowledgeSourcesQuery",
-      "operationKind": "query",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xfb_meta_ai_biz_agent_wa_ai_home",
-          "type": "XFBMetaAIBizAgentWAAIHome",
-          "plural": false,
-          "selections": [
             {
               "kind": "scalar",
               "name": "chat_history_export_status"
@@ -7176,6 +7572,234 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAiKnowledgeReviewCommitMutation.graphql",
+      "id": "24096216066682686",
+      "name": "WAWebBizAiKnowledgeReviewCommitMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "http_relay",
+        "http_comet"
+      ],
+      "variables": [
+        {
+          "name": "ids",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_maiba_approve_potential_knowledge",
+          "type": "XFBMAIBAPotentialKnowledgeMutationResponse",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "success"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAiKnowledgeReviewDeleteMutation.graphql",
+      "id": "26733698232996680",
+      "name": "WAWebBizAiKnowledgeReviewDeleteMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "http_relay"
+      ],
+      "variables": [
+        {
+          "name": "id",
+          "defaultValue": null
+        },
+        {
+          "name": "source",
+          "defaultValue": "AUTO_SAVE"
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_maiba_delete_potential_knowledge_mutation",
+          "type": "XFBMAIBAPotentialKnowledgeMutationResponse",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "success"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAiKnowledgeReviewDrawerQuery.graphql",
+      "id": "27195779110043143",
+      "name": "WAWebBizAiKnowledgeReviewDrawerQuery",
+      "operationKind": "query",
+      "transports": [
+        "http_comet"
+      ],
+      "variables": [
+        {
+          "name": "timestamp",
+          "defaultValue": null
+        },
+        {
+          "name": "source",
+          "defaultValue": "AUTO_SAVE"
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_maiba_load_potential_knowledge_for_review",
+          "type": "XFBMAIBALoadKnowledgeForReviewResponse",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "linked",
+              "name": "items",
+              "type": "XFBMAIBAPotentialKnowlege",
+              "plural": true,
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "id"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "type"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "faq_question"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "faq_answer"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "biz_info_attribute"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "biz_info_value"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAiKnowledgeSourceDeleteMutation.graphql",
+      "id": "26730550573239991",
+      "name": "WAWebBizAiKnowledgeSourceDeleteMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "http_relay",
+        "http_comet"
+      ],
+      "variables": [
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_maiba_trigger_file_deletion",
+          "type": "XFBMetaAIBizAgentWATriggerFileDeletionReturn",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "success"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAiKnowledgeSourceDeleteMutationChatHistoryMutation.graphql",
+      "id": "26634033512955259",
+      "name": "WAWebBizAiKnowledgeSourceDeleteMutationChatHistoryMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "http_relay"
+      ],
+      "variables": [],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_maiba_delete_chat_history",
+          "type": "XFBMetaAIBizAgentWADeleteChatHistoryReturn",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "success"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAiKnowledgeSourceDeleteMutationWebsiteMutation.graphql",
+      "id": "26239208135750680",
+      "name": "WAWebBizAiKnowledgeSourceDeleteMutationWebsiteMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "http_relay"
+      ],
+      "variables": [
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "maiba_trigger_website_deletion",
+          "type": "MetaAIBizAgentWATriggerWebsiteDeletionReturn",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "success"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7184,7 +7808,8 @@
       "name": "WAWebBizAiKnowledgeSourceUploadMutation",
       "operationKind": "mutation",
       "transports": [
-        "http_relay"
+        "http_relay",
+        "http_comet"
       ],
       "variables": [
         {
@@ -7213,6 +7838,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7242,6 +7870,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7250,7 +7881,8 @@
       "name": "WAWebBizAiLeadGenDeleteMutation",
       "operationKind": "mutation",
       "transports": [
-        "http_relay"
+        "http_relay",
+        "http_comet"
       ],
       "variables": [
         {
@@ -7271,15 +7903,18 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
-      "module": "WAWebBizAiLeadGenFormsQuery.graphql",
-      "id": "26699844229652541",
-      "name": "WAWebBizAiLeadGenFormsQuery",
+      "module": "WAWebBizAILeadGenListDrawerQuery.graphql",
+      "id": "26924948820481142",
+      "name": "WAWebBizAILeadGenListDrawerQuery",
       "operationKind": "query",
       "transports": [
-        "http_relay"
+        "http_comet"
       ],
       "variables": [],
       "response": [
@@ -7300,6 +7935,14 @@
             {
               "kind": "scalar",
               "name": "moment_type"
+            },
+            {
+              "kind": "scalar",
+              "name": "has_unseen_lead_data"
+            },
+            {
+              "kind": "scalar",
+              "name": "num_of_lead_data"
             },
             {
               "kind": "linked",
@@ -7344,10 +7987,6 @@
                           "name": "has_seen"
                         },
                         {
-                          "kind": "scalar",
-                          "name": "customer_info"
-                        },
-                        {
                           "kind": "linked",
                           "name": "consumer_uid",
                           "type": "XFBMaibaAiBizAgentWAConsumerUIDOutput",
@@ -7366,23 +8005,22 @@
                         {
                           "kind": "scalar",
                           "name": "creation_time"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "customer_info"
                         }
                       ]
                     }
                   ]
                 }
               ]
-            },
-            {
-              "kind": "scalar",
-              "name": "has_unseen_lead_data"
-            },
-            {
-              "kind": "scalar",
-              "name": "num_of_lead_data"
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7391,7 +8029,8 @@
       "name": "WAWebBizAiLeadGenMarkAllSeenMutation",
       "operationKind": "mutation",
       "transports": [
-        "http_relay"
+        "http_relay",
+        "http_comet"
       ],
       "variables": [
         {
@@ -7412,6 +8051,41 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAILeadGenResponseDetailDrawerMarkSeenMutation.graphql",
+      "id": "27560975943534036",
+      "name": "WAWebBizAILeadGenResponseDetailDrawerMarkSeenMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "http_comet"
+      ],
+      "variables": [
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_meta_ai_biz_agent_wa_mark_lead_gen_data_as_seen",
+          "type": "XFBMetaAIBizAgentWALeadGenDataMutationResponse",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "success"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7420,7 +8094,8 @@
       "name": "WAWebBizAiLeadGenUpdateMutation",
       "operationKind": "mutation",
       "transports": [
-        "http_relay"
+        "http_relay",
+        "http_comet"
       ],
       "variables": [
         {
@@ -7441,6 +8116,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7449,7 +8127,8 @@
       "name": "WAWebBizAiProductInfoMutation",
       "operationKind": "mutation",
       "transports": [
-        "http_relay"
+        "http_relay",
+        "http_comet"
       ],
       "variables": [
         {
@@ -7498,6 +8177,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7531,6 +8213,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7568,6 +8253,48 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizAIPurchaseInfoDrawerQuery.graphql",
+      "id": "26971463405821153",
+      "name": "WAWebBizAIPurchaseInfoDrawerQuery",
+      "operationKind": "query",
+      "transports": [
+        "http_comet"
+      ],
+      "variables": [],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_meta_ai_biz_agent_wa_ai_home",
+          "type": "XFBMetaAIBizAgentWAAIHome",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "linked",
+              "name": "ordered_knowledge",
+              "type": "XFBMetaAIBizAgentWAKnowlegeEntry",
+              "plural": true,
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "knowledge_type"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "string_data"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7601,6 +8328,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7609,7 +8339,8 @@
       "name": "WAWebBizAiReplyBotEnabledTimeUpdateMutation",
       "operationKind": "mutation",
       "transports": [
-        "http_relay"
+        "http_relay",
+        "http_comet"
       ],
       "variables": [
         {
@@ -7630,6 +8361,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7638,7 +8372,8 @@
       "name": "WAWebBizAiReplyChatTriggerUpdateMutation",
       "operationKind": "mutation",
       "transports": [
-        "http_relay"
+        "http_relay",
+        "http_comet"
       ],
       "variables": [
         {
@@ -7659,15 +8394,18 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
-      "module": "WAWebBizAiReplySettingsQuery.graphql",
-      "id": "35327675310179742",
-      "name": "WAWebBizAiReplySettingsQuery",
+      "module": "WAWebBizAIResponseSettingsDrawerQuery.graphql",
+      "id": "36824596957127390",
+      "name": "WAWebBizAIResponseSettingsDrawerQuery",
       "operationKind": "query",
       "transports": [
-        "http_relay"
+        "http_comet"
       ],
       "variables": [],
       "response": [
@@ -7698,15 +8436,14 @@
                 {
                   "kind": "scalar",
                   "name": "to_sec_in_day"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "time_zone"
                 }
               ]
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7780,6 +8517,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7788,7 +8528,8 @@
       "name": "WAWebBizAiRuleDeleteMutation",
       "operationKind": "mutation",
       "transports": [
-        "http_relay"
+        "http_relay",
+        "http_comet"
       ],
       "variables": [
         {
@@ -7809,6 +8550,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7817,7 +8561,8 @@
       "name": "WAWebBizAiRulesGenMutation",
       "operationKind": "mutation",
       "transports": [
-        "http_relay"
+        "http_relay",
+        "http_comet"
       ],
       "variables": [],
       "response": [
@@ -7893,6 +8638,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7966,6 +8714,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -7990,6 +8741,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -8014,7 +8768,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebBizBroadcastGenAIRecommendationJobQuery.graphql",
@@ -8091,6 +8846,36 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
+      ]
+    },
+    {
+      "module": "WAWebBizBroadcastProNuxOnboardingStatusFetchQuery.graphql",
+      "id": "27248535558089999",
+      "name": "WAWebBizBroadcastProNuxOnboardingStatusFetchQuery",
+      "operationKind": "query",
+      "transports": [
+        "http_relay"
+      ],
+      "variables": [],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xfb_whatsapp_bb_pro",
+          "type": "XFBWhatsAppSMBBBPro",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "onboarding_status"
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -8460,6 +9245,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -8489,6 +9277,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -8522,6 +9313,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -8551,6 +9345,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -8600,6 +9397,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -8629,6 +9429,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -8658,6 +9461,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -9027,6 +9833,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -9432,6 +10241,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -9857,6 +10669,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -10234,6 +11049,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -10619,6 +11437,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -11040,6 +11861,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -11073,6 +11897,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -11122,6 +11949,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -11151,6 +11981,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -11184,6 +12017,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -11249,6 +12085,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -11290,6 +12129,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -11347,6 +12189,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -11436,6 +12281,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -11485,6 +12333,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -11578,6 +12429,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -11623,6 +12477,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -11656,6 +12513,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -12077,6 +12937,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -12162,6 +13025,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -12295,6 +13161,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -12392,6 +13261,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -12445,42 +13317,9 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "module": "WAWebCanonicalHatchAgentStatusGetQuery.graphql",
-      "id": "25845071235188952",
-      "name": "WAWebCanonicalHatchAgentStatusGetQuery",
-      "operationKind": "query",
-      "transports": [
-        "http_relay"
       ],
-      "variables": [],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "wa_genai_hatch_channel_metadata",
-          "type": "WAGenAIHatchChannelMetadata",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "linked",
-              "name": "agent_status",
-              "type": "WAGenAIHatchAgentStatusResponse",
-              "plural": false,
-              "selections": [
-                {
-                  "kind": "scalar",
-                  "name": "activity_code"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "activity_text"
-                }
-              ]
-            }
-          ]
-        }
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -12517,42 +13356,9 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "module": "WAWebCanonicalHatchIdentityGetQuery.graphql",
-      "id": "26226835783605669",
-      "name": "WAWebCanonicalHatchIdentityGetQuery",
-      "operationKind": "query",
-      "transports": [
-        "http_relay"
       ],
-      "variables": [],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "wa_genai_hatch_identity_get",
-          "type": "WAGenAIHatchIdentityGetResponse",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "name"
-            },
-            {
-              "kind": "linked",
-              "name": "avatar",
-              "type": "WAGenAIHatchIdentityAvatarInfo",
-              "plural": false,
-              "selections": [
-                {
-                  "kind": "scalar",
-                  "name": "image_url"
-                }
-              ]
-            }
-          ]
-        }
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -12597,6 +13403,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -12621,6 +13430,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -13321,6 +14133,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -13350,6 +14165,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -13411,6 +14229,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -13444,6 +14265,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -13489,6 +14313,110 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
+      ]
+    },
+    {
+      "module": "WAWebDebugLabyrinthInboxSnapshotQuery.graphql",
+      "id": "27416732057922291",
+      "name": "WAWebDebugLabyrinthInboxSnapshotQuery",
+      "operationKind": "query",
+      "transports": [
+        "http_relay"
+      ],
+      "variables": [
+        {
+          "name": "params",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "get_wa_mailbox",
+          "type": null,
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "__typename"
+            },
+            {
+              "kind": "linked",
+              "name": "snapshot_threads_with_messages",
+              "type": "WAMailboxSnapshotResponse",
+              "plural": false,
+              "selections": [
+                {
+                  "kind": "linked",
+                  "name": "items_with_messages",
+                  "type": "WAMailboxSnapshotItemWithMessages",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "linked",
+                      "name": "item",
+                      "type": null,
+                      "plural": false,
+                      "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "__typename"
+                        },
+                        {
+                          "kind": "TypeDiscriminator"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "id"
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "linked",
+                      "name": "messages",
+                      "type": null,
+                      "plural": true,
+                      "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "__typename"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "encrypted_payload"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "encryption_version"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "id"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "inlineFragment",
+              "onType": "WALabyrinthAccount",
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "id"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -13514,6 +14442,9 @@
           "kind": "scalar",
           "name": "edit_wa_web_biz_profile"
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -13547,12 +14478,15 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
-      "module": "WAWebFetchAdEntryPointsConfigurationM1Query.graphql",
-      "id": "9737776042983782",
-      "name": "WAWebFetchAdEntryPointsConfigurationM1Query",
+      "module": "WAWebFetchBizAiLargeScreensGateQuery.graphql",
+      "id": "27287965697525752",
+      "name": "WAWebFetchBizAiLargeScreensGateQuery",
       "operationKind": "query",
       "transports": [
         "http_relay"
@@ -13561,56 +14495,19 @@
       "response": [
         {
           "kind": "linked",
-          "name": "ctwa_client_entry_point_entitlement",
-          "type": "TCTWAClientEntryPointEntitlementResponse",
-          "plural": true,
+          "name": "xfb_meta_ai_biz_agent_wa_large_screens_gate",
+          "type": "XFBMetaAIBizAgentWAQEBoolResult",
+          "plural": false,
           "selections": [
             {
               "kind": "scalar",
-              "name": "entry_point_or_experience"
-            },
-            {
-              "kind": "scalar",
-              "name": "should_show"
-            },
-            {
-              "kind": "scalar",
-              "name": "content"
-            },
-            {
-              "kind": "scalar",
-              "name": "sub_content"
+              "name": "value"
             }
           ]
         }
-      ]
-    },
-    {
-      "module": "WAWebFetchAdEntryPointsConfigurationQuery.graphql",
-      "id": "9656368401073090",
-      "name": "WAWebFetchAdEntryPointsConfigurationQuery",
-      "operationKind": "query",
-      "transports": [
-        "http_relay"
       ],
-      "variables": [],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "ctwa_client_entry_point_entitlement",
-          "type": "TCTWAClientEntryPointEntitlementResponse",
-          "plural": true,
-          "selections": [
-            {
-              "kind": "scalar",
-              "name": "entry_point_or_experience"
-            },
-            {
-              "kind": "scalar",
-              "name": "should_show"
-            }
-          ]
-        }
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -13701,6 +14598,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -13741,121 +14641,20 @@
             }
           ]
         }
-      ]
-    },
-    {
-      "module": "WAWebFetchMetaAISearchNullStateSuggestionsQuery.graphql",
-      "id": "9962874563796224",
-      "name": "WAWebFetchMetaAISearchNullStateSuggestionsQuery",
-      "operationKind": "query",
-      "transports": [
-        "http_relay"
       ],
-      "variables": [
-        {
-          "name": "locale",
-          "defaultValue": null
-        },
-        {
-          "name": "null_state_source",
-          "defaultValue": null
-        },
-        {
-          "name": "exp_config",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xwa_genai_meta_ai_search_null_state",
-          "type": "XWAMetaAISearchNullStateResponse",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "linked",
-              "name": "suggestions",
-              "type": "XWAMetaAINullStateSuggestion",
-              "plural": true,
-              "selections": [
-                {
-                  "kind": "scalar",
-                  "name": "suggestion"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "query"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "session_id"
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "module": "WAWebFetchMetaAISearchTypeAheadSuggestionsQuery.graphql",
-      "id": "10099941310063078",
-      "name": "WAWebFetchMetaAISearchTypeAheadSuggestionsQuery",
-      "operationKind": "query",
-      "transports": [
-        "http_relay"
-      ],
-      "variables": [
-        {
-          "name": "param",
-          "defaultValue": null
-        }
-      ],
-      "response": [
-        {
-          "kind": "linked",
-          "name": "xwa_genai_meta_ai_search_typeahead",
-          "type": "XWAMetaAISearchTypeaheadResponse",
-          "plural": false,
-          "selections": [
-            {
-              "kind": "linked",
-              "name": "suggestions",
-              "type": "XWAMetaAITypeaheadSuggestion",
-              "plural": true,
-              "selections": [
-                {
-                  "kind": "scalar",
-                  "name": "suggestion",
-                  "alias": "query"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "session_id"
-                },
-                {
-                  "kind": "scalar",
-                  "name": "context"
-                }
-              ]
-            }
-          ]
-        }
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
       "module": "WAWebFetchNativeAdsMvpEligibilityQuery.graphql",
-      "id": "34778300218423824",
+      "id": "26673846358955912",
       "name": "WAWebFetchNativeAdsMvpEligibilityQuery",
       "operationKind": "query",
       "transports": [
         "http_relay"
       ],
-      "variables": [
-        {
-          "name": "phone_number",
-          "defaultValue": null
-        }
-      ],
+      "variables": [],
       "response": [
         {
           "kind": "linked",
@@ -13881,6 +14680,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -13937,7 +14739,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebFetchOIDCStateQuery.graphql",
@@ -13953,6 +14756,9 @@
           "kind": "scalar",
           "name": "xfb_wa_biz_get_oidc_state"
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -14638,6 +15444,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -14683,6 +15492,9 @@
           ],
           "alias": "waSubscriptionEntryPoints"
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -14772,6 +15584,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -14869,6 +15684,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -14906,6 +15724,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -14955,6 +15776,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -15025,6 +15849,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -15074,6 +15901,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_www"
       ]
     },
     {
@@ -15103,6 +15933,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -15148,6 +15981,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -15189,6 +16025,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -15226,6 +16065,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -15310,6 +16152,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -15343,7 +16188,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexCachedTokenJobMutation.graphql",
@@ -15396,7 +16242,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexChangeNewsletterOwnerJobMutation.graphql",
@@ -15433,7 +16280,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexCreateInviteCodeJobMutation.graphql",
@@ -15462,7 +16310,70 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
+    },
+    {
+      "module": "WAWebMexCreateLabyrinthBackupJobMutation.graphql",
+      "id": "27207738338837013",
+      "name": "WAWebMexCreateLabyrinthBackupJobMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "stanza_mex"
+      ],
+      "variables": [
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xwa2_labyrinth_create_backup",
+          "type": null,
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "__typename"
+            },
+            {
+              "kind": "inlineFragment",
+              "onType": "XWA2LabyrinthCreateBackupData",
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "backup_id"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "device_id"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "epoch_id"
+                }
+              ]
+            },
+            {
+              "kind": "inlineFragment",
+              "onType": "XWA2LabyrinthError",
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "status"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "message"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexCreateNewsletterAdminInviteJobMutation.graphql",
@@ -15499,7 +16410,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexCreateNewsletterJobMutation.graphql",
@@ -15677,11 +16589,12 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexCreateReportAppealJobMutation.graphql",
-      "id": "27283301737925761",
+      "id": "27103316329328467",
       "name": "WAWebMexCreateReportAppealJobMutation",
       "operationKind": "mutation",
       "transports": [
@@ -15727,6 +16640,22 @@
             {
               "kind": "scalar",
               "name": "channel_jid"
+            },
+            {
+              "kind": "linked",
+              "name": "appeal_reason_options",
+              "type": "XWA2ReportAppealReasonOption",
+              "plural": true,
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "reason"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "label"
+                }
+              ]
             },
             {
               "kind": "linked",
@@ -15826,7 +16755,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexDeleteNewsletterJobMutation.graphql",
@@ -15867,7 +16797,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexDemoteNewsletterAdminJobMutation.graphql",
@@ -15904,7 +16835,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchAboutStatusJobQuery.graphql",
@@ -15951,7 +16883,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchAllNewslettersMetadataJobQuery.graphql",
@@ -16202,7 +17135,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchAllSubgroupsJobQuery.graphql",
@@ -16353,11 +17287,46 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
+    },
+    {
+      "module": "WAWebMexFetchBotCertificateRevocationListQuery.graphql",
+      "id": "35807917542188393",
+      "name": "WAWebMexFetchBotCertificateRevocationListQuery",
+      "operationKind": "query",
+      "transports": [
+        "stanza_mex"
+      ],
+      "variables": [
+        {
+          "name": "crl_name",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xwa2_fetch_feature_pki_crl",
+          "type": "XWA2FeaturePKICRL",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "crl"
+            },
+            {
+              "kind": "scalar",
+              "name": "next_update"
+            }
+          ]
+        }
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchGroupInfoIncludBotsJobQuery.graphql",
-      "id": "26412593755077157",
+      "id": "27795062750123057",
       "name": "WAWebMexFetchGroupInfoIncludBotsJobQuery",
       "operationKind": "query",
       "transports": [
@@ -16668,6 +17637,14 @@
                     {
                       "kind": "scalar",
                       "name": "role"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "join_time"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "group_history_sent"
                     }
                   ]
                 },
@@ -17055,11 +18032,12 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchGroupInfoJobQuery.graphql",
-      "id": "26570027442651356",
+      "id": "27508847222068472",
       "name": "WAWebMexFetchGroupInfoJobQuery",
       "operationKind": "query",
       "transports": [
@@ -17357,6 +18335,14 @@
                     {
                       "kind": "scalar",
                       "name": "role"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "join_time"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "group_history_sent"
                     }
                   ]
                 },
@@ -17744,7 +18730,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchGroupInviteCodeJobQuery.graphql",
@@ -17785,7 +18772,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchGroupIsInternalJobQuery.graphql",
@@ -17890,7 +18878,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchIntegritySignalsQuery.graphql",
@@ -17955,7 +18944,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewChatMessageCappingInfoJobQuery.graphql",
@@ -18012,7 +19002,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterAdminCapabilitiesJobQuery.graphql",
@@ -18045,7 +19036,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterAdminInfoJobQuery.graphql",
@@ -18122,11 +19114,12 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterDehydratedJobQuery.graphql",
-      "id": "30328461880085868",
+      "id": "26944199458535748",
       "name": "WAWebMexFetchNewsletterDehydratedJobQuery",
       "operationKind": "query",
       "transports": [
@@ -18139,6 +19132,10 @@
         },
         {
           "name": "fetch_wamo_sub",
+          "defaultValue": null
+        },
+        {
+          "name": "fetch_pinned_messages",
           "defaultValue": null
         }
       ],
@@ -18205,6 +19202,29 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "kind": "condition",
+                  "variable": "fetch_pinned_messages",
+                  "passingValue": true,
+                  "selections": [
+                    {
+                      "kind": "linked",
+                      "name": "pinned_messages",
+                      "type": "XWA2NewsletterPinnedMessage",
+                      "plural": true,
+                      "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "message_id"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "expiry_ts"
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             },
@@ -18229,7 +19249,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterDirectoryCategoriesPreviewJobQuery.graphql",
@@ -18397,7 +19418,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterDirectoryListJobQuery.graphql",
@@ -18573,7 +19595,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterDirectorySearchResultsJobQuery.graphql",
@@ -18749,11 +19772,12 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterEnforcementsJobQuery.graphql",
-      "id": "26807357005541676",
+      "id": "27835373536068060",
       "name": "WAWebMexFetchNewsletterEnforcementsJobQuery",
       "operationKind": "query",
       "transports": [
@@ -18776,6 +19800,156 @@
           "type": "XWA2ChannelEnforcementsResponse",
           "plural": false,
           "selections": [
+            {
+              "kind": "linked",
+              "name": "admin_profiles",
+              "type": "XWA2BaseEnforcementData",
+              "plural": true,
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "enforcement_creation_time"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "appeal_creation_time"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "appeal_state"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "enforcement_violation_category"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "enforcement_source"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "enforcement_id"
+                },
+                {
+                  "kind": "linked",
+                  "name": "appeal_reason_options",
+                  "type": "XWA2EnforcementAppealReasonOption",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "reason"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "label"
+                    }
+                  ]
+                },
+                {
+                  "kind": "linked",
+                  "name": "enforcement_extra_data",
+                  "type": "XWA2EnforcementExtraData",
+                  "plural": false,
+                  "selections": [
+                    {
+                      "kind": "linked",
+                      "name": "ip_violation_report_data",
+                      "type": "XWA2IPViolationReportData",
+                      "plural": false,
+                      "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "report_fbid"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "appeal_form_url"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "reporter_email"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "reporter_name"
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "linked",
+                      "name": "enforcement_target_data",
+                      "type": null,
+                      "plural": false,
+                      "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "__typename"
+                        },
+                        {
+                          "kind": "inlineFragment",
+                          "onType": "XWA2NewsletterAdminProfile",
+                          "selections": [
+                            {
+                              "kind": "scalar",
+                              "name": "id"
+                            },
+                            {
+                              "kind": "scalar",
+                              "name": "name"
+                            },
+                            {
+                              "kind": "linked",
+                              "name": "picture",
+                              "type": "XWA2Picture",
+                              "plural": false,
+                              "selections": [
+                                {
+                                  "kind": "scalar",
+                                  "name": "id"
+                                },
+                                {
+                                  "kind": "scalar",
+                                  "name": "direct_path"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "kind": "linked",
+                  "name": "enforcement_policy_information",
+                  "type": "XWA2EnforcementPolicyInformation",
+                  "plural": false,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "overview"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "headline"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "subtitle"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "explanation"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "admin_disclaimer"
+                    }
+                  ]
+                }
+              ]
+            },
             {
               "kind": "linked",
               "name": "profile_picture_deletions",
@@ -18805,6 +19979,22 @@
                 {
                   "kind": "scalar",
                   "name": "enforcement_id"
+                },
+                {
+                  "kind": "linked",
+                  "name": "appeal_reason_options",
+                  "type": "XWA2EnforcementAppealReasonOption",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "reason"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "label"
+                    }
+                  ]
                 },
                 {
                   "kind": "linked",
@@ -18897,6 +20087,22 @@
                 {
                   "kind": "scalar",
                   "name": "enforcement_source"
+                },
+                {
+                  "kind": "linked",
+                  "name": "appeal_reason_options",
+                  "type": "XWA2EnforcementAppealReasonOption",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "reason"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "label"
+                    }
+                  ]
                 },
                 {
                   "kind": "linked",
@@ -19052,6 +20258,22 @@
                     },
                     {
                       "kind": "linked",
+                      "name": "appeal_reason_options",
+                      "type": "XWA2EnforcementAppealReasonOption",
+                      "plural": true,
+                      "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "reason"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "label"
+                        }
+                      ]
+                    },
+                    {
+                      "kind": "linked",
                       "name": "enforcement_extra_data",
                       "type": "XWA2EnforcementExtraData",
                       "plural": false,
@@ -19181,6 +20403,22 @@
                     {
                       "kind": "scalar",
                       "name": "enforcement_source"
+                    },
+                    {
+                      "kind": "linked",
+                      "name": "appeal_reason_options",
+                      "type": "XWA2EnforcementAppealReasonOption",
+                      "plural": true,
+                      "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "reason"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "label"
+                        }
+                      ]
                     },
                     {
                       "kind": "linked",
@@ -19326,7 +20564,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterFollowersJobQuery.graphql",
@@ -19449,7 +20688,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterInsightsJobQuery.graphql",
@@ -19534,7 +20774,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterIsDomainPreviewableJobQuery.graphql",
@@ -19575,11 +20816,12 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterJobQuery.graphql",
-      "id": "35452404184358876",
+      "id": "27456920720571478",
       "name": "WAWebMexFetchNewsletterJobQuery",
       "operationKind": "query",
       "transports": [
@@ -19608,6 +20850,10 @@
         },
         {
           "name": "fetch_status_metadata",
+          "defaultValue": null
+        },
+        {
+          "name": "fetch_pinned_messages",
           "defaultValue": null
         }
       ],
@@ -19793,6 +21039,29 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "kind": "condition",
+                  "variable": "fetch_pinned_messages",
+                  "passingValue": true,
+                  "selections": [
+                    {
+                      "kind": "linked",
+                      "name": "pinned_messages",
+                      "type": "XWA2NewsletterPinnedMessage",
+                      "plural": true,
+                      "selections": [
+                        {
+                          "kind": "scalar",
+                          "name": "message_id"
+                        },
+                        {
+                          "kind": "scalar",
+                          "name": "expiry_ts"
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             },
@@ -19867,7 +21136,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterMessageReactionSenderListJobQuery.graphql",
@@ -19936,7 +21206,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterPendingInvitesJobQuery.graphql",
@@ -19989,7 +21260,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterPollVotersJobQuery.graphql",
@@ -20059,17 +21331,23 @@
           ],
           "alias": "voter_list"
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchNewsletterReportsJobQuery.graphql",
-      "id": "24241374008893508",
+      "id": "35936238352686172",
       "name": "WAWebMexFetchNewsletterReportsJobQuery",
       "operationKind": "query",
       "transports": [
         "stanza_mex"
       ],
-      "variables": [],
+      "variables": [
+        {
+          "name": "locale",
+          "defaultValue": null
+        }
+      ],
       "response": [
         {
           "kind": "linked",
@@ -20106,6 +21384,22 @@
                 {
                   "kind": "scalar",
                   "name": "channel_jid"
+                },
+                {
+                  "kind": "linked",
+                  "name": "appeal_reason_options",
+                  "type": "XWA2ReportAppealReasonOption",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "reason"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "label"
+                    }
+                  ]
                 },
                 {
                   "kind": "linked",
@@ -20207,7 +21501,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchPlaintextLinkPreviewJobQuery.graphql",
@@ -20264,7 +21559,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchReachoutTimelockJobQuery.graphql",
@@ -20296,7 +21592,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchRecommendedNewslettersJobQuery.graphql",
@@ -20485,7 +21782,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchSimilarNewslettersJobQuery.graphql",
@@ -20609,7 +21907,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchSubgroupSuggestionsJobQuery.graphql",
@@ -20740,7 +22039,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexFetchTextStatusListJobQuery.graphql",
@@ -20793,7 +22093,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexGetDsbInfoJobMutation.graphql",
@@ -20822,7 +22123,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexGetPrivacyListsQuery.graphql",
@@ -20911,7 +22213,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexGetPrivacySettingsQuery.graphql",
@@ -20974,7 +22277,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexGetUsernameJobQuery.graphql",
@@ -21014,7 +22318,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexGroupStoreInviteSmsJobMutation.graphql",
@@ -21055,7 +22360,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexIntegrityChallengeResponseMutation.graphql",
@@ -21088,7 +22394,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexJoinNewsletterJobMutation.graphql",
@@ -21129,7 +22436,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexLeaveNewsletterJobMutation.graphql",
@@ -21170,7 +22478,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexLidChangeNotificationQuery.graphql",
@@ -21198,7 +22507,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexLogNewsletterExposuresJobMutation.graphql",
@@ -21227,7 +22537,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexNewsletterAddPaidPartnershipLabelJobMutation.graphql",
@@ -21264,7 +22575,166 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
+    },
+    {
+      "module": "WAWebMexNewsletterPinMessagesJobMutation.graphql",
+      "id": "27165709459706559",
+      "name": "WAWebMexNewsletterPinMessagesJobMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "stanza_mex"
+      ],
+      "variables": [
+        {
+          "name": "newsletter_id",
+          "defaultValue": null
+        },
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xwa2_newsletter_pin_messages",
+          "type": "XWA2Newsletter",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "id"
+            },
+            {
+              "kind": "linked",
+              "name": "thread_metadata",
+              "type": "XWA2NewsletterThreadMetadata",
+              "plural": false,
+              "selections": [
+                {
+                  "kind": "linked",
+                  "name": "pinned_messages",
+                  "type": "XWA2NewsletterPinnedMessage",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "message_id"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "expiry_ts"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": []
+    },
+    {
+      "module": "WAWebMexNewsletterQuestionResponseStateUpdateJobMutation.graphql",
+      "id": "24636260219323456",
+      "name": "WAWebMexNewsletterQuestionResponseStateUpdateJobMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "stanza_mex"
+      ],
+      "variables": [
+        {
+          "name": "newsletter_id",
+          "defaultValue": null
+        },
+        {
+          "name": "server_id",
+          "defaultValue": null
+        },
+        {
+          "name": "response_server_id",
+          "defaultValue": null
+        },
+        {
+          "name": "state",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xwa2_newsletter_question_response_state_update",
+          "type": "XWA2NewsletterMutationResponse",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "id"
+            }
+          ]
+        }
+      ],
+      "environments": []
+    },
+    {
+      "module": "WAWebMexNewsletterUnpinMessagesJobMutation.graphql",
+      "id": "28007176042216937",
+      "name": "WAWebMexNewsletterUnpinMessagesJobMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "stanza_mex"
+      ],
+      "variables": [
+        {
+          "name": "newsletter_id",
+          "defaultValue": null
+        },
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xwa2_newsletter_unpin_messages",
+          "type": "XWA2Newsletter",
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "id"
+            },
+            {
+              "kind": "linked",
+              "name": "thread_metadata",
+              "type": "XWA2NewsletterThreadMetadata",
+              "plural": false,
+              "selections": [
+                {
+                  "kind": "linked",
+                  "name": "pinned_messages",
+                  "type": "XWA2NewsletterPinnedMessage",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "message_id"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "expiry_ts"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexQuerySubgroupParticipantCountJobQuery.graphql",
@@ -21335,7 +22805,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexRequestClientLogsForBugJobMutation.graphql",
@@ -21356,7 +22827,8 @@
           "kind": "scalar",
           "name": "xwa2_request_client_logs_for_bug"
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexRevokeNewsletterAdminInviteJobMutation.graphql",
@@ -21393,7 +22865,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexSetUsernameJobMutation.graphql",
@@ -21434,7 +22907,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexSetUsernameKeyJobMutation.graphql",
@@ -21463,7 +22937,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexTransferCommunityOwnershipJobMutation.graphql",
@@ -21504,7 +22979,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexUpdateGroupPropertyJobMutation.graphql",
@@ -21541,7 +23017,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexUpdateNewsletterJobMutation.graphql",
@@ -21711,7 +23188,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexUpdateNewsletterUserSettingJobMutation.graphql",
@@ -21752,7 +23230,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexUpdateTextStatusJobMutation.graphql",
@@ -21781,7 +23260,78 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
+    },
+    {
+      "module": "WAWebMexUploadLabyrinthMessagesJobMutation.graphql",
+      "id": "27746955431579348",
+      "name": "WAWebMexUploadLabyrinthMessagesJobMutation",
+      "operationKind": "mutation",
+      "transports": [
+        "stanza_mex"
+      ],
+      "variables": [
+        {
+          "name": "input",
+          "defaultValue": null
+        }
+      ],
+      "response": [
+        {
+          "kind": "linked",
+          "name": "xwa2_labyrinth_upload_messages",
+          "type": null,
+          "plural": false,
+          "selections": [
+            {
+              "kind": "scalar",
+              "name": "__typename"
+            },
+            {
+              "kind": "inlineFragment",
+              "onType": "XWA2LabyrinthUploadMessagesData",
+              "selections": [
+                {
+                  "kind": "linked",
+                  "name": "results",
+                  "type": "XWA2LabyrinthMessageUploadResult",
+                  "plural": true,
+                  "selections": [
+                    {
+                      "kind": "scalar",
+                      "name": "offline_threading_id"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "success"
+                    },
+                    {
+                      "kind": "scalar",
+                      "name": "error"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "kind": "inlineFragment",
+              "onType": "XWA2LabyrinthError",
+              "selections": [
+                {
+                  "kind": "scalar",
+                  "name": "status"
+                },
+                {
+                  "kind": "scalar",
+                  "name": "message"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexUsernameAvailabilityQuery.graphql",
@@ -21822,7 +23372,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebMexUsyncQuery.graphql",
@@ -21982,7 +23533,8 @@
             }
           ]
         }
-      ]
+      ],
+      "environments": []
     },
     {
       "module": "WAWebNativeMLModelQuery.graphql",
@@ -22115,6 +23667,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_www"
       ]
     },
     {
@@ -22152,6 +23707,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -22525,6 +24083,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -22918,6 +24479,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -23339,6 +24903,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -23716,6 +25283,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -24133,6 +25703,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -24162,11 +25735,14 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
       "module": "WAWebReportProductJobMutation.graphql",
-      "id": "WAWebReportProductJobMutation",
+      "id": "27419506181072609",
       "name": "WAWebReportProductJobMutation",
       "operationKind": "mutation",
       "transports": [
@@ -24195,6 +25771,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -24211,6 +25790,9 @@
           "kind": "scalar",
           "name": "xfb_wa_biz_clear_oidc_preference"
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -24244,6 +25826,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -24285,6 +25870,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_www"
       ]
     },
     {
@@ -24330,6 +25918,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -24375,6 +25966,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -24412,6 +26006,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_web"
       ]
     },
     {
@@ -24445,6 +26042,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "facebook"
       ]
     },
     {
@@ -24549,6 +26149,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -24565,6 +26168,9 @@
           "kind": "scalar",
           "name": "xfb_waffle_fx_wamo_update_uoom"
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     },
     {
@@ -24682,6 +26288,9 @@
             }
           ]
         }
+      ],
+      "environments": [
+        "whatsapp_catalog"
       ]
     }
   ]

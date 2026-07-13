@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudUnsupportedVersionException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudApiException;
 import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
 import com.github.auties00.cobalt.model.cloud.template.CloudMessageTemplate;
 import com.github.auties00.cobalt.model.cloud.template.CloudOtpType;
@@ -125,7 +127,7 @@ class CloudTemplateManagementTest {
         @DisplayName("queryAllMessageTemplates rethrows a non-100 CloudApiException")
         void rethrowsAuthError() throws Exception {
             var http = new PagingHttpClient("__ERROR_131009__");
-            assertThrows(WhatsAppCloudException.CloudApiException.class,
+            assertThrows(WhatsAppCloudApiException.class,
                     () -> clientFor(http).queryAllMessageTemplates());
         }
 
@@ -172,7 +174,7 @@ class CloudTemplateManagementTest {
         void batchDeleteGuard() throws Exception {
             var http = http();
             var client = client(http, CloudApiVersion.V24_0);
-            var exception = assertThrows(WhatsAppCloudException.CloudUnsupportedVersionException.class,
+            var exception = assertThrows(WhatsAppCloudUnsupportedVersionException.class,
                     () -> client.deleteMessageTemplates(List.of("111")));
             assertEquals("deleteMessageTemplates", exception.operation());
             assertEquals(CloudApiVersion.V25_0, exception.requiredVersion());

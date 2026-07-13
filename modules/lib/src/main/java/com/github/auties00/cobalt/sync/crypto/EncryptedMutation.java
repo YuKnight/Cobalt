@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.crypto;
 
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.action.SyncActionData;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 
@@ -39,6 +41,11 @@ public record EncryptedMutation(
         byte[] keyId,
         SyncdOperation operation
 ) {
+    /**
+     * The logger for {@link EncryptedMutation}.
+     */
+    private static final System.Logger LOGGER = Log.get(EncryptedMutation.class);
+
     /**
      * Encrypts a pending mutation into its wire form.
      *
@@ -102,6 +109,7 @@ public record EncryptedMutation(
         try {
             plaintext = SyncActionDataSpec.encode(actionData);
         } catch (Exception exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "action data protobuf serialization failed", exception);
             throw new WhatsAppWebAppStateSyncException.UnexpectedError(
                     "action data protobuf serialization failed", exception
             );
@@ -118,6 +126,8 @@ public record EncryptedMutation(
         System.arraycopy(valueMac, 0, encryptedValue, ivAndCipherText.length, valueMac.length);
 
         var indexMacResult = keys.generateIndexMac(indexBytes);
+
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "encrypted mutation built: operation={0}, keyId={1}, valueLen={2}", mutation.operation(), keyId, encryptedValue.length);
 
         return new EncryptedMutation(indexMacResult, encryptedValue, keyId, mutation.operation());
     }

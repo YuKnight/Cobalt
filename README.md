@@ -115,9 +115,9 @@ Cobalt also ships a `/validate` command for agentic coding tools ([.claude/comma
 - **Source parity**: each Cobalt module is checked against the behaviour of its WhatsApp counterpart.
 - **Observable parity**: the stanzas, events and requests Cobalt produces for a given input are diffed against what the real WhatsApp runtime produces for the same input, captured live through the MCP.
 
-To be transparent, I'm not that much into agentic coding: this is highly experimental, something I built because I like trying things out and wanted to see whether it could help us maintain a repository of this size long term. 
-Treat it as an experiment, not as a required part of the workflow.
-If you want to architect something better, feel free to try to do so.
+To be transparent, this is highly experimental, something I built because I like trying things out and wanted to see whether it could help us maintain a repository of this size long term. 
+Treat it as an experiment, not as a required part of the workflow, and consider it has never been run end to end (it's incredibly expensive).
+If you want to design something better, feel free to try to do so.
 
 ---
 
@@ -151,16 +151,13 @@ Snapshots and per-commit builds are available through [JitPack][jitpack].
 
 ### Native libraries
 
-Calls and media use native components (Opus, VP8, H.264, SCTP, the embedded MDBX database). By default nothing ships in the jar: the right binary for the host is downloaded on first use, SHA-256 verified, and cached under `~/.cobalt/natives/`. That is all a normal setup needs.
+Calls and media use native components. 
+By default, nothing ships in the jar: the right binary for the host is downloaded on first use, SHA-256 verified, and cached under `~/.cobalt/natives/`. That is all a normal setup needs.
 
-If you want to have the native libraries bundled in the JAR, add the vendored bundle for each platform you target. The bundles are classified artifacts of `cobalt-lib`, one per target:
+If you want to have the native libraries bundled in the JAR, add the vendored bundle for each platform you target. The bundles are classified artifacts of `cobalt-lib`, one per target. Expand the block for your platform to get the Maven and Gradle snippets:
 
-- `natives-windows-x86_64` for Windows x86-64
-- `natives-windows-aarch64` for Windows ARM64
-- `natives-linux-x86_64` for Linux x86-64
-- `natives-linux-aarch64` for Linux ARM64
-- `natives-darwin-x86_64` for macOS Intel
-- `natives-darwin-aarch64` for macOS Apple Silicon
+<details>
+<summary><b>Windows x86-64</b> &mdash; <code>natives-windows-x86_64</code></summary>
 
 **Maven**
 
@@ -185,6 +182,153 @@ runtimeOnly("com.github.auties00:cobalt-lib:0.1.0:natives-windows-x86_64")
 ```groovy
 runtimeOnly 'com.github.auties00:cobalt-lib:0.1.0:natives-windows-x86_64'
 ```
+
+</details>
+
+<details>
+<summary><b>Windows ARM64</b> &mdash; <code>natives-windows-aarch64</code></summary>
+
+**Maven**
+
+```xml
+<dependency>
+    <groupId>com.github.auties00</groupId>
+    <artifactId>cobalt-lib</artifactId>
+    <version>0.1.0</version>
+    <classifier>natives-windows-aarch64</classifier>
+    <scope>runtime</scope>
+</dependency>
+```
+
+**Gradle (Kotlin DSL)**
+
+```kotlin
+runtimeOnly("com.github.auties00:cobalt-lib:0.1.0:natives-windows-aarch64")
+```
+
+**Gradle (Groovy DSL)**
+
+```groovy
+runtimeOnly 'com.github.auties00:cobalt-lib:0.1.0:natives-windows-aarch64'
+```
+
+</details>
+
+<details>
+<summary><b>Linux x86-64</b> &mdash; <code>natives-linux-x86_64</code></summary>
+
+**Maven**
+
+```xml
+<dependency>
+    <groupId>com.github.auties00</groupId>
+    <artifactId>cobalt-lib</artifactId>
+    <version>0.1.0</version>
+    <classifier>natives-linux-x86_64</classifier>
+    <scope>runtime</scope>
+</dependency>
+```
+
+**Gradle (Kotlin DSL)**
+
+```kotlin
+runtimeOnly("com.github.auties00:cobalt-lib:0.1.0:natives-linux-x86_64")
+```
+
+**Gradle (Groovy DSL)**
+
+```groovy
+runtimeOnly 'com.github.auties00:cobalt-lib:0.1.0:natives-linux-x86_64'
+```
+
+</details>
+
+<details>
+<summary><b>Linux ARM64</b> &mdash; <code>natives-linux-aarch64</code></summary>
+
+**Maven**
+
+```xml
+<dependency>
+    <groupId>com.github.auties00</groupId>
+    <artifactId>cobalt-lib</artifactId>
+    <version>0.1.0</version>
+    <classifier>natives-linux-aarch64</classifier>
+    <scope>runtime</scope>
+</dependency>
+```
+
+**Gradle (Kotlin DSL)**
+
+```kotlin
+runtimeOnly("com.github.auties00:cobalt-lib:0.1.0:natives-linux-aarch64")
+```
+
+**Gradle (Groovy DSL)**
+
+```groovy
+runtimeOnly 'com.github.auties00:cobalt-lib:0.1.0:natives-linux-aarch64'
+```
+
+</details>
+
+<details>
+<summary><b>macOS Intel</b> &mdash; <code>natives-darwin-x86_64</code></summary>
+
+**Maven**
+
+```xml
+<dependency>
+    <groupId>com.github.auties00</groupId>
+    <artifactId>cobalt-lib</artifactId>
+    <version>0.1.0</version>
+    <classifier>natives-darwin-x86_64</classifier>
+    <scope>runtime</scope>
+</dependency>
+```
+
+**Gradle (Kotlin DSL)**
+
+```kotlin
+runtimeOnly("com.github.auties00:cobalt-lib:0.1.0:natives-darwin-x86_64")
+```
+
+**Gradle (Groovy DSL)**
+
+```groovy
+runtimeOnly 'com.github.auties00:cobalt-lib:0.1.0:natives-darwin-x86_64'
+```
+
+</details>
+
+<details>
+<summary><b>macOS Apple Silicon</b> &mdash; <code>natives-darwin-aarch64</code></summary>
+
+**Maven**
+
+```xml
+<dependency>
+    <groupId>com.github.auties00</groupId>
+    <artifactId>cobalt-lib</artifactId>
+    <version>0.1.0</version>
+    <classifier>natives-darwin-aarch64</classifier>
+    <scope>runtime</scope>
+</dependency>
+```
+
+**Gradle (Kotlin DSL)**
+
+```kotlin
+runtimeOnly("com.github.auties00:cobalt-lib:0.1.0:natives-darwin-aarch64")
+```
+
+**Gradle (Groovy DSL)**
+
+```groovy
+runtimeOnly 'com.github.auties00:cobalt-lib:0.1.0:natives-darwin-aarch64'
+```
+
+</details>
 
 ---
 
@@ -369,3 +513,10 @@ The Cloud quickstart follows the same shape with a different first stage. There 
 - `build()` produces the `CloudWhatsAppClient`.
 
 Listeners register exactly as on the Linked client, and `sendMessage` takes the same `MessageContainer`, so everything from the message model onward carries over unchanged.
+
+---
+
+## Documentation
+
+Every member of the library, public and internal alike, carries extensive Javadocs, so this README only covers the essentials. For anything not spelled out here, or any doubt about how a type or method behaves, refer to the [Javadoc][javadoc].
+The goal of this library to allow you to do anything you can do in WhatsApp, on any client, so if your use case is not covered, feel free to open an issue about it.

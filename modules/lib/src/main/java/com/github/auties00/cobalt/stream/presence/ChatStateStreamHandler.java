@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.stanza.smax.chatstate.SmaxServerNotificationSt
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedContactPresenceListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,8 @@ import com.github.auties00.cobalt.model.contact.Contact;
 import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stream.NodeStreamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Updates the {@link Contact#lastKnownPresence()} of the contact identified by a {@code <chatstate>} stanza.
@@ -39,9 +42,9 @@ import com.github.auties00.cobalt.stream.NodeStreamService;
 @WhatsAppWebModule(moduleName = "WAWebChangePresenceHandlerAction")
 public final class ChatStateStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * Reports {@code <chatstate>} stanzas with missing or unsupported children at debug level.
+     * The logger for {@link ChatStateStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(ChatStateStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(ChatStateStreamHandler.class);
 
     /**
      * Owns the store this handler mutates and the listeners that receive the resulting presence notifications.
@@ -81,7 +84,7 @@ public final class ChatStateStreamHandler extends SocketStreamHandler.Concurrent
     public void handle(Stanza stanza) {
         var from = stanza.getAttributeAsJid("from", null);
         if (from == null) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring chatstate stanza without from: {0}", stanza);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring chatstate stanza without from: {0}", stanza);
             return;
         }
 
@@ -93,8 +96,10 @@ public final class ChatStateStreamHandler extends SocketStreamHandler.Concurrent
         }
 
         if (participant != null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "group chatstate {0} from {1} in {2}", state, participant, from);
             handleGroupChatState(from, participant, state);
         } else {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "individual chatstate {0} from {1}", state, from);
             handleIndividualChatState(from, state);
         }
     }
@@ -195,8 +200,10 @@ public final class ChatStateStreamHandler extends SocketStreamHandler.Concurrent
     private ContactStatus resolveState(Stanza stanza) {
         var stateType = SmaxServerNotificationStateType.of(stanza).orElse(null);
         if (stateType == null) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring chatstate stanza with a missing or unsupported state: {0}", stanza);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "ignoring chatstate stanza with a missing or unsupported state: {0}", stanza);
+            }
             return null;
         }
 

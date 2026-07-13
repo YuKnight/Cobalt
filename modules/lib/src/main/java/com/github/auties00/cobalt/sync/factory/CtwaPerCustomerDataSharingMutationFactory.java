@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -24,6 +26,11 @@ import java.util.List;
  * {@link com.github.auties00.cobalt.sync.handler.CtwaPerCustomerDataSharingHandler}.
  */
 public final class CtwaPerCustomerDataSharingMutationFactory {
+    /**
+     * The logger for {@link CtwaPerCustomerDataSharingMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(CtwaPerCustomerDataSharingMutationFactory.class);
+
     /**
      * Creates a stateless factory with no collaborators.
      *
@@ -53,6 +60,7 @@ public final class CtwaPerCustomerDataSharingMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebCtwaPerCustomerDataSharingSync", exports = "getCtwaPerCustomerDataSharingMutation", adaptation = WhatsAppAdaptation.DIRECT)
     public SyncPendingMutation getCtwaPerCustomerDataSharingMutation(Jid accountLid, boolean isEnabled) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building ctwa per-customer data sharing mutation account={0} enabled={1}", accountLid, isEnabled);
         var timestamp = Instant.now();
         var action = new CtwaPerCustomerDataSharingActionBuilder()
                 .isCtwaPerCustomerDataSharingEnabled(isEnabled)

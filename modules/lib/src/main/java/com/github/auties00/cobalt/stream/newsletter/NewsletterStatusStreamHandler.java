@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.newsletter;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.NewMessageListener;
@@ -15,6 +16,7 @@ import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfoBuilder;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 
 /**
@@ -43,7 +45,7 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
      * {@link MessageContainerSpec#decode(byte[])} failures. Downstream code never relies on these
      * messages.
      */
-    private static final System.Logger LOGGER = System.getLogger(NewsletterStatusStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NewsletterStatusStreamHandler.class);
 
     /**
      * Holds the owning {@link LinkedWhatsAppClient} used to access the store and broadcast new-message
@@ -101,8 +103,8 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
             // TODO: project admin revoke (edit="8") into a synthetic protocol
             //       message the way WAWebNewsletterStatusUtils.mapStatusRevokeToMsgData
             //       does, rather than dropping it here.
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Skipping newsletter status revoke for {0} from {1}", id, from);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "skipping newsletter status revoke {0} from {1}", id, from);
             return;
         }
 
@@ -110,8 +112,8 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
                 .flatMap(Stanza::toContentBytes)
                 .orElse(null);
         if (plaintext == null || plaintext.length == 0) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring newsletter status with no plaintext content for {0}", id);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "ignoring newsletter status {0} with no plaintext content", id);
             return;
         }
 
@@ -119,6 +121,8 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
         if (message == null) {
             return;
         }
+
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "storing newsletter message {0} from {1}", id, from);
 
         var serverId = stanza.getAttributeAsInt("server_id", 0);
         var timestamp = resolveTimestamp(stanza);
@@ -161,8 +165,8 @@ public final class NewsletterStatusStreamHandler extends SocketStreamHandler.Con
         try {
             return MessageContainerSpec.decode(plaintext);
         } catch (Exception exception) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Failed to decode newsletter status {0}: {1}", id, exception.getMessage());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "failed to decode newsletter status " + id, exception);
             return null;
         }
     }

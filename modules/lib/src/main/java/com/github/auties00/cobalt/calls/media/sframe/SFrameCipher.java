@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.calls.media.sframe;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.Arrays;
@@ -35,6 +37,11 @@ import java.util.Objects;
  * are reused fields rather than per frame {@code getInstance} calls.
  */
 public final class SFrameCipher {
+    /**
+     * The logger for {@link SFrameCipher}.
+     */
+    private static final System.Logger LOGGER = Log.get(SFrameCipher.class);
+
     /**
      * Holds the JCA transformation name for AES in counter mode without padding.
      */
@@ -160,6 +167,7 @@ public final class SFrameCipher {
             this.blockCipher = Cipher.getInstance("AES/ECB/NoPadding");
             this.hmac = Mac.getInstance(HMAC_ALGORITHM);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sframe cipher init failed suite=" + suite, e);
             throw new WhatsAppCallException.Srtp("SFrame cipher initialization failed", e);
         }
     }
@@ -211,6 +219,7 @@ public final class SFrameCipher {
             this.blockCipher = Cipher.getInstance("AES/ECB/NoPadding");
             this.hmac = Mac.getInstance(HMAC_ALGORITHM);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sframe cipher init failed suite=" + suite, e);
             throw new WhatsAppCallException.Srtp("SFrame cipher initialization failed", e);
         }
     }
@@ -266,9 +275,12 @@ public final class SFrameCipher {
      * @return a new {@value SFrameCipherSuite#IV_LENGTH} byte all zero array
      */
     public static byte[] zeroCounterMask() {
-        // TODO: the 12 byte per key id salt that feeds the real counter mask is not yet recovered, so
-        //  the key provider installs this all zero mask instead; encrypt and decrypt stay mutually
-        //  consistent but are not byte compatible with WhatsApp's native counter mask
+        // TODO: install the real 12 byte counter mask salt once the native ratchet is recovered. RE
+        //  (re/calls) established the salt is the 12 bytes contiguous after the 16 byte AES key in the native
+        //  WASframeAESCipher's 28 byte cipher key, so it is a derived value, not zero; see
+        //  SFrameKeyProvider.deriveCipher for the recovered layout and the remaining unknown (the
+        //  facebook::sframe ratchet HKDF). Until that lands the provider installs this all zero mask, which
+        //  keeps encrypt and decrypt mutually consistent but is not byte compatible with native WhatsApp.
         return new byte[SFrameCipherSuite.IV_LENGTH];
     }
 
@@ -354,6 +366,7 @@ public final class SFrameCipher {
         Objects.requireNonNull(trailer, "trailer cannot be null");
         Objects.requireNonNull(plaintext, "plaintext cannot be null");
         Objects.requireNonNull(out, "out cannot be null");
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "sframe seal counter={0} ptLen={1} tagLen={2}", counter, plaintext.length, suite.tagLength());
         var counterBlock = counterBlock(counter);
         aesCtrInto(plaintext, counterBlock, out, outOffset);
         var tagLength = suite.tagLength();
@@ -384,6 +397,7 @@ public final class SFrameCipher {
         Objects.requireNonNull(body, "body cannot be null");
         var tagLength = suite.tagLength();
         if (body.length < tagLength) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe open: body shorter than tag, counter={0} bodyLen={1} tagLen={2}", counter, body.length, tagLength);
             return null;
         }
         var ciphertextLength = body.length - tagLength;
@@ -391,6 +405,7 @@ public final class SFrameCipher {
             var receivedTag = Arrays.copyOfRange(body, ciphertextLength, body.length);
             var expectedTag = authTag(trailer, 0, trailer.length, body, 0, ciphertextLength);
             if (!MessageDigest.isEqual(expectedTag, receivedTag)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe open: authentication failed, dropping frame, counter={0}", counter);
                 return null;
             }
         }
@@ -418,6 +433,7 @@ public final class SFrameCipher {
     byte[] openFrame(byte[] frame, int trailerStart, long counter) {
         var tagLength = suite.tagLength();
         if (trailerStart < tagLength) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe openFrame: body shorter than tag, counter={0} trailerStart={1} tagLen={2}", counter, trailerStart, tagLength);
             return null;
         }
         var ciphertextLength = trailerStart - tagLength;
@@ -426,6 +442,7 @@ public final class SFrameCipher {
             var expectedTag =
                     authTag(frame, trailerStart, frame.length - trailerStart, frame, 0, ciphertextLength);
             if (!MessageDigest.isEqual(expectedTag, receivedTag)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe openFrame: authentication failed, dropping frame, counter={0}", counter);
                 return null;
             }
         }
@@ -478,6 +495,7 @@ public final class SFrameCipher {
             ctrCipher.init(Cipher.ENCRYPT_MODE, aesKeySpec, new IvParameterSpec(initalBlock));
             return ctrCipher.doFinal(data, offset, length);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sframe aes-ctr failed", e);
             throw new WhatsAppCallException.Srtp("SFrame AES-CTR failed", e);
         }
     }
@@ -499,6 +517,7 @@ public final class SFrameCipher {
             ctrCipher.init(Cipher.ENCRYPT_MODE, aesKeySpec, new IvParameterSpec(initalBlock));
             ctrCipher.doFinal(data, 0, data.length, out, outOffset);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sframe aes-ctr (into) failed", e);
             throw new WhatsAppCallException.Srtp("SFrame AES-CTR failed", e);
         }
     }
@@ -516,6 +535,7 @@ public final class SFrameCipher {
             blockCipher.init(Cipher.ENCRYPT_MODE, aesKeySpec);
             return blockCipher.doFinal(block);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sframe aes block encryption failed", e);
             throw new WhatsAppCallException.Srtp("SFrame AES block encryption failed", e);
         }
     }
@@ -548,6 +568,7 @@ public final class SFrameCipher {
             var full = hmac.doFinal();
             return Arrays.copyOf(full, suite.tagLength());
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sframe hmac failed", e);
             throw new WhatsAppCallException.Srtp("SFrame HMAC failed", e);
         }
     }

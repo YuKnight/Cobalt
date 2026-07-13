@@ -13,16 +13,10 @@ import java.io.UncheckedIOException;
 /**
  * Builds the comet mutation that deletes a click-to-WhatsApp (CTWA) ad draft.
  *
- * <p>The mutation takes a single {@code input} GraphQL object identifying the draft to delete. The
- * relay returns the deletion outcome under the scalar {@code delete_ads_ctwa_draft}; the reply is
- * consumed through {@link BizAdDeleteDraftFacebookGraphQlResponse}.
- *
- * @implNote This implementation accepts the {@code input} object as a caller-supplied, already
- * JSON-encoded object literal because the {@code useWAWebBizAdDeleteDraftMutation} hook module and
- * its input type are not present in the static bundle of snapshot {@code 1040120866}; it is one of
- * the Comet ad-creation documents loaded on demand. The value is emitted verbatim as the
- * {@code input} variable. Once a caller that builds the object surfaces, replace this with typed
- * scalar fields mirroring that construction.
+ * <p>The mutation takes a single {@code input} GraphQL object identifying the draft to delete by its
+ * {@code draft_id}. The relay returns the deletion outcome under the scalar
+ * {@code delete_ads_ctwa_draft}; the reply is consumed through
+ * {@link BizAdDeleteDraftFacebookGraphQlResponse}.
  *
  * @see BizAdDeleteDraftFacebookGraphQlResponse
  */
@@ -48,23 +42,21 @@ public final class BizAdDeleteDraftFacebookGraphQlRequest implements FacebookGra
     public static final String OPERATION_NAME = "useWAWebBizAdDeleteDraftMutation";
 
     /**
-     * The pre-encoded JSON of the {@code input} GraphQL object identifying the draft to delete, or
+     * The {@code draft_id} field of the {@code input} object identifying the draft to delete, or
      * {@code null} to omit it.
      */
-    private final String inputJson;
+    private final String draftId;
 
     /**
      * Constructs a delete-CTWA-ad-draft mutation request.
      *
-     * <p>The {@code inputJson} is the already-JSON-encoded {@code input} object identifying the draft;
-     * its field names are defined by the server-side input type and are not modelled here (see the
-     * class {@code @implNote}). A {@code null} value omits the variable from the serialized object.
+     * <p>The {@code draftId} identifies the draft to delete. A {@code null} value omits the field from
+     * the serialized {@code input} object.
      *
-     * @param inputJson the already-JSON-encoded {@code input} object, or {@code null} to omit the
-     *                  variable
+     * @param draftId the ad-draft identifier, or {@code null} to omit the field
      */
-    public BizAdDeleteDraftFacebookGraphQlRequest(String inputJson) {
-        this.inputJson = inputJson;
+    public BizAdDeleteDraftFacebookGraphQlRequest(String draftId) {
+        this.draftId = draftId;
     }
 
     /**
@@ -86,20 +78,23 @@ public final class BizAdDeleteDraftFacebookGraphQlRequest implements FacebookGra
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"input": <inputJson>}}, writing the variable only
-     * when its value is non-null and emitting {@code "{}"} when it is {@code null}. The {@code input}
-     * value is spliced in as a raw JSON value via {@link JSONWriter#writeRaw(String)} because it is
-     * supplied already encoded.
+     * @implNote This implementation emits {@code {"input": {"draft_id": <draftId>}}}, writing
+     * {@code draft_id} only when {@code draftId} is non-null and emitting {@code {"input": {}}}
+     * otherwise.
      */
     @Override
     public String variables() {
         try (var writer = JSONWriter.ofUTF8()) {
             writer.startObject();
-            if (inputJson != null) {
-                writer.writeName("input");
+            writer.writeName("input");
+            writer.writeColon();
+            writer.startObject();
+            if (draftId != null) {
+                writer.writeName("draft_id");
                 writer.writeColon();
-                writer.writeRaw(inputJson);
+                writer.writeString(draftId);
             }
+            writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {
                 writer.flushTo(output);

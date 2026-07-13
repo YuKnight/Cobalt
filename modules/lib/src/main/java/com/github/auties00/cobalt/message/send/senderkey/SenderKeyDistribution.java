@@ -2,7 +2,8 @@ package com.github.auties00.cobalt.message.send.senderkey;
 
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.message.send.icdc.IcdcEnricher;
@@ -18,6 +19,7 @@ import com.github.auties00.cobalt.model.message.group.SenderKeyDistributionMessa
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.util.*;
 
 /**
@@ -33,9 +35,9 @@ import java.util.*;
 @WhatsAppWebModule(moduleName = "WAWebGetGroupKeyDistributionMsg")
 public final class SenderKeyDistribution {
     /**
-     * Logs sender-key distribution diagnostics.
+     * The logger for {@link SenderKeyDistribution}.
      */
-    private static final System.Logger LOGGER = System.getLogger(SenderKeyDistribution.class.getName());
+    private static final System.Logger LOGGER = Log.get(SenderKeyDistribution.class);
 
     /**
      * Encrypts the distribution payload under each recipient device's Signal session.
@@ -157,9 +159,9 @@ public final class SenderKeyDistribution {
                 var payload = encryption.encryptForDevice(device, plaintext);
                 results.add(payload);
             } catch (Exception e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "getKeyDistributionMsg: encryption fail for {0}: {1}",
-                        device, e.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "getKeyDistributionMsg: encryption fail for " + Log.jid(String.valueOf(device)), e);
+                }
                 if (isPrimaryDevice(device)) {
                     throw new WhatsAppMessageException.Send.Unknown(
                             "getKeyDistributionMsg: encryption fail for primary device " + device, e);
@@ -230,9 +232,9 @@ public final class SenderKeyDistribution {
                 var payload = encryption.encryptForDevice(device, plaintext);
                 results.add(payload);
             } catch (Exception e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "getCompanionDsmPhashMsg: encryption fail for {0}: {1}",
-                        device, e.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "getCompanionDsmPhashMsg: encryption fail for " + Log.jid(String.valueOf(device)), e);
+                }
             }
         }
 

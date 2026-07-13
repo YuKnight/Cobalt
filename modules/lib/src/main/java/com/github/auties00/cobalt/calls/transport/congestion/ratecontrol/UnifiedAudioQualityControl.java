@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.ratecontrol;
 
 import com.github.auties00.cobalt.calls.util.RttEstimator;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -35,6 +37,11 @@ import java.util.Objects;
  * wires them in, keeping the compiled defaults only for the fields the server omits.
  */
 public final class UnifiedAudioQualityControl {
+    /**
+     * The logger for {@link UnifiedAudioQualityControl}.
+     */
+    private static final System.Logger LOGGER = Log.get(UnifiedAudioQualityControl.class);
+
     /**
      * Holds the per state lower and upper thresholds and trend slopes the three signals are evaluated
      * against in a given quality state.
@@ -310,6 +317,10 @@ public final class UnifiedAudioQualityControl {
         var plrSignal = evaluatePlr(thresholds);
         var rttSignal = evaluateRtt(thresholds, rttSlope);
         var rembSignal = evaluateRemb(thresholds);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "uaqc round: state={0} plr={1} rtt={2} remb={3}",
+                    state, plrSignal, rttSignal, rembSignal);
+        }
 
         applyTransition(plrSignal, rttSignal, rembSignal, rembBps, nowMs);
 
@@ -572,8 +583,12 @@ public final class UnifiedAudioQualityControl {
         if (next == state) {
             return;
         }
+        var previous = state;
         state = next;
         lastTransitionMs = nowMs;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "uaqc state {0} -> {1}", previous, next);
+        }
     }
 
     /**

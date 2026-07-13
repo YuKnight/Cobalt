@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.signal;
 
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.LiveSenderBandwidthEstimator;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Produces the {@link CongestionSignals} for one feedback round by comparing round trip time and
@@ -25,6 +28,11 @@ import com.github.auties00.cobalt.calls.transport.congestion.bwe.LiveSenderBandw
  * so they are supplied by the caller through the constructor.
  */
 public final class CongestionSignalDetector {
+    /**
+     * The logger for {@link CongestionSignalDetector}.
+     */
+    private static final System.Logger LOGGER = Log.get(CongestionSignalDetector.class);
+
     /**
      * Enable bit selecting the round trip time threshold check.
      */
@@ -182,7 +190,15 @@ public final class CongestionSignalDetector {
             congested = true;
         }
         if (aggressive) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "congestion signal aggressive: rtt={0}ms baseline={1}ms remotePlr={2} localPlr={3}",
+                        rttMs, baselineRttMs, remotePlr, localPlr);
+            }
             return CongestionSignals.AGGRESSIVE;
+        }
+        if (congested && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "congestion signal congested: rtt={0}ms baseline={1}ms remotePlr={2} localPlr={3}",
+                    rttMs, baselineRttMs, remotePlr, localPlr);
         }
         return congested ? CongestionSignals.CONGESTED : CongestionSignals.NONE;
     }

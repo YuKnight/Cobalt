@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.combine;
 
 import com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping.BweHoldController;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Fuses the sender side estimate, the remote receiver estimate, the packet pair link capacity, and
@@ -25,6 +28,11 @@ import com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping.BweHold
  * on a caller supplied draw.
  */
 public final class BitrateCombiner {
+    /**
+     * The logger for {@link BitrateCombiner}.
+     */
+    private static final System.Logger LOGGER = Log.get(BitrateCombiner.class);
+
     /**
      * Remote estimate threshold, in bits per second, at or above which the remote picture in picture
      * phase converts to throttle and the gated average mode engages.
@@ -138,6 +146,10 @@ public final class BitrateCombiner {
             base = (long) ((1.0 - EMA_BLEND_COEFFICIENT) * base + EMA_BLEND_COEFFICIENT * senderBweBps);
         }
         lastCombinedBps = base;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "bitrate combine: mode={0} sender={1} remote={2} linkCapacity={3} result={4}",
+                    mode, senderBweBps, remoteBweBps, linkCapacityBps, base);
+        }
         return base;
     }
 
@@ -218,6 +230,10 @@ public final class BitrateCombiner {
             if (elapsed >= PHASE_TIME_THRESHOLD_MS || remoteBweBps >= REMOTE_PIP_ENTER_BPS) {
                 remotePipPhase = RemotePipPhase.THROTTLE;
                 phaseStartMs = nowMs;
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "bitrate combine: remote pip phase {0} -> {1}, elapsedMs={2} remote={3}",
+                            RemotePipPhase.ENTER, RemotePipPhase.THROTTLE, elapsed, remoteBweBps);
+                }
             }
         }
         if (remotePipPhase == RemotePipPhase.ENTER) {
@@ -240,6 +256,10 @@ public final class BitrateCombiner {
     private void updateInflectionLatch(long senderBweBps, long remoteBweBps) {
         if (!inflectionLatched && remoteBweBps > 0 && senderBweBps >= remoteBweBps) {
             inflectionLatched = true;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "bitrate combine: inflection latch set, sender={0} remote={1}",
+                        senderBweBps, remoteBweBps);
+            }
         }
     }
 
@@ -330,5 +350,6 @@ public final class BitrateCombiner {
         inflectionLatched = false;
         recvDropDetected = false;
         lastCombinedBps = 0;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "bitrate combine: reset");
     }
 }

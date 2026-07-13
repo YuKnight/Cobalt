@@ -3,9 +3,10 @@ package com.github.auties00.cobalt.device.adv;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.device.timestamp.DeviceExpectedTsUtils;
-import com.github.auties00.cobalt.exception.WhatsAppAdvCheckException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppAdvValidationException;
 import com.github.auties00.cobalt.exception.WhatsAppException;
-import com.github.auties00.cobalt.exception.WhatsAppOwnDeviceListExpiredException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppOwnDeviceListExpiredException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -46,9 +47,9 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebAdvDeviceInfoCheckJob")
 public final class DeviceADVChecker implements AutoCloseable {
     /**
-     * Logs ADV check diagnostics.
+     * The logger for {@link DeviceADVChecker}.
      */
-    private static final System.Logger LOGGER = System.getLogger(DeviceADVChecker.class.getName());
+    private static final System.Logger LOGGER = Log.get(DeviceADVChecker.class);
 
     /**
      * Holds the recurrence interval for the ADV check, fixed at 24 hours.
@@ -133,8 +134,10 @@ public final class DeviceADVChecker implements AutoCloseable {
                 return;
             }
             var initialDelay = computeInitialDelay();
-            LOGGER.log(Level.DEBUG, "ADV check scheduler starting with initial delay of {0} seconds",
-                    initialDelay.toSeconds());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "adv check scheduler starting with initial delay of {0} seconds",
+                        initialDelay.toSeconds());
+            }
             checkJob = ScheduledTask.schedule(initialDelay, CHECK_INTERVAL, this::performCheck);
         }
     }
@@ -181,7 +184,8 @@ public final class DeviceADVChecker implements AutoCloseable {
      *
      * @implNote
      * This implementation surfaces unexpected exceptions through
-     * {@link LinkedWhatsAppClient#handleFailure(WhatsAppException)} as a {@link WhatsAppAdvCheckException}
+     * {@link LinkedWhatsAppClient#handleFailure(WhatsAppException)} as a
+     * {@link WhatsAppAdvValidationException.MaintenanceJobFailed}
      * so the error pipeline routes them the same way as any other ADV failure. The WAM events fire
      * before the self-expired logout so telemetry is not lost on the logout path.
      */
@@ -217,8 +221,13 @@ public final class DeviceADVChecker implements AutoCloseable {
 
             sendAdvStoredTimestampExpiredEvents(result.expiredLists(), now, expiryThreshold);
 
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "adv check tick classified {0} expired and {1} device lists needing sync",
+                        result.expiredLists().size(), result.jidsNeedingSync().size());
+            }
+
             if (result.selfExpired() && shouldLogoutOnSelfExpired()) {
-                LOGGER.log(Level.WARNING, "Own device list expired, triggering logout");
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "own device list expired, triggering logout");
                 client.handleFailure(new WhatsAppOwnDeviceListExpiredException());
                 return;
             }
@@ -231,7 +240,8 @@ public final class DeviceADVChecker implements AutoCloseable {
                 scheduleProactiveSync(result.jidsNeedingSync());
             }
         } catch (Exception e) {
-            client.handleFailure(new WhatsAppAdvCheckException(e));
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "adv check tick failed", e);
+            client.handleFailure(new WhatsAppAdvValidationException.MaintenanceJobFailed(e));
         } finally {
             deviceService.updateAdvCheckTime();
         }
@@ -350,8 +360,10 @@ public final class DeviceADVChecker implements AutoCloseable {
                 .build();
         client.store().contactStore().addDeviceList(deletedList);
 
-        LOGGER.log(Level.DEBUG, "Marked device list as deleted for {0}, cleaned up {1} companion devices",
-                userJid, deviceList.devices().size() - 1);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "marked device list as deleted for {0}, cleaned up {1} companion devices",
+                    userJid, deviceList.devices().size() - 1);
+        }
     }
 
     /**
@@ -400,7 +412,7 @@ public final class DeviceADVChecker implements AutoCloseable {
      * @param jids the JIDs to enqueue
      */
     private void scheduleProactiveSync(List<Jid> jids) {
-        LOGGER.log(Level.DEBUG, "Proactively syncing {0} device lists", jids.size());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "proactively syncing {0} device lists", jids.size());
         var pendingSync = PendingDeviceSync.of(jids, UsyncContext.BACKGROUND.wireValue());
         client.store().syncStore().addPendingDeviceSync(pendingSync);
         deviceService.retryPendingSyncs();

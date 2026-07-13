@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.calls.transport.srtp;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
@@ -31,6 +34,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@link #unprotectRtp(byte[], int) unprotect} inbound packets.
  */
 public final class E2eMediaSrtp {
+    /**
+     * The logger for {@link E2eMediaSrtp}.
+     */
+    private static final System.Logger LOGGER = Log.get(E2eMediaSrtp.class);
+
     /**
      * The length, in bytes, of the trailing WARP message integrity tag appended to each media packet.
      */
@@ -149,6 +157,9 @@ public final class E2eMediaSrtp {
             try {
                 return Cipher.getInstance("AES/CTR/NoPadding");
             } catch (Exception exception) {
+                if (Log.ERROR) {
+                    LOGGER.log(Level.ERROR, "e2e srtp aes-ctr engine unavailable", exception);
+                }
                 throw new WhatsAppCallException.Srtp("end-to-end SRTP AES-CTR unavailable", exception);
             }
         });
@@ -156,10 +167,16 @@ public final class E2eMediaSrtp {
             try {
                 return Mac.getInstance("HmacSHA1");
             } catch (Exception exception) {
+                if (Log.ERROR) {
+                    LOGGER.log(Level.ERROR, "e2e srtp warp-mi hmac engine unavailable", exception);
+                }
                 throw new WhatsAppCallException.Srtp("end-to-end SRTP WARP-MI HMAC unavailable", exception);
             }
         });
         this.nonceScratch = ThreadLocal.withInitial(() -> new byte[16]);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "e2e media srtp context created");
+        }
     }
 
     /**
@@ -187,6 +204,9 @@ public final class E2eMediaSrtp {
         cryptPayload(packet, headerLength, length - headerLength, ssrc, roc, sequence);
         var tag = warpMiTag(packet, length, roc);
         System.arraycopy(tag, 0, packet, length, WARP_MI_TAG_LENGTH);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "e2e srtp rtp protected, ssrc={0} sequence={1} roc={2}", ssrc, sequence, roc);
+        }
         return length + WARP_MI_TAG_LENGTH;
     }
 
@@ -218,6 +238,9 @@ public final class E2eMediaSrtp {
         var sequence = ((packet[2] & 0xFF) << 8) | (packet[3] & 0xFF);
         var roc = inboundRoc.computeIfAbsent(ssrc, _ -> new RolloverState()).advance(sequence);
         cryptPayload(packet, headerLength, payloadEnd - headerLength, ssrc, roc, sequence);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "e2e srtp rtp unprotected, ssrc={0} sequence={1} roc={2}", ssrc, sequence, roc);
+        }
         return payloadEnd;
     }
 
@@ -235,6 +258,13 @@ public final class E2eMediaSrtp {
      * @param roc        the packet's rollover counter
      * @param sequence   the packet's sixteen bit RTP sequence number
      * @throws WhatsAppCallException.Srtp if the AES computation fails
+     * @implNote This implementation transforms the payload in place through the copy-safe
+     * {@link Cipher#doFinal(ByteBuffer, ByteBuffer)} overload, wrapping the payload region in a
+     * {@link ByteBuffer} and passing its {@link ByteBuffer#duplicate() duplicate} as the output. That
+     * overload is contractually copy-safe (its input and output buffers may reference the same backing
+     * array), so no per packet payload sized output array is allocated and no separate copy back is needed;
+     * the {@code byte[]} {@code doFinal} overloads carry no such overlap guarantee, which is why the buffer
+     * form is used on this per packet path.
      */
     private void cryptPayload(byte[] packet, int offset, int payloadLen, int ssrc, int roc, int sequence) {
         if (payloadLen <= 0) {
@@ -244,12 +274,12 @@ public final class E2eMediaSrtp {
             var cipher = ctrCipher.get();
             cipher.init(Cipher.ENCRYPT_MODE, cipherKeySpec,
                     new IvParameterSpec(buildNonce(ssrc, roc, sequence)));
-            // TODO: the doFinal output array is still allocated per packet; reusing it in place would need a
-            //  five argument doFinal into the same buffer, whose overlap behaviour is not proven safe across
-            //  JCA providers, so it is left allocating to stay strictly behaviour preserving.
-            var transformed = cipher.doFinal(packet, offset, payloadLen);
-            System.arraycopy(transformed, 0, packet, offset, transformed.length);
+            var payload = ByteBuffer.wrap(packet, offset, payloadLen);
+            cipher.doFinal(payload, payload.duplicate());
         } catch (Exception exception) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "e2e srtp aes-ctr failed for ssrc=" + ssrc, exception);
+            }
             throw new WhatsAppCallException.Srtp("end-to-end SRTP AES-CTR failed", exception);
         }
     }
@@ -303,6 +333,9 @@ public final class E2eMediaSrtp {
             mac.update(new byte[]{(byte) (roc >>> 24), (byte) (roc >>> 16), (byte) (roc >>> 8), (byte) roc});
             return Arrays.copyOf(mac.doFinal(), WARP_MI_TAG_LENGTH);
         } catch (Exception exception) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "e2e srtp warp-mi hmac failed", exception);
+            }
             throw new WhatsAppCallException.Srtp("end-to-end SRTP WARP-MI HMAC failed", exception);
         }
     }
@@ -369,6 +402,9 @@ public final class E2eMediaSrtp {
             cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(masterKey, "AES"), new IvParameterSpec(counter));
             return cipher.doFinal(new byte[length]);
         } catch (Exception exception) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "e2e srtp session-key derivation failed", exception);
+            }
             throw new WhatsAppCallException.Srtp("end-to-end SRTP session-key derivation failed", exception);
         }
     }

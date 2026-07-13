@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq.decoder;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 import com.github.auties00.cobalt.calls.media.audio.neteq.LiveNetEq;
 
 /**

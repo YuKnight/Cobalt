@@ -18,9 +18,8 @@ import java.util.Optional;
  * accounts are linked, and any onboarding email to confirm. This input
  * carries the parameters the server uses to resolve those values.
  *
- * <p>The {@link #inputJson() creation context} is a JSON-encoded object
- * passed to the server-side resolver; its field set is defined by the
- * server and is carried verbatim as a string. The
+ * <p>The {@link #input() creation context} is a typed
+ * {@link BusinessAdCreationRootInput} passed to the server-side resolver. The
  * {@link #draftId() draft id} resumes an in-progress draft, the
  * {@link #pageId() page id} names the page being promoted, and the
  * {@link #facebookAccountLinked() Facebook}/
@@ -34,12 +33,11 @@ import java.util.Optional;
 @ProtobufMessage(name = "BusinessAdCreationRootQuery")
 public final class BusinessAdCreationRootQuery {
     /**
-     * JSON-encoded creation context passed verbatim to the server-side
-     * resolver. The field set is defined by the server. Unset omits the
+     * Creation context passed to the server-side resolver. Unset omits the
      * variable.
      */
-    @ProtobufProperty(index = 1, type = ProtobufType.STRING)
-    final String inputJson;
+    @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
+    final BusinessAdCreationRootInput input;
 
     /**
      * Draft identifier the flow resumes from. Unset starts a fresh ad
@@ -82,8 +80,8 @@ public final class BusinessAdCreationRootQuery {
      * may be {@code null} to omit the corresponding variable from the
      * request.
      *
-     * @param inputJson                         the JSON-encoded creation
-     *                                          context, or {@code null}
+     * @param input                             the creation context, or
+     *                                          {@code null}
      * @param draftId                           the draft identifier, or
      *                                          {@code null}
      * @param facebookAccountLinked             whether a Facebook account is
@@ -96,10 +94,10 @@ public final class BusinessAdCreationRootQuery {
      *                                          double-write is enabled, or
      *                                          {@code null}
      */
-    public BusinessAdCreationRootQuery(String inputJson, String draftId, Boolean facebookAccountLinked,
+    public BusinessAdCreationRootQuery(BusinessAdCreationRootInput input, String draftId, Boolean facebookAccountLinked,
                                        Boolean whatsAppAccountLinked, String pageId,
                                        Boolean instagramUserIdDoubleWriteEnabled) {
-        this.inputJson = inputJson;
+        this.input = input;
         this.draftId = draftId;
         this.facebookAccountLinked = facebookAccountLinked;
         this.whatsAppAccountLinked = whatsAppAccountLinked;
@@ -108,13 +106,13 @@ public final class BusinessAdCreationRootQuery {
     }
 
     /**
-     * Returns the JSON-encoded creation context.
+     * Returns the creation context.
      *
      * @return an {@link Optional} carrying the context, or empty when
      *         unset
      */
-    public Optional<String> inputJson() {
-        return Optional.ofNullable(inputJson);
+    public Optional<BusinessAdCreationRootInput> input() {
+        return Optional.ofNullable(input);
     }
 
     /**
@@ -175,7 +173,7 @@ public final class BusinessAdCreationRootQuery {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (BusinessAdCreationRootQuery) obj;
-        return Objects.equals(inputJson, that.inputJson)
+        return Objects.equals(input, that.input)
                 && Objects.equals(draftId, that.draftId)
                 && Objects.equals(facebookAccountLinked, that.facebookAccountLinked)
                 && Objects.equals(whatsAppAccountLinked, that.whatsAppAccountLinked)
@@ -185,14 +183,14 @@ public final class BusinessAdCreationRootQuery {
 
     @Override
     public int hashCode() {
-        return Objects.hash(inputJson, draftId, facebookAccountLinked, whatsAppAccountLinked,
+        return Objects.hash(input, draftId, facebookAccountLinked, whatsAppAccountLinked,
                 pageId, instagramUserIdDoubleWriteEnabled);
     }
 
     @Override
     public String toString() {
         return "BusinessAdCreationRootQuery[" +
-                "inputJson=" + inputJson + ", " +
+                "input=" + input + ", " +
                 "draftId=" + draftId + ", " +
                 "facebookAccountLinked=" + facebookAccountLinked + ", " +
                 "whatsAppAccountLinked=" + whatsAppAccountLinked + ", " +

@@ -2,7 +2,8 @@ package com.github.auties00.cobalt.media;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaHost.Operation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -40,6 +41,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -100,6 +102,9 @@ import java.util.function.Supplier;
 @WhatsAppWebModule(moduleName = "WAWebWebcMediaRmrWamEvent")
 @WhatsAppWebModule(moduleName = "WAWebStickerErrorWamEvent")
 public final class LiveMediaConnectionService implements MediaConnectionService {
+    /** The logger for {@link LiveMediaConnectionService}. */
+    private static final System.Logger LOGGER = Log.get(LiveMediaConnectionService.class);
+
     /**
      * The {@link ABPropsService} consulted when assembling CDN download URLs
      * and deciding whether the hash-based download fallback is still
@@ -317,6 +322,10 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
         this.maxAutoDownloadRetry = parsedMaxAutoDownloadRetry;
         this.timestamp = parsedTimestamp;
         this.hosts = parsedHosts;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "media_conn updated: hosts={0} ttl={1}s authTtl={2}s maxBuckets={3}",
+                    parsedHosts.size(), parsedTtl, parsedAuthTtl, parsedMaxBuckets);
+        }
         initialized.countDown();
     }
 
@@ -553,6 +562,9 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
             return;
         }
         var delayMillis = MIN_BACKOFF_TIMEOUT_MILLIS << attemptCount;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "backoff sleep: attempt={0} delayMillis={1}", attemptCount, delayMillis);
+        }
         try {
             Thread.sleep(delayMillis);
         } catch (InterruptedException _) {
@@ -680,6 +692,8 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
             return false;
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "upload start: mediaType={0}", provider.mediaPath());
+
         awaitInitialized();
         var uploadStart = Instant.now();
         var currentAuth = this.auth;
@@ -700,6 +714,9 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
             fileEncSha256 = pass1.fileEncSha256().orElse(null);
             fileLength = pass1.fileLength();
         } catch (IOException exception) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "upload hash pass failed: mediaType=" + provider.mediaPath(), exception);
+            }
             throw new WhatsAppMediaException.Upload(
                     "Cannot encrypt media (hash pass)", exception);
         }
@@ -737,6 +754,10 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
                 }
                 lastHostUsed = hostname;
 
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "upload attempt {0} host={1}", attemptCount, hostname);
+                }
+
                 try {
                     var body = buildEncryptingBodyPublisher(provider, payload, mediaKey, encryptedLength);
                     var uploadResult = tryUpload(client, hostname, path.get(), currentAuth, fileEncSha256, fileSha256, body);
@@ -756,12 +777,24 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
                         externalBlobReference.setHandle(handle);
                     }
 
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "upload succeeded: host={0} attempt={1} size={2} encryptedSize={3}",
+                                hostname, attemptCount, fileLength, encryptedLength);
+                    }
                     commitMessageMediaUploadSuccess(provider, hostname, fileLength, encryptedLength, attemptCount, uploadStart);
                     return true;
                 } catch (WhatsAppMediaException.Upload uploadException) {
                     if (!isRetryable(uploadException)) {
+                        if (Log.ERROR) {
+                            LOGGER.log(Level.ERROR, "upload failed (non-retryable): host=" + hostname, uploadException);
+                        }
                         commitMessageMediaUploadFailure(provider, fileLength, attemptCount, uploadStart, uploadException);
                         throw uploadException;
+                    }
+
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "upload attempt {0} failed on host {1}, retrying: {2}",
+                                attemptCount, hostname, uploadException.getMessage());
                     }
 
                     lastFetchMadeProgress = false;
@@ -773,6 +806,9 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
             }
 
             var noHostError = new WhatsAppMediaException.Upload("Cannot upload media: no hosts available");
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "upload failed: mediaType=" + provider.mediaPath(), noHostError);
+            }
             commitMessageMediaUploadFailure(provider, fileLength, MAX_ATTEMPT_COUNT - 1, uploadStart, noHostError);
             throw noHostError;
         }
@@ -895,6 +931,9 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
                     .headers("Origin", "https://web.whatsapp.com")
                     .build();
             var response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "mms upload response: host={0} status={1}", hostname, response.statusCode());
+            }
 
             if (response.statusCode() != 200) {
                 var statusCode = response.statusCode();
@@ -1081,13 +1120,19 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
     public InputStream download(MediaProvider provider) throws WhatsAppMediaException, InterruptedException {
         Objects.requireNonNull(provider, "provider cannot be null");
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "download start: mediaType={0}", provider.mediaPath());
+
         var rmrStart = Instant.now();
         try {
             var stream = performDownload(provider);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "download succeeded: mediaType={0}", provider.mediaPath());
             commitMessageMediaDownloadSuccess(provider, rmrStart);
             commitWebcMediaRmr(provider, rmrStart, false, OptionalInt.empty());
             return stream;
         } catch (WhatsAppMediaException.Download downloadException) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "download failed: mediaType=" + provider.mediaPath(), downloadException);
+            }
             commitMessageMediaDownloadFailure(provider, rmrStart, downloadException);
             commitWebcMediaRmr(provider, rmrStart, true, downloadException.httpStatusCode());
             if (isStickerMedia(provider.mediaPath())) {
@@ -1126,7 +1171,14 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
                 return tryDownload(provider, defaultUploadUrl.get());
             } catch (WhatsAppMediaException.Download downloadException) {
                 if (!isDownloadRetryable(downloadException)) {
+                    if (Log.ERROR) {
+                        LOGGER.log(Level.ERROR, "download failed (non-retryable) from cached url", downloadException);
+                    }
                     throw downloadException;
+                }
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "cached download url failed, falling back to host resolution: {0}",
+                            downloadException.getMessage());
                 }
             }
         }
@@ -1140,8 +1192,12 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
 
         if ((defaultDirectPath == null || defaultDirectPath.isEmpty())
                 && (encFileHash == null || encFileHash.isEmpty())) {
-            throw new WhatsAppMediaException.Download(
+            var missingRefError = new WhatsAppMediaException.Download(
                     "No staticUrl, directPath, or encFilehash available for download");
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "download failed: mediaType=" + mediaType, missingRefError);
+            }
+            throw missingRefError;
         }
 
         awaitInitialized();
@@ -1183,11 +1239,23 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
                     hostname, defaultDirectPath, encFileHash, mediaType, hostBucket
             );
 
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "download attempt {0} host={1}", attemptCount, hostname);
+            }
+
             try {
                 return tryDownload(provider, downloadUrl);
             } catch (WhatsAppMediaException.Download downloadException) {
                 if (!isDownloadRetryable(downloadException)) {
+                    if (Log.ERROR) {
+                        LOGGER.log(Level.ERROR, "download failed (non-retryable): host=" + hostname, downloadException);
+                    }
                     throw downloadException;
+                }
+
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "download attempt {0} failed on host {1}, retrying: {2}",
+                            attemptCount, hostname, downloadException.getMessage());
                 }
 
                 lastFetchMadeProgress = false;
@@ -1198,7 +1266,11 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
             }
         }
 
-        throw new WhatsAppMediaException.Download("Cannot download media: no hosts available");
+        var noHostError = new WhatsAppMediaException.Download("Cannot download media: no hosts available");
+        if (Log.ERROR) {
+            LOGGER.log(Level.ERROR, "download failed: mediaType=" + mediaType, noHostError);
+        }
+        throw noHostError;
     }
 
     /**
@@ -1424,6 +1496,10 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
                 .build();
         try {
             var response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "mms download response: host={0} status={1}",
+                        request.uri().getHost(), response.statusCode());
+            }
 
             if (response.statusCode() != 200) {
                 // 403 with "URL signature expired" body must reclassify to MediaNotFoundError so read the body first
@@ -1711,6 +1787,10 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
                     .method("HEAD", HttpRequest.BodyPublishers.noBody())
                     .build();
             var response = client.send(request, HttpResponse.BodyHandlers.discarding());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "{0} HEAD response: host={1} status={2}",
+                        functionName, hostname, response.statusCode());
+            }
 
             if (response.statusCode() != 200) {
                 validateMmsResponse(response.statusCode(), url, null);
@@ -1718,6 +1798,9 @@ public final class LiveMediaConnectionService implements MediaConnectionService 
 
             return response;
         } catch (IOException | InterruptedException exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, functionName + " HEAD request failed: host=" + hostname, exception);
+            }
             throw new WhatsAppMediaException.Download(functionName + ": network error", exception);
         }
     }

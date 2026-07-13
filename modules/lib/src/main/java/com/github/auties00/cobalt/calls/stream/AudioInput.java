@@ -12,13 +12,13 @@ import com.github.auties00.cobalt.calls.stream.audio.WavFileAudioInput;
  * {@link AudioFrame}s the call engine decodes from the peer.
  *
  * <p>This is the read side of a call's audio. The engine decodes each audio packet received from the
- * peer and {@linkplain #offer(AudioFrame) delivers} the resulting frame to this sink; the embedder
+ * peer and {@linkplain #offerAudio(AudioFrame) delivers} the resulting frame to this sink; the embedder
  * decides what becomes of it. The contract has two faces. The engine facing face is
- * {@link #offer(AudioFrame)} and {@link #shutdown()}, by which the engine fills the sink and signals
- * the end of the stream. The application facing face is {@link #read()}, by which a programmatic
+ * {@link #offerAudio(AudioFrame)} and {@link #shutdown()}, by which the engine fills the sink and signals
+ * the end of the stream. The application facing face is {@link #readAudio()}, by which a programmatic
  * consumer (a bot or a bridge between two calls) pulls received frames to forward or analyse them; a
  * sink backed by a device instead renders each frame to its playback device inside
- * {@link #offer(AudioFrame)} and is not read from.
+ * {@link #offerAudio(AudioFrame)} and is not read from.
  *
  * <p>Frames carry mono 16 bit PCM at 16 kHz as described by {@link AudioFrame}. An implementation
  * decides its own buffering policy between the engine fill and the consumer; a buffered sink typically
@@ -30,15 +30,15 @@ import com.github.auties00.cobalt.calls.stream.audio.WavFileAudioInput;
  * @apiNote An embedder implements this interface to consume or render received audio, or obtains a
  * bundled implementation from one of the factories on this type: {@link #discard()} to drop the received
  * audio, {@link #toSpeaker()} to render to the speaker, and {@link #toWav(Path)} to record to a WAV file.
- * The {@link #offer(AudioFrame)} and {@link #shutdown()} methods belong to the engine; application code
- * drives a programmatic sink through {@link #read()} and never calls the engine facing pair directly.
+ * The {@link #offerAudio(AudioFrame)} and {@link #shutdown()} methods belong to the engine; application code
+ * drives a programmatic sink through {@link #readAudio()} and never calls the engine facing pair directly.
  */
 public interface AudioInput {
     /**
      * Returns a sink that discards the received audio.
      *
-     * <p>Every {@link #offer(AudioFrame)} is dropped and {@link #read()} yields nothing, so this is the
-     * sink to install when a call needs no inbound audio. {@link #read()} blocks until the call ends and
+     * <p>Every {@link #offerAudio(AudioFrame)} is dropped and {@link #readAudio()} yields nothing, so this is the
+     * sink to install when a call needs no inbound audio. {@link #readAudio()} blocks until the call ends and
      * then returns {@code null}, so a consumer that drains it in a loop terminates cleanly.
      *
      * @return a discarding sink
@@ -50,7 +50,7 @@ public interface AudioInput {
     /**
      * Returns a sink bound to the operating system speaker.
      *
-     * <p>Each {@link #offer(AudioFrame)} renders the frame to the default output device, blocking while
+     * <p>Each {@link #offerAudio(AudioFrame)} renders the frame to the default output device, blocking while
      * the line buffer is full, until the call ends and the playback line is released. The application does
      * not read a sink bound to the speaker.
      *
@@ -82,7 +82,7 @@ public interface AudioInput {
     /**
      * Returns a sink that records the received audio to a WAV file.
      *
-     * <p>Each {@link #offer(AudioFrame)} appends the frame to the file; the file is finalized when the
+     * <p>Each {@link #offerAudio(AudioFrame)} appends the frame to the file; the file is finalized when the
      * call ends. The application does not read a sink bound to a file.
      *
      * @param path the WAV file to write
@@ -99,7 +99,7 @@ public interface AudioInput {
      * Delivers one decoded remote frame for the application to consume.
      *
      * <p>Invoked by the engine for each frame it decodes from the peer. A buffered sink enqueues the
-     * frame for {@link #read()}, dropping the oldest buffered frame if the consumer is behind; a sink
+     * frame for {@link #readAudio()}, dropping the oldest buffered frame if the consumer is behind; a sink
      * backed by a device renders the frame straight to its playback device or file. After
      * {@link #shutdown()} has run an implementation discards the frame. The frame is never
      * {@code null}.
@@ -107,22 +107,22 @@ public interface AudioInput {
      * <p>The frame's {@linkplain AudioFrame#pcm() sample buffer} may be borrowed from a pool the engine
      * reuses across frames, so it is valid only for the duration of this call. A sink that renders or writes
      * the frame synchronously before returning needs no copy; a sink that buffers it for a later
-     * {@link #read()} or hands it to another thread copies the samples out first (or copies the whole frame),
+     * {@link #readAudio()} or hands it to another thread copies the samples out first (or copies the whole frame),
      * since the engine may refill the buffer on a subsequent decode.
      *
      * @param frame the decoded frame; never {@code null}
      * @throws NullPointerException if {@code frame} is {@code null}
      */
-    void offer(AudioFrame frame);
+    void offerAudio(AudioFrame frame);
 
     /**
      * Returns the next frame of received remote audio, blocking until one is available, or
      * {@code null} once the call has ended.
      *
-     * <p>Returns frames previously delivered through {@link #offer(AudioFrame)} in order. The method
+     * <p>Returns frames previously delivered through {@link #offerAudio(AudioFrame)} in order. The method
      * blocks while no frame is ready and returns {@code null} exactly once the sink has been
      * {@linkplain #shutdown() ended} and drained. A sink backed by a device renders inside
-     * {@link #offer(AudioFrame)} and is not read from.
+     * {@link #offerAudio(AudioFrame)} and is not read from.
      *
      * <p>The returned frame's {@linkplain AudioFrame#pcm() sample buffer} is borrowed from a pool the
      * engine reuses across frames: it is valid only until the next call to this method on the same
@@ -133,12 +133,12 @@ public interface AudioInput {
      * @return the next frame, or {@code null} once the stream has ended
      * @throws InterruptedException if the calling thread is interrupted while waiting
      */
-    AudioFrame read() throws InterruptedException;
+    AudioFrame readAudio() throws InterruptedException;
 
     /**
-     * Ends the sink, unblocking a pending {@link #read()} and finalizing any bound device.
+     * Ends the sink, unblocking a pending {@link #readAudio()} and finalizing any bound device.
      *
-     * <p>Invoked by the engine when the call ends. After it runs, {@link #read()} returns {@code null}
+     * <p>Invoked by the engine when the call ends. After it runs, {@link #readAudio()} returns {@code null}
      * once drained and the implementation finalizes or releases any playback device or file it held.
      * Implementations make this idempotent, since the engine may signal teardown more than once during
      * a racing shutdown.

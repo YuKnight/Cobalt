@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -17,6 +18,7 @@ import com.github.auties00.cobalt.wam.event.AiThreadsUserJourneyEventBuilder;
 import com.github.auties00.cobalt.wam.threadlogging.LiveThreadLoggingService;
 import com.github.auties00.cobalt.wam.type.ThreadActionTypes;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -44,6 +46,11 @@ import java.util.UUID;
  * the title via {@link AiThreadRenameAction#newTitle()}.
  */
 public final class AiThreadRenameMutationFactory {
+    /**
+     * The logger for {@link AiThreadRenameMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(AiThreadRenameMutationFactory.class);
+
     /**
      * Holds the bound client, used to resolve the provisioned chat-thread
      * logging secret that hashes the AI thread id into the
@@ -113,6 +120,7 @@ public final class AiThreadRenameMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebAiThreadRenameSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getAiThreadRenameMutation(Jid chatJid, String threadId, String newTitle) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building ai thread rename mutation chat={0} thread={1}", chatJid, threadId);
         var timestamp = Instant.now();
         var action = new AiThreadRenameActionBuilder()
                 .newTitle(newTitle)
@@ -167,6 +175,7 @@ public final class AiThreadRenameMutationFactory {
         if (!conversationThreadId.isBlank()) {
             builder.conversationThreadId(conversationThreadId);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "committing ai thread rename journey event thread={0}", threadId);
         wamService.commit(builder.build());
     }
 }

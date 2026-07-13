@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Enumerates the client platform the engine attributes to a call participant.
  *
@@ -123,6 +126,41 @@ public enum CallParticipantPlatform {
     WEB(16, "web");
 
     /**
+     * Resolves an engine platform code to its platform, backing {@link #ofCode(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #code}, so a code resolves to its
+     * platform in constant time rather than by scanning {@link #values()}. A code with no entry falls back
+     * to {@link #UNKNOWN} in {@link #ofCode(int)}.
+     */
+    private static final Map<Integer, CallParticipantPlatform> BY_CODE;
+
+    /**
+     * Resolves a wire token to its platform, backing {@link #ofToken(String)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #token}, so a token resolves to its
+     * platform in constant time rather than by scanning {@link #values()}. Keys are the raw tokens, so
+     * matching is case sensitive, preserving the {@link String#equals(Object)} semantics this lookup
+     * replaces; an unrecognized or {@code null} token falls back to {@link #UNKNOWN} in
+     * {@link #ofToken(String)}.
+     */
+    private static final Map<String, CallParticipantPlatform> BY_TOKEN;
+
+    static {
+        var byCode = new HashMap<Integer, CallParticipantPlatform>();
+        var byToken = new HashMap<String, CallParticipantPlatform>();
+        for (var platform : values()) {
+            if (byCode.put(platform.code, platform) != null) {
+                throw new AssertionError("Conflict");
+            }
+            if (byToken.put(platform.token, platform) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_CODE = Map.copyOf(byCode);
+        BY_TOKEN = Map.copyOf(byToken);
+    }
+
+    /**
      * The integer code the engine stores for this platform.
      */
     private final int code;
@@ -167,16 +205,14 @@ public enum CallParticipantPlatform {
      * <p>Any code outside the defined range {@code 0..16} resolves to {@link #UNKNOWN},
      * matching the engine's fallback for codes it does not recognize.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_CODE} map rather than
+     * scanning {@link #values()}.
      * @param code the engine platform code to resolve
      * @return the matching platform, or {@link #UNKNOWN} if the code is out of range
      */
     public static CallParticipantPlatform ofCode(int code) {
-        for (var platform : values()) {
-            if (platform.code == code) {
-                return platform;
-            }
-        }
-        return UNKNOWN;
+        var platform = BY_CODE.get(code);
+        return platform != null ? platform : UNKNOWN;
     }
 
     /**
@@ -184,15 +220,13 @@ public enum CallParticipantPlatform {
      *
      * <p>Any unrecognized or {@code null} token resolves to {@link #UNKNOWN}.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_TOKEN} map rather than
+     * scanning {@link #values()}; a {@code null} token maps to no entry and falls back to {@link #UNKNOWN}.
      * @param token the wire token to resolve, may be {@code null}
      * @return the matching platform, or {@link #UNKNOWN} if the token is unrecognized
      */
     public static CallParticipantPlatform ofToken(String token) {
-        for (var platform : values()) {
-            if (platform.token.equals(token)) {
-                return platform;
-            }
-        }
-        return UNKNOWN;
+        var platform = BY_TOKEN.get(token);
+        return platform != null ? platform : UNKNOWN;
     }
 }

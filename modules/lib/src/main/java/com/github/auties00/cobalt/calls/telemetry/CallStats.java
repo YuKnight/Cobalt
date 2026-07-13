@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.telemetry;
 
 import com.github.auties00.cobalt.calls.telemetry.CallResult;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.CallState;
 import com.github.auties00.cobalt.wam.type.CallSide;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -25,6 +27,11 @@ import com.github.auties00.cobalt.calls.CallRuntime;
  * background ticker exists.
  */
 public final class CallStats {
+    /**
+     * The logger for {@link CallStats}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallStats.class);
+
     /**
      * The call identifier these dimensions belong to.
      */
@@ -80,8 +87,26 @@ public final class CallStats {
         this.side = Objects.requireNonNull(side, "side cannot be null");
         this.videoEnabled = videoEnabled;
         this.startedAt = Objects.requireNonNull(startedAt, "startedAt cannot be null");
-        // TODO: wire calls last minute call telemetry; accumulate the last_min_* WAM fields (avg_rtt, jitter buffer delay/lost, video render freeze) from a per second field stats sampler into per metric rolling 60s buffers and emit them via sum()/count() aggregates, gated by the engine's report last minute metrics flag.
-        //  Left as a TODO because the faithful per second sampler this needs does not exist yet and cannot be built without guessing. Cobalt is deliberately tickerless (this class stamps only lifecycle instants) and has no 1Hz per call stats sampler, so nothing produces the per second amounts to insert. The metric sources are also not reachable as per second snapshots: NetEq statistics are a drain at end snapshot not a per second delta, average RTT lives in scattered per unit estimators with no aggregated surface, and there is no video render freeze source at all. Feeding fabricated numbers would reach the WAM wire, so this stays unwired until a faithful per second field stats sampler and a video render freeze detector exist.
+        // TODO: wire the "last minute" call telemetry (the last_min_* WAM fields: avg_rtt, jitter buffer
+        //  delay, jitter buffer lost, video render freeze). Concrete steps, in order; every one is a
+        //  prerequisite that does not exist in Cobalt yet, which is why this is unwired:
+        //   1. Add a per-call 1Hz field-stats sampler: a periodic task (one per active call) that fires once
+        //      per second while the call runs and snapshots each metric below. CallStats today stamps only
+        //      discrete lifecycle instants, so this sampler is new (mirror WhatsApp's per-second field stats
+        //      tick). Cobalt's virtual-thread model can host it as a scheduled per-call task.
+        //   2. Expose each metric as a per-second value the sampler can read; none of these surfaces exists:
+        //      a. avg_rtt: fold the per-unit RTT estimators (scattered across the transport/BWE) into one
+        //         aggregated per-second RTT reading.
+        //      b. jitter buffer delay/lost: expose a per-second delta from NetEq, which today only drains its
+        //         statistics once at end-of-call rather than as a running per-second delta.
+        //      c. video render freeze: build a freeze detector on the video render path; there is no freeze
+        //         source at all today.
+        //   3. Accumulate each per-second sample into a per-metric rolling 60s buffer.
+        //   4. Emit the buffers via their sum()/count() aggregates, gated by the engine's
+        //      report-last-minute-metrics flag.
+        //  DO NOT wire steps 3-4 until 2a-2c produce real values: these fields ship to Meta's WAM telemetry,
+        //  so feeding fabricated or partial numbers would send invented telemetry upstream. Until then
+        //  CallStats stays lifecycle-instant-only and the last_min_* fields are left unset.
     }
 
     /**
@@ -129,6 +154,7 @@ public final class CallStats {
     public void markConnected() {
         if (connectedAt == null) {
             connectedAt = Instant.now();
+            if (Log.INFO) LOGGER.log(Level.INFO, "call {0} connected", callId);
         }
     }
 
@@ -141,6 +167,10 @@ public final class CallStats {
     public void markEnded() {
         if (endedAt == null) {
             endedAt = Instant.now();
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "call {0} ended, connected duration {1}s", callId,
+                        connectedDurationSeconds());
+            }
         }
     }
 
@@ -174,6 +204,7 @@ public final class CallStats {
      */
     public void result(CallResult result) {
         this.result = result;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} result set to {1}", callId, result);
     }
 
     /**

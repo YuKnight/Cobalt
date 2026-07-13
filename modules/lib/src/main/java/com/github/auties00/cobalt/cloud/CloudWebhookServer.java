@@ -2,13 +2,16 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.exception.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudWebhookException;
+import com.github.auties00.cobalt.log.Log;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -37,6 +40,11 @@ import java.util.function.Consumer;
  * with the appropriate {@code 4xx} status; it never tears the server down.
  */
 public final class CloudWebhookServer {
+    /**
+     * The logger for {@link CloudWebhookServer}.
+     */
+    private static final System.Logger LOGGER = Log.get(CloudWebhookServer.class);
+
     /**
      * The bind address, or {@code null} to bind the wildcard address.
      */
@@ -121,8 +129,10 @@ public final class CloudWebhookServer {
             created.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
             created.start();
             this.server = created;
+            if (Log.INFO) LOGGER.log(Level.INFO, "webhook server started on port {0} path {1}", port, path);
         } catch (IOException exception) {
-            throw new WhatsAppCloudException.CloudWebhookException("failed to bind webhook server", exception);
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "webhook server failed to bind on port " + port, exception);
+            throw new WhatsAppCloudWebhookException("failed to bind webhook server", exception);
         }
     }
 
@@ -136,6 +146,7 @@ public final class CloudWebhookServer {
         if (running != null) {
             running.stop(0);
             this.server = null;
+            if (Log.INFO) LOGGER.log(Level.INFO, "webhook server stopped");
         }
     }
 
@@ -178,8 +189,10 @@ public final class CloudWebhookServer {
         var token = query.get("hub.verify_token");
         var challenge = query.get("hub.challenge");
         if ("subscribe".equals(mode) && verifyToken.equals(token) && challenge != null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "webhook handshake accepted");
             respond(exchange, 200, challenge);
         } else {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "webhook handshake rejected, mode={0}", mode);
             respond(exchange, 403, "forbidden");
         }
     }
@@ -195,7 +208,8 @@ public final class CloudWebhookServer {
         if (appSecret != null) {
             var signature = exchange.getRequestHeaders().getFirst("X-Hub-Signature-256");
             if (!verifySignature(body, signature)) {
-                onError.accept(new WhatsAppCloudException.CloudWebhookException(
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "webhook delivery rejected, signature mismatch, bytes={0}", body.length);
+                onError.accept(new WhatsAppCloudWebhookException(
                         "webhook signature verification failed"));
                 respond(exchange, 401, "invalid signature");
                 return;
@@ -205,14 +219,17 @@ public final class CloudWebhookServer {
         try {
             envelope = JSON.parseObject(new String(body, StandardCharsets.UTF_8));
         } catch (RuntimeException exception) {
-            onError.accept(new WhatsAppCloudException.CloudWebhookException("malformed webhook payload", exception));
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "webhook delivery rejected, malformed payload", exception);
+            onError.accept(new WhatsAppCloudWebhookException("malformed webhook payload", exception));
             respond(exchange, 400, "malformed payload");
             return;
         }
         respond(exchange, 200, "EVENT_RECEIVED");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "webhook delivery accepted, bytes={0}", body.length);
         try {
             onEnvelope.accept(envelope);
         } catch (RuntimeException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "webhook envelope dispatch failed", exception);
             onError.accept(exception);
         }
     }

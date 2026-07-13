@@ -116,6 +116,10 @@ module com.github.auties00.cobalt {
 
     // Exceptions
     exports com.github.auties00.cobalt.exception;
+    exports com.github.auties00.cobalt.exception.linked;
+    exports com.github.auties00.cobalt.exception.linked.web;
+    exports com.github.auties00.cobalt.exception.linked.mobile;
+    exports com.github.auties00.cobalt.exception.cloud;
 
     // Stanza queries
     // Exported so the user can make his own queries
@@ -128,7 +132,7 @@ module com.github.auties00.cobalt {
     // GraphQL queries
     // Exported so the user can make his own queries
     exports com.github.auties00.cobalt.graphql.facebook;
-    exports com.github.auties00.cobalt.graphql.whatsapp;
+    exports com.github.auties00.cobalt.graphql.whatsappWeb;
 
     // Store
     // Exported for obvious reasons
@@ -141,4 +145,5 @@ module com.github.auties00.cobalt {
     // Don't export the WAM internals
     exports com.github.auties00.cobalt.wam.event;
     exports com.github.auties00.cobalt.wam.type;
+    exports com.github.auties00.cobalt.graphql.whatsapp;
 }

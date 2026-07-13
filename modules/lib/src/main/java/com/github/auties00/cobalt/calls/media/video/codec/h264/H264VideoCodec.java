@@ -4,9 +4,11 @@ import com.github.auties00.cobalt.calls.capability.VideoDecoderCapability;
 import com.github.auties00.cobalt.calls.media.video.codec.h264.bindings.CobaltOpenH264;
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.DataUtils;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;
@@ -50,6 +52,11 @@ import com.github.auties00.cobalt.calls.media.video.codec.VideoCodecStats;
  * FFM binding is host ABI independent.
  */
 public final class H264VideoCodec implements VideoCodec {
+    /**
+     * The logger for {@link H264VideoCodec}.
+     */
+    private static final System.Logger LOGGER = Log.get(H264VideoCodec.class);
+
     /**
      * The neutral complexity that maps to the low complexity real time mode, also used for any negative
      * complexity value.
@@ -173,6 +180,10 @@ public final class H264VideoCodec implements VideoCodec {
         if (params.codec() != VideoDecoderCapability.H264) {
             throw new IllegalArgumentException("H264VideoCodec requires H264 params, got " + params.codec());
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "opening h264 codec, {0}x{1} bitrate={2} fps={3}",
+                    params.width(), params.height(), params.targetBitrate(), params.frameRate());
+        }
         this.codec = VideoDecoderCapability.H264;
         this.params = params;
         this.arena = Arena.ofShared();
@@ -193,6 +204,7 @@ public final class H264VideoCodec implements VideoCodec {
             this.packetKeyCell = arena.allocate(CobaltOpenH264.C_INT);
             this.frameImgCell = arena.allocate(CobaltOpenH264.C_POINTER);
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "h264 codec open failed", e);
             if (dec != null) {
                 CobaltOpenH264.cobalt_h264_decoder_destroy(dec);
             }
@@ -340,6 +352,7 @@ public final class H264VideoCodec implements VideoCodec {
             if (keyFrame) {
                 keyFramesEncoded++;
             }
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "h264 access unit encoded, bytes={0} keyFrame={1}", len, keyFrame);
         }
         return new EncodedVideoFrame(payload, codec, keyFrame, source.width(), source.height(), source.ptsMicros());
     }
@@ -395,6 +408,7 @@ public final class H264VideoCodec implements VideoCodec {
         var frame = copyDecodedImage(img, ptsMicros, reuse);
         framesDecoded++;
         bytesDecoded += payload.length;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "h264 picture decoded, payload bytes={0}", payload.length);
         return frame;
     }
 
@@ -436,6 +450,7 @@ public final class H264VideoCodec implements VideoCodec {
         var picture = copyDecodedImageToNative(img, ptsMicros, allocator);
         framesDecoded++;
         bytesDecoded += payload.length;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "h264 picture decoded to native, payload bytes={0}", payload.length);
         return picture;
     }
 
@@ -549,6 +564,7 @@ public final class H264VideoCodec implements VideoCodec {
         ensureOpen();
         keyFrameRequested = true;
         keyFrameRequests++;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "h264 key frame requested, total requests={0}", keyFrameRequests);
     }
 
     /**
@@ -590,6 +606,7 @@ public final class H264VideoCodec implements VideoCodec {
                 || params.frameSkip() != previous.frameSkip()
                 || params.idrBitrateRatio() != previous.idrBitrateRatio();
         if (reopen) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "h264 encoder reopening for quantizer/frameSkip/idrRatio change");
             var replacement = openEncoder();
             CobaltOpenH264.cobalt_h264_encoder_destroy(encoderCtx);
             encoderCtx = replacement;
@@ -599,6 +616,7 @@ public final class H264VideoCodec implements VideoCodec {
         if (err != CobaltOpenH264.COBALT_H264_OK()) {
             throw nativeFailure("cobalt_h264_encoder_set_rates", err, encoderCtx);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "h264 encoder rates updated, bitrate={0} fps={1}", params.targetBitrate(), params.frameRate());
     }
 
     /**
@@ -625,6 +643,7 @@ public final class H264VideoCodec implements VideoCodec {
         CobaltOpenH264.cobalt_h264_decoder_destroy(decoderCtx);
         CobaltOpenH264.cobalt_h264_encoder_destroy(encoderCtx);
         arena.close();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "h264 codec closed");
     }
 
     /**
@@ -680,6 +699,7 @@ public final class H264VideoCodec implements VideoCodec {
             var nativeStatus = CobaltOpenH264.cobalt_h264_last_native_status(handle);
             message += ", openh264 status 0x" + Integer.toHexString(nativeStatus);
         }
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "h264 native call {0} failed with status {1}", operation, status);
         return new WhatsAppCallException.H264(message);
     }
 

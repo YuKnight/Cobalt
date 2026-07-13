@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync.exchange;
 
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.model.media.ExternalBlobReferenceBuilder;
 import com.github.auties00.cobalt.model.media.ExternalBlobReferenceSpec;
 import com.github.auties00.cobalt.model.signal.KeyIdBuilder;

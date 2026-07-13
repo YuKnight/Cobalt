@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.celp;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowEntropyWrapper;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowRangeDecoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PitchTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Decodes the per subframe integer pitch lags of an MLow voiced low band frame.
@@ -41,6 +44,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PitchTable
  * carries three frames.
  */
 public final class PitchLagDecoder {
+    /**
+     * The logger for {@link PitchLagDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(PitchLagDecoder.class);
+
     /**
      * The within block lag block size in lag indices, {@code 2 * 16 * 2} = 64.
      *
@@ -213,6 +221,9 @@ public final class PitchLagDecoder {
             if ((map[i] & 0xFF) == ixJulia) {
                 return i;
             }
+        }
+        if (Log.ERROR) {
+            LOGGER.log(Level.ERROR, "mlow pitch lag decode: no block-segmentation index maps to {0}", ixJulia);
         }
         throw new IllegalStateException("no block-segmentation index maps to native index " + ixJulia);
     }

@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.sync;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -28,6 +29,7 @@ import com.github.auties00.cobalt.wam.event.NonMessagePeerDataRequestEventBuilde
 import com.github.auties00.cobalt.wam.type.PeerDataRequestType;
 
 import java.io.ByteArrayInputStream;
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -35,7 +37,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -53,11 +54,9 @@ import java.util.zip.GZIPInputStream;
 @WhatsAppWebModule(moduleName = "WAWebSendNonMessageDataRequest")
 public final class LiveSnapshotRecoveryService implements SnapshotRecoveryService {
     /**
-     * The logger used for non-fatal recovery diagnostics; recovery failures
-     * are logged here and the call returns {@code null} so the caller can
-     * fall back to a full re-link.
+     * The logger for {@link LiveSnapshotRecoveryService}.
      */
-    private static final Logger LOGGER = Logger.getLogger(LiveSnapshotRecoveryService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveSnapshotRecoveryService.class);
 
     /**
      * The hard upper bound, in milliseconds, on a single recovery call.
@@ -143,15 +142,21 @@ public final class LiveSnapshotRecoveryService implements SnapshotRecoveryServic
     @Override
     public boolean shouldAttemptRecovery(SyncPatchType collectionName, int mutationCount) {
         if (!isRecoveryEnabled()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "snapshot recovery disabled, skipping collection {0}", collectionName);
             return false;
         }
 
         if (collectionName == SyncPatchType.CRITICAL_BLOCK) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "snapshot recovery not supported for critical block collection");
             return false;
         }
 
         var maxMutations = abPropsService.getInt(ABProp.SNAPSHOT_RECOVERY_MAX_MUTATIONS_COUNT_ALLOWED);
-        return mutationCount <= maxMutations;
+        var withinBudget = mutationCount <= maxMutations;
+        if (!withinBudget && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "snapshot recovery mutation count {0} exceeds budget {1} for collection {2}", mutationCount, maxMutations, collectionName);
+        }
+        return withinBudget;
     }
 
     /**
@@ -171,7 +176,7 @@ public final class LiveSnapshotRecoveryService implements SnapshotRecoveryServic
         var startTime = System.currentTimeMillis();
         try {
             if (!recoverySemaphore.tryAcquire(RECOVERY_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                LOGGER.warning("Snapshot recovery timed out waiting for concurrent recovery to complete");
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "snapshot recovery timed out waiting for concurrent recovery to complete, collection {0}", collectionName);
                 return null;
             }
         } catch (InterruptedException e) {
@@ -188,12 +193,14 @@ public final class LiveSnapshotRecoveryService implements SnapshotRecoveryServic
             var elapsed = System.currentTimeMillis() - startTime;
             var remainingTimeout = RECOVERY_TIMEOUT_MS - elapsed;
             if (remainingTimeout <= 0) {
-                LOGGER.warning("Snapshot recovery timed out after semaphore acquisition for collection " + collectionName);
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "snapshot recovery timed out after semaphore acquisition for collection {0}", collectionName);
                 return null;
             }
-            return responseFuture.get(remainingTimeout, TimeUnit.MILLISECONDS);
+            var recovered = responseFuture.get(remainingTimeout, TimeUnit.MILLISECONDS);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "snapshot recovery completed for collection {0}", collectionName);
+            return recovered;
         } catch (Exception e) {
-            LOGGER.warning("Snapshot recovery failed for collection " + collectionName + ": " + e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "snapshot recovery failed for collection " + collectionName, e);
             return null;
         } finally {
             pendingRecoveries.remove(collectionName);
@@ -211,7 +218,7 @@ public final class LiveSnapshotRecoveryService implements SnapshotRecoveryServic
         if (future != null) {
             future.complete(recoveredSnapshot);
         } else {
-            LOGGER.fine("Received snapshot recovery response for " + collectionName + " but no pending request found");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received snapshot recovery response for {0} but no pending request found", collectionName);
         }
     }
 
@@ -231,6 +238,7 @@ public final class LiveSnapshotRecoveryService implements SnapshotRecoveryServic
                 return SyncdSnapshotRecoverySpec.decode(snapshotBytes);
             }
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to decode snapshot recovery response", e);
             throw new WhatsAppWebAppStateSyncException.ExternalDecodeFailed(e);
         }
     }
@@ -280,7 +288,7 @@ public final class LiveSnapshotRecoveryService implements SnapshotRecoveryServic
                 .protocolMessage(protocolMessage)
                 .build();
 
-        LOGGER.info("Sending snapshot recovery request for collection " + collectionName + " to primary device " + primaryDevice);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending snapshot recovery request for collection {0} to primary device {1}", collectionName, primaryDevice);
         var self = client.store().accountStore().jid().orElse(null);
         if (self == null) {
             throw new IllegalStateException("Own JID not available for snapshot recovery request");

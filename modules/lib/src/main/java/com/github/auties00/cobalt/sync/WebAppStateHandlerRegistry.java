@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.sync.handler.*;
 import com.github.auties00.cobalt.wam.WamService;
 
+import java.lang.System.Logger.Level;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +33,11 @@ import java.util.Optional;
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncdGetActionHandler")
 public final class WebAppStateHandlerRegistry {
+    /**
+     * The logger for {@link WebAppStateHandlerRegistry}.
+     */
+    private static final System.Logger LOGGER = Log.get(WebAppStateHandlerRegistry.class);
+
     /**
      * The action-name to handler map populated at construction time and
      * mutable through {@link #registerHandler(WebAppStateActionHandler)}.
@@ -167,6 +174,9 @@ public final class WebAppStateHandlerRegistry {
     @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "setActionHandlers", adaptation = WhatsAppAdaptation.ADAPTED)
     public void registerHandler(WebAppStateActionHandler handler) {
         handlers.put(handler.actionName(), handler);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "registered sync action handler for {0}", handler.actionName());
+        }
     }
 
     /**
@@ -182,7 +192,14 @@ public final class WebAppStateHandlerRegistry {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdGetActionHandler", exports = "getActionHandler", adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<WebAppStateActionHandler> findHandler(String actionName) {
-        return Optional.ofNullable(handlers.get(actionName));
+        var handler = handlers.get(actionName);
+        if (handler == null) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "no sync action handler registered for action {0}", actionName);
+            }
+            return Optional.empty();
+        }
+        return Optional.of(handler);
     }
 
     /**

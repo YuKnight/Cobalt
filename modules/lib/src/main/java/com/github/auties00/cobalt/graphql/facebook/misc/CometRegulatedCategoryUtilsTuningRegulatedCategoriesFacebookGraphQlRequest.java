@@ -2,13 +2,18 @@ package com.github.auties00.cobalt.graphql.facebook.misc;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
+import com.github.auties00.cobalt.graphql.facebook.ads.BizAdInputJson;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.ads.SpecialAdCategory;
+import com.github.auties00.cobalt.model.business.ads.TargetingSpec;
+import com.github.auties00.cobalt.model.business.ads.TuningOptions;
 
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.List;
 
 /**
  * Builds the Facebook GraphQL query that tunes a targeting spec for the configured regulated categories in the
@@ -16,9 +21,10 @@ import java.io.UncheckedIOException;
  *
  * <p>The query takes five GraphQL variables. {@code legacyAccount} is the Facebook ad account the
  * targeting belongs to. {@code targetSpec}, {@code regulatedCategories}, {@code specialAdCategoryCountries}
- * and {@code tuningOptions} parameterise the regulated-category tuning: the targeting spec to tune,
- * the regulated categories to tune for, the special-ad-category countries that apply, and the tuning
- * options object. The relay returns the tuned targeting spec under the linked {@code hec} root's
+ * and {@code tuningOptions} parameterise the regulated-category tuning: the {@link TargetingSpec
+ * targeting spec} to tune, the {@link SpecialAdCategory regulated categories} to tune for, the
+ * special-ad-category countries that apply, and the {@link TuningOptions tuning options}. The relay
+ * returns the tuned targeting spec under the linked {@code hec} root's
  * {@code tune_target_spec_for_categories.target_spec_string}; the reply is consumed through
  * {@link CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookGraphQlResponse}.
  *
@@ -28,12 +34,9 @@ import java.io.UncheckedIOException;
  * is one of the Comet ad-creation documents loaded on demand. {@code legacyAccount} is a Facebook
  * ad-account identifier (a numeric string), not a WhatsApp address, so it is modelled as a
  * {@code String} rather than a {@link com.github.auties00.cobalt.model.jid.Jid}. The
- * {@code targetSpec}, {@code regulatedCategories}, {@code specialAdCategoryCountries} and
- * {@code tuningOptions} variables are GraphQL input objects whose field names are not recoverable
- * from the bundle, so each is accepted as a caller-supplied, already JSON-encoded object literal and
- * spliced in verbatim via {@link JSONWriter#writeRaw(String)}. Once a caller that builds those
- * objects surfaces, replace the raw-JSON fields with typed scalar fields mirroring that
- * construction.
+ * {@code targetSpec} and {@code tuningOptions} objects are mapped to their snake_case JSON shapes by
+ * {@link BizAdInputJson}; {@code regulatedCategories} is a JSON array of category wire literals and
+ * {@code specialAdCategoryCountries} a JSON array of country codes.
  *
  * @see CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookGraphQlResponse
  */
@@ -67,57 +70,52 @@ public final class CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookG
     private final String legacyAccount;
 
     /**
-     * The pre-encoded JSON of the {@code targetSpec} GraphQL input object carrying the targeting spec
-     * to tune, or {@code null} to omit it.
+     * The {@code targetSpec} GraphQL input object carrying the targeting spec to tune, or {@code null}
+     * to omit it.
      */
-    private final String targetSpecJson;
+    private final TargetingSpec targetSpec;
 
     /**
-     * The pre-encoded JSON of the {@code regulatedCategories} GraphQL input value carrying the
-     * regulated categories to tune for, or {@code null} to omit it.
+     * The {@code regulatedCategories} GraphQL input value carrying the regulated categories to tune
+     * for, written only when non-empty. Never {@code null} after construction.
      */
-    private final String regulatedCategoriesJson;
+    private final List<SpecialAdCategory> regulatedCategories;
 
     /**
-     * The pre-encoded JSON of the {@code specialAdCategoryCountries} GraphQL input value carrying the
-     * special-ad-category countries that apply, or {@code null} to omit it.
+     * The {@code specialAdCategoryCountries} GraphQL input value carrying the special-ad-category
+     * countries that apply, written only when non-empty. Never {@code null} after construction.
      */
-    private final String specialAdCategoryCountriesJson;
+    private final List<String> specialAdCategoryCountries;
 
     /**
-     * The pre-encoded JSON of the {@code tuningOptions} GraphQL input object carrying the tuning
-     * options, or {@code null} to omit it.
+     * The {@code tuningOptions} GraphQL input object carrying the tuning options, or {@code null} to
+     * omit it.
      */
-    private final String tuningOptionsJson;
+    private final TuningOptions tuningOptions;
 
     /**
      * Constructs a regulated-category tuning query request.
      *
      * <p>The {@code legacyAccount} populates the {@code legacyAccount} GraphQL variable. The
-     * {@code targetSpecJson}, {@code regulatedCategoriesJson}, {@code specialAdCategoryCountriesJson}
-     * and {@code tuningOptionsJson} are the already-JSON-encoded {@code targetSpec},
-     * {@code regulatedCategories}, {@code specialAdCategoryCountries} and {@code tuningOptions} input
-     * values; their field names are defined by the server-side input types and are not modelled here
-     * (see the class {@code @implNote}). Each value that is {@code null} omits its variable from the
-     * serialized object.
+     * {@code targetSpec}, {@code regulatedCategories}, {@code specialAdCategoryCountries} and
+     * {@code tuningOptions} populate the corresponding input values. Each value that is {@code null}
+     * (or, for the lists, empty) omits its variable from the serialized object.
      *
-     * @param legacyAccount                  the Facebook ad-account identifier, or {@code null} to
-     *                                       omit the variable
-     * @param targetSpecJson                 the already-JSON-encoded {@code targetSpec} value, or
-     *                                       {@code null} to omit the variable
-     * @param regulatedCategoriesJson        the already-JSON-encoded {@code regulatedCategories}
-     *                                       value, or {@code null} to omit the variable
-     * @param specialAdCategoryCountriesJson the already-JSON-encoded {@code specialAdCategoryCountries}
-     *                                       value, or {@code null} to omit the variable
-     * @param tuningOptionsJson              the already-JSON-encoded {@code tuningOptions} value, or
-     *                                       {@code null} to omit the variable
+     * @param legacyAccount              the Facebook ad-account identifier, or {@code null} to omit
+     *                                   the variable
+     * @param targetSpec                 the {@code targetSpec} object, or {@code null} to omit the
+     *                                   variable
+     * @param regulatedCategories        the regulated categories, written only when non-empty
+     * @param specialAdCategoryCountries the special-ad-category countries, written only when non-empty
+     * @param tuningOptions              the {@code tuningOptions} object, or {@code null} to omit the
+     *                                   variable
      */
-    public CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookGraphQlRequest(String legacyAccount, String targetSpecJson, String regulatedCategoriesJson, String specialAdCategoryCountriesJson, String tuningOptionsJson) {
+    public CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookGraphQlRequest(String legacyAccount, TargetingSpec targetSpec, List<SpecialAdCategory> regulatedCategories, List<String> specialAdCategoryCountries, TuningOptions tuningOptions) {
         this.legacyAccount = legacyAccount;
-        this.targetSpecJson = targetSpecJson;
-        this.regulatedCategoriesJson = regulatedCategoriesJson;
-        this.specialAdCategoryCountriesJson = specialAdCategoryCountriesJson;
-        this.tuningOptionsJson = tuningOptionsJson;
+        this.targetSpec = targetSpec;
+        this.regulatedCategories = regulatedCategories == null ? List.of() : List.copyOf(regulatedCategories);
+        this.specialAdCategoryCountries = specialAdCategoryCountries == null ? List.of() : List.copyOf(specialAdCategoryCountries);
+        this.tuningOptions = tuningOptions;
     }
 
     /**
@@ -139,13 +137,11 @@ public final class CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookG
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"legacyAccount": <legacyAccount>, "targetSpec":
-     * <targetSpecJson>, "regulatedCategories": <regulatedCategoriesJson>, "specialAdCategoryCountries":
-     * <specialAdCategoryCountriesJson>, "tuningOptions": <tuningOptionsJson>}}, writing each variable
-     * only when its value is non-null and emitting {@code "{}"} when all are {@code null}. The
-     * {@code targetSpec}, {@code regulatedCategories}, {@code specialAdCategoryCountries} and
-     * {@code tuningOptions} values are spliced in as raw JSON values via
-     * {@link JSONWriter#writeRaw(String)} because they are supplied already encoded.
+     * @implNote This implementation emits {@code {"legacyAccount": <legacyAccount>, "targetSpec": {...},
+     * "regulatedCategories": [...], "specialAdCategoryCountries": [...], "tuningOptions": {...}}},
+     * writing each variable only when present (and the arrays only when non-empty) and emitting
+     * {@code "{}"} when all are absent. The {@code targetSpec} and {@code tuningOptions} objects are
+     * mapped by {@link BizAdInputJson}; each {@link SpecialAdCategory} is rendered as its wire literal.
      */
     @Override
     public String variables() {
@@ -157,28 +153,35 @@ public final class CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookG
                 writer.writeString(legacyAccount);
             }
 
-            if (targetSpecJson != null) {
+            if (targetSpec != null) {
                 writer.writeName("targetSpec");
                 writer.writeColon();
-                writer.writeRaw(targetSpecJson);
+                BizAdInputJson.writeTargetingSpec(writer, targetSpec);
             }
 
-            if (regulatedCategoriesJson != null) {
+            if (!regulatedCategories.isEmpty()) {
                 writer.writeName("regulatedCategories");
                 writer.writeColon();
-                writer.writeRaw(regulatedCategoriesJson);
+                BizAdInputJson.writeSpecialAdCategories(writer, regulatedCategories);
             }
 
-            if (specialAdCategoryCountriesJson != null) {
+            if (!specialAdCategoryCountries.isEmpty()) {
                 writer.writeName("specialAdCategoryCountries");
                 writer.writeColon();
-                writer.writeRaw(specialAdCategoryCountriesJson);
+                writer.startArray();
+                for (var i = 0; i < specialAdCategoryCountries.size(); i++) {
+                    if (i > 0) {
+                        writer.writeComma();
+                    }
+                    writer.writeString(specialAdCategoryCountries.get(i));
+                }
+                writer.endArray();
             }
 
-            if (tuningOptionsJson != null) {
+            if (tuningOptions != null) {
                 writer.writeName("tuningOptions");
                 writer.writeColon();
-                writer.writeRaw(tuningOptionsJson);
+                BizAdInputJson.writeTuningOptions(writer, tuningOptions);
             }
             writer.endObject();
             try (var output = new StringWriter()) {

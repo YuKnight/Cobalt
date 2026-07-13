@@ -41,11 +41,11 @@ public interface WhatsAppSocketListener {
      * <p>Errors surface here rather than being thrown at the application
      * thread because the reader runs asynchronously on a virtual thread. The
      * exception type discriminates the recovery action: see
-     * {@link com.github.auties00.cobalt.exception.WhatsAppSessionException.BadMac}
+     * {@link com.github.auties00.cobalt.exception.linked.WhatsAppSessionException.BadMac}
      * for fatal stream corruption,
-     * {@link com.github.auties00.cobalt.exception.WhatsAppConnectionException}
+     * {@link com.github.auties00.cobalt.exception.linked.WhatsAppConnectionException}
      * for transport-level drops, and
-     * {@link com.github.auties00.cobalt.exception.WhatsAppStreamException.MalformedNode}
+     * {@link com.github.auties00.cobalt.exception.linked.WhatsAppStreamException.MalformedNode}
      * for protocol-level parse failures.
      *
      * @implSpec

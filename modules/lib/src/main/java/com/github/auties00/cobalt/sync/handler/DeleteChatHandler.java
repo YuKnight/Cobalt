@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -16,6 +17,8 @@ import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.DeleteChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code deleteChat} app-state sync action that removes a chat
@@ -41,6 +44,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebDeleteChatSync")
 public final class DeleteChatHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link DeleteChatHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(DeleteChatHandler.class);
 
     /**
      * Constructs a new singleton {@link DeleteChatHandler}.
@@ -108,6 +115,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
 
             if (chatJidString == null || chatJidString.isEmpty()
                     || deleteMediaString == null || deleteMediaString.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete chat: malformed mutation index");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
@@ -115,24 +123,29 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
             try {
                 chatJid = Jid.of(chatJidString);
             } catch (Exception e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete chat: failed to parse chat jid={0}", Log.jid(chatJidString));
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (chatJid == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete chat: chat jid resolved to null, jid={0}", Log.jid(chatJidString));
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof DeleteChatAction deleteChatAction)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete chat: mutation value is not a DeleteChatAction");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var messageRange = deleteChatAction.messageRange().orElse(null);
             if (messageRange == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete chat: missing message range chat={0}", chatJid);
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "delete chat: orphan, chat not found {0}", chatJid);
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
@@ -142,9 +155,11 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
             //       currently falls through to a full removal and loses the messages
             //       outside the incoming range.
             client.store().chatStore().removeChat(chat.get());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "delete chat: removed chat={0} deleteMedia={1}", chatJid, deleteMediaString);
 
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "delete chat: failed to apply mutation", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -197,6 +212,7 @@ public final class DeleteChatHandler implements WebAppStateActionHandler {
                             ? ConflictResolution.of(MutationConflictResolutionState.APPLY_REMOTE_DROP_LOCAL)
                             : ConflictResolution.of(MutationConflictResolutionState.SKIP_REMOTE);
             case RANGES_NOT_ENCLOSING -> {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "delete chat: merging conflicting message ranges");
                 var mergedRange = MessageRangeUtils.mergeMessageRanges(remoteRange, localRange);
                 var mergedAction = new DeleteChatActionBuilder()
                         .messageRange(mergedRange)

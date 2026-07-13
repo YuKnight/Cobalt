@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.transport.ice;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.DataUtils;
 
+import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -39,6 +41,11 @@ import com.github.auties00.cobalt.calls.transport.warp.WarpCodecSupport;
  * <p>The agent is driven by the single call transport thread and is not thread safe.
  */
 public final class IceAgent {
+    /**
+     * The logger for {@link IceAgent}.
+     */
+    private static final System.Logger LOGGER = Log.get(IceAgent.class);
+
     /**
      * The maximum number of remote candidates the agent accepts from signaling.
      */
@@ -142,6 +149,10 @@ public final class IceAgent {
     public void addLocalCandidate(IceCandidate candidate) {
         Objects.requireNonNull(candidate, "candidate cannot be null");
         localCandidates.add(candidate);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ice local candidate added, type={0} protocol={1} priority={2}",
+                    candidate.type(), candidate.protocol(), candidate.priority());
+        }
         rebuildChecklist();
     }
 
@@ -163,6 +174,10 @@ public final class IceAgent {
                     + (remoteCandidates.size() + candidates.size()) + " exceeds " + MAX_REMOTE_CANDIDATES);
         }
         remoteCandidates.addAll(candidates);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ice remote candidates appended, added={0} total={1}",
+                    candidates.size(), remoteCandidates.size());
+        }
         rebuildChecklist();
     }
 
@@ -219,6 +234,10 @@ public final class IceAgent {
         var message = new StunMessage(StunMessage.TYPE_BINDING_REQUEST, StunMessage.MAGIC_COOKIE,
                 transactionId, attributes);
         pair.setState(IceCheckState.IN_PROGRESS);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ice binding request built, nominate={0} controlling={1}",
+                    nominate, controlling);
+        }
         return message.finalizeWithIntegrity(remotePassword);
     }
 
@@ -249,6 +268,9 @@ public final class IceAgent {
         var attributes = List.of(new StunMessage.Attribute(StunAttributeType.XOR_MAPPED_ADDRESS, xorMapped));
         var message = new StunMessage(StunMessage.TYPE_BINDING_SUCCESS_RESPONSE, StunMessage.MAGIC_COOKIE,
                 transactionId, attributes);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ice binding response built");
+        }
         return message.finalizeWithIntegrity(localPassword);
     }
 
@@ -281,19 +303,38 @@ public final class IceAgent {
         StunMessage parsed;
         try {
             parsed = StunMessage.decode(message);
-        } catch (RuntimeException _) {
+        } catch (RuntimeException exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "ice inbound stun message failed to decode, length=" + message.length,
+                        exception);
+            }
             return Optional.empty();
         }
         if (parsed.magicCookie() != StunMessage.MAGIC_COOKIE) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "ice inbound stun message has wrong magic cookie, type={0}",
+                        parsed.messageType());
+            }
             return Optional.empty();
         }
         var integrityOffset = locateIntegrityOffset(message);
         if (integrityOffset < 0) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "ice inbound stun message missing message-integrity, type={0}",
+                        parsed.messageType());
+            }
             return Optional.empty();
         }
         var key = isResponse(parsed.messageType()) ? remotePassword : localPassword;
         if (!StunIntegrity.verifyMessageIntegrity(message, integrityOffset, key)) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "ice inbound stun message failed integrity check, type={0}",
+                        parsed.messageType());
+            }
             return Optional.empty();
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "ice inbound stun message verified, type={0}", parsed.messageType());
         }
         return Optional.of(parsed);
     }
@@ -328,9 +369,15 @@ public final class IceAgent {
     public void onCheckSucceeded(IceCandidatePair pair) {
         Objects.requireNonNull(pair, "pair cannot be null");
         pair.setState(IceCheckState.SUCCEEDED);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ice pair check succeeded, priority=0x{0}", Long.toHexString(pair.priority()));
+        }
         if (controlling && nominatedPair == null) {
             pair.nominate();
             nominatedPair = pair;
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "ice pair nominated, priority=0x{0}", Long.toHexString(pair.priority()));
+            }
         }
     }
 
@@ -347,6 +394,10 @@ public final class IceAgent {
         Objects.requireNonNull(pair, "pair cannot be null");
         pair.nominate();
         nominatedPair = pair;
+        if (Log.INFO) {
+            LOGGER.log(Level.INFO, "ice remote nomination adopted, priority=0x{0}",
+                    Long.toHexString(pair.priority()));
+        }
     }
 
     /**
@@ -386,6 +437,9 @@ public final class IceAgent {
             }
         }
         checklist.sort(Comparator.comparingLong(IceCandidatePair::priority).reversed());
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "ice checklist rebuilt, pairs={0}", checklist.size());
+        }
     }
 
     /**

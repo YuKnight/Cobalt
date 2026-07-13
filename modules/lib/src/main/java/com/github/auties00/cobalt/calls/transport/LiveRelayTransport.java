@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.calls.transport;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptions;
 import com.github.auties00.cobalt.model.call.datachannel.StreamDescriptors;
 import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptions;
 
+import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -13,10 +15,10 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import com.github.auties00.cobalt.calls.transport.datachannel.RelayDataChannel;
 import com.github.auties00.cobalt.calls.transport.ice.IceAgent;
@@ -117,7 +119,7 @@ public final class LiveRelayTransport implements MediaTransport {
          * bringup thread until the channel is ready or the bringup fails. It is called once, after ICE has
          * selected the relay path; a second call after the channel is ready is a no op.
          *
-         * @throws com.github.auties00.cobalt.exception.WhatsAppCallException.DataChannel if the handshake,
+         * @throws com.github.auties00.cobalt.exception.linked.WhatsAppCallException.DataChannel if the handshake,
          *                                                                                the SCTP connect, or
          *                                                                                the channel open
          *                                                                                fails
@@ -179,11 +181,9 @@ public final class LiveRelayTransport implements MediaTransport {
     }
 
     /**
-     * Logs the bringup outcome so a relay bind failure records which stage failed (ICE nomination versus the
-     * DTLS/SCTP data channel connect) and what the relay returned, rather than only the opaque
-     * {@link TransportEvent#RELAY_BINDS_FAILED} event the media session surfaces.
+     * The logger for {@link LiveRelayTransport}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveRelayTransport.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveRelayTransport.class);
 
     /**
      * Holds the count of binding request retransmissions before a candidate pair's check is abandoned.
@@ -451,14 +451,12 @@ public final class LiveRelayTransport implements MediaTransport {
      * Tracks the in flight connectivity check per candidate pair by its STUN transaction id, so a binding
      * success response is matched back to the pair that produced it.
      *
-     * <p>It is concurrent because the bringup thread starts and paces checks while the socket reader thread
-     * completes them from inbound binding responses.
+     * <p>Every access holds {@link #iceLock}: the bringup thread paces checks through
+     * {@link #driveConnectivityChecks(long)} and {@link #startNextCheck(long)}, the socket reader thread
+     * completes them in {@link #onStun(byte[], SocketAddress)}, and {@link #close()} clears the map at
+     * teardown. Because the lock serializes all of them, a plain {@link HashMap} is sufficient.
      */
-    // TODO: the check paths (driveConnectivityChecks, startNextCheck, onStun) touch this map only under
-    //  iceLock, so it could drop to a plain HashMap; the blocker is close(), which calls
-    //  pendingChecks.clear() outside iceLock concurrently with those iceLock held iterations. Move that
-    //  clear() under iceLock first, then this can become a HashMap.
-    private final Map<TransactionKey, PendingCheck> pendingChecks = new ConcurrentHashMap<>();
+    private final Map<TransactionKey, PendingCheck> pendingChecks = new HashMap<>();
 
     /**
      * Holds whether the ICE agent has nominated a candidate pair, set on the socket reader thread when a
@@ -752,25 +750,31 @@ public final class LiveRelayTransport implements MediaTransport {
         try {
             if (!driveIceToNomination()) {
                 if (!closed) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "calls relay ICE nomination failed against {0}: no verified binding response "
-                                    + "({1} inbound STUN datagram(s), {2} rejected, {3} check-send failure(s))",
-                            relayReflexiveAddress, inboundStunCount, stunVerifyFailures, checkSendFailures);
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "calls relay ICE nomination failed against {0}: no verified binding response "
+                                        + "({1} inbound STUN datagram(s), {2} rejected, {3} check-send failure(s))",
+                                relayReflexiveAddress, inboundStunCount, stunVerifyFailures, checkSendFailures);
+                    }
                     emit(TransportEvent.RELAY_BINDS_FAILED);
                 }
                 return;
             }
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls relay ICE nominated against {0} after {1} inbound STUN datagram(s); connecting data channel",
-                    relayReflexiveAddress, inboundStunCount);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO,
+                        "calls relay ICE nominated against {0} after {1} inbound STUN datagram(s); connecting data channel",
+                        relayReflexiveAddress, inboundStunCount);
+            }
             dataChannel.connect();
             pollDataChannel();
             runKeepaliveLoop();
         } catch (RuntimeException exception) {
             if (!closed) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "calls relay data-channel bring-up failed against " + relayReflexiveAddress
-                                + " after ICE nomination (DTLS handshake or SCTP connect)", exception);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "calls relay data-channel bring-up failed against " + relayReflexiveAddress
+                                    + " after ICE nomination (DTLS handshake or SCTP connect)", exception);
+                }
                 emit(TransportEvent.RELAY_BINDS_FAILED);
             }
         }
@@ -868,9 +872,11 @@ public final class LiveRelayTransport implements MediaTransport {
         var accepted = dataChannel.send(slice(packet, protectedLength));
         if (isRtp && !firstOutboundRtpLogged) {
             firstOutboundRtpLogged = true;
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls relay first outbound RTP: ssrc=0x{0}, payloadLen={1}, onWireLen={2}, e2e={3}, accepted={4}",
-                    Integer.toHexString(ssrc), length, protectedLength, e2eSend != null, accepted);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO,
+                        "calls relay first outbound RTP: ssrc=0x{0}, payloadLen={1}, onWireLen={2}, e2e={3}, accepted={4}",
+                        Integer.toHexString(ssrc), length, protectedLength, e2eSend != null, accepted);
+            }
         }
         return accepted ? length : 0;
     }
@@ -906,6 +912,10 @@ public final class LiveRelayTransport implements MediaTransport {
         if (closed || dataChannel == null || !dataChannel.isReady()
                 || missingSequences == null || missingSequences.isEmpty()) {
             return;
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls relay sending nack for ssrc=0x{0}, {1} missing sequence(s)",
+                    Integer.toHexString(mediaSsrc), missingSequences.size());
         }
         var sorted = new ArrayList<>(new TreeSet<>(missingSequences));
         var index = 0;
@@ -1011,9 +1021,11 @@ public final class LiveRelayTransport implements MediaTransport {
         if (closed || relayKey == null || relayToken == null || relayReflexiveAddress == null) {
             if (!closed && !subscriptionSkipLogged) {
                 subscriptionSkipLogged = true;
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "calls relay 0x0003 subscription NOT sent: relayKey present={0}, relayToken present={1}, reflexiveAddr present={2}",
-                        relayKey != null, relayToken != null, relayReflexiveAddress != null);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "calls relay 0x0003 subscription NOT sent: relayKey present={0}, relayToken present={1}, reflexiveAddr present={2}",
+                            relayKey != null, relayToken != null, relayReflexiveAddress != null);
+                }
             }
             return false;
         }
@@ -1027,9 +1039,11 @@ public final class LiveRelayTransport implements MediaTransport {
         var accepted = sendAppData(envelope);
         if (!subscriptionLogged) {
             subscriptionLogged = true;
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls relay first outbound 0x0003 subscription sent ({0} bytes, {1} stream entries, token {3} bytes, key {4} bytes); accepted={2}",
-                    envelope.length, subscriptions.entries().size(), accepted, relayToken.length, relayKey.length);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO,
+                        "calls relay first outbound 0x0003 subscription sent ({0} bytes, {1} stream entries, token {3} bytes, key {4} bytes); accepted={2}",
+                        envelope.length, subscriptions.entries().size(), accepted, relayToken.length, relayKey.length);
+            }
         }
         return accepted;
     }
@@ -1060,9 +1074,11 @@ public final class LiveRelayTransport implements MediaTransport {
         if (closed || relayKey == null || relayToken == null || relayReflexiveAddress == null) {
             if (!closed && !subscriptionSkipLogged) {
                 subscriptionSkipLogged = true;
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "calls relay 0x0003 subscription NOT sent: relayKey present={0}, relayToken present={1}, reflexiveAddr present={2}",
-                        relayKey != null, relayToken != null, relayReflexiveAddress != null);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "calls relay 0x0003 subscription NOT sent: relayKey present={0}, relayToken present={1}, reflexiveAddr present={2}",
+                            relayKey != null, relayToken != null, relayReflexiveAddress != null);
+                }
             }
             return false;
         }
@@ -1071,9 +1087,11 @@ public final class LiveRelayTransport implements MediaTransport {
         var accepted = sendAppData(envelope);
         if (!subscriptionLogged) {
             subscriptionLogged = true;
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls relay first outbound 0x0003 subscription sent ({0} bytes, {1} stream descriptors, token {3} bytes, key {4} bytes); accepted={2}",
-                    envelope.length, descriptors.streamDescriptors().size(), accepted, relayToken.length, relayKey.length);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO,
+                        "calls relay first outbound 0x0003 subscription sent ({0} bytes, {1} stream descriptors, token {3} bytes, key {4} bytes); accepted={2}",
+                        envelope.length, descriptors.streamDescriptors().size(), accepted, relayToken.length, relayKey.length);
+            }
         }
         return accepted;
     }
@@ -1105,9 +1123,11 @@ public final class LiveRelayTransport implements MediaTransport {
         if (closed || relayKey == null || relayToken == null || relayReflexiveAddress == null) {
             if (!closed && !subscriptionSkipLogged) {
                 subscriptionSkipLogged = true;
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "calls relay 0x0003 subscription NOT sent: relayKey present={0}, relayToken present={1}, reflexiveAddr present={2}",
-                        relayKey != null, relayToken != null, relayReflexiveAddress != null);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "calls relay 0x0003 subscription NOT sent: relayKey present={0}, relayToken present={1}, reflexiveAddr present={2}",
+                            relayKey != null, relayToken != null, relayReflexiveAddress != null);
+                }
             }
             return false;
         }
@@ -1116,9 +1136,11 @@ public final class LiveRelayTransport implements MediaTransport {
         var accepted = sendAppData(envelope);
         if (!subscriptionLogged) {
             subscriptionLogged = true;
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls relay first outbound 0x0003 subscription sent ({0} bytes, {1} sender-subscription sources, token {3} bytes, key {4} bytes); accepted={2}",
-                    envelope.length, senderSubscriptions.subscriptions().size(), accepted, relayToken.length, relayKey.length);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO,
+                        "calls relay first outbound 0x0003 subscription sent ({0} bytes, {1} sender-subscription sources, token {3} bytes, key {4} bytes); accepted={2}",
+                        envelope.length, senderSubscriptions.subscriptions().size(), accepted, relayToken.length, relayKey.length);
+            }
         }
         return accepted;
     }
@@ -1345,16 +1367,20 @@ public final class LiveRelayTransport implements MediaTransport {
             var accepted = dataChannel.send(slice(buffer, protectedLength));
             if (!firstRtcpLogged) {
                 firstRtcpLogged = true;
-                LOGGER.log(System.Logger.Level.INFO,
-                        "calls relay first outbound RTCP sent ({0} cleartext bytes, {1} on wire); accepted={2}",
-                        report.length, protectedLength, accepted);
+                if (Log.INFO) {
+                    LOGGER.log(Level.INFO,
+                            "calls relay first outbound RTCP sent ({0} cleartext bytes, {1} on wire); accepted={2}",
+                            report.length, protectedLength, accepted);
+                }
             }
         } catch (RuntimeException exception) {
             // A failed RTCP protection or send is nonfatal; the next tick retries.
             if (!firstRtcpLogged) {
                 firstRtcpLogged = true;
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "calls relay first outbound RTCP protect/send failed (hop-by-hop SRTCP)", exception);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "calls relay first outbound RTCP protect/send failed (hop-by-hop SRTCP)", exception);
+                }
             }
         }
     }
@@ -1428,13 +1454,18 @@ public final class LiveRelayTransport implements MediaTransport {
         if (closed) {
             return;
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "calls relay transport closing against {0}", relayReflexiveAddress);
+        }
         closed = true;
         started = false;
         var thread = bringUpThread;
         if (thread != null) {
             thread.interrupt();
         }
-        pendingChecks.clear();
+        synchronized (iceLock) {
+            pendingChecks.clear();
+        }
         if (dataChannel != null) {
             try {
                 dataChannel.close();
@@ -1608,8 +1639,8 @@ public final class LiveRelayTransport implements MediaTransport {
         if (closed) {
             return;
         }
-        if (inboundChannelMsgCount++ == 0) {
-            LOGGER.log(System.Logger.Level.INFO,
+        if (inboundChannelMsgCount++ == 0 && Log.INFO) {
+            LOGGER.log(Level.INFO,
                     "calls relay first inbound data-channel message: class={0}, leadingByte=0x{1}, {2} bytes",
                     InboundPacketDemux.classify(message),
                     String.format("%02X", message.length == 0 ? 0 : message[0] & 0xFF),
@@ -1617,14 +1648,12 @@ public final class LiveRelayTransport implements MediaTransport {
         }
         if (!firstInboundAckLogged && message.length >= 2 && (message[0] & 0xFF) == 0x01) {
             firstInboundAckLogged = true;
-            var hex = new StringBuilder(message.length * 2);
-            for (var b : message) {
-                hex.append(String.format("%02x", b & 0xFF));
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO,
+                        "calls relay first inbound app-STUN response type=0x{0}{1}, msg={2}",
+                        String.format("%02X", message[0] & 0xFF), String.format("%02X", message[1] & 0xFF),
+                        message);
             }
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls relay first inbound app-STUN response type=0x{0} ({1} bytes): {2}",
-                    String.format("%02X%02X", message[0] & 0xFF, message[1] & 0xFF),
-                    message.length, hex);
         }
         emit(TransportEvent.RX_APP_DATA);
         channelDemux.accept(message, null);
@@ -1658,8 +1687,8 @@ public final class LiveRelayTransport implements MediaTransport {
         } catch (WhatsAppCallException.Srtp | IllegalArgumentException _) {
             // A packet that fails authentication or does not parse is dropped, not surfaced: per the engine
             // the leg silently discards an unverifiable media packet.
-            if (inboundMediaDecryptFailures++ == 0) {
-                LOGGER.log(System.Logger.Level.WARNING,
+            if (inboundMediaDecryptFailures++ == 0 && Log.WARNING) {
+                LOGGER.log(Level.WARNING,
                         "calls relay first inbound media (RTP) decrypt failure ({0} bytes); dropping",
                         message.length);
             }
@@ -1685,8 +1714,8 @@ public final class LiveRelayTransport implements MediaTransport {
             // block can reflect its last SR and delay since last SR round trip fields.
             recordInboundSenderReports(message, cleartextLength, System.nanoTime());
             var feedback = RtcpFeedbackParser.parse(message, cleartextLength);
-            if (inboundRtcpDiagCount++ == 0) {
-                LOGGER.log(System.Logger.Level.INFO,
+            if (inboundRtcpDiagCount++ == 0 && Log.INFO) {
+                LOGGER.log(Level.INFO,
                         "calls relay first inbound RTCP ({0} bytes, {1} cleartext): parsed feedback={2}",
                         message.length, cleartextLength,
                         feedback == null ? "NONE" : "loss=" + feedback.hasLoss() + " rtt=" + feedback.hasRtt()
@@ -1700,8 +1729,8 @@ public final class LiveRelayTransport implements MediaTransport {
             // leg silently discards an unverifiable RTCP packet. The libsrtp status carried in the exception
             // message distinguishes the cause on the first failure (7 auth_fail, 9/10 replay, 13 no_ctx,
             // 2 bad_param), which tells whether the inbound SRTCP key/policy or the stream lookup is wrong.
-            if (inboundRtcpDiagCount++ == 0) {
-                LOGGER.log(System.Logger.Level.INFO,
+            if (inboundRtcpDiagCount++ == 0 && Log.WARNING) {
+                LOGGER.log(Level.WARNING,
                         "calls relay first inbound RTCP ({0} bytes) FAILED hop-by-hop unprotect ({1}); dropping",
                         message.length, srtpFailure.getMessage());
             }

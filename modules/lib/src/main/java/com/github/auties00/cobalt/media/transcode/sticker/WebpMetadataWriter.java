@@ -1,12 +1,14 @@
 package com.github.auties00.cobalt.media.transcode.sticker;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.util.DataUtils;
 import com.alibaba.fastjson2.JSON;
 
+import java.lang.System.Logger.Level;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -31,6 +33,9 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebAddWebpMetadata")
 final class WebpMetadataWriter {
+    /** The logger for {@link WebpMetadataWriter}. */
+    private static final System.Logger LOGGER = Log.get(WebpMetadataWriter.class);
+
     /**
      * Length, in bytes, of the RIFF outer header: {@code "RIFF" + 4-byte size + "WEBP"}.
      *
@@ -93,10 +98,10 @@ final class WebpMetadataWriter {
     /**
      * Prevents instantiation of this static-only type.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private WebpMetadataWriter() {
-        throw new UnsupportedOperationException();
+        throw new AssertionError();
     }
 
     /**
@@ -122,6 +127,10 @@ final class WebpMetadataWriter {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(metadata, "metadata");
         if (!isExtendedWebp(source)) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "webp metadata write rejected, source is not an extended webp, bytes={0}",
+                        source.length);
+            }
             throw new WhatsAppMediaException.Processing(
                     "WebP source is not an extended file (missing VP8X chunk)");
         }
@@ -143,6 +152,10 @@ final class WebpMetadataWriter {
             result[cursor] = 0;
         }
         DataUtils.putInt(result, RIFF_SIZE_OFFSET, totalLength - 8, ByteOrder.LITTLE_ENDIAN);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "webp metadata chunk appended, jsonBytes={0}, totalBytes={1}",
+                    jsonBytes.length, totalLength);
+        }
         return result;
     }
 

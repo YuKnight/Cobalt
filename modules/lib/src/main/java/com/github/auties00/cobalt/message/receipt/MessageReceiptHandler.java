@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.message.receipt;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.receive.stanza.MessageReceiveStanza;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -16,6 +17,7 @@ import com.github.auties00.cobalt.util.DataUtils;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.key.SignalPreKeyPair;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -46,9 +48,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebSendReceiptJobCommon")
 public final class MessageReceiptHandler {
     /**
-     * Logs the prekey-bundle build-failure trace emitted by {@link #buildKeyBundleNode()}.
+     * The logger for {@link MessageReceiptHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MessageReceiptHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(MessageReceiptHandler.class);
 
     /**
      * Holds the retry count from which the {@code <keys>} bundle is attached to the retry
@@ -158,6 +160,10 @@ public final class MessageReceiptHandler {
                                 : null)
                 .attribute("recipient",
                         shouldSetRecipient ? recipientJid.toUserJid() : null);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sending delivery receipt id={0} type={1} to={2}",
+                    stanza.id(), receiptType, toJid);
+        }
         client.sendNodeWithNoResponse(receipt.build());
     }
 
@@ -185,6 +191,9 @@ public final class MessageReceiptHandler {
         var from = resolveFrom(stanza);
         var participant = resolveReceiptParticipant(stanza);
         if (!from.hasBotServer() && participant != null && participant.hasBotServer()) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "skipping retry receipt for bot participant id={0}", stanza.id());
+            }
             return;
         }
 
@@ -240,6 +249,10 @@ public final class MessageReceiptHandler {
                 .attribute("recipient", recipientAttr)
                 .attribute("category", categoryAttr)
                 .content(retryNode, registrationNode, keysNode);
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "sending retry receipt id={0} reason={1} count={2} keyBundle={3}",
+                    stanza.id(), retryReason, retryCount, keysNode != null);
+        }
         client.sendNodeWithNoResponse(receipt.build());
     }
 
@@ -280,6 +293,9 @@ public final class MessageReceiptHandler {
                 .attribute("participant", participantJid)
                 .attribute("class", "message")
                 .attribute("type", "text");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sending bot invoke-response ack id={0} to={1}", stanza.id(), to);
+        }
         client.sendNodeWithNoResponse(ack.build());
     }
 
@@ -354,6 +370,10 @@ public final class MessageReceiptHandler {
                 .attribute("type", stanza.stanzaType())
                 .attribute("error", errorCode)
                 .content(metaStanza);
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "sending nack id={0} errorCode={1} failureReason={2}",
+                    stanza.id(), errorCode, failureReason);
+        }
         client.sendNodeWithNoResponse(ack.build());
     }
 
@@ -438,8 +458,9 @@ public final class MessageReceiptHandler {
                     .content(typeNode, identityNode, preKeyNode, skeyNode, deviceIdentityNode)
                     .build();
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to build key bundle for retry receipt: {0}", e.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "failed to build key bundle for retry receipt", e);
+            }
             return null;
         }
     }

@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the has-categories query built by
+ * Parses the graph.whatsapp.com GraphQL response of the has-categories query built by
  * {@link QueryCatalogHasCategoriesWhatsAppGraphQlRequest}.
  *
  * <p>Exposes the linked root {@code xwa_product_catalog_get_categories} of type {@link Categories},
@@ -24,7 +24,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebQueryCatalogHasCategoriesQuery")
 public final class QueryCatalogHasCategoriesWhatsAppGraphQlResponse implements WhatsAppGraphQlOperation.Response {
     /**
-     * Holds the parsed {@code xwa_product_catalog_get_categories} root, or {@code null} when the relay
+     * Holds the parsed {@code xwa_product_catalog_get_categories} root, or {@code null} when the graph.whatsapp.com endpoint
      * omitted it.
      */
     private final Categories categories;
@@ -34,14 +34,14 @@ public final class QueryCatalogHasCategoriesWhatsAppGraphQlResponse implements W
      *
      * <p>Reserved for the static parser.
      *
-     * @param categories the parsed categories root, or {@code null} when the relay omitted the field
+     * @param categories the parsed categories root, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private QueryCatalogHasCategoriesWhatsAppGraphQlResponse(Categories categories) {
         this.categories = categories;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_product_catalog_get_categories}; the returned
      * {@link Optional} is empty when {@code data} is {@code null}.
@@ -62,7 +62,7 @@ public final class QueryCatalogHasCategoriesWhatsAppGraphQlResponse implements W
     /**
      * Returns the parsed categories root.
      *
-     * @return the parsed {@link Categories}, or empty when the relay omitted the field
+     * @return the parsed {@link Categories}, or empty when the graph.whatsapp.com endpoint omitted the field
      */
     public Optional<Categories> categories() {
         return Optional.ofNullable(categories);
@@ -74,7 +74,7 @@ public final class QueryCatalogHasCategoriesWhatsAppGraphQlResponse implements W
      * <p>Mirrors the WhatsApp Web reduction of this query to a single boolean: the catalog "has
      * categories" when the root is present and its {@code categories} array is non-empty.
      *
-     * @return {@code true} when the relay returned at least one category, {@code false} otherwise
+     * @return {@code true} when the graph.whatsapp.com endpoint returned at least one category, {@code false} otherwise
      */
     public boolean hasCategories() {
         return categories != null && !categories.categories().isEmpty();
@@ -89,7 +89,7 @@ public final class QueryCatalogHasCategoriesWhatsAppGraphQlResponse implements W
      */
     public static final class Categories {
         /**
-         * Holds the parsed category entries returned by the relay.
+         * Holds the parsed category entries returned by the graph.whatsapp.com endpoint.
          */
         private final List<Category> categories;
 
@@ -107,7 +107,7 @@ public final class QueryCatalogHasCategoriesWhatsAppGraphQlResponse implements W
         /**
          * Returns the parsed category entries.
          *
-         * @return the parsed entries, empty when the relay returned none
+         * @return the parsed entries, empty when the graph.whatsapp.com endpoint returned none
          */
         public List<Category> categories() {
             return categories;
@@ -150,7 +150,7 @@ public final class QueryCatalogHasCategoriesWhatsAppGraphQlResponse implements W
          *
          * <p>Reserved for the static parser.
          *
-         * @param typename the {@code __typename} discriminator, or {@code null} when the relay
+         * @param typename the {@code __typename} discriminator, or {@code null} when the graph.whatsapp.com endpoint
          *                 omitted it
          */
         private Category(String typename) {
@@ -160,7 +160,7 @@ public final class QueryCatalogHasCategoriesWhatsAppGraphQlResponse implements W
         /**
          * Returns the GraphQL {@code __typename} discriminator of this category entry.
          *
-         * @return the discriminator, or empty when the relay omitted the field
+         * @return the discriminator, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> typename() {
             return Optional.ofNullable(typename);

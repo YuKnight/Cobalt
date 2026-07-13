@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.ratecontrol;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Detects congestion of the SCTP data channel send buffer and clamps the video send rate while the
  * buffer is filling.
@@ -24,6 +28,11 @@ package com.github.auties00.cobalt.calls.transport.congestion.ratecontrol;
  * samples, and the least squares slope over that window reproduces the peak plus slope linear regression.
  */
 public final class SctpBufferCongestionController {
+    /**
+     * The logger for {@link SctpBufferCongestionController}.
+     */
+    private static final System.Logger LOGGER = Log.get(SctpBufferCongestionController.class);
+
     /**
      * The number of occupancy samples the slope regression window retains.
      *
@@ -228,6 +237,9 @@ public final class SctpBufferCongestionController {
                     congested = false;
                     clearStreak = 0;
                     activateStreak = 0;
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "sctp buffer congestion cleared: occupancy={0}bytes", occupancyBytes);
+                    }
                 }
             } else {
                 clearStreak = 0;
@@ -241,6 +253,11 @@ public final class SctpBufferCongestionController {
                     congested = true;
                     activateStreak = 0;
                     clearStreak = 0;
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "sctp buffer congestion detected: occupancy={0}bytes standingTail={1} peakAndSlope={2}",
+                                occupancyBytes, standingTail, peakAndSlope);
+                    }
                 }
             } else {
                 activateStreak = 0;
@@ -285,6 +302,9 @@ public final class SctpBufferCongestionController {
         activateStreak = 0;
         clearStreak = 0;
         congested = false;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sctp buffer congestion controller reset");
+        }
     }
 
     /**

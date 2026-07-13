@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.calls.signaling.session;
 
 import com.github.auties00.cobalt.calls.engine.control.PrivacyToken;
+import com.github.auties00.cobalt.exception.linked.WhatsAppStreamException;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
@@ -1014,9 +1015,13 @@ public final class OfferStanza implements CallMessage {
                 var creator = stanza.getAttributeAsJid(CallMessages.CALL_CREATOR_ATTRIBUTE).orElse(null);
                 if (creator != null) {
                     var version = enc.get().getAttributeAsInt("v", -1);
-                    var encType = enc.get().getAttributeAsString("type", null);
+                    // WA requires the <enc> "type"; a typeless ciphertext bearing enc is malformed, not
+                    // defaulted (see CallKeyDistribution.of).
+                    var encType = enc.get().getAttributeAsString("type")
+                            .orElseThrow(() -> new WhatsAppStreamException.MalformedNode(
+                                    "<enc> carrying a call key ciphertext is missing the required \"type\" attribute"));
                     var count = enc.get().getAttributeAsInt("count", -1);
-                    return List.of(new CallKeyDistribution(creator, version, encType, count, ciphertext.get()));
+                    return List.of(CallKeyDistribution.encrypted(creator, version, encType, count, ciphertext.get()));
                 }
             }
         }

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -27,6 +28,8 @@ import com.github.auties00.cobalt.wam.type.MuteAction;
 import com.github.auties00.cobalt.wam.type.MuteOrigin;
 import com.github.auties00.cobalt.wam.type.StatusCategory;
 import com.github.auties00.cobalt.wam.type.StatusPosterContactType;
+
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -45,6 +48,10 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 @WhatsAppWebModule(moduleName = "WAWebUserStatusMuteSync")
 public final class UserStatusMuteHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link UserStatusMuteHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(UserStatusMuteHandler.class);
 
     /**
      * Holds the WAM telemetry service used to commit the {@link StatusMuteEvent} when a
@@ -142,6 +149,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
         try {
             wid = Jid.of(widString);
         } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "user status mute: invalid wid={0}", Log.jid(widString));
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
@@ -156,19 +164,25 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
                     .build();
             var updated = client.store().chatStore().applyGroupMetadataEdit(wid, edit);
             if (updated.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "user status mute: orphan group={0}", wid);
                 return MutationApplicationResult.orphan(widString, "UserStatusMute");
             }
             emitStatusMuteEvent(client, wid, action.muted(), null);
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "user status mute: set muted={0} for group={1}", action.muted(), wid);
             return MutationApplicationResult.success();
         }
 
         var contact = client.store().contactStore().findContactByJid(wid);
         if (contact.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "user status mute: orphan contact={0}", wid);
             return MutationApplicationResult.orphan(widString, "UserStatusMute");
         }
 
         contact.get().setStatusMuted(action.muted());
         emitStatusMuteEvent(client, wid, action.muted(), contact.get());
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "user status mute: set muted={0} for contact={1}", action.muted(), wid);
         return MutationApplicationResult.success();
     }
 

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.registration.push.apns.plist.binary;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistArrayValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistBooleanValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDataValue;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistIntege
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistStringValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistValue;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -35,6 +37,11 @@ import java.util.List;
  *           own writer.
  */
 public final class PlistBinaryWriter {
+    /**
+     * The logger for {@link PlistBinaryWriter}.
+     */
+    private static final System.Logger LOGGER = Log.get(PlistBinaryWriter.class);
+
     /**
      * Holds the byte length of the trailer that closes every binary plist.
      *
@@ -99,6 +106,7 @@ public final class PlistBinaryWriter {
         writeBigEndian(out, trailerOffset + 16, 0L, 8);
         writeBigEndian(out, trailerOffset + 24, offsetTableOffset, 8);
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "encoded binary plist, objects={0}, bytes={1}", numObjects, totalSize);
         return out;
     }
 

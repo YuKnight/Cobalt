@@ -14,20 +14,12 @@ import java.io.UncheckedIOException;
  * Builds the Facebook GraphQL query that reads the WhatsApp Business ad-creation budget state for the linked
  * boosted component.
  *
- * <p>The single {@code input} GraphQL variable is the {@code CTWABoostedComponentInput} object
- * WhatsApp Web passes to {@code lwi.boosted_component(caller: ..., input: $input)}. The compiled
- * {@code useWAWebBizAdCreationAdAccountUpdate_BudgetQuery.graphql} document declares the variable
- * opaquely and no caller building the object is present in the analysed bundle, so its field names
- * are not recoverable; the caller supplies it as an already JSON-encoded object. The query returns
- * the boosted component's current budget amount, the high-granularity budget option list,
- * and the minimum daily-budget constraint under {@code lwi.boosted_component}; the reply is consumed
- * through {@link BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlResponse}.
- *
- * @implNote This implementation accepts the {@code input} object as a caller-supplied, already
- * JSON-encoded object literal because the {@code CTWABoostedComponentInput} field names are not
- * present in the JS bundle of snapshot {@code 1040120866}; the value is emitted verbatim as the
- * {@code input} variable. Once a caller that builds the object surfaces, replace this with typed
- * scalar fields mirroring that construction.
+ * <p>The single {@code input} GraphQL variable identifies the ad account and budget the state is read
+ * for: the legacy Facebook ad account ({@code legacy_ad_account_id}), the {@code budget} amount, and
+ * the {@code currency}. The query returns the boosted component's current budget amount, the
+ * high-granularity budget option list, and the minimum daily-budget constraint under
+ * {@code lwi.boosted_component}; the reply is consumed through
+ * {@link BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlResponse}.
  *
  * @see BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlResponse
  */
@@ -53,24 +45,38 @@ public final class BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlRequest imp
     public static final String OPERATION_NAME = "useWAWebBizAdCreationAdAccountUpdate_BudgetQuery";
 
     /**
-     * The pre-encoded JSON of the {@code input} GraphQL object identifying the boosted component to
-     * read, or {@code null} to omit it.
+     * The {@code legacy_ad_account_id} field of the {@code input} object naming the funding ad
+     * account, or {@code null} to omit it.
+     *
+     * <p>A Facebook ad-account identifier (a numeric string), not a WhatsApp address.
      */
-    private final String inputJson;
+    private final String legacyAdAccountId;
+
+    /**
+     * The {@code budget} field of the {@code input} object holding the budget amount in minor units,
+     * or {@code null} to omit it.
+     */
+    private final Long budget;
+
+    /**
+     * The {@code currency} field of the {@code input} object holding the currency code, or
+     * {@code null} to omit it.
+     */
+    private final String currency;
 
     /**
      * Constructs a budget-state query request.
      *
-     * <p>The {@code inputJson} is the already-JSON-encoded {@code input} object identifying the
-     * boosted component; its field names are defined by the server-side
-     * {@code CTWABoostedComponentInput} type and are not modelled here (see the class
-     * {@code @implNote}). A {@code null} value omits the variable from the serialized object.
+     * <p>Each value that is {@code null} omits its field from the serialized {@code input} object.
      *
-     * @param inputJson the already-JSON-encoded {@code input} object, or {@code null} to omit the
-     *                  variable
+     * @param legacyAdAccountId the funding ad-account identifier, or {@code null} to omit the field
+     * @param budget            the budget amount in minor units, or {@code null} to omit the field
+     * @param currency          the currency code, or {@code null} to omit the field
      */
-    public BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlRequest(String inputJson) {
-        this.inputJson = inputJson;
+    public BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlRequest(String legacyAdAccountId, Long budget, String currency) {
+        this.legacyAdAccountId = legacyAdAccountId;
+        this.budget = budget;
+        this.currency = currency;
     }
 
     /**
@@ -92,20 +98,35 @@ public final class BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlRequest imp
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"input": <inputJson>}}, writing the variable only
-     * when its value is non-null and emitting {@code "{}"} when it is {@code null}. The {@code input}
-     * value is spliced in as a raw JSON value via {@link JSONWriter#writeRaw(String)} because it is
-     * supplied already encoded.
+     * @implNote This implementation emits {@code {"input": {"legacy_ad_account_id": <legacyAdAccountId>,
+     * "budget": <budget>, "currency": <currency>}}}, writing each field only when its value is non-null
+     * and emitting {@code {"input": {}}} when all are {@code null}.
      */
     @Override
     public String variables() {
         try (var writer = JSONWriter.ofUTF8()) {
             writer.startObject();
-            if (inputJson != null) {
-                writer.writeName("input");
+            writer.writeName("input");
+            writer.writeColon();
+            writer.startObject();
+            if (legacyAdAccountId != null) {
+                writer.writeName("legacy_ad_account_id");
                 writer.writeColon();
-                writer.writeRaw(inputJson);
+                writer.writeString(legacyAdAccountId);
             }
+
+            if (budget != null) {
+                writer.writeName("budget");
+                writer.writeColon();
+                writer.writeInt64(budget);
+            }
+
+            if (currency != null) {
+                writer.writeName("currency");
+                writer.writeColon();
+                writer.writeString(currency);
+            }
+            writer.endObject();
             writer.endObject();
             try (var output = new StringWriter()) {
                 writer.flushTo(output);

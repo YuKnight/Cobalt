@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.ads.LwiBoostedComponentInput;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -13,16 +14,11 @@ import java.io.UncheckedIOException;
 /**
  * Builds the comet mutation that creates a click-to-WhatsApp (CTWA) ad draft.
  *
- * <p>The mutation takes a single {@code input} GraphQL object carrying the draft payload. The relay
- * returns the created draft under {@code create_ads_ctwa_draft}, whose {@code id} scalar is the new
- * draft identifier; the reply is consumed through {@link BizAdCreateDraftFacebookGraphQlResponse}.
- *
- * @implNote This implementation accepts the {@code input} object as a caller-supplied, already
- * JSON-encoded object literal because the {@code useWAWebBizAdCreateDraftMutation} hook module and
- * its input type are not present in the static bundle of snapshot {@code 1040120866}; it is one of
- * the Comet ad-creation documents loaded on demand. The value is emitted verbatim as the
- * {@code input} variable. Once a caller that builds the object surfaces, replace this with typed
- * scalar fields mirroring that construction.
+ * <p>The mutation takes a single {@code input} GraphQL object carrying the draft payload as a
+ * {@link LwiBoostedComponentInput}: the ad-group creatives, budget, schedule, audience, placement, and
+ * welcome experience of the boost. The relay returns the created draft under
+ * {@code create_ads_ctwa_draft}, whose {@code id} scalar is the new draft identifier; the reply is
+ * consumed through {@link BizAdCreateDraftFacebookGraphQlResponse}.
  *
  * @see BizAdCreateDraftFacebookGraphQlResponse
  */
@@ -48,24 +44,20 @@ public final class BizAdCreateDraftFacebookGraphQlRequest implements FacebookGra
     public static final String OPERATION_NAME = "useWAWebBizAdCreateDraftMutation";
 
     /**
-     * The pre-encoded JSON of the {@code input} GraphQL object carrying the draft payload, or
-     * {@code null} to omit it.
+     * The {@code input} GraphQL variable carrying the draft payload, or {@code null} to omit it.
      */
-    private final String inputJson;
+    private final LwiBoostedComponentInput input;
 
     /**
      * Constructs a create-CTWA-ad-draft mutation request.
      *
-     * <p>The {@code inputJson} is the already-JSON-encoded {@code input} object holding the draft
-     * payload; its field names are defined by the server-side input type and are not modelled here
-     * (see the class {@code @implNote}). A {@code null} value omits the variable from the serialized
-     * object.
+     * <p>The {@code input} holds the draft payload. A {@code null} value omits the variable from the
+     * serialized object.
      *
-     * @param inputJson the already-JSON-encoded {@code input} object, or {@code null} to omit the
-     *                  variable
+     * @param input the boosted-component draft payload, or {@code null} to omit the variable
      */
-    public BizAdCreateDraftFacebookGraphQlRequest(String inputJson) {
-        this.inputJson = inputJson;
+    public BizAdCreateDraftFacebookGraphQlRequest(LwiBoostedComponentInput input) {
+        this.input = input;
     }
 
     /**
@@ -87,19 +79,19 @@ public final class BizAdCreateDraftFacebookGraphQlRequest implements FacebookGra
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"input": <inputJson>}}, writing the variable only
-     * when its value is non-null and emitting {@code "{}"} when it is {@code null}. The {@code input}
-     * value is spliced in as a raw JSON value via {@link JSONWriter#writeRaw(String)} because it is
-     * supplied already encoded.
+     * @implNote This implementation emits {@code {"input": {...}}} with the boost fields under their
+     * snake_case keys, writing the variable only when the input is non-null and emitting {@code "{}"}
+     * otherwise. The camelCase-to-snake_case mapping is performed by
+     * {@link BizAdInputJson#writeLwiBoostedComponentInput(JSONWriter, LwiBoostedComponentInput)}.
      */
     @Override
     public String variables() {
         try (var writer = JSONWriter.ofUTF8()) {
             writer.startObject();
-            if (inputJson != null) {
+            if (input != null) {
                 writer.writeName("input");
                 writer.writeColon();
-                writer.writeRaw(inputJson);
+                BizAdInputJson.writeLwiBoostedComponentInput(writer, input);
             }
             writer.endObject();
             try (var output = new StringWriter()) {

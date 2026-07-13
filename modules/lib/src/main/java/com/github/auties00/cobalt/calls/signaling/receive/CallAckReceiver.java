@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.signaling.receive;
 
 import com.github.auties00.cobalt.calls.CallsService;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -33,9 +35,9 @@ import java.util.Objects;
  */
 public final class CallAckReceiver extends SocketStreamHandler.Ordered {
     /**
-     * Logs malformed ack traces.
+     * The logger for {@link CallAckReceiver}.
      */
-    private static final System.Logger LOGGER = System.getLogger(CallAckReceiver.class.getName());
+    private static final System.Logger LOGGER = Log.get(CallAckReceiver.class);
 
     /**
      * The stream tag this handler is registered under.
@@ -100,13 +102,14 @@ public final class CallAckReceiver extends SocketStreamHandler.Ordered {
         CallAckOutcome outcome;
         try {
             outcome = CallAckParser.parse(stanza).orElse(null);
-        } catch (RuntimeException _) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring malformed call <ack>: {0}", stanza);
+        } catch (RuntimeException exception) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring malformed call ack", exception);
             return;
         }
         if (outcome == null) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "forwarding call ack id={0} nack={1}", outcome.id(), outcome.isNack());
         callsService.handleInboundAck(outcome);
     }
 }

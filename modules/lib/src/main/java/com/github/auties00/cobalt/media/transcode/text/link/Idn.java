@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.media.transcode.text.link;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -42,6 +44,9 @@ import java.util.regex.Pattern;
 @WhatsAppWebModule(moduleName = "WALanguagesAndRegions")
 @WhatsAppWebModule(moduleName = "WAPhoneFindCC")
 public final class Idn {
+    /** The logger for {@link Idn}. */
+    private static final System.Logger LOGGER = Log.get(Idn.class);
+
     /**
      * Matches labels composed entirely of ASCII letters, digits, and dashes.
      *
@@ -157,10 +162,10 @@ public final class Idn {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private Idn() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -464,6 +469,7 @@ public final class Idn {
                     return false;
                 }
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "idn homograph flagged, reason=cyrillic-confusable");
             return true;
         }
         if (matched.isEmpty()) {
@@ -471,6 +477,10 @@ public final class Idn {
         }
         for (var codePoint : matched) {
             if (isCharacterSuspicious(codePoint, recipientCountryCode, selfCountryCode, languages)) {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "idn homograph flagged, reason=confusable-character, codePoint={0}",
+                            codePoint);
+                }
                 return true;
             }
         }

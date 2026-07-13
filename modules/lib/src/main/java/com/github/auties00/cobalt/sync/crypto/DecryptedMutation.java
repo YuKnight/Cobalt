@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.crypto;
 
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.sync.action.SyncActionEntry;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -84,6 +86,11 @@ public sealed interface DecryptedMutation {
      * that LT-Hash recomputation reads back during consistency checks.
      */
     final class Untrusted implements DecryptedMutation {
+        /**
+         * The logger for {@link Untrusted}.
+         */
+        private static final System.Logger LOGGER = Log.get(Untrusted.class);
+
         /**
          * The UTF-8 decoded mutation index string.
          */
@@ -227,6 +234,9 @@ public sealed interface DecryptedMutation {
 
             var expectedMac = keys.generateMac(associatedData, ivAndCipherText);
             if (!MessageDigest.isEqual(valueMac, expectedMac)) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "sync mutation value mac mismatch for operation {0}", operation);
+                }
                 throw new WhatsAppWebAppStateSyncException.ValueMacMismatch();
             }
 
@@ -263,7 +273,14 @@ public sealed interface DecryptedMutation {
 
             var expectedIndexMac = keys.generateIndexMac(actionIndex);
             if (!MessageDigest.isEqual(indexMac, expectedIndexMac)) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "sync mutation index mac mismatch for operation {0}", operation);
+                }
                 throw new WhatsAppWebAppStateSyncException.IndexMacMismatch();
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "sync mutation decrypted and authenticated: operation={0} version={1}",
+                        operation, actionVersion);
             }
             return new Untrusted(
                     new String(actionIndex, StandardCharsets.UTF_8),

@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.pipeline;
 
 import com.github.auties00.cobalt.calls.platform.audio.AudioWriterPump;
 import com.github.auties00.cobalt.calls.stream.AudioFrame;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -49,6 +51,11 @@ import java.util.Objects;
  * the receiver.
  */
 public final class AudioDecoderReceiver implements AudioWriterPump.AudioBlockSource {
+    /**
+     * The logger for {@link AudioDecoderReceiver}.
+     */
+    private static final System.Logger LOGGER = Log.get(AudioDecoderReceiver.class);
+
     /**
      * The jitter buffer get period, in milliseconds.
      *
@@ -291,6 +298,7 @@ public final class AudioDecoderReceiver implements AudioWriterPump.AudioBlockSou
      */
     public void receivePacket(int rtpSequence, long rtpTimestamp, byte[] payload) {
         Objects.requireNonNull(payload, "payload cannot be null");
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "audio receive packet seq={0} ts={1} len={2}", rtpSequence, rtpTimestamp, payload.length);
         netEq.insert(rtpSequence, rtpTimestamp, payload);
     }
 
@@ -330,6 +338,7 @@ public final class AudioDecoderReceiver implements AudioWriterPump.AudioBlockSou
         }
         var written = netEq.getAudioInto(block, length);
         lastFrameVoiceActive = netEq.lastFrameVoiceActive();
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "audio pull written={0} voiceActive={1}", written, lastFrameVoiceActive);
         return written;
     }
 }

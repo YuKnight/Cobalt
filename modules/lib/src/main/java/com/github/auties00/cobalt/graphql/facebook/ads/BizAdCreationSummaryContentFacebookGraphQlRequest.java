@@ -16,18 +16,11 @@ import java.io.UncheckedIOException;
  *
  * <p>The query takes two GraphQL variables. The {@code asset_id} variable is the Facebook billable
  * asset id whose billable account the summary is computed for; it is a numeric Facebook id rather
- * than a WhatsApp address, so it is kept as a {@link String}. The {@code budget} variable carries
- * the advertiser's chosen budget against which the server estimates taxes and totals. The query
- * returns the billable account's estimated taxes and total under {@code billable_account_by_asset_id};
- * the reply is consumed through {@link BizAdCreationSummaryContentFacebookGraphQlResponse}.
- *
- * @implNote This implementation accepts {@code budget} as a caller-supplied, already JSON-encoded
- * value because the {@code budget} GraphQL input type and field names are not recoverable from the
- * compiled {@code WAWebBizAdCreationSummaryContentQuery.graphql} document of snapshot
- * {@code 1040120866} (the document declares it only as an opaque {@code LocalArgument} forwarded as
- * a {@code Variable} to {@code billing_info}, and no in-bundle caller builds it); the value is
- * emitted verbatim as the {@code budget} variable. Once a caller that builds the budget surfaces,
- * replace this with typed scalar fields mirroring that construction.
+ * than a WhatsApp address, so it is kept as a {@link String}. The {@code budget} variable is the
+ * advertiser's chosen budget the server estimates taxes and totals against: the {@code budget} amount,
+ * the {@code budget_type}, the {@code currency}, and the {@code duration_in_days}. The query returns
+ * the billable account's estimated taxes and total under {@code billable_account_by_asset_id}; the
+ * reply is consumed through {@link BizAdCreationSummaryContentFacebookGraphQlResponse}.
  *
  * @see BizAdCreationSummaryContentFacebookGraphQlResponse
  */
@@ -59,26 +52,48 @@ public final class BizAdCreationSummaryContentFacebookGraphQlRequest implements 
     private final String assetId;
 
     /**
-     * The pre-encoded JSON of the {@code budget} GraphQL variable carrying the advertiser's chosen
-     * budget, or {@code null} to omit it.
+     * The {@code budget} field of the {@code budget} object holding the budget amount in minor units,
+     * or {@code null} to omit it.
      */
-    private final String budgetJson;
+    private final Long budget;
+
+    /**
+     * The {@code budget_type} field of the {@code budget} object (for example daily or lifetime), or
+     * {@code null} to omit it.
+     */
+    private final String budgetType;
+
+    /**
+     * The {@code currency} field of the {@code budget} object holding the currency code, or
+     * {@code null} to omit it.
+     */
+    private final String currency;
+
+    /**
+     * The {@code duration_in_days} field of the {@code budget} object holding the campaign duration, or
+     * {@code null} to omit it.
+     */
+    private final Integer durationInDays;
 
     /**
      * Constructs a summary-content query request.
      *
-     * <p>The {@code assetId} is the Facebook billable asset id, and {@code budgetJson} is the
-     * already-JSON-encoded {@code budget} value whose shape is defined by the server-side budget input
-     * type and is not modelled here (see the class {@code @implNote}). Each value that is {@code null}
-     * omits its variable from the serialized object.
+     * <p>The {@code assetId} is the Facebook billable asset id, and the {@code budget},
+     * {@code budgetType}, {@code currency} and {@code durationInDays} populate the nested {@code budget}
+     * object. Each value that is {@code null} omits its variable from the serialized object.
      *
-     * @param assetId    the Facebook billable asset id, or {@code null} to omit the variable
-     * @param budgetJson the already-JSON-encoded {@code budget} value, or {@code null} to omit the
-     *                   variable
+     * @param assetId        the Facebook billable asset id, or {@code null} to omit the variable
+     * @param budget         the budget amount in minor units, or {@code null} to omit the field
+     * @param budgetType     the budget-type token, or {@code null} to omit the field
+     * @param currency       the currency code, or {@code null} to omit the field
+     * @param durationInDays the campaign duration in days, or {@code null} to omit the field
      */
-    public BizAdCreationSummaryContentFacebookGraphQlRequest(String assetId, String budgetJson) {
+    public BizAdCreationSummaryContentFacebookGraphQlRequest(String assetId, Long budget, String budgetType, String currency, Integer durationInDays) {
         this.assetId = assetId;
-        this.budgetJson = budgetJson;
+        this.budget = budget;
+        this.budgetType = budgetType;
+        this.currency = currency;
+        this.durationInDays = durationInDays;
     }
 
     /**
@@ -100,10 +115,10 @@ public final class BizAdCreationSummaryContentFacebookGraphQlRequest implements 
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"asset_id": <assetId>, "budget": <budgetJson>}},
-     * writing each variable only when its value is non-null and emitting {@code "{}"} when both are
-     * {@code null}. The {@code budget} value is spliced in as a raw JSON value via
-     * {@link JSONWriter#writeRaw(String)} because it is supplied already encoded.
+     * @implNote This implementation emits {@code {"asset_id": <assetId>, "budget": {"budget": <budget>,
+     * "budget_type": <budgetType>, "currency": <currency>, "duration_in_days": <durationInDays>}}},
+     * writing {@code asset_id} only when non-null and each {@code budget} sub-field only when non-null,
+     * and omitting the {@code budget} object entirely when all four sub-fields are {@code null}.
      */
     @Override
     public String variables() {
@@ -115,10 +130,34 @@ public final class BizAdCreationSummaryContentFacebookGraphQlRequest implements 
                 writer.writeString(assetId);
             }
 
-            if (budgetJson != null) {
+            if (budget != null || budgetType != null || currency != null || durationInDays != null) {
                 writer.writeName("budget");
                 writer.writeColon();
-                writer.writeRaw(budgetJson);
+                writer.startObject();
+                if (budget != null) {
+                    writer.writeName("budget");
+                    writer.writeColon();
+                    writer.writeInt64(budget);
+                }
+
+                if (budgetType != null) {
+                    writer.writeName("budget_type");
+                    writer.writeColon();
+                    writer.writeString(budgetType);
+                }
+
+                if (currency != null) {
+                    writer.writeName("currency");
+                    writer.writeColon();
+                    writer.writeString(currency);
+                }
+
+                if (durationInDays != null) {
+                    writer.writeName("duration_in_days");
+                    writer.writeColon();
+                    writer.writeInt32(durationInDays);
+                }
+                writer.endObject();
             }
             writer.endObject();
             try (var output = new StringWriter()) {

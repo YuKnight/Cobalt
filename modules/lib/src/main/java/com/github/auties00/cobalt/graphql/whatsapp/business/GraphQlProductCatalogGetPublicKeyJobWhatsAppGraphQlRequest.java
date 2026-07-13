@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,12 +14,12 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that fetches a business catalog's encryption public key.
+ * Builds the graph.whatsapp.com GraphQL query that fetches a business catalog's encryption public key.
  *
  * <p>The single {@code request} GraphQL variable wraps a {@code public_key} object naming the
  * business whose catalog public key is being fetched. WhatsApp Web's
  * {@code WAWebGraphQLProductCatalogGetPublicKeyJob} fills it as
- * {@code {request: {public_key: {biz_jid: <jid>}}}} from the business {@link Jid}. The relay returns
+ * {@code {request: {public_key: {biz_jid: <jid>}}}} from the business {@link Jid}. The graph.whatsapp.com endpoint returns
  * the PEM-encoded public key and its signature under {@code xwa_product_catalog_get_public_key}; the
  * reply is consumed through {@link GraphQlProductCatalogGetPublicKeyJobWhatsAppGraphQlResponse}.
  *
@@ -26,15 +28,15 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebGraphQLProductCatalogGetPublicKeyJobQuery")
 public final class GraphQlProductCatalogGetPublicKeyJobWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      *
      * @implNote This implementation ships the numeric persisted-query id resolved from
      * {@code WAWebGraphQLPersistedQueries.PersistedQueries["WAWebGraphQLProductCatalogGetPublicKeyJobQuery"]}
      * rather than the document's own {@code params.id}, which is the non-numeric document name; the
-     * relay rewrites the document-name {@code params.id} to this registered numeric id at dispatch.
+     * graph.whatsapp.com endpoint rewrites the document-name {@code params.id} to this registered numeric id at dispatch.
      */
     @WhatsAppWebExport(moduleName = "WAWebGraphQLPersistedQueries", exports = "PersistedQueries",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -117,5 +119,21 @@ public final class GraphQlProductCatalogGetPublicKeyJobWhatsAppGraphQlRequest im
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

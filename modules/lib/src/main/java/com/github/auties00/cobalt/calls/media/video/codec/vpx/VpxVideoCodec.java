@@ -4,9 +4,11 @@ import com.github.auties00.cobalt.calls.capability.VideoDecoderCapability;
 import com.github.auties00.cobalt.calls.media.video.codec.vpx.bindings.CobaltVpx;
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.DataUtils;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -57,6 +59,11 @@ public final class VpxVideoCodec implements VideoCodec {
      * The frame drop threshold percentage applied when {@link VideoCodecParams#frameSkip()} is set.
      */
     private static final int FRAME_SKIP_DROP_THRESH = 30;
+
+    /**
+     * The logger for {@link VpxVideoCodec}.
+     */
+    private static final System.Logger LOGGER = Log.get(VpxVideoCodec.class);
 
     /**
      * The codec format this instance implements, {@link VideoDecoderCapability#VP8 VP8} or
@@ -202,12 +209,14 @@ public final class VpxVideoCodec implements VideoCodec {
                     params.targetBitrate(), params.frameRate(), params.minQuantizer(), params.maxQuantizer(),
                     dropFrameThresh(), params.keyFrameIntervalFrames(), cpuUsed(), encCell);
             if (encErr != CobaltVpx.COBALT_VPX_OK()) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "calls vpx encoder create rejected: codec={0} rc={1}", codec, encErr);
                 throw WhatsAppCallException.Vpx.fromErr("cobalt_vpx_encoder_create", encErr);
             }
             enc = encCell.get(CobaltVpx.C_POINTER, 0);
             var decCell = arena.allocate(CobaltVpx.C_POINTER);
             var decErr = CobaltVpx.cobalt_vpx_decoder_create(codecSelector(), params.width(), params.height(), decCell);
             if (decErr != CobaltVpx.COBALT_VPX_OK()) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "calls vpx decoder create rejected: codec={0} rc={1}", codec, decErr);
                 throw WhatsAppCallException.Vpx.fromErr("cobalt_vpx_decoder_create", decErr);
             }
             dec = decCell.get(CobaltVpx.C_POINTER, 0);
@@ -217,7 +226,12 @@ public final class VpxVideoCodec implements VideoCodec {
             this.packetLenCell = arena.allocate(CobaltVpx.C_INT);
             this.packetKeyCell = arena.allocate(CobaltVpx.C_INT);
             this.frameImgCell = arena.allocate(CobaltVpx.C_POINTER);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "calls vpx codec opened: codec={0} width={1} height={2} bitrate={3}",
+                        codec, params.width(), params.height(), params.targetBitrate());
+            }
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls vpx codec open failed", e);
             if (dec != null) {
                 CobaltVpx.cobalt_vpx_decoder_destroy(dec);
             }
@@ -301,10 +315,16 @@ public final class VpxVideoCodec implements VideoCodec {
         var err = CobaltVpx.cobalt_vpx_encoder_encode(encoderCtx, pixels, planar.length,
                 params.width(), params.height(), encodePts++, keyFrameForced ? 1 : 0);
         if (err != CobaltVpx.COBALT_VPX_OK()) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls vpx encode rejected: codec={0} rc={1}", codec, err);
             throw WhatsAppCallException.Vpx.fromErr("cobalt_vpx_encoder_encode", err);
         }
         keyFrameRequested = false;
-        return drainEncodedPackage(frame);
+        var encoded = drainEncodedPackage(frame);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls vpx encode: codec={0} bytes={1} keyFrame={2} forced={3}",
+                    codec, encoded.payload().length, encoded.keyFrame(), keyFrameForced);
+        }
+        return encoded;
     }
 
     /**
@@ -323,6 +343,7 @@ public final class VpxVideoCodec implements VideoCodec {
     private EncodedVideoFrame drainEncodedPackage(VideoFrame source) {
         var err = CobaltVpx.cobalt_vpx_encoder_get_packet(encoderCtx, packetBufCell, packetLenCell, packetKeyCell);
         if (err != CobaltVpx.COBALT_VPX_OK()) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls vpx get packet rejected: codec={0} rc={1}", codec, err);
             throw WhatsAppCallException.Vpx.fromErr("cobalt_vpx_encoder_get_packet", err);
         }
         var len = packetLenCell.get(CobaltVpx.C_INT, 0);
@@ -380,19 +401,26 @@ public final class VpxVideoCodec implements VideoCodec {
         MemorySegment.copy(payload, 0, data, ValueLayout.JAVA_BYTE, 0, payload.length);
         var err = CobaltVpx.cobalt_vpx_decoder_decode(decoderCtx, data, payload.length);
         if (err != CobaltVpx.COBALT_VPX_OK()) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls vpx decode rejected: codec={0} rc={1}", codec, err);
             throw WhatsAppCallException.Vpx.fromErr("cobalt_vpx_decoder_decode", err);
         }
         var frameErr = CobaltVpx.cobalt_vpx_decoder_get_frame(decoderCtx, frameImgCell);
         if (frameErr != CobaltVpx.COBALT_VPX_OK()) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls vpx get frame rejected: codec={0} rc={1}", codec, frameErr);
             throw WhatsAppCallException.Vpx.fromErr("cobalt_vpx_decoder_get_frame", frameErr);
         }
         var img = frameImgCell.get(CobaltVpx.C_POINTER, 0);
         if (img.equals(MemorySegment.NULL)) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls vpx decode: codec={0} no displayable frame", codec);
             return null;
         }
         var frame = copyDecodedImage(img, ptsMicros, reuse);
         framesDecoded++;
         bytesDecoded += payload.length;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls vpx decode: codec={0} bytes={1} width={2} height={3}",
+                    codec, payload.length, frame.width(), frame.height());
+        }
         return frame;
     }
 
@@ -454,6 +482,7 @@ public final class VpxVideoCodec implements VideoCodec {
         ensureOpen();
         keyFrameRequested = true;
         keyFrameRequests++;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls vpx key frame requested: codec={0}", codec);
     }
 
     /**
@@ -483,7 +512,12 @@ public final class VpxVideoCodec implements VideoCodec {
                 params.targetBitrate(), params.frameRate(), params.minQuantizer(), params.maxQuantizer(),
                 dropFrameThresh(), params.keyFrameIntervalFrames(), cpuUsed());
         if (err != CobaltVpx.COBALT_VPX_OK()) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "calls vpx reconfigure rejected: codec={0} rc={1}", codec, err);
             throw WhatsAppCallException.Vpx.fromErr("cobalt_vpx_encoder_reconfigure", err);
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "calls vpx codec reconfigured: codec={0} bitrate={1} frameRate={2}",
+                    codec, params.targetBitrate(), params.frameRate());
         }
     }
 
@@ -511,6 +545,10 @@ public final class VpxVideoCodec implements VideoCodec {
         CobaltVpx.cobalt_vpx_decoder_destroy(decoderCtx);
         CobaltVpx.cobalt_vpx_encoder_destroy(encoderCtx);
         arena.close();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "calls vpx codec closed: codec={0} framesEncoded={1} framesDecoded={2}",
+                    codec, framesEncoded, framesDecoded);
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stanza.binary;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.util.DataUtils;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
@@ -75,6 +77,11 @@ import static com.github.auties00.cobalt.stanza.binary.StanzaTokens.*;
  */
 @WhatsAppWebModule(moduleName = "WAWap")
 public abstract class StanzaReader implements AutoCloseable {
+
+    /**
+     * The logger for {@link StanzaReader}.
+     */
+    private static final System.Logger LOGGER = Log.get(StanzaReader.class);
 
     /**
      * Holds the decoder alphabet for nibble packed strings.
@@ -269,7 +276,9 @@ public abstract class StanzaReader implements AutoCloseable {
     @WhatsAppWebExport(moduleName = "WAWap", exports = "decodeStanza",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public final Stanza decode() throws IOException {
-        return readStanza();
+        var stanza = readStanza();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stanza decoded {0}", stanza);
+        return stanza;
     }
 
     /**
@@ -397,6 +406,7 @@ public abstract class StanzaReader implements AutoCloseable {
     private Stanza readStanza() throws IOException {
         var size = readStanzaSize();
         if (size == 0) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "malformed stanza: zero size header");
             throw new IOException("Unexpected empty stanza");
         }
 
@@ -428,6 +438,7 @@ public abstract class StanzaReader implements AutoCloseable {
             default -> {
                 var index = tag & 0xFF;
                 if (index >= 240) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "malformed stanza content tag {0}", index);
                     throw new IOException("Unexpected tag in stanza content: " + index);
                 }
                 yield new Stanza.TextStanza(description, attrs, readSingleByteToken(tag));
@@ -452,7 +463,10 @@ public abstract class StanzaReader implements AutoCloseable {
         return switch (token) {
             case LIST_8 -> read() & 0xFF;
             case LIST_16 -> readShort();
-            default -> throw new IllegalStateException("Unexpected value: " + token);
+            default -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "malformed stanza size token {0}", token);
+                throw new IllegalStateException("Unexpected value: " + token);
+            }
         };
     }
 
@@ -483,6 +497,7 @@ public abstract class StanzaReader implements AutoCloseable {
             default -> {
                 var index = tag & 0xFF;
                 if (index >= 240) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "malformed string tag {0}", index);
                     throw new IOException("Unexpected tag in string position: " + index);
                 }
                 yield readSingleByteToken(tag);
@@ -621,6 +636,7 @@ public abstract class StanzaReader implements AutoCloseable {
             default -> {
                 var index = tag & 0xFF;
                 if (index >= 240) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "malformed attribute tag {0}", index);
                     throw new IOException("Unexpected tag in attribute position: " + index);
                 }
                 yield new StanzaAttribute.TextAttribute(readSingleByteToken(tag));
@@ -733,6 +749,7 @@ public abstract class StanzaReader implements AutoCloseable {
                 if ((domainType & 1) == 0 && (domainType & DOMAIN_HOSTED) != 0) {
                     yield JidServer.hosted();
                 }
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "malformed ad-jid domain type {0}", domainType);
                 throw new IOException("Invalid AD_JID domain type: " + domainType);
             }
         };
@@ -1328,6 +1345,7 @@ public abstract class StanzaReader implements AutoCloseable {
             while (frameRemaining > 0) {
                 var n = source.read(buffer, 0, Math.min(buffer.length, frameRemaining));
                 if (n < 0) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "datagram truncated, {0} byte(s) missing", frameRemaining);
                     throw new IOException("Datagram truncated: " + frameRemaining + " plaintext byte(s) missing");
                 }
                 frameRemaining -= n;
@@ -1843,6 +1861,7 @@ public abstract class StanzaReader implements AutoCloseable {
             try {
                 n = source.read(dst, 0, Math.min(max, frameRemaining));
             } catch (IOException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "compressed stanza read failed, deferring to drain", e);
                 return 0;
             }
             if (n < 0) {
@@ -1866,6 +1885,7 @@ public abstract class StanzaReader implements AutoCloseable {
             while (frameRemaining > 0) {
                 var n = source.read(inflaterInputBuffer, 0, Math.min(inflaterInputBuffer.length, frameRemaining));
                 if (n < 0) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "datagram truncated, {0} byte(s) missing", frameRemaining);
                     throw new IOException("Datagram truncated: " + frameRemaining + " plaintext byte(s) missing");
                 }
                 frameRemaining -= n;

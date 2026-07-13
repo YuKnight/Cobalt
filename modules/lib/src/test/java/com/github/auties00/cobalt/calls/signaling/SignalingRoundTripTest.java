@@ -26,6 +26,7 @@ import com.github.auties00.cobalt.calls.signaling.session.CallMediaDescriptor;
 import com.github.auties00.cobalt.calls.signaling.session.OfferStanza;
 import com.github.auties00.cobalt.calls.signaling.session.RejectStanza;
 import com.github.auties00.cobalt.calls.signaling.session.RingingStanza;
+import com.github.auties00.cobalt.calls.signaling.session.CallSummary;
 import com.github.auties00.cobalt.calls.signaling.session.TerminateStanza;
 
 /**
@@ -101,10 +102,9 @@ class SignalingRoundTripTest {
     void richTerminateRoundTrip() {
         var d1 = Jid.of("44444444", JidServer.lid(), 1, 0);
         var d2 = Jid.of("44444444", JidServer.lid(), 2, 0);
-        var summary = new StanzaBuilder()
-                .description("call_summary")
-                .content(new StanzaBuilder().description("participant").attribute("jid", d1).build())
-                .build();
+        var summary = new CallSummary(CALL_ID, CALL_CREATOR, 42, "audio", List.of(
+                new CallSummary.Participant(d1, d2, "connected", false),
+                new CallSummary.Participant(d2, null, "left", true)));
         var original = new TerminateStanza(CALL_ID, CALL_CREATOR, CallEndReason.MEDIA_RX_TIMEOUT,
                 "media_rx_timeout", 2, true, 11, "hint-x", summary, List.of(d1, d2));
 

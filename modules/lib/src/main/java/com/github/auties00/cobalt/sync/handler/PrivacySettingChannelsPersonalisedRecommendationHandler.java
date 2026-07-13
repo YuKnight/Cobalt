@@ -1,12 +1,15 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivacySettingChannelsPersonalisedRecommendationAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code setting_channels_personalised_recommendation_optout}
@@ -44,6 +47,11 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
      */
     public static final PrivacySettingChannelsPersonalisedRecommendationHandler INSTANCE =
             new PrivacySettingChannelsPersonalisedRecommendationHandler();
+
+    /**
+     * The logger for {@link PrivacySettingChannelsPersonalisedRecommendationHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(PrivacySettingChannelsPersonalisedRecommendationHandler.class);
 
     /**
      * Constructs the singleton handler instance.
@@ -107,10 +115,14 @@ public final class PrivacySettingChannelsPersonalisedRecommendationHandler imple
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrivacySettingChannelsPersonalisedRecommendationAction action)) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "channels personalised recommendation mutation malformed: missing action value");
             return MutationApplicationResult.malformed();
         }
 
         client.store().settingsStore().setChannelsPersonalisedRecommendationOptOut(action.isUserOptedOut());
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "channels personalised recommendation: opt-out set to {0}", action.isUserOptedOut());
         return MutationApplicationResult.success();
     }
 }

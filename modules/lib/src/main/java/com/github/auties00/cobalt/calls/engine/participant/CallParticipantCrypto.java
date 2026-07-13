@@ -1,12 +1,14 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.calls.media.sframe.SFrameKeyProvider;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.E2eRekeyPayload;
 import com.github.auties00.cobalt.model.call.datachannel.RekeyKeyEntry;
 import com.github.auties00.cobalt.model.call.datachannel.RekeyKeyType;
+import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,7 +23,7 @@ import com.github.auties00.cobalt.calls.crypto.CallE2eKeyDerivation;
  * that key, and the keys the engine derives from it (the SFrame chain key and the per
  * participant SRTP master). This class is both the data holder for that block and the entry
  * point that derives the per participant keys from the stored raw key:
- * {@link #deriveKeys(CallDeviceJid)} runs the {@link CallE2eKeyDerivation} chain for the
+ * {@link #deriveKeys(Jid)} runs the {@link CallE2eKeyDerivation} chain for the
  * participant's device JID and writes the SFrame chain key and the SRTP master back into the
  * holder. The lower level setters ({@link #sframeChainKey(byte[])}, {@link #srtpMaster(byte[])})
  * remain so a caller that derives elsewhere can install results directly.
@@ -46,6 +48,11 @@ import com.github.auties00.cobalt.calls.crypto.CallE2eKeyDerivation;
  * key material cannot be mutated through a returned reference.
  */
 public final class CallParticipantCrypto {
+    /**
+     * The logger for {@link CallParticipantCrypto}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallParticipantCrypto.class);
+
     /**
      * Holds the required length, in bytes, of the raw end to end key.
      *
@@ -188,12 +195,10 @@ public final class CallParticipantCrypto {
         if (keygenVersion != SUPPORTED_KEYGEN_VER) {
             throw new WhatsAppCallException.Srtp("Unsupported keygen ver " + keygenVersion);
         }
-        var rawKeyHex = new StringBuilder(rawKey.length * 2);
-        for (var b : rawKey) {
-            rawKeyHex.append(String.format("%02x", b & 0xFF));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "storing raw call key {0}, keygenVer={1}, keyCount={2}, transactionId={3}",
+                    rawKey, keygenVersion, keyCount, transactionId);
         }
-        System.getLogger(CallParticipantCrypto.class.getName()).log(System.Logger.Level.INFO,
-                "calls E2E raw call key ({0} bytes, keygenVer={1}): {2}", rawKey.length, keygenVersion, rawKeyHex);
         this.rawKey = rawKey.clone();
         this.keygenVersion = keygenVersion;
         this.keyCount = keyCount;
@@ -232,6 +237,11 @@ public final class CallParticipantCrypto {
         // TODO: only the single key rekey shape has been observed; whether a multi entry payload
         //  of per domain masters can occur (for example on a group call rekey) is unconfirmed.
         if (keys.size() != 1) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "rekey payload carries {0} key entries, expected exactly 1, transactionId={1}",
+                        keys.size(), transactionId);
+            }
             throw new WhatsAppCallException.Srtp(
                     "rekey payload must carry exactly one key entry, got " + keys.size());
         }
@@ -358,7 +368,11 @@ public final class CallParticipantCrypto {
             return false;
         }
         var keyTransaction = transactionId == NO_TRANSACTION_ID ? 0L : transactionId;
-        return provider.setChainKey(sframeChainKey, keyTransaction);
+        var installed = provider.setChainKey(sframeChainKey, keyTransaction);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "installed sframe chain key for transaction {0}: {1}", keyTransaction, installed);
+        }
+        return installed;
     }
 
     /**
@@ -367,7 +381,7 @@ public final class CallParticipantCrypto {
      * <p>The master is the thirty byte {@code AES_CM_128_HMAC_SHA1} master (16 byte key followed
      * by 14 byte salt) derived from the raw key bound to this participant's device JID. This holder
      * stores a defensive copy; it does not perform the derivation unless
-     * {@link #deriveKeys(CallDeviceJid)} is used.
+     * {@link #deriveKeys(Jid)} is used.
      *
      * @implNote The transport keys its two SRTP directions from the 16 byte key halves of this
      * participant's and the peer participant's masters, one master per direction, rather than from
@@ -425,7 +439,7 @@ public final class CallParticipantCrypto {
      *                                    unsupported, or the raw key is not the full
      *                                    {@value #RAW_E2E_KEY_LENGTH} bytes
      */
-    public void deriveKeys(CallDeviceJid deviceJid) {
+    public void deriveKeys(Jid deviceJid) {
         Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
         if (rawKey == null) {
             throw new WhatsAppCallException.Srtp("cannot derive keys before a raw key is ingested");
@@ -438,6 +452,7 @@ public final class CallParticipantCrypto {
         var chain = CallE2eKeyDerivation.deriveKeyChain(rawKey, keygenVersion, deviceJid);
         sframeChainKey(chain.sframeBaseKey());
         srtpMaster(chain.srtpMaster());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "derived sframe and srtp keys for device {0}", deviceJid);
     }
 
     /**
@@ -477,12 +492,12 @@ public final class CallParticipantCrypto {
      * @return the HKDF info bytes
      * @throws WhatsAppCallException.Srtp if {@code deviceJid} is {@code null}
      */
-    public static byte[] sframeHkdfInfo(CallDeviceJid deviceJid) {
+    public static byte[] sframeHkdfInfo(Jid deviceJid) {
         if (deviceJid == null) {
             throw new WhatsAppCallException.Srtp("deviceJid cannot be null");
         }
         var label = SFRAME_HKDF_INFO_LABEL.getBytes(StandardCharsets.US_ASCII);
-        var jid = deviceJid.jid().toString().getBytes(StandardCharsets.US_ASCII);
+        var jid = deviceJid.toString().getBytes(StandardCharsets.US_ASCII);
         var info = new byte[label.length + jid.length];
         System.arraycopy(label, 0, info, 0, label.length);
         System.arraycopy(jid, 0, info, label.length, jid.length);

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.TreeMap;
@@ -24,6 +27,11 @@ import java.util.TreeMap;
  * the {@link LiveNetEq} locks.
  */
 public final class PacketBuffer {
+    /**
+     * The logger for {@link PacketBuffer}.
+     */
+    private static final System.Logger LOGGER = Log.get(PacketBuffer.class);
+
     /**
      * The upper bound on a single packet's sample span, in samples, used to reject a corrupt RTP timestamp
      * delta when measuring the packet spacing.
@@ -116,10 +124,14 @@ public final class PacketBuffer {
         var seq = packet.sequenceNumber();
         if (playoutCursor >= 0 && !NackTracker.isNewerSequenceNumber(seq, playoutCursor)) {
             packetsDiscarded++;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "packet buffer: discarding late packet, seq={0} cursor={1}", seq, playoutCursor);
+            }
             return false;
         }
         if (packets.putIfAbsent(seq, packet) != null) {
             packetsDiscarded++;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "packet buffer: discarding duplicate packet, seq={0}", seq);
             return false;
         }
         observeSpacing(packet);
@@ -265,6 +277,7 @@ public final class PacketBuffer {
         packets.clear();
         playoutCursor = -1;
         lastObservedSamplesPerPacket = 0;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "packet buffer cleared");
     }
 
     /**
@@ -280,9 +293,14 @@ public final class PacketBuffer {
         }
         var newestKey = packets.lastKey();
         var newest = packets.get(newestKey);
+        var droppedCount = packets.size() - 1;
         packets.clear();
         packets.put(newestKey, newest);
         bufferFlushes++;
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "packet buffer: flushed for overbuffering, dropped={0} kept seq={1}",
+                    droppedCount, newestKey);
+        }
     }
 
     /**

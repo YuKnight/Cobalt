@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSONObject;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfoBuilder;
 import com.github.auties00.cobalt.model.cloud.CloudAccountUpdate;
@@ -58,6 +59,7 @@ import com.github.auties00.cobalt.model.message.media.VideoMessageBuilder;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessageBuilder;
 import com.github.auties00.cobalt.model.message.text.ReactionMessageBuilder;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -77,6 +79,11 @@ import java.util.Map;
  * cards and catalog orders; genuinely unmapped types fall back to {@link MessageContainer#empty()}.
  */
 public final class CloudWebhookDecoder {
+    /**
+     * The logger for {@link CloudWebhookDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(CloudWebhookDecoder.class);
+
     /**
      * Private constructor; the decoder exposes only static behaviour.
      */
@@ -736,7 +743,8 @@ public final class CloudWebhookDecoder {
             var body = system.getString("body");
             var customer = system.getString("customer");
             var timestamp = epochInstant(message.getLong("timestamp"));
-            switch (normalizeSystemType(system)) {
+            var systemType = normalizeSystemType(system);
+            switch (systemType) {
                 case "customer_changed_number" -> {
                     var newWaId = system.getString("new_wa_id");
                     if (newWaId == null) {
@@ -753,6 +761,7 @@ public final class CloudWebhookDecoder {
                     }
                 }
                 default -> {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unmapped system update type {0}", systemType);
                 }
             }
         }
@@ -1066,7 +1075,10 @@ public final class CloudWebhookDecoder {
             // TODO: unmapped inbound content type; the message is delivered with an empty container so
             //       the dispatcher can route the type to the error listener for observability. Add the
             //       missing content decode (and its mapped type below) when the type is modelled.
-            default -> MessageContainer.empty();
+            default -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "unmapped inbound content type {0}", type);
+                yield MessageContainer.empty();
+            }
         };
     }
 

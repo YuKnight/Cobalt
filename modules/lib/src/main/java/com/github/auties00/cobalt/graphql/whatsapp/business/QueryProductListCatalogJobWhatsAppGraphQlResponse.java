@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.graphql.whatsapp.business;
 
+import com.github.auties00.cobalt.graphql.whatsappWeb.business.CatalogProductInfoParser;
+
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.graphql.WhatsAppGraphQlClient;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
@@ -12,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the public product-list query built by
+ * Parses the graph.whatsapp.com GraphQL response of the public product-list query built by
  * {@link QueryProductListCatalogJobWhatsAppGraphQlRequest} into a list of {@link BusinessProduct}.
  *
  * <p>Reads the linked chain {@code xwa_product_catalog_get_product_list -> product_list -> products}
@@ -39,7 +41,7 @@ public final class QueryProductListCatalogJobWhatsAppGraphQlResponse implements 
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked chain {@code xwa_product_catalog_get_product_list -> product_list ->
      * products} and projects each product onto a {@link BusinessProduct}.

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -15,7 +16,8 @@ import com.github.auties00.cobalt.model.sync.action.bot.AiThreadRenameAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import java.util.logging.Logger;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Renames a Meta-AI conversation thread in the local store in response to an {@code ai_thread_rename} sync mutation.
@@ -36,12 +38,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebAiThreadRenameSync")
 public final class AiThreadRenameHandler implements WebAppStateActionHandler {
     /**
-     * The handler-scoped {@link Logger} used to record failed mutation attempts.
-     *
-     * <p>Records the {@link Exception} message of a mutation that threw before
-     * completing.
+     * The logger for {@link AiThreadRenameHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(AiThreadRenameHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(AiThreadRenameHandler.class);
 
     /**
      * Constructs the singleton AI thread rename handler.
@@ -131,18 +130,24 @@ public final class AiThreadRenameHandler implements WebAppStateActionHandler {
                     .filter(level -> level != DeviceCapabilities.AiThread.SupportLevel.NONE)
                     .isPresent();
             if (!aiThreadSupported) {
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "ai thread rename: ai-thread support disabled for chat={0}", chatJid);
                 return MutationApplicationResult.unsupported();
             }
 
             var key = chatJidString + "|" + threadId;
             if (client.store().businessStore().findAiThreadTitle(key).isEmpty()) {
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "ai thread rename: orphan thread for chat={0}, thread={1}", chatJid, threadId);
                 return MutationApplicationResult.orphan(key, "Thread");
             }
 
             client.store().businessStore().putAiThreadTitle(new AiThreadTitleBuilder().threadId(key).title(newTitle).build());
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "ai thread rename: renamed thread for chat={0}, thread={1}, titleLen={2}", chatJid, threadId, newTitle.length());
             return MutationApplicationResult.success();
         } catch (Exception e) {
-            LOGGER.warning("AI thread rename mutation failed: " + e.getMessage());
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "ai thread rename mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

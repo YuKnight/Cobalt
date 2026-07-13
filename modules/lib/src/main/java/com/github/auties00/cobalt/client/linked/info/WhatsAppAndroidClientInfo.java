@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.client.linked.info;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.util.PlayStoreUtils;
 import net.dongliu.apk.parser.ByteArrayApkFile;
@@ -13,6 +14,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -42,6 +44,11 @@ import java.util.zip.ZipInputStream;
  * @see WhatsAppMobileClientInfo
  */
 final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
+    /**
+     * The logger for {@link WhatsAppAndroidClientInfo}.
+     */
+    private static final System.Logger LOGGER = Log.get(WhatsAppAndroidClientInfo.class);
+
     /**
      * Holds the static salt fed into the PBKDF2-HMAC-SHA1 routine that derives the registration token HMAC key.
      *
@@ -236,13 +243,22 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
             var latest = PlayStoreUtils.latestVersion(packageName);
             var cached = loadCached(business);
             if (cached != null && cached.versionCode == latest.code()) {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "using cached android apk info for {0}, versionCode {1}", packageName, latest.code());
+                }
                 return cached;
             }
 
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "downloading android apk for {0}, versionCode {1}", packageName, latest.code());
+            }
             try (var downloaded = PlayStoreUtils.downloadApk(packageName, latest.code());
                  var baseApk = new ByteArrayApkFile(downloaded.baseApk().readAllBytes())) {
                 var aboutLogo = findAboutLogoInBase(baseApk);
                 if (aboutLogo == null) {
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "about_logo.png missing from base apk, scanning density splits for {0}", packageName);
+                    }
                     for (var split : downloaded.splits().entrySet()) {
                         if (!isDensityConfigSplit(split.getKey())) {
                             try {
@@ -258,7 +274,11 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
                     }
                 }
                 if (aboutLogo == null) {
-                    throw new NoSuchElementException("Missing about_logo.png from apk");
+                    var notFound = new NoSuchElementException("Missing about_logo.png from apk");
+                    if (Log.ERROR) {
+                        LOGGER.log(Level.ERROR, "missing about_logo.png resource for " + packageName, notFound);
+                    }
+                    throw notFound;
                 }
 
                 var version = ClientAppVersion.of(baseApk.getApkMeta().getVersionName());
@@ -273,9 +293,16 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
 
                 var info = new WhatsAppAndroidClientInfo(version, latest.code(), md5Hash, secretKey, certificates, business);
                 saveCached(info);
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "resolved android apk info for {0}: version {1}, versionCode {2}",
+                            packageName, version, latest.code());
+                }
                 return info;
             }
         } catch (IOException | GeneralSecurityException exception) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "failed to extract data from apk for " + packageName, exception);
+            }
             throw new RuntimeException("Cannot extract data from APK", exception);
         }
     }
@@ -307,6 +334,9 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
             }
             return new WhatsAppAndroidClientInfo(version, versionCode, md5Hash, secretKey, certificates, business);
         } catch (IOException | RuntimeException _) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "no usable cached android apk info at {0}", path);
+            }
             return null;
         }
     }
@@ -338,7 +368,13 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
             json.put("secretKey", encoder.encodeToString(info.secretKey.getEncoded()));
             json.put("certificates", certificates);
             Files.writeString(path, json.toJSONString());
-        } catch (IOException | RuntimeException _) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "saved android apk info cache at {0}", path);
+            }
+        } catch (IOException | RuntimeException exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "failed to write android apk info cache", exception);
+            }
         }
     }
 
@@ -543,8 +579,15 @@ final class WhatsAppAndroidClientInfo implements WhatsAppMobileClientInfo {
 
             mac.update(md5Hash);
             mac.update(String.valueOf(nationalPhoneNumber).getBytes(StandardCharsets.UTF_8));
-            return URLEncoder.encode(Base64.getEncoder().encodeToString(mac.doFinal()), StandardCharsets.UTF_8);
+            var token = URLEncoder.encode(Base64.getEncoder().encodeToString(mac.doFinal()), StandardCharsets.UTF_8);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "computed android registration token for {0}, business {1}", Log.phone(nationalPhoneNumber), business);
+            }
+            return token;
         }catch (GeneralSecurityException exception) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "failed to compute android registration token", exception);
+            }
             throw new InternalError("Cannot compute registration token", exception);
         }
     }

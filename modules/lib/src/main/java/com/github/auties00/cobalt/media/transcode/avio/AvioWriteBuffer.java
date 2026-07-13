@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.media.transcode.avio;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.ffmpeg.AVIOContext;
 import com.github.auties00.cobalt.util.ffmpeg.FFmpegError;
 import com.github.auties00.cobalt.util.ffmpeg.Ffmpeg;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -34,7 +36,7 @@ import java.util.Arrays;
  * <p>The upcalls cannot propagate exceptions across the native boundary, so a sink I/O error is
  * reported to libavformat as a negative status and stashed in {@link #lastError()}. The owning
  * pipeline inspects {@link #lastError()} after FFmpeg returns and converts a non-null result into a
- * {@link com.github.auties00.cobalt.exception.WhatsAppMediaException.Processing}.
+ * {@link com.github.auties00.cobalt.exception.linked.WhatsAppMediaException.Processing}.
  *
  * @implNote This implementation binds the upcall stubs to {@code this}, so the virtual dispatch of
  * the abstract {@link #writePacket} and the overridable {@link #readPacket} and {@link #seek}
@@ -48,6 +50,9 @@ import java.util.Arrays;
  */
 public sealed abstract class AvioWriteBuffer implements AutoCloseable
         permits AvioWriteBuffer.HeapBuffer, AvioWriteBuffer.FileSystem {
+    /** The logger for {@link AvioWriteBuffer}. */
+    private static final System.Logger LOGGER = Log.get(AvioWriteBuffer.class);
+
     /**
      * Describes the {@code read_packet} upcall signature {@code int (*)(void *opaque, uint8_t *buf, int buf_size)}.
      *
@@ -265,8 +270,10 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
         FileChannel channel = null;
         try {
             channel = FileChannel.open(path, StandardOpenOption.READ, StandardOpenOption.WRITE);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mux temp file created: bufferSize={0}", bufferSize);
             return new FileSystem(arena, bufferSize, path, channel);
         } catch (Throwable t) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "mux temp file setup failed", t);
             if (channel != null && channel.isOpen()) {
                 try {
                     channel.close();
@@ -275,7 +282,8 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
             }
             try {
                 Files.deleteIfExists(path);
-            } catch (IOException ignored) {
+            } catch (IOException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to delete mux temp file after setup failure", e);
             }
             throw t;
         }
@@ -296,7 +304,7 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
      * <p>Because the upcalls cannot throw across the native boundary, a sink I/O error is reported
      * to libavformat as a negative status and stashed here. The owning pipeline inspects this value
      * after FFmpeg returns and converts a non-null result into a
-     * {@link com.github.auties00.cobalt.exception.WhatsAppMediaException.Processing}.
+     * {@link com.github.auties00.cobalt.exception.linked.WhatsAppMediaException.Processing}.
      *
      * @return the last sink exception, or {@code null} if none occurred
      */
@@ -468,6 +476,7 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
         @Override
         @SuppressWarnings("unused")
         int writePacket(MemorySegment opaque, MemorySegment buf, int bufSize) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "avio heap write: bufSize={0}", bufSize);
             if (bufSize <= 0) {
                 return 0;
             }
@@ -565,6 +574,7 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
             channel.close();
             var released = path;
             path = null;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mux temp file released to caller");
             return released;
         }
 
@@ -580,6 +590,7 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
         @Override
         @SuppressWarnings("unused")
         int writePacket(MemorySegment opaque, MemorySegment buf, int bufSize) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "avio file write: bufSize={0}", bufSize);
             if (bufSize <= 0) {
                 return 0;
             }
@@ -597,6 +608,7 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
                 return total;
             } catch (IOException e) {
                 lastError = e;
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "avio file write failed: bufSize=" + bufSize, e);
                 return Ffmpeg.AVERROR_EOF();
             }
         }
@@ -614,6 +626,7 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
         @Override
         @SuppressWarnings("unused")
         int readPacket(MemorySegment opaque, MemorySegment buf, int bufSize) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "avio file read: bufSize={0}", bufSize);
             try {
                 var dst = buf.reinterpret(bufSize).asByteBuffer();
                 dst.limit(bufSize);
@@ -621,6 +634,7 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
                 return read > 0 ? read : Ffmpeg.AVERROR_EOF();
             } catch (IOException e) {
                 lastError = e;
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "avio file read failed: bufSize=" + bufSize, e);
                 return Ffmpeg.AVERROR_EOF();
             }
         }
@@ -639,6 +653,7 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
         @Override
         @SuppressWarnings("unused")
         long seek(MemorySegment opaque, long offset, int whence) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "avio file seek: offset={0} whence={1}", offset, whence);
             try {
                 if ((whence & AVSEEK_SIZE) != 0) {
                     return channel.size();
@@ -651,12 +666,16 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
                     default -> -1L;
                 };
                 if (newPosition < 0) {
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "avio file seek out of bounds: target={0}", newPosition);
+                    }
                     return -1L;
                 }
                 channel.position(newPosition);
                 return newPosition;
             } catch (IOException e) {
                 lastError = e;
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "avio file seek failed: offset=" + offset, e);
                 return -1L;
             }
         }
@@ -676,12 +695,14 @@ public sealed abstract class AvioWriteBuffer implements AutoCloseable
             if (channel.isOpen()) {
                 try {
                     channel.close();
-                } catch (IOException ignored) {
+                } catch (IOException e) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to close mux temp file channel", e);
                 }
             }
             try {
                 Files.deleteIfExists(path);
-            } catch (IOException ignored) {
+            } catch (IOException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to delete mux temp file on cleanup", e);
             }
             path = null;
         }

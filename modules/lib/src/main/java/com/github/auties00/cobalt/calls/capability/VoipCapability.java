@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.calls.capability;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -141,6 +143,27 @@ public enum VoipCapability {
     BIT_36(36, 1);
 
     /**
+     * Resolves a bit index and version pair to its capability, backing {@link #of(int, int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #index} and {@link #sinceVersion},
+     * so a pair resolves to its capability in constant time rather than by scanning {@link #values()}. The
+     * two ints are packed into a single {@code long} key as {@code ((long) index << 32) | (version &
+     * 0xFFFFFFFFL)}, a bijection over all {@code int} pairs, so distinct pairs never collide.
+     */
+    private static final Map<Long, VoipCapability> BY_INDEX_AND_VERSION;
+
+    static {
+        var byIndexAndVersion = new HashMap<Long, VoipCapability>();
+        for (var capability : values()) {
+            var key = ((long) capability.index << 32) | (capability.sinceVersion & 0xFFFFFFFFL);
+            if (byIndexAndVersion.put(key, capability) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_INDEX_AND_VERSION = Map.copyOf(byIndexAndVersion);
+    }
+
+    /**
      * The largest capability bit index any version mask can carry.
      *
      * <p>The engine allocates a {@code 0x40}-byte ({@code 512}-bit) mask per version and
@@ -198,16 +221,15 @@ public enum VoipCapability {
      * Returns the capability whose {@link #index() index} and {@link #sinceVersion() version}
      * match the given pair.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_INDEX_AND_VERSION} map, keyed
+     * on the {@code index} and {@code version} pair packed into a single {@code long}, rather than scanning
+     * {@link #values()}.
      * @param index   the bit index to resolve
      * @param version the capability version to resolve
      * @return the matching capability, or {@link Optional#empty()} if no constant matches
      */
     public static Optional<VoipCapability> of(int index, int version) {
-        for (var capability : values()) {
-            if (capability.index == index && capability.sinceVersion == version) {
-                return Optional.of(capability);
-            }
-        }
-        return Optional.empty();
+        var key = ((long) index << 32) | (version & 0xFFFFFFFFL);
+        return Optional.ofNullable(BY_INDEX_AND_VERSION.get(key));
     }
 }

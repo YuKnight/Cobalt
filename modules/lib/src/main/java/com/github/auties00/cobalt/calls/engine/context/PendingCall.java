@@ -2,9 +2,11 @@ package com.github.auties00.cobalt.calls.engine.context;
 
 import com.github.auties00.cobalt.calls.signaling.CallMessage;
 import com.github.auties00.cobalt.calls.signaling.session.OfferStanza;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.IncomingCall;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,11 @@ import java.util.Objects;
  * models the pending lifecycle, with {@link State#REJECTED} as its terminal value.
  */
 public final class PendingCall {
+    /**
+     * The logger for {@link PendingCall}.
+     */
+    private static final System.Logger LOGGER = Log.get(PendingCall.class);
+
     /**
      * Enumerates the lifecycle states of a pending call.
      *
@@ -140,9 +147,11 @@ public final class PendingCall {
         Objects.requireNonNull(message, "message cannot be null");
         synchronized (lock) {
             if (state != State.PENDING) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping buffered message for rejected pending call {0}", callId());
                 return false;
             }
             buffered.add(message);
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "buffered message for pending call {0}, {1} queued", callId(), buffered.size());
             return true;
         }
     }
@@ -161,6 +170,7 @@ public final class PendingCall {
         synchronized (lock) {
             var drained = List.copyOf(buffered);
             buffered.clear();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "drained {0} buffered message(s) for pending call {1}", drained.size(), callId());
             return drained;
         }
     }
@@ -194,6 +204,7 @@ public final class PendingCall {
             }
             state = State.REJECTED;
             buffered.clear();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "rejected pending call {0}", callId());
             return true;
         }
     }

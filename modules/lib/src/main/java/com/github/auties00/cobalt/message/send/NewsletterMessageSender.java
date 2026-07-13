@@ -1,9 +1,10 @@
 package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.NewsletterStanza;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -30,6 +31,7 @@ import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
 
+import java.lang.System.Logger.Level;
 import java.util.Optional;
 
 /**
@@ -47,9 +49,9 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WASmaxOutMessagePublishNewsletterClientIdContent")
 final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo> {
     /**
-     * Surfaces newsletter-send diagnostics.
+     * The logger for {@link NewsletterMessageSender}.
      */
-    private static final System.Logger LOGGER = System.getLogger(NewsletterMessageSender.class.getName());
+    private static final System.Logger LOGGER = Log.get(NewsletterMessageSender.class);
 
     /**
      * Defines the {@code edit} attribute value stamped onto a newsletter
@@ -98,6 +100,11 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
         var container = messageInfo.message();
         var containerType = container.futureProofContentType();
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "publishing newsletter message {0} to {1}, contentType={2}",
+                    messageInfo.key().id().orElse(null), newsletterJid, containerType);
+        }
+
         if (containerType == FutureProofMessageType.QUESTION || containerType == FutureProofMessageType.QUESTION_REPLY) {
             var innerContent = container.content();
             var mediaSubtype = resolveSmaxMediaType(innerContent);
@@ -119,7 +126,11 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
             }
             var stanza = stanzaBuilder.content(metaNode, plaintextNode);
             var ackNode = client.sendNode(stanza);
-            return AckParser.parse(ackNode);
+            var ack = AckParser.parse(ackNode);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "newsletter publish result for {0}: success={1}", newsletterJid, ack.isSuccess());
+            }
+            return ack;
         } else {
             var message = container.content();
 
@@ -149,11 +160,20 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
 
                 case MediaMessage _ -> buildMedia(messageInfo, newsletterJid, resolveSmaxMediaType(message));
 
-                default -> throw new WhatsAppMessageException.Send.Unknown("Invalid message type");
+                default -> {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "unsupported newsletter message type for {0}", newsletterJid);
+                    }
+                    throw new WhatsAppMessageException.Send.Unknown("Invalid message type");
+                }
             };
 
             var ackNode = client.sendNode(stanza);
-            return AckParser.parse(ackNode);
+            var ack = AckParser.parse(ackNode);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "newsletter publish result for {0}: success={1}", newsletterJid, ack.isSuccess());
+            }
+            return ack;
         }
     }
 
@@ -463,6 +483,9 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
     ) {
         var pollKey = pollUpdate.pollCreationMessageKey();
         if (pollKey.isEmpty()) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "poll vote missing pollCreationMessageKey for {0}", newsletterJid);
+            }
             return null;
         }
 
@@ -470,6 +493,9 @@ final class NewsletterMessageSender extends MessageSender<NewsletterMessageInfo>
         if (parentMessage.isEmpty()
                 || !(parentMessage.get() instanceof NewsletterMessageInfo parentNewsletter)
                 || !(parentNewsletter.message().content() instanceof PollCreationMessage pollCreationMessage)) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "poll vote parent poll not resolved for {0}", newsletterJid);
+            }
             return null;
         }
 

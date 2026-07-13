@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.util;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.exception.ProtobufDeserializationException;
@@ -9,6 +10,7 @@ import it.auties.protobuf.model.ProtobufType;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -48,6 +50,11 @@ import java.util.stream.Collectors;
  * {@link #downloadApk(String, int)} for the actual download.
  */
 public final class PlayStoreUtils {
+    /**
+     * The logger for {@link PlayStoreUtils}.
+     */
+    private static final System.Logger LOGGER = Log.get(PlayStoreUtils.class);
+
     /**
      * Holds the URL of the Aurora OSS anonymous token dispenser.
      */
@@ -154,10 +161,10 @@ public final class PlayStoreUtils {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private PlayStoreUtils() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -194,6 +201,7 @@ public final class PlayStoreUtils {
         if (packageName == null || packageName.isBlank()) {
             throw new IllegalArgumentException("packageName must not be blank");
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "downloading latest apk for package {0}", packageName);
         var client = newClient();
         var headers = buildFdfeHeaders(fetchAnonymousAuth(client));
         var version = fetchVersion(client, packageName, headers);
@@ -220,6 +228,7 @@ public final class PlayStoreUtils {
         if (packageName == null || packageName.isBlank()) {
             throw new IllegalArgumentException("packageName must not be blank");
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "downloading apk for package {0} version {1}", packageName, versionCode);
         var client = newClient();
         var headers = buildFdfeHeaders(fetchAnonymousAuth(client));
         return openDownloadedApk(client, packageName, versionCode, headers);
@@ -266,10 +275,12 @@ public final class PlayStoreUtils {
                 splits.put(split.name(), openDownloadStream(client, split.url(), delivery.cookies()));
             }
         } catch (IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to open split stream for " + packageName, e);
             closeQuietly(baseStream);
             splits.values().forEach(PlayStoreUtils::closeQuietly);
             throw e;
         }
+        if (Log.INFO) LOGGER.log(Level.INFO, "opened apk download for {0} version {1}, {2} splits", packageName, versionCode, splits.size());
         return new DownloadedApk(packageName, baseStream, splits);
     }
 
@@ -302,6 +313,7 @@ public final class PlayStoreUtils {
             throw new IOException("Interrupted while contacting token dispenser", e);
         }
         if (response.statusCode() != 200) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "token dispenser returned http {0}", response.statusCode());
             throw new IOException("Token dispenser returned HTTP " + response.statusCode());
         }
         var json = JSON.parseObject(response.body());
@@ -310,6 +322,7 @@ public final class PlayStoreUtils {
         }
         var authToken = json.getString("authToken");
         if (authToken == null || authToken.isBlank()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "token dispenser response missing authToken");
             throw new IOException("Token dispenser returned no authToken");
         }
         var rawGsfId = json.getString("gsfId");
@@ -328,6 +341,7 @@ public final class PlayStoreUtils {
         var mccMnc = deviceInfoProvider != null
                 ? deviceInfoProvider.getString("mccMnc")
                 : null;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "obtained anonymous play store auth token");
         return new AuthContext(
                 authToken,
                 gsfId,
@@ -399,6 +413,7 @@ public final class PlayStoreUtils {
         if (packageName == null || packageName.isBlank()) {
             throw new IllegalArgumentException("packageName must not be blank");
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "querying latest version for package {0}", packageName);
         try (var client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(CONNECT_TIMEOUT)
@@ -437,13 +452,17 @@ public final class PlayStoreUtils {
                 .map(DetailsResponse::docV2)
                 .map(DocV2::docDetails)
                 .map(DocDetails::appDetails)
-                .orElseThrow(() -> new IOException(
-                        "Details response missing AppDetails for '" + packageName + "'"));
+                .orElseThrow(() -> {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "details response missing AppDetails for {0}", packageName);
+                    return new IOException("Details response missing AppDetails for '" + packageName + "'");
+                });
         var code = details.versionCode();
         if (code == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "details response missing versionCode for {0}", packageName);
             throw new IOException("Details response missing versionCode for '" + packageName + "'");
         }
         var name = details.versionName();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resolved latest version for {0}: code={1}", packageName, code);
         return new AppVersion(code, name == null ? "" : name);
     }
 
@@ -473,10 +492,12 @@ public final class PlayStoreUtils {
         });
         try {
             client.send(builder.build(), HttpResponse.BodyHandlers.discarding());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "acquired package {0} version {1}", packageName, versionCode);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-        } catch (IOException _) {
+        } catch (IOException e) {
             // Best-effort: already-purchased apps return 4xx; downloads still work.
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "acquire request failed for {0} (already owned or unavailable)", packageName);
         }
     }
 
@@ -510,10 +531,13 @@ public final class PlayStoreUtils {
         var data = Optional.ofNullable(wrapper.payload())
                 .map(Payload::deliveryResponse)
                 .map(DeliveryResponse::appDeliveryData)
-                .orElseThrow(() -> new IOException(
-                        "Delivery response missing AppDeliveryData for '" + packageName + "'"));
+                .orElseThrow(() -> {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "delivery response missing AppDeliveryData for {0}", packageName);
+                    return new IOException("Delivery response missing AppDeliveryData for '" + packageName + "'");
+                });
         var baseUrl = data.downloadUrl();
         if (baseUrl == null || baseUrl.isBlank()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "no download url for {0}, may require purchase", packageName);
             throw new IOException(
                     "No download URL for '" + packageName + "'; app may require purchase or be unavailable");
         }
@@ -534,6 +558,7 @@ public final class PlayStoreUtils {
                 .map(PlayStoreUtils::decodeCookie)
                 .filter(c -> c != null && c.name() != null && !c.name().isEmpty() && c.value() != null)
                 .collect(Collectors.toMap(HttpCookie::name, HttpCookie::value, (a, b) -> a, LinkedHashMap::new));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resolved delivery for {0}: {1} splits", packageName, splits.size());
         return new Delivery(baseUrl, splits, cookies);
     }
 
@@ -575,6 +600,7 @@ public final class PlayStoreUtils {
         try (raw) {
             return PlayStoreUtilsResponseWrapperSpec.decode(new BufferedProtobufInputStream(raw));
         } catch (ProtobufDeserializationException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to decode " + endpoint + " response for " + packageName, e);
             throw new IOException("Failed to decode " + endpoint + " response for '" + packageName + "'", e);
         }
     }
@@ -614,6 +640,7 @@ public final class PlayStoreUtils {
         }
         if (response.statusCode() / 100 != 2) {
             closeQuietly(response.body());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apk download failed with http {0}", response.statusCode());
             throw new IOException("APK download failed with HTTP " + response.statusCode());
         }
         return response.body();
@@ -653,6 +680,7 @@ public final class PlayStoreUtils {
         }
         if (response.statusCode() != 200) {
             closeQuietly(response.body());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "get {0} returned http {1}", url, response.statusCode());
             throw new IOException("GET " + url + " returned HTTP " + response.statusCode());
         }
         return response.body();
@@ -693,6 +721,7 @@ public final class PlayStoreUtils {
             }
             return json;
         } catch (IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to load play store device profile", e);
             throw new UncheckedIOException("Failed to load device profile from " + DEVICE_PROFILE_RESOURCE, e);
         }
     }

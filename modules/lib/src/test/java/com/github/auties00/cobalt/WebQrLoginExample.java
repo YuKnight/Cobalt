@@ -1,5 +1,7 @@
 import com.github.auties00.cobalt.calls.stream.AudioInput;
 import com.github.auties00.cobalt.calls.stream.AudioOutput;
+import com.github.auties00.cobalt.calls.stream.VideoInput;
+import com.github.auties00.cobalt.calls.stream.VideoOutput;
 import com.github.auties00.cobalt.client.WhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
@@ -34,7 +36,7 @@ void main() throws IOException {
                     var path1 = Files.createTempFile("cobalt-call-inbound1-", ".y4m");
 
                     var call = client.startCall(peer,
-                            AudioOutput.fromFile(audio), AudioInput.toWav(path));
+                            AudioOutput.fromFile(audio), AudioInput.toWav(path), VideoOutput.fromUri(URI.create("https://thetestdata.com/assets/video/mp4/highquality/4K_UHD_60_FPS.mp4")), VideoInput.toY4m(path1));
                     System.out.println("Path: " + path);
                     System.out.printf("Called %s: %s%n", peer, call.callId());
                 }catch (Throwable throwable) {

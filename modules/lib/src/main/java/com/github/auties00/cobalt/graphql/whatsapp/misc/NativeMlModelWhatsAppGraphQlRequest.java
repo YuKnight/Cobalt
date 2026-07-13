@@ -2,6 +2,11 @@ package com.github.auties00.cobalt.graphql.whatsapp.misc;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import com.github.auties00.cobalt.model.business.waa.ClientCapabilityMetadata;
+import com.github.auties00.cobalt.model.business.waa.ModelRequestMetadata;
+import java.util.List;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,35 +16,32 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that fetches the batched native machine-learning model manifest for a set
+ * Builds the graph.whatsapp.com GraphQL query that fetches the batched native machine-learning model manifest for a set
  * of requested models.
  *
- * <p>The operation takes two GraphQL variables: {@code model_request_metadatas}, a list naming the
- * models and versions to resolve, and {@code client_capability_metadata}, an object describing the
- * client's decode capabilities. WhatsApp Web's
+ * <p>The operation takes two GraphQL variables: {@code model_request_metadatas}, a list of
+ * {@link ModelRequestMetadata} naming the models and versions to resolve, and
+ * {@code client_capability_metadata}, a {@link ClientCapabilityMetadata} describing the client's
+ * decode capabilities. WhatsApp Web's
  * {@code WAWebNativeMLModelQuery.getNativeMLModel(modelRequestMetadatas, clientCapabilityMetadata)}
- * forwards both straight through to the relay. The relay returns the model manifest under
- * {@code aim_model_batched_manifest}; the reply is consumed through
+ * forwards both to the graph.whatsapp.com endpoint. The graph.whatsapp.com endpoint returns the model
+ * manifest under {@code aim_model_batched_manifest}; the reply is consumed through
  * {@link NativeMlModelWhatsAppGraphQlResponse}.
  *
- * @implNote This implementation accepts each variable as a caller-supplied, already JSON-encoded
- * value because the {@code model_request_metadatas} list elements and the
- * {@code client_capability_metadata} object are server-side input types whose field schema is not
- * declared in the JS bundle of snapshot {@code 1040120866}; the relay forwards both opaquely. The
- * only construction observed in the bundle ({@code WAWebBweMLModelManager}) builds list elements as
- * {@code {"name": <modelName>, "version": <version>}} and the capability object as
- * {@code {"bytecodeVersion": [...]}}. Once a typed caller surfaces, replace these with typed scalar
- * fields mirroring that construction.
+ * @implNote The only construction observed in the bundle ({@code WAWebBweMLModelManager}) builds each
+ * list element as {@code {"name": <modelName>, "version": <version>}} and the capability object as
+ * {@code {"bytecodeVersion": [...]}} with an always-empty array; this implementation mirrors those
+ * shapes, keeping the {@code bytecodeVersion} key camelCase to match the wire.
  *
  * @see NativeMlModelWhatsAppGraphQlResponse
  */
 @WhatsAppWebModule(moduleName = "WAWebNativeMLModelQuery")
 public final class NativeMlModelWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      *
      * @implNote This implementation ships the live {@code WAWebGraphQLPersistedQueries} numeric id
      * rather than the compiled {@code params.id} literal ({@code "32743078615336512"}); the
@@ -59,33 +61,31 @@ public final class NativeMlModelWhatsAppGraphQlRequest implements WhatsAppGraphQ
     public static final String OPERATION_NAME = "WAWebNativeMLModelQuery";
 
     /**
-     * The pre-encoded JSON of the {@code model_request_metadatas} list naming the models to resolve,
-     * or {@code null} to omit it.
+     * The {@code model_request_metadatas} list naming the models to resolve, written only when
+     * non-empty. Never {@code null} after construction.
      */
-    private final String modelRequestMetadatasJson;
+    private final List<ModelRequestMetadata> modelRequestMetadatas;
 
     /**
-     * The pre-encoded JSON of the {@code client_capability_metadata} object describing the client's
-     * decode capabilities, or {@code null} to omit it.
+     * The {@code client_capability_metadata} object describing the client's decode capabilities, or
+     * {@code null} to omit it.
      */
-    private final String clientCapabilityMetadataJson;
+    private final ClientCapabilityMetadata clientCapabilityMetadata;
 
     /**
      * Constructs a native-ML-model query request carrying the model request metadatas and the client
      * capability metadata.
      *
-     * <p>Both values are already-JSON-encoded GraphQL variables forwarded opaquely to the relay (see
-     * the class {@code @implNote}); each value that is {@code null} is omitted from the serialized
-     * object.
+     * <p>An empty {@code modelRequestMetadatas} list and a {@code null} {@code clientCapabilityMetadata}
+     * each omit the corresponding variable from the serialized object.
      *
-     * @param modelRequestMetadatasJson    the already-JSON-encoded {@code model_request_metadatas}
-     *                                     list, or {@code null} to omit the variable
-     * @param clientCapabilityMetadataJson the already-JSON-encoded {@code client_capability_metadata}
-     *                                     object, or {@code null} to omit the variable
+     * @param modelRequestMetadatas    the models to resolve, written only when non-empty
+     * @param clientCapabilityMetadata the client decode capabilities, or {@code null} to omit the
+     *                                 variable
      */
-    public NativeMlModelWhatsAppGraphQlRequest(String modelRequestMetadatasJson, String clientCapabilityMetadataJson) {
-        this.modelRequestMetadatasJson = modelRequestMetadatasJson;
-        this.clientCapabilityMetadataJson = clientCapabilityMetadataJson;
+    public NativeMlModelWhatsAppGraphQlRequest(List<ModelRequestMetadata> modelRequestMetadatas, ClientCapabilityMetadata clientCapabilityMetadata) {
+        this.modelRequestMetadatas = modelRequestMetadatas == null ? List.of() : List.copyOf(modelRequestMetadatas);
+        this.clientCapabilityMetadata = clientCapabilityMetadata;
     }
 
     /**
@@ -107,11 +107,11 @@ public final class NativeMlModelWhatsAppGraphQlRequest implements WhatsAppGraphQ
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"model_request_metadatas":
-     * <modelRequestMetadatasJson>, "client_capability_metadata": <clientCapabilityMetadataJson>}},
-     * writing each variable only when its value is non-null and emitting {@code "{}"} when both are
-     * {@code null}. Each value is spliced in as a raw JSON value via
-     * {@link JSONWriter#writeRaw(String)} because it is supplied already encoded.
+     * @implNote This implementation emits {@code {"model_request_metadatas": [{"name": ..., "version":
+     * ...}, ...], "client_capability_metadata": {"bytecodeVersion": [...]}}}, writing
+     * {@code model_request_metadatas} only when the list is non-empty and
+     * {@code client_capability_metadata} only when it is non-null, and emitting {@code "{}"} when both
+     * are absent.
      */
     @WhatsAppWebExport(moduleName = "WAWebNativeMLModelQuery", exports = "getNativeMLModel",
             adaptation = WhatsAppAdaptation.ADAPTED)
@@ -119,16 +119,47 @@ public final class NativeMlModelWhatsAppGraphQlRequest implements WhatsAppGraphQ
     public String variables() {
         try (var writer = JSONWriter.ofUTF8()) {
             writer.startObject();
-            if (modelRequestMetadatasJson != null) {
+            if (!modelRequestMetadatas.isEmpty()) {
                 writer.writeName("model_request_metadatas");
                 writer.writeColon();
-                writer.writeRaw(modelRequestMetadatasJson);
+                writer.startArray();
+                for (var i = 0; i < modelRequestMetadatas.size(); i++) {
+                    if (i > 0) {
+                        writer.writeComma();
+                    }
+                    var metadata = modelRequestMetadatas.get(i);
+                    writer.startObject();
+                    metadata.name().ifPresent(value -> {
+                        writer.writeName("name");
+                        writer.writeColon();
+                        writer.writeString(value);
+                    });
+                    metadata.version().ifPresent(value -> {
+                        writer.writeName("version");
+                        writer.writeColon();
+                        writer.writeString(value);
+                    });
+                    writer.endObject();
+                }
+                writer.endArray();
             }
 
-            if (clientCapabilityMetadataJson != null) {
+            if (clientCapabilityMetadata != null) {
                 writer.writeName("client_capability_metadata");
                 writer.writeColon();
-                writer.writeRaw(clientCapabilityMetadataJson);
+                writer.startObject();
+                writer.writeName("bytecodeVersion");
+                writer.writeColon();
+                writer.startArray();
+                var versions = clientCapabilityMetadata.bytecodeVersion();
+                for (var i = 0; i < versions.size(); i++) {
+                    if (i > 0) {
+                        writer.writeComma();
+                    }
+                    writer.writeInt32(versions.get(i));
+                }
+                writer.endArray();
+                writer.endObject();
             }
             writer.endObject();
             try (var output = new StringWriter()) {
@@ -138,5 +169,21 @@ public final class NativeMlModelWhatsAppGraphQlRequest implements WhatsAppGraphQ
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.WWW;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

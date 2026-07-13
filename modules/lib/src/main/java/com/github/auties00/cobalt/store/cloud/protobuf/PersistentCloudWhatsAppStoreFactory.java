@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.store.cloud.protobuf;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStoreFactory;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -31,11 +33,16 @@ import java.util.Optional;
  * @implNote
  * This implementation records the most recently created or loaded session in a {@code .latest} pointer
  * file beside the per-session directories so {@link #loadLatest()} resolves without scanning. The actual
- * snapshot write is driven by {@link CloudWhatsAppStore#save()} on the store the factory hands back, which
- * the factory binds to its session directory through the package-private
- * {@link ProtobufCloudWhatsAppStore#attachPersistence(Path)} hook.
+ * snapshot write is driven by {@link CloudWhatsAppStore#save()} on the store the factory hands back; a
+ * freshly created store carries its session directory as a builder-supplied property, and a loaded store
+ * restores it from the snapshot, so no post-construction wiring step is needed.
  */
 public final class PersistentCloudWhatsAppStoreFactory implements CloudWhatsAppStoreFactory {
+    /**
+     * The logger for {@link PersistentCloudWhatsAppStoreFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(PersistentCloudWhatsAppStoreFactory.class);
+
     /**
      * The default root directory for Cobalt persistent Cloud sessions.
      *
@@ -94,8 +101,8 @@ public final class PersistentCloudWhatsAppStoreFactory implements CloudWhatsAppS
      *
      * @implNote
      * This implementation returns {@link Optional#empty()} when the session's {@code store.proto} does
-     * not exist; otherwise it decodes the snapshot, binds it to its session directory, and records it as
-     * the latest session.
+     * not exist; otherwise it decodes the snapshot, whose persisted session directory is restored with
+     * it, and records it as the latest session.
      */
     @Override
     public Optional<CloudWhatsAppStore> load(String phoneNumberId) throws IOException {
@@ -103,11 +110,12 @@ public final class PersistentCloudWhatsAppStoreFactory implements CloudWhatsAppS
         var sessionDirectory = sessionDirectory(phoneNumberId);
         var storeFile = sessionDirectory.resolve(STORE_FILE);
         if (Files.notExists(storeFile)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no cloud store snapshot found for {0}", Log.phone(phoneNumberId));
             return Optional.empty();
         }
         var store = deserialize(storeFile);
-        store.attachPersistence(sessionDirectory);
         writeLatestSession(phoneNumberId);
+        if (Log.INFO) LOGGER.log(Level.INFO, "loaded cloud store for {0}", Log.phone(phoneNumberId));
         return Optional.of(store);
     }
 
@@ -123,6 +131,7 @@ public final class PersistentCloudWhatsAppStoreFactory implements CloudWhatsAppS
     public Optional<CloudWhatsAppStore> loadLatest() throws IOException {
         var latest = readLatestSession();
         if (latest.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no latest cloud session pointer recorded");
             return Optional.empty();
         }
         return load(latest.get());
@@ -133,8 +142,8 @@ public final class PersistentCloudWhatsAppStoreFactory implements CloudWhatsAppS
      *
      * @implNote
      * This implementation seeds the store with the two credentials plus the default
-     * {@link CloudApiVersion}, binds it to its session directory, writes the initial snapshot, and records
-     * it as the latest session so a later {@link #loadLatest()} resumes it.
+     * {@link CloudApiVersion}, supplies its session directory through the builder, writes the initial
+     * snapshot, and records it as the latest session so a later {@link #loadLatest()} resumes it.
      */
     @Override
     public CloudWhatsAppStore create(String accessToken, String phoneNumberId) throws IOException {
@@ -144,10 +153,11 @@ public final class PersistentCloudWhatsAppStoreFactory implements CloudWhatsAppS
                 .accessToken(accessToken)
                 .phoneNumberId(phoneNumberId)
                 .apiVersion(CloudApiVersion.DEFAULT.version())
+                .storeDirectory(sessionDirectory(phoneNumberId))
                 .build();
-        store.attachPersistence(sessionDirectory(phoneNumberId));
         store.save();
         writeLatestSession(phoneNumberId);
+        if (Log.INFO) LOGGER.log(Level.INFO, "created cloud store for {0}", Log.phone(phoneNumberId));
         return store;
     }
 
@@ -195,6 +205,7 @@ public final class PersistentCloudWhatsAppStoreFactory implements CloudWhatsAppS
         try {
             Files.move(temp, pointer, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException _) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "atomic move unsupported, falling back to replacing move for latest session pointer");
             Files.move(temp, pointer, StandardCopyOption.REPLACE_EXISTING);
         }
     }

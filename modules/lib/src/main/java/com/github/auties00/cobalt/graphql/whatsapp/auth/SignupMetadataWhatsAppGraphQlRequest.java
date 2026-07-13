@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.auth;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,13 +13,13 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that fetches the onboarding metadata for a WhatsApp Business signup flow.
+ * Builds the graph.whatsapp.com GraphQL query that fetches the onboarding metadata for a WhatsApp Business signup flow.
  *
  * <p>The query takes two top-level scalar GraphQL variables: a {@code signup_id} identifying the
  * in-progress signup and a {@code phone_number} the signup is being attached to. WhatsApp Web's
  * {@code WAWebSignupMetadataFetcher.fetchSignupMetadata(signup_id, phone_number)} forwards both
- * straight through to the relay, then projects the reply into the consent copy shown during signup.
- * The relay returns the signup metadata under the linked {@code wa_signup_metadata} field; the reply
+ * straight through to the graph.whatsapp.com endpoint, then projects the reply into the consent copy shown during signup.
+ * The graph.whatsapp.com endpoint returns the signup metadata under the linked {@code wa_signup_metadata} field; the reply
  * is consumed through {@link SignupMetadataWhatsAppGraphQlResponse}.
  *
  * @see SignupMetadataWhatsAppGraphQlResponse
@@ -25,10 +27,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebSignupMetadataQuery")
 public final class SignupMetadataWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebSignupMetadataQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -122,5 +124,21 @@ public final class SignupMetadataWhatsAppGraphQlRequest implements WhatsAppGraph
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.WWW;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

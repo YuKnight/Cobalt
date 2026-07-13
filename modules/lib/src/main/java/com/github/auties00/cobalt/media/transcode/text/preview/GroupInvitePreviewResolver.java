@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.transcode.text.link.DeepLinkParser;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.jid.JidProvider;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 
+import java.lang.System.Logger.Level;
 import java.net.http.HttpClient;
 import java.time.Duration;
 
@@ -26,6 +28,9 @@ import java.time.Duration;
  */
 @WhatsAppWebModule(moduleName = "WAWebLinkPreviewGroupUtils")
 public final class GroupInvitePreviewResolver {
+    /** The logger for {@link GroupInvitePreviewResolver}. */
+    private static final System.Logger LOGGER = Log.get(GroupInvitePreviewResolver.class);
+
     /**
      * Holds the default description rendered when no community or
      * sub-group hint applies.
@@ -40,10 +45,10 @@ public final class GroupInvitePreviewResolver {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private GroupInvitePreviewResolver() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -86,10 +91,12 @@ public final class GroupInvitePreviewResolver {
         GroupMetadata metadata;
         try {
             metadata = client.queryInviteGroupInfo(code).orElse(null);
-        } catch (RuntimeException _) {
+        } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "group invite metadata query failed for code " + Log.token(code), e);
             return false;
         }
         if (metadata == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "group invite preview skipped, no metadata for code {0}", Log.token(code));
             return false;
         }
         message.setTitle(metadata.subject());
@@ -100,6 +107,7 @@ public final class GroupInvitePreviewResolver {
         if (thumbnailBytes != null) {
             message.setJpegThumbnail(thumbnailBytes);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "group invite preview resolved for {0}", metadata.jid());
         return true;
     }
 
@@ -134,7 +142,8 @@ public final class GroupInvitePreviewResolver {
                 return null;
             }
             return PreviewThumbnailFetcher.download(httpClient, pictureUri, timeout);
-        } catch (RuntimeException _) {
+        } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "group picture download failed for " + Log.jid(String.valueOf(groupJid)), e);
             return null;
         }
     }

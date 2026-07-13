@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.receipt;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
@@ -36,6 +37,7 @@ import com.github.auties00.libsignal.SignalSessionCipher;
 import com.github.auties00.libsignal.key.SignalIdentityPublicKey;
 import com.github.auties00.libsignal.state.SignalPreKeyBundleBuilder;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -89,10 +91,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebRetryRequestParser")
 public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * The {@link System.Logger} used to report parse failures, refused
-     * retries and unknown-device WAM emissions.
+     * The logger for {@link MessageReceiptStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MessageReceiptStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(MessageReceiptStreamHandler.class);
 
     /**
      * The hard ceiling on the {@code count} attribute of a retry request,
@@ -193,6 +194,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
 
         var parsed = parseReceipt(stanza);
         if (parsed == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "unparsable receipt stanza id={0}", stanza.getAttributeAsString("id", "<unknown>"));
             sendAck(stanza, null);
             return;
         }
@@ -210,10 +212,11 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
                 case AggregatedByMessageReceipt aggregatedByMessageReceipt -> handleAggregatedByMessage(aggregatedByMessageReceipt);
             }
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to process incoming receipt {0}: {1}",
-                    stanza.getAttributeAsString("id", "<unknown>"),
-                    exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "failed to process incoming receipt id=" + stanza.getAttributeAsString("id", "<unknown>"),
+                        exception);
+            }
         }
 
         sendAck(stanza, parsed);
@@ -364,6 +367,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
         for (var externalId : receipt.externalIds()) {
             var info = findMessage(receipt.from(), receipt.participant(), externalId);
             if (info == null) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "no stored message for simple receipt id={0}", externalId);
                 continue;
             }
 
@@ -396,18 +400,19 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
      */
     private void handleAggregatedByType(AggregatedByTypeReceipt receipt) {
         if (receipt.ack() == ReceiptAck.CONTENT_GONE) {
-            LOGGER.log(System.Logger.Level.WARNING, "Reupload receipts cannot be aggregated");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "reupload receipts cannot be aggregated");
             return;
         }
 
         if (!receipt.from().hasGroupOrCommunityServer() && !receipt.from().hasBroadcastServer()) {
-            LOGGER.log(System.Logger.Level.WARNING, "Aggregated receipts only supported for group/broadcast");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "aggregated receipts only supported for group/broadcast");
             return;
         }
 
         for (var participantReceipt : receipt.receipts()) {
             var info = findMessage(receipt.from(), participantReceipt.participant(), receipt.externalId());
             if (info == null) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "no stored message for aggregated-by-type receipt id={0}", receipt.externalId());
                 continue;
             }
 
@@ -445,6 +450,7 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
         for (var participantReceipt : receipt.receipts()) {
             var info = findMessage(receipt.from(), participantReceipt.participant(), receipt.externalId());
             if (info == null) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "no stored message for aggregated-by-message receipt id={0}", receipt.externalId());
                 continue;
             }
 
@@ -487,15 +493,18 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
     private void handleRetryReceipt(Stanza stanza) {
         try {
             processRetryRequest(stanza);
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Processed retry receipt request type={0} id={1}",
-                    stanza.getAttributeAsString("type", null),
-                    stanza.getAttributeAsString("id", null));
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "processed retry receipt request type={0} id={1}",
+                        stanza.getAttributeAsString("type", null),
+                        stanza.getAttributeAsString("id", null));
+            }
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to inspect retry receipt {0}: {1}",
-                    stanza.getAttributeAsString("id", "<unknown>"),
-                    exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "failed to inspect retry receipt id=" + stanza.getAttributeAsString("id", "<unknown>"),
+                        exception);
+            }
         } finally {
             sendRetryAck(stanza);
         }
@@ -560,9 +569,11 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
                 ? retryNode.getAttributeAsInt("count").orElse(0)
                 : 0;
         if (retryCount >= MAX_RETRY) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Refusing retry attempt #{0}, exceeds max retry count {1}",
-                    retryCount, MAX_RETRY);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "refusing retry attempt #{0}, exceeds max retry count {1}",
+                        retryCount, MAX_RETRY);
+            }
             var highRetryRequester = participant != null ? participant : from;
             if (highRetryRequester != null) {
                 emitRetryReject(highRetryRequester, from, retryCount, null, RetryRejectReason.HIGH_RETRY_COUNT);
@@ -572,16 +583,13 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
 
         var requester = participant != null ? participant : from;
         if (requester == null) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "handleRetryRequest: no requester found for incoming retry request");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no requester found for incoming retry request");
             return;
         }
 
         var deviceId = Math.max(requester.device(), 0);
         if (!isDeviceKnown(requester, deviceId)) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "handleRetryRequest: device {0} not found for {1}",
-                    deviceId, requester.user());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "device {0} not found for {1}", deviceId, requester);
             var offline = stanza.hasAttribute("offline");
             emitRetryFromUnknownDevice(deviceId, offline);
             return;
@@ -804,7 +812,10 @@ public final class MessageReceiptStreamHandler extends SocketStreamHandler.Concu
             var sessionCipher = new SignalSessionCipher(whatsapp.store().signalStore());
             sessionCipher.process(remoteDevice.toSignalAddress(), builder.build());
             whatsapp.store().save();
-        } catch (Throwable _) {
+        } catch (Throwable throwable) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "failed to process retry key bundle for " + Log.jid(String.valueOf(remoteDevice)), throwable);
+            }
         }
     }
 

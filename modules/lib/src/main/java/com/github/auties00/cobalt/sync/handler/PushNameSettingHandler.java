@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedNameChangedListener;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -18,6 +19,8 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 import com.github.auties00.cobalt.wam.event.MdBootstrapAppStateCriticalDataProcessingEventBuilder;
 import com.github.auties00.cobalt.wam.type.BootstrapAppStateDataStageCode;
 import com.github.auties00.cobalt.wam.WamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code setting_pushName} app-state action that distributes the
@@ -49,6 +52,11 @@ import com.github.auties00.cobalt.wam.WamService;
  */
 @WhatsAppWebModule(moduleName = "WAWebPushNameSync")
 public final class PushNameSettingHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link PushNameSettingHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(PushNameSettingHandler.class);
+
     /**
      * Holds the WAM telemetry service used to commit critical-bootstrap stage
      * events when a mutation is applied during the initial sync.
@@ -133,6 +141,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
                 .orElse(null);
         String name;
         if (resolvedName == null || resolvedName.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "pushname mutation: resolved name missing or empty");
             logCriticalBootstrapStageIfNecessary(client, BootstrapAppStateDataStageCode.PUSHNAME_INVALID);
             name = "";
         } else {
@@ -143,6 +152,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
                 .description("presence")
                 .attribute("name", name)
                 .build());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pushname: sent presence stanza with updated name, length={0}", name.length());
 
         var oldName = client.store().accountStore().name().orElse(null);
         client.store().accountStore().setName(name);
@@ -159,6 +169,7 @@ public final class PushNameSettingHandler implements WebAppStateActionHandler {
 
         logCriticalBootstrapStageIfNecessary(client, BootstrapAppStateDataStageCode.PUSHNAME_APPLIED);
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "pushname: updated successfully");
         return MutationApplicationResult.success();
     }
 

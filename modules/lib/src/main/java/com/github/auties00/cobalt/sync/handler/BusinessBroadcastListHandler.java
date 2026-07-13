@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -16,9 +17,9 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 /**
  * Maintains the business broadcast-list catalog from {@code business_broadcast_list} sync mutations.
@@ -44,11 +45,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebBroadcastListSync")
 public final class BusinessBroadcastListHandler implements WebAppStateActionHandler {
     /**
-     * The handler-scoped {@link Logger} used to emit the per-batch malformed-mutation summary.
-     *
-     * <p>Records the count of malformed mutations after each batch.
+     * The logger for {@link BusinessBroadcastListHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(BusinessBroadcastListHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(BusinessBroadcastListHandler.class);
 
     /**
      * Constructs the singleton broadcast-list handler.
@@ -109,15 +108,18 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() <= 1) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast list mutation malformed: index size={0}", indexArray.size());
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             var listId = indexArray.getString(1);
             if (listId == null || listId.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast list mutation malformed: missing list id");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (mutation.operation() == SyncdOperation.SET) {
                 if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof BusinessBroadcastListAction action)) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast list mutation malformed: missing action value list={0}", listId);
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
@@ -140,16 +142,20 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
                         .labelIds(mirroredLabelIds)
                         .audienceExpression(action.audienceExpression().orElse(null))
                         .build());
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "broadcast list upserted: id={0} deleted={1}", listId, action.deleted());
                 return MutationApplicationResult.success();
             }
 
             if (mutation.operation() == SyncdOperation.REMOVE) {
                 client.store().businessStore().removeBusinessBroadcastList(listId);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "broadcast list removed: id={0}", listId);
                 return MutationApplicationResult.success();
             }
 
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast list mutation failed: unexpected operation={0}", mutation.operation());
             return MutationApplicationResult.failed();
         } catch (Exception e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast list mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -174,7 +180,7 @@ public final class BusinessBroadcastListHandler implements WebAppStateActionHand
             results.add(result);
         }
         if (malformedCount > 0) {
-            LOGGER.warning("broadcast list sync: " + malformedCount + " malformed mutations");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast list sync: {0} malformed mutations", malformedCount);
         }
         return results;
     }

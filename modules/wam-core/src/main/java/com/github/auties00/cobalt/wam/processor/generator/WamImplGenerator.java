@@ -60,7 +60,7 @@ public final class WamImplGenerator {
     public static final int MAP_THRESHOLD = 100;
 
     private WamImplGenerator() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

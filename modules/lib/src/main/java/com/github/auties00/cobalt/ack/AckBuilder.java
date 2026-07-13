@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.ack;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -7,6 +8,7 @@ import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -36,6 +38,11 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebReceiptAck")
 @WhatsAppWebModule(moduleName = "WAWebCreateNackFromStanza")
 public final class AckBuilder {
+    /**
+     * The logger for {@link AckBuilder}.
+     */
+    private static final System.Logger LOGGER = Log.get(AckBuilder.class);
+
     /**
      * The {@link AckSender} that dispatches the assembled stanza on {@link #send()}.
      */
@@ -341,6 +348,9 @@ public final class AckBuilder {
         var id = inbound.getAttributeAsString("id", null);
         var to = toOverrideSet ? toOverride : inbound.getAttributeAsJid("from").orElse(null);
         if (id == null || to == null) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "ack drop class={0}: missing id or to", ackClass);
+            }
             return false;
         }
 
@@ -368,6 +378,11 @@ public final class AckBuilder {
             for (var child : children) {
                 builder.content(child);
             }
+        }
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ack send class={0} id={1} to={2} type={3} error={4}",
+                    ackClass, id, to, resolvedType, error);
         }
 
         owner.dispatch(builder.build());

@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the Meta cross-posting and account-linking service-data mutation
+ * Parses the graph.whatsapp.com GraphQL response of the Meta cross-posting and account-linking service-data mutation
  * built by {@link WaffleFxServiceDataQueryV2WhatsAppGraphQlRequest} into a
  * {@link CrossPostingServiceData}.
  *
@@ -43,7 +43,7 @@ public final class WaffleFxServiceDataQueryV2WhatsAppGraphQlResponse implements 
      *
      * <p>Reserved for the static parser.
      *
-     * @param serviceData the parsed service-data view, or {@code null} when the relay omitted the
+     * @param serviceData the parsed service-data view, or {@code null} when the graph.whatsapp.com endpoint omitted the
      *                    field
      */
     private WaffleFxServiceDataQueryV2WhatsAppGraphQlResponse(CrossPostingServiceData serviceData) {
@@ -51,7 +51,7 @@ public final class WaffleFxServiceDataQueryV2WhatsAppGraphQlResponse implements 
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code waffle_fx_service_data} and projects its {@code services}
      * child onto a {@link CrossPostingServiceData}; the returned {@link Optional} is empty when

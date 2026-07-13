@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.calls.engine.context;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
@@ -37,9 +39,9 @@ import java.util.function.Consumer;
  */
 public final class CallManager {
     /**
-     * Logs slot allocation, dual call starts, and teardowns.
+     * The logger for {@link CallManager}.
      */
-    private static final System.Logger LOGGER = System.getLogger(CallManager.class.getName());
+    private static final System.Logger LOGGER = Log.get(CallManager.class);
 
     /**
      * Serializes allocation and clearing of the two slots.
@@ -319,17 +321,17 @@ public final class CallManager {
                 var ended = secondary;
                 secondary = null;
                 closeQuietly(ended);
-                LOGGER.log(System.Logger.Level.DEBUG, "Ended secondary call {0}", callId);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ended secondary call {0}", callId);
                 return Optional.of(ended);
             }
             if (primary != null && primary.callId().equals(callId)) {
                 var ended = primary;
                 primary = null;
                 closeQuietly(ended);
-                LOGGER.log(System.Logger.Level.DEBUG, "Ended primary call {0}", callId);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ended primary call {0}", callId);
                 return Optional.of(ended);
             }
-            LOGGER.log(System.Logger.Level.DEBUG, "End requested for {0} does not match active call id", callId);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "end requested for {0} does not match active call id", callId);
             return Optional.empty();
         } finally {
             lock.unlock();
@@ -376,7 +378,7 @@ public final class CallManager {
                         "cannot start a primary call while call " + primary.callId() + " is active");
             }
             primary = context;
-            LOGGER.log(System.Logger.Level.DEBUG, "Allocated primary call {0}", context.callId());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "allocated primary call {0}", context.callId());
             notifyAllocated(context);
             return context;
         } finally {
@@ -403,7 +405,7 @@ public final class CallManager {
                         "cannot start a dual call while secondary call " + secondary.callId() + " is active");
             }
             secondary = context;
-            LOGGER.log(System.Logger.Level.DEBUG, "Allocated secondary call {0}", context.callId());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "allocated secondary call {0}", context.callId());
             notifyAllocated(context);
             return context;
         } finally {
@@ -436,8 +438,7 @@ public final class CallManager {
         try {
             context.close();
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to close call context " + context.callId(), exception);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to close call context " + context.callId(), exception);
         } finally {
             context.lock().unlock();
         }

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.chat.*;
 import com.github.auties00.cobalt.model.chat.group.GroupParticipant;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.message.PrivacySystemMessage;
 import com.github.auties00.cobalt.model.setting.WallpaperSettings;
 import it.auties.protobuf.annotation.ProtobufMessage;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -32,6 +34,11 @@ import java.util.stream.Stream;
  */
 @ProtobufMessage
 final class PersistentChat extends Chat {
+    /**
+     * The logger for {@link PersistentChat}.
+     */
+    private static final System.Logger LOGGER = Log.get(PersistentChat.class);
+
     /**
      * The MVStore facade backing every message accessor.
      *
@@ -124,10 +131,10 @@ final class PersistentChat extends Chat {
     }
 
     /**
-     * Binds the given MVStore facade to this chat and reseeds the cached message count.
+     * Sets the given MVStore facade on this chat and reseeds the cached message count.
      *
      * @apiNote
-     * Invoked by {@link PersistentStore#attachMessageStore(PersistentMessageStore)} immediately
+     * Invoked by {@link PersistentStore#setMessageStore(PersistentMessageStore)} immediately
      * after construction or after the protobuf deserialiser produces a freshly decoded chat. Until
      * this call returns, every message accessor on this instance will throw because
      * {@link #messageStore} is still {@code null}.
@@ -138,9 +145,10 @@ final class PersistentChat extends Chat {
      *
      * @param messageStore the MVStore facade owned by the parent store
      */
-    void attach(PersistentMessageStore messageStore) {
+    void setMessageStore(PersistentMessageStore messageStore) {
         this.messageStore = messageStore;
         this.messageCount.set(messageStore.countChatMessages(jid()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat {0} message store set, cached count={1}", jid(), messageCount.get());
     }
 
     /**
@@ -182,6 +190,7 @@ final class PersistentChat extends Chat {
         Objects.requireNonNull(info, "info cannot be null");
         messageStore.putChatMessage(jid(), info);
         messageCount.incrementAndGet();
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "message added to chat {0}", jid());
     }
 
     /**
@@ -200,6 +209,7 @@ final class PersistentChat extends Chat {
         if (removed) {
             messageCount.decrementAndGet();
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "message {0} removed from chat {1}: {2}", id, jid(), removed);
         return removed;
     }
 
@@ -215,6 +225,7 @@ final class PersistentChat extends Chat {
     public void removeMessages() {
         messageStore.removeChatMessages(jid());
         messageCount.set(0);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "all messages removed from chat {0}", jid());
     }
 
     /**

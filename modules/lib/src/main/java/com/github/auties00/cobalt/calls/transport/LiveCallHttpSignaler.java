@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.transport;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
@@ -33,6 +35,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *           {@link WhatsAppCallException.DataChannel}, the non fatal media plane bring up failure.
  */
 public final class LiveCallHttpSignaler {
+    /**
+     * The logger for {@link LiveCallHttpSignaler}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveCallHttpSignaler.class);
+
     /**
      * The fixed length, in characters, of a generated session bootstrap request id.
      */
@@ -85,20 +92,34 @@ public final class LiveCallHttpSignaler {
     public StartSessionResult sendStartSessionRequest() {
         var requestId = newRequestId();
         openRequests.put(requestId, System.nanoTime());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "posting start_session_request {0}", requestId);
         try {
             byte[] responseBody;
             try {
                 responseBody = transport.sendStartSessionRequest(
                         requestId, START_SESSION_REQUEST_BODY.getBytes(StandardCharsets.UTF_8));
             } catch (WhatsAppCallException exception) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "start_session_request failed for request " + requestId, exception);
+                }
                 throw exception;
             } catch (RuntimeException exception) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "start_session_request failed for request " + requestId, exception);
+                }
                 throw new WhatsAppCallException.DataChannel(
                         "start_session_request failed for request " + requestId, exception);
             }
             if (responseBody == null) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "start_session_request {0} returned no response", requestId);
+                }
                 throw new WhatsAppCallException.DataChannel(
                         "start_session_request returned no response for request " + requestId);
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "received start_session_response {0}, {1} bytes", requestId,
+                        responseBody.length);
             }
             return new StartSessionResult(requestId, responseBody);
         } finally {

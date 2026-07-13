@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.registration.push.apns.activation;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.plist.Plist;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDataValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDictionaryValue;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 
 /**
  * Models the decoded {@code <Protocol>} plist returned from {@code albert.apple.com}'s
@@ -22,6 +24,11 @@ import java.io.IOException;
  * @param deviceCertificate the DER bytes of the Apple-signed device certificate
  */
 public record ApnsActivationInfo(byte[] deviceCertificate) {
+    /**
+     * The logger for {@link ApnsActivationInfo}.
+     */
+    private static final System.Logger LOGGER = Log.get(ApnsActivationInfo.class);
+
     /**
      * Parses the {@code <Protocol>} plist into the structured record.
      *
@@ -46,8 +53,11 @@ public record ApnsActivationInfo(byte[] deviceCertificate) {
             var deviceActivation = (PlistDictionaryValue) root.get("device-activation").orElseThrow();
             var activationRecord = (PlistDictionaryValue) deviceActivation.get("activation-record").orElseThrow();
             var deviceCertificate = (PlistDataValue) activationRecord.get("DeviceCertificate").orElseThrow();
-            return new ApnsActivationInfo(deviceCertificate.toByteArray());
+            var info = new ApnsActivationInfo(deviceCertificate.toByteArray());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsed device activation info, certificate bytes={0}", info.deviceCertificate().length);
+            return info;
         } catch (Exception e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot parse device activation info", e);
             throw new IOException("Cannot parse device activation info", e);
         }
     }

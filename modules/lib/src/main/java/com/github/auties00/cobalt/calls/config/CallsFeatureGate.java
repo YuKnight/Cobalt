@@ -10,18 +10,17 @@ import java.util.Objects;
  *
  * <p>WhatsApp ships its calling capabilities behind server pushed feature flags rather than a
  * static client build: each capability (one to one calling, group calling, call links, screen
- * share), each negotiated protocol version (admin control, LID addressing, audio sharing, the
- * rust migration bitmap), and each engine implementation selector (the WASM variant, the video and
- * audio capture/render/playback impls) is keyed by a numeric {@link ABProp} the relay syncs over
- * the binary XMPP socket. The calls engine reads these flags to decide whether to spin up at all,
- * what to advertise in an {@code <offer>}, and which protocol versions to negotiate.
+ * share) and each negotiated protocol version (admin control, LID addressing, audio sharing) is
+ * keyed by a numeric {@link ABProp} the relay syncs over the binary XMPP socket. The calls engine
+ * reads these flags to decide whether to spin up at all, what to advertise in an {@code <offer>},
+ * and which protocol versions to negotiate.
  *
  * <p>This facade owns no flag storage. It holds the same {@link ABPropsService} instance the owning
  * client already owns and forwards each read to that service's typed accessor keyed by the matching
  * {@link ABProp} constant; the service caches the synced values, applies the production vs beta
- * default, and coerces the raw string. Boolean predicates return the coerced flag; version and
- * bitmap reads return the integer the relay synced, or the prop default (ultimately {@code 0}); the
- * WASM variant read returns the raw string selector.
+ * default, and coerces the raw string. Boolean predicates return the coerced flag; the integer reads
+ * (versions, counts, and intervals) return the value the relay synced, or the prop default
+ * (ultimately {@code 0}).
  *
  * <p>Reads block on the first AB props sync by default, matching {@link ABPropsService}'s
  * {@code waitForSync = true} accessors, so a gate query made before the cache is warm waits up to
@@ -175,20 +174,6 @@ public final class CallsFeatureGate {
     }
 
     /**
-     * Returns whether inbound signaling messages are handed off into the voip stack.
-     *
-     * <p>When enabled the message plane transfers ownership of an inbound call signaling message to
-     * the voip stack instead of processing it on the message path. Reads
-     * {@link ABProp#VOIP_STACK_INCOMING_MESSAGE_OWNERSHIP_TRANSFER}.
-     *
-     * @return {@code true} when inbound signaling messages are handed off to the voip stack
-     */
-    public boolean isVoipStackMessageOwnershipTransferEnabled() {
-        // TODO: inbound call stanzas are always routed to the call engine; no ownership hand off consumes this flag yet
-        return abPropsService.getBool(ABProp.VOIP_STACK_INCOMING_MESSAGE_OWNERSHIP_TRANSFER);
-    }
-
-    /**
      * Returns whether a one to one {@code <terminate>} is ignored while a group call is active.
      *
      * <p>When enabled the engine drops a one to one terminate that arrives during a group call, so a
@@ -213,20 +198,6 @@ public final class CallsFeatureGate {
      */
     public boolean isIgnoreJoinableTerminateOnExpiredOffer() {
         return abPropsService.getBool(ABProp.IGNORE_JOINABLE_TERMINATE_ON_EXPIRED_OFFER);
-    }
-
-    /**
-     * Returns whether the call result fix for a {@code 404} accept NACK is enabled.
-     *
-     * <p>When enabled the engine maps a {@code 404} NACK on an outbound {@code accept} to the
-     * corrected call result rather than the legacy one. Reads
-     * {@link ABProp#ENABLE_CALL_RESULT_FIX_FOR_404_ACCEPT_NACK}.
-     *
-     * @return {@code true} when the {@code 404} accept NACK call result fix is enabled
-     */
-    public boolean isCallResultFixFor404AcceptNackEnabled() {
-        // TODO: thread this flag into CallResult.fromAcceptAckError so a 404 accept NACK resolves to the legacy result when the flag is off; today the corrected result is selected unconditionally
-        return abPropsService.getBool(ABProp.ENABLE_CALL_RESULT_FIX_FOR_404_ACCEPT_NACK);
     }
 
     /**
@@ -296,34 +267,6 @@ public final class CallsFeatureGate {
     }
 
     /**
-     * Returns the calling rust migration bitmap.
-     *
-     * <p>Each bit selects whether a calling subsystem runs on the rust/native stack rather than the
-     * legacy one; the engine masks this value per subsystem. Reads
-     * {@link ABProp#CALLING_RUST_MIGRATION_BITMAP}.
-     *
-     * @return the rust migration bitmap
-     */
-    public int callingRustMigrationBitmap() {
-        // TODO: no calling subsystem consults this bitmap yet
-        return abPropsService.getInt(ABProp.CALLING_RUST_MIGRATION_BITMAP);
-    }
-
-    /**
-     * Returns the web calling performance optimization bitmask.
-     *
-     * <p>Each bit toggles one calling performance optimization; the engine masks this value per
-     * optimization. Reads {@link ABProp#WEB_CALLING_PERF_OPTIMIZATIONS_BITMASK}, whose default is
-     * {@code 1}.
-     *
-     * @return the performance optimization bitmask
-     */
-    public int callPerfOptimizationsBitmask() {
-        // TODO: no calling performance optimization consults this bitmask yet
-        return abPropsService.getInt(ABProp.WEB_CALLING_PERF_OPTIMIZATIONS_BITMASK);
-    }
-
-    /**
      * Returns the screen share milestone version.
      *
      * <p>This is the host side screen share capability gate expressed as a milestone version: a value
@@ -335,84 +278,5 @@ public final class CallsFeatureGate {
      */
     public int screenShareMilestoneVersion() {
         return abPropsService.getInt(ABProp.CALLING_SCREEN_SHARE_MILESTONE_VERSION);
-    }
-
-    /**
-     * Returns the number of voip worker threads to preallocate.
-     *
-     * <p>The engine preallocates this many dynamic worker threads at startup rather than growing the
-     * pool lazily; {@code 0} disables preallocation. Reads
-     * {@link ABProp#WEB_VOIP_DYNAMIC_THREAD_PREALLOCATE_COUNT}.
-     *
-     * @return the worker thread preallocation count
-     */
-    public int dynamicThreadPreallocateCount() {
-        // TODO: no worker thread preallocation consumes this count yet
-        return abPropsService.getInt(ABProp.WEB_VOIP_DYNAMIC_THREAD_PREALLOCATE_COUNT);
-    }
-
-    /**
-     * Returns the selector for the video renderer implementation.
-     *
-     * <p>The engine chooses among its video renderer implementations by this selector. Reads
-     * {@link ABProp#WEB_VOIP_VIDEO_RENDERER}.
-     *
-     * @return the video renderer implementation selector
-     */
-    public int videoRendererImpl() {
-        // TODO: no engine site selects a video renderer from this selector yet
-        return abPropsService.getInt(ABProp.WEB_VOIP_VIDEO_RENDERER);
-    }
-
-    /**
-     * Returns the selector for the video capture implementation.
-     *
-     * <p>The engine chooses among its video capture implementations by this selector. Reads
-     * {@link ABProp#WEB_VOIP_VIDEO_CAPTURE_IMPL}.
-     *
-     * @return the video capture implementation selector
-     */
-    public int videoCaptureImpl() {
-        // TODO: no engine site selects a video capture impl from this selector yet
-        return abPropsService.getInt(ABProp.WEB_VOIP_VIDEO_CAPTURE_IMPL);
-    }
-
-    /**
-     * Returns the selector for the audio capture implementation.
-     *
-     * <p>The engine chooses among its audio capture implementations by this selector. Reads
-     * {@link ABProp#WEB_VOIP_AUDIO_CAPTURE_IMPL}.
-     *
-     * @return the audio capture implementation selector
-     */
-    public int audioCaptureImpl() {
-        // TODO: no engine site selects an audio capture impl from this selector yet
-        return abPropsService.getInt(ABProp.WEB_VOIP_AUDIO_CAPTURE_IMPL);
-    }
-
-    /**
-     * Returns the selector for the audio playback implementation.
-     *
-     * <p>The engine chooses among its audio playback implementations by this selector. Reads
-     * {@link ABProp#WEB_VOIP_AUDIO_PLAYBACK_IMPL}.
-     *
-     * @return the audio playback implementation selector
-     */
-    public int audioPlaybackImpl() {
-        // TODO: no engine site selects an audio playback impl from this selector yet
-        return abPropsService.getInt(ABProp.WEB_VOIP_AUDIO_PLAYBACK_IMPL);
-    }
-
-    /**
-     * Returns the voip WASM variant selector.
-     *
-     * <p>This selects which voip engine asset variant the host loads; the default is
-     * {@code "prod-nonlab"}. Reads {@link ABProp#WEB_VOIP_LOAD_WASM_VARIANT}.
-     *
-     * @return the voip WASM variant selector string
-     */
-    public String wasmVariant() {
-        // TODO: no engine site selects a voip engine asset variant from this selector yet
-        return abPropsService.getString(ABProp.WEB_VOIP_LOAD_WASM_VARIANT);
     }
 }

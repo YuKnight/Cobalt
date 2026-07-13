@@ -5,6 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.media.audio.pipeline.StreamPacketCache;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Builds the WhatsApp MLow redundancy payload: it prepends compact two byte headers for the most recent
@@ -41,6 +44,11 @@ import com.github.auties00.cobalt.calls.media.audio.pipeline.StreamPacketCache;
  * amount the RTP timestamp advances between the two packets.
  */
 public final class MLowRedPacker {
+    /**
+     * The logger for {@link MLowRedPacker}.
+     */
+    private static final System.Logger LOGGER = Log.get(MLowRedPacker.class);
+
     /**
      * The redundant block header size, in bytes, of the WhatsApp MLow redundancy form.
      */
@@ -154,6 +162,10 @@ public final class MLowRedPacker {
             out.writeBytes(block.payload());
         }
         out.writeBytes(primaryPayload);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls mlow red pack: seq={0} redundant={1} bytes={2}",
+                    primarySequence, selected.size(), out.size());
+        }
         return out.toByteArray();
     }
 

@@ -2,8 +2,10 @@ package com.github.auties00.cobalt.socket;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator;
+import com.github.auties00.cobalt.log.Log;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
@@ -38,6 +40,11 @@ import java.nio.charset.StandardCharsets;
  * {@link IOException} to ease proxy debugging.
  */
 final class HttpConnectTunnel {
+
+    /**
+     * The logger for {@link HttpConnectTunnel}.
+     */
+    private static final System.Logger LOGGER = Log.get(HttpConnectTunnel.class);
 
     /**
      * The size of the reusable read buffer used to drain the
@@ -88,8 +95,10 @@ final class HttpConnectTunnel {
      */
     static void tunnel(Socket socket, String targetHost, int targetPort,
                        WhatsAppClientProxyAuthenticator.Http auth) throws IOException {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opening http connect tunnel to {0}:{1}", targetHost, targetPort);
         sendConnect(socket, targetHost, targetPort, auth);
         readConnectResponse(socket);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "http connect tunnel established to {0}:{1}", targetHost, targetPort);
     }
 
     /**
@@ -238,8 +247,9 @@ final class HttpConnectTunnel {
             throw invalidResponse(buffer, filled);
         }
         if (d1 != '2') {
-            throw new IOException("Proxy refused CONNECT: "
-                    + (char) d1 + (char) d2 + (char) d3);
+            var status = "" + (char) d1 + (char) d2 + (char) d3;
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "http proxy refused connect, status={0}", status);
+            throw new IOException("Proxy refused CONNECT: " + status);
         }
     }
 
@@ -267,6 +277,7 @@ final class HttpConnectTunnel {
      * @return a new {@link IOException} suitable for throwing
      */
     private static IOException invalidResponse(byte[] buffer, int filled) {
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "http connect tunnel received malformed response, {0} byte(s)", filled);
         return new IOException("Invalid HTTP CONNECT response: "
                 + new String(buffer, 0, filled, StandardCharsets.US_ASCII));
     }

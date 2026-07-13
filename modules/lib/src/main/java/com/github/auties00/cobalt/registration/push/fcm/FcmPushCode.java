@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.registration.push.fcm;
 
+import com.github.auties00.cobalt.log.Log;
+
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 
 /**
  * Single-value, set-once synchronisation primitive that hands the verification code received over the FCM MCS stream
@@ -17,6 +20,9 @@ import java.io.IOException;
  * cheaper than the lock-based alternatives.
  */
 final class FcmPushCode {
+    /** The logger for {@link FcmPushCode}. */
+    private static final System.Logger LOGGER = Log.get(FcmPushCode.class);
+
     /**
      * Lock guarding {@link #code} and {@link #closed}.
      *
@@ -68,6 +74,7 @@ final class FcmPushCode {
                 lock.wait();
             }
             if (code == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "fcm push code holder closed before a code was delivered");
                 throw new IOException("FcmPushCode is closed");
             }
             return code;
@@ -90,6 +97,7 @@ final class FcmPushCode {
         synchronized (lock) {
             if (this.code == null) {
                 this.code = code;
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fcm push code delivered: {0}", Log.code(code));
                 lock.notifyAll();
             }
         }
@@ -106,6 +114,7 @@ final class FcmPushCode {
                 return;
             }
             closed = true;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fcm push code holder closed");
             lock.notifyAll();
         }
     }

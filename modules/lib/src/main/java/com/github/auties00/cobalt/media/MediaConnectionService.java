@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.media;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
 import com.github.auties00.cobalt.model.media.MediaPath;
 import com.github.auties00.cobalt.model.media.MediaProvider;
 import com.github.auties00.cobalt.stanza.Stanza;

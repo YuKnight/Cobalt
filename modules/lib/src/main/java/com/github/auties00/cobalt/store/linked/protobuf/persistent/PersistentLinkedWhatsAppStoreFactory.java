@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.store.*;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -28,7 +30,8 @@ import java.util.UUID;
  * Cobalt embedders obtain instances through {@link LinkedWhatsAppStoreFactory#persistent()} and its
  * overloads; the class is package-private so the persistence strategy is not part of the public
  * API surface. Each session lives under {@code <baseDirectory>/<clientType>/<sessionId>/} with a
- * {@code store.proto} metadata snapshot beside a {@code messages.mv} file.
+ * {@code store.proto} metadata snapshot beside a {@code messages.mv} message file and a {@code wam.mv}
+ * WAM buffer file.
  *
  * @implNote
  * This implementation runs an orphan-recovery pass on {@link #load load}: after the metadata
@@ -40,6 +43,11 @@ import java.util.UUID;
  * see a consistent shape regardless of whether the previous shutdown was clean or crashy.
  */
 public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAppStoreFactory {
+    /**
+     * The logger for {@link PersistentLinkedWhatsAppStoreFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(PersistentLinkedWhatsAppStoreFactory.class);
+
     /**
      * The default root directory for Cobalt persistent sessions.
      *
@@ -189,14 +197,18 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
     private Optional<LinkedWhatsAppStore> loadSession(LinkedWhatsAppClientType clientType, String sessionId) throws IOException {
         var storeFile = PersistentStore.storeFilePath(clientType, directory, sessionId);
         if (Files.notExists(storeFile)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no persisted session found for client type {0}", clientType);
             return Optional.empty();
         }
         var store = PersistentStore.deserialize(storeFile);
         var envPath = PersistentStore.messagesEnvPath(clientType, directory, sessionId);
         var messageStore = PersistentMessageStore.open(envPath, mapSize);
-        store.attachMessageStore(messageStore);
+        store.setMessageStore(messageStore);
+        var wamPath = PersistentStore.wamBuffersEnvPath(clientType, directory, sessionId);
+        store.setWamBuffersStore(PersistentWamBuffersStore.open(wamPath));
         recoverOrphans(store, messageStore);
         writeLatestSession(clientType, sessionId);
+        if (Log.INFO) LOGGER.log(Level.INFO, "session loaded for client type {0}", clientType);
         return Optional.of(store);
     }
 
@@ -219,15 +231,23 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
      */
     private static void recoverOrphans(PersistentStore store, PersistentMessageStore messageStore) {
         var chatStore = store.chatStore();
+        var recoveredChats = 0;
         for (var chatJid : messageStore.distinctChatJids()) {
             if (!chatStore.chats.containsKey(chatJid)) {
                 chatStore.addNewChat(chatJid);
+                recoveredChats++;
             }
         }
+        var recoveredNewsletters = 0;
         for (var newsletterJid : messageStore.distinctNewsletterJids()) {
             if (!chatStore.newsletters.containsKey(newsletterJid)) {
                 chatStore.addNewNewsletter(newsletterJid);
+                recoveredNewsletters++;
             }
+        }
+        if (Log.WARNING && (recoveredChats > 0 || recoveredNewsletters > 0)) {
+            LOGGER.log(Level.WARNING, "recovered {0} orphan chats and {1} orphan newsletters from message store",
+                    recoveredChats, recoveredNewsletters);
         }
     }
 
@@ -256,9 +276,9 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
                 new ProtobufLinkedWhatsAppSettingsStoreBuilder().build(),
                 directory,
                 new ProtobufLinkedWebSessionStoreBuilder().build(),
-                new ProtobufLinkedWhatsAppWamStoreBuilder().build(),
+                new PersistentLinkedWhatsAppWamStoreBuilder().build(),
                 new PersistentLinkedWhatsAppChatStoreBuilder().build());
-        attachFreshMessageStore(store, clientType, sessionId);
+        attachFreshStores(store, clientType, sessionId);
         return store;
     }
 
@@ -286,9 +306,9 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
                 new ProtobufLinkedWhatsAppSettingsStoreBuilder().build(),
                 directory,
                 new ProtobufLinkedWebSessionStoreBuilder().build(),
-                new ProtobufLinkedWhatsAppWamStoreBuilder().build(),
+                new PersistentLinkedWhatsAppWamStoreBuilder().build(),
                 new PersistentLinkedWhatsAppChatStoreBuilder().build());
-        attachFreshMessageStore(store, clientType, sessionId);
+        attachFreshStores(store, clientType, sessionId);
         return store;
     }
 
@@ -326,14 +346,14 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
                 new ProtobufLinkedWhatsAppSettingsStoreBuilder().build(),
                 directory,
                 new ProtobufLinkedWebSessionStoreBuilder().build(),
-                new ProtobufLinkedWhatsAppWamStoreBuilder().build(),
+                new PersistentLinkedWhatsAppWamStoreBuilder().build(),
                 new PersistentLinkedWhatsAppChatStoreBuilder().build());
-        attachFreshMessageStore(store, clientType, sessionId);
+        attachFreshStores(store, clientType, sessionId);
         return store;
     }
 
     /**
-     * Opens a fresh MVStore for {@code sessionId}, wires it into {@code store}, and records the
+     * Opens fresh MVStores for {@code sessionId}, wires them into {@code store}, and records the
      * session as the most recently opened one.
      *
      * @apiNote
@@ -341,20 +361,23 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
      * produces an otherwise empty store.
      *
      * @implNote
-     * This implementation writes the
-     * {@link #writeLatestSession(LinkedWhatsAppClientType, String) latest-session pointer} once the
-     * message store is open so a subsequent {@link #loadLatest(LinkedWhatsAppClientType)} resumes the
-     * session just created without scanning the home directory.
+     * This implementation opens both the message store and the independent WAM buffer store, then writes
+     * the {@link #writeLatestSession(LinkedWhatsAppClientType, String) latest-session pointer} so a
+     * subsequent {@link #loadLatest(LinkedWhatsAppClientType)} resumes the session just created without
+     * scanning the home directory.
      *
      * @param store      the freshly built store
      * @param clientType the client type
      * @param sessionId  the session UUID string or phone-number string
      * @throws IOException if the session directory cannot be created or the pointer cannot be written
      */
-    private void attachFreshMessageStore(PersistentStore store, LinkedWhatsAppClientType clientType, String sessionId) throws IOException {
+    private void attachFreshStores(PersistentStore store, LinkedWhatsAppClientType clientType, String sessionId) throws IOException {
         var envPath = PersistentStore.messagesEnvPath(clientType, directory, sessionId);
-        store.attachMessageStore(PersistentMessageStore.open(envPath, mapSize));
+        store.setMessageStore(PersistentMessageStore.open(envPath, mapSize));
+        var wamPath = PersistentStore.wamBuffersEnvPath(clientType, directory, sessionId);
+        store.setWamBuffersStore(PersistentWamBuffersStore.open(wamPath));
         writeLatestSession(clientType, sessionId);
+        if (Log.INFO) LOGGER.log(Level.INFO, "new session created for client type {0}", clientType);
     }
 
     /**
@@ -388,6 +411,7 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
         } catch (AtomicMoveNotSupportedException _) {
             Files.move(temp, pointer, StandardCopyOption.REPLACE_EXISTING);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "recorded latest session pointer for client type {0}", clientType);
     }
 
     /**
@@ -415,6 +439,7 @@ public final class PersistentLinkedWhatsAppStoreFactory implements LinkedWhatsAp
             var sessionId = Files.readString(pointer).strip();
             return sessionId.isEmpty() ? Optional.empty() : Optional.of(sessionId);
         } catch (NoSuchFileException _) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "no latest-session pointer found for client type {0}", clientType);
             return Optional.empty();
         }
     }

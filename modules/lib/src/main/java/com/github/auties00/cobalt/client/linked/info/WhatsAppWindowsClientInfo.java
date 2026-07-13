@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.client.linked.info;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -8,6 +9,7 @@ import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersionBuilder;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -32,6 +34,11 @@ import java.net.http.HttpResponse;
  */
 @WhatsAppWebModule(moduleName = "WAWebBuildConstants", platform = WhatsAppWebPlatform.WINDOWS)
 final class WhatsAppWindowsClientInfo implements LinkedWhatsAppClientInfo {
+    /**
+     * The logger for {@link WhatsAppWindowsClientInfo}.
+     */
+    private static final System.Logger LOGGER = Log.get(WhatsAppWindowsClientInfo.class);
+
     /**
      * Holds the resolved Windows client identity once it has been built.
      *
@@ -130,6 +137,7 @@ final class WhatsAppWindowsClientInfo implements LinkedWhatsAppClientInfo {
                 .tertiary(tertiary.isPresent() ? tertiary.getAsInt() : null)
                 .quaternary(queryWindowsBuild())
                 .build();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resolved windows client info, version {0}", version);
         return new WhatsAppWindowsClientInfo(version);
     }
 
@@ -157,31 +165,50 @@ final class WhatsAppWindowsClientInfo implements LinkedWhatsAppClientInfo {
                     .build();
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "microsoft store catalog query returned status {0}, falling back to default build", response.statusCode());
+                }
                 return DEFAULT_WINDOWS_BUILD;
             }
             var body = response.body();
             var markerStart = body.indexOf(PACKAGE_MARKER);
             if (markerStart < 0) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "package marker missing from microsoft store catalog response, falling back to default build");
+                }
                 return DEFAULT_WINDOWS_BUILD;
             }
             var versionStart = markerStart + PACKAGE_MARKER.length();
             var versionEnd = body.indexOf('_', versionStart);
             if (versionEnd < 0) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "malformed package version in microsoft store catalog response, falling back to default build");
+                }
                 return DEFAULT_WINDOWS_BUILD;
             }
             var versionStr = body.substring(versionStart, versionEnd);
             var parts = versionStr.split("\\.");
             if (parts.length < 3) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "malformed package version parts in microsoft store catalog response, falling back to default build");
+                }
                 return DEFAULT_WINDOWS_BUILD;
             }
             var secondary = Integer.parseInt(parts[1]);
             var tertiary = Integer.parseInt(parts[2]);
             var build = secondary * 100 + (tertiary % 100);
             if (build < 100000 || build > 999999) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "windows build {0} out of expected range, falling back to default build", build);
+                }
                 return DEFAULT_WINDOWS_BUILD;
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resolved windows store build {0}", build);
             return build;
         } catch (IOException | InterruptedException | NumberFormatException exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "failed to query microsoft store catalog, falling back to default build", exception);
+            }
             return DEFAULT_WINDOWS_BUILD;
         }
     }

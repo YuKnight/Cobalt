@@ -4,10 +4,8 @@ import com.github.auties00.cobalt.calls.capability.*;
 import com.github.auties00.cobalt.calls.config.*;
 import com.github.auties00.cobalt.calls.config.param.*;
 import com.github.auties00.cobalt.calls.engine.participant.*;
-import com.github.auties00.cobalt.calls.jid.*;
 import com.github.auties00.cobalt.calls.config.CallsFeatureGate;
 import com.github.auties00.cobalt.calls.config.VoipSettings;
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.calls.engine.LifecycleController;
 import com.github.auties00.cobalt.calls.crypto.CallE2eKeyDerivation;
 import com.github.auties00.cobalt.calls.transport.srtp.E2eMediaSrtp;
@@ -60,7 +58,7 @@ import com.github.auties00.cobalt.calls.stream.audio.*;
 import com.github.auties00.cobalt.calls.stream.ffmpeg.*;
 import com.github.auties00.cobalt.calls.stream.video.*;
 import com.github.auties00.cobalt.calls.util.TimerHeap;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptionExt;
 import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptionExtBuilder;
 import com.github.auties00.cobalt.model.call.datachannel.SenderSubscriptionExtPidTemporalLayerBuilder;
@@ -75,12 +73,16 @@ import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptions;
 import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptionsBuilder;
 import com.github.auties00.cobalt.model.call.datachannel.StreamSubscriptionsEntryBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.model.jid.JidServer;
+import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.util.DataUtils;
+import com.github.auties00.cobalt.log.Log;
 
 import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.System.Logger.Level;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -92,11 +94,11 @@ import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BiConsumer;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.LongSupplier;
@@ -158,9 +160,9 @@ import com.github.auties00.cobalt.calls.engine.state.CallLifecycleState;
  */
 public final class LiveMediaSession implements MediaPlane.Session {
     /**
-     * Logs media plane bring up, teardown, and isolated pipeline faults.
+     * The logger for {@link LiveMediaSession}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveMediaSession.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveMediaSession.class);
 
     /**
      * The call audio sample rate, in hertz, fixed at sixteen kilohertz mono to match the public call
@@ -1061,8 +1063,10 @@ public final class LiveMediaSession implements MediaPlane.Session {
             voipDriverManager.startPlayback(null, AUDIO_SAMPLE_RATE_HZ, AUDIO_FRAME_SAMPLES, AUDIO_CHANNELS);
             writerPump.start();
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "calls playback start failed for call {0}: {1}", callId, exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "calls playback start failed for call {0}: {1}", callId, exception.getMessage());
+            }
         }
     }
 
@@ -1100,8 +1104,10 @@ public final class LiveMediaSession implements MediaPlane.Session {
                     AUDIO_FRAME_SAMPLES, AUDIO_CHANNELS);
             readerPump.start();
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "calls capture start failed for call {0}: {1}", callId, exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "calls capture start failed for call {0}: {1}", callId, exception.getMessage());
+            }
         }
     }
 
@@ -1133,8 +1139,8 @@ public final class LiveMediaSession implements MediaPlane.Session {
             } catch (java.nio.channels.ClosedChannelException exception) {
                 break;
             } catch (IOException exception) {
-                if (running.get()) {
-                    LOGGER.log(System.Logger.Level.DEBUG,
+                if (running.get() && Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
                             "calls media receive error for call {0}: {1}", callId, exception.getMessage());
                 }
             }
@@ -1208,7 +1214,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
         try {
             action.run();
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.DEBUG, "calls media teardown step failed", exception);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls media teardown step failed", exception);
         }
     }
 
@@ -1240,9 +1246,9 @@ public final class LiveMediaSession implements MediaPlane.Session {
      */
     public static final class LiveMediaPlane implements MediaPlane {
         /**
-         * Logs media plane bring up faults.
+         * The logger for {@link LiveMediaPlane}.
          */
-        private static final System.Logger LOGGER = System.getLogger(LiveMediaPlane.class.getName());
+        private static final System.Logger LOGGER = Log.get(LiveMediaPlane.class);
 
         /**
          * Holds the host the brought up sessions reach for the datagram fallback, the rendered video sink,
@@ -1255,11 +1261,13 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * deterministic media SSRCs and the per participant SFrame base key, or {@code null} until the client
          * is logged in.
          *
-         * <p>Seeded by the assembler with the LID device form (the account LID user with the device number off
-         * the account JID), the form {@link CallSecureSsrcGenerator} and the SFrame derivation are byte verified
-         * against; read at each call bring up so a self JID that became known after assembly is picked up.
+         * <p>The self device JID is derived from this account sub-store as the LID device form (the account LID
+         * user with the device number off the account JID), the form {@link CallSecureSsrcGenerator} and the
+         * SFrame derivation are byte verified against; read live per bring up through {@link #selfDeviceJid()}
+         * so a self JID that became known after the engine was built (the engine is built before the client
+         * logs in) is picked up.
          */
-        private final AtomicReference<Jid> selfJid;
+        private final LinkedWhatsAppAccountStore accountStore;
 
         /**
          * The running wall clock deadline, in nanos, the next media send is held until; advanced by each
@@ -1298,12 +1306,6 @@ public final class LiveMediaSession implements MediaPlane.Session {
         private boolean videoSendPacingStarted;
 
         /**
-         * Holds the sink notified with a call identifier when that call's media plane reaches its first
-         * traffic, bound by the assembler to the controller's media connected entry point.
-         */
-        private final AtomicReference<Consumer<String>> connectionSink;
-
-        /**
          * Holds the engine's single driver manager, the one per engine registry every brought up session
          * routes its platform audio capture and playback and its no application source video capture
          * through.
@@ -1315,40 +1317,59 @@ public final class LiveMediaSession implements MediaPlane.Session {
         private final VoipDriverManager voipDriverManager;
 
         /**
-         * Reads whether the server enables seeding an initial bandwidth estimate when a group call starts.
+         * The server calling feature gate, read per bring up for the group call initial bandwidth estimate
+         * seed decision.
          *
-         * <p>Backed by {@link CallsFeatureGate#isInitBweForGroupCallEnabled()},
-         * read per bring up rather than captured at assembly so the value reflects the warmed AB props cache
-         * by the time a call starts (the engine is assembled at client construction, before the first
-         * AB props sync) and is not read on a possibly cold cache during assembly. Threaded into each group
-         * call's {@link RateControlLoop} so the loop seeds its initial estimate for a group call rather
-         * than ramping from the conservative cold start band; a one to one call ignores it.
+         * <p>{@link CallsFeatureGate#isInitBweForGroupCallEnabled()} is read per bring up rather than captured
+         * at build time so the value reflects the warmed AB props cache by the time a call starts (the engine
+         * is built at client construction, before the first AB props sync) and is not read on a possibly cold
+         * cache. Threaded into each group call's {@link RateControlLoop} so the loop seeds its initial estimate
+         * for a group call rather than ramping from the conservative cold start band; a one to one call ignores
+         * it.
          */
-        private final BooleanSupplier initBweForGroupCallEnabled;
+        private final CallsFeatureGate featureGate;
 
         /**
          * Constructs a media plane over the given host and the engine's driver manager.
          *
-         * @param host                       the host for the datagram fallback, video render, and randomness
-         * @param selfJid                    the holder of the local device JID for the per participant key
-         *                                   derivation
-         * @param connectionSink             the holder of the media connected sink the controller binds
-         * @param voipDriverManager          the engine's initialized driver manager the brought up sessions
-         *                                   route their platform capture and playback through
-         * @param initBweForGroupCallEnabled reads whether the server enables seeding an initial group call
-         *                                   bandwidth estimate, evaluated per bring up and applied to each
-         *                                   group call's rate control loop
+         * @param host              the host for the datagram fallback, video render, and randomness
+         * @param accountStore      the account sub-store the self device JID is derived from, read live per
+         *                          bring up through {@link #selfDeviceJid()}
+         * @param voipDriverManager the engine's initialized driver manager the brought up sessions route their
+         *                          platform capture and playback through
+         * @param featureGate       the server calling feature gate, read per bring up for the group call
+         *                          initial bandwidth estimate seed decision
          * @throws NullPointerException if any argument is {@code null}
          */
-        public LiveMediaPlane(VoipHostApi host, AtomicReference<Jid> selfJid,
-                       AtomicReference<Consumer<String>> connectionSink, VoipDriverManager voipDriverManager,
-                       BooleanSupplier initBweForGroupCallEnabled) {
+        public LiveMediaPlane(VoipHostApi host, LinkedWhatsAppAccountStore accountStore,
+                       VoipDriverManager voipDriverManager, CallsFeatureGate featureGate) {
             this.host = Objects.requireNonNull(host, "host cannot be null");
-            this.selfJid = Objects.requireNonNull(selfJid, "selfJid cannot be null");
-            this.connectionSink = Objects.requireNonNull(connectionSink, "connectionSink cannot be null");
+            this.accountStore = Objects.requireNonNull(accountStore, "accountStore cannot be null");
             this.voipDriverManager = Objects.requireNonNull(voipDriverManager, "voipDriverManager cannot be null");
-            this.initBweForGroupCallEnabled = Objects.requireNonNull(initBweForGroupCallEnabled,
-                    "initBweForGroupCallEnabled cannot be null");
+            this.featureGate = Objects.requireNonNull(featureGate, "featureGate cannot be null");
+        }
+
+        /**
+         * Returns the local account's own LID device JID, the {@code <lid>:<device>@lid} form the media plane
+         * keys its per device SSRCs and per participant SFrame base key on, or {@code null} when the account
+         * is not yet paired.
+         *
+         * <p>Composed live from the injected account sub-store: the account LID user and the {@code @lid}
+         * domain, with the device number carried on the account phone number JID. Reading live per bring up
+         * picks up a LID that became known after the engine was built. When the session is not yet LID paired
+         * this falls back to the account phone number JID; the plane's own random layout fallback covers a
+         * fully unseeded holder.
+         *
+         * @return the own LID device JID, or the account phone number JID when no LID is set, or {@code null}
+         *         when the account is not yet paired
+         */
+        private Jid selfDeviceJid() {
+            var lid = accountStore.lid().orElse(null);
+            if (lid == null) {
+                return accountStore.jid().orElse(null);
+            }
+            var device = accountStore.jid().map(Jid::device).orElse(0);
+            return lid.withServer(JidServer.lid()).withDevice(device);
         }
 
         /**
@@ -1363,7 +1384,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * the Opus codec and the SFrame chain (on a group call), parses the {@code <voip_settings>} bundles into
          * a {@link LiveVoipParamManager} and selects the active set for the call's media mode, and starts
          * every pump. The local media SSRC layout is derived deterministically from the self device JID (read
-         * from the {@link #selfJid} holder, the same JID the SFrame key derivation uses) and {@code callId}
+         * live through {@link #selfDeviceJid()}, the same JID the SFrame key derivation uses) and {@code callId}
          * through {@link #buildStreamLayout(String, Jid, boolean)} rather than drawn at random; a bring up
          * before the self JID is known falls back to a random layout. A relay block missing an endpoint or a
          * hop by hop key, or a socket or codec that cannot be created, surfaces as a
@@ -1373,12 +1394,13 @@ public final class LiveMediaSession implements MediaPlane.Session {
         public Session bringUp(String callId, Stanza relay, List<Stanza> voipSettings, byte[] callKey,
                                boolean isCaller, boolean video, int participantCount,
                                CallMembership membership, MediaStreams streams, Jid peerDeviceJid,
-                               Optional<String> electedRelayName) {
+                               Optional<String> electedRelayName, MediaSessionListener listener) {
             Objects.requireNonNull(callId, "callId cannot be null");
             Objects.requireNonNull(relay, "relay cannot be null");
             Objects.requireNonNull(voipSettings, "voipSettings cannot be null");
             Objects.requireNonNull(callKey, "callKey cannot be null");
             Objects.requireNonNull(streams, "streams cannot be null");
+            Objects.requireNonNull(listener, "listener cannot be null");
             var relayInfo = RelayInfo.of(relay)
                     .orElseThrow(() -> new WhatsAppCallException.DataChannel(
                             "relay block for call " + callId + " is not a <relay> element"));
@@ -1447,7 +1469,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 // The local SSRC layout the encode path stamps and the subscription layer advertises is the
                 // deterministic set derived for the self device, keyed by the call id and the device JID (the
                 // same self JID the SFrame key derivation reads), never random.
-                var streamLayout = buildStreamLayout(callId, selfJid.get(), video);
+                var streamLayout = buildStreamLayout(callId, selfDeviceJid(), video);
 
                 // One to one media is end to end SRTP the relay forwards opaquely, keyed by the per participant
                 // master the call key and device JID derive, not the relay hop by hop SRTP a group or SFU leg
@@ -1457,7 +1479,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 E2eMediaSrtp e2eSend = null;
                 E2eMediaSrtp e2eRecv = null;
                 if (membership == null && callKey.length == CallE2eKeyDerivation.RAW_E2E_KEY_LENGTH) {
-                    var localDeviceJid = selfJid.get();
+                    var localDeviceJid = selfDeviceJid();
                     // The E2E recv key is keyed by the peer's DEVICE JID (for example "...:2@lid"), which the
                     // signaling layer recorded; the relay block's <participant> list carries only the
                     // user level (bare) JID, so prefer the signaling device JID and fall back to the relay
@@ -1476,18 +1498,22 @@ public final class LiveMediaSession implements MediaPlane.Session {
                     }
                     if (localDeviceJid != null && resolvedPeer != null) {
                         e2eSend = new E2eMediaSrtp(
-                                CallE2eKeyDerivation.deriveSrtpMaster(callKey, CallDeviceJid.of(localDeviceJid)));
+                                CallE2eKeyDerivation.deriveSrtpMaster(callKey, localDeviceJid));
                         e2eRecv = new E2eMediaSrtp(
-                                CallE2eKeyDerivation.deriveSrtpMaster(callKey, CallDeviceJid.of(resolvedPeer)));
-                        System.getLogger(LiveMediaSession.class.getName()).log(System.Logger.Level.INFO,
-                                "calls one-to-one E2E-SRTP engaged: self={0}(sendAudioSsrc=0x{2}) peer={1}(expectAudioSsrc=0x{3})",
-                                localDeviceJid, resolvedPeer,
-                                Integer.toHexString(CallSecureSsrcGenerator.audioMainSsrc(callId, CallDeviceJid.of(localDeviceJid))),
-                                Integer.toHexString(CallSecureSsrcGenerator.audioMainSsrc(callId, CallDeviceJid.of(resolvedPeer))));
+                                CallE2eKeyDerivation.deriveSrtpMaster(callKey, resolvedPeer));
+                        if (Log.INFO) {
+                            LOGGER.log(Level.INFO,
+                                    "calls one-to-one E2E-SRTP engaged: self={0}(sendAudioSsrc=0x{2}) peer={1}(expectAudioSsrc=0x{3})",
+                                    localDeviceJid, resolvedPeer,
+                                    Integer.toHexString(CallSecureSsrcGenerator.audioMainSsrc(callId, localDeviceJid)),
+                                    Integer.toHexString(CallSecureSsrcGenerator.audioMainSsrc(callId, resolvedPeer)));
+                        }
                     } else {
-                        System.getLogger(LiveMediaSession.class.getName()).log(System.Logger.Level.WARNING,
-                                "calls one-to-one E2E-SRTP NOT engaged (self={0} peer={1}); media stays hop-by-hop",
-                                localDeviceJid, resolvedPeer);
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING,
+                                    "calls one-to-one E2E-SRTP NOT engaged (self={0} peer={1}); media stays hop-by-hop",
+                                    localDeviceJid, resolvedPeer);
+                        }
                     }
                 }
                 // The local device's relay assigned participant id (the <relay> block's self_pid attribute,
@@ -1499,16 +1525,23 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 var selfPid = relayInfo.selfPidValue().orElse(0);
                 return assemble(callId, relayConnection, channel, hbhSrtp, warpAuthKey, warpMiTagLength,
                         audioCodec, repacketizer, sframeProvider, isCaller, video, voipParamManager, participantCount,
-                        streamLayout, membership, streams, useMlowCodec, e2eSend, e2eRecv, selfPid);
+                        streamLayout, membership, streams, useMlowCodec, e2eSend, e2eRecv, selfPid, listener);
             } catch (WhatsAppCallException exception) {
                 releaseQuietly(channel, hbhSrtp, audioCodec, repacketizer);
                 throw exception;
             } catch (IOException exception) {
                 releaseQuietly(channel, hbhSrtp, audioCodec, repacketizer);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "calls media bring-up socket open failed for call " + callId,
+                            exception);
+                }
                 throw new WhatsAppCallException.DataChannel(
                         "could not open the transport datagram socket for call " + callId, exception);
             } catch (RuntimeException exception) {
                 releaseQuietly(channel, hbhSrtp, audioCodec, repacketizer);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "calls media bring-up failed for call " + callId, exception);
+                }
                 throw new WhatsAppCallException.DataChannel(
                         "could not bring up the media plane for call " + callId, exception);
             } catch (UnsatisfiedLinkError error) {
@@ -1516,6 +1549,10 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 // bring the media plane up; surface it as the non fatal call exception the controller
                 // isolates rather than letting the Error escape the call handling thread.
                 releaseQuietly(channel, hbhSrtp, audioCodec, repacketizer);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "calls media bring-up native libraries unavailable for call " + callId, error);
+                }
                 throw new WhatsAppCallException.DataChannel(
                         "the native media libraries are unavailable for call " + callId, error);
             }
@@ -1590,7 +1627,8 @@ public final class LiveMediaSession implements MediaPlane.Session {
                                  boolean video, LiveVoipParamManager voipParamManager, int participantCount,
                                  StreamLayout streamLayout, CallMembership membership,
                                  MediaStreams streams, boolean useMlow,
-                                 E2eMediaSrtp e2eSend, E2eMediaSrtp e2eRecv, int selfPid) {
+                                 E2eMediaSrtp e2eSend, E2eMediaSrtp e2eRecv, int selfPid,
+                                 MediaSessionListener listener) {
             var relayAddress = relayConnection.address();
             // Route the decode side through the same codec the encode side selected: an MLow call decodes
             // through an MLowAudioDecoder, otherwise the default OpusAudioDecoder. LiveNetEq renders each frame
@@ -1609,7 +1647,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
             // source and a camera the manager cannot start) leaves the bridge unfed and the encode loop idle.
             var managerVideoBridge = video && streams.videoCapture() == null
                     ? new ManagerVideoSourceBridge(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FRAME_RATE,
-                    VIDEO_DEFAULT_BITRATE_BPS)
+                    VIDEO_DEFAULT_BITRATE_BPS, () -> notifyCaptureInterrupted(callId, listener))
                     : null;
             VideoOutput videoCaptureSource = streams.videoCapture() != null
                     ? streams.videoCapture()
@@ -1634,7 +1672,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
             // a one to one call tracks no roster and passes 0) seeds its initial estimate rather than ramping
             // from the conservative cold start band when ENABLE_INIT_BWE_FOR_GROUP_CALL is on, read from the
             // feature gate at bring up.
-            var seedInitialGroupBwe = participantCount > 0 && initBweForGroupCallEnabled.getAsBoolean();
+            var seedInitialGroupBwe = participantCount > 0 && featureGate.isInitBweForGroupCallEnabled();
             // The relay transport is built below; the rate loop and the app data send seam reach it through
             // this forward holder, set once it is constructed. The loop reads the live SCTP send buffer
             // occupancy each round through it: the real per stream buffered amount once the transport is up,
@@ -1781,7 +1819,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
             // 0x0103, and the relay forwards a peer's media only after it has the subscription, so the
             // transport ships it as a connect time burst and then on content change. The publisher below is
             // retained for its receive subscription cache and hop by hop RTCP feedback table.
-            var subResender = subscriptionResender(transportHolder, buildSelfStreamDescriptors(callId, selfJid.get()));
+            var subResender = subscriptionResender(transportHolder, buildSelfStreamDescriptors(callId, selfDeviceJid()));
             transport.onSubscriptionResend(() -> subResender.accept(null));
             var subscriptionPublisher = new LiveSubscriptionPublisher(
                     new TimerHeap(),
@@ -1889,7 +1927,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
             var playback = openPlaybackSink(callId, receiver, streams, renderTap);
 
             var transportConnected = new AtomicBoolean();
-            transport.onTransportEvent(event -> onTransportEvent(callId, event, transportConnected));
+            transport.onTransportEvent(event -> onTransportEvent(callId, event, transportConnected, listener));
 
             // No real inbound observers are attached here: the reaction and transcription observers are the
             // in call control units the lifecycle controller builds later and attaches through the
@@ -1920,7 +1958,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
             // only exist here, and is run once by the session under its one shot video send guard.
             if (videoPipeline == null) {
                 session.bindVideoUpgrade(() -> upgradeToVideo(callId, transport, streams, rateControlLoop, session,
-                        streamLayout.videoStream0Ssrc()));
+                        streamLayout.videoStream0Ssrc(), listener));
             }
             try {
                 session.start();
@@ -1977,14 +2015,16 @@ public final class LiveMediaSession implements MediaPlane.Session {
          *                        manager bridge
          * @param videoSsrc       the deterministic first simulcast layer video SSRC the new packetizer stamps,
          *                        from the call's {@link StreamLayout}
+         * @param listener        the call's media session listener the local capture interrupted notification
+         *                        is reported to
          * @return the built video pipeline, or {@code null} when the video codec could not be opened
          */
         private VideoPipeline upgradeToVideo(String callId, MediaTransport transport, MediaStreams streams,
                                              RateControlLoop rateControlLoop, LiveMediaSession session,
-                                             int videoSsrc) {
+                                             int videoSsrc, MediaSessionListener listener) {
             var managerVideoBridge = streams.videoCapture() == null
                     ? new ManagerVideoSourceBridge(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FRAME_RATE,
-                    VIDEO_DEFAULT_BITRATE_BPS)
+                    VIDEO_DEFAULT_BITRATE_BPS, () -> notifyCaptureInterrupted(callId, listener))
                     : null;
             var videoCaptureSource = streams.videoCapture() != null ? streams.videoCapture() : managerVideoBridge;
             var pipeline = buildVideoPipeline(callId, videoCaptureSource, streams.videoPlayback());
@@ -2024,10 +2064,28 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 var capability = new VideoCaptureCapability(VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FRAME_RATE);
                 voipDriverManager.startVideoCapture(MANAGER_CAMERA_DEVICE_ID, bridge, capability);
             } catch (RuntimeException exception) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "calls camera capture unavailable for call {0}; sending no video: {1}",
-                        callId, exception.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "calls camera capture unavailable for call {0}; sending no video: {1}",
+                            callId, exception.getMessage());
+                }
             }
+        }
+
+        /**
+         * Forwards a platform camera capture revocation for a call to its media session listener.
+         *
+         * <p>Runs on the capture driver's pump thread when the driver enters
+         * {@link com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.State#INTERRUPTED}, wired
+         * as each manager camera bridge's interrupted callback. Notifies the controller through the call's
+         * {@link MediaSessionListener#onCaptureInterrupted(String)}, which drives the call's local video to
+         * paused and broadcasts it to the peer.
+         *
+         * @param callId   the identifier of the call whose platform camera capture was revoked
+         * @param listener the call's media session listener
+         */
+        private void notifyCaptureInterrupted(String callId, MediaSessionListener listener) {
+            listener.onCaptureInterrupted(callId);
         }
 
         /**
@@ -2127,10 +2185,11 @@ public final class LiveMediaSession implements MediaPlane.Session {
             var active = voipParamManager.activeParams();
             var flag = key == null ? Optional.<Boolean>empty() : active.flatMap(params -> params.getBoolean(key));
             var useMlow = flag.orElse(true);
-            // DIAGNOSTIC: distinguish a read flag from the fallback default; remove once codec routing is confirmed.
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls codec select: keyResolved={0}, activeParams={1}, use_mlow_codec_v1={2} -> useMlow={3}",
-                    key != null, active.isPresent(), flag.map(String::valueOf).orElse("ABSENT"), useMlow);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "calls codec select: keyResolved={0}, activeParams={1}, use_mlow_codec_v1={2} -> useMlow={3}",
+                        key != null, active.isPresent(), flag.map(String::valueOf).orElse("ABSENT"), useMlow);
+            }
             return useMlow;
         }
 
@@ -2273,20 +2332,22 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * @param callId    the call identifier
          * @param event     the transport event
          * @param connected the once only latch guarding the media connected notification
+         * @param listener  the call's media session listener the media connected notification is reported to
          */
-        private void onTransportEvent(String callId, TransportEvent event, AtomicBoolean connected) {
+        private void onTransportEvent(String callId, TransportEvent event, AtomicBoolean connected,
+                                      MediaSessionListener listener) {
             switch (event) {
                 case RELAY_CREATE_SUCCESS, RX_TRAFFIC_STARTED, TX_TRAFFIC_START -> {
                     if (connected.compareAndSet(false, true)) {
-                        var sink = connectionSink.get();
-                        if (sink != null) {
-                            Thread.ofVirtual().name("calls-media-connected-" + callId)
-                                    .start(() -> sink.accept(callId));
-                        }
+                        Thread.ofVirtual().name("calls-media-connected-" + callId)
+                                .start(() -> listener.onConnected(callId));
                     }
                 }
-                case RELAY_BINDS_FAILED -> LOGGER.log(System.Logger.Level.WARNING,
-                        "calls relay binds failed for call {0}", callId);
+                case RELAY_BINDS_FAILED -> {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "calls relay binds failed for call {0}", callId);
+                    }
+                }
                 case RX_TRAFFIC_STOPPED, TX_TRAFFIC_STOPPED, RX_APP_DATA -> {
                 }
             }
@@ -2323,7 +2384,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 // includes the packet's populated header extension.
                 transport.sendMedia(packet, packet.length - 64);
             } catch (RuntimeException exception) {
-                LOGGER.log(System.Logger.Level.DEBUG, "calls outbound audio send failed", exception);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls outbound audio send failed", exception);
             }
         }
 
@@ -2443,7 +2504,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
                     transport.sendMedia(packet, packet.length - 64);
                 }
             } catch (RuntimeException exception) {
-                LOGGER.log(System.Logger.Level.DEBUG, "calls outbound video send failed", exception);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls outbound video send failed", exception);
             }
         }
 
@@ -2527,9 +2588,11 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 return new VideoPipeline(callId, host, codec, params, jitterBuffer, videoCaptureSource,
                         videoPlayback);
             } catch (RuntimeException | UnsatisfiedLinkError error) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "calls video codec unavailable for call {0}; proceeding audio-only: {1}",
-                        callId, error.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "calls video codec unavailable for call {0}; proceeding audio-only: {1}",
+                            callId, error.getMessage());
+                }
                 return null;
             }
         }
@@ -2555,11 +2618,11 @@ public final class LiveMediaSession implements MediaPlane.Session {
          *         JID is not yet known or the call key is not the full raw length
          */
         private SFrameKeyProvider groupSframeProvider(byte[] callKey) {
-            var self = selfJid.get();
+            var self = selfDeviceJid();
             if (self == null || callKey.length != CallE2eKeyDerivation.RAW_E2E_KEY_LENGTH) {
                 return null;
             }
-            var baseKey = CallE2eKeyDerivation.deriveSframeBaseKey(callKey, CallDeviceJid.of(self));
+            var baseKey = CallE2eKeyDerivation.deriveSframeBaseKey(callKey, self);
             var provider = new SFrameKeyProvider();
             provider.setChainKey(baseKey, 0L);
             return provider;
@@ -2586,15 +2649,14 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * and video descriptors carry is runtime derived and left {@code false}, its observed default. The SSRC
          * values themselves are byte verified against a live call in {@link CallSecureSsrcGenerator} (for the
          * LID device JID form); the keying JID this method is handed is the own {@code <lid>:<device>@lid}
-         * device JID the {@link #selfJid} holder is seeded with, the same JID the SFrame key derivation reads,
-         * so the SSRCs and the SFrame keys are both derived from the verified device JID form and match the
-         * values a peer pre registers. A {@code null} self JID (the holder not yet seeded) yields a random
-         * audio and app data layout so the call still runs; this is a degenerate edge, not the faithful path,
-         * since a random SSRC will not match the value the peer pre registers.
+         * device JID {@link #selfDeviceJid()} returns, the same JID the SFrame key derivation reads, so the
+         * SSRCs and the SFrame keys are both derived from the verified device JID form and match the values a
+         * peer pre registers. A {@code null} self JID (the account not yet paired) yields a random audio and
+         * app data layout so the call still runs; this is a degenerate edge, not the faithful path, since a
+         * random SSRC will not match the value the peer pre registers.
          *
          * @param callId        the call id keying the secure SSRC generation
-         * @param selfDeviceJid the local device's call JID, or {@code null} when the self JID holder is not
-         *                      yet seeded
+         * @param selfDeviceJid the local device's call JID, or {@code null} when the account is not yet paired
          * @param video         whether the call sends video, so the video simulcast SSRCs are allocated
          * @return the local SSRC layout
          */
@@ -2610,11 +2672,11 @@ public final class LiveMediaSession implements MediaPlane.Session {
             }
             // The keying JID is the self device's "<lid>:<device>@lid" device JID, the form the native SSRC
             // generation and the SFrame derivation key on and the form CallSecureSsrcGenerator is verified
-            // against: the LiveMediaPlane.selfJid holder is seeded with the own LID device JID (the account LID
-            // user with the device number off the account JID), not the account phone number JID. The same
-            // holder feeds groupSframeProvider, so the stamped SSRCs and the SFrame base key are both derived
-            // from the verified device JID form and match the values a peer pre registers.
-            var device = CallDeviceJid.of(selfDeviceJid);
+            // against: LiveMediaPlane.selfDeviceJid() returns the own LID device JID (the account LID user with
+            // the device number off the account JID), not the account phone number JID. The same accessor feeds
+            // groupSframeProvider, so the stamped SSRCs and the SFrame base key are both derived from the
+            // verified device JID form and match the values a peer pre registers.
+            var device = selfDeviceJid;
             var audioSsrc = CallSecureSsrcGenerator.audioMainSsrc(callId, device);
             var appDataSsrc = CallSecureSsrcGenerator.appDataSsrc(callId, device);
             var videoStream0Ssrc = video
@@ -2806,7 +2868,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
         static StreamDescriptors buildSelfStreamDescriptors(String callId, Jid selfDeviceJid) {
             var descriptors = new ArrayList<StreamDescriptor>();
             if (selfDeviceJid != null) {
-                var device = CallDeviceJid.of(selfDeviceJid);
+                var device = selfDeviceJid;
                 appendSelfMediaTriple(descriptors, StreamDescriptor.StreamLayer.AUDIO,
                         CallSecureSsrcGenerator.audioTriple(callId, device));
                 appendSelfMediaTriple(descriptors, StreamDescriptor.StreamLayer.VIDEO_STREAM0,
@@ -2862,14 +2924,14 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * {@code selfPid} relay participant id to the SVC temporal layer:
          * <ul>
          * <li>video stream {@code 0}: the {@code [primary, FEC, NACK]} triple
-         *     ({@link CallSecureSsrcGenerator#videoTriple(String, CallDeviceJid, int)} stream {@code 0}); a
+         *     ({@link CallSecureSsrcGenerator#videoTriple(String, Jid, int)} stream {@code 0}); a
          *     {@code (selfPid, ENHANCEMENT)} descriptor only when {@code sendingVideo}, otherwise no descriptor;
          * <li>video stream {@code 1}: the {@code [primary, FEC, NACK]} triple (stream {@code 1}); never a
          *     descriptor;
          * <li>audio: the {@code [primary, FEC, NACK]} triple
-         *     ({@link CallSecureSsrcGenerator#audioTriple(String, CallDeviceJid)}); a {@code (selfPid, BASE)}
+         *     ({@link CallSecureSsrcGenerator#audioTriple(String, Jid)}); a {@code (selfPid, BASE)}
          *     descriptor;
-         * <li>app data: the single {@link CallSecureSsrcGenerator#appDataSsrc(String, CallDeviceJid)} SSRC; a
+         * <li>app data: the single {@link CallSecureSsrcGenerator#appDataSsrc(String, Jid)} SSRC; a
          *     {@code (selfPid, BASE)} descriptor.
          * </ul>
          *
@@ -2898,7 +2960,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
                                                                 boolean sendingVideo) {
             var subscriptions = new ArrayList<SenderSubscriptionExt>();
             if (selfDeviceJid != null) {
-                var device = CallDeviceJid.of(selfDeviceJid);
+                var device = selfDeviceJid;
                 var video0 = CallSecureSsrcGenerator.videoTriple(callId, device, 0);
                 subscriptions.add(senderSubscriptionSource(
                         unsignedSsrcs(video0.primary(), video0.fec(), video0.oobNack()),
@@ -3419,9 +3481,9 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * @implNote This implementation uses eleven, one more than the ten frames a sink may hold in flight.
          * A buffer is reused only after the ring has cycled through the other ten hand outs, by which point
          * the frame that borrowed it has necessarily been handed to and consumed by the sink through
-         * {@link com.github.auties00.cobalt.calls.stream.AudioInput#offer(com.github.auties00.cobalt.calls.stream.AudioFrame)},
+         * {@link com.github.auties00.cobalt.calls.stream.AudioInput#offerAudio(com.github.auties00.cobalt.calls.stream.AudioFrame)},
          * so refilling a ring buffer never aliases a frame still reachable through
-         * {@link com.github.auties00.cobalt.calls.stream.AudioInput#read()}.
+         * {@link com.github.auties00.cobalt.calls.stream.AudioInput#readAudio()}.
          */
         private static final int RING_DEPTH = 11;
 
@@ -3539,7 +3601,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
                         } else {
                             samples = Arrays.copyOf(buffer, produced);
                         }
-                        sink.offer(new AudioFrame(samples, ptsMicros));
+                        sink.offerAudio(new AudioFrame(samples, ptsMicros));
                         ptsMicros += FRAME_PTS_MICROS;
                     }
                     java.util.concurrent.locks.LockSupport.parkNanos(RENDER_PERIOD_NANOS);
@@ -3547,8 +3609,10 @@ public final class LiveMediaSession implements MediaPlane.Session {
                         break;
                     }
                 } catch (RuntimeException exception) {
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "calls audio render error for call {0}: {1}", callId, exception.getMessage());
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG,
+                                "calls audio render error for call {0}: {1}", callId, exception.getMessage());
+                    }
                 }
             }
         }
@@ -3738,7 +3802,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * WhatsApp starts at, not zero) and the timestamp zeroed.
          *
          * <p>The SSRC is the self device's deterministic audio main SSRC
-         * ({@link CallSecureSsrcGenerator#audioMainSsrc(String, CallDeviceJid)}, media type {@code 0}), the
+         * ({@link CallSecureSsrcGenerator#audioMainSsrc(String, Jid)}, media type {@code 0}), the
          * value the peer pre registers a receive context for, never random.
          *
          * @param ssrc             the outbound audio stream SSRC
@@ -4490,7 +4554,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * Constructs a video packetizer stamping the given video SSRC with a zeroed sequence.
          *
          * <p>The SSRC is the self device's deterministic first simulcast layer primary video SSRC
-         * ({@link CallSecureSsrcGenerator#videoTriple(String, CallDeviceJid, int)} stream {@code 0},
+         * ({@link CallSecureSsrcGenerator#videoTriple(String, Jid, int)} stream {@code 0},
          * media type {@code 2}), the value the peer pre registers a receive context for, never random.
          *
          * @param ssrc              the outbound video stream SSRC
@@ -4811,7 +4875,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
             try {
                 rateControlLoop.onPacketReceived(sendTimeMs, arrivalMs, payloadBytes);
             } catch (RuntimeException exception) {
-                LOGGER.log(System.Logger.Level.DEBUG, "calls inbound rate-control tee failed", exception);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls inbound rate-control tee failed", exception);
             }
         }
 
@@ -4865,7 +4929,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
             try {
                 netEq.insert(sequence, timestamp, payload);
             } catch (RuntimeException exception) {
-                LOGGER.log(System.Logger.Level.DEBUG, "calls inbound audio insert failed", exception);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls inbound audio insert failed", exception);
                 return;
             }
             // After inserting, request retransmission of any audio sequence gap the NACK scheduler now judges
@@ -5008,7 +5072,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
      * <p>A platform capture driver pushes fixed size {@code short[]} blocks to a sink as they are captured,
      * while the {@link AudioReaderPump} pulls {@link AudioFrame}s from an {@link AudioOutput}. This bridge
      * adapts the push to the pull through a small bounded queue: the driver {@linkplain #offer(short[])
-     * offers} each captured block, and the reader pump {@linkplain #take() takes} it as a frame, blocking
+     * offers} each captured block, and the reader pump {@linkplain #takeAudio() takes} it as a frame, blocking
      * until one is available. The queue prefers freshness, dropping the oldest block when full so capture
      * never blocks on a slow drain.
      *
@@ -5057,13 +5121,13 @@ public final class LiveMediaSession implements MediaPlane.Session {
         }
 
         @Override
-        public void write(AudioFrame frame) {
+        public void writeAudio(AudioFrame frame) {
             Objects.requireNonNull(frame, "frame cannot be null");
             offer(frame.pcm());
         }
 
         @Override
-        public AudioFrame take() throws InterruptedException {
+        public AudioFrame takeAudio() throws InterruptedException {
             if (shutdown.get()) {
                 return null;
             }
@@ -5096,10 +5160,10 @@ public final class LiveMediaSession implements MediaPlane.Session {
      * {@link VideoSink}, while the {@link VideoPipeline} encode loop pulls frames from a {@link VideoOutput}.
      * This bridge is both: it is the {@link VideoSink} the driver forwards each captured frame to through
      * {@link #accept(VideoFrame)}, and the {@link VideoOutput} the encode loop drains through
-     * {@link #take()}. It adapts the driver's push to the encoder's pull through a small freshness preferring
+     * {@link #takeVideo()}. It adapts the driver's push to the encoder's pull through a small freshness preferring
      * queue, dropping the oldest frame when full so capture never blocks on a slow encoder, the same policy
      * the audio {@link CaptureSourceBridge} uses. The advertised {@link #width()} by {@link #height()} at
-     * {@link #fps()} sizes the encoder to the negotiated capture geometry; {@link #write(VideoFrame)} is the
+     * {@link #fps()} sizes the encoder to the negotiated capture geometry; {@link #writeVideo(VideoFrame)} is the
      * unused application facing face, since this is a device backed source the driver fills.
      *
      * @implNote This implementation is the video analogue of {@link CaptureSourceBridge}: the native driver
@@ -5114,6 +5178,13 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * convention where the video sink returns {@code 0} on success.
          */
         private static final int SINK_OK = 0;
+
+        /**
+         * The interval, in milliseconds, {@link #takeVideo()} waits per poll so a {@link #shutdown()} or an
+         * {@link #onInterrupted()} unblocks a pending take within one interval rather than blocking forever
+         * on a source that stopped feeding the queue.
+         */
+        private static final long INTERRUPT_POLL_MILLIS = 200;
 
         /**
          * Holds the bounded queue of forwarded frames the driver offers and the encode loop takes.
@@ -5147,30 +5218,46 @@ public final class LiveMediaSession implements MediaPlane.Session {
         private final int bitrateBps;
 
         /**
+         * Runs once when the capture driver reports its device was revoked, invoked from
+         * {@link #onInterrupted()} so the media plane can drive the local video to paused and notify the peer.
+         */
+        private final Runnable interruptedCallback;
+
+        /**
+         * Holds the silence companion serving this device video source's inherited audio face, since a camera
+         * capture source carries no audio and the engine sources the call's audio from a separate capture; the
+         * inherited {@link AudioOutput} methods delegate to it.
+         */
+        private final AudioOutput audio = AudioOutput.fromSilence();
+
+        /**
          * Constructs a video source bridge advertising the given capture geometry with a small
          * freshness preferring queue.
          *
-         * @param width      the advertised capture width in pixels
-         * @param height     the advertised capture height in pixels
-         * @param fps        the advertised capture frame rate
-         * @param bitrateBps the advertised target encoder bitrate in bits per second
+         * @param width               the advertised capture width in pixels
+         * @param height              the advertised capture height in pixels
+         * @param fps                 the advertised capture frame rate
+         * @param bitrateBps          the advertised target encoder bitrate in bits per second
+         * @param interruptedCallback runs once when the capture driver reports its device was revoked
          */
-        private ManagerVideoSourceBridge(int width, int height, int fps, int bitrateBps) {
+        private ManagerVideoSourceBridge(int width, int height, int fps, int bitrateBps,
+                                         Runnable interruptedCallback) {
             this.queue = new ArrayBlockingQueue<>(8);
             this.shutdown = new AtomicBoolean();
             this.width = width;
             this.height = height;
             this.fps = fps;
             this.bitrateBps = bitrateBps;
+            this.interruptedCallback = Objects.requireNonNull(interruptedCallback, "interruptedCallback cannot be null");
         }
 
         /**
          * {@inheritDoc}
          *
          * @implNote This implementation copies the frame's pixels into a fresh buffer before enqueueing it,
-         * because the queue retains frames across several {@link VideoOutput#take()} calls while a
+         * because the queue retains frames across several {@link VideoOutput#takeVideo()} calls while a
          * device backed source may lend and immediately refill one pixel buffer per the
-         * {@link VideoOutput#take()} borrow contract; queuing the borrowed frame directly would alias every
+         * {@link VideoOutput#takeVideo()} borrow contract; queuing the borrowed frame directly would alias every
          * queued frame onto the source's latest picture.
          */
         @Override
@@ -5188,24 +5275,58 @@ public final class LiveMediaSession implements MediaPlane.Session {
             return SINK_OK;
         }
 
+        /**
+         * {@inheritDoc}
+         *
+         * @implNote This implementation ends the bridge as its own {@linkplain #shutdown() source teardown}
+         * so the encode loop's {@link #takeVideo()} unblocks and returns {@code null}, stopping the outbound
+         * video pipeline cleanly rather than hanging on a source that stopped feeding; it then runs the
+         * {@link #interruptedCallback} so the media plane drives the local video to paused and notifies the
+         * peer.
+         */
         @Override
-        public void write(VideoFrame frame) {
+        public void onInterrupted() {
+            shutdown();
+            interruptedCallback.run();
+        }
+
+        @Override
+        public void writeVideo(VideoFrame frame) {
             Objects.requireNonNull(frame, "frame cannot be null");
             accept(frame);
         }
 
         @Override
-        public VideoFrame take() throws InterruptedException {
-            if (shutdown.get()) {
-                return null;
+        public VideoFrame takeVideo() throws InterruptedException {
+            while (!shutdown.get()) {
+                var frame = queue.poll(INTERRUPT_POLL_MILLIS, TimeUnit.MILLISECONDS);
+                if (frame != null) {
+                    return frame;
+                }
             }
-            return queue.take();
+            return null;
+        }
+
+        @Override
+        public void writeAudio(AudioFrame frame) throws InterruptedException {
+            audio.writeAudio(frame);
+        }
+
+        @Override
+        public AudioFrame takeAudio() throws InterruptedException {
+            return audio.takeAudio();
+        }
+
+        @Override
+        public boolean isLiveCapture() {
+            return audio.isLiveCapture();
         }
 
         @Override
         public void shutdown() {
             shutdown.set(true);
             queue.clear();
+            audio.shutdown();
         }
 
         @Override
@@ -5258,9 +5379,9 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * A ring buffer is passed back to the decoder for refill only after the ring has cycled through the
          * other four hand outs, by which point the frame that borrowed it has necessarily been handed to and
          * consumed by the sink through
-         * {@link com.github.auties00.cobalt.calls.stream.VideoInput#offer(com.github.auties00.cobalt.calls.stream.VideoFrame)},
+         * {@link com.github.auties00.cobalt.calls.stream.VideoInput#offerVideo(com.github.auties00.cobalt.calls.stream.VideoFrame)},
          * so refilling a ring buffer never aliases a frame still reachable through
-         * {@link com.github.auties00.cobalt.calls.stream.VideoInput#read()}.
+         * {@link com.github.auties00.cobalt.calls.stream.VideoInput#readVideo()}.
          */
         private static final int PLAYBACK_RING_DEPTH = 5;
 
@@ -5527,7 +5648,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
          * Drains the capture source, encodes each picture, and ships it until the pipeline stops.
          *
          * <p>Each turn pulls one raw picture from the application video source with a blocking
-         * {@link VideoOutput#take()}, normalizes it to planar I420 at the advertised geometry, encodes it
+         * {@link VideoOutput#takeVideo()}, normalizes it to planar I420 at the advertised geometry, encodes it
          * through the codec, and ships a non empty access unit through the send seam; an empty access unit
          * (a rate controller frame drop) is sent as nothing. A {@code null} pull or a cleared running flag
          * ends the loop, and an interrupt during the pull is treated as a stop.
@@ -5536,7 +5657,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
             while (running.get()) {
                 VideoFrame frame;
                 try {
-                    frame = videoCapture.take();
+                    frame = videoCapture.takeVideo();
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
                     break;
@@ -5550,8 +5671,10 @@ public final class LiveMediaSession implements MediaPlane.Session {
                         frameSink.accept(encoded);
                     }
                 } catch (RuntimeException exception) {
-                    LOGGER.log(System.Logger.Level.DEBUG, "calls video encode error for call {0}: {1}",
-                            callId, exception.getMessage());
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "calls video encode error for call {0}: {1}",
+                                callId, exception.getMessage());
+                    }
                 }
             }
         }
@@ -5575,8 +5698,10 @@ public final class LiveMediaSession implements MediaPlane.Session {
                     }
                     renderReleased(released);
                 } catch (RuntimeException exception) {
-                    LOGGER.log(System.Logger.Level.DEBUG, "calls video render error for call {0}: {1}",
-                            callId, exception.getMessage());
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "calls video render error for call {0}: {1}",
+                                callId, exception.getMessage());
+                    }
                 }
             }
         }
@@ -5613,7 +5738,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 }
                 playbackRing[slot] = picture.pixels();
                 playbackRingIndex = (slot + 1) % PLAYBACK_RING_DEPTH;
-                videoPlayback.offer(picture);
+                videoPlayback.offerVideo(picture);
                 return;
             }
             try (var arena = Arena.ofConfined()) {
@@ -5646,7 +5771,7 @@ public final class LiveMediaSession implements MediaPlane.Session {
             try {
                 codec.close();
             } catch (RuntimeException exception) {
-                LOGGER.log(System.Logger.Level.DEBUG, "calls video codec close failed", exception);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls video codec close failed", exception);
             }
         }
     }
@@ -5814,9 +5939,9 @@ public final class LiveMediaSession implements MediaPlane.Session {
         private static final long FEEDBACK_STALENESS_MS = 500;
 
         /**
-         * Logs rate control faults.
+         * The logger for {@link RateControlLoop}.
          */
-        private static final System.Logger LOOP_LOGGER = System.getLogger(RateControlLoop.class.getName());
+        private static final System.Logger LOGGER = Log.get(RateControlLoop.class);
 
         /**
          * The call identifier, used in the tick thread name and diagnostics.
@@ -6241,9 +6366,11 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 lastFeedbackMs = System.nanoTime() / 1_000_000L;
                 runTick(plr, rttNs, remoteBweBps, lastFeedbackMs);
             } catch (RuntimeException exception) {
-                LOOP_LOGGER.log(System.Logger.Level.DEBUG,
-                        "calls rate-control feedback tick failed for call {0}: {1}", callId,
-                        exception.getMessage());
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "calls rate-control feedback tick failed for call {0}: {1}", callId,
+                            exception.getMessage());
+                }
             } finally {
                 lock.unlock();
             }
@@ -6415,9 +6542,11 @@ public final class LiveMediaSession implements MediaPlane.Session {
                 try {
                     fallbackTick();
                 } catch (RuntimeException exception) {
-                    LOOP_LOGGER.log(System.Logger.Level.DEBUG,
-                            "calls rate-control fallback tick failed for call {0}: {1}", callId,
-                            exception.getMessage());
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG,
+                                "calls rate-control fallback tick failed for call {0}: {1}", callId,
+                                exception.getMessage());
+                    }
                 }
                 java.util.concurrent.locks.LockSupport.parkNanos(FALLBACK_TICK_NANOS);
                 if (Thread.interrupted()) {

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.graphql.whatsapp.misc;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Builds the relay mutation that runs the Waffle cross-posting eligibility (XE) check for a set of
+ * Builds the graph.whatsapp.com GraphQL mutation that runs the Waffle cross-posting eligibility (XE) check for a set of
  * status unique ids against the linked Facebook and Instagram destinations.
  *
  * <p>The single {@code input} GraphQL variable is the {@code WaffleXEInput} object, mapped onto the
@@ -23,7 +24,7 @@ import java.util.Optional;
  * ({@code exp_time}), the caller's ephemeral cross-posting public key ({@code purpose_client_pub_key}),
  * the unique-id count and the unique-id list themselves ({@code waffle_unique_id_count},
  * {@code waffle_unique_ids}), the targeted destinations ({@code waffle_xas}), and the cross-posting
- * session id ({@code session_id}). The relay returns the per-purpose public keys, the echoed unique
+ * session id ({@code session_id}). The graph.whatsapp.com endpoint returns the per-purpose public keys, the echoed unique
  * ids, and the per-destination eligibility data under {@code waffle_xe_root}; the reply is consumed
  * through {@link WaffleXeWhatsAppGraphQlResponse}.
  *
@@ -32,10 +33,10 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebWaffleXEQuery")
 public final class WaffleXeWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebWaffleXEQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -338,5 +339,21 @@ public final class WaffleXeWhatsAppGraphQlRequest implements WhatsAppGraphQlOper
             }
             return Optional.empty();
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

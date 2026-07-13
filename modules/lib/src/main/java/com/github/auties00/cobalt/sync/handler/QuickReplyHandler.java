@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,8 @@ import com.github.auties00.cobalt.model.sync.action.chat.QuickReplyAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code quick_reply} app-state action that creates, updates, or
@@ -35,6 +38,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebQuickRepliesSync")
 public final class QuickReplyHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link QuickReplyHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(QuickReplyHandler.class);
 
     /**
      * Constructs the singleton quick reply sync handler.
@@ -103,21 +110,26 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
             var indexArray = JSON.parseArray(mutation.index());
             var quickReplyId = indexArray.size() > 1 ? indexArray.getString(1) : null;
             if (quickReplyId == null || quickReplyId.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "quick reply mutation malformed: missing id");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof QuickReplyAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "quick reply mutation malformed: missing action value");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             if (action.deleted()) {
                 client.store().settingsStore().removeQuickReply(quickReplyId);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "quick reply: removed id={0}", quickReplyId);
                 return MutationApplicationResult.success();
             }
 
             var message = action.message().orElse(null);
             var shortcut = action.shortcut().orElse(null);
             if (shortcut == null || shortcut.isEmpty() || message == null || message.isEmpty()) {
+                if (Log.WARNING)
+                    LOGGER.log(Level.WARNING, "quick reply mutation malformed: missing shortcut or message");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
@@ -131,8 +143,10 @@ public final class QuickReplyHandler implements WebAppStateActionHandler {
                     .count(count)
                     .build();
             client.store().settingsStore().addQuickReply(quickReply);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "quick reply: upserted id={0}, keywords={1}", quickReplyId, keywords.size());
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "quick reply mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

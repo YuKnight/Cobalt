@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Encoder-only line-spectral-frequency search tables, gain bit-cost tables, and rate-control constants for
  * the MLow speech codec, the port of the encode-relevant products of {@code smpl_load_lsf_CBks}
@@ -42,6 +46,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables;
  * behind a double-checked lock, like {@link LsfCodebooks}.
  */
 public final class EncoderTables {
+    /**
+     * The logger for {@link EncoderTables}.
+     */
+    private static final System.Logger LOGGER = Log.get(EncoderTables.class);
+
     /**
      * Smallest LSF spacing used by the Laroia weighting, the {@code 1e-3f} floor in
      * {@code smpl_lsf_weights_laroia}.
@@ -355,6 +364,9 @@ public final class EncoderTables {
             synchronized (EncoderTables.class) {
                 local = cachedLsf;
                 if (local == null) {
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "building encoder lsf search tables");
+                    }
                     local = buildLsfSearch();
                     cachedLsf = local;
                 }
@@ -376,6 +388,9 @@ public final class EncoderTables {
             synchronized (EncoderTables.class) {
                 local = cachedGains;
                 if (local == null) {
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "building encoder gain cost tables");
+                    }
                     local = buildGainCosts();
                     cachedGains = local;
                 }

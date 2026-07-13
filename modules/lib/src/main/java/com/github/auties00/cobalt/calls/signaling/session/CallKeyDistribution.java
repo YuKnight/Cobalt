@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.calls.signaling.session;
 
+import com.github.auties00.cobalt.exception.linked.WhatsAppStreamException;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
@@ -210,13 +211,16 @@ public record CallKeyDistribution(Jid deviceJid, int version, String type, int c
             return Optional.of(bare(deviceJid.get()));
         }
         var version = enc.get().getAttributeAsInt(VERSION_ATTRIBUTE, -1);
-        // FIXME: an <enc> carrying ciphertext but no type attribute yields a null Signal ciphertext
-        //  type here (the compact ctor only validates deviceJid), propagating a null type downstream;
-        //  whether WA rejects a typeless <enc> or defaults it is not capture confirmed, so parsing
-        //  behavior is left unchanged until confirmed.
-        var type = enc.get().getAttributeAsString(TYPE_ATTRIBUTE, null);
+        // WA treats the <enc> "type" as mandatory and never defaults it: both the call key path
+        // (WAWebVoipValidateAndDecryptEnc) and the message path (WAWebHandleMsgParser) read it via
+        // ParsableXmlNode.attrEnumValues("type", CiphertextType.members()), whose attrString throws when the
+        // attribute is absent, hard rejecting the stanza before decryption. A ciphertext bearing <enc> with no
+        // type is therefore malformed rather than a bare destination.
+        var type = enc.get().getAttributeAsString(TYPE_ATTRIBUTE)
+                .orElseThrow(() -> new WhatsAppStreamException.MalformedNode(
+                        "<enc> carrying a call key ciphertext is missing the required \"type\" attribute"));
         var count = enc.get().getAttributeAsInt(COUNT_ATTRIBUTE, -1);
-        return Optional.of(new CallKeyDistribution(deviceJid.get(), version, type, count, ciphertext.get()));
+        return Optional.of(CallKeyDistribution.encrypted(deviceJid.get(), version, type, count, ciphertext.get()));
     }
 
     /**

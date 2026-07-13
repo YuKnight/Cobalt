@@ -3,7 +3,8 @@ package com.github.auties00.cobalt.cloud;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudUnsupportedVersionException;
 import com.github.auties00.cobalt.model.cloud.CloudApiVersion;
 import com.github.auties00.cobalt.model.cloud.phone.CloudLocalStorageSettings;
 import com.github.auties00.cobalt.model.cloud.phone.CloudLocalStorageStatus;
@@ -280,7 +281,7 @@ class CloudPhoneNumberManagementTest {
         void guardGet() throws Exception {
             var http = http();
             var client = client(http, CloudApiVersion.V19_0);
-            var exception = assertThrows(WhatsAppCloudException.CloudUnsupportedVersionException.class,
+            var exception = assertThrows(WhatsAppCloudUnsupportedVersionException.class,
                     client::queryLocalStorageSettings);
             assertEquals("queryLocalStorageSettings", exception.operation());
             assertEquals(CloudApiVersion.V21_0, exception.requiredVersion());
@@ -293,7 +294,7 @@ class CloudPhoneNumberManagementTest {
         void guardSet() throws Exception {
             var http = http();
             var client = client(http, CloudApiVersion.V19_0);
-            var exception = assertThrows(WhatsAppCloudException.CloudUnsupportedVersionException.class,
+            var exception = assertThrows(WhatsAppCloudUnsupportedVersionException.class,
                     () -> client.updateLocalStorageSettings(
                             new CloudLocalStorageSettings(CloudLocalStorageStatus.IN_COUNTRY_STORAGE_ENABLED, "DE", null)));
             assertEquals("updateLocalStorageSettings", exception.operation());

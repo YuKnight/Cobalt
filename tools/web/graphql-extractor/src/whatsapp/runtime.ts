@@ -2,6 +2,7 @@ import { chromium, type Browser, type Page } from "playwright";
 
 const PAGE_LOAD_TIMEOUT = 60_000;
 const WAIT_AFTER_LOAD = 5_000;
+const LOGIN_WAIT = 300_000;
 const LAZY_CHUNK_BATCH_SIZE = 50;
 const LAZY_CHUNK_SETTLE_WAIT = 12_000;
 
@@ -10,11 +11,24 @@ const DEFINE_HOOK = `(() => {
   window.__waDefineHookInstalled = true;
   window.__waDefinedModules = [];
   window.__waModuleDeps = {};
+  window.__waModuleSource = {};
   const record = (name) => { try { window.__waDefinedModules.push(name); } catch (e) {} };
   const recordDeps = (name, deps) => {
     try { if (typeof name === "string" && Array.isArray(deps)) window.__waModuleDeps[name] = deps; } catch (e) {}
   };
-  const wrap = (fn) => function (name, deps) { record(name); recordDeps(name, deps); return fn.apply(this, arguments); };
+  const recordSource = (name, deps, args) => {
+    try {
+      if (typeof name !== "string" || !Array.isArray(deps)) return;
+      if (deps.indexOf("WAWebRelayClient") === -1 && deps.indexOf("WAWebRelayEnvironment") === -1) return;
+      for (var i = 0; i < args.length; i++) {
+        if (typeof args[i] === "function") {
+          window.__waModuleSource[name] = Function.prototype.toString.call(args[i]);
+          return;
+        }
+      }
+    } catch (e) {}
+  };
+  const wrap = (fn) => function (name, deps) { record(name); recordDeps(name, deps); recordSource(name, deps, arguments); return fn.apply(this, arguments); };
   let current;
   Object.defineProperty(window, "__d", {
     configurable: true,
@@ -66,6 +80,21 @@ export async function withForceLoadedBundle<T>(
       timeout: PAGE_LOAD_TIMEOUT,
     });
     await page.waitForTimeout(WAIT_AFTER_LOAD);
+
+    console.log("[INFO] Waiting for login; scan the QR code in the opened browser window...");
+    try {
+      await page.waitForFunction(
+        () =>
+          !!document.querySelector("#pane-side") ||
+          !!document.querySelector('[aria-label="Chat list"]'),
+        undefined,
+        { timeout: LOGIN_WAIT, polling: 1000 },
+      );
+      console.log("[INFO] Login detected; letting the app settle...");
+      await page.waitForTimeout(WAIT_AFTER_LOAD);
+    } catch {
+      console.warn("[WARN] Login not detected within timeout; proceeding with whatever loaded.");
+    }
 
     console.log("[INFO] Force-loading all bootloader resources...");
     const stats = (await page.evaluate(FORCE_LOAD)) as ForceLoadStats;

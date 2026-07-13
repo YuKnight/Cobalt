@@ -1,14 +1,16 @@
 package com.github.auties00.cobalt.calls.config.param;
 
+import com.github.auties00.cobalt.calls.config.VoipSettingsType;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
-import com.github.auties00.cobalt.calls.config.VoipSettingsType;
 
 /**
  * Owns the voip param sets for one call: the stored raw sets keyed by device JID and settings
@@ -48,6 +50,11 @@ import com.github.auties00.cobalt.calls.config.VoipSettingsType;
  * from.
  */
 public final class LiveVoipParamManager {
+    /**
+     * The logger for {@link LiveVoipParamManager}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveVoipParamManager.class);
+
     /**
      * The stored raw parameter sets, keyed by device JID then by settings type.
      *
@@ -117,6 +124,9 @@ public final class LiveVoipParamManager {
         try {
             stored.computeIfAbsent(deviceJid, key -> new EnumMap<>(VoipSettingsType.class))
                     .put(type, params);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "stored voip params, device={0}, type={1}, size={2}", deviceJid, type, params.size());
+            }
         } finally {
             lock.unlock();
         }
@@ -160,10 +170,16 @@ public final class LiveVoipParamManager {
                 // stored bundle is a peer device bundle and a group's forwarded single stream is
                 // codec homogeneous, so this resolves the one codec the local side encodes for all peers.
                 deviceSets = stored.values().iterator().next();
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "voip params: no bundle for device={0} or own bundle, falling back to first peer device bundle", deviceJid);
+                }
             }
             if (deviceSets == null) {
                 activeType = null;
                 active = null;
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "voip params: no stored bundle available, device={0}, requestedType={1}", deviceJid, type);
+                }
                 return Optional.empty();
             }
             var chosenType = type;
@@ -175,11 +191,17 @@ public final class LiveVoipParamManager {
             if (baseline == null) {
                 activeType = null;
                 active = null;
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "voip params: no set of requestedType={0} or default, device={1}", type, deviceJid);
+                }
                 return Optional.empty();
             }
             activeType = chosenType;
             active = new VoipParams(baseline);
             dynamicUpdater.beginRound();
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "voip params active set selected, device={0}, requestedType={1}, selectedType={2}", deviceJid, type, chosenType);
+            }
             return Optional.of(chosenType);
         } finally {
             lock.unlock();
@@ -210,12 +232,18 @@ public final class LiveVoipParamManager {
         lock.lock();
         try {
             if (active == null) {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "voip params: no active set, skipping participant count override, count={0}", participantCount);
+                }
                 return 0;
             }
             var written = 0;
             for (var override : overrides) {
                 override.writeOnto(active);
                 written++;
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "applied participant count overrides, count={0}, written={1}", participantCount, written);
             }
             return written;
         } finally {
@@ -242,6 +270,9 @@ public final class LiveVoipParamManager {
         lock.lock();
         try {
             if (active == null) {
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "voip params: no active set, skipping dynamic rule round, matched={0}", overrides.size());
+                }
                 return 0;
             }
             dynamicUpdater.beginRound();
@@ -315,6 +346,9 @@ public final class LiveVoipParamManager {
     public void clear() {
         lock.lock();
         try {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "cleared voip param manager, storedDevices={0}", stored.size());
+            }
             stored.clear();
             activeType = null;
             active = null;

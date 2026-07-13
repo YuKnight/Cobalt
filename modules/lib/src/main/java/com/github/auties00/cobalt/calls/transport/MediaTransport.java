@@ -40,7 +40,7 @@ public sealed interface MediaTransport extends AutoCloseable permits LiveRelayTr
      * The method returns once bring up has been initiated; the connection becoming usable is reported
      * asynchronously through the {@link TransportEvent} listener.
      *
-     * @throws com.github.auties00.cobalt.exception.WhatsAppCallException if bring up cannot be initiated
+     * @throws com.github.auties00.cobalt.exception.linked.WhatsAppCallException if bring up cannot be initiated
      */
     void start();
 

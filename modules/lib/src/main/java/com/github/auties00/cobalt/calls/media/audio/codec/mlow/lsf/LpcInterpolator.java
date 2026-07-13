@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Interpolates one line spectral frequency (LSF) vector per frame into per subframe LSF vectors and
  * stabilized linear prediction (LPC) filters for the MLow speech codec decode path.
@@ -52,6 +56,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf;
  */
 public final class LpcInterpolator {
     /**
+     * The logger for {@link LpcInterpolator}.
+     */
+    private static final System.Logger LOGGER = Log.get(LpcInterpolator.class);
+
+    /**
      * Linear prediction order of the MLow short term filter; the LSF vector length and the number of LPC
      * predictor taps. Each LPC filter row is this many taps plus the leading unity coefficient.
      */
@@ -94,6 +103,7 @@ public final class LpcInterpolator {
      */
     public void reset() {
         java.util.Arrays.fill(previousLsf, 0.0f);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mlow lpc interpolator: reset");
     }
 
     /**
@@ -216,6 +226,10 @@ public final class LpcInterpolator {
             iter++;
             bweExpand(a, 1.0f - iter * 0.001f);
         } while (!isStable(a));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "mlow lpc interpolator: unstable filter, bandwidth-expanded iterations={0}",
+                    iter);
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.token;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -9,6 +10,7 @@ import javax.crypto.KDF;
 import javax.crypto.Mac;
 import javax.crypto.spec.HKDFParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
@@ -29,6 +31,11 @@ import java.util.Optional;
  */
 @WhatsAppWebModule(moduleName = "WAWebReportingTokenUtils")
 public final class ReportingToken {
+    /**
+     * The logger for {@link ReportingToken}.
+     */
+    private static final System.Logger LOGGER = Log.get(ReportingToken.class);
+
     /**
      * The HKDF-derived reporting-token key length, in bytes.
      *
@@ -90,10 +97,10 @@ public final class ReportingToken {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private ReportingToken() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -144,6 +151,7 @@ public final class ReportingToken {
         Objects.requireNonNull(remoteJid, "remoteJid");
 
         if (reportingTokenContent == null || reportingTokenContent.length == 0) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reporting token generation skipped: no franking content");
             return Optional.empty();
         }
 
@@ -151,6 +159,7 @@ public final class ReportingToken {
 
         var token = hmacTruncated(key, reportingTokenContent);
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reporting token generated for message {0} version={1}", stanzaId, version);
         return Optional.of(new ReportingTokenResult(version, token));
     }
 

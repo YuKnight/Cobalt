@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.signaling.receive;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.CallEndReason;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,6 +54,11 @@ import java.util.OptionalInt;
  * {@code removeEldestEntry} override evicts the eldest identifier when a new one arrives at capacity.
  */
 public final class CallMessageBuffer {
+    /**
+     * The logger for {@link CallMessageBuffer}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallMessageBuffer.class);
+
     /**
      * The number of call identifier slots in the transaction id ring.
      *
@@ -167,6 +174,9 @@ public final class CallMessageBuffer {
         var slot = slotFor(callId);
         if (transactionId > slot.transactionId()) {
             ring.put(callId, slot.withTransactionId(transactionId));
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "call {0} transaction id advanced to {1}", callId, transactionId);
+            }
         }
     }
 
@@ -209,7 +219,12 @@ public final class CallMessageBuffer {
         if (slot == null || slot.transactionId() == NO_TRANSACTION_ID) {
             return false;
         }
-        return transactionId < slot.transactionId();
+        var stale = transactionId < slot.transactionId();
+        if (Log.DEBUG && stale) {
+            LOGGER.log(Level.DEBUG, "call {0} transaction id {1} is stale, latest is {2}",
+                    callId, transactionId, slot.transactionId());
+        }
+        return stale;
     }
 
     /**
@@ -227,6 +242,7 @@ public final class CallMessageBuffer {
         Objects.requireNonNull(callId, "callId cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
         ring.put(callId, slotFor(callId).withTerminateReason(reason));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} terminate reason recorded: {1}", callId, reason);
     }
 
     /**
@@ -256,6 +272,7 @@ public final class CallMessageBuffer {
     public synchronized void recordAcceptedElsewhere(String callId) {
         Objects.requireNonNull(callId, "callId cannot be null");
         ring.put(callId, slotFor(callId).withAcceptedElsewhere(true));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} recorded as accepted elsewhere", callId);
     }
 
     /**
@@ -286,7 +303,9 @@ public final class CallMessageBuffer {
     public synchronized void buffer(String callId, Stanza payload) {
         Objects.requireNonNull(callId, "callId cannot be null");
         Objects.requireNonNull(payload, "payload cannot be null");
-        bufferedMessages.computeIfAbsent(callId, ignored -> new ArrayList<>()).add(payload);
+        var messages = bufferedMessages.computeIfAbsent(callId, ignored -> new ArrayList<>());
+        messages.add(payload);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} buffered message, pending count={1}", callId, messages.size());
     }
 
     /**
@@ -304,6 +323,9 @@ public final class CallMessageBuffer {
     public synchronized List<Stanza> drainBufferedMessages(String callId) {
         Objects.requireNonNull(callId, "callId cannot be null");
         var messages = bufferedMessages.remove(callId);
+        if (Log.DEBUG && messages != null && !messages.isEmpty()) {
+            LOGGER.log(Level.DEBUG, "call {0} drained {1} buffered messages", callId, messages.size());
+        }
         return messages == null ? List.of() : Collections.unmodifiableList(messages);
     }
 
@@ -328,6 +350,10 @@ public final class CallMessageBuffer {
      * terminate reasons, accepted elsewhere flags, or buffered messages from the previous connection.
      */
     public synchronized void reset() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "resetting call message buffer: {0} ring slots, {1} pending call ids",
+                    ring.size(), bufferedMessages.size());
+        }
         ring.clear();
         bufferedMessages.clear();
     }

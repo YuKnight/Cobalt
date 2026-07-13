@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.business.NoteStateBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
@@ -13,12 +14,12 @@ import com.github.auties00.cobalt.model.sync.action.media.NoteEditAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.logging.Logger;
 
 /**
  * Applies the {@code note_edit} app-state action that creates, edits, or
@@ -46,15 +47,14 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebNoteSync")
 public final class NoteEditHandler implements WebAppStateActionHandler {
     /**
-     * Logger used for diagnostic traces emitted by
-     * {@link #applyMutation(LinkedWhatsAppClient, DecryptedMutation.Trusted)}.
+     * The logger for {@link NoteEditHandler}.
      *
      * @implNote
-     * This implementation logs at {@code WARNING} for missing
+     * This implementation logs at {@link Level#WARNING} for missing
      * {@code createdAt}/{@code unstructuredContent} fields and for exceptions,
      * mirroring the WA Web warning surface.
      */
-    private static final Logger LOGGER = Logger.getLogger(NoteEditHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NoteEditHandler.class);
 
     /**
      * Constructs a stateless {@link NoteEditHandler} for registration in the
@@ -117,24 +117,29 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (mutation.operation() != SyncdOperation.SET) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "note edit: unsupported operation {0}", mutation.operation());
                 return MutationApplicationResult.unsupported();
             }
 
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() < 2) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "note edit mutation malformed: missing note id index");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             var noteId = indexArray.getString(1);
             if (noteId == null || noteId.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "note edit mutation malformed: empty note id");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof NoteEditAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "note edit mutation malformed: missing action value");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             if (action.deleted()) {
                 client.store().businessStore().removeNoteState(noteId);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "note edit: removed note id={0}", noteId);
                 return MutationApplicationResult.success();
             }
 
@@ -144,22 +149,25 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
             var createdAtOpt = action.createdAt();
 
             if (type == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "note edit mutation malformed: missing type");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
             if (rawChatJid == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "note edit mutation malformed: missing chat jid");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
             var validatedChatJid = rawChatJid;
 
             if (createdAtOpt.isEmpty()) {
-                LOGGER.warning("noteEditAction.createdAt is empty");
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "note edit: noteEditAction.createdAt is empty");
             }
             if (content == null) {
-                LOGGER.warning("noteEditAction.unstructuredContent is empty");
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "note edit: noteEditAction.unstructuredContent is empty");
             }
 
             var chat = client.store().chatStore().findChatByJid(validatedChatJid);
             if (chat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "note edit: orphan chat {0}", validatedChatJid);
                 return MutationApplicationResult.orphan(validatedChatJid.toString(), "Chat");
             }
 
@@ -176,9 +184,10 @@ public final class NoteEditHandler implements WebAppStateActionHandler {
                     .unstructuredContent(content != null ? content : "")
                     .build());
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "note edit: upserted note for chat {0}", resolvedChatJid);
             return MutationApplicationResult.success();
         } catch (Exception e) {
-            LOGGER.warning("Note edit mutation failed: " + e.getMessage());
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "note edit mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

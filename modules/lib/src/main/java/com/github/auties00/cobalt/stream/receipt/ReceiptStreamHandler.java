@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.receipt;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckSender;
@@ -8,6 +9,8 @@ import com.github.auties00.cobalt.message.MessageService;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.calls.signaling.receive.CallReceiptReceiver;
 import com.github.auties00.cobalt.wam.WamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Routes an incoming {@code <receipt>} stanza to the appropriate specialised
@@ -38,6 +41,11 @@ import com.github.auties00.cobalt.wam.WamService;
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleMessagingStanza")
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleStanzaUtils")
 public final class ReceiptStreamHandler extends SocketStreamHandler.Concurrent {
+    /**
+     * The logger for {@link ReceiptStreamHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(ReceiptStreamHandler.class);
+
     /**
      * The {@link CallReceiptReceiver} that consumes VoIP signalling
      * receipts.
@@ -91,6 +99,7 @@ public final class ReceiptStreamHandler extends SocketStreamHandler.Concurrent {
     @Override
     public void handle(Stanza stanza) {
         if (isCallReceipt(stanza)) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "routing receipt {0} to call receipt handler", stanza);
             callReceiptHandler.handle(stanza);
             return;
         }

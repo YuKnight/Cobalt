@@ -463,7 +463,7 @@ server.tool(
 
 server.tool(
   "get_native_module_wat",
-  "Returns a WASM function/module as text. format='wat' (default): WAT disassembly via WABT (whole module, or one function with functionIndex). format='ghidra': C pseudocode via Ghidra headless + the ghidra-wasm-plugin; requires functionIndex, which may be a single index or an array of indices decompiled in one batch (the whole-module analysis is paid once for the batch, so prefer one call with many indices over many single-index calls). Falls back to an error message if Ghidra/plugin is not installed.",
+  "Returns a WASM function/module as text. functionIndex is the global wasm function index (imports first, then defined functions), matching get_native_module_metadata and the ghidra format. format='wat' (default): WAT disassembly via the native wasm2wat CLI (handles multi-MB modules; the whole-module disassembly is cached per module, then a single function is streamed out with functionIndex). Omitting functionIndex returns the whole module and is refused for large modules. format='ghidra': C pseudocode via Ghidra headless + the ghidra-wasm-plugin; requires functionIndex (a single index or an array decompiled in one batch), cached per function. A function the plugin cannot decode (commonly the SIMD/atomics opcodes it mis-decodes) is returned with decompiled=false plus an error and a hint to retry that index with format='wat', rather than failing the whole call. Errors if Ghidra/plugin is not installed.",
   {
     name: z.string(),
     platform: platformSchema,
@@ -487,17 +487,13 @@ server.tool(
         const indices = Array.isArray(functionIndex) ? functionIndex : [functionIndex];
         if (indices.length === 0) throw new Error("format='ghidra' requires at least one functionIndex");
         const catalog = requireCatalog(platform);
-        const { binary } = await catalog.getNativeModuleBinary(name);
+        const wasmPath = catalog.getNativeModulePath(name);
         const { decompileWasmFunctions } = await import("../../extractor/ghidra.js");
-        const tmp = join(tmpdir(), `wasm-ghidra-${name.replace(/[^a-zA-Z0-9_-]/g, "_")}-${indices[0]}-${indices.length}.wasm`);
-        await writeFile(tmp, binary);
-        try {
-          const results = await decompileWasmFunctions(tmp, indices);
-          const payload = Array.isArray(functionIndex) ? results : results[0];
-          return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
-        } finally {
-          await rm(tmp, { force: true }).catch(() => {});
-        }
+        const results = await decompileWasmFunctions(wasmPath, indices, {
+          cacheDir: `${wasmPath}.ghidra-cache`,
+        });
+        const payload = Array.isArray(functionIndex) ? results : results[0];
+        return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
       }
       if (Array.isArray(functionIndex) && functionIndex.length > 1) {
         throw new Error("format='wat' supports only a single functionIndex; use format='ghidra' to decompile a batch");

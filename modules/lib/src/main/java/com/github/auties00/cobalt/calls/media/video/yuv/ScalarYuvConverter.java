@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.media.video.yuv;
 
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -70,6 +72,11 @@ final class ScalarYuvConverter implements YuvConverter {
     private static final int BR = VR * 128 + YGB;
 
     /**
+     * The logger for {@link ScalarYuvConverter}.
+     */
+    private static final System.Logger LOGGER = Log.get(ScalarYuvConverter.class);
+
+    /**
      * Constructs the scalar backend.
      */
     ScalarYuvConverter() {
@@ -79,11 +86,16 @@ final class ScalarYuvConverter implements YuvConverter {
     @Override
     public int[] toArgb(VideoFrame frame) {
         Objects.requireNonNull(frame, "frame cannot be null");
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "scalar yuv converter: toArgb, format={0} width={1} height={2}",
+                    frame.format(), frame.width(), frame.height());
+        }
         return toArgbFrame(frame);
     }
 
     @Override
     public VideoFrame argbToI420(int[] argb, int width, int height, long ptsMicros) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "scalar yuv converter: argbToI420, width={0} height={1}", width, height);
         return argbToI420Frame(argb, width, height, ptsMicros);
     }
 
@@ -104,12 +116,17 @@ final class ScalarYuvConverter implements YuvConverter {
         Objects.requireNonNull(src, "src cannot be null");
         requireEvenDimension(dstWidth, "dstWidth");
         requireEvenDimension(dstHeight, "dstHeight");
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "scalar yuv converter: scale, srcWidth={0} srcHeight={1} dstWidth={2} dstHeight={3}",
+                    src.width(), src.height(), dstWidth, dstHeight);
+        }
         return scaleFrame(src, dstWidth, dstHeight);
     }
 
     @Override
     public VideoFrame rotate(VideoFrame src, int degrees) {
         Objects.requireNonNull(src, "src cannot be null");
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "scalar yuv converter: rotate, degrees={0}", degrees);
         return rotateFrame(src, degrees);
     }
 

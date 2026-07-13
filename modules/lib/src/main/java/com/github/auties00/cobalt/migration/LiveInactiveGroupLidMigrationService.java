@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.migration;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.util.ScheduledTask;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -50,10 +52,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebInactiveGroupLidMigration")
 public final class LiveInactiveGroupLidMigrationService implements InactiveGroupLidMigrationService {
     /**
-     * Logger used by {@link #run()} and {@link #start()} to trace migration
-     * progress and individual query failures.
+     * The logger for {@link LiveInactiveGroupLidMigrationService}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveInactiveGroupLidMigrationService.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveInactiveGroupLidMigrationService.class);
 
     /**
      * Delay before the first migration pass after {@link #start()}.
@@ -119,11 +120,15 @@ public final class LiveInactiveGroupLidMigrationService implements InactiveGroup
     @Override
     public void start() {
         if (isInactiveGroupLidMigrationComplete()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "[lid-inactive-group-migration] already done, skip");
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "inactive-group lid migration: already complete, skipping start");
+            }
             return;
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "inactive-group lid migration: scheduling first pass in {0}", INITIAL_DELAY);
+        }
         scheduledTask = ScheduledTask.scheduleDelayed(INITIAL_DELAY, this::run);
     }
 
@@ -136,6 +141,9 @@ public final class LiveInactiveGroupLidMigrationService implements InactiveGroup
         if (task != null) {
             task.cancel();
             scheduledTask = null;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "inactive-group lid migration: cancelled pending scheduled pass");
+            }
         }
     }
 
@@ -196,53 +204,63 @@ public final class LiveInactiveGroupLidMigrationService implements InactiveGroup
     void run() {
         try {
             if (isInactiveGroupLidMigrationComplete()) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "[lid-inactive-group-migration] already done, skip");
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "inactive-group lid migration: already complete, skipping pass");
+                }
                 return;
             }
 
-            LOGGER.log(System.Logger.Level.INFO,
-                    "[lid-inactive-group-migration] starting migration");
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "inactive-group lid migration: starting pass");
+            }
 
             var pnGroups = findPnGroups();
             if (pnGroups.isEmpty()) {
-                LOGGER.log(System.Logger.Level.INFO,
-                        "[lid-inactive-group-migration] no PN groups, done");
+                if (Log.INFO) {
+                    LOGGER.log(Level.INFO, "inactive-group lid migration: no PN groups found, complete");
+                }
                 setInactiveGroupLidMigrationComplete();
                 return;
             }
 
-            LOGGER.log(System.Logger.Level.INFO,
-                    "[lid-inactive-group-migration] found {0} PN groups", pnGroups.size());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "inactive-group lid migration: found {0} PN groups", pnGroups.size());
+            }
 
             for (var groupJid : pnGroups) {
                 try {
                     client.queryChatMetadata(groupJid);
                 } catch (Exception e) {
-                    LOGGER.log(System.Logger.Level.DEBUG,
-                            "[lid-inactive-group-migration] failed to query {0}: {1}",
-                            groupJid, e.getMessage());
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING,
+                                "inactive-group lid migration: metadata query failed for " + Log.jid(String.valueOf(groupJid)),
+                                e);
+                    }
                 }
             }
 
-            LOGGER.log(System.Logger.Level.INFO,
-                    "[lid-inactive-group-migration] groups queried+updated");
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "inactive-group lid migration: metadata queries issued for {0} groups",
+                        pnGroups.size());
+            }
 
             var remaining = findPnGroups();
             if (remaining.isEmpty()) {
-                LOGGER.log(System.Logger.Level.INFO,
-                        "[lid-inactive-group-migration] no PN groups left, done");
+                if (Log.INFO) {
+                    LOGGER.log(Level.INFO, "inactive-group lid migration: no PN groups left, complete");
+                }
                 setInactiveGroupLidMigrationComplete();
             } else {
-                LOGGER.log(System.Logger.Level.INFO,
-                        "[lid-inactive-group-migration] {0} PN groups left, retry later",
-                        remaining.size());
+                if (Log.INFO) {
+                    LOGGER.log(Level.INFO, "inactive-group lid migration: {0} PN groups remain, retrying in {1}",
+                            remaining.size(), RETRY_DELAY);
+                }
                 scheduledTask = ScheduledTask.scheduleDelayed(RETRY_DELAY, this::run);
             }
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "[lid-inactive-group-migration] Failed to complete migration: {0}",
-                    e.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "inactive-group lid migration: pass failed", e);
+            }
         }
     }
 

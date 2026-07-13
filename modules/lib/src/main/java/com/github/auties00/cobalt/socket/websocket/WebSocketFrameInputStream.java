@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.socket.websocket;
 
+import com.github.auties00.cobalt.log.Log;
+
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
@@ -31,6 +34,11 @@ import static com.github.auties00.cobalt.socket.websocket.WebSocketFrameConstant
  * cannot race the writer thread's data frame.
  */
 public final class WebSocketFrameInputStream extends FilterInputStream {
+
+    /**
+     * The logger for {@link WebSocketFrameInputStream}.
+     */
+    private static final System.Logger LOGGER = Log.get(WebSocketFrameInputStream.class);
 
     /**
      * Holds the masker selected once at class-load time, shared by every
@@ -177,6 +185,9 @@ public final class WebSocketFrameInputStream extends FilterInputStream {
         var toRead = (int) Math.min(frameRemaining, len);
         var n = readFromSource(dst, off, toRead);
         if (n < 0) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "websocket stream ended mid-frame, {0} byte(s) still expected", frameRemaining);
+            }
             throw new IOException("Unexpected end of stream mid-frame");
         }
         if (masked) {
@@ -279,6 +290,9 @@ public final class WebSocketFrameInputStream extends FilterInputStream {
         var second = readByte();
 
         if ((first & 0x70) != 0) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "websocket frame has reserved bits set: 0x{0}", Integer.toHexString(first));
+            }
             throw new IOException("WebSocket frame has reserved bits set: 0x"
                     + Integer.toHexString(first));
         }
@@ -300,10 +314,16 @@ public final class WebSocketFrameInputStream extends FilterInputStream {
         }
 
         if (length < 0 || length > MAX_FRAME_LENGTH) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "websocket frame length out of bounds: {0}", length);
+            }
             throw new IOException("WebSocket frame length out of bounds: " + length);
         }
 
         if (isControlOpcode() && length > CONTROL_PAYLOAD_MAX_LENGTH) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "websocket control frame too large: {0}", length);
+            }
             throw new IOException("WebSocket control frame too large: " + length);
         }
 
@@ -319,6 +339,10 @@ public final class WebSocketFrameInputStream extends FilterInputStream {
         }
 
         frameRemaining = length;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "websocket frame header opcode=0x{0} length={1} masked={2}",
+                    Integer.toHexString(currentOpcode), length, masked);
+        }
         return true;
     }
 
@@ -383,20 +407,39 @@ public final class WebSocketFrameInputStream extends FilterInputStream {
         frameRemaining = 0;
 
         switch (currentOpcode) {
-            case OPCODE_PING -> pairedOutput.writeControlFrame(OPCODE_PONG, controlPayload, length);
+            case OPCODE_PING -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "received websocket ping, sending pong, length={0}", length);
+                }
+                pairedOutput.writeControlFrame(OPCODE_PONG, controlPayload, length);
+            }
             case OPCODE_CLOSE -> {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "received websocket close frame, acknowledging");
+                }
                 try {
                     pairedOutput.writeControlFrame(OPCODE_CLOSE, controlPayload, length);
-                } catch (IOException _) {
+                } catch (IOException e) {
                     // Peer may have torn down the socket before the
                     // acknowledgement could land; CLOSE is best effort.
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "failed to send websocket close acknowledgement", e);
+                    }
                 }
                 closed = true;
             }
             case OPCODE_PONG -> {
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "received websocket pong, ignoring");
+                }
             }
-            default -> throw new IOException("Unexpected control opcode: 0x"
-                    + Integer.toHexString(currentOpcode));
+            default -> {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "unexpected websocket control opcode: 0x{0}", Integer.toHexString(currentOpcode));
+                }
+                throw new IOException("Unexpected control opcode: 0x"
+                        + Integer.toHexString(currentOpcode));
+            }
         }
     }
 }

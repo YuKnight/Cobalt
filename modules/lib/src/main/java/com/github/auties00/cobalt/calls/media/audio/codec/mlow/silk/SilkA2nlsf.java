@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.silk;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Converts monic whitening filter coefficients into normalized line spectral frequencies (NLSFs) in integer
  * fixed point.
@@ -44,6 +48,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.silk;
  * escape after {@value #MAX_ITERATIONS} expansions.
  */
 public final class SilkA2nlsf {
+    /**
+     * The logger for {@link SilkA2nlsf}.
+     */
+    private static final System.Logger LOGGER = Log.get(SilkA2nlsf.class);
+
     /**
      * Number of binary division refinement steps per root.
      *
@@ -295,6 +304,11 @@ public final class SilkA2nlsf {
                 if (k > LSF_COS_TAB_SZ) {
                     i++;
                     if (i > MAX_ITERATIONS) {
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING,
+                                    "a2nlsf root search exhausted {0} bandwidth-expansion retries, falling back to flat spectrum, order={1}",
+                                    MAX_ITERATIONS, d);
+                        }
                         nlsf[0] = (short) ((1 << 15) / (d + 1));
                         for (k = 1; k < d; k++) {
                             nlsf[k] = (short) (nlsf[k - 1] + nlsf[0]);

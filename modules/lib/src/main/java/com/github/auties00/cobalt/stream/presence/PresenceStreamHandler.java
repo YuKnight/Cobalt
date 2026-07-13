@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.stream.presence;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.smax.presence.SmaxServerUpdateResponse;
 import com.github.auties00.cobalt.store.linked.protobuf.ProtobufWhatsAppStore;
@@ -15,6 +16,7 @@ import com.github.auties00.cobalt.model.contact.ContactStatus;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stream.NodeStreamService;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Set;
 
@@ -42,9 +44,9 @@ import java.util.Set;
 @WhatsAppWebModule(moduleName = "WAWebChangePresenceHandlerAction")
 public final class PresenceStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * Reports stanzas that cannot be parsed or that carry malformed {@code last} timestamps at debug level.
+     * The logger for {@link PresenceStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(PresenceStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(PresenceStreamHandler.class);
 
     /**
      * Holds the {@code last}-attribute sentinel strings that mean the peer has hidden their last-seen timestamp via
@@ -111,7 +113,7 @@ public final class PresenceStreamHandler extends SocketStreamHandler.Concurrent 
     public void handle(Stanza stanza) {
         SmaxServerUpdateResponse presence = SmaxServerUpdateResponse.of(stanza).orElse(null);
         if (presence == null) {
-            LOGGER.log(System.Logger.Level.DEBUG, "Ignoring unparsable presence stanza: {0}", stanza);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring unparsable presence stanza {0}", stanza);
             return;
         }
 
@@ -148,11 +150,13 @@ public final class PresenceStreamHandler extends SocketStreamHandler.Concurrent 
 
         var meJid = whatsapp.store().accountStore().jid().orElse(null);
         if (meJid != null && isSelfPresence(from, meJid)) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "ignoring self presence update from {0}", from);
             return;
         }
 
         var contact = getOrCreateContact(from);
         if (contact == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring presence update with unresolved from jid");
             return;
         }
 
@@ -163,6 +167,7 @@ public final class PresenceStreamHandler extends SocketStreamHandler.Concurrent 
             contact.setLastSeen(lastSeen);
         }
         whatsapp.store().contactStore().addContact(contact);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "updated presence for {0} to {1}", contact.toJid(), status);
         notifyPresence(contact.toJid(), contact.toJid());
     }
 
@@ -203,8 +208,7 @@ public final class PresenceStreamHandler extends SocketStreamHandler.Concurrent 
         try {
             return Instant.ofEpochSecond(Long.parseLong(lastValue));
         } catch (NumberFormatException exception) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Ignoring malformed presence last value {0}", lastValue);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring malformed presence last value {0}", lastValue);
             return null;
         }
     }

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.stun;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.HashMap;
 import java.util.Map;
 import com.github.auties00.cobalt.calls.transport.warp.WarpMessage;
@@ -186,6 +189,11 @@ public enum StunAttributeType {
     WA_XOR_MAPPED_ADDRESS(0x0016);
 
     /**
+     * The logger for {@link StunAttributeType}.
+     */
+    private static final System.Logger LOGGER = Log.get(StunAttributeType.class);
+
+    /**
      * Caches the constant array so the per attribute {@link #ofValue(int)} decode scan does not pay the
      * defensive clone cost of {@link #values()} on every STUN attribute parsed.
      */
@@ -251,7 +259,11 @@ public enum StunAttributeType {
      * @return the matching {@link StunAttributeType}, or {@code null} if none is known
      */
     public static StunAttributeType ofValue(int value) {
-        return BY_VALUE.get(value & 0xFFFF);
+        var type = BY_VALUE.get(value & 0xFFFF);
+        if (type == null && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "unknown stun attribute type=0x{0}", Integer.toHexString(value & 0xFFFF));
+        }
+        return type;
     }
 
     /**

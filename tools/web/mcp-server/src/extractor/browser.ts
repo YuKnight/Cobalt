@@ -2,7 +2,7 @@ import type { ParsedModule, ParsedNativeModule } from "../types/module.js";
 import type { SnapshotPlatform } from "../types/snapshot.js";
 import type { PlatformBridge } from "../types/bridge.js";
 import { connectToPlatform } from "../bridge/connect.js";
-import { parseModules } from "./parser.js";
+import { isWhatsAppModule, parseModules, parseRuntimeModule } from "./parser.js";
 import { createLogger } from "../utils/logger.js";
 
 const log = createLogger("extractor:browser");
@@ -21,8 +21,26 @@ const DEFINE_HOOK = `(() => {
   if (window.__waDefineHookInstalled) return;
   window.__waDefineHookInstalled = true;
   window.__waDefinedModules = [];
+  window.__waModules = {};
   const record = (name) => { try { window.__waDefinedModules.push(name); } catch (e) {} };
-  const wrap = (fn) => function (name) { record(name); return fn.apply(this, arguments); };
+  const recordModule = (name, deps, args) => {
+    try {
+      if (typeof name !== "string" || window.__waModules[name]) return;
+      let factory = null;
+      for (let i = 0; i < args.length; i++) {
+        if (typeof args[i] === "function") { factory = args[i]; break; }
+      }
+      window.__waModules[name] = {
+        deps: Array.isArray(deps) ? deps : [],
+        source: factory ? Function.prototype.toString.call(factory) : null,
+      };
+    } catch (e) {}
+  };
+  const wrap = (fn) => function (name, deps) {
+    record(name);
+    recordModule(name, deps, arguments);
+    return fn.apply(this, arguments);
+  };
   let current;
   Object.defineProperty(window, "__d", {
     configurable: true,
@@ -104,7 +122,14 @@ const AGNOSTIC_WASM_TRIGGER = `(() => {
   return { fired };
 })()`;
 
+interface RuntimeModule {
+  name: string;
+  deps: string[];
+  source: string | null;
+}
+
 interface CapturedResponses {
+  runtimeModules: RuntimeModule[];
   jsUrls: string[];
   wasmCaptures: Map<string, Buffer>;
 }
@@ -155,6 +180,27 @@ async function forceLoadAllChunks(bridge: PlatformBridge): Promise<void> {
     } catch {}
   }, LAZY_CHUNK_BATCH_SIZE);
   await new Promise((resolve) => setTimeout(resolve, LAZY_CHUNK_SETTLE_WAIT));
+}
+
+async function collectRuntimeModules(
+  bridge: PlatformBridge
+): Promise<RuntimeModule[]> {
+  return bridge.evaluate(() => {
+    const registry =
+      (window as unknown as {
+        __waModules?: Record<string, { deps?: string[]; source?: string | null }>;
+      }).__waModules ?? {};
+    const modules: RuntimeModule[] = [];
+    for (const name of Object.keys(registry)) {
+      const entry = registry[name];
+      modules.push({
+        name,
+        deps: Array.isArray(entry?.deps) ? entry.deps : [],
+        source: entry?.source ?? null,
+      });
+    }
+    return modules;
+  });
 }
 
 async function discoverBxDataWasmUrls(
@@ -314,10 +360,13 @@ async function collectResponses(
 
   await triggerWasmLoadersAgnostic(bridge);
 
+  const runtimeModules = await collectRuntimeModules(bridge);
+  log.info(`captured ${runtimeModules.length} module definitions from the __d registry`);
+
   await Promise.all(pendingCaptures);
   bridge.removeResponseListeners();
 
-  return { jsUrls: [...jsUrls], wasmCaptures };
+  return { runtimeModules, jsUrls: [...jsUrls], wasmCaptures };
 }
 
 function deriveNativeName(url: string): string {
@@ -348,24 +397,47 @@ async function fetchWithRetry(url: string): Promise<string> {
   throw new Error("Unreachable retry state");
 }
 
-async function parseCollectedResponses(
-  jsUrls: string[],
-  wasmCaptures: Map<string, Buffer>
-): Promise<[ParsedModule[], ParsedNativeModule[]]> {
-  const allModules: ParsedModule[] = [];
+function buildModulesFromRuntime(
+  runtimeModules: RuntimeModule[]
+): ParsedModule[] {
+  const modules: ParsedModule[] = [];
+  for (const runtimeModule of runtimeModules) {
+    if (!isWhatsAppModule(runtimeModule.name)) continue;
+    if (!runtimeModule.source) continue;
+    const parsed = parseRuntimeModule(
+      runtimeModule.name,
+      runtimeModule.deps,
+      runtimeModule.source
+    );
+    if (parsed) modules.push(parsed);
+  }
+  return modules;
+}
+
+async function parseFromNetworkUrls(jsUrls: string[]): Promise<ParsedModule[]> {
   const results = await Promise.all(
     jsUrls.map(async (url) => {
       try {
-        const content = await fetchWithRetry(url);
-        return parseModules(content);
+        return parseModules(await fetchWithRetry(url));
       } catch {
         return [] as ParsedModule[];
       }
     })
   );
+  return results.flat();
+}
 
-  for (const modules of results) {
-    allModules.push(...modules);
+async function parseCollectedResponses(
+  runtimeModules: RuntimeModule[],
+  jsUrls: string[],
+  wasmCaptures: Map<string, Buffer>
+): Promise<[ParsedModule[], ParsedNativeModule[]]> {
+  let allModules = buildModulesFromRuntime(runtimeModules);
+  if (allModules.length === 0) {
+    log.warn(
+      "runtime __d registry yielded no modules; falling back to network-fetched bundle parsing"
+    );
+    allModules = await parseFromNetworkUrls(jsUrls);
   }
 
   const nativeModules: ParsedNativeModule[] = [];
@@ -419,14 +491,17 @@ export async function extractModules(
   const bridge = await connectToPlatform(platform);
   try {
     log.debug("collecting responses (JS + WASM)");
-    const { jsUrls, wasmCaptures } = await collectResponses(bridge);
-    log.info(`collected ${jsUrls.length} JS URLs, ${wasmCaptures.size} WASM binaries`);
+    const { runtimeModules, jsUrls, wasmCaptures } = await collectResponses(bridge);
+    log.info(
+      `collected ${runtimeModules.length} runtime modules, ${jsUrls.length} JS URLs, ${wasmCaptures.size} WASM binaries`
+    );
     const revision = await extractRevision(bridge);
     log.info(`extracted revision: ${revision}`);
     await bridge.disconnect();
 
     log.debug("parsing collected responses");
     const [allModules, nativeModules] = await parseCollectedResponses(
+      runtimeModules,
       jsUrls,
       wasmCaptures
     );

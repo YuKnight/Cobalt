@@ -7,6 +7,9 @@ import com.github.auties00.cobalt.model.sync.action.bot.MaibaAIFeaturesControlAc
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code maiba_ai_features_control} app-state sync action that
@@ -30,6 +33,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * matching module.
  */
 public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link MaibaAIFeaturesControlHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(MaibaAIFeaturesControlHandler.class);
 
     /**
      * Constructs a new singleton {@link MaibaAIFeaturesControlHandler}.
@@ -92,10 +99,12 @@ public final class MaibaAIFeaturesControlHandler implements WebAppStateActionHan
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MaibaAIFeaturesControlAction action)
                 || action.aiFeatureStatus().isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "maiba ai features control mutation has malformed action value");
             return MutationApplicationResult.malformed();
         }
 
         client.store().businessStore().setAiBusinessAgentStatus(action.aiFeatureStatus().get());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "maiba ai business agent status applied, status={0}", action.aiFeatureStatus().get());
         return MutationApplicationResult.success();
     }
 

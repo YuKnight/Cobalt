@@ -17,7 +17,9 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Collection;
 
 /**
@@ -44,6 +46,10 @@ import java.util.Collection;
  */
 @WhatsAppWebModule(moduleName = "WAWebInteractiveMessageSync")
 public final class InteractiveMessageHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link InteractiveMessageHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(InteractiveMessageHandler.class);
 
     /**
      * Constructs a new singleton {@link InteractiveMessageHandler}.
@@ -127,6 +133,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof InteractiveMessageAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "interactive message mutation has malformed action value, id={0}", messageId);
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
@@ -143,6 +150,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
             var agmId = action.agmId().orElse(null);
 
             if (localChat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "interactive message action orphaned, chat {0} not found", chatJid);
                 return MutationApplicationResult.orphan(
                         SyncdIndexUtils.serializeMessageKey(incomingMsgKey.get()),
                         "Msg"
@@ -161,9 +169,11 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
 
             if (maybeMessage.isEmpty()) {
                 if (agmId != null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "interactive message agm state recorded without message, agmId={0}", agmId);
                     return MutationApplicationResult.success();
                 }
 
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "interactive message action orphaned, message {0} not found in chat {1}", messageId, chatJid);
                 return MutationApplicationResult.orphan(
                         SyncdIndexUtils.serializeMessageKey(incomingMsgKey.get()),
                         "Msg"
@@ -173,6 +183,7 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
             var chatMessage = maybeMessage.get();
 
             if (action.type() != InteractiveMessageActionMode.DISABLE_CTA) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "interactive message action skipped, mode={0}", action.type());
                 return MutationApplicationResult.skipped();
             }
 
@@ -187,8 +198,10 @@ public final class InteractiveMessageHandler implements WebAppStateActionHandler
                     .type(action.type())
                     .agmId(action.agmId().orElse(null))
                     .build());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "interactive message cta disabled for message {0} in chat {1}", messageKeyId, chatJid);
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "interactive message mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

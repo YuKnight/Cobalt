@@ -9,8 +9,8 @@ import com.github.auties00.cobalt.calls.stream.AudioInput;
  * Discards the remote audio of a call.
  *
  * <p>This is the {@link AudioInput} returned by {@link AudioInput#discard()}: every
- * {@link #offer(AudioFrame)} is dropped and nothing is buffered, so it is the sink to install when a call
- * needs no inbound audio. It is not read from; {@link #read()} blocks until the call ends and then returns
+ * {@link #offerAudio(AudioFrame)} is dropped and nothing is buffered, so it is the sink to install when a call
+ * needs no inbound audio. It is not read from; {@link #readAudio()} blocks until the call ends and then returns
  * {@code null}, so a consumer that drains it in a loop terminates cleanly when the call ends.
  *
  * <p>This implementation class is not instantiated directly by application code; it is obtained through the
@@ -18,10 +18,10 @@ import com.github.auties00.cobalt.calls.stream.AudioInput;
  */
 public final class DiscardAudioInput implements AudioInput {
     /**
-     * Latch counted down by {@link #shutdown()} to release a pending {@link #read()}.
+     * Latch counted down by {@link #shutdown()} to release a pending {@link #readAudio()}.
      *
      * <p>The latch starts at one and stays raised for the life of the call. A thread parked in
-     * {@link #read()} waits on it, and {@link #shutdown()} counts it down exactly when the call ends so
+     * {@link #readAudio()} waits on it, and {@link #shutdown()} counts it down exactly when the call ends so
      * that read observes the end of stream and returns {@code null}.
      */
     private final CountDownLatch done = new CountDownLatch(1);
@@ -35,7 +35,7 @@ public final class DiscardAudioInput implements AudioInput {
      * @throws NullPointerException if {@code frame} is {@code null}
      */
     @Override
-    public void offer(AudioFrame frame) {
+    public void offerAudio(AudioFrame frame) {
         Objects.requireNonNull(frame, "frame cannot be null");
     }
 
@@ -48,7 +48,7 @@ public final class DiscardAudioInput implements AudioInput {
      * @throws InterruptedException if the calling thread is interrupted while waiting
      */
     @Override
-    public AudioFrame read() throws InterruptedException {
+    public AudioFrame readAudio() throws InterruptedException {
         done.await();
         return null;
     }
@@ -56,7 +56,7 @@ public final class DiscardAudioInput implements AudioInput {
     /**
      * {@inheritDoc}
      *
-     * <p>Wakes a pending {@link #read()}. Idempotent.
+     * <p>Wakes a pending {@link #readAudio()}. Idempotent.
      */
     @Override
     public void shutdown() {

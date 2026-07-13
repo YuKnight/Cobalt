@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.calls.config.param;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -80,6 +82,24 @@ public enum VoipParamType {
     UNKNOWN(0);
 
     /**
+     * Resolves an engine value type code to its type, backing {@link #ofCode(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #code}, so a code resolves to its
+     * type in constant time rather than by scanning {@link #values()}.
+     */
+    private static final Map<Integer, VoipParamType> BY_CODE;
+
+    static {
+        var byCode = new HashMap<Integer, VoipParamType>();
+        for (var type : values()) {
+            if (byCode.put(type.code, type) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_CODE = Map.copyOf(byCode);
+    }
+
+    /**
      * The integer value type code the engine stores in the descriptor's type byte.
      */
     private final int code;
@@ -117,15 +137,12 @@ public enum VoipParamType {
     /**
      * Returns the value type whose {@linkplain #code() code} equals the given value.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_CODE} map rather than
+     * scanning {@link #values()}.
      * @param code the engine value type code to resolve
      * @return the matching value type, or {@link Optional#empty()} if no type matches
      */
     public static Optional<VoipParamType> ofCode(int code) {
-        for (var type : values()) {
-            if (type.code == code) {
-                return Optional.of(type);
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(BY_CODE.get(code));
     }
 }

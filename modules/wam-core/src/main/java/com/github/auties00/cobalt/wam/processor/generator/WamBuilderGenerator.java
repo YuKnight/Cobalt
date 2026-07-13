@@ -41,7 +41,7 @@ public final class WamBuilderGenerator {
     private static final ClassName WAM_WIRE_STRING = WAM_WIRE_VALUE.nestedClass("WamString");
 
     private WamBuilderGenerator() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**

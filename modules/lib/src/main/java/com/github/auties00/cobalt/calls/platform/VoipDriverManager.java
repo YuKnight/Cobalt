@@ -7,7 +7,9 @@ import com.github.auties00.cobalt.calls.platform.video.LiveVideoCaptureDriver.Ca
 import com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.State;
 import com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.VideoCaptureCapability;
 import com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver.VideoSink;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 import com.github.auties00.cobalt.calls.platform.audio.AudioCaptureDriver;
@@ -44,9 +46,9 @@ import com.github.auties00.cobalt.calls.platform.video.VideoCaptureDriver;
  */
 public final class VoipDriverManager {
     /**
-     * Logs initialization and driver lifecycle transitions.
+     * The logger for {@link VoipDriverManager}.
      */
-    private static final System.Logger LOGGER = System.getLogger(VoipDriverManager.class.getName());
+    private static final System.Logger LOGGER = Log.get(VoipDriverManager.class);
 
     /**
      * Captures the microphone, the routing target for any source kind other than
@@ -146,11 +148,11 @@ public final class VoipDriverManager {
         lock.lock();
         try {
             if (initialized) {
-                LOGGER.log(System.Logger.Level.DEBUG, "VoipDriverManager already initialized");
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "voip driver manager already initialized");
                 return;
             }
             this.initialized = true;
-            LOGGER.log(System.Logger.Level.DEBUG, "VoipDriverManager initialized");
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "voip driver manager initialized");
         } finally {
             lock.unlock();
         }
@@ -244,6 +246,10 @@ public final class VoipDriverManager {
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "starting audio capture type={0} sampleRate={1} framesPerBuffer={2} channels={3}",
+                    deviceType, sampleRate, framesPerBuffer, channelCount);
+        }
         var driver = captureDriver(deviceType);
         driver.init(deviceId, sampleRate, framesPerBuffer, channelCount, deviceType);
         driver.start();
@@ -259,6 +265,7 @@ public final class VoipDriverManager {
      */
     public void stopAudioCapture(AudioDeviceType deviceType) {
         Objects.requireNonNull(deviceType, "deviceType cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stopping audio capture type={0}", deviceType);
         captureDriver(deviceType).stop();
     }
 
@@ -283,6 +290,10 @@ public final class VoipDriverManager {
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "starting audio playback sampleRate={0} framesPerBuffer={1} channels={2}",
+                    sampleRate, framesPerBuffer, channelCount);
+        }
         playbackDriver.init(deviceId, sampleRate, framesPerBuffer, channelCount);
         playbackDriver.start();
     }
@@ -293,6 +304,7 @@ public final class VoipDriverManager {
      * <p>Delegates to {@link AudioPlaybackDriver#stop()} on the playback driver.
      */
     public void stopPlayback() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stopping audio playback");
         playbackDriver.stop();
     }
 
@@ -325,6 +337,7 @@ public final class VoipDriverManager {
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting video capture");
         driver.initDriver(deviceId, sink);
         driver.start(capability);
     }
@@ -345,12 +358,14 @@ public final class VoipDriverManager {
         lock.lock();
         try {
             if (videoDriver == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "select camera requested before video capture started");
                 throw new IllegalStateException("video capture not started");
             }
             driver = videoDriver;
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "switching camera");
         driver.selectCamera(deviceId);
     }
 
@@ -370,6 +385,7 @@ public final class VoipDriverManager {
             lock.unlock();
         }
         if (driver != null && driver.state() != State.VOID && driver.state() != State.INITIALIZED) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stopping video capture");
             driver.stop();
         }
     }
@@ -404,6 +420,7 @@ public final class VoipDriverManager {
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting desktop capture");
         driver.initDriver(surfaceId, sink);
         driver.start(capability);
     }
@@ -426,12 +443,14 @@ public final class VoipDriverManager {
         lock.lock();
         try {
             if (desktopDriver == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "desktop config requested before desktop capture started");
                 throw new IllegalStateException("desktop capture not started");
             }
             driver = desktopDriver;
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reconfiguring desktop capture");
         driver.setConfig(capability);
     }
 
@@ -451,6 +470,7 @@ public final class VoipDriverManager {
             lock.unlock();
         }
         if (driver != null && driver.state() != State.VOID && driver.state() != State.INITIALIZED) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stopping desktop capture");
             driver.stop();
         }
     }
@@ -465,6 +485,7 @@ public final class VoipDriverManager {
      */
     private void requireInitialized() {
         if (!initialized) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "voip driver manager not initialized");
             throw new IllegalStateException("VoipDriverManager not initialized");
         }
     }

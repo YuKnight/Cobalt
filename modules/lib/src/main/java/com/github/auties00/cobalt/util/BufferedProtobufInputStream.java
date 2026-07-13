@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.util;
 
+import com.github.auties00.cobalt.log.Log;
 import it.auties.protobuf.model.ProtobufString;
 import it.auties.protobuf.stream.ProtobufInputStream;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.InvalidMarkException;
 import java.nio.file.Files;
@@ -49,6 +51,11 @@ import java.util.Objects;
  */
 // TODO: Delete me when we migrate to Daedalus
 public final class BufferedProtobufInputStream extends ProtobufInputStream {
+    /**
+     * The logger for {@link BufferedProtobufInputStream}.
+     */
+    private static final System.Logger LOGGER = Log.get(BufferedProtobufInputStream.class);
+
     /**
      * The buffer size used by the constructors that take no explicit size, matching the conventional
      * 8 KiB block size of the JDK stream decorators.
@@ -154,6 +161,7 @@ public final class BufferedProtobufInputStream extends ProtobufInputStream {
         this.bufferMark = -1;
         this.autoclose = true;
         this.length = -1;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opening buffered protobuf input stream, bufferSize={0}", bufferSize);
     }
 
     /**
@@ -293,6 +301,7 @@ public final class BufferedProtobufInputStream extends ProtobufInputStream {
      */
     @Override
     protected ProtobufInputStream subStream(int size) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "opening protobuf sub-stream, size={0}", size);
         if (length != -1) {
             position += size;
         }
@@ -307,6 +316,7 @@ public final class BufferedProtobufInputStream extends ProtobufInputStream {
     @Override
     public void close() throws IOException {
         if (autoclose) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing buffered protobuf input stream");
             inputStream.close();
         }
     }
@@ -325,6 +335,7 @@ public final class BufferedProtobufInputStream extends ProtobufInputStream {
             }
             return buffer[bufferPosition++] & 0xFF;
         } catch (IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "buffered protobuf input stream read failed", exception);
             throw new UncheckedIOException(exception);
         }
     }
@@ -361,6 +372,7 @@ public final class BufferedProtobufInputStream extends ProtobufInputStream {
             }
             return result;
         } catch (IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "buffered protobuf input stream read failed for size=" + size, exception);
             throw new UncheckedIOException(exception);
         }
     }
@@ -396,6 +408,7 @@ public final class BufferedProtobufInputStream extends ProtobufInputStream {
         try {
             return bufferPosition >= bufferLimit && !fill();
         } catch (IOException exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "buffered protobuf input stream end-of-stream check failed", exception);
             throw new UncheckedIOException(exception);
         }
     }
@@ -424,9 +437,11 @@ public final class BufferedProtobufInputStream extends ProtobufInputStream {
         }
         var read = inputStream.read(buffer, bufferLimit, buffer.length - bufferLimit);
         if (read <= 0) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "buffer refill reached end of stream");
             return false;
         }
         bufferLimit += read;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "refilled buffer, read={0} bytes", read);
         return true;
     }
 }

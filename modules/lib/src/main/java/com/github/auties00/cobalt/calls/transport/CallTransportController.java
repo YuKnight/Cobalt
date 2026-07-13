@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.transport;
 
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.RxSubscriptions;
 
+import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.Optional;
@@ -44,6 +46,11 @@ import com.github.auties00.cobalt.calls.transport.warp.BweConfigSender;
  *           {@link WhatsAppCallException.DataChannel} rather than an inline recovery.
  */
 public final class CallTransportController implements AutoCloseable {
+    /**
+     * The logger for {@link CallTransportController}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallTransportController.class);
+
     /**
      * Holds the signaler that posts the call bootstrap request.
      */
@@ -199,11 +206,16 @@ public final class CallTransportController implements AutoCloseable {
     public LiveCallHttpSignaler.StartSessionResult start() {
         ensureOpen();
         if (state != State.UNINITIALIZED) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "transport bring-up already started in state {0}", state);
+            }
             throw new IllegalStateException("transport bring-up already started in state " + state);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting call transport bring-up");
         var result = signaler.sendStartSessionRequest();
         transitionTo(State.PREPARED);
         transport.start();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call transport bring-up started");
         return result;
     }
 
@@ -269,6 +281,7 @@ public final class CallTransportController implements AutoCloseable {
             return;
         }
         if (transport instanceof LiveRelayTransport relay) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "ticking relay leg upkeep, state {0}", state);
             relay.tick(nowNanos);
         }
     }
@@ -294,12 +307,17 @@ public final class CallTransportController implements AutoCloseable {
         }
         // TODO: no production path drives onDownlinkBweDrop yet; it builds a BweConfigSender message and
         //  sends it as a standalone WARP, but it is not yet fed by a live downlink estimator.
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "downlink bwe dropped, sending warp config index {0}, min remote bwe {1}kbps",
+                    index, minRemoteBweKbps);
+        }
         var message = BweConfigSender.build(index, minRemoteBweKbps);
         try {
             transport.sendStandaloneWarp(message);
         } catch (IllegalStateException unsupported) {
             // The Web P2P transport does not carry WARP and rejects a standalone WARP send; the downlink
             // BWE config is a relay path control message, so an unsupported transport simply skips it.
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "transport does not carry warp, skipping bwe config send");
         }
     }
 
@@ -322,6 +340,9 @@ public final class CallTransportController implements AutoCloseable {
             return false;
         }
         var attribute = subscriptionPublisher.publishRxSubscription(rxSubscriptions, nowNanos);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "resend subscription evaluated, sent {0}", attribute.isPresent());
+        }
         attribute.ifPresent(this::sendSubscriptionAttribute);
         return attribute.isPresent();
     }
@@ -346,6 +367,7 @@ public final class CallTransportController implements AutoCloseable {
         if (closed) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing call transport controller, state {0}", state);
         closed = true;
         if (subscriptionPublisher != null) {
             subscriptionPublisher.close();
@@ -372,6 +394,7 @@ public final class CallTransportController implements AutoCloseable {
         if (closed) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call transport event {0} in state {1}", event, state);
         switch (event) {
             case RELAY_CREATE_SUCCESS -> transitionTo(State.RELAY_CREATE_SUCCESS);
             case RX_TRAFFIC_STARTED -> {
@@ -380,7 +403,12 @@ public final class CallTransportController implements AutoCloseable {
             }
             case TX_TRAFFIC_START -> transitionTo(State.TX_TRAFFIC_STARTED);
             case RX_TRAFFIC_STOPPED, TX_TRAFFIC_STOPPED -> transitionTo(State.RELAY_CREATE_SUCCESS);
-            case RELAY_BINDS_FAILED -> transitionTo(State.RELAY_BINDS_FAILED);
+            case RELAY_BINDS_FAILED -> {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "relay bind failed, ever active {0}", everActive);
+                }
+                transitionTo(State.RELAY_BINDS_FAILED);
+            }
             case RX_APP_DATA -> {
                 // The transport surfaces an inbound application data arrival; the bytes themselves are
                 // delivered by the data channel layer, so the controller only needs to mark liveness.
@@ -430,6 +458,7 @@ public final class CallTransportController implements AutoCloseable {
         var framed = new StunMessage.Attribute(attribute.attributeType(), attribute.value());
         var envelope = SubscriptionEnvelope.subscriptionEnvelope(relayKey, framed, relayReflexiveAddress,
                 VoipCryptoNative.randomBytes(StunMessage.TRANSACTION_ID_LENGTH));
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "sending subscription envelope, {0} bytes", envelope.length);
         relay.sendAppData(envelope);
     }
 
@@ -442,6 +471,7 @@ public final class CallTransportController implements AutoCloseable {
         if (state == next) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call transport state {0} -> {1}", state, next);
         state = next;
         stateObserver.accept(next);
     }

@@ -17,9 +17,10 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
-import java.util.logging.Logger;
 
 /**
  * Applies the {@code lid_contact} app-state sync action that propagates
@@ -48,10 +49,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebLidContactSync")
 public final class LidContactHandler implements WebAppStateActionHandler {
     /**
-     * The {@link Logger} that records non-LID-jid sightings and orphan
-     * status-mute retry failures.
+     * The logger for {@link LidContactHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(LidContactHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(LidContactHandler.class);
 
     /**
      * The {@link ABPropsService} consulted before every mutation to gate the
@@ -140,13 +140,14 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
         var lidJid = Jid.of(lidJidString);
         if (!lidJid.hasLidServer()) {
-            LOGGER.fine(() -> "[syncd] lid contact sync received non-lid jid: " + lidJidString);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact sync received non-lid jid {0}", Log.jid(lidJidString));
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         return switch (mutation.operation()) {
             case SET -> {
                 if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LidContactAction action)) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "lid contact mutation has malformed action value, lid={0}", lidJid);
                     yield SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
@@ -171,6 +172,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
                 contact.setAddedByUsername(hasUsername);
 
                 retryOrphanStatusMutes(client, lidJidString);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact upserted, lid={0} hasUsername={1}", lidJid, hasUsername);
                 yield MutationApplicationResult.success();
             }
             case REMOVE -> {
@@ -180,6 +182,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
                         contact.setShortName(null);
                         contact.setUsername(null);
                         contact.setAddedByUsername(false);
+                        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact cleared, lid={0}", lidJid);
                     }
                 });
                 yield MutationApplicationResult.success();
@@ -201,7 +204,7 @@ public final class LidContactHandler implements WebAppStateActionHandler {
      *
      * @implNote
      * This implementation catches and logs unexpected exceptions at
-     * {@link java.util.logging.Level#WARNING} because the surrounding mutation
+     * {@link Level#WARNING} because the surrounding mutation
      * has already mutated the store and must not roll back.
      *
      * @param client       the {@link LinkedWhatsAppClient} whose orphan store is
@@ -214,6 +217,8 @@ public final class LidContactHandler implements WebAppStateActionHandler {
             if (entries.isEmpty()) {
                 return;
             }
+
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact retrying {0} orphan status mutes for {1}", entries.size(), Log.jid(lidJidString));
 
             var applied = new ArrayList<OrphanMutationEntry>();
             for (var entry : entries) {
@@ -232,9 +237,10 @@ public final class LidContactHandler implements WebAppStateActionHandler {
 
             if (!applied.isEmpty()) {
                 client.store().syncStore().removeOrphanMutations(UserStatusMuteAction.COLLECTION_NAME, applied);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "lid contact resolved {0} orphan status mutes for {1}", applied.size(), Log.jid(lidJidString));
             }
         } catch (Exception e) {
-            LOGGER.warning("[syncd] lid contact: orphan status mutes check failed: " + e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "lid contact orphan status mutes retry failed for " + Log.jid(lidJidString), e);
         }
     }
 }

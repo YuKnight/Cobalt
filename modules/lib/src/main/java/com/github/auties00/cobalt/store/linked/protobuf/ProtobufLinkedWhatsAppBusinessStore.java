@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.bot.AiThreadTitle;
 import com.github.auties00.cobalt.model.bot.BotWelcomeRequestState;
 import com.github.auties00.cobalt.model.business.AgentState;
@@ -26,6 +27,7 @@ import com.github.auties00.cobalt.model.sync.action.payment.MerchantPaymentPartn
 import com.github.auties00.cobalt.model.sync.action.payment.PaymentTosAction;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -52,6 +54,11 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 final class ProtobufLinkedWhatsAppBusinessStore implements LinkedWhatsAppBusinessStore {
+    /**
+     * The logger for {@link ProtobufLinkedWhatsAppBusinessStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufLinkedWhatsAppBusinessStore.class);
+
     /**
      * The per-account business feature flags keyed by flag name.
      */
@@ -342,6 +349,7 @@ final class ProtobufLinkedWhatsAppBusinessStore implements LinkedWhatsAppBusines
         } finally {
             nonceLock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "business account nonce updated: {0}", Log.token(nonce));
         return this;
     }
 
@@ -353,6 +361,9 @@ final class ProtobufLinkedWhatsAppBusinessStore implements LinkedWhatsAppBusines
         try {
             while (businessAccountNonce == null || Objects.equals(businessAccountNonce, previous)) {
                 if (remaining <= 0L) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "business account nonce wait timed out after {0}", timeout);
+                    }
                     return Optional.empty();
                 }
                 remaining = nonceUpdated.awaitNanos(remaining);

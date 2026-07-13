@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.device.timestamp;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.info.DeviceList;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
@@ -28,6 +30,10 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebAdvExpectedTsApi")
 @WhatsAppWebModule(moduleName = "WAWebAdvDeviceInfoCheckJob")
 public final class DeviceExpectedTsUtils {
+    /**
+     * The logger for {@link DeviceExpectedTsUtils}.
+     */
+    private static final System.Logger LOGGER = Log.get(DeviceExpectedTsUtils.class);
 
     /**
      * Holds the twenty-five hour grace window the daily ADV job allows before
@@ -45,10 +51,10 @@ public final class DeviceExpectedTsUtils {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private DeviceExpectedTsUtils() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -96,6 +102,9 @@ public final class DeviceExpectedTsUtils {
         var cachedExpectedTimestamp = cachedList.expectedTimestamp();
 
         if (!incomingTimestamp.isBefore(cachedExpectedTimestamp)) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "clearing expected timestamp for {0}: incoming timestamp caught up to cached expectation", cachedList.userJid());
+            }
             return true;
         }
 
@@ -104,7 +113,11 @@ public final class DeviceExpectedTsUtils {
         }
 
         var cachedLastJobTimestamp = cachedList.expectedTimestampLastDeviceJobTimestamp();
-        return cachedLastJobTimestamp == null || lastADVCheckTime.isAfter(cachedLastJobTimestamp);
+        var clear = cachedLastJobTimestamp == null || lastADVCheckTime.isAfter(cachedLastJobTimestamp);
+        if (Log.DEBUG && clear) {
+            LOGGER.log(Level.DEBUG, "clearing expected timestamp for {0}: newer adv job observed cached expectation", cachedList.userJid());
+        }
+        return clear;
     }
 
     /**
@@ -255,6 +268,7 @@ public final class DeviceExpectedTsUtils {
             newExpectedTimestampUpdateTimestamp = Instant.now();
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "expected timestamp advanced to incoming server timestamp");
         return new ExpectedTimestampResult(incomingTimestamp, lastADVCheckTime, newExpectedTimestampUpdateTimestamp);
     }
 
@@ -297,6 +311,7 @@ public final class DeviceExpectedTsUtils {
         var timestamp = deviceList.timestamp();
 
         if (Duration.between(timestamp, currentTime).compareTo(expiryThreshold) >= 0) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "device list stale for {0}: age exceeds expiry threshold", deviceList.userJid());
             return true;
         }
 
@@ -311,7 +326,11 @@ public final class DeviceExpectedTsUtils {
         }
 
         var expectedTimestampLastDeviceJobTimestamp = deviceList.expectedTimestampLastDeviceJobTimestamp();
-        return !Objects.equals(expectedTimestampLastDeviceJobTimestamp, lastADVCheckTime);
+        var stale = !Objects.equals(expectedTimestampLastDeviceJobTimestamp, lastADVCheckTime);
+        if (Log.DEBUG && stale) {
+            LOGGER.log(Level.DEBUG, "device list stale for {0}: expected timestamp record exceeded grace window", deviceList.userJid());
+        }
+        return stale;
     }
 
     /**
@@ -344,10 +363,15 @@ public final class DeviceExpectedTsUtils {
         var timestamp = deviceList.timestamp();
 
         if (Duration.between(timestamp, currentTime).compareTo(warningThreshold) >= 0) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "device list close to expiration for {0}: age exceeds warning threshold", deviceList.userJid());
             return true;
         }
 
         var expectedTimestamp = deviceList.expectedTimestamp();
-        return expectedTimestamp != null && expectedTimestamp.isAfter(timestamp);
+        var close = expectedTimestamp != null && expectedTimestamp.isAfter(timestamp);
+        if (Log.DEBUG && close) {
+            LOGGER.log(Level.DEBUG, "device list close to expiration for {0}: server signalled newer expectation", deviceList.userJid());
+        }
+        return close;
     }
 }

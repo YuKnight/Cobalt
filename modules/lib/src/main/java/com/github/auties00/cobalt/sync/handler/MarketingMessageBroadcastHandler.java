@@ -12,6 +12,9 @@ import com.github.auties00.cobalt.model.sync.action.business.MarketingMessageBro
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code marketingMessageBroadcast} app-state sync action that
@@ -40,6 +43,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebPremiumMessageBroadcastSync")
 public final class MarketingMessageBroadcastHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link MarketingMessageBroadcastHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(MarketingMessageBroadcastHandler.class);
 
     /**
      * Constructs a new {@link MarketingMessageBroadcastHandler} for
@@ -114,6 +121,7 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
         }
 
         if (client.store().businessStore().findMarketingMessage(premiumMessageId).isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "marketing message broadcast orphaned, template {0} not found", premiumMessageId);
             return MutationApplicationResult.orphan();
         }
 
@@ -121,6 +129,7 @@ public final class MarketingMessageBroadcastHandler implements WebAppStateAction
                 .templateId(messageId)
                 .status(premiumMessageId)
                 .build());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "marketing message broadcast recorded, message={0} template={1}", messageId, premiumMessageId);
         return MutationApplicationResult.success();
     }
 }

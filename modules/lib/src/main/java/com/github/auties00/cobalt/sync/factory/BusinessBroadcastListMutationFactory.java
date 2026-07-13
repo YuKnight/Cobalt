@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -33,6 +35,11 @@ import java.util.List;
  * field clear.
  */
 public final class BusinessBroadcastListMutationFactory {
+    /**
+     * The logger for {@link BusinessBroadcastListMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(BusinessBroadcastListMutationFactory.class);
+
     /**
      * Creates a stateless factory with no collaborators.
      *
@@ -101,6 +108,7 @@ public final class BusinessBroadcastListMutationFactory {
             Instant timestamp,
             String audienceExpression
     ) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building business broadcast list mutation id={0} participants={1}", listId, participants.size());
         var action = new BusinessBroadcastListActionBuilder()
                 .participants(participants)
                 .listName(listName)
@@ -143,6 +151,7 @@ public final class BusinessBroadcastListMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "getDeleteBroadcastListMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getDeleteBroadcastListMutation(String listId, Instant timestamp) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building business broadcast list delete mutation id={0}", listId);
         var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)
                 .build();

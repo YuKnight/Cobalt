@@ -12,7 +12,6 @@ import com.github.auties00.cobalt.bot.LiveBotCertificateRevocationService;
 import com.github.auties00.cobalt.bot.LiveBotSignatureVerificationService;
 import com.github.auties00.cobalt.calls.CallsService;
 import com.github.auties00.cobalt.calls.LiveCallsService;
-import com.github.auties00.cobalt.calls.engine.EngineAssembler;
 import com.github.auties00.cobalt.calls.stream.AudioInput;
 import com.github.auties00.cobalt.calls.stream.AudioOutput;
 import com.github.auties00.cobalt.calls.stream.VideoInput;
@@ -24,37 +23,46 @@ import com.github.auties00.cobalt.ctwa.LiveCtwaConversionSignalService;
 import com.github.auties00.cobalt.device.DeviceService;
 import com.github.auties00.cobalt.device.LiveDeviceService;
 import com.github.auties00.cobalt.exception.*;
+import com.github.auties00.cobalt.exception.linked.*;
+import com.github.auties00.cobalt.exception.linked.web.*;
 import com.github.auties00.cobalt.export.ChatExporterService;
 import com.github.auties00.cobalt.export.LiveChatExporterService;
 import com.github.auties00.cobalt.graphql.FacebookGraphQlClient;
 import com.github.auties00.cobalt.graphql.WhatsAppGraphQlClient;
+import com.github.auties00.cobalt.graphql.WhatsAppWebGraphQlClient;
 import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
-import com.github.auties00.cobalt.graphql.facebook.ads.*;
-import com.github.auties00.cobalt.graphql.facebook.business.BizAiToolsTileEligibilityFacebookGraphQlRequest;
-import com.github.auties00.cobalt.graphql.facebook.business.BizAiToolsTileEligibilityFacebookGraphQlResponse;
-import com.github.auties00.cobalt.graphql.facebook.group.BizAdManagementHeaderButtonGroupBillingInfoProfileSectionFacebookGraphQlRequest;
-import com.github.auties00.cobalt.graphql.facebook.group.BizAdManagementHeaderButtonGroupBillingInfoProfileSectionFacebookGraphQlResponse;
-import com.github.auties00.cobalt.graphql.facebook.misc.*;
+import com.github.auties00.cobalt.graphql.whatsappWeb.auth.*;
+import com.github.auties00.cobalt.graphql.whatsappWeb.business.*;
+import com.github.auties00.cobalt.graphql.whatsappWeb.misc.*;
+import com.github.auties00.cobalt.graphql.whatsappWeb.promotion.*;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
-import com.github.auties00.cobalt.graphql.whatsapp.acs.AcsServerProviderConfigWhatsAppGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsapp.acs.AcsServerProviderConfigWhatsAppGraphQlResponse;
-import com.github.auties00.cobalt.graphql.whatsapp.acs.AcsServerProviderIssuanceWhatsAppGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsapp.acs.AcsServerProviderIssuanceWhatsAppGraphQlResponse;
+import com.github.auties00.cobalt.graphql.facebook.ads.*;
+import com.github.auties00.cobalt.graphql.facebook.auth.*;
+import com.github.auties00.cobalt.graphql.facebook.business.*;
+import com.github.auties00.cobalt.graphql.facebook.promotion.*;
 import com.github.auties00.cobalt.graphql.whatsapp.ads.*;
 import com.github.auties00.cobalt.graphql.whatsapp.auth.*;
 import com.github.auties00.cobalt.graphql.whatsapp.business.*;
-import com.github.auties00.cobalt.graphql.whatsapp.group.GroupSuspensionAppealWhatsAppGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsapp.group.GroupSuspensionAppealWhatsAppGraphQlResponse;
 import com.github.auties00.cobalt.graphql.whatsapp.misc.*;
-import com.github.auties00.cobalt.graphql.whatsapp.promotion.*;
-import com.github.auties00.cobalt.graphql.whatsapp.user.FetchBotProfilesGqlWhatsAppGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsapp.user.FetchBotProfilesGqlWhatsAppGraphQlResponse;
-import com.github.auties00.cobalt.graphql.whatsapp.user.SupportContactFormSubmitWhatsAppGraphQlRequest;
-import com.github.auties00.cobalt.graphql.whatsapp.user.SupportContactFormSubmitWhatsAppGraphQlResponse;
+import com.github.auties00.cobalt.graphql.facebook.group.BizAdManagementHeaderButtonGroupBillingInfoProfileSectionFacebookGraphQlRequest;
+import com.github.auties00.cobalt.graphql.facebook.group.BizAdManagementHeaderButtonGroupBillingInfoProfileSectionFacebookGraphQlResponse;
+import com.github.auties00.cobalt.graphql.facebook.misc.*;
+import com.github.auties00.cobalt.graphql.whatsappWeb.WhatsAppWebGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsappWeb.acs.AcsServerProviderConfigWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.graphql.whatsappWeb.acs.AcsServerProviderConfigWhatsAppWebGraphQlResponse;
+import com.github.auties00.cobalt.graphql.whatsappWeb.acs.AcsServerProviderIssuanceWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.graphql.whatsappWeb.acs.AcsServerProviderIssuanceWhatsAppWebGraphQlResponse;
+import com.github.auties00.cobalt.graphql.whatsappWeb.group.GroupSuspensionAppealWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.graphql.whatsappWeb.group.GroupSuspensionAppealWhatsAppWebGraphQlResponse;
+import com.github.auties00.cobalt.graphql.whatsappWeb.user.FetchBotProfilesGqlWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.graphql.whatsappWeb.user.FetchBotProfilesGqlWhatsAppWebGraphQlResponse;
+import com.github.auties00.cobalt.graphql.whatsappWeb.user.SupportContactFormSubmitWhatsAppWebGraphQlRequest;
+import com.github.auties00.cobalt.graphql.whatsappWeb.user.SupportContactFormSubmitWhatsAppWebGraphQlResponse;
 import com.github.auties00.cobalt.listener.*;
 import com.github.auties00.cobalt.listener.linked.*;
 import com.github.auties00.cobalt.listener.linked.internal.InternalLinkedListener;
 import com.github.auties00.cobalt.listener.linked.internal.LinkedTrustedContactTokenListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.LiveMediaConnectionService;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.transcode.LiveMediaTranscoderService;
@@ -348,6 +356,7 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.http.HttpClient;
@@ -459,6 +468,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * before raising {@link WhatsAppFacebookGraphQlException.SilentNonceTimeout}.
      */
     private static final Duration FACEBOOK_GRAPHQL_NONCE_TIMEOUT = Duration.ofSeconds(15);
+
+    /** The logger for {@link LiveLinkedWhatsAppClient}. */
+    private static final System.Logger LOGGER = Log.get(LiveLinkedWhatsAppClient.class);
 
     /**
      * The persisted session state (credentials, chats, contacts, Signal
@@ -1099,12 +1111,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         this.companionPairingService = new LiveCompanionPairingService(this, webVerificationHandler);
         this.shortcakePairingService = new LiveShortcakePairingService(this, webVerificationHandler, passkeyAuthenticator);
         var calls2EventBus = new com.github.auties00.cobalt.calls.engine.event.LiveCallEventBus(this);
-        var calls2Engine = EngineAssembler.assemble(this, messageEncryption, messageService, deviceService, store, abPropsService, calls2EventBus);
         this.calls2CallLogSync = new CallLogSync(this, callLogMutationFactory, webAppStateService);
-        calls2Engine.bindCallLogSink(calls2CallLogSync::recordEndOfCall);
-        var liveCalls2Service = new LiveCallsService(this, wamService, messageService, calls2Engine, calls2EventBus);
-        this.callsService = liveCalls2Service;
-        calls2Engine.bindResultSink(liveCalls2Service::recordCallResult);
+        this.callsService = new LiveCallsService(this, wamService, messageService, messageEncryption, deviceService, store, abPropsService, calls2EventBus, calls2CallLogSync);
         var ackSender = new AckSender(this);
         this.nodeStreamService = new LiveNodeStreamService(this, callsService, webVerificationHandler, lidMigrationService, inactiveGroupLidMigrationService, messageService, abPropsService, deviceService, wamService, snapshotRecoveryService, webAppStateService, companionPairingService, shortcakePairingService, ackSender, mediaConnectionService, tosService, quarantineService, passkeyAuthenticator);
         this.disconnecting = new AtomicBoolean();
@@ -1155,9 +1163,11 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         if (isConnected()) {
             throw new IllegalStateException("Client is already connected");
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "connecting, reason={0}", reason);
         try {
             openSocket(reason);
         } catch (IOException throwable) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "connect failed", throwable);
             handleFailure(new WhatsAppConnectionException(throwable.getMessage(), throwable));
             return;
         }
@@ -1168,6 +1178,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             Runtime.getRuntime().addShutdownHook(shutdownHook);
         }
         onSocketOpened();
+        if (Log.INFO) LOGGER.log(Level.INFO, "connected");
     }
 
     /**
@@ -1242,8 +1253,15 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @throws IOException if the socket cannot be opened
      */
     private void reconnectAttempt() throws IOException {
-        openSocket(WhatsAppClientDisconnectReason.RECONNECTING);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reconnect attempt");
+        try {
+            openSocket(WhatsAppClientDisconnectReason.RECONNECTING);
+        } catch (IOException throwable) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "reconnect attempt failed", throwable);
+            throw throwable;
+        }
         onSocketOpened();
+        if (Log.INFO) LOGGER.log(Level.INFO, "reconnected");
     }
 
     /**
@@ -1260,6 +1278,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         // genuine later drop can drive a fresh reconnect, without clobbering a terminal state.
         state.compareAndSet(ConnectionState.RECONNECTING, ConnectionState.ACTIVE);
         if (state.get() == ConnectionState.TERMINATED) {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "socket opened while session terminated, skipping keepalive start");
             return;
         }
         keepAliveService.start();
@@ -1347,6 +1367,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @param stanza the inbound stanza
      */
     private void onNode(Stanza stanza) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "received stanza: {0}", stanza);
         try {
             for (var listener : store.listeners()) {
                 if (listener instanceof LinkedNodeReceivedListener typed) {
@@ -1411,6 +1432,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      *                              removed as part of this disconnect
      */
     private void disconnect0(WhatsAppClientDisconnectReason reason, boolean canRemoveShutdownHook) {
+        if (Log.INFO) LOGGER.log(Level.INFO, "disconnecting, reason={0}", reason);
         if (reason == WhatsAppClientDisconnectReason.RECONNECTING) {
             // A terminal disconnect (logout/ban/disconnect) that already ran wins over any
             // later reconnect request, so a reader-loop EOF or onClose racing in behind it
@@ -1552,10 +1574,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         }
 
         if (flushThread.isAlive()) {
-            System.getLogger(LiveLinkedWhatsAppClient.class.getName())
-                    .log(System.Logger.Level.WARNING,
-                            "Sentinel flush did not complete within {0}ms, proceeding with disconnect",
-                            timeoutMs);
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING,
+                        "sentinel flush did not complete within {0}ms, proceeding with disconnect",
+                        timeoutMs);
         }
     }
 
@@ -1584,11 +1606,16 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         // of dereferencing the cleared socket.
         var client = socketClient;
         if (state.get() == ConnectionState.TERMINATED || client == null) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "cannot send stanza with no response, session is closed");
             throw new WhatsAppSessionException.Closed();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending stanza with no response: {0}", stanza);
         try {
             client.sendNode(stanza);
         } catch (IOException exception) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "failed to send stanza with no response", exception);
             throw new WhatsAppSessionException.Closed();
         }
         for (var listener : store.listeners()) {
@@ -1638,11 +1665,16 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .toString();
         var client = socketClient;
         if (state.get() == ConnectionState.TERMINATED || client == null) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "cannot send stanza id={0}, session is closed", outgoingId);
             throw new WhatsAppSessionException.Closed();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending stanza id={0}: {1}", outgoingId, outgoing);
         try {
             client.sendNode(outgoing);
         } catch (IOException exception) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "failed to send stanza id=" + outgoingId, exception);
             throw new WhatsAppSessionException.Closed();
         }
 
@@ -1654,7 +1686,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
         var request = new WhatsAppSocketStanza(outgoing, filter);
         pendingSocketRequests.put(outgoingId, request);
-        return timeout == null ? request.waitForResponse() : request.waitForResponse(timeout);
+        try {
+            return timeout == null ? request.waitForResponse() : request.waitForResponse(timeout);
+        } catch (RuntimeException exception) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "no response for stanza id=" + outgoingId, exception);
+            throw exception;
+        }
     }
 
     /**
@@ -1718,17 +1756,17 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebRelayEnvironment", exports = "getEnvironment",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public JSONObject sendGraphQl(WhatsAppGraphQlOperation.Request request, String sessionCookie, String lsdToken) {
+    public JSONObject sendGraphQl(WhatsAppWebGraphQlOperation.Request request, String sessionCookie, String lsdToken) {
         Objects.requireNonNull(request, "request cannot be null");
         Objects.requireNonNull(sessionCookie, "sessionCookie cannot be null");
         Objects.requireNonNull(lsdToken, "lsdToken cannot be null");
         var locale = store.accountStore().locale().orElse("en_US");
-        return new WhatsAppGraphQlClient(graphqlHttpClient, sessionCookie, lsdToken, locale).send(request);
+        return new WhatsAppWebGraphQlClient(graphqlHttpClient, sessionCookie, lsdToken, locale).send(request);
     }
 
     /** {@inheritDoc} */
     @Override
-    public JSONObject sendGraphQl(WhatsAppGraphQlOperation.Request request) {
+    public JSONObject sendGraphQl(WhatsAppWebGraphQlOperation.Request request) {
         Objects.requireNonNull(request, "request cannot be null");
         var session = store.webSessionStore().whatsAppWebGraphQlSession()
                 .filter(relay -> relay.sessionCookie() != null && relay.lsdToken() != null)
@@ -1780,15 +1818,20 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @throws WhatsAppWebGraphQlException.ExchangeFailed if the server rejects the canonical exchange
      */
     private WhatsAppWebGraphQlSession bootstrapAndExchange(String canonicalAccessToken, long fbid, int deviceId) {
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "bootstrapping whatsapp web graphql session, deviceId={0}", deviceId);
         var bootstrap = new WhatsAppWebGraphQlBootstrapClient();
         String lsd;
         try {
             lsd = bootstrap.fetchLsd();
         } catch (Exception exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "whatsapp web graphql lsd fetch failed", exception);
             throw new WhatsAppWebGraphQlException.LsdFetchFailed(exception);
         }
         var credentials = new CanonicalCredentials(canonicalAccessToken, fbid, null, deviceId);
         if (!bootstrap.exchange(credentials, lsd)) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "whatsapp web graphql canonical token exchange rejected");
             throw new WhatsAppWebGraphQlException.ExchangeFailed();
         }
         var refreshed = new WhatsAppWebGraphQlSessionBuilder()
@@ -1803,6 +1846,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             store.save();
         } catch (IOException ignored) {
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "whatsapp web graphql session refreshed, deviceId={0}", deviceId);
         for (var listener : store.listeners()) {
             if (listener instanceof LinkedGraphQlSessionChangedListener typed) {
                 Thread.startVirtualThread(() -> typed.onGraphQlSessionChanged(this, refreshed));
@@ -1923,15 +1967,31 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         } catch (FacebookGraphQlClient.AuthException first) {
             // WA invalidates and re-mints the CTWA token on a graph auth error, then retries once
             // (FETCH_AD_ACCOUNT_TOKEN_MAX_RETRIES = 1); a second auth failure propagates.
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "facebook graphql request {0} failed auth, re-minting token", request.name());
             store.webSessionStore().setFacebookGraphQlSession(null);
             var refreshed = refreshFacebookGraphQlSession()
                     .orElseThrow(WhatsAppFacebookGraphQlException.TokenExchangeFailed::new);
             try {
                 return sendFacebookGraphQl(request, refreshed);
             } catch (FacebookGraphQlClient.AuthException second) {
+                if (Log.ERROR)
+                    LOGGER.log(Level.ERROR, "facebook graphql request " + request.name()
+                            + " still unauthorized after token re-mint", second);
                 throw new WhatsAppServerRuntimeException("Facebook GraphQL request for " + request.name() + " still unauthorized after token re-mint", second);
             }
         }
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @WhatsAppWebExport(moduleName = "WAWebRelayEnvironment", exports = "getEnvironment",
+            adaptation = WhatsAppAdaptation.ADAPTED)
+    public JSONObject sendGraphQl(WhatsAppGraphQlOperation.Request request) {
+        Objects.requireNonNull(request, "request cannot be null");
+        var locale = store.accountStore().locale().orElse("en_US");
+        var remappedLocale = graphQLRemapLocale(locale, abPropsService.getString(ABProp.GRAPHQL_LOCALE_REMAPPING));
+        return new WhatsAppGraphQlClient(graphqlHttpClient, remappedLocale).send(request);
     }
 
     /**
@@ -2001,6 +2061,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public Optional<CtwaAccessTokenSession> refreshFacebookGraphQlSession() {
         facebookGraphQlRefreshLock.lock();
         try {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "refreshing facebook graphql session");
             var self = store.accountStore().jid().orElseThrow(WhatsAppFacebookGraphQlException.SessionUnseeded::new);
             var previousNonce = store.businessStore().businessAccountNonce().orElse(null);
             var probe = querySilentNonce(self)
@@ -2023,6 +2084,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 store.save();
             } catch (IOException ignored) {
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "facebook graphql session refreshed");
             for (var listener : store.listeners()) {
                 if (listener instanceof LinkedFacebookGraphQlSessionChangedListener typed) {
                     Thread.startVirtualThread(() -> typed.onFacebookGraphQlSessionChanged(this, session));
@@ -2177,11 +2239,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @param device the companion-device JID to unpair; never {@code null}
      */
     private void dispatchUnpairDevice(Jid device) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dispatching unpair-device for {0}", device);
         var request = new IqUnpairDeviceRequest(device, "user_initiated");
         var requestNode = request.toStanza();
         var response = sendNode(requestNode);
         switch (IqUnpairDeviceResponse.of(response, requestNode.build()).orElse(null)) {
-            case IqUnpairDeviceResponse.Success ignored -> {}
+            case IqUnpairDeviceResponse.Success ignored -> {
+                if (Log.INFO) LOGGER.log(Level.INFO, "unpaired device {0}", device);
+            }
             case IqUnpairDeviceResponse.ClientError clientError ->
                     throw new WhatsAppServerRuntimeException("Unpair device rejected: code=" + clientError.errorCode() + ", text=" + clientError.errorText().orElse(null));
             case IqUnpairDeviceResponse.ServerError serverError ->
@@ -2211,6 +2276,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         }
         var snapshot = List.copyOf(result);
         store.accountStore().setLinkedDevices(snapshot);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "refreshed linked devices, count={0}", snapshot.size());
         for (var listener : store.listeners()) {
             if (listener instanceof LinkedDevicesListener typed) {
                 typed.onLinkedDevices(this, snapshot);
@@ -2253,8 +2319,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         // while the server tears the stream down, an in-flight stanza timing out) are noise:
         // acting on them would re-enter the reconnect loop the terminal disconnect just left.
         if (state.get() == ConnectionState.TERMINATED) {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "ignoring failure after session terminated: {0}",
+                        exception.getClass().getSimpleName());
             return;
         }
+        if (Log.ERROR)
+            LOGGER.log(Level.ERROR, "handling failure: " + exception.getClass().getSimpleName()
+                    + " defaultResult=" + exception.toErrorResult(), exception);
         // A server-issued logout or ban ends the connection at the protocol level: reconnecting
         // is futile because the credentials are gone. Mark the session terminal synchronously,
         // before the pluggable handler runs (its logging of a stack-trace warning is slow), so a
@@ -2268,6 +2340,9 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             emitSyncdFatalErrorMetric(syncdException);
         }
         var result = errorHandler.handleError(this, exception);
+        if (Log.WARNING)
+            LOGGER.log(Level.WARNING, "error handler result {0} for {1}", result,
+                    exception.getClass().getSimpleName());
         switch (result) {
             // Mark terminal before disconnecting so a concurrent reader-loop onClose
             // sees the state and does not reconnect ahead of this teardown.
@@ -3659,6 +3734,24 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
     /** {@inheritDoc} */
     @Override
+    public Call startCall(JidProvider targetProvider, VideoOutput videoOut, VideoInput videoIn) {
+        return startCall(targetProvider, videoOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call startCall(JidProvider targetProvider, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        return startCall(targetProvider, audioOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call startCall(JidProvider targetProvider, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
+        return startCall(targetProvider, videoOut, audioIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipFunctions", exports = "acceptCall",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn,
@@ -3672,6 +3765,24 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn) {
         return acceptCall(offer, audioOut, audioIn, null, null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call acceptCall(IncomingCall offer, VideoOutput videoOut, VideoInput videoIn) {
+        return acceptCall(offer, videoOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call acceptCall(IncomingCall offer, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        return acceptCall(offer, audioOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call acceptCall(IncomingCall offer, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
+        return acceptCall(offer, videoOut, audioIn, videoOut, videoIn);
     }
 
     /** {@inheritDoc} */
@@ -4313,6 +4424,24 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
     /** {@inheritDoc} */
     @Override
+    public Call joinCallLink(URI link, VideoOutput videoOut, VideoInput videoIn) {
+        return joinCallLink(link, videoOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinCallLink(URI link, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        return joinCallLink(link, audioOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinCallLink(URI link, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
+        return joinCallLink(link, videoOut, audioIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
     @WhatsAppWebExport(moduleName = "WAWebVoipStartCall", exports = "joinOngoingCallByCallId",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn,
@@ -4330,6 +4459,24 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn) {
         return joinGroupCall(call, audioOut, audioIn, null, null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinGroupCall(IncomingCall call, VideoOutput videoOut, VideoInput videoIn) {
+        return joinGroupCall(call, videoOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinGroupCall(IncomingCall call, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        return joinGroupCall(call, audioOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinGroupCall(IncomingCall call, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
+        return joinGroupCall(call, videoOut, audioIn, videoOut, videoIn);
     }
 
     /** {@inheritDoc} */
@@ -4361,6 +4508,24 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn) {
         return joinGroupCall(group, audioOut, audioIn, null, null);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinGroupCall(JidProvider group, VideoOutput videoOut, VideoInput videoIn) {
+        return joinGroupCall(group, videoOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinGroupCall(JidProvider group, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        return joinGroupCall(group, audioOut, videoIn, videoOut, videoIn);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Call joinGroupCall(JidProvider group, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
+        return joinGroupCall(group, videoOut, audioIn, videoOut, videoIn);
     }
 
     /**
@@ -8070,6 +8235,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var jid = Objects.requireNonNull(jidProvider, "jid cannot be null").toJid();
         Objects.requireNonNull(container, "container cannot be null");
         var ack = messageService.send(jid, container);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent message id={0} to {1}", ack.id(), jid);
         recordSentMessageActivity(jid, container);
         return new MessageKeyBuilder()
                 .parentJid(jid)
@@ -8136,6 +8302,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public void sendMessage(MessageInfo messageInfo) {
         Objects.requireNonNull(messageInfo, "messageInfo cannot be null");
         messageService.send(messageInfo);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent message id={0}", messageInfo.key().id());
     }
 
     /** {@inheritDoc} */
@@ -11248,17 +11415,16 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                     try {
                         shadow = refreshPrivacySettingsViaMex(meDeviceLid, false);
                     } catch (RuntimeException exception) {
-                        System.getLogger(LiveLinkedWhatsAppClient.class.getName())
-                                .log(System.Logger.Level.WARNING,
-                                        "MEX privacy-settings shadow read failed: {0}", exception.getMessage());
+                        if (Log.WARNING)
+                            LOGGER.log(Level.WARNING, "mex privacy-settings shadow read failed", exception);
                     }
                 }
                 var authoritative = refreshPrivacySettingsViaIq();
                 if (shadow != null && !shadow.equals(authoritative)) {
-                    System.getLogger(LiveLinkedWhatsAppClient.class.getName())
-                            .log(System.Logger.Level.WARNING,
-                                    "MEX privacy-settings shadow result diverged from IQ result: mex={0}, iq={1}",
-                                    shadow, authoritative);
+                    if (Log.WARNING)
+                        LOGGER.log(Level.WARNING,
+                                "mex privacy-settings shadow result diverged from iq result: mex.size={0}, iq.size={1}",
+                                shadow.size(), authoritative.size());
                 }
                 yield authoritative;
             }
@@ -14464,10 +14630,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public boolean uploadMedia(MediaProvider provider, InputStream inputStream) {
         Objects.requireNonNull(provider, "provider cannot be null");
         Objects.requireNonNull(inputStream, "inputStream cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "uploading media from input stream");
         try (var payload = mediaTranscoderService.transcode(provider, inputStream)) {
-            return mediaConnectionService.upload(provider, payload);
+            var uploaded = mediaConnectionService.upload(provider, payload);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "media upload finished, success={0}", uploaded);
+            return uploaded;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "media upload interrupted", interrupted);
             throw new WhatsAppMediaException.Connection("Interrupted while awaiting media connection", interrupted);
         }
     }
@@ -14479,10 +14649,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public boolean uploadMedia(MediaProvider provider, Path source) {
         Objects.requireNonNull(provider, "provider cannot be null");
         Objects.requireNonNull(source, "source cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "uploading media from file");
         try (var payload = mediaTranscoderService.transcode(provider, source)) {
-            return mediaConnectionService.upload(provider, payload);
+            var uploaded = mediaConnectionService.upload(provider, payload);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "media upload finished, success={0}", uploaded);
+            return uploaded;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "media upload interrupted", interrupted);
             throw new WhatsAppMediaException.Connection("Interrupted while awaiting media connection", interrupted);
         }
     }
@@ -14493,12 +14667,16 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public InputStream downloadMedia(MediaProvider provider) {
         var downloadStartNanos = System.nanoTime();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "downloading media");
         try {
             var stream = mediaConnectionService.download(provider);
-            emitStickerLatencyIfApplicable(provider, (System.nanoTime() - downloadStartNanos) / 1_000_000L);
+            var elapsedMs = (System.nanoTime() - downloadStartNanos) / 1_000_000L;
+            emitStickerLatencyIfApplicable(provider, elapsedMs);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "media download finished, elapsedMs={0}", elapsedMs);
             return stream;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "media download interrupted", interrupted);
             throw new WhatsAppMediaException.Connection("Interrupted while awaiting media connection", interrupted);
         }
     }
@@ -18088,8 +18266,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
 
     /** {@inheritDoc} */
     @Override
-    public Optional<BusinessProduct> addCatalogProduct(JidProvider bizJid, String productInfoJson) {
-        return addCatalogProduct(new BusinessCatalogProductCreate(bizJid, null, null, productInfoJson));
+    public Optional<BusinessProduct> addCatalogProduct(JidProvider bizJid, CatalogProductInfo productInfo) {
+        return addCatalogProduct(new BusinessCatalogProductCreate(bizJid, null, null, productInfo));
     }
 
     /** {@inheritDoc} */
@@ -18098,19 +18276,19 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessProduct> addCatalogProduct(BusinessCatalogProductCreate input) {
         Objects.requireNonNull(input, "input cannot be null");
-        var request = new BizCatalogManagementAddProductWhatsAppGraphQlRequest(input.businessJid(),
+        var request = new BizCatalogManagementAddProductFacebookGraphQlRequest(input.businessJid(),
                 input.thumbnailWidth().isPresent() ? input.thumbnailWidth().getAsInt() : null,
                 input.thumbnailHeight().isPresent() ? input.thumbnailHeight().getAsInt() : null,
-                input.productInfoJson().orElse(null));
+                input.productInfo().orElse(null));
         var response = sendGraphQl(request);
-        return BizCatalogManagementAddProductWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementAddProductWhatsAppGraphQlResponse::product);
+        return BizCatalogManagementAddProductFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementAddProductFacebookGraphQlResponse::product);
     }
 
     /** {@inheritDoc} */
     @Override
-    public Optional<BusinessProduct> editCatalogProduct(JidProvider bizJid, String productId, String productInfoJson) {
-        return editCatalogProduct(new BusinessCatalogProductEdit(bizJid, productId, null, null, productInfoJson));
+    public Optional<BusinessProduct> editCatalogProduct(JidProvider bizJid, String productId, CatalogProductInfo productInfo) {
+        return editCatalogProduct(new BusinessCatalogProductEdit(bizJid, productId, null, null, productInfo));
     }
 
     /** {@inheritDoc} */
@@ -18119,13 +18297,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessProduct> editCatalogProduct(BusinessCatalogProductEdit input) {
         Objects.requireNonNull(input, "input cannot be null");
-        var request = new BizCatalogManagementEditProductWhatsAppGraphQlRequest(input.businessJid(), input.productId(),
+        var request = new BizCatalogManagementEditProductFacebookGraphQlRequest(input.businessJid(), input.productId(),
                 input.thumbnailWidth().isPresent() ? input.thumbnailWidth().getAsInt() : null,
                 input.thumbnailHeight().isPresent() ? input.thumbnailHeight().getAsInt() : null,
-                input.productInfoJson().orElse(null));
+                input.productInfo().orElse(null));
         var response = sendGraphQl(request);
-        return BizCatalogManagementEditProductWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementEditProductWhatsAppGraphQlResponse::product);
+        return BizCatalogManagementEditProductFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementEditProductFacebookGraphQlResponse::product);
     }
 
     /** {@inheritDoc} */
@@ -18135,10 +18313,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public Optional<BusinessCatalogMutationResult> deleteCatalogProduct(JidProvider bizJid, List<String> productIds) {
         var jid = Objects.requireNonNull(bizJid, "bizJid cannot be null").toJid();
         Objects.requireNonNull(productIds, "productIds cannot be null");
-        var request = new BizCatalogManagementDeleteProductWhatsAppGraphQlRequest(jid, productIds);
+        var request = new BizCatalogManagementDeleteProductFacebookGraphQlRequest(jid, productIds);
         var response = sendGraphQl(request);
-        return BizCatalogManagementDeleteProductWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementDeleteProductWhatsAppGraphQlResponse::result);
+        return BizCatalogManagementDeleteProductFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementDeleteProductFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18153,10 +18331,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessCatalogMutationResult> createCatalog(JidProvider bizJid, String platform) {
         var jid = Objects.requireNonNull(bizJid, "bizJid cannot be null").toJid();
-        var request = new BizCatalogManagementCreateCatalogWhatsAppGraphQlRequest(jid, platform);
+        var request = new BizCatalogManagementCreateCatalogFacebookGraphQlRequest(jid, platform);
         var response = sendGraphQl(request);
-        return BizCatalogManagementCreateCatalogWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementCreateCatalogWhatsAppGraphQlResponse::result);
+        return BizCatalogManagementCreateCatalogFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementCreateCatalogFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18171,11 +18349,11 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessProductCollection> createCatalogCollection(BusinessCatalogCollectionCreate input) {
         Objects.requireNonNull(input, "input cannot be null");
-        var request = new BizCatalogManagementCreateCollectionWhatsAppGraphQlRequest(input.name(), input.productIds(),
+        var request = new BizCatalogManagementCreateCollectionFacebookGraphQlRequest(input.name(), input.productIds(),
                 input.businessJid(), input.catalogSessionId().orElse(null));
         var response = sendGraphQl(request);
-        return BizCatalogManagementCreateCollectionWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementCreateCollectionWhatsAppGraphQlResponse::collection);
+        return BizCatalogManagementCreateCollectionFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementCreateCollectionFacebookGraphQlResponse::collection);
     }
 
     /** {@inheritDoc} */
@@ -18185,10 +18363,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public Optional<BusinessCatalogMutationResult> deleteCatalogCollections(List<String> collectionIds, JidProvider bizJid, String catalogSessionId) {
         Objects.requireNonNull(collectionIds, "collectionIds cannot be null");
         var jid = Objects.requireNonNull(bizJid, "bizJid cannot be null").toJid();
-        var request = new BizCatalogManagementDeleteCollectionsWhatsAppGraphQlRequest(collectionIds, jid, catalogSessionId);
+        var request = new BizCatalogManagementDeleteCollectionsFacebookGraphQlRequest(collectionIds, jid, catalogSessionId);
         var response = sendGraphQl(request);
-        return BizCatalogManagementDeleteCollectionsWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementDeleteCollectionsWhatsAppGraphQlResponse::result);
+        return BizCatalogManagementDeleteCollectionsFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementDeleteCollectionsFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18197,12 +18375,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessProductCollection> updateCatalogCollection(BusinessCatalogCollectionEdit input) {
         Objects.requireNonNull(input, "input cannot be null");
-        var request = new BizCatalogManagementUpdateCollectionWhatsAppGraphQlRequest(input.collectionId(),
+        var request = new BizCatalogManagementUpdateCollectionFacebookGraphQlRequest(input.collectionId(),
                 input.businessJid(), input.catalogSessionId().orElse(null),
                 input.name().orElse(null), input.productsToAdd(), input.productsToRemove());
         var response = sendGraphQl(request);
-        return BizCatalogManagementUpdateCollectionWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementUpdateCollectionWhatsAppGraphQlResponse::collection);
+        return BizCatalogManagementUpdateCollectionFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementUpdateCollectionFacebookGraphQlResponse::collection);
     }
 
     /** {@inheritDoc} */
@@ -18213,12 +18391,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var jid = Objects.requireNonNull(bizJid, "bizJid cannot be null").toJid();
         Objects.requireNonNull(moves, "moves cannot be null");
         var wireMoves = moves.stream()
-                .map(move -> new BizCatalogManagementUpdateCollectionListWhatsAppGraphQlRequest.Move(move.collectionId(), move.fromIndex(), move.toIndex()))
+                .map(move -> new BizCatalogManagementUpdateCollectionListFacebookGraphQlRequest.Move(move.collectionId(), move.fromIndex(), move.toIndex()))
                 .toList();
-        var request = new BizCatalogManagementUpdateCollectionListWhatsAppGraphQlRequest(jid, wireMoves);
+        var request = new BizCatalogManagementUpdateCollectionListFacebookGraphQlRequest(jid, wireMoves);
         var response = sendGraphQl(request);
-        return BizCatalogManagementUpdateCollectionListWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementUpdateCollectionListWhatsAppGraphQlResponse::result);
+        return BizCatalogManagementUpdateCollectionListFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementUpdateCollectionListFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18229,10 +18407,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var bizJid = Objects.requireNonNull(jid, "jid cannot be null").toJid();
         Objects.requireNonNull(productId, "productId cannot be null");
         Objects.requireNonNull(reason, "reason cannot be null");
-        var request = new BizCatalogManagementAppealProductWhatsAppGraphQlRequest(bizJid, productId, reason);
+        var request = new BizCatalogManagementAppealProductFacebookGraphQlRequest(bizJid, productId, reason);
         var response = sendGraphQl(request);
-        return BizCatalogManagementAppealProductWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementAppealProductWhatsAppGraphQlResponse::result);
+        return BizCatalogManagementAppealProductFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementAppealProductFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18243,10 +18421,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         Objects.requireNonNull(productSetId, "productSetId cannot be null");
         var bizJid = Objects.requireNonNull(jid, "jid cannot be null").toJid();
         Objects.requireNonNull(reason, "reason cannot be null");
-        var request = new BizCatalogManagementAppealCollectionWhatsAppGraphQlRequest(productSetId, bizJid, reason);
+        var request = new BizCatalogManagementAppealCollectionFacebookGraphQlRequest(productSetId, bizJid, reason);
         var response = sendGraphQl(request);
-        return BizCatalogManagementAppealCollectionWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementAppealCollectionWhatsAppGraphQlResponse::result);
+        return BizCatalogManagementAppealCollectionFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementAppealCollectionFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18255,10 +18433,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean updateCatalogCommerceSettings(JidProvider bizJid, boolean cartEnabled) {
         var jid = Objects.requireNonNull(bizJid, "bizJid cannot be null").toJid();
-        var request = new BizCatalogManagementUpdateCommerceSettingsWhatsAppGraphQlRequest(jid, cartEnabled);
+        var request = new BizCatalogManagementUpdateCommerceSettingsFacebookGraphQlRequest(jid, cartEnabled);
         var response = sendGraphQl(request);
-        return BizCatalogManagementUpdateCommerceSettingsWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementUpdateCommerceSettingsWhatsAppGraphQlResponse::cartEnabled)
+        return BizCatalogManagementUpdateCommerceSettingsFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementUpdateCommerceSettingsFacebookGraphQlResponse::cartEnabled)
                 .orElse(false);
     }
 
@@ -18270,12 +18448,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var bizJid = Objects.requireNonNull(jid, "jid cannot be null").toJid();
         Objects.requireNonNull(products, "products cannot be null");
         var wireProducts = products.stream()
-                .map(product -> new BizCatalogManagementUpdateProductVisibilityWhatsAppGraphQlRequest.Product(product.productId(), product.hidden()))
+                .map(product -> new BizCatalogManagementUpdateProductVisibilityFacebookGraphQlRequest.Product(product.productId(), product.hidden()))
                 .toList();
-        var request = new BizCatalogManagementUpdateProductVisibilityWhatsAppGraphQlRequest(bizJid, wireProducts);
+        var request = new BizCatalogManagementUpdateProductVisibilityFacebookGraphQlRequest(bizJid, wireProducts);
         var response = sendGraphQl(request);
-        return BizCatalogManagementUpdateProductVisibilityWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementUpdateProductVisibilityWhatsAppGraphQlResponse::result);
+        return BizCatalogManagementUpdateProductVisibilityFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementUpdateProductVisibilityFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18291,7 +18469,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public Optional<BusinessCatalogPage> fetchCatalog(JidProvider jid, CatalogFetchOptions options) {
         var bizJid = Objects.requireNonNull(jid, "jid cannot be null").toJid();
         Objects.requireNonNull(options, "options cannot be null");
-        var request = new BizCatalogManagementFetchCatalogWhatsAppGraphQlRequest(
+        var request = new BizCatalogManagementFetchCatalogFacebookGraphQlRequest(
                 bizJid,
                 options.afterCursor().orElse(null),
                 stringDimension(options.limit()),
@@ -18305,8 +18483,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 stringDimension(options.variantThumbnailWidth()),
                 options.platform().orElse(null));
         var response = sendGraphQl(request);
-        return BizCatalogManagementFetchCatalogWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementFetchCatalogWhatsAppGraphQlResponse::catalog);
+        return BizCatalogManagementFetchCatalogFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementFetchCatalogFacebookGraphQlResponse::catalog);
     }
 
     /** {@inheritDoc} */
@@ -18322,7 +18500,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public Optional<BusinessCatalogCollections> fetchCatalogCollections(JidProvider bizJid, CatalogFetchOptions options) {
         var jid = Objects.requireNonNull(bizJid, "bizJid cannot be null").toJid();
         Objects.requireNonNull(options, "options cannot be null");
-        var request = new BizCatalogManagementFetchCollectionsWhatsAppGraphQlRequest(
+        var request = new BizCatalogManagementFetchCollectionsFacebookGraphQlRequest(
                 jid,
                 options.afterCursor().orElse(null),
                 stringDimension(options.limit()),
@@ -18334,8 +18512,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 stringDimension(options.variantThumbnailHeight()),
                 stringDimension(options.variantThumbnailWidth()));
         var response = sendGraphQl(request);
-        return BizCatalogManagementFetchCollectionsWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementFetchCollectionsWhatsAppGraphQlResponse::collections);
+        return BizCatalogManagementFetchCollectionsFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementFetchCollectionsFacebookGraphQlResponse::collections);
     }
 
     /** {@inheritDoc} */
@@ -18352,7 +18530,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var bizJid = Objects.requireNonNull(jid, "jid cannot be null").toJid();
         Objects.requireNonNull(productId, "productId cannot be null");
         Objects.requireNonNull(options, "options cannot be null");
-        var request = new BizCatalogManagementFetchProductWhatsAppGraphQlRequest(
+        var request = new BizCatalogManagementFetchProductFacebookGraphQlRequest(
                 bizJid,
                 productId,
                 stringDimension(options.imageWidth()),
@@ -18363,8 +18541,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 stringDimension(options.variantThumbnailHeight()),
                 stringDimension(options.variantThumbnailWidth()));
         var response = sendGraphQl(request);
-        return BizCatalogManagementFetchProductWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementFetchProductWhatsAppGraphQlResponse::product);
+        return BizCatalogManagementFetchProductFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementFetchProductFacebookGraphQlResponse::product);
     }
 
     /** {@inheritDoc} */
@@ -18381,15 +18559,15 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var bizJid = Objects.requireNonNull(jid, "jid cannot be null").toJid();
         Objects.requireNonNull(productIds, "productIds cannot be null");
         Objects.requireNonNull(options, "options cannot be null");
-        var request = new BizCatalogManagementFetchProductListWhatsAppGraphQlRequest(
+        var request = new BizCatalogManagementFetchProductListFacebookGraphQlRequest(
                 bizJid,
                 productIds,
                 stringDimension(options.imageWidth()),
                 stringDimension(options.imageHeight()),
                 options.directConnectionEncryptedInfo().orElse(null));
         var response = sendGraphQl(request);
-        return BizCatalogManagementFetchProductListWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementFetchProductListWhatsAppGraphQlResponse::products)
+        return BizCatalogManagementFetchProductListFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementFetchProductListFacebookGraphQlResponse::products)
                 .orElseGet(List::of);
     }
 
@@ -18407,7 +18585,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var jid = Objects.requireNonNull(bizJid, "bizJid cannot be null").toJid();
         Objects.requireNonNull(id, "id cannot be null");
         Objects.requireNonNull(options, "options cannot be null");
-        var request = new BizCatalogManagementFetchSingleCollectionWhatsAppGraphQlRequest(
+        var request = new BizCatalogManagementFetchSingleCollectionFacebookGraphQlRequest(
                 jid,
                 id,
                 stringDimension(options.limit()),
@@ -18419,8 +18597,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 stringDimension(options.variantThumbnailHeight()),
                 stringDimension(options.variantThumbnailWidth()));
         var response = sendGraphQl(request);
-        return BizCatalogManagementFetchSingleCollectionWhatsAppGraphQlResponse.of(response)
-                .map(BizCatalogManagementFetchSingleCollectionWhatsAppGraphQlResponse::collection);
+        return BizCatalogManagementFetchSingleCollectionFacebookGraphQlResponse.of(response)
+                .map(BizCatalogManagementFetchSingleCollectionFacebookGraphQlResponse::collection);
     }
 
     /** {@inheritDoc} */
@@ -18524,27 +18702,21 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiAbilitiesQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiAgentHome> queryAiAbilities() {
-        var request = new BizAiAbilitiesWhatsAppGraphQlRequest();
+        var request = new BizAiAbilitiesFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return BizAiAbilitiesWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiAbilitiesWhatsAppGraphQlResponse::agentHome);
+        return BizAiAbilitiesFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiAbilitiesFacebookGraphQlResponse::agentHome);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote Field shape is not yet recovered. The {@code inputJson} is passed through as an
-     * opaque pre-encoded JSON object. Replace with a typed input model once the field shape is
-     * captured via a live request.
-     */
+    /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBizAiChatHistoryCreateMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAiMutationResult> createAiChatHistory(String inputJson) {
-        var request = new BizAiChatHistoryCreateWhatsAppGraphQlRequest(inputJson);
+    public Optional<BusinessAiMutationResult> createAiChatHistory(AiChatHistoryUploadRequest input) {
+        var request = new BizAiChatHistoryCreateFacebookGraphQlRequest(input);
         var response = sendGraphQl(request);
-        return BizAiChatHistoryCreateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiChatHistoryCreateWhatsAppGraphQlResponse::result);
+        return BizAiChatHistoryCreateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiChatHistoryCreateFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18558,10 +18730,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiExampleResponseDeleteMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> deleteAiExampleResponses(List<String> knowledgeTypesToDelete, List<String> faqIds) {
-        var request = new BizAiExampleResponseDeleteWhatsAppGraphQlRequest(knowledgeTypesToDelete, faqIds);
+        var request = new BizAiExampleResponseDeleteFacebookGraphQlRequest(knowledgeTypesToDelete, faqIds);
         var response = sendGraphQl(request);
-        return BizAiExampleResponseDeleteWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiExampleResponseDeleteWhatsAppGraphQlResponse::result);
+        return BizAiExampleResponseDeleteFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiExampleResponseDeleteFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18569,21 +18741,21 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiExampleResponsesQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiAgentHome> queryAiExampleResponses() {
-        var request = new BizAiExampleResponsesWhatsAppGraphQlRequest();
+        var request = new BizAiExampleResponsesFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return BizAiExampleResponsesWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiExampleResponsesWhatsAppGraphQlResponse::agentHome);
+        return BizAiExampleResponsesFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiExampleResponsesFacebookGraphQlResponse::agentHome);
     }
 
     /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBizAiExampleResponseUpdateMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAiMutationResult> updateAiExampleResponses(String faqJson) {
-        var request = new BizAiExampleResponseUpdateWhatsAppGraphQlRequest(faqJson);
+    public Optional<BusinessAiMutationResult> updateAiExampleResponses(List<AiFaqEntry> faq) {
+        var request = new BizAiExampleResponseUpdateFacebookGraphQlRequest(faq);
         var response = sendGraphQl(request);
-        return BizAiExampleResponseUpdateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiExampleResponseUpdateWhatsAppGraphQlResponse::result);
+        return BizAiExampleResponseUpdateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiExampleResponseUpdateFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18597,10 +18769,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiKnowledgeReviewQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiKnowledgeReview> queryAiKnowledgeReview(Instant timestamp) {
-        var request = new BizAiKnowledgeReviewWhatsAppGraphQlRequest(timestamp);
+        var request = new BizAiKnowledgeReviewFacebookGraphQlRequest(timestamp);
         var response = sendGraphQl(request);
-        return BizAiKnowledgeReviewWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiKnowledgeReviewWhatsAppGraphQlResponse::knowledgeReview);
+        return BizAiKnowledgeReviewFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiKnowledgeReviewFacebookGraphQlResponse::knowledgeReview);
     }
 
     /** {@inheritDoc} */
@@ -18608,10 +18780,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiKnowledgeReviewCommitMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> commitAiKnowledgeReview(List<String> ids) {
-        var request = new BizAiKnowledgeReviewCommitWhatsAppGraphQlRequest(ids);
+        var request = new BizAiKnowledgeReviewCommitFacebookGraphQlRequest(ids);
         var response = sendGraphQl(request);
-        return BizAiKnowledgeReviewCommitWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiKnowledgeReviewCommitWhatsAppGraphQlResponse::result);
+        return BizAiKnowledgeReviewCommitFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiKnowledgeReviewCommitFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18619,10 +18791,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiKnowledgeReviewDeleteMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> deleteAiPendingKnowledge(String id) {
-        var request = new BizAiKnowledgeReviewDeleteWhatsAppGraphQlRequest(id);
+        var request = new BizAiKnowledgeReviewDeleteFacebookGraphQlRequest(id);
         var response = sendGraphQl(request);
-        return BizAiKnowledgeReviewDeleteWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiKnowledgeReviewDeleteWhatsAppGraphQlResponse::result);
+        return BizAiKnowledgeReviewDeleteFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiKnowledgeReviewDeleteFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18630,10 +18802,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiKnowledgeSourceDeleteMutationChatHistoryMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> deleteAiChatHistorySource() {
-        var request = new BizAiKnowledgeSourceDeleteMutationChatHistoryWhatsAppGraphQlRequest();
+        var request = new BizAiKnowledgeSourceDeleteMutationChatHistoryFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return BizAiKnowledgeSourceDeleteMutationChatHistoryWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiKnowledgeSourceDeleteMutationChatHistoryWhatsAppGraphQlResponse::result);
+        return BizAiKnowledgeSourceDeleteMutationChatHistoryFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiKnowledgeSourceDeleteMutationChatHistoryFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18641,10 +18813,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiKnowledgeSourceDeleteMutationWebsiteMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> deleteAiWebsiteSource(String websiteDataSourceId) {
-        var request = new BizAiKnowledgeSourceDeleteMutationWebsiteWhatsAppGraphQlRequest(websiteDataSourceId);
+        var request = new BizAiKnowledgeSourceDeleteMutationWebsiteFacebookGraphQlRequest(websiteDataSourceId);
         var response = sendGraphQl(request);
-        return BizAiKnowledgeSourceDeleteMutationWebsiteWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiKnowledgeSourceDeleteMutationWebsiteWhatsAppGraphQlResponse::result);
+        return BizAiKnowledgeSourceDeleteMutationWebsiteFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiKnowledgeSourceDeleteMutationWebsiteFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18652,10 +18824,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiKnowledgeSourceDeleteMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> deleteAiFileSource(String uploadedFileDataSourceId) {
-        var request = new BizAiKnowledgeSourceDeleteWhatsAppGraphQlRequest(uploadedFileDataSourceId);
+        var request = new BizAiKnowledgeSourceDeleteFacebookGraphQlRequest(uploadedFileDataSourceId);
         var response = sendGraphQl(request);
-        return BizAiKnowledgeSourceDeleteWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiKnowledgeSourceDeleteWhatsAppGraphQlResponse::result);
+        return BizAiKnowledgeSourceDeleteFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiKnowledgeSourceDeleteFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18663,10 +18835,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiKnowledgeSourcesQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiAgentHome> queryAiKnowledgeSources() {
-        var request = new BizAiKnowledgeSourcesWhatsAppGraphQlRequest();
+        var request = new BizAiKnowledgeSourcesFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return BizAiKnowledgeSourcesWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiKnowledgeSourcesWhatsAppGraphQlResponse::agentHome);
+        return BizAiKnowledgeSourcesFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiKnowledgeSourcesFacebookGraphQlResponse::agentHome);
     }
 
     /** {@inheritDoc} */
@@ -18674,32 +18846,32 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiKnowledgeSourceUploadMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> uploadAiKnowledgeSource(String manifoldFilePath, String userProvidedFileName) {
-        var request = new BizAiKnowledgeSourceUploadWhatsAppGraphQlRequest(manifoldFilePath, userProvidedFileName);
+        var request = new BizAiKnowledgeSourceUploadFacebookGraphQlRequest(manifoldFilePath, userProvidedFileName);
         var response = sendGraphQl(request);
-        return BizAiKnowledgeSourceUploadWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiKnowledgeSourceUploadWhatsAppGraphQlResponse::result);
+        return BizAiKnowledgeSourceUploadFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiKnowledgeSourceUploadFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBizAiLeadGenCreateMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAiLeadGenForm> createAiLeadGenFlow(String requestJson) {
-        var request = new BizAiLeadGenCreateWhatsAppGraphQlRequest(requestJson);
-        var response = sendGraphQl(request);
-        return BizAiLeadGenCreateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiLeadGenCreateWhatsAppGraphQlResponse::form);
+    public Optional<BusinessAiLeadGenForm> createAiLeadGenFlow(AiLeadGenFlowInput request) {
+        var graphQlRequest = new BizAiLeadGenCreateFacebookGraphQlRequest(request);
+        var response = sendGraphQl(graphQlRequest);
+        return BizAiLeadGenCreateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiLeadGenCreateFacebookGraphQlResponse::form);
     }
 
     /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBizAiLeadGenUpdateMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAiLeadGenForm> updateAiLeadGenFlow(String requestJson) {
-        var request = new BizAiLeadGenUpdateWhatsAppGraphQlRequest(requestJson);
-        var response = sendGraphQl(request);
-        return BizAiLeadGenUpdateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiLeadGenUpdateWhatsAppGraphQlResponse::form);
+    public Optional<BusinessAiLeadGenForm> updateAiLeadGenFlow(AiLeadGenFlowInput request) {
+        var graphQlRequest = new BizAiLeadGenUpdateFacebookGraphQlRequest(request);
+        var response = sendGraphQl(graphQlRequest);
+        return BizAiLeadGenUpdateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiLeadGenUpdateFacebookGraphQlResponse::form);
     }
 
     /** {@inheritDoc} */
@@ -18707,10 +18879,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiLeadGenDeleteMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> deleteAiLeadGenFlow(String flowId) {
-        var request = new BizAiLeadGenDeleteWhatsAppGraphQlRequest(flowId);
+        var request = new BizAiLeadGenDeleteFacebookGraphQlRequest(flowId);
         var response = sendGraphQl(request);
-        return BizAiLeadGenDeleteWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiLeadGenDeleteWhatsAppGraphQlResponse::result);
+        return BizAiLeadGenDeleteFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiLeadGenDeleteFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18718,10 +18890,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiLeadGenFormsQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<BusinessAiLeadGenForm> queryAiLeadGenForms() {
-        var request = new BizAiLeadGenFormsWhatsAppGraphQlRequest();
+        var request = new BizAiLeadGenFormsFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return BizAiLeadGenFormsWhatsAppGraphQlResponse.of(response)
-                .map(BizAiLeadGenFormsWhatsAppGraphQlResponse::forms)
+        return BizAiLeadGenFormsFacebookGraphQlResponse.of(response)
+                .map(BizAiLeadGenFormsFacebookGraphQlResponse::forms)
                 .orElseGet(List::of);
     }
 
@@ -18730,17 +18902,17 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiLeadGenMarkAllSeenMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> markAiLeadGenAllSeen(String flowId) {
-        var request = new BizAiLeadGenMarkAllSeenWhatsAppGraphQlRequest(flowId);
+        var request = new BizAiLeadGenMarkAllSeenFacebookGraphQlRequest(flowId);
         var response = sendGraphQl(request);
-        return BizAiLeadGenMarkAllSeenWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiLeadGenMarkAllSeenWhatsAppGraphQlResponse::result);
+        return BizAiLeadGenMarkAllSeenFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiLeadGenMarkAllSeenFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
     @Override
-    public Optional<BusinessAiProductInfo> createAiProductInfo(String name, String priceJson, String description) {
-        return createAiProductInfo(new BusinessAiProductInfoCreate(name, priceJson, description,
-                List.of(), null, null, null));
+    public Optional<BusinessAiProductInfo> createAiProductInfo(String name, String complexPrice, String description) {
+        return createAiProductInfo(new BusinessAiProductInfoCreate(name, complexPrice, description,
+                List.of(), List.of(), null, null));
     }
 
     /** {@inheritDoc} */
@@ -18749,13 +18921,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiProductInfo> createAiProductInfo(BusinessAiProductInfoCreate input) {
         Objects.requireNonNull(input, "input cannot be null");
-        var request = new BizAiProductInfoWhatsAppGraphQlRequest(input.name(),
-                input.priceJson().orElse(null), input.description().orElse(null),
-                input.localImageFilePaths(), input.existingImageReferencesJson().orElse(null),
+        var request = new BizAiProductInfoFacebookGraphQlRequest(input.name(),
+                input.complexPrice().orElse(null), input.description().orElse(null),
+                input.localImageFilePaths(), input.existingImages(),
                 input.thumbnailHeightPx().orElse(null), input.thumbnailWidthPx().orElse(null));
         var response = sendGraphQl(request);
-        return BizAiProductInfoWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiProductInfoWhatsAppGraphQlResponse::productInfo);
+        return BizAiProductInfoFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiProductInfoFacebookGraphQlResponse::productInfo);
     }
 
     /** {@inheritDoc} */
@@ -18764,13 +18936,13 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiProductInfo> updateAiProductInfo(BusinessAiProductInfoEdit input) {
         Objects.requireNonNull(input, "input cannot be null");
-        var request = new BizAiProductInfoMutationUpdateWhatsAppGraphQlRequest(input.productInfoId(),
+        var request = new BizAiProductInfoMutationUpdateFacebookGraphQlRequest(input.productInfoId(),
                 input.name().orElse(null), input.priceJson().orElse(null),
                 input.description().orElse(null), input.localImageFilePaths(),
                 input.imageReferences());
         var response = sendGraphQl(request);
-        return BizAiProductInfoMutationUpdateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiProductInfoMutationUpdateWhatsAppGraphQlResponse::productInfo);
+        return BizAiProductInfoMutationUpdateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiProductInfoMutationUpdateFacebookGraphQlResponse::productInfo);
     }
 
     /** {@inheritDoc} */
@@ -18778,10 +18950,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiProductInfoMutationDeleteMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<BusinessAiMutationResult> deleteAiProductInfo(List<String> ids) {
-        var request = new BizAiProductInfoMutationDeleteWhatsAppGraphQlRequest(ids);
+        var request = new BizAiProductInfoMutationDeleteFacebookGraphQlRequest(ids);
         var response = sendGraphQl(request);
-        return BizAiProductInfoMutationDeleteWhatsAppGraphQlResponse.of(response)
-                .map(BizAiProductInfoMutationDeleteWhatsAppGraphQlResponse::results)
+        return BizAiProductInfoMutationDeleteFacebookGraphQlResponse.of(response)
+                .map(BizAiProductInfoMutationDeleteFacebookGraphQlResponse::results)
                 .orElseGet(List::of);
     }
 
@@ -18790,10 +18962,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiReengagementUpdateMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> updateAiReengagement(Boolean enabled, Long amount) {
-        var request = new BizAiReengagementUpdateWhatsAppGraphQlRequest(enabled, amount);
+        var request = new BizAiReengagementUpdateFacebookGraphQlRequest(enabled, amount);
         var response = sendGraphQl(request);
-        return BizAiReengagementUpdateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiReengagementUpdateWhatsAppGraphQlResponse::result);
+        return BizAiReengagementUpdateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiReengagementUpdateFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18809,11 +18981,11 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> updateAiReplyBotEnabledTime(BusinessAiReplyBotSchedule schedule) {
         Objects.requireNonNull(schedule, "schedule cannot be null");
-        var request = new BizAiReplyBotEnabledTimeUpdateWhatsAppGraphQlRequest(schedule.enabled(),
+        var request = new BizAiReplyBotEnabledTimeUpdateFacebookGraphQlRequest(schedule.enabled(),
                 schedule.zoneIdString(), schedule.startSecondOfDay(), schedule.endSecondOfDay());
         var response = sendGraphQl(request);
-        return BizAiReplyBotEnabledTimeUpdateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiReplyBotEnabledTimeUpdateWhatsAppGraphQlResponse::result);
+        return BizAiReplyBotEnabledTimeUpdateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiReplyBotEnabledTimeUpdateFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18821,10 +18993,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiReplyChatTriggerUpdateMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> updateAiReplyChatTrigger(String triggerChatType) {
-        var request = new BizAiReplyChatTriggerUpdateWhatsAppGraphQlRequest(triggerChatType);
+        var request = new BizAiReplyChatTriggerUpdateFacebookGraphQlRequest(triggerChatType);
         var response = sendGraphQl(request);
-        return BizAiReplyChatTriggerUpdateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiReplyChatTriggerUpdateWhatsAppGraphQlResponse::result);
+        return BizAiReplyChatTriggerUpdateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiReplyChatTriggerUpdateFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18832,32 +19004,32 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiReplySettingsQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiReplySettings> queryAiReplySettings() {
-        var request = new BizAiReplySettingsWhatsAppGraphQlRequest();
+        var request = new BizAiReplySettingsFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return BizAiReplySettingsWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiReplySettingsWhatsAppGraphQlResponse::replySettings);
+        return BizAiReplySettingsFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiReplySettingsFacebookGraphQlResponse::replySettings);
     }
 
     /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBizAiRuleCreateMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAiRule> createAiRule(String requestJson) {
-        var request = new BizAiRuleCreateWhatsAppGraphQlRequest(requestJson);
-        var response = sendGraphQl(request);
-        return BizAiRuleCreateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiRuleCreateWhatsAppGraphQlResponse::rule);
+    public Optional<BusinessAiRule> createAiRule(AiRuleInput request) {
+        var graphQlRequest = new BizAiRuleCreateFacebookGraphQlRequest(request);
+        var response = sendGraphQl(graphQlRequest);
+        return BizAiRuleCreateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiRuleCreateFacebookGraphQlResponse::rule);
     }
 
     /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBizAiRuleUpdateMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAiRule> updateAiRule(String requestJson) {
-        var request = new BizAiRuleUpdateWhatsAppGraphQlRequest(requestJson);
-        var response = sendGraphQl(request);
-        return BizAiRuleUpdateWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiRuleUpdateWhatsAppGraphQlResponse::rule);
+    public Optional<BusinessAiRule> updateAiRule(AiRuleInput request) {
+        var graphQlRequest = new BizAiRuleUpdateFacebookGraphQlRequest(request);
+        var response = sendGraphQl(graphQlRequest);
+        return BizAiRuleUpdateFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiRuleUpdateFacebookGraphQlResponse::rule);
     }
 
     /** {@inheritDoc} */
@@ -18865,10 +19037,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiRuleDeleteMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAiMutationResult> deleteAiRule(String ruleId) {
-        var request = new BizAiRuleDeleteWhatsAppGraphQlRequest(ruleId);
+        var request = new BizAiRuleDeleteFacebookGraphQlRequest(ruleId);
         var response = sendGraphQl(request);
-        return BizAiRuleDeleteWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizAiRuleDeleteWhatsAppGraphQlResponse::result);
+        return BizAiRuleDeleteFacebookGraphQlResponse.of(response)
+                .flatMap(BizAiRuleDeleteFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -18876,10 +19048,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBizAiRulesGenMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<BusinessAiRule> generateAiRules() {
-        var request = new BizAiRulesGenWhatsAppGraphQlRequest();
+        var request = new BizAiRulesGenFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return BizAiRulesGenWhatsAppGraphQlResponse.of(response)
-                .map(BizAiRulesGenWhatsAppGraphQlResponse::rules)
+        return BizAiRulesGenFacebookGraphQlResponse.of(response)
+                .map(BizAiRulesGenFacebookGraphQlResponse::rules)
                 .orElseGet(List::of);
     }
 
@@ -19177,46 +19349,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<BusinessAddressSuggestion> queryBusinessAddressAutocomplete(BusinessAddressAutocompleteQuery query) {
         Objects.requireNonNull(query, "query cannot be null");
-        var inputJson = buildAddressAutocompleteInputJson(query);
-        var request = new BizProfileAddressAutocompleteWhatsAppGraphQlRequest(inputJson);
+        var request = new BizProfileAddressAutocompleteFacebookGraphQlRequest(
+                query.center().orElse(null), query.query().orElse(null), query.useCaseId().orElse(null));
         var response = sendGraphQl(request);
-        return BizProfileAddressAutocompleteWhatsAppGraphQlResponse.of(response)
-                .map(BizProfileAddressAutocompleteWhatsAppGraphQlResponse::suggestions)
+        return BizProfileAddressAutocompleteFacebookGraphQlResponse.of(response)
+                .map(BizProfileAddressAutocompleteFacebookGraphQlResponse::suggestions)
                 .orElseGet(List::of);
-    }
-
-    /**
-     * Builds the {@code input} JSON object the address-autocomplete WhatsApp Web GraphQL request carries.
-     *
-     * @param query the typed autocomplete query whose populated fields are emitted
-     * @return the serialized {@code input} object as a JSON string
-     */
-    private static String buildAddressAutocompleteInputJson(BusinessAddressAutocompleteQuery query) {
-        try (var writer = JSONWriter.ofUTF8()) {
-            writer.startObject();
-            query.query().ifPresent(value -> {
-                writer.writeName("query");
-                writer.writeColon();
-                writer.writeString(value);
-            });
-            query.locale().ifPresent(value -> {
-                writer.writeName("locale");
-                writer.writeColon();
-                writer.writeString(value);
-            });
-            query.country().ifPresent(value -> {
-                writer.writeName("country");
-                writer.writeColon();
-                writer.writeString(value);
-            });
-            writer.endObject();
-            try (var output = new StringWriter()) {
-                writer.flushTo(output);
-                return output.toString();
-            }
-        } catch (IOException exception) {
-            throw new UncheckedIOException(exception);
-        }
     }
 
     /** {@inheritDoc} */
@@ -19225,10 +19363,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessMerchantCompliance> setMerchantCompliance(MerchantComplianceEdit edit) {
         Objects.requireNonNull(edit, "edit cannot be null");
-        var request = new BizSetMerchantComplianceWhatsAppGraphQlRequest(edit);
+        var request = new BizSetMerchantComplianceFacebookGraphQlRequest(edit);
         var response = sendGraphQl(request);
-        return BizSetMerchantComplianceWhatsAppGraphQlResponse.of(response)
-                .map(BizSetMerchantComplianceWhatsAppGraphQlResponse::merchantInfo);
+        return BizSetMerchantComplianceFacebookGraphQlResponse.of(response)
+                .map(BizSetMerchantComplianceFacebookGraphQlResponse::merchantInfo);
     }
 
     /** {@inheritDoc} */
@@ -19261,27 +19399,21 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "useWAWebBizBroadcastBillingInfoQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessBroadcastBillingAccount> queryBroadcastBillingInfo(String assetId, Long budget, String entrypoint) {
-        var request = new BizBroadcastBillingInfoWhatsAppGraphQlRequest(assetId, budget, entrypoint);
+        var request = new BizBroadcastBillingInfoFacebookGraphQlRequest(assetId, budget, entrypoint);
         var response = sendGraphQl(request);
-        return BizBroadcastBillingInfoWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizBroadcastBillingInfoWhatsAppGraphQlResponse::billableAccount);
+        return BizBroadcastBillingInfoFacebookGraphQlResponse.of(response)
+                .flatMap(BizBroadcastBillingInfoFacebookGraphQlResponse::billableAccount);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote Field shape is not yet recovered. The {@code inputJson} is passed through as an
-     * opaque pre-encoded JSON object. Replace with a typed input model once the field shape is
-     * captured via a live request.
-     */
+    /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "useWAWebBizBroadcastBusinessInfoMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessBroadcastTargetInfo> queryBroadcastBusinessInfo(String inputJson) {
-        var request = new BizBroadcastBusinessInfoWhatsAppGraphQlRequest(inputJson);
+    public Optional<BusinessBroadcastTargetInfo> queryBroadcastBusinessInfo(Boolean shouldReturnAdAccount) {
+        var request = new BizBroadcastBusinessInfoFacebookGraphQlRequest(shouldReturnAdAccount);
         var response = sendGraphQl(request);
-        return BizBroadcastBusinessInfoWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizBroadcastBusinessInfoWhatsAppGraphQlResponse::businessInfo);
+        return BizBroadcastBusinessInfoFacebookGraphQlResponse.of(response)
+                .flatMap(BizBroadcastBusinessInfoFacebookGraphQlResponse::businessInfo);
     }
 
     /** {@inheritDoc} */
@@ -19290,26 +19422,26 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessBroadcastGenAiRecommendation> queryBroadcastGenAiRecommendation(BusinessBroadcastGenAiRecommendationQuery query) {
         Objects.requireNonNull(query, "query cannot be null");
-        var request = new BizBroadcastGenAiRecommendationJobWhatsAppGraphQlRequest(
+        var request = new BizBroadcastGenAiRecommendationJobFacebookGraphQlRequest(
                 query.actorId().orElse(null),
                 query.modelId().orElse(null),
                 query.userInfo().orElse(null),
                 query.userMessageDraft().orElse(null),
                 query.userPrompt().orElse(null));
         var response = sendGraphQl(request);
-        return BizBroadcastGenAiRecommendationJobWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizBroadcastGenAiRecommendationJobWhatsAppGraphQlResponse::recommendation);
+        return BizBroadcastGenAiRecommendationJobFacebookGraphQlResponse.of(response)
+                .flatMap(BizBroadcastGenAiRecommendationJobFacebookGraphQlResponse::recommendation);
     }
 
     /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "useWAWebBizBroadcastQuotaQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessBroadcastQuota> queryBroadcastQuota(String dataJson) {
-        var request = new BizBroadcastQuotaWhatsAppGraphQlRequest(dataJson);
+    public Optional<BusinessBroadcastQuota> queryBroadcastQuota(BusinessBroadcastQuotaData data) {
+        var request = new BizBroadcastQuotaFacebookGraphQlRequest(data);
         var response = sendGraphQl(request);
-        return BizBroadcastQuotaWhatsAppGraphQlResponse.of(response)
-                .flatMap(BizBroadcastQuotaWhatsAppGraphQlResponse::quota);
+        return BizBroadcastQuotaFacebookGraphQlResponse.of(response)
+                .flatMap(BizBroadcastQuotaFacebookGraphQlResponse::quota);
     }
 
     /** {@inheritDoc} */
@@ -19320,11 +19452,11 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         var jid = Objects.requireNonNull(consumerLid, "consumerLid cannot be null").toJid();
         var relayStatus = threadStatus == null
                 ? null
-                : AiAgentAutoReplyControlWhatsAppGraphQlRequest.ThreadStatus.of(threadStatus.wireValue()).orElse(null);
-        var request = new AiAgentAutoReplyControlWhatsAppGraphQlRequest(jid, phoneNumber, relayStatus);
+                : AiAgentAutoReplyControlFacebookGraphQlRequest.ThreadStatus.of(threadStatus.wireValue()).orElse(null);
+        var request = new AiAgentAutoReplyControlFacebookGraphQlRequest(jid, phoneNumber, relayStatus);
         var response = sendGraphQl(request);
-        return AiAgentAutoReplyControlWhatsAppGraphQlResponse.of(response)
-                .map(AiAgentAutoReplyControlWhatsAppGraphQlResponse::result);
+        return AiAgentAutoReplyControlFacebookGraphQlResponse.of(response)
+                .map(AiAgentAutoReplyControlFacebookGraphQlResponse::result);
     }
 
     /** {@inheritDoc} */
@@ -19333,15 +19465,15 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessMarketingCampaign> createMarketingCampaign(BusinessMarketingCampaignCreate campaign) {
         Objects.requireNonNull(campaign, "campaign cannot be null");
-        var request = new CreateMarketingCampaignActionWhatsAppGraphQlRequest(
+        var request = new CreateMarketingCampaignActionFacebookGraphQlRequest(
                 campaign.adAccountId().orElse(null),
                 campaign.campaignName().orElse(null),
                 campaign.lifetimeBudget().orElse(null),
                 campaign.pageId().orElse(null),
                 campaign.whatsAppBusinessAccountId().orElse(null));
         var response = sendGraphQl(request);
-        return CreateMarketingCampaignActionWhatsAppGraphQlResponse.of(response)
-                .map(CreateMarketingCampaignActionWhatsAppGraphQlResponse::campaign);
+        return CreateMarketingCampaignActionFacebookGraphQlResponse.of(response)
+                .map(CreateMarketingCampaignActionFacebookGraphQlResponse::campaign);
     }
 
     /** {@inheritDoc} */
@@ -19361,10 +19493,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFetchAdEntryPointsConfigurationQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<AdEntryPointEntitlement> queryClickToWhatsAppAdEntryPoints() {
-        var request = new FetchAdEntryPointsConfigurationWhatsAppGraphQlRequest();
+        var request = new FetchAdEntryPointsConfigurationFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return FetchAdEntryPointsConfigurationWhatsAppGraphQlResponse.of(response)
-                .map(FetchAdEntryPointsConfigurationWhatsAppGraphQlResponse::entitlements)
+        return FetchAdEntryPointsConfigurationFacebookGraphQlResponse.of(response)
+                .map(FetchAdEntryPointsConfigurationFacebookGraphQlResponse::entitlements)
                 .orElseGet(List::of);
     }
 
@@ -19373,10 +19505,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFetchAdEntryPointsConfigurationM1Query", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<AdEntryPointEntitlement> queryClickToWhatsAppAdEntryPointsWithCopy() {
-        var request = new FetchAdEntryPointsConfigurationM1WhatsAppGraphQlRequest();
+        var request = new FetchAdEntryPointsConfigurationM1FacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return FetchAdEntryPointsConfigurationM1WhatsAppGraphQlResponse.of(response)
-                .map(FetchAdEntryPointsConfigurationM1WhatsAppGraphQlResponse::entitlements)
+        return FetchAdEntryPointsConfigurationM1FacebookGraphQlResponse.of(response)
+                .map(FetchAdEntryPointsConfigurationM1FacebookGraphQlResponse::entitlements)
                 .orElseGet(List::of);
     }
 
@@ -19385,10 +19517,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFetchDynamicAIModesQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MetaAiMode> queryDynamicAiModes() {
-        var request = new FetchDynamicAiModesWhatsAppGraphQlRequest();
+        var request = new FetchDynamicAiModesWhatsAppWebGraphQlRequest();
         var response = sendGraphQl(request);
-        return FetchDynamicAiModesWhatsAppGraphQlResponse.of(response)
-                .map(FetchDynamicAiModesWhatsAppGraphQlResponse::modes)
+        return FetchDynamicAiModesWhatsAppWebGraphQlResponse.of(response)
+                .map(FetchDynamicAiModesWhatsAppWebGraphQlResponse::modes)
                 .orElseGet(List::of);
     }
 
@@ -19408,10 +19540,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFetchOIDCStateQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<String> queryOidcState() {
-        var request = new FetchOidcStateWhatsAppGraphQlRequest();
+        var request = new FetchOidcStateFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return FetchOidcStateWhatsAppGraphQlResponse.of(response)
-                .flatMap(FetchOidcStateWhatsAppGraphQlResponse::oidcState);
+        return FetchOidcStateFacebookGraphQlResponse.of(response)
+                .flatMap(FetchOidcStateFacebookGraphQlResponse::oidcState);
     }
 
     /** {@inheritDoc} */
@@ -19419,10 +19551,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFetchSubscriptionEntryPointsQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessSubscriptionEntryPoints> querySubscriptionEntryPoints() {
-        var request = new FetchSubscriptionEntryPointsWhatsAppGraphQlRequest();
+        var request = new FetchSubscriptionEntryPointsFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return FetchSubscriptionEntryPointsWhatsAppGraphQlResponse.of(response)
-                .map(FetchSubscriptionEntryPointsWhatsAppGraphQlResponse::entryPoints);
+        return FetchSubscriptionEntryPointsFacebookGraphQlResponse.of(response)
+                .map(FetchSubscriptionEntryPointsFacebookGraphQlResponse::entryPoints);
     }
 
     /** {@inheritDoc} */
@@ -19430,10 +19562,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFetchSubscriptionsQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessSubscriptions> queryBusinessSubscriptions(String platform) {
-        var request = new FetchSubscriptionsWhatsAppGraphQlRequest(platform);
+        var request = new FetchSubscriptionsFacebookGraphQlRequest(platform);
         var response = sendGraphQl(request);
-        return FetchSubscriptionsWhatsAppGraphQlResponse.of(response)
-                .map(FetchSubscriptionsWhatsAppGraphQlResponse::subscriptions);
+        return FetchSubscriptionsFacebookGraphQlResponse.of(response)
+                .map(FetchSubscriptionsFacebookGraphQlResponse::subscriptions);
     }
 
     /** {@inheritDoc} */
@@ -19453,10 +19585,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebGetFBAccountPagesQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<FacebookPage> queryPromotableFacebookPages(String userId) {
-        var request = new GetFbAccountPagesWhatsAppGraphQlRequest(userId);
+        var request = new GetFbAccountPagesFacebookGraphQlRequest(userId);
         var response = sendGraphQl(request);
-        return GetFbAccountPagesWhatsAppGraphQlResponse.of(response)
-                .map(GetFbAccountPagesWhatsAppGraphQlResponse::pages)
+        return GetFbAccountPagesFacebookGraphQlResponse.of(response)
+                .map(GetFbAccountPagesFacebookGraphQlResponse::pages)
                 .orElseGet(List::of);
     }
 
@@ -19477,10 +19609,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebGetWAAEligibilityQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<WhatsAppAdsEligibility> queryWaaEligibility(String flowId, Instant requestId) {
-        var request = new GetWaaEligibilityWhatsAppGraphQlRequest(flowId, requestId);
+        var request = new GetWaaEligibilityFacebookGraphQlRequest(flowId, requestId);
         var response = sendGraphQl(request);
-        return GetWaaEligibilityWhatsAppGraphQlResponse.of(response)
-                .map(GetWaaEligibilityWhatsAppGraphQlResponse::eligibility);
+        return GetWaaEligibilityFacebookGraphQlResponse.of(response)
+                .map(GetWaaEligibilityFacebookGraphQlResponse::eligibility);
     }
 
     /** {@inheritDoc} */
@@ -19499,8 +19631,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebNativeMLModelQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<NativeMachineLearningModelManifest> queryNativeMlModelManifest(String modelRequestMetadatasJson, String clientCapabilityMetadataJson) {
-        var request = new NativeMlModelWhatsAppGraphQlRequest(modelRequestMetadatasJson, clientCapabilityMetadataJson);
+    public Optional<NativeMachineLearningModelManifest> queryNativeMlModelManifest(List<ModelRequestMetadata> modelRequestMetadatas, ClientCapabilityMetadata clientCapabilityMetadata) {
+        var request = new NativeMlModelWhatsAppGraphQlRequest(modelRequestMetadatas, clientCapabilityMetadata);
         var response = sendGraphQl(request);
         return NativeMlModelWhatsAppGraphQlResponse.of(response)
                 .map(NativeMlModelWhatsAppGraphQlResponse::manifest);
@@ -19511,10 +19643,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebResolveAccountTypeAndAdPageMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<WhatsAppAdsAccountTypeReset> queryAccountTypeAndAdPage() {
-        var request = new ResolveAccountTypeAndAdPageMutationWhatsAppGraphQlRequest();
+        var request = new ResolveAccountTypeAndAdPageMutationFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return ResolveAccountTypeAndAdPageMutationWhatsAppGraphQlResponse.of(response)
-                .map(ResolveAccountTypeAndAdPageMutationWhatsAppGraphQlResponse::reset);
+        return ResolveAccountTypeAndAdPageMutationFacebookGraphQlResponse.of(response)
+                .map(ResolveAccountTypeAndAdPageMutationFacebookGraphQlResponse::reset);
     }
 
     /** {@inheritDoc} */
@@ -19522,10 +19654,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebResolveAccountTypeAndAdPageQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<WhatsAppAdsPageEligibility> queryPageEligibility(String pageId) {
-        var request = new ResolveAccountTypeAndAdPageQueryWhatsAppGraphQlRequest(pageId);
+        var request = new ResolveAccountTypeAndAdPageQueryFacebookGraphQlRequest(pageId);
         var response = sendGraphQl(request);
-        return ResolveAccountTypeAndAdPageQueryWhatsAppGraphQlResponse.of(response)
-                .map(ResolveAccountTypeAndAdPageQueryWhatsAppGraphQlResponse::eligibility);
+        return ResolveAccountTypeAndAdPageQueryFacebookGraphQlResponse.of(response)
+                .map(ResolveAccountTypeAndAdPageQueryFacebookGraphQlResponse::eligibility);
     }
 
     /** {@inheritDoc} */
@@ -19534,35 +19666,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<SupportBugReportSubmission> submitSupportBugReport(SupportBugReportSubmissionRequest request) {
         Objects.requireNonNull(request, "request cannot be null");
-        var inputJson = buildBugReportInputJson(request);
-        var relayRequest = new SupportBugReportSubmitWhatsAppGraphQlRequest(inputJson);
+        var relayRequest = new SupportBugReportSubmitWhatsAppWebGraphQlRequest(request);
         var response = sendGraphQl(relayRequest);
-        return SupportBugReportSubmitWhatsAppGraphQlResponse.of(response)
-                .map(SupportBugReportSubmitWhatsAppGraphQlResponse::submission);
-    }
-
-    /**
-     * Builds the {@code input} JSON object the bug-report submission WhatsApp Web GraphQL request carries.
-     *
-     * <p>The typed {@code category} and {@code description} fields are emitted as {@code category} and
-     * {@code description} entries; {@link SupportBugReportSubmissionRequest#additionalContextJson()},
-     * when present, is parsed as a JSON object and its top-level entries are merged into the result so
-     * server-accepted fields not yet typed can be supplied.
-     *
-     * @param request the typed bug-report request whose populated fields are emitted
-     * @return the serialized {@code input} object as a JSON string
-     */
-    private static String buildBugReportInputJson(SupportBugReportSubmissionRequest request) {
-        var merged = new JSONObject();
-        request.category().ifPresent(value -> merged.put("category", value));
-        request.description().ifPresent(value -> merged.put("description", value));
-        request.additionalContextJson().ifPresent(extra -> {
-            var parsed = JSON.parseObject(extra);
-            if (parsed != null) {
-                merged.putAll(parsed);
-            }
-        });
-        return merged.toJSONString();
+        return SupportBugReportSubmitWhatsAppWebGraphQlResponse.of(response)
+                .map(SupportBugReportSubmitWhatsAppWebGraphQlResponse::submission);
     }
 
     /** {@inheritDoc} */
@@ -19575,12 +19682,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 : feedbackTypes.stream()
                 .map(kind -> kind == null
                         ? null
-                        : SupportMessageFeedbackSubmitWhatsAppGraphQlRequest.FeedbackType.of(kind.wireValue()).orElse(null))
+                        : SupportMessageFeedbackSubmitWhatsAppWebGraphQlRequest.FeedbackType.of(kind.wireValue()).orElse(null))
                 .toList();
-        var request = new SupportMessageFeedbackSubmitWhatsAppGraphQlRequest(messageId, relayTypes);
+        var request = new SupportMessageFeedbackSubmitWhatsAppWebGraphQlRequest(messageId, relayTypes);
         var response = sendGraphQl(request);
-        return SupportMessageFeedbackSubmitWhatsAppGraphQlResponse.of(response)
-                .map(SupportMessageFeedbackSubmitWhatsAppGraphQlResponse::submission);
+        return SupportMessageFeedbackSubmitWhatsAppWebGraphQlResponse.of(response)
+                .map(SupportMessageFeedbackSubmitWhatsAppWebGraphQlResponse::submission);
     }
 
     /** {@inheritDoc} */
@@ -19588,10 +19695,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebWAAOnboardingMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<WhatsAppAdsAdAccount> onboardWaaAccount(String flowId, Instant requestId) {
-        var request = new WaaOnboardingWhatsAppGraphQlRequest(flowId, requestId);
+        var request = new WaaOnboardingFacebookGraphQlRequest(flowId, requestId);
         var response = sendGraphQl(request);
-        return WaaOnboardingWhatsAppGraphQlResponse.of(response)
-                .map(WaaOnboardingWhatsAppGraphQlResponse::adAccount);
+        return WaaOnboardingFacebookGraphQlResponse.of(response)
+                .map(WaaOnboardingFacebookGraphQlResponse::adAccount);
     }
 
     /** {@inheritDoc} */
@@ -19653,10 +19760,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebGetAccountNonceMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAccountNonce> queryBusinessAccountNonce(String scope) {
-        var request = new GetAccountNonceWhatsAppGraphQlRequest(scope);
+        var request = new GetAccountNonceFacebookGraphQlRequest(scope);
         var response = sendGraphQl(request);
-        return GetAccountNonceWhatsAppGraphQlResponse.of(response)
-                .map(GetAccountNonceWhatsAppGraphQlResponse::nonce);
+        return GetAccountNonceFacebookGraphQlResponse.of(response)
+                .map(GetAccountNonceFacebookGraphQlResponse::nonce);
     }
 
     /** {@inheritDoc} */
@@ -19664,10 +19771,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebLinkedAccountsGQLQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessLinkedAdAccounts> queryRelayLinkedAccounts() {
-        var request = new LinkedAccountsGqlWhatsAppGraphQlRequest();
+        var request = new LinkedAccountsGqlFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return LinkedAccountsGqlWhatsAppGraphQlResponse.of(response)
-                .map(LinkedAccountsGqlWhatsAppGraphQlResponse::accounts);
+        return LinkedAccountsGqlFacebookGraphQlResponse.of(response)
+                .map(LinkedAccountsGqlFacebookGraphQlResponse::accounts);
     }
 
     /** {@inheritDoc} */
@@ -19675,10 +19782,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebAuthAgentFeaturePolicyQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<AuthorizedAgentFeaturePolicy> queryAgentFeaturePolicy() {
-        var request = new AuthAgentFeaturePolicyWhatsAppGraphQlRequest();
+        var request = new AuthAgentFeaturePolicyFacebookGraphQlRequest();
         var response = sendGraphQl(request);
-        return AuthAgentFeaturePolicyWhatsAppGraphQlResponse.of(response)
-                .map(AuthAgentFeaturePolicyWhatsAppGraphQlResponse::policy);
+        return AuthAgentFeaturePolicyFacebookGraphQlResponse.of(response)
+                .map(AuthAgentFeaturePolicyFacebookGraphQlResponse::policy);
     }
 
     /** {@inheritDoc} */
@@ -19686,10 +19793,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebBPAccessTokenAndSessionCookiesMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessPlatformAuthToken> exchangeBusinessPlatformAuthCode(long applicationId, String code) {
-        var request = new BpAccessTokenAndSessionCookiesWhatsAppGraphQlRequest(applicationId, code);
+        var request = new BpAccessTokenAndSessionCookiesWhatsAppWebGraphQlRequest(applicationId, code);
         var response = sendGraphQl(request);
-        return BpAccessTokenAndSessionCookiesWhatsAppGraphQlResponse.of(response)
-                .map(BpAccessTokenAndSessionCookiesWhatsAppGraphQlResponse::token);
+        return BpAccessTokenAndSessionCookiesWhatsAppWebGraphQlResponse.of(response)
+                .map(BpAccessTokenAndSessionCookiesWhatsAppWebGraphQlResponse::token);
     }
 
     /** {@inheritDoc} */
@@ -19697,10 +19804,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebCanonicalUserValidQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public boolean queryWebSessionUserValidity() {
-        var request = new CanonicalUserValidWhatsAppGraphQlRequest();
+        var request = new CanonicalUserValidWhatsAppWebGraphQlRequest();
         var response = sendGraphQl(request);
-        return CanonicalUserValidWhatsAppGraphQlResponse.of(response)
-                .map(CanonicalUserValidWhatsAppGraphQlResponse::valid)
+        return CanonicalUserValidWhatsAppWebGraphQlResponse.of(response)
+                .map(CanonicalUserValidWhatsAppWebGraphQlResponse::valid)
                 .orElse(false);
     }
 
@@ -19709,10 +19816,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebCanonicalHatchAgentStatusGetQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<AiChannelAgentStatus> queryAiChannelAgentStatus() {
-        var request = new CanonicalHatchAgentStatusGetWhatsAppGraphQlRequest();
+        var request = new CanonicalHatchAgentStatusGetWhatsAppWebGraphQlRequest();
         var response = sendGraphQl(request);
-        return CanonicalHatchAgentStatusGetWhatsAppGraphQlResponse.of(response)
-                .map(CanonicalHatchAgentStatusGetWhatsAppGraphQlResponse::status);
+        return CanonicalHatchAgentStatusGetWhatsAppWebGraphQlResponse.of(response)
+                .map(CanonicalHatchAgentStatusGetWhatsAppWebGraphQlResponse::status);
     }
 
     /** {@inheritDoc} */
@@ -19720,10 +19827,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebCanonicalHatchCommandGetQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<AiChannelCommand> queryAiChannelCommands() {
-        var request = new CanonicalHatchCommandGetWhatsAppGraphQlRequest();
+        var request = new CanonicalHatchCommandGetWhatsAppWebGraphQlRequest();
         var response = sendGraphQl(request);
-        return CanonicalHatchCommandGetWhatsAppGraphQlResponse.of(response)
-                .map(CanonicalHatchCommandGetWhatsAppGraphQlResponse::commands)
+        return CanonicalHatchCommandGetWhatsAppWebGraphQlResponse.of(response)
+                .map(CanonicalHatchCommandGetWhatsAppWebGraphQlResponse::commands)
                 .orElseGet(List::of);
     }
 
@@ -19732,10 +19839,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebCanonicalHatchIdentityGetQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<AiChannelIdentity> queryAiChannelIdentity() {
-        var request = new CanonicalHatchIdentityGetWhatsAppGraphQlRequest();
+        var request = new CanonicalHatchIdentityGetWhatsAppWebGraphQlRequest();
         var response = sendGraphQl(request);
-        return CanonicalHatchIdentityGetWhatsAppGraphQlResponse.of(response)
-                .map(CanonicalHatchIdentityGetWhatsAppGraphQlResponse::identity);
+        return CanonicalHatchIdentityGetWhatsAppWebGraphQlResponse.of(response)
+                .map(CanonicalHatchIdentityGetWhatsAppWebGraphQlResponse::identity);
     }
 
     /** {@inheritDoc} */
@@ -19743,10 +19850,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebCanonicalHatchLinkedStatusGetQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<AiChannelLinkedStatus> queryAiChannelLinkedStatus() {
-        var request = new CanonicalHatchLinkedStatusGetWhatsAppGraphQlRequest();
+        var request = new CanonicalHatchLinkedStatusGetWhatsAppWebGraphQlRequest();
         var response = sendGraphQl(request);
-        return CanonicalHatchLinkedStatusGetWhatsAppGraphQlResponse.of(response)
-                .map(CanonicalHatchLinkedStatusGetWhatsAppGraphQlResponse::status);
+        return CanonicalHatchLinkedStatusGetWhatsAppWebGraphQlResponse.of(response)
+                .map(CanonicalHatchLinkedStatusGetWhatsAppWebGraphQlResponse::status);
     }
 
     /** {@inheritDoc} */
@@ -19774,10 +19881,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebGetAccessTokenFromOIDCCodeMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<FacebookOidcAccessToken> exchangeOidcCodeForAccessToken(String code, String state) {
-        var request = new GetAccessTokenFromOidcCodeWhatsAppGraphQlRequest(code, state);
+        var request = new GetAccessTokenFromOidcCodeFacebookGraphQlRequest(code, state);
         var response = sendGraphQl(request);
-        return GetAccessTokenFromOidcCodeWhatsAppGraphQlResponse.of(response)
-                .map(GetAccessTokenFromOidcCodeWhatsAppGraphQlResponse::token);
+        return GetAccessTokenFromOidcCodeFacebookGraphQlResponse.of(response)
+                .map(GetAccessTokenFromOidcCodeFacebookGraphQlResponse::token);
     }
 
     /** {@inheritDoc} */
@@ -19796,10 +19903,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebCreateWhatsAppAdsIdentityMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<WhatsAppAdsIdentityPage> createWhatsAppAdsIdentity(String phoneNumber, String code) {
-        var request = new CreateWhatsAppAdsIdentityWhatsAppGraphQlRequest(phoneNumber, code);
+        var request = new CreateWhatsAppAdsIdentityFacebookGraphQlRequest(phoneNumber, code);
         var response = sendGraphQl(request);
-        return CreateWhatsAppAdsIdentityWhatsAppGraphQlResponse.of(response)
-                .map(CreateWhatsAppAdsIdentityWhatsAppGraphQlResponse::page);
+        return CreateWhatsAppAdsIdentityFacebookGraphQlResponse.of(response)
+                .map(CreateWhatsAppAdsIdentityFacebookGraphQlResponse::page);
     }
 
     /** {@inheritDoc} */
@@ -19808,16 +19915,16 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<AdMediaRegistration> linkMediaToNativeAd(List<AdMediaLink> mediaList) {
         var wireEntries = mediaList == null ? null : mediaList.stream()
-                .map(entry -> new BizAdCreationLinkWaMediaToStatusWhatsAppGraphQlRequest.MediaEntry(
+                .map(entry -> new BizAdCreationLinkWaMediaToStatusFacebookGraphQlRequest.MediaEntry(
                         entry.id().orElse(null),
                         entry.type()
-                                .map(type -> BizAdCreationLinkWaMediaToStatusWhatsAppGraphQlRequest.MediaType.ofWireValue(type.wireValue()).orElse(null))
+                                .map(type -> BizAdCreationLinkWaMediaToStatusFacebookGraphQlRequest.MediaType.ofWireValue(type.wireValue()).orElse(null))
                                 .orElse(null)))
                 .toList();
-        var request = new BizAdCreationLinkWaMediaToStatusWhatsAppGraphQlRequest(wireEntries);
+        var request = new BizAdCreationLinkWaMediaToStatusFacebookGraphQlRequest(wireEntries);
         var response = sendGraphQl(request);
-        return BizAdCreationLinkWaMediaToStatusWhatsAppGraphQlResponse.of(response)
-                .map(BizAdCreationLinkWaMediaToStatusWhatsAppGraphQlResponse::registrations)
+        return BizAdCreationLinkWaMediaToStatusFacebookGraphQlResponse.of(response)
+                .map(BizAdCreationLinkWaMediaToStatusFacebookGraphQlResponse::registrations)
                 .orElseGet(List::of);
     }
 
@@ -19828,14 +19935,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public List<AdMediaUpload> uploadAdMedia(AdMediaUploadOptions options) {
         Objects.requireNonNull(options, "options cannot be null");
         var mediaIds = options.mediaIds();
-        var request = new BizAdCreationLwiMediaUploadWhatsAppGraphQlRequest(
+        var request = new BizAdCreationLwiMediaUploadFacebookGraphQlRequest(
                 options.adAccountId().orElse(null),
                 options.pageId().orElse(null),
                 mediaIds.isEmpty() ? null : mediaIds,
                 options.facebookAccessToken().orElse(null));
         var response = sendGraphQl(request);
-        return BizAdCreationLwiMediaUploadWhatsAppGraphQlResponse.of(response)
-                .map(BizAdCreationLwiMediaUploadWhatsAppGraphQlResponse::uploads)
+        return BizAdCreationLwiMediaUploadFacebookGraphQlResponse.of(response)
+                .map(BizAdCreationLwiMediaUploadFacebookGraphQlResponse::uploads)
                 .orElseGet(List::of);
     }
 
@@ -19862,10 +19969,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFetchNativeAdsMvpEligibilityQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<NativeAdsEligibility> queryNativeAdsEligibility(String phoneNumber) {
-        var request = new FetchNativeAdsMvpEligibilityWhatsAppGraphQlRequest(phoneNumber);
+        var request = new FetchNativeAdsMvpEligibilityFacebookGraphQlRequest(phoneNumber);
         var response = sendGraphQl(request);
-        return FetchNativeAdsMvpEligibilityWhatsAppGraphQlResponse.of(response)
-                .map(FetchNativeAdsMvpEligibilityWhatsAppGraphQlResponse::eligibility);
+        return FetchNativeAdsMvpEligibilityFacebookGraphQlResponse.of(response)
+                .map(FetchNativeAdsMvpEligibilityFacebookGraphQlResponse::eligibility);
     }
 
     /** {@inheritDoc} */
@@ -19875,16 +19982,16 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public List<QuickPromotionSurfaceBatch> queryQuickPromotions(List<String> surfaceIds, QuickPromotionTriggerContext triggerContext) {
         var relayContext = triggerContext == null
                 ? null
-                : new FetchQuickPromotionsWhatsAppGraphQlRequest.TriggerContext(
+                : new FetchQuickPromotionsFacebookGraphQlRequest.TriggerContext(
                 triggerContext.fromBusinessApp().orElse(null),
                 triggerContext.appVersion().orElse(null),
                 triggerContext.country().orElse(null),
                 triggerContext.locale().orElse(null));
-        var request = new FetchQuickPromotionsWhatsAppGraphQlRequest(surfaceIds, relayContext);
+        var request = new FetchQuickPromotionsFacebookGraphQlRequest(surfaceIds, relayContext);
         try {
             var response = sendGraphQl(request);
-            var batches = FetchQuickPromotionsWhatsAppGraphQlResponse.of(response)
-                    .map(FetchQuickPromotionsWhatsAppGraphQlResponse::batches)
+            var batches = FetchQuickPromotionsFacebookGraphQlResponse.of(response)
+                    .map(FetchQuickPromotionsFacebookGraphQlResponse::batches)
                     .orElseGet(List::of);
             emitSmbQpCallHealthEvent(FetchResultEnum.SUCCESS, null);
             return batches;
@@ -19901,16 +20008,16 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public List<QuickPromotionSurfaceBatch> queryConsumerQuickPromotions(List<String> surfaceIds, QuickPromotionTriggerContext triggerContext) {
         var relayContext = triggerContext == null
                 ? null
-                : new ConsumerFetchQuickPromotionsWhatsAppGraphQlRequest.TriggerContext(
+                : new ConsumerFetchQuickPromotionsWhatsAppWebGraphQlRequest.TriggerContext(
                 triggerContext.fromBusinessApp().orElse(null),
                 triggerContext.appVersion().orElse(null),
                 triggerContext.country().orElse(null),
                 triggerContext.locale().orElse(null));
-        var request = new ConsumerFetchQuickPromotionsWhatsAppGraphQlRequest(surfaceIds, relayContext);
+        var request = new ConsumerFetchQuickPromotionsWhatsAppWebGraphQlRequest(surfaceIds, relayContext);
         try {
             var response = sendGraphQl(request);
-            var batches = ConsumerFetchQuickPromotionsWhatsAppGraphQlResponse.of(response)
-                    .map(ConsumerFetchQuickPromotionsWhatsAppGraphQlResponse::batches)
+            var batches = ConsumerFetchQuickPromotionsWhatsAppWebGraphQlResponse.of(response)
+                    .map(ConsumerFetchQuickPromotionsWhatsAppWebGraphQlResponse::batches)
                     .orElseGet(List::of);
             emitSmbQpCallHealthEvent(FetchResultEnum.SUCCESS, null);
             return batches;
@@ -19926,7 +20033,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<QuickPromotionLogAcknowledgement> logPromotionAction(QuickPromotionActionLog log) {
         Objects.requireNonNull(log, "log cannot be null");
-        var request = new QuickPromotionActionWhatsAppGraphQlRequest(
+        var request = new QuickPromotionActionFacebookGraphQlRequest(
                 log.event().orElse(null),
                 log.action().orElse(null),
                 log.promotionId().orElse(null),
@@ -19934,8 +20041,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 log.loggingBlob().orElse(null),
                 log.clientTime().orElse(null));
         var response = sendGraphQl(request);
-        return QuickPromotionActionWhatsAppGraphQlResponse.of(response)
-                .map(QuickPromotionActionWhatsAppGraphQlResponse::acknowledgement);
+        return QuickPromotionActionFacebookGraphQlResponse.of(response)
+                .map(QuickPromotionActionFacebookGraphQlResponse::acknowledgement);
     }
 
     /** {@inheritDoc} */
@@ -19944,7 +20051,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<QuickPromotionLogAcknowledgement> logConsumerPromotionAction(QuickPromotionActionLog log) {
         Objects.requireNonNull(log, "log cannot be null");
-        var request = new ConsumerQuickPromotionActionGraphQlWhatsAppGraphQlRequest(
+        var request = new ConsumerQuickPromotionActionGraphQlWhatsAppWebGraphQlRequest(
                 log.event().orElse(null),
                 log.action().orElse(null),
                 log.promotionId().orElse(null),
@@ -19952,8 +20059,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 log.loggingBlob().orElse(null),
                 log.clientTime().orElse(null));
         var response = sendGraphQl(request);
-        return ConsumerQuickPromotionActionGraphQlWhatsAppGraphQlResponse.of(response)
-                .map(ConsumerQuickPromotionActionGraphQlWhatsAppGraphQlResponse::acknowledgement);
+        return ConsumerQuickPromotionActionGraphQlWhatsAppWebGraphQlResponse.of(response)
+                .map(ConsumerQuickPromotionActionGraphQlWhatsAppWebGraphQlResponse::acknowledgement);
     }
 
     /** {@inheritDoc} */
@@ -19961,10 +20068,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebACSServerProviderConfigQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<AnonymousCredentialServiceConfig> queryAnonymousCredentialServiceConfig(String projectName) {
-        var request = new AcsServerProviderConfigWhatsAppGraphQlRequest(projectName);
+        var request = new AcsServerProviderConfigWhatsAppWebGraphQlRequest(projectName);
         var response = sendGraphQl(request);
-        return AcsServerProviderConfigWhatsAppGraphQlResponse.of(response)
-                .map(AcsServerProviderConfigWhatsAppGraphQlResponse::config);
+        return AcsServerProviderConfigWhatsAppWebGraphQlResponse.of(response)
+                .map(AcsServerProviderConfigWhatsAppWebGraphQlResponse::config);
     }
 
     /** {@inheritDoc} */
@@ -19974,14 +20081,14 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public Optional<AnonymousCredentialIssuance> issueAnonymousCredentials(AnonymousCredentialIssuanceRequest request) {
         Objects.requireNonNull(request, "request cannot be null");
         var blindedTokens = request.blindedTokens();
-        var relayRequest = new AcsServerProviderIssuanceWhatsAppGraphQlRequest(
+        var relayRequest = new AcsServerProviderIssuanceWhatsAppWebGraphQlRequest(
                 request.projectName().orElse(null),
                 request.configurationId().orElse(null),
                 blindedTokens.isEmpty() ? null : blindedTokens,
                 request.requestProof().orElse(null));
         var response = sendGraphQl(relayRequest);
-        return AcsServerProviderIssuanceWhatsAppGraphQlResponse.of(response)
-                .map(AcsServerProviderIssuanceWhatsAppGraphQlResponse::issuance);
+        return AcsServerProviderIssuanceWhatsAppWebGraphQlResponse.of(response)
+                .map(AcsServerProviderIssuanceWhatsAppWebGraphQlResponse::issuance);
     }
 
     /** {@inheritDoc} */
@@ -19989,10 +20096,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebFetchBotProfilesGQLQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<BotProfile> queryBotProfiles(List<String> personaIds) {
-        var request = new FetchBotProfilesGqlWhatsAppGraphQlRequest(personaIds);
+        var request = new FetchBotProfilesGqlWhatsAppWebGraphQlRequest(personaIds);
         var response = sendGraphQl(request);
-        return FetchBotProfilesGqlWhatsAppGraphQlResponse.of(response)
-                .map(FetchBotProfilesGqlWhatsAppGraphQlResponse::profiles)
+        return FetchBotProfilesGqlWhatsAppWebGraphQlResponse.of(response)
+                .map(FetchBotProfilesGqlWhatsAppWebGraphQlResponse::profiles)
                 .orElseGet(List::of);
     }
 
@@ -20001,10 +20108,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "WAWebSupportContactFormSubmitMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<SupportContactFormSubmission> submitSupportContactForm(String description, String diagnosticsJson, SupportContactFormContextFlow contextFlow) {
-        var request = new SupportContactFormSubmitWhatsAppGraphQlRequest(description, diagnosticsJson, contextFlow);
+        var request = new SupportContactFormSubmitWhatsAppWebGraphQlRequest(description, diagnosticsJson, contextFlow);
         var response = sendGraphQl(request);
-        return SupportContactFormSubmitWhatsAppGraphQlResponse.of(response)
-                .map(SupportContactFormSubmitWhatsAppGraphQlResponse::submission);
+        return SupportContactFormSubmitWhatsAppWebGraphQlResponse.of(response)
+                .map(SupportContactFormSubmitWhatsAppWebGraphQlResponse::submission);
     }
 
     /** {@inheritDoc} */
@@ -20013,7 +20120,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<GroupSuspensionAppeal> appealGroupSuspension(JidProvider groupJid, String appealReason, String clientDebugBundle) {
         var jid = groupJid == null ? null : groupJid.toJid();
-        var request = new GroupSuspensionAppealWhatsAppGraphQlRequest(jid, appealReason, clientDebugBundle);
+        var request = new GroupSuspensionAppealWhatsAppWebGraphQlRequest(jid, appealReason, clientDebugBundle);
         var response = sendGraphQl(request);
         var appealBuilder = new GroupSuspensionAppealEventsEventBuilder()
                 .isAdmin(true);
@@ -20021,39 +20128,27 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             appealBuilder.groupJid(sanitizeGroupJidForWam(jid));
         }
         wamService.commit(appealBuilder.build());
-        return GroupSuspensionAppealWhatsAppGraphQlResponse.of(response)
-                .map(GroupSuspensionAppealWhatsAppGraphQlResponse::appeal);
+        return GroupSuspensionAppealWhatsAppWebGraphQlResponse.of(response)
+                .map(GroupSuspensionAppealWhatsAppWebGraphQlResponse::appeal);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote Field shape is not yet recovered. The {@code inputJson} is passed through as an
-     * opaque pre-encoded JSON object. Replace with a typed input model once the field shape is
-     * captured via a live request.
-     */
+    /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "useWAWebBizAdCreateDraftMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAdDraft> createAdDraft(String inputJson) {
-        var request = new BizAdCreateDraftFacebookGraphQlRequest(inputJson);
+    public Optional<BusinessAdDraft> createAdDraft(LwiBoostedComponentInput input) {
+        var request = new BizAdCreateDraftFacebookGraphQlRequest(input);
         var response = sendGraphQl(request);
         return BizAdCreateDraftFacebookGraphQlResponse.of(response)
                 .flatMap(BizAdCreateDraftFacebookGraphQlResponse::draft);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote Field shape is not yet recovered. The {@code inputJson} is passed through as an
-     * opaque pre-encoded JSON object. Replace with a typed input model once the field shape is
-     * captured via a live request.
-     */
+    /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "useWAWebBizAdEditDraftMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAdDraft> editAdDraft(String inputJson) {
-        var request = new BizAdEditDraftFacebookGraphQlRequest(inputJson);
+    public Optional<BusinessAdDraft> editAdDraft(LwiBoostedComponentInput input) {
+        var request = new BizAdEditDraftFacebookGraphQlRequest(input);
         var response = sendGraphQl(request);
         return BizAdEditDraftFacebookGraphQlResponse.of(response)
                 .flatMap(BizAdEditDraftFacebookGraphQlResponse::draft);
@@ -20064,26 +20159,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @WhatsAppWebExport(moduleName = "useWAWebBizAdDeleteDraftMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAdMutationResult> deleteAdDraft(String draftId) {
-        var inputJson = buildDeleteAdDraftInputJson(draftId);
-        var request = new BizAdDeleteDraftFacebookGraphQlRequest(inputJson);
+        var request = new BizAdDeleteDraftFacebookGraphQlRequest(draftId);
         var response = sendGraphQl(request);
         return BizAdDeleteDraftFacebookGraphQlResponse.of(response)
                 .flatMap(BizAdDeleteDraftFacebookGraphQlResponse::result);
-    }
-
-    /**
-     * Builds the {@code input} JSON object the delete-ad-draft Facebook GraphQL request carries.
-     *
-     * @param draftId the opaque ad-draft identifier the deletion targets, or {@code null} to emit an
-     *                empty object
-     * @return the serialized {@code input} object as a JSON string
-     */
-    private static String buildDeleteAdDraftInputJson(String draftId) {
-        var input = new JSONObject();
-        if (draftId != null) {
-            input.put("draft_id", draftId);
-        }
-        return input.toJSONString();
     }
 
     /** {@inheritDoc} */
@@ -20119,35 +20198,23 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .flatMap(BizAdResumeFacebookGraphQlResponse::result);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote Field shape is not yet recovered. The {@code inputJson} is passed through as an
-     * opaque pre-encoded JSON object. Replace with a typed input model once the field shape is
-     * captured via a live request.
-     */
+    /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "useWAWebBizAdCertifyMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAdMutationResult> certifyAd(String inputJson) {
-        var request = new BizAdCertifyFacebookGraphQlRequest(inputJson);
+    public Optional<BusinessAdMutationResult> certifyAd(String source) {
+        var request = new BizAdCertifyFacebookGraphQlRequest(source);
         var response = sendGraphQl(request);
         return BizAdCertifyFacebookGraphQlResponse.of(response)
                 .flatMap(BizAdCertifyFacebookGraphQlResponse::result);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote Field shape is not yet recovered. The {@code inputJson} is passed through as an
-     * opaque pre-encoded JSON object. Replace with a typed input model once the field shape is
-     * captured via a live request.
-     */
+    /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "LWICometCreateBoostedComponentMutation", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessBoostedComponent> createBoostedComponent(String inputJson) {
-        var request = new CometCreateBoostedComponentFacebookGraphQlRequest(inputJson);
+    public Optional<BusinessBoostedComponent> createBoostedComponent(LwiBoostedComponentInput input) {
+        var request = new CometCreateBoostedComponentFacebookGraphQlRequest(input);
         var response = sendGraphQl(request);
         return CometCreateBoostedComponentFacebookGraphQlResponse.of(response)
                 .flatMap(CometCreateBoostedComponentFacebookGraphQlResponse::component);
@@ -20164,18 +20231,12 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .flatMap(BizAdCreationAdAccountUpdateAdAccountDetailsFacebookGraphQlResponse::adAccount);
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @implNote Field shape is not yet recovered. The {@code inputJson} is passed through as an
-     * opaque pre-encoded JSON object. Replace with a typed input model once the field shape is
-     * captured via a live request.
-     */
+    /** {@inheritDoc} */
     @Override
     @WhatsAppWebExport(moduleName = "useWAWebBizAdCreationAdAccountUpdate_BudgetQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAdBudgetOptions> queryAdBudgetOptions(String inputJson) {
-        var request = new BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlRequest(inputJson);
+    public Optional<BusinessAdBudgetOptions> queryAdBudgetOptions(String legacyAdAccountId, Long budget, String currency) {
+        var request = new BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlRequest(legacyAdAccountId, budget, currency);
         var response = sendGraphQl(request);
         return BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlResponse.of(response)
                 .flatMap(BizAdCreationAdAccountUpdate_BudgetFacebookGraphQlResponse::budgetOptions);
@@ -20243,25 +20304,24 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAdMutationResult> confirmAdEmailOnboarding(BusinessAdEmailOnboardingConfirmation confirmation) {
         Objects.requireNonNull(confirmation, "confirmation cannot be null");
-        var inputJson = buildConfirmAdEmailInputJson(confirmation);
-        var request = new BizAdCreationConfirmEmailOnboardingFacebookGraphQlRequest(inputJson);
+        var request = new BizAdCreationConfirmEmailOnboardingFacebookGraphQlRequest(
+                confirmation.code().map(LiveLinkedWhatsAppClient::sensitiveString).orElse(null),
+                confirmation.email().map(LiveLinkedWhatsAppClient::sensitiveString).orElse(null),
+                confirmation.silentNonce().map(LiveLinkedWhatsAppClient::sensitiveString).orElse(null));
         var response = sendGraphQl(request);
         return BizAdCreationConfirmEmailOnboardingFacebookGraphQlResponse.of(response)
                 .flatMap(BizAdCreationConfirmEmailOnboardingFacebookGraphQlResponse::result);
     }
 
     /**
-     * Builds the {@code input} JSON object the confirm-email-onboarding Facebook GraphQL request carries.
+     * Wraps a plain string in a {@link SensitiveString} for the sensitive-string-typed onboarding
+     * inputs.
      *
-     * @param confirmation the typed email confirmation whose populated fields are emitted
-     * @return the serialized {@code input} object as a JSON string
+     * @param value the string value to wrap
+     * @return the wrapping {@link SensitiveString}
      */
-    private static String buildConfirmAdEmailInputJson(BusinessAdEmailOnboardingConfirmation confirmation) {
-        var input = new JSONObject();
-        confirmation.adAccountId().ifPresent(value -> input.put("ad_account_id", value));
-        confirmation.email().ifPresent(value -> input.put("email", value));
-        confirmation.verificationCode().ifPresent(value -> input.put("verification_code", value));
-        return input.toJSONString();
+    private static SensitiveString sensitiveString(String value) {
+        return new SensitiveStringBuilder().value(value).build();
     }
 
     /** {@inheritDoc} */
@@ -20270,24 +20330,11 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public Optional<BusinessAdMutationResult> sendAdEmailVerificationCode(BusinessAdEmailVerificationCodeRequest request) {
         Objects.requireNonNull(request, "request cannot be null");
-        var inputJson = buildSendAdEmailVerificationInputJson(request);
-        var relayRequest = new BizAdCreationSendEmailVerificationCodeFacebookGraphQlRequest(inputJson);
+        var relayRequest = new BizAdCreationSendEmailVerificationCodeFacebookGraphQlRequest(
+                request.email().map(LiveLinkedWhatsAppClient::sensitiveString).orElse(null));
         var response = sendGraphQl(relayRequest);
         return BizAdCreationSendEmailVerificationCodeFacebookGraphQlResponse.of(response)
                 .flatMap(BizAdCreationSendEmailVerificationCodeFacebookGraphQlResponse::result);
-    }
-
-    /**
-     * Builds the {@code input} JSON object the send-email-verification-code Facebook GraphQL request carries.
-     *
-     * @param request the typed verification-code request whose populated fields are emitted
-     * @return the serialized {@code input} object as a JSON string
-     */
-    private static String buildSendAdEmailVerificationInputJson(BusinessAdEmailVerificationCodeRequest request) {
-        var input = new JSONObject();
-        request.adAccountId().ifPresent(value -> input.put("ad_account_id", value));
-        request.email().ifPresent(value -> input.put("email", value));
-        return input.toJSONString();
     }
 
     /** {@inheritDoc} */
@@ -20297,7 +20344,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public Optional<BusinessAdAudienceSection> queryAdAudienceSection(BusinessAdAudienceSectionQuery query) {
         Objects.requireNonNull(query, "query cannot be null");
         var request = new BizAdCreationAudienceSectionFacebookGraphQlRequest(
-                query.inputJson().orElse(null),
+                query.input().orElse(null),
                 query.objective().orElse(null),
                 query.budgetMicros().isPresent() ? query.budgetMicros().getAsLong() : null,
                 query.budgetType().orElse(null),
@@ -20391,7 +20438,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         Objects.requireNonNull(query, "query cannot be null");
         var request = new BizAdCreationSuggestedInterestsFacebookGraphQlRequest(
                 query.adAccountId().orElse(null),
-                query.detailedTargetingItemsJson().orElse(null),
+                query.detailedTargetingItems(),
                 query.count().isPresent() ? query.count().getAsInt() : null);
         var response = sendGraphQl(request);
         return BizAdCreationSuggestedInterestsFacebookGraphQlResponse.of(response)
@@ -20486,7 +20533,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     public Optional<BusinessAdCreationScreen> queryAdCreationRoot(BusinessAdCreationRootQuery query) {
         Objects.requireNonNull(query, "query cannot be null");
         var request = new BizAdCreationRootFacebookGraphQlRequest(
-                query.inputJson().orElse(null),
+                query.input().orElse(null),
                 query.draftId().orElse(null),
                 query.facebookAccountLinked(),
                 query.whatsAppAccountLinked(),
@@ -20516,7 +20563,6 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 query.primaryPageId().orElse(null),
                 query.secondaryPageId().orElse(null),
                 query.draftPageId().orElse(null),
-                query.optionsJson().orElse(null),
                 query.pageSize().isPresent() ? query.pageSize().getAsInt() : null,
                 query.afterCursor().orElse(null));
         var response = sendGraphQl(request);
@@ -20528,8 +20574,8 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     @WhatsAppWebExport(moduleName = "WAWebBizAdCreationSummaryContentQuery", exports = "default",
             adaptation = WhatsAppAdaptation.ADAPTED)
-    public Optional<BusinessAdCreationSummary> queryAdCreationSummaryContent(String assetId, String budgetJson) {
-        var request = new BizAdCreationSummaryContentFacebookGraphQlRequest(assetId, budgetJson);
+    public Optional<BusinessAdCreationSummary> queryAdCreationSummaryContent(String assetId, Long budget, String budgetType, String currency, Integer durationInDays) {
+        var request = new BizAdCreationSummaryContentFacebookGraphQlRequest(assetId, budget, budgetType, currency, durationInDays);
         var response = sendGraphQl(request);
         emitCtwaAdJourneyEvent(LwiSurface.AD_DESIGN, nextWamUnifiedSessionId(), null);
         return BizAdCreationSummaryContentFacebookGraphQlResponse.of(response)
@@ -20556,10 +20602,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         Objects.requireNonNull(query, "query cannot be null");
         var request = new EstimatedDailyReachFacebookGraphQlRequest(
                 query.adAccountId().orElse(null),
-                query.targetingSpecAudienceJson().orElse(null),
-                query.optimizationGoalInputJson().orElse(null),
-                query.audienceOptionAudienceJson().orElse(null),
-                query.configuredPlacementSpecJson().orElse(null),
+                query.targetingSpecAudience().orElse(null),
+                query.optimizationGoalInput().orElse(null),
+                query.audienceOptionAudience().orElse(null),
+                query.configuredPlacementSpec().orElse(null),
                 query.currency().orElse(null),
                 query.postId().orElse(null),
                 query.flowId().orElse(null),
@@ -20579,7 +20625,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 tuning.adAccountId().orElse(null),
                 tuning.targetingSpec().orElse(null),
                 tuning.regulatedCategory().orElse(null),
-                tuning.tuningOptionsJson().orElse(null));
+                tuning.tuningOptions().orElse(null));
         var response = sendGraphQl(request);
         return CometRegulatedCategoryUtilsTuningFacebookGraphQlResponse.of(response)
                 .map(CometRegulatedCategoryUtilsTuningFacebookGraphQlResponse::result);
@@ -20593,10 +20639,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         Objects.requireNonNull(tuning, "tuning cannot be null");
         var request = new CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookGraphQlRequest(
                 tuning.adAccountId().orElse(null),
-                tuning.targetingSpecJson().orElse(null),
-                tuning.regulatedCategoriesJson().orElse(null),
-                tuning.specialAdCategoryCountriesJson().orElse(null),
-                tuning.tuningOptionsJson().orElse(null));
+                tuning.targetSpec().orElse(null),
+                tuning.regulatedCategories(),
+                tuning.specialAdCategoryCountries(),
+                tuning.tuningOptions().orElse(null));
         var response = sendGraphQl(request);
         return CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookGraphQlResponse.of(response)
                 .map(CometRegulatedCategoryUtilsTuningRegulatedCategoriesFacebookGraphQlResponse::result);

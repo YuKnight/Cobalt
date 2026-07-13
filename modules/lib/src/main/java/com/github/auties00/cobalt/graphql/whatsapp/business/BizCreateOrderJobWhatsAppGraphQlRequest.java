@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,7 +15,7 @@ import java.io.UncheckedIOException;
 import java.util.List;
 
 /**
- * Builds the relay mutation that places a WhatsApp Business catalog order on behalf of a buyer.
+ * Builds the graph.whatsapp.com GraphQL mutation that places a WhatsApp Business catalog order on behalf of a buyer.
  *
  * <p>The single {@code input} GraphQL variable wraps an {@code order} object. WhatsApp Web's
  * {@code WAWebBizCreateOrderJob.createOrderMD} fills it with the seller {@code jid}, a
@@ -21,7 +23,7 @@ import java.util.List;
  * {@code direct_connection_encrypted_info} blob carried for direct-connection checkouts. Each line
  * item names the product {@code id}, {@code name} and {@code quantity}, and optionally its
  * {@code currency}, unit {@code price} (the {@code priceAmount1000} thousandths serialized as a
- * decimal string) and {@code variant_info} attributes. The relay returns the placed order under
+ * decimal string) and {@code variant_info} attributes. The graph.whatsapp.com endpoint returns the placed order under
  * {@code xwa_checkout_place_order}; the reply is consumed through
  * {@link BizCreateOrderJobWhatsAppGraphQlResponse}.
  *
@@ -30,10 +32,10 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebBizCreateOrderJobMutation")
 public final class BizCreateOrderJobWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebBizCreateOrderJobMutation.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -411,5 +413,21 @@ public final class BizCreateOrderJobWhatsAppGraphQlRequest implements WhatsAppGr
             writer.writeString(value != null ? value : "");
             writer.endObject();
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

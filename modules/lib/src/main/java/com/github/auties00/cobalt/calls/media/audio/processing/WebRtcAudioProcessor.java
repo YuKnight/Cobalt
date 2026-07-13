@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.media.audio.processing;
 
 import com.github.auties00.cobalt.calls.media.audio.processing.bindings.CobaltWebRtcApm;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.NativeLibLoader;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -48,6 +50,11 @@ import java.util.Objects;
  * the WebRTC APM defaults the shim applies.
  */
 public final class WebRtcAudioProcessor implements AutoCloseable {
+    /**
+     * The logger for {@link WebRtcAudioProcessor}.
+     */
+    private static final System.Logger LOGGER = Log.get(WebRtcAudioProcessor.class);
+
     /**
      * The fixed call audio sample rate in hertz: 16 kHz mono, matching the call codec configuration and
      * the capture pump's sample rate.
@@ -222,6 +229,7 @@ public final class WebRtcAudioProcessor implements AutoCloseable {
         this.config = Objects.requireNonNull(config, "config cannot be null");
         // TODO: build the webrtc audio processing archive into cobalt native so the shim symbols resolve; until then they are absent, this processor cannot be constructed, and the media plane leaves the live capture unconditioned
         if (!nativeApmAvailable()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "webrtc apm shim unavailable, live capture stays unconditioned");
             throw new IllegalStateException(
                     "WebRTC APM shim is not available in cobalt-native; live capture stays unconditioned");
         }
@@ -238,9 +246,14 @@ public final class WebRtcAudioProcessor implements AutoCloseable {
             this.captureFrame = arena.allocate((long) APM_FRAME_SAMPLES * Float.BYTES);
             this.referenceFrame = arena.allocate((long) APM_FRAME_SAMPLES * Float.BYTES);
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "webrtc apm create failed", e);
             destroyApm();
             arena.close();
             throw e;
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "webrtc apm created aecMode={0} ns={1} denoiser={2} agc={3}",
+                    config.aecMode(), config.noiseSuppression(), config.useDenoiser(), config.automaticGainControl());
         }
     }
 
@@ -295,6 +308,7 @@ public final class WebRtcAudioProcessor implements AutoCloseable {
             throw new IllegalArgumentException(
                     "capture, reference, and out must each hold at least " + BLOCK_SAMPLES + " samples");
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "webrtc apm process block samples={0}", BLOCK_SAMPLES);
         for (var frame = 0; frame < FRAMES_PER_BLOCK; frame++) {
             var offset = frame * APM_FRAME_SAMPLES;
             pcmToFloat(reference, offset, referenceFrame);
@@ -322,6 +336,7 @@ public final class WebRtcAudioProcessor implements AutoCloseable {
         if (apm.equals(MemorySegment.NULL)) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "webrtc apm stream delay updated delayMs={0}", delayMs);
         apmCall("set_stream_delay_ms", CobaltWebRtcApm.cobalt_webrtc_apm_set_stream_delay_ms(apm, delayMs));
     }
 
@@ -336,6 +351,7 @@ public final class WebRtcAudioProcessor implements AutoCloseable {
         if (apm.equals(MemorySegment.NULL)) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "webrtc apm closed");
         destroyApm();
         arena.close();
     }
@@ -379,6 +395,7 @@ public final class WebRtcAudioProcessor implements AutoCloseable {
      */
     private static void apmCall(String call, int rc) {
         if (rc != CobaltWebRtcApm.COBALT_APM_OK()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "webrtc apm call {0} failed rc={1}", call, rc);
             throw new WhatsAppCallException.AudioProcessing("cobalt_webrtc_apm_" + call + " returned " + rc);
         }
     }
@@ -413,6 +430,7 @@ public final class WebRtcAudioProcessor implements AutoCloseable {
                     .find("cobalt_webrtc_apm_create")
                     .isPresent();
         } catch (Throwable t) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "webrtc apm availability probe failed", t);
             return false;
         }
     }

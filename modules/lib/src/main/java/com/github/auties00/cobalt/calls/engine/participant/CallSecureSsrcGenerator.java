@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
@@ -41,6 +43,11 @@ import java.util.Objects;
  *           HKDF is computed through {@link VoipCryptoNative}.
  */
 public final class CallSecureSsrcGenerator {
+    /**
+     * The logger for {@link CallSecureSsrcGenerator}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallSecureSsrcGenerator.class);
+
     /**
      * Holds the media type code of a receive (incoming) primary stream.
      */
@@ -129,15 +136,14 @@ public final class CallSecureSsrcGenerator {
      * @throws NullPointerException       if {@code callId} or {@code deviceJid} is {@code null}
      * @throws WhatsAppCallException.Srtp if the HKDF computation fails
      */
-    public static int ssrc(String callId, CallDeviceJid deviceJid, int mediaType, int streamId) {
+    public static int ssrc(String callId, Jid deviceJid, int mediaType, int streamId) {
         Objects.requireNonNull(callId, "callId cannot be null");
         Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
-        var jid = deviceJid.jid();
         // The identifier is always "<user>:<device>@<server>" with the device present even for the
         // primary device 0, whereas Jid.toString() omits ":0" for the primary; build it explicitly so a
         // device 0 participant derives the same SSRC the peer registers in advance. Call participant JIDs
         // are agentless LID device JIDs, so no agent component appears.
-        var base = jid.user() + ":" + jid.device() + "@" + jid.server();
+        var base = deviceJid.user() + ":" + deviceJid.device() + "@" + deviceJid.server();
         var identifier = streamId > 0 ? base + "_" + streamId : base;
         var salt = new byte[]{
                 (byte) mediaType, (byte) (mediaType >>> 8),
@@ -147,10 +153,15 @@ public final class CallSecureSsrcGenerator {
                 salt,
                 identifier.getBytes(StandardCharsets.US_ASCII),
                 SSRC_BYTES);
-        return (okm[0] & 0xff)
+        var ssrc = (okm[0] & 0xff)
                 | (okm[1] & 0xff) << 8
                 | (okm[2] & 0xff) << 16
                 | (okm[3] & 0xff) << 24;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "derived ssrc for device {0} mediaType={1} streamId={2}",
+                    deviceJid, mediaType, streamId);
+        }
+        return ssrc;
     }
 
     /**
@@ -159,7 +170,7 @@ public final class CallSecureSsrcGenerator {
      * <p>The three SSRCs are derived with media type codes {@link #MEDIA_TYPE_RX},
      * {@link #MEDIA_TYPE_RX_FEC}, and {@link #MEDIA_TYPE_RX_OOB_NACK}. A device's audio stream uses this
      * {@code 0}/{@code 1}/{@code 4} code family, while a device's video streams use the
-     * {@code 2}/{@code 3}/{@code 5} family of {@link #videoTriple(String, CallDeviceJid, int)}; a 1:1
+     * {@code 2}/{@code 3}/{@code 5} family of {@link #videoTriple(String, Jid, int)}; a 1:1
      * audio call only ever sends the audio primary.
      *
      * @param callId    the {@code call-id} string from the offer
@@ -168,7 +179,7 @@ public final class CallSecureSsrcGenerator {
      * @throws NullPointerException       if {@code callId} or {@code deviceJid} is {@code null}
      * @throws WhatsAppCallException.Srtp if an HKDF computation fails
      */
-    public static SsrcTriple audioTriple(String callId, CallDeviceJid deviceJid) {
+    public static SsrcTriple audioTriple(String callId, Jid deviceJid) {
         return new SsrcTriple(
                 ssrc(callId, deviceJid, MEDIA_TYPE_RX, FIRST_STREAM_ID),
                 ssrc(callId, deviceJid, MEDIA_TYPE_RX_FEC, FIRST_STREAM_ID),
@@ -191,7 +202,7 @@ public final class CallSecureSsrcGenerator {
      * @throws NullPointerException       if {@code callId} or {@code deviceJid} is {@code null}
      * @throws WhatsAppCallException.Srtp if an HKDF computation fails
      */
-    public static SsrcTriple videoTriple(String callId, CallDeviceJid deviceJid, int videoStreamId) {
+    public static SsrcTriple videoTriple(String callId, Jid deviceJid, int videoStreamId) {
         return new SsrcTriple(
                 ssrc(callId, deviceJid, MEDIA_TYPE_TX, videoStreamId),
                 ssrc(callId, deviceJid, MEDIA_TYPE_TX_FEC, videoStreamId),
@@ -203,7 +214,7 @@ public final class CallSecureSsrcGenerator {
      *
      * <p>This is the SSRC the peer registers a receive context for, so the local sender stamps it onto
      * its outbound audio RTP and declares it in the relay stream descriptor publish. A 1:1 audio call
-     * only ever sends this stream. It is the primary of {@link #audioTriple(String, CallDeviceJid)}.
+     * only ever sends this stream. It is the primary of {@link #audioTriple(String, Jid)}.
      *
      * @param callId    the {@code call-id} string from the offer
      * @param deviceJid the transmitting participant device
@@ -211,7 +222,7 @@ public final class CallSecureSsrcGenerator {
      * @throws NullPointerException       if {@code callId} or {@code deviceJid} is {@code null}
      * @throws WhatsAppCallException.Srtp if the HKDF computation fails
      */
-    public static int audioMainSsrc(String callId, CallDeviceJid deviceJid) {
+    public static int audioMainSsrc(String callId, Jid deviceJid) {
         return ssrc(callId, deviceJid, MEDIA_TYPE_RX, FIRST_STREAM_ID);
     }
 
@@ -224,7 +235,7 @@ public final class CallSecureSsrcGenerator {
      * @throws NullPointerException       if {@code callId} or {@code deviceJid} is {@code null}
      * @throws WhatsAppCallException.Srtp if the HKDF computation fails
      */
-    public static int appDataSsrc(String callId, CallDeviceJid deviceJid) {
+    public static int appDataSsrc(String callId, Jid deviceJid) {
         return ssrc(callId, deviceJid, MEDIA_TYPE_APP_DATA, FIRST_STREAM_ID);
     }
 
@@ -237,7 +248,7 @@ public final class CallSecureSsrcGenerator {
      * @throws NullPointerException       if {@code callId} or {@code deviceJid} is {@code null}
      * @throws WhatsAppCallException.Srtp if the HKDF computation fails
      */
-    public static int imuDataSsrc(String callId, CallDeviceJid deviceJid) {
+    public static int imuDataSsrc(String callId, Jid deviceJid) {
         return ssrc(callId, deviceJid, MEDIA_TYPE_IMU_DATA, FIRST_STREAM_ID);
     }
 

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +36,11 @@ import java.util.List;
  * resolve the range upstream.
  */
 public final class ArchiveChatMutationFactory {
+    /**
+     * The logger for {@link ArchiveChatMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(ArchiveChatMutationFactory.class);
+
     /**
      * The pin-chat factory consulted to emit the companion unpin mutation when archiving.
      *
@@ -97,6 +104,7 @@ public final class ArchiveChatMutationFactory {
             Jid chatJid,
             SyncActionMessageRange messageRange
     ) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building archive chat mutation chat={0} archived={1}", chatJid, archived);
         var action = new ArchiveChatActionBuilder()
                 .archived(archived)
                 .messageRange(messageRange)
@@ -148,6 +156,7 @@ public final class ArchiveChatMutationFactory {
         var mutations = new ArrayList<SyncPendingMutation>();
         mutations.add(getArchiveChatMutation(timestamp, archived, chatJid, messageRange));
         if (archived) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "archiving chat={0} also unpins it", chatJid);
             mutations.add(pinChatMutationFactory.getPinMutation(timestamp, false, chatJid));
         }
         return mutations;

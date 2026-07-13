@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the brand-id resolution query built by
+ * Parses the graph.whatsapp.com GraphQL response of the brand-id resolution query built by
  * {@link GetNumbersForBrandIdsJobWhatsAppGraphQlRequest} into a list of {@link BrandPhoneNumberMapping}.
  *
  * <p>Reads the linked root {@code xwa_get_numbers_for_brand_ids -> brand_ids_data} and projects each
@@ -41,7 +41,7 @@ public final class GetNumbersForBrandIdsJobWhatsAppGraphQlResponse implements Wh
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_get_numbers_for_brand_ids -> brand_ids_data} and projects each
      * record onto a {@link BrandPhoneNumberMapping}; the returned {@link Optional} is empty when
@@ -114,7 +114,7 @@ public final class GetNumbersForBrandIdsJobWhatsAppGraphQlResponse implements Wh
     /**
      * Returns the parsed per-brand mappings.
      *
-     * @return the parsed mappings, empty when the relay returned none
+     * @return the parsed mappings, empty when the graph.whatsapp.com endpoint returned none
      */
     public List<BrandPhoneNumberMapping> mappings() {
         return mappings;

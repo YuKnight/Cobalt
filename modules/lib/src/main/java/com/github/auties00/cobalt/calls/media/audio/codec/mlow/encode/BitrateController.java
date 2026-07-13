@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.EncoderTables;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Per subframe target bitrate controller of the MLow speech encoder.
@@ -151,6 +154,11 @@ public final class BitrateController {
     private static final float[] HR_NONFLAT_THRESHOLDS = {0.5f, 0.0f};
 
     /**
+     * The logger for {@link BitrateController}.
+     */
+    private static final System.Logger LOGGER = Log.get(BitrateController.class);
+
+    /**
      * The previous frame's voicing decision.
      *
      * <p>Read to bump the importance on a voicing transition and overwritten at the end of each rate point loop
@@ -249,6 +257,9 @@ public final class BitrateController {
             bitrateDeltaSmth[r] = 0.0f;
             rateContBitrate[r] = 0.0f;
             adjustmentFactor[r] = 1.0f;
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "bitrate controller reset");
         }
     }
 
@@ -382,6 +393,10 @@ public final class BitrateController {
             prevVoiced = voiced;
         }
 
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "rate control: lowRate={0} mainBitRate={1} voiced={2} maxPulses={3} importance={4}",
+                    lowRate, mainBitRate, voiced, maxPulsesPerSubfr[IDX_MAIN], subfrImportance[IDX_MAIN]);
+        }
         return new Allocation(maxPulsesPerSubfr, subfrImportance);
     }
 
@@ -418,6 +433,10 @@ public final class BitrateController {
                 bitrateDeltaSmth[r] = Math.max(Math.min(bitrateDeltaSmth[r], RATE_CONT_CLAMP_MAX), RATE_CONT_CLAMP_MIN);
                 adjustmentFactor[r] = Math.max(1.0f - bitrateDeltaSmth[r], 0.0f);
             }
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "rate control feedback: mainBitRate={0} adjustmentFactor={1} deltaSmth={2}",
+                    mainBitRate, adjustmentFactor[IDX_MAIN], bitrateDeltaSmth[IDX_MAIN]);
         }
     }
 
@@ -620,6 +639,9 @@ public final class BitrateController {
         }
         mainBitRate = Math.max(Math.min(mainBitRate, 30000), 3000);
         fecBitRate = Math.max(Math.min(fecBitRate, 30000), 0);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rate split: requested={0} main={1} fec={2}", bitRate, mainBitRate, fecBitRate);
+        }
         return new RateSplit(mainBitRate, fecBitRate);
     }
 

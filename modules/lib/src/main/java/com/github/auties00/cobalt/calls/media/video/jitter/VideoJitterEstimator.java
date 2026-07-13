@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.media.video.jitter;
 
 import com.github.auties00.cobalt.calls.media.audio.neteq.MovingMedianFilter;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Estimates the network jitter of a video stream with a two state Kalman filter over frame size and
@@ -37,6 +40,11 @@ import com.github.auties00.cobalt.calls.media.audio.neteq.MovingMedianFilter;
  * clock pace regardless of the stream's frame rate.
  */
 public final class VideoJitterEstimator {
+    /**
+     * The logger for {@link VideoJitterEstimator}.
+     */
+    private static final System.Logger LOGGER = Log.get(VideoJitterEstimator.class);
+
     /**
      * The Kalman process noise gain on the transmission rate state.
      *
@@ -347,8 +355,16 @@ public final class VideoJitterEstimator {
             var outlierResidualMs = (residualMs >= 0.0 ? NUM_STD_DEV_DELAY_OUTLIER : -NUM_STD_DEV_DELAY_OUTLIER)
                     * noiseStdDev;
             updateNoiseEstimate(outlierResidualMs, nowMs);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "video jitter estimator: delay outlier rejected, residualMs={0}", residualMs);
+            }
         }
-        return jitterEstimateMs();
+        var estimate = jitterEstimateMs();
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "video jitter estimator: frameSizeBytes={0} frameDelayMs={1} jitterMs={2}",
+                    frameSizeBytes, frameDelayMs, estimate);
+        }
+        return estimate;
     }
 
     /**
@@ -430,6 +446,7 @@ public final class VideoJitterEstimator {
         frameIntervalSumMs = 0.0;
         lastFrameTimeMs = -1;
         frameSizeFilter.reset();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "video jitter estimator: reset");
     }
 
     /**
@@ -531,12 +548,14 @@ public final class VideoJitterEstimator {
      * folded in unclamped because the caller has already bounded the delay it derives from to
      * {@link #NUM_STD_DEV_DELAY_CLAMP} standard deviations.
      *
+     * @implNote This implementation omits the {@code use_proportional_decay}, {@code enable_time_based_fps},
+     * and {@code apply_var_fix} jitter estimator variants: all three default off in WhatsApp's production
+     * configuration, so this unconditional path matches the shipped behaviour and the switches are not
+     * modelled.
      * @param residualMs the delay residual, in milliseconds
      * @param nowMs      the current time in milliseconds, from a monotonic source
      */
     private void updateNoiseEstimate(double residualMs, long nowMs) {
-        // TODO: the use_proportional_decay, enable_time_based_fps, and apply_var_fix jitter estimator
-        // TODO: config switches are unimplemented; all three default off in the production configuration.
         updateFrameRate(nowMs);
         if (alphaCount < ALPHA_COUNT_MAX) {
             alphaCount += 1.0;

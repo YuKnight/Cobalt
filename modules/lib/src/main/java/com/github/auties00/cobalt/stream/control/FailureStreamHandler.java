@@ -2,15 +2,18 @@ package com.github.auties00.cobalt.stream.control;
 
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppConnectionException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppConnectionException;
 import com.github.auties00.cobalt.exception.WhatsAppException;
-import com.github.auties00.cobalt.exception.WhatsAppServerRuntimeException;
-import com.github.auties00.cobalt.exception.WhatsAppSessionException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppServerRuntimeException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppSessionException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.NodeStreamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Handles {@code <failure>} stanzas that report session-fatal error conditions during or after the post-handshake
@@ -34,10 +37,9 @@ import com.github.auties00.cobalt.stream.NodeStreamService;
 public final class FailureStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
-     * The system logger used to record every received failure stanza and any reason codes that do not trigger an
-     * exception dispatch.
+     * The logger for {@link FailureStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(FailureStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(FailureStreamHandler.class);
 
     /**
      * The {@code reason=400} (generic failure) code, logged at {@code WARNING} with no recovery dispatch.
@@ -134,14 +136,16 @@ public final class FailureStreamHandler extends SocketStreamHandler.Concurrent {
         var logoutMessageSubtext = stanza.getAttributeAsString("logout_message_subtext", null);
         var logoutMessageLocale = stanza.getAttributeAsString("logout_message_locale", null);
 
-        LOGGER.log(System.Logger.Level.WARNING,
-                "Received failure stanza: reason={0}, location={1}, code={2}, expire={3}, message={4}, url={5}",
-                reason,
-                location,
-                code,
-                expire,
-                message,
-                url);
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING,
+                    "received failure stanza reason={0} location={1} code={2} expire={3} message={4} url={5}",
+                    reason,
+                    location,
+                    code,
+                    expire,
+                    message,
+                    url);
+        }
 
         if (reason == null) {
             whatsapp.handleFailure(new WhatsAppServerRuntimeException(
@@ -177,12 +181,16 @@ public final class FailureStreamHandler extends SocketStreamHandler.Concurrent {
                 }
             }
             case REASON_GENERIC_FAILURE, REASON_INTERNAL_SERVER_ERROR, REASON_EXPERIMENTAL -> {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Server failure code {0}, no action taken", reason);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "server failure code={0}, no action taken", reason);
+                }
             }
             case REASON_SERVICE_UNAVAILABLE -> {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Service unavailable (reason {0})", reason);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "service unavailable reason={0}", reason);
+                }
             }
             default -> {
                 whatsapp.handleFailure(new WhatsAppServerRuntimeException(

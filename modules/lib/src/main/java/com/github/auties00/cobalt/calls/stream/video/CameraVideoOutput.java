@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.calls.stream.video;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecParameters;
 import com.github.auties00.cobalt.util.ffmpeg.AVFormatContext;
 import com.github.auties00.cobalt.util.ffmpeg.AVFrame;
@@ -10,11 +11,14 @@ import com.github.auties00.cobalt.util.ffmpeg.Ffmpeg;
 import com.github.auties00.cobalt.util.ffmpeg.FFmpegError;
 import com.github.auties00.cobalt.util.ffmpeg.FFmpegLoader;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import com.github.auties00.cobalt.calls.stream.AudioFrame;
+import com.github.auties00.cobalt.calls.stream.AudioOutput;
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoOutput;
 import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
@@ -58,8 +62,12 @@ import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
  *       no stable default index</li>
  * </ul>
  *
- * <p>Capture is blocking: {@link #take()} returns once a frame is available, or {@code null} when the
+ * <p>Capture is blocking: {@link #takeVideo()} returns once a frame is available, or {@code null} when the
  * device closes. {@link #shutdown()} releases the operating system device and the native decoder.
+ *
+ * <p>As a {@link VideoOutput} it is also an {@link AudioOutput}; a camera carries no audio, so the audio
+ * side is generated silence. Pass a real audio source through the output-only or input-only call overloads
+ * to send live audio alongside the camera.
  *
  * @implNote This implementation configures the capture device to the resolution it will encode at rather
  * than grabbing native and rescaling, matching WhatsApp, through the {@code video_size}/{@code framerate}
@@ -69,10 +77,15 @@ import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
  * derived RTP timestamp never moves backward. The frame path allocates nothing per frame once running: each
  * captured picture is written into one reusable I420 pixel buffer (and, on the rescale path, through one
  * reusable libswscale scratch buffer), and that pixel buffer is lent to the returned {@link VideoFrame} under
- * the {@link VideoOutput#take()} borrow contract.
+ * the {@link VideoOutput#takeVideo()} borrow contract.
  */
 public sealed class CameraVideoOutput implements VideoOutput
         permits ScreenVideoOutput {
+    /**
+     * The logger for {@link CameraVideoOutput}.
+     */
+    private static final System.Logger LOGGER = Log.get(CameraVideoOutput.class);
+
     /**
      * Holds the advertised frame rate a native path capture source reports, since the device's blocking read
      * paces the stream to its own rate when no {@code framerate} is requested.
@@ -123,10 +136,16 @@ public sealed class CameraVideoOutput implements VideoOutput
     private final int bitrate;
 
     /**
-     * Guards {@link #shutdown()} so the device is released at most once, and read by {@link #take()} to end
+     * Guards {@link #shutdown()} so the device is released at most once, and read by {@link #takeVideo()} to end
      * once the source is closed.
      */
     private final AtomicBoolean closed = new AtomicBoolean();
+
+    /**
+     * Holds the composed silence audio companion supplying the audio side of this source, since a camera
+     * carries no audio; the inherited {@link AudioOutput} methods delegate to it.
+     */
+    private final AudioOutput audio = AudioOutput.fromSilence();
 
     /**
      * Holds the arena owning every native allocation this source makes, closed when the source shuts
@@ -165,9 +184,9 @@ public sealed class CameraVideoOutput implements VideoOutput
      *
      * <p>The advertised geometry is fixed for the source's life, so every frame occupies exactly
      * {@link #width()} by {@link #height()} I420 bytes; this one buffer is filled afresh by each
-     * {@link #take()} and lent to the returned {@link VideoFrame} rather than allocating per frame. The lend
-     * is governed by the {@link VideoOutput#take()} borrow contract: the buffer is valid only until the next
-     * {@link #take()}, so a consumer that retains a frame past that point copies the pixels out first.
+     * {@link #takeVideo()} and lent to the returned {@link VideoFrame} rather than allocating per frame. The lend
+     * is governed by the {@link VideoOutput#takeVideo()} borrow contract: the buffer is valid only until the next
+     * {@link #takeVideo()}, so a consumer that retains a frame past that point copies the pixels out first.
      */
     private final byte[] pixelBuffer;
 
@@ -336,7 +355,7 @@ public sealed class CameraVideoOutput implements VideoOutput
      * {@link CapturedInput} it returns; this constructor adopts that geometry together with the probe's
      * demuxer, decoder, packet, and frame handles and its arena, and records the advertised frame rate and
      * bitrate. It also allocates the reusable {@link #pixelBuffer} sized to the advertised I420 geometry,
-     * which every {@link #take()} refills and lends. The probe already releases its arena on any open
+     * which every {@link #takeVideo()} refills and lends. The probe already releases its arena on any open
      * failure, so reaching this constructor means the pipeline is ready and nothing leaks here.
      *
      * @param in      the opened and probed capture device whose geometry and native handles this source
@@ -368,8 +387,8 @@ public sealed class CameraVideoOutput implements VideoOutput
      * an unrecoverable end of input or once {@link #shutdown()} has ended the source.
      *
      * <p>The returned frame's pixels are lent from the {@link #pixelBuffer} this source reuses across calls,
-     * so a caller that retains the frame past the next {@link #take()} copies the pixels out first, per the
-     * {@link VideoOutput#take()} borrow contract.
+     * so a caller that retains the frame past the next {@link #takeVideo()} copies the pixels out first, per the
+     * {@link VideoOutput#takeVideo()} borrow contract.
      *
      * @return {@inheritDoc}
      * @implNote This implementation does not sleep between frames: the device read blocks until a frame
@@ -378,7 +397,7 @@ public sealed class CameraVideoOutput implements VideoOutput
      * capture allocates nothing on the frame path.
      */
     @Override
-    public VideoFrame take() {
+    public VideoFrame takeVideo() {
         if (closed.get()) {
             return null;
         }
@@ -386,10 +405,12 @@ public sealed class CameraVideoOutput implements VideoOutput
             int read;
             try {
                 read = Ffmpeg.av_read_frame(formatCtx, packet);
-            } catch (RuntimeException _) {
+            } catch (RuntimeException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "camera device read raised, ending capture", e);
                 return null;
             }
             if (read < 0) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "camera device read ended, code={0}", read);
                 return null;
             }
             try {
@@ -398,6 +419,10 @@ public sealed class CameraVideoOutput implements VideoOutput
                 }
                 var sent = Ffmpeg.avcodec_send_packet(codecCtx, packet);
                 if (sent < 0 && !FFmpegError.isAgain(sent)) {
+                    if (Log.ERROR) {
+                        LOGGER.log(Level.ERROR, "camera decode send_packet failed: {0}",
+                                FFmpegError.describe(sent));
+                    }
                     throw new IllegalStateException("avcodec_send_packet failed: "
                             + FFmpegError.describe(sent));
                 }
@@ -406,6 +431,9 @@ public sealed class CameraVideoOutput implements VideoOutput
                     continue;
                 }
                 if (got < 0) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "camera decoder receive_frame failed, code={0}", got);
+                    }
                     return null;
                 }
                 try {
@@ -431,6 +459,8 @@ public sealed class CameraVideoOutput implements VideoOutput
         if (!closed.compareAndSet(false, true)) {
             return;
         }
+        if (Log.INFO) LOGGER.log(Level.INFO, "shutting down camera capture");
+        audio.shutdown();
         try (arena) {
             if (swsCtx != null && swsCtx.address() != 0L) {
                 Ffmpeg.sws_freeContext(swsCtx);
@@ -469,13 +499,49 @@ public sealed class CameraVideoOutput implements VideoOutput
     /**
      * {@inheritDoc}
      *
-     * <p>A device backed source fills itself from the capture device inside {@link #take()} and ignores
+     * <p>A device backed source fills itself from the capture device inside {@link #takeVideo()} and ignores
      * application writes, so this does nothing.
      *
      * @param frame the frame that would be written; ignored
      */
     @Override
-    public void write(VideoFrame frame) {
+    public void writeVideo(VideoFrame frame) {
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Ignored: the audio companion generates its own frames inside {@link #takeAudio()}.
+     *
+     * @param frame the frame that would be written; ignored
+     * @throws InterruptedException if the calling thread is interrupted while waiting for buffer space
+     */
+    @Override
+    public void writeAudio(AudioFrame frame) throws InterruptedException {
+        audio.writeAudio(frame);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Yields a silence frame from the composed audio companion, since a camera carries no audio.
+     *
+     * @return a silence frame; never {@code null} until shut down
+     * @throws InterruptedException if the calling thread is interrupted while waiting
+     */
+    @Override
+    public AudioFrame takeAudio() throws InterruptedException {
+        return audio.takeAudio();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @return {@code false}; generated silence is not live acoustic capture
+     */
+    @Override
+    public boolean isLiveCapture() {
+        return audio.isLiveCapture();
     }
 
     /**
@@ -643,6 +709,9 @@ public sealed class CameraVideoOutput implements VideoOutput
         var h = AVFrame.height(frame);
         var srcFmt = AVFrame.format(frame);
         if (w < 2 || h < 2 || (w & 1) != 0 || (h & 1) != 0) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "captured frame has unsupported dimensions {0}x{1}", w, h);
+            }
             throw new IllegalStateException(
                     "captured frame has unsupported dimensions " + w + "x" + h);
         }
@@ -724,6 +793,9 @@ public sealed class CameraVideoOutput implements VideoOutput
             if (swsCtx != null && swsCtx.address() != 0L) {
                 Ffmpeg.sws_freeContext(swsCtx);
             }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "(re)building sws scaler {0}x{1} -> {2}x{3}", w, h, dstW, dstH);
+            }
             swsCtx = FFmpegError.requireNonNull("sws_getContext",
                     Ffmpeg.sws_getContext(w, h, srcFmt, dstW, dstH, Ffmpeg.AV_PIX_FMT_YUV420P(),
                             Ffmpeg.SWS_BILINEAR(),
@@ -738,6 +810,7 @@ public sealed class CameraVideoOutput implements VideoOutput
                 AVFrame.data(frame), AVFrame.linesize(frame),
                 0, h, scaleDstData, scaleDstStride);
         if (produced < 0) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sws_scale failed, code={0}", produced);
             throw new IllegalStateException("sws_scale failed: " + produced);
         }
 
@@ -898,6 +971,10 @@ public sealed class CameraVideoOutput implements VideoOutput
                                             int reqWidth, int reqHeight, int reqFps) {
         Objects.requireNonNull(indev, "indev cannot be null");
         Objects.requireNonNull(url, "url cannot be null");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "opening camera device {0} ({1}), requested {2}x{3}@{4}fps",
+                    indev, url, reqWidth, reqHeight, reqFps);
+        }
         FFmpegLoader.ensureLoaded();
         Ffmpeg.avdevice_register_all();
         var arena = Arena.ofShared();
@@ -954,9 +1031,14 @@ public sealed class CameraVideoOutput implements VideoOutput
             var advertised = requested
                     ? new int[]{evenDown(nativeWidth), evenDown(nativeHeight)}
                     : capGeometry(nativeWidth, nativeHeight);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "camera device opened, advertised {0}x{1}",
+                        advertised[0], advertised[1]);
+            }
             return new CapturedInput(advertised[0], advertised[1], arena, formatCtx, codecCtx, packet,
                     frame, streamIndex);
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to open camera device " + indev + ":" + url, e);
             arena.close();
             throw e;
         }

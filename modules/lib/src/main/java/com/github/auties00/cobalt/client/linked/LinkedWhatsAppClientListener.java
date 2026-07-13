@@ -14,6 +14,7 @@ import com.github.auties00.cobalt.model.call.CallInteraction;
 import com.github.auties00.cobalt.model.call.JoinableCallLink;
 import com.github.auties00.cobalt.model.call.IncomingCall;
 import com.github.auties00.cobalt.model.call.CallPeerState;
+import com.github.auties00.cobalt.model.call.CallScreenShareState;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.model.business.BusinessDataSharingConsent;
 import com.github.auties00.cobalt.model.business.ctwa.CtwaAccessTokenSession;
@@ -112,6 +113,9 @@ public non-sealed interface LinkedWhatsAppClientListener extends LinkedListener,
         LinkedCallInteractionListener,
         LinkedCallParticipantsChangedListener,
         LinkedCallPeerStateChangedListener,
+        LinkedCallPeerVideoPermissionChangedListener,
+        LinkedCallScreenShareChangedListener,
+        LinkedCallTranscriptListener,
         LinkedCallOfferNoticeListener,
         LinkedDeviceIdentityChangedListener,
         LinkedGraphQlSessionChangedListener,
@@ -300,6 +304,18 @@ public non-sealed interface LinkedWhatsAppClientListener extends LinkedListener,
 
     @Override
     default void onCallVideoStateChanged(LinkedWhatsAppClient whatsapp, String callId, Jid fromJid, boolean enabled) {
+    }
+
+    @Override
+    default void onCallScreenShareChanged(LinkedWhatsAppClient whatsapp, String callId, Jid participantJid, CallScreenShareState state) {
+    }
+
+    @Override
+    default void onCallPeerVideoPermissionChanged(LinkedWhatsAppClient whatsapp, String callId, Jid peerJid, boolean permitted) {
+    }
+
+    @Override
+    default void onCallTranscript(LinkedWhatsAppClient whatsapp, String callId, Jid speakerJid, String text, String language, long sequence) {
     }
 
     @Override

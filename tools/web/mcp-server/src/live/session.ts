@@ -603,6 +603,13 @@ export class LiveWebSession {
       autoLaunchDesktop: true,
     });
 
+    if (bridge.cdpUrl) {
+      const resolvedPort = Number(new URL(bridge.cdpUrl).port);
+      if (Number.isFinite(resolvedPort) && resolvedPort > 0) {
+        this.cdpPort = resolvedPort;
+      }
+    }
+
     this.browser = bridge.browser;
     this.context = bridge.context;
     this.page = bridge.page;

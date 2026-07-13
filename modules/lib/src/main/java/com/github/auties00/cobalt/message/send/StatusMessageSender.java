@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
 import com.github.auties00.cobalt.ack.AckParser;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
@@ -13,6 +13,7 @@ import com.github.auties00.cobalt.message.send.stanza.ChatFanoutStanza;
 import com.github.auties00.cobalt.message.send.stanza.MetaStanza;
 import com.github.auties00.cobalt.message.send.stanza.ParticipantsStanza;
 import com.github.auties00.cobalt.message.send.stanza.ReportingStanza;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -44,6 +45,7 @@ import com.github.auties00.cobalt.wam.type.StatusCategory;
 import com.github.auties00.cobalt.wam.type.StatusPostOrigin;
 import com.github.auties00.cobalt.wam.type.StatusPostResult;
 
+import java.lang.System.Logger.Level;
 import java.util.*;
 
 /**
@@ -61,9 +63,9 @@ import java.util.*;
 @WhatsAppWebModule(moduleName = "WAWebEncryptAndSendStatusMsg")
 final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
     /**
-     * Surfaces status-send diagnostics.
+     * The logger for {@link StatusMessageSender}.
      */
-    private static final System.Logger LOGGER = System.getLogger(StatusMessageSender.class.getName());
+    private static final System.Logger LOGGER = Log.get(StatusMessageSender.class);
 
     /**
      * Performs both the SKMSG group encryption and the per-device path taken by
@@ -152,10 +154,16 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         var statusAudience = resolveStatusAudience();
         var audienceDevices = deviceService.getStatusFanout(statusAudience);
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "status send audience resolved: {0} users, {1} devices",
+                    statusAudience.size(), audienceDevices.size());
+        }
+
         var revokeResult = resolveRevokeDevices(container, audienceDevices);
         if (revokeResult.useDirect()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Status revoke requires direct path for {0}", messageInfo.key().id());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "status revoke requires direct path for {0}", messageInfo.key().id().orElse(null));
+            }
             return sendDirectRevoke(statusJid, messageInfo, revokeResult.devices());
         }
 
@@ -176,6 +184,9 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
 
         var rotateKey = store.signalStore().clearKeyRotation(statusJid);
         if (rotateKey) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "rotating status sender key for {0}", statusJid);
+            }
             encryption.rotateSenderKey(statusJid, selfJid);
             skDistribDevices.addAll(skExistingDevices);
             skExistingDevices.clear();
@@ -260,6 +271,10 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         flushStore();
         var ackNode = client.sendNode(stanza);
         var ack = AckParser.parse(ackNode);
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "status send to {0} finished, success={1}", statusJid, ack.isSuccess());
+        }
 
         if (ack.isSuccess()) {
             for (var device : skDistribDevices) {
@@ -457,6 +472,9 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
         var senderIcdc = deviceService.computeIcdc(requireSelfJid()).orElse(null);
         var payloads = encryptForDevices(encryption, allDevices, container, statusJid, senderIcdc, null);
         if (payloads.isEmpty()) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "status direct revoke encryption failed for all devices targeting {0}", statusJid);
+            }
             throw new WhatsAppMessageException.Send.Unknown(
                     "Encryption failed for all devices in direct status revoke to " + statusJid, null);
         }
@@ -495,7 +513,11 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
 
         flushStore();
         var ackNode = client.sendNode(stanza);
-        return AckParser.parse(ackNode);
+        var ack = AckParser.parse(ackNode);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "status direct revoke to {0} finished, success={1}", statusJid, ack.isSuccess());
+        }
+        return ack;
     }
 
     /**

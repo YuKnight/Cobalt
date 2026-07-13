@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.misc;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,15 +14,15 @@ import java.io.UncheckedIOException;
 import java.util.List;
 
 /**
- * Builds the relay query that resolves the WhatsApp phone numbers and LIDs backing a set of
+ * Builds the graph.whatsapp.com GraphQL query that resolves the WhatsApp phone numbers and LIDs backing a set of
  * marketing brand identifiers.
  *
  * <p>The single {@code input} GraphQL variable, forwarded to the server-side field argument named
  * {@code request}, carries the list of {@code brand_ids} to resolve and a {@code lid_based_response}
- * flag selecting whether the relay returns LIDs rather than phone numbers. WhatsApp Web's
+ * flag selecting whether the graph.whatsapp.com endpoint returns LIDs rather than phone numbers. WhatsApp Web's
  * {@code WAWebGetNumbersForBrandIdsJob.getNumbersForBrandIdsJob(brandIds)} fills the list from the
  * caller's opt-out brand identifiers and the flag from the marketing-messages LID gating check. The
- * relay returns one record per brand id under {@code xwa_get_numbers_for_brand_ids}; the reply is
+ * graph.whatsapp.com endpoint returns one record per brand id under {@code xwa_get_numbers_for_brand_ids}; the reply is
  * consumed through {@link GetNumbersForBrandIdsJobWhatsAppGraphQlResponse}.
  *
  * @see GetNumbersForBrandIdsJobWhatsAppGraphQlResponse
@@ -28,10 +30,10 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebGetNumbersForBrandIdsJobQuery")
 public final class GetNumbersForBrandIdsJobWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebGetNumbersForBrandIdsJobQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -53,7 +55,7 @@ public final class GetNumbersForBrandIdsJobWhatsAppGraphQlRequest implements Wha
     private final List<String> brandIds;
 
     /**
-     * The {@code lid_based_response} field of the {@code input} object selecting whether the relay
+     * The {@code lid_based_response} field of the {@code input} object selecting whether the graph.whatsapp.com endpoint
      * returns LIDs instead of phone numbers, or {@code null} to omit it.
      */
     private final Boolean lidBasedResponse;
@@ -67,7 +69,7 @@ public final class GetNumbersForBrandIdsJobWhatsAppGraphQlRequest implements Wha
      *
      * @param brandIds         the marketing brand identifiers to resolve, or {@code null} to omit the
      *                         field
-     * @param lidBasedResponse whether the relay returns LIDs instead of phone numbers, or
+     * @param lidBasedResponse whether the graph.whatsapp.com endpoint returns LIDs instead of phone numbers, or
      *                         {@code null} to omit the field
      */
     public GetNumbersForBrandIdsJobWhatsAppGraphQlRequest(List<String> brandIds, Boolean lidBasedResponse) {
@@ -134,5 +136,21 @@ public final class GetNumbersForBrandIdsJobWhatsAppGraphQlRequest implements Wha
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.WWW;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -9,6 +10,7 @@ import com.github.auties00.cobalt.wam.event.MdCriticalEventEventBuilder;
 import com.github.auties00.cobalt.wam.type.Collection;
 import com.github.auties00.cobalt.wam.type.MdSyncdCriticalEventCode;
 
+import java.lang.System.Logger.Level;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -49,6 +51,11 @@ import java.util.function.Supplier;
  */
 @WhatsAppWebModule(moduleName = "WAWebSyncd")
 public final class SyncdCoordinator {
+    /**
+     * The logger for {@link SyncdCoordinator}.
+     */
+    private static final System.Logger LOGGER = Log.get(SyncdCoordinator.class);
+
     /**
      * The single reentrant lock that serializes every syncd state segment.
      *
@@ -253,6 +260,9 @@ public final class SyncdCoordinator {
                     admitted.add(patchType);
                 } else {
                     pendingRetrigger.add(patchType);
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "collection {0} already in flight, deferring for retrigger", patchType);
+                    }
                 }
             }
             return admitted;
@@ -280,7 +290,11 @@ public final class SyncdCoordinator {
         monitor.lock();
         try {
             inFlight.remove(patchType);
-            return pendingRetrigger.remove(patchType);
+            var retrigger = pendingRetrigger.remove(patchType);
+            if (Log.DEBUG && retrigger) {
+                LOGGER.log(Level.DEBUG, "collection {0} retriggered after its in-flight round completed", patchType);
+            }
+            return retrigger;
         } finally {
             monitor.unlock();
         }
@@ -375,6 +389,13 @@ public final class SyncdCoordinator {
     @WhatsAppWebExport(moduleName = "WAWebSyncdMetrics", exports = "uploadMdCriticalEventMetric", adaptation = WhatsAppAdaptation.ADAPTED)
     public void reportCriticalEvent(MdSyncdCriticalEventCode code, SyncPatchType collection, String mutationActionName, Throwable cause) {
         Objects.requireNonNull(code, "code cannot be null");
+        if (Log.WARNING) {
+            if (cause != null) {
+                LOGGER.log(Level.WARNING, "syncd critical event " + code + " for collection " + collection, cause);
+            } else {
+                LOGGER.log(Level.WARNING, "syncd critical event: code={0} collection={1}", code, collection);
+            }
+        }
         if (wamService == null) {
             return;
         }

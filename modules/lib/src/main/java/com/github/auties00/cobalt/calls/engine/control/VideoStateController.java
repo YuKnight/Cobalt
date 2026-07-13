@@ -2,8 +2,10 @@ package com.github.auties00.cobalt.calls.engine.control;
 
 import com.github.auties00.cobalt.calls.engine.participant.VideoStreamState;
 import com.github.auties00.cobalt.calls.signaling.incall.VideoStateStanza;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.engine.control.event.PeerVideoPermissionChanged;
 import com.github.auties00.cobalt.calls.engine.control.event.VideoStateChanged;
@@ -36,6 +38,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.VideoStateChanged;
  * rather than behind a lock, since each is a lone reference or flag with no compound read modify write.
  */
 public final class VideoStateController {
+    /**
+     * The logger for {@link VideoStateController}.
+     */
+    private static final System.Logger LOGGER = Log.get(VideoStateController.class);
+
     /**
      * The call identity this controller stamps onto its video actions.
      */
@@ -194,6 +201,7 @@ public final class VideoStateController {
     public void onPeerVideoState(Jid peer, VideoStreamState state) {
         Objects.requireNonNull(peer, "peer cannot be null");
         Objects.requireNonNull(state, "state cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "peer {0} video state -> {1}", peer, state);
         events.emit(new VideoStateChanged(peer, state, false));
     }
 
@@ -208,6 +216,7 @@ public final class VideoStateController {
      */
     public void onPeerVideoPermission(Jid peer, boolean allowed) {
         Objects.requireNonNull(peer, "peer cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "peer {0} video permission allowed={1}", peer, allowed);
         events.emit(new PeerVideoPermissionChanged(peer, allowed));
     }
 
@@ -220,6 +229,7 @@ public final class VideoStateController {
      * @param next the new local video stream state
      */
     private void transition(VideoStreamState next) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "local video state {0} -> {1}", state, next);
         this.state = next;
         sender.send(new VideoStateStanza(context.callId(), context.callCreator(), next));
         events.emit(new VideoStateChanged(context.selfJid(), next, true));

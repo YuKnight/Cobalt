@@ -57,7 +57,7 @@ import java.util.Set;
  * {@link CallMessage} to the engine lifecycle controller for its per type dispatch (offer ringing,
  * preaccept, accept, reject, terminate, transport). It must keep a call failure non fatal so it never
  * tears the messaging socket down: a media or transport bring up that cannot start surfaces as a non fatal
- * {@link com.github.auties00.cobalt.exception.WhatsAppCallException}, and a peer driven call end is a
+ * {@link com.github.auties00.cobalt.exception.linked.WhatsAppCallException}, and a peer driven call end is a
  * listener event rather than a thrown exception.
  */
 public sealed interface CallsService permits LiveCallsService {

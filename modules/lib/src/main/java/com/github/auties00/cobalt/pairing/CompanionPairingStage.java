@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSignalStore;
  * <p>This is an internal state-machine label for
  * {@link CompanionPairingService}. Embedders do not observe this enum;
  * transitions are guarded internally and surface only as success or as
- * a {@link com.github.auties00.cobalt.exception.WhatsAppRegistrationException}
+ * a {@link com.github.auties00.cobalt.exception.linked.mobile.WhatsAppRegistrationException}
  * raised from {@link CompanionPairingService#start} or
  * {@link CompanionPairingService#handlePrimaryHello}.
  *

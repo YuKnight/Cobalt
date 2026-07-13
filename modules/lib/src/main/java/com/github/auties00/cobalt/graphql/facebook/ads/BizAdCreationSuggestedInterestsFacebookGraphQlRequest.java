@@ -5,10 +5,12 @@ import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.ads.DetailedTargetingItem;
 
 import java.io.IOException;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
+import java.util.List;
 
 /**
  * Builds the Facebook GraphQL query that fetches suggested detailed-targeting interests for the WhatsApp
@@ -17,19 +19,11 @@ import java.io.UncheckedIOException;
  * <p>The query takes three GraphQL variables. The {@code adAccountID} variable is the Facebook
  * ad-account legacy id scoping the suggestion request; it is a numeric Facebook account id rather
  * than a WhatsApp address, so it is kept as a {@link String}. The {@code detailedTargetingItems}
- * variable is the list of detailed-targeting selections the advertiser has already picked, used as
- * the seed the server expands suggestions from. The {@code count} variable is the maximum number of
- * suggested interests to return. The query returns the suggested interests under the advertiser's
- * {@code ad_account}; the reply is consumed through
+ * variable is the list of {@link DetailedTargetingItem detailed-targeting selections} the advertiser
+ * has already picked, used as the seed the server expands suggestions from. The {@code count} variable
+ * is the maximum number of suggested interests to return. The query returns the suggested interests
+ * under the advertiser's {@code ad_account}; the reply is consumed through
  * {@link BizAdCreationSuggestedInterestsFacebookGraphQlResponse}.
- *
- * @implNote This implementation accepts {@code detailedTargetingItems} as a caller-supplied,
- * already JSON-encoded array literal because the {@code AdDetailedTargetingItem} input field names
- * are not present in the JS bundle of snapshot {@code 1040120866} (the
- * {@code useWAWebBizAdCreationSuggestedInterestsQuery.graphql} document and its hook are not
- * compiled there); the value is emitted verbatim as the {@code detailedTargetingItems} variable.
- * Once a caller that builds the list surfaces, replace this with a typed element model mirroring
- * that construction.
  *
  * @see BizAdCreationSuggestedInterestsFacebookGraphQlResponse
  */
@@ -61,10 +55,11 @@ public final class BizAdCreationSuggestedInterestsFacebookGraphQlRequest impleme
     private final String adAccountId;
 
     /**
-     * The pre-encoded JSON array of the {@code detailedTargetingItems} GraphQL variable carrying the
-     * already-selected detailed-targeting seed items, or {@code null} to omit it.
+     * The {@code detailedTargetingItems} GraphQL variable carrying the already-selected
+     * detailed-targeting seed items, written only when non-empty. Never {@code null} after
+     * construction.
      */
-    private final String detailedTargetingItemsJson;
+    private final List<DetailedTargetingItem> detailedTargetingItems;
 
     /**
      * The {@code count} GraphQL variable carrying the maximum number of suggested interests to
@@ -76,21 +71,20 @@ public final class BizAdCreationSuggestedInterestsFacebookGraphQlRequest impleme
      * Constructs a suggested-interests query request.
      *
      * <p>The {@code adAccountId} is the Facebook ad-account legacy id scoping the request,
-     * {@code detailedTargetingItemsJson} is the already-JSON-encoded array of detailed-targeting seed
-     * items whose element field names are defined by the server-side {@code AdDetailedTargetingItem}
-     * input type and are not modelled here (see the class {@code @implNote}), and {@code count} is the
-     * result limit. Each value that is {@code null} omits its variable from the serialized object.
+     * {@code detailedTargetingItems} is the list of detailed-targeting seed items, and {@code count}
+     * is the result limit. Each value that is {@code null} (or, for the list, empty) omits its variable
+     * from the serialized object.
      *
-     * @param adAccountId                the Facebook ad-account legacy id, or {@code null} to omit the
-     *                                   variable
-     * @param detailedTargetingItemsJson the already-JSON-encoded {@code detailedTargetingItems} array,
-     *                                   or {@code null} to omit the variable
-     * @param count                      the maximum number of results to return, or {@code null} to
-     *                                   omit the variable
+     * @param adAccountId            the Facebook ad-account legacy id, or {@code null} to omit the
+     *                               variable
+     * @param detailedTargetingItems the {@code detailedTargetingItems} seed list, written only when
+     *                               non-empty
+     * @param count                  the maximum number of results to return, or {@code null} to omit
+     *                               the variable
      */
-    public BizAdCreationSuggestedInterestsFacebookGraphQlRequest(String adAccountId, String detailedTargetingItemsJson, Integer count) {
+    public BizAdCreationSuggestedInterestsFacebookGraphQlRequest(String adAccountId, List<DetailedTargetingItem> detailedTargetingItems, Integer count) {
         this.adAccountId = adAccountId;
-        this.detailedTargetingItemsJson = detailedTargetingItemsJson;
+        this.detailedTargetingItems = detailedTargetingItems == null ? List.of() : List.copyOf(detailedTargetingItems);
         this.count = count;
     }
 
@@ -114,10 +108,11 @@ public final class BizAdCreationSuggestedInterestsFacebookGraphQlRequest impleme
      * {@inheritDoc}
      *
      * @implNote This implementation emits {@code {"adAccountID": <adAccountId>,
-     * "detailedTargetingItems": <detailedTargetingItemsJson>, "count": <count>}}, writing each
-     * variable only when its value is non-null and emitting {@code "{}"} when all are {@code null}.
-     * The {@code detailedTargetingItems} value is spliced in as a raw JSON value via
-     * {@link JSONWriter#writeRaw(String)} because it is supplied already encoded.
+     * "detailedTargetingItems": [{"id": ..., "name": ..., "type": ...}, ...], "count": <count>}},
+     * writing {@code adAccountID} and {@code count} only when non-null and the
+     * {@code detailedTargetingItems} array only when non-empty, and emitting {@code "{}"} when all are
+     * absent. Each entry is rendered by
+     * {@link BizAdInputJson#writeDetailedTargetingItem(JSONWriter, DetailedTargetingItem)}.
      */
     @Override
     public String variables() {
@@ -129,10 +124,17 @@ public final class BizAdCreationSuggestedInterestsFacebookGraphQlRequest impleme
                 writer.writeString(adAccountId);
             }
 
-            if (detailedTargetingItemsJson != null) {
+            if (!detailedTargetingItems.isEmpty()) {
                 writer.writeName("detailedTargetingItems");
                 writer.writeColon();
-                writer.writeRaw(detailedTargetingItemsJson);
+                writer.startArray();
+                for (var i = 0; i < detailedTargetingItems.size(); i++) {
+                    if (i > 0) {
+                        writer.writeComma();
+                    }
+                    BizAdInputJson.writeDetailedTargetingItem(writer, detailedTargetingItems.get(i));
+                }
+                writer.endArray();
             }
 
             if (count != null) {

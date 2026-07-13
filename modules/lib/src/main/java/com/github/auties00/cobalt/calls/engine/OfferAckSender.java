@@ -37,7 +37,7 @@ public interface OfferAckSender {
      * @param offerEnvelope the built {@code <call>} envelope nesting the {@code <offer>} action
      * @return the server's {@code <ack class="call">} reply stanza
      * @throws NullPointerException if {@code offerEnvelope} is {@code null}
-     * @throws com.github.auties00.cobalt.exception.WhatsAppCallException.DataChannel if the offer could not
+     * @throws com.github.auties00.cobalt.exception.linked.WhatsAppCallException.DataChannel if the offer could not
      * be sent or no ack arrived
      */
     Stanza sendOfferAndAwaitAck(Stanza offerEnvelope);

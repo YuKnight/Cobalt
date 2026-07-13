@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.calls.media.video.yuv;
 
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
+import com.github.auties00.cobalt.log.Log;
 
 import jdk.incubator.vector.IntVector;
 import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -97,6 +99,11 @@ final class VectorYuvConverter implements YuvConverter {
     private static final IntVector MAX255 = IntVector.broadcast(SPECIES, 255);
 
     /**
+     * The logger for {@link VectorYuvConverter}.
+     */
+    private static final System.Logger LOGGER = Log.get(VectorYuvConverter.class);
+
+    /**
      * Creates the vector backend.
      *
      * <p>The field initialisers above are what touch the Vector API, so a host without the incubator module
@@ -110,6 +117,9 @@ final class VectorYuvConverter implements YuvConverter {
     public int[] toArgb(VideoFrame frame) {
         Objects.requireNonNull(frame, "frame cannot be null");
         var i420 = ScalarYuvConverter.toI420Frame(frame);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "vector yuv converter: toArgb, width={0} height={1}", i420.width(), i420.height());
+        }
         return i420ToArgb(i420.pixels(), i420.width(), i420.height());
     }
 

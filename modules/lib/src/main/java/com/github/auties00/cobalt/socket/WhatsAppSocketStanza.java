@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.socket;
 
-import com.github.auties00.cobalt.exception.WhatsAppStreamException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppStreamException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Function;
@@ -31,6 +33,11 @@ import java.util.function.Function;
  * Project Loom.
  */
 public final class WhatsAppSocketStanza {
+    /**
+     * The logger for {@link WhatsAppSocketStanza}.
+     */
+    private static final System.Logger LOGGER = Log.get(WhatsAppSocketStanza.class);
+
     /**
      * Default upper bound on how long {@link #waitForResponse()} parks
      * before raising {@link WhatsAppStreamException.NodeTimeout}.
@@ -98,6 +105,7 @@ public final class WhatsAppSocketStanza {
         var acceptable = response == null
                 || filter == null
                 || filter.apply(response);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "stanza candidate offered, acceptable={0}", acceptable);
         if (acceptable) {
             synchronized (this) {
                 this.response = response;
@@ -153,15 +161,18 @@ public final class WhatsAppSocketStanza {
             while (response == null) {
                 var remainingMs = Duration.between(Instant.now(), end).toMillis();
                 if (remainingMs <= 0) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "stanza timed out waiting for response to {0}", body);
                     throw new WhatsAppStreamException.NodeTimeout(body);
                 }
                 try {
                     wait(remainingMs);
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "stanza wait interrupted for {0}", body);
                     throw new WhatsAppStreamException.NodeTimeout(body);
                 }
             }
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "stanza response received for {0}", body);
             return response;
         }
     }

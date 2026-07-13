@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Adapts the Opus encoder complexity at runtime from a rolling measurement of how much encode time the
  * encoder spends per second of audio, restoring complexity toward its configured level when there is
@@ -24,6 +28,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec;
  * <p>Instances are not thread safe; the codec drives one controller from its single encode thread.
  */
 public final class AdaptiveComplexityController {
+    /**
+     * The logger for {@link AdaptiveComplexityController}.
+     */
+    private static final System.Logger LOGGER = Log.get(AdaptiveComplexityController.class);
+
     /**
      * Minimum accumulated audio, in milliseconds, before the window yields an estimate.
      *
@@ -191,6 +200,10 @@ public final class AdaptiveComplexityController {
      */
     private void evaluate() {
         var avgMillisPerSecond = windowEncodeMicros / windowAudioMillis;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "encode budget check: avg={0}ms/s budget={1}ms/s complexity={2}",
+                    avgMillisPerSecond, budgetMillisPerSecond, currentComplexity);
+        }
         if (avgMillisPerSecond < budgetMillisPerSecond * INCREASE_BUDGET_MULTIPLE) {
             increaseGateMillis += windowAudioMillis;
             if (increaseGateMillis > INCREASE_GATE_MILLIS - 1) {
@@ -229,6 +242,9 @@ public final class AdaptiveComplexityController {
             if (previousOverruns > SUSTAINED_OVERRUN_LIMIT) {
                 if (complexityPeak <= complexityCap) {
                     complexityCap = complexityPeak - 1;
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "lowering permanent encoder complexity cap to {0} after sustained overruns", complexityCap);
+                    }
                 }
                 complexityPeak = 0;
                 sustainedOverruns = 0;
@@ -236,6 +252,7 @@ public final class AdaptiveComplexityController {
         }
         var next = currentComplexity / 2;
         if (next != currentComplexity) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "decreasing encoder complexity {0} -> {1}", currentComplexity, next);
             currentComplexity = next;
             changed = true;
         }
@@ -252,6 +269,7 @@ public final class AdaptiveComplexityController {
         if (currentComplexity < complexityCap) {
             var next = Math.min(complexityCap, currentComplexity + 1);
             if (next != currentComplexity) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "increasing encoder complexity {0} -> {1}", currentComplexity, next);
                 currentComplexity = next;
                 changed = true;
             }

@@ -1,12 +1,15 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.bot.UGCBotAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Persists the user-generated-content bot definition carried by a
@@ -29,6 +32,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * the wire payload is not lost when the server starts emitting it.
  */
 public final class UGCBotHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link UGCBotHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(UGCBotHandler.class);
 
     /**
      * Constructs the handler.
@@ -96,10 +103,13 @@ public final class UGCBotHandler implements WebAppStateActionHandler {
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof UGCBotAction action)
                 || action.definition().isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ugc bot: malformed mutation, missing definition");
             return MutationApplicationResult.malformed();
         }
 
         client.store().businessStore().setUserCreatedBotDefinition(action.definition().get());
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "ugc bot: persisted definition, size={0}", action.definition().get().length);
         return MutationApplicationResult.success();
     }
 }

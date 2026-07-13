@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,7 +11,8 @@ import com.github.auties00.cobalt.model.sync.action.device.AndroidUnsupportedAct
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
-import java.util.logging.Logger;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Tracks the primary device's permission for companions to ship mutations the primary cannot interpret.
@@ -34,11 +36,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebAndroidUnsupportedActionsSync")
 public final class AndroidUnsupportedActionsHandler implements WebAppStateActionHandler {
     /**
-     * The handler-scoped {@link Logger} used to record the one-shot flag transition.
-     *
-     * <p>Records a line when the latch first transitions from unset to set.
+     * The logger for {@link AndroidUnsupportedActionsHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(AndroidUnsupportedActionsHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(AndroidUnsupportedActionsHandler.class);
 
     /**
      * Constructs the singleton android-unsupported-actions handler.
@@ -97,6 +97,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
 
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "android unsupported actions mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -119,7 +120,7 @@ public final class AndroidUnsupportedActionsHandler implements WebAppStateAction
     @WhatsAppWebExport(moduleName = "WAWebAndroidUnsupportedActionsSync", exports = "default", adaptation = WhatsAppAdaptation.DIRECT)
     private void updatePrimaryAllowsAllMutationsFlag(LinkedWhatsAppClient client) {
         if (!client.store().syncStore().primaryAllowsAllMutations()) {
-            LOGGER.info("[syncd] primary allows all mutations flag set: allow_unsupported_mutation");
+            if (Log.INFO) LOGGER.log(Level.INFO, "primary allows all mutations flag set");
             client.store().syncStore().setPrimaryAllowsAllMutations(true);
         }
     }

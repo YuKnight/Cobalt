@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.chat.ChatMute;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
@@ -16,6 +17,7 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 
 /**
@@ -44,6 +46,11 @@ import java.time.Instant;
  */
 @WhatsAppWebModule(moduleName = "WAWebMuteChatSync")
 public final class MuteChatHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link MuteChatHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(MuteChatHandler.class);
+
     /**
      * The AB-props service consulted for the
      * {@link ABProp#ENABLE_MENTION_EVERYONE_RECEIVER_WEB} gate on every group
@@ -116,30 +123,37 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebMuteChatSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mute chat: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         try {
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MuteAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "mute chat mutation malformed: missing action value");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chatJidString = JSON.parseArray(mutation.index()).getString(1);
             if (chatJidString == null || chatJidString.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "mute chat mutation malformed: missing chat jid index");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (action.muted() && action.muteEndTimestamp().isEmpty()) {
+                if (Log.WARNING)
+                    LOGGER.log(Level.WARNING, "mute chat mutation malformed: muted with no end timestamp");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chatJid = Jid.of(chatJidString);
             if (chatJid == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "mute chat mutation malformed: unparseable chat jid");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mute chat: orphan chat {0}", chatJid);
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
@@ -148,6 +162,8 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
                     ? 0L
                     : muteEndMillis / 1000;
             chat.get().setMute(ChatMute.mutedUntil(muteEndSeconds));
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "mute chat: chat {0} mute set to {1}", chatJid, muteEndSeconds);
 
             if (chatJid.hasGroupOrCommunityServer()
                     && abPropsService.getBool(ABProp.ENABLE_MENTION_EVERYONE_RECEIVER_WEB)) {
@@ -162,11 +178,14 @@ public final class MuteChatHandler implements WebAppStateActionHandler {
                         mentionSeconds = mentionMillis;
                     }
                     client.store().chatStore().setMentionEveryoneMuteExpiration(chatJid, ChatMute.mutedUntil(mentionSeconds));
+                    if (Log.DEBUG)
+                        LOGGER.log(Level.DEBUG, "mute chat: chat {0} mention-everyone mute set to {1}", chatJid, mentionSeconds);
                 });
             }
 
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "mute chat mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

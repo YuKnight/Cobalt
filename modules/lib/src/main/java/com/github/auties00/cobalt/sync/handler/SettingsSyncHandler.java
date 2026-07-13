@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.sync.handler;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -16,6 +17,8 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppAccountStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +46,11 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebSettingsSync")
 @WhatsAppWebModule(moduleName = "WAWebSettingsSyncHelpers")
 public final class SettingsSyncHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link SettingsSyncHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(SettingsSyncHandler.class);
+
     /**
      * The {@code "app"} scope literal used as the wildcard mutation scope for
      * global (non-per-chat) settings.
@@ -121,6 +129,8 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (!isSettingsSyncEnabled(client)) {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "settings sync: unsupported batch of {0} mutations, gate closed", mutations.size());
             var unsupported = new ArrayList<MutationApplicationResult>(mutations.size());
             for (var ignored : mutations) {
                 unsupported.add(MutationApplicationResult.unsupported());
@@ -146,11 +156,14 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
             if (latest == null) {
                 results.add(MutationApplicationResult.malformed());
             } else if (latest != mutation) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "settings sync: skipped superseded mutation for index");
                 results.add(MutationApplicationResult.skipped());
             } else {
                 results.add(applyOne(client, mutation));
             }
         }
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "settings sync: applied batch of {0} mutations, {1} distinct indices", mutations.size(), latestByIndex.size());
         return results;
     }
 
@@ -169,6 +182,7 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebSettingsSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!isSettingsSyncEnabled(client)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "settings sync: unsupported, gate closed");
             return MutationApplicationResult.unsupported();
         }
         if (mutation.operation() != SyncdOperation.SET) {
@@ -210,9 +224,11 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
         try {
             indexArray = JSON.parseArray(mutation.index());
         } catch (Exception exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "settings sync mutation malformed: unparseable index");
             return MutationApplicationResult.malformed();
         }
         if (indexArray == null || indexArray.size() != INDEX_PARTS_LENGTH) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "settings sync mutation malformed: wrong index arity");
             return MutationApplicationResult.malformed();
         }
 
@@ -222,32 +238,43 @@ public final class SettingsSyncHandler implements WebAppStateActionHandler {
 
         var platform = parsePlatform(platformValue);
         if (!appliesToCurrentPlatform(client, platform)) {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "settings sync: skipped, platform {0} does not apply to this client", platformValue);
             return MutationApplicationResult.skipped();
         }
 
         var settingKey = parseSettingKey(settingKeyValue);
         if (settingKey == null) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "settings sync mutation malformed: unknown setting key {0}", settingKeyValue);
             return MutationApplicationResult.malformed();
         }
 
         if (settingKey == SettingsSyncAction.SettingKey.SETTING_KEY_UNKNOWN) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "settings sync mutation malformed: setting key unknown");
             return MutationApplicationResult.malformed();
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof SettingsSyncAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "settings sync mutation malformed: missing action value");
             return MutationApplicationResult.malformed();
         }
 
         if (!hasFieldFor(action, settingKey)) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "settings sync mutation malformed: missing field for key {0}", settingKey);
             return MutationApplicationResult.malformed();
         }
 
         try {
             applySettingUpdate(client, action, settingKey, scope);
         } catch (RuntimeException exception) {
+            if (Log.ERROR)
+                LOGGER.log(Level.ERROR, "settings sync: apply failed for key " + settingKey, exception);
             return MutationApplicationResult.failed();
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "settings sync: applied key={0}", settingKey);
         return MutationApplicationResult.success();
     }
 

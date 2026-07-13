@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,6 +11,8 @@ import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.device.PrimaryVersionAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,6 +41,11 @@ import java.util.List;
  */
 @WhatsAppWebModule(moduleName = "WAWebPrimaryVersionSync")
 public final class PrimaryVersionHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link PrimaryVersionHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(PrimaryVersionHandler.class);
+
     /**
      * Holds the {@code "current"} sub-index value identifying the primary
      * device's current-build version checkpoint.
@@ -143,17 +151,22 @@ public final class PrimaryVersionHandler implements WebAppStateActionHandler {
 
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() <= 1) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "primary version mutation malformed: missing sub-index");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
         var subIndex = indexArray.getString(1);
         if (subIndex == null || subIndex.isEmpty() || (!subIndex.equals(INDEX_CURRENT) && !subIndex.equals(INDEX_SESSION_START))) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "primary version mutation malformed: unknown sub-index {0}", subIndex);
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrimaryVersionAction action) || action.version().isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "primary version mutation malformed: missing version");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "primary version: validated checkpoint {0}", subIndex);
         return MutationApplicationResult.success();
     }
 }

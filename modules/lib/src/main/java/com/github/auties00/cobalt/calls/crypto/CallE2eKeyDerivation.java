@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.calls.crypto;
 
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.calls.platform.VoipCryptoNative;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.RekeyKeyType;
+import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
@@ -50,6 +52,11 @@ import java.util.Objects;
  *           variant of later key generation versions is not derived.
  */
 public final class CallE2eKeyDerivation {
+    /**
+     * The logger for {@link CallE2eKeyDerivation}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallE2eKeyDerivation.class);
+
     /**
      * Holds the required length, in bytes, of the raw end to end call key.
      *
@@ -157,7 +164,7 @@ public final class CallE2eKeyDerivation {
      * {@link #deriveHbhSrtpMaster(byte[], HopByHopGroup)} (the SRTP/SRTCP masters, 30 bytes) and
      * {@link #deriveWarpAuthKey(byte[])} (the WARP authentication key, 32 bytes) select. The end to end
      * {@code "e2e sframe key"} label is not a hop by hop group and is derived by
-     * {@link #deriveSframeBaseKey(byte[], CallDeviceJid)}, so it is deliberately absent here.
+     * {@link #deriveSframeBaseKey(byte[], Jid)}, so it is deliberately absent here.
      */
     public enum HopByHopGroup {
         /**
@@ -244,7 +251,9 @@ public final class CallE2eKeyDerivation {
      * @implNote This implementation draws the bytes from {@link VoipCryptoNative#randomBytes(int)}.
      */
     public static byte[] mintRawKey() {
-        return VoipCryptoNative.randomBytes(RAW_E2E_KEY_LENGTH);
+        var key = VoipCryptoNative.randomBytes(RAW_E2E_KEY_LENGTH);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "raw e2e call key minted {0}", key);
+        return key;
     }
 
     /**
@@ -291,7 +300,7 @@ public final class CallE2eKeyDerivation {
      *           expansion and the chain ratchet that sit on top of it are owned by the SFrame
      *           media crypto layer.
      */
-    public static byte[] deriveSframeBaseKey(byte[] rawKey, CallDeviceJid deviceJid) {
+    public static byte[] deriveSframeBaseKey(byte[] rawKey, Jid deviceJid) {
         Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
         requireRawKey(rawKey);
         var jidBytes = participantInfo(deviceJid).getBytes(StandardCharsets.US_ASCII);
@@ -300,7 +309,9 @@ public final class CallE2eKeyDerivation {
         System.arraycopy(jidBytes, 0, info, SFRAME_INFO_LABEL.length, jidBytes.length);
         var salt = Arrays.copyOfRange(rawKey, 0, SFRAME_HALF);
         var ikm = Arrays.copyOfRange(rawKey, SFRAME_HALF, RAW_E2E_KEY_LENGTH);
-        return VoipCryptoNative.hkdfSha256(ikm, salt, info, SFRAME_BASE_KEY_LENGTH);
+        var baseKey = VoipCryptoNative.hkdfSha256(ikm, salt, info, SFRAME_BASE_KEY_LENGTH);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "sframe base key derived for {0}", deviceJid);
+        return baseKey;
     }
 
     /**
@@ -324,11 +335,13 @@ public final class CallE2eKeyDerivation {
      *                                    bytes long
      * @throws WhatsAppCallException.Srtp if the HKDF computation fails
      */
-    public static byte[] deriveSrtpMaster(byte[] rawKey, CallDeviceJid deviceJid) {
+    public static byte[] deriveSrtpMaster(byte[] rawKey, Jid deviceJid) {
         Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
         requireRawKey(rawKey);
         var info = participantInfo(deviceJid).getBytes(StandardCharsets.US_ASCII);
-        return VoipCryptoNative.hkdfSha256(rawKey, ZERO_SALT, info, SRTP_MASTER_LENGTH);
+        var master = VoipCryptoNative.hkdfSha256(rawKey, ZERO_SALT, info, SRTP_MASTER_LENGTH);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "srtp master derived for {0}", deviceJid);
+        return master;
     }
 
     /**
@@ -349,10 +362,11 @@ public final class CallE2eKeyDerivation {
      *                                    bytes long
      * @throws WhatsAppCallException.Srtp if {@code keygenVer} is unsupported or an HKDF computation fails
      */
-    public static ParticipantKeyChain deriveKeyChain(byte[] rawKey, int keygenVer, CallDeviceJid deviceJid) {
+    public static ParticipantKeyChain deriveKeyChain(byte[] rawKey, int keygenVer, Jid deviceJid) {
         requireSupportedKeygenVersion(keygenVer);
         var sframeBaseKey = deriveSframeBaseKey(rawKey, deviceJid);
         var srtpMaster = deriveSrtpMaster(rawKey, deviceJid);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "media key chain derived for {0}, keygenVer={1}", deviceJid, keygenVer);
         return new ParticipantKeyChain(sframeBaseKey, srtpMaster);
     }
 
@@ -360,7 +374,7 @@ public final class CallE2eKeyDerivation {
      * Splits a 30-byte SRTP master into its {@code AES_CM_128_HMAC_SHA1} master key.
      *
      * @param master a {@value #SRTP_MASTER_LENGTH}-byte master from
-     *               {@link #deriveSrtpMaster(byte[], CallDeviceJid)}
+     *               {@link #deriveSrtpMaster(byte[], Jid)}
      * @return the {@value #SRTP_DIRECTION_KEY_LENGTH}-byte master key
      * @throws NullPointerException     if {@code master} is {@code null}
      * @throws IllegalArgumentException if {@code master} is not exactly {@value #SRTP_MASTER_LENGTH}
@@ -375,7 +389,7 @@ public final class CallE2eKeyDerivation {
      * Splits a 30-byte SRTP master into its {@code AES_CM_128_HMAC_SHA1} master salt.
      *
      * @param master a {@value #SRTP_MASTER_LENGTH}-byte master from
-     *               {@link #deriveSrtpMaster(byte[], CallDeviceJid)}
+     *               {@link #deriveSrtpMaster(byte[], Jid)}
      * @return the 14-byte master salt
      * @throws NullPointerException     if {@code master} is {@code null}
      * @throws IllegalArgumentException if {@code master} is not exactly {@value #SRTP_MASTER_LENGTH}
@@ -417,7 +431,9 @@ public final class CallE2eKeyDerivation {
      */
     public static byte[] deriveHbhSrtpMaster(byte[] hbhKey, HopByHopGroup group) {
         Objects.requireNonNull(group, "group cannot be null");
-        return deriveChainedHbhKey(hbhKey, group, HBH_SRTP_MASTER_LENGTH);
+        var master = deriveChainedHbhKey(hbhKey, group, HBH_SRTP_MASTER_LENGTH);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "hop-by-hop srtp master derived for group {0}", group);
+        return master;
     }
 
     /**
@@ -450,7 +466,9 @@ public final class CallE2eKeyDerivation {
      * @throws WhatsAppCallException.Srtp if an HKDF computation fails
      */
     public static byte[] deriveWarpAuthKey(byte[] hbhKey) {
-        return deriveChainedHbhKey(hbhKey, HopByHopGroup.WARP_AUTH, WARP_AUTH_KEY_LENGTH);
+        var key = deriveChainedHbhKey(hbhKey, HopByHopGroup.WARP_AUTH, WARP_AUTH_KEY_LENGTH);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "warp auth key derived");
+        return key;
     }
 
     /**
@@ -493,10 +511,9 @@ public final class CallE2eKeyDerivation {
      * @param deviceJid the participant device whose identifier is rendered
      * @return the ASCII participant identifier in the form {@code user[_agent]:device@server}
      */
-    private static String participantInfo(CallDeviceJid deviceJid) {
-        var jid = deviceJid.jid();
-        var agent = jid.agent() != 0 ? "_" + jid.agent() : "";
-        return jid.user() + agent + ":" + jid.device() + "@" + jid.server();
+    private static String participantInfo(Jid deviceJid) {
+        var agent = deviceJid.agent() != 0 ? "_" + deviceJid.agent() : "";
+        return deviceJid.user() + agent + ":" + deviceJid.device() + "@" + deviceJid.server();
     }
 
     /**

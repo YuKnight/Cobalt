@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,8 @@ import com.github.auties00.cobalt.model.sync.action.call.CallLogAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Maintains the cross-device VoIP call history from inbound {@code call_log} app-state mutations.
@@ -46,6 +49,11 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebCallLogSync")
 public final class CallLogHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link CallLogHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallLogHandler.class);
+
     /**
      * The slot in the parsed {@code call_log} index that carries the call id.
      *
@@ -138,24 +146,29 @@ public final class CallLogHandler implements WebAppStateActionHandler {
         try {
             if (mutation.operation() == SyncdOperation.SET) {
                 if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof CallLogAction action)) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "call log mutation malformed: missing action value");
                     return MutationApplicationResult.malformed();
                 }
 
                 var log = action.log().orElse(null);
                 if (log == null) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "call log mutation malformed: missing log record");
                     return MutationApplicationResult.malformed();
                 }
 
                 var indexArray = JSON.parseArray(mutation.index());
                 if (indexArray == null || indexArray.size() < MINIMUM_INDEX_LENGTH) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "call log mutation malformed: index too short");
                     return MutationApplicationResult.malformed();
                 }
 
                 if (log.callId().isEmpty()) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "call log mutation malformed: missing call id");
                     return MutationApplicationResult.malformed();
                 }
 
                 client.store().chatStore().addCallLog(log);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call log added: id={0}", log.callId().orElse(null));
                 return MutationApplicationResult.success();
             }
 
@@ -165,13 +178,16 @@ public final class CallLogHandler implements WebAppStateActionHandler {
                     var callId = indexArray.getString(CALL_ID_INDEX);
                     if (callId != null) {
                         client.store().chatStore().removeCallLog(callId);
+                        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call log removed: id={0}", callId);
                     }
                 }
                 return MutationApplicationResult.success();
             }
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call log mutation unsupported: operation={0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         } catch (Exception exception) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "call log mutation failed", exception);
             return MutationApplicationResult.failed();
         }
     }

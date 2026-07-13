@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,6 +15,8 @@ import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.sync.ConflictResolution;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code deleteMessageForMe} app-state sync action that removes a
@@ -41,6 +44,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebDeleteMessageForMeSync")
 public final class DeleteMessageForMeHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link DeleteMessageForMeHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(DeleteMessageForMeHandler.class);
 
     /**
      * Constructs a new singleton {@link DeleteMessageForMeHandler}.
@@ -100,6 +107,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
 
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() < 5) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "delete message for me: malformed mutation index");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
@@ -110,6 +118,7 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
 
         if (isNullOrEmpty(chatJidString) || isNullOrEmpty(messageId)
                 || isNullOrEmpty(fromMeString) || isNullOrEmpty(participantString)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "delete message for me: malformed mutation index fields");
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
@@ -117,12 +126,14 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
                 client.store(), chatJidString, messageId, fromMeString, participantString
         );
         if (msgKey.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "delete message for me: failed to resolve message key, id={0}", messageId);
             return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
         }
 
         var chatJid = Jid.of(chatJidString);
         var chat = client.store().chatStore().findChatByJid(chatJid);
         if (chat.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "delete message for me: orphan, chat not found {0}", chatJid);
             return MutationApplicationResult.orphan(
                     SyncdIndexUtils.serializeMessageKey(msgKey.get()),
                     "Msg"
@@ -140,6 +151,11 @@ public final class DeleteMessageForMeHandler implements WebAppStateActionHandler
                     return id;
                 })
                 .isPresent();
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "delete message for me: {0} messageId={1} chat={2}",
+                    removed ? "removed" : "orphan, message not found", messageId, chatJid);
+        }
 
         return removed
                 ? MutationApplicationResult.success()

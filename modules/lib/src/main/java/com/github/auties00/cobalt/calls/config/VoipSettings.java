@@ -2,8 +2,10 @@ package com.github.auties00.cobalt.calls.config;
 
 import com.github.auties00.cobalt.calls.config.param.VoipParamJsonDeserializer;
 import com.github.auties00.cobalt.calls.config.param.VoipParams;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.util.Optional;
 
 /**
@@ -29,6 +31,11 @@ import java.util.Optional;
  *                     or not uncompressed JSON
  */
 public record VoipSettings(boolean uncompressed, VoipParams params) {
+    /**
+     * The logger for {@link VoipSettings}.
+     */
+    private static final System.Logger LOGGER = Log.get(VoipSettings.class);
+
     /**
      * The element description (tag name) that identifies a {@code <voip_settings>} {@link Stanza}.
      *
@@ -76,11 +83,17 @@ public record VoipSettings(boolean uncompressed, VoipParams params) {
         var uncompressed = stanza.getAttributeAsBool(UNCOMPRESSED_ATTRIBUTE, false);
         if (!uncompressed) {
             // TODO: decode the compressed (uncompressed flag unset) body into a VoipParams set
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "voip_settings body is compressed, decoding not supported, params discarded");
+            }
             return new VoipSettings(false, new VoipParams());
         }
         var params = stanza.toContentString()
                 .map(deserializer::parse)
                 .orElseGet(VoipParams::new);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "parsed voip_settings, paramCount={0}", params.size());
+        }
         return new VoipSettings(true, params);
     }
 

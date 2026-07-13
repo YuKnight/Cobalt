@@ -5,9 +5,11 @@ import com.github.auties00.cobalt.calls.media.video.codec.av1.bindings.CobaltDav
 import com.github.auties00.cobalt.calls.media.video.codec.av1.bindings.CobaltRav1e;
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.DataUtils;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -38,8 +40,20 @@ import com.github.auties00.cobalt.calls.media.video.codec.VideoCodecStats;
  * <p>rav1e is a lookahead encoder, so a {@code send} need not yield a packet: the first frames buffer
  * and {@link #encode(VideoFrame, boolean)} returns an empty access unit until output catches up. The
  * codec opens rav1e in low latency mode to keep that delay small.
+ *
+ * @implNote WhatsApp's own AV1 encoder library is unidentified, so this implementation stands in with
+ * rav1e, whose C API imposes two limitations a WhatsApp native encoder would not. It cannot force a key
+ * frame on the next frame, so a {@link #requestKeyFrame()} or an {@link #encode(VideoFrame, boolean)} with
+ * {@code forceKeyFrame} set falls on the configured key frame interval instead; and it exposes no live rate
+ * control reconfiguration, so a {@link #modify(VideoCodecParams)} bitrate or quantizer change takes effect
+ * only when the codec is recreated. Each limitation is logged where it takes effect.
  */
 public final class Av1VideoCodec implements VideoCodec {
+    /**
+     * The logger for {@link Av1VideoCodec}.
+     */
+    private static final System.Logger LOGGER = Log.get(Av1VideoCodec.class);
+
     /**
      * The dav1d decode thread count.
      *
@@ -154,6 +168,10 @@ public final class Av1VideoCodec implements VideoCodec {
         if (params.codec() != VideoDecoderCapability.AV1) {
             throw new IllegalArgumentException("Av1VideoCodec requires AV1 params, got " + params.codec());
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "opening av1 codec, {0}x{1} bitrate={2} fps={3}",
+                    params.width(), params.height(), params.targetBitrate(), params.frameRate());
+        }
         this.params = params;
         this.arena = Arena.ofShared();
         MemorySegment dec = null;
@@ -176,7 +194,6 @@ public final class Av1VideoCodec implements VideoCodec {
             var encCell = arena.allocate(CobaltRav1e.C_POINTER);
             int encRc;
             try {
-                // TODO: WhatsApp's AV1 encoder library is unidentified; rav1e stands in for it here.
                 encRc = CobaltRav1e.cobalt_rav1e_encoder_create(
                         params.width(), params.height(), params.targetBitrate(),
                         params.frameRate(), 1, ENCODE_SPEED, params.keyFrameIntervalFrames(),
@@ -199,6 +216,7 @@ public final class Av1VideoCodec implements VideoCodec {
             this.outIsKeyCell = arena.allocate(CobaltRav1e.C_INT);
             this.outPacketCell = arena.allocate(CobaltRav1e.C_POINTER);
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "av1 codec open failed", e);
             if (enc != null) {
                 try {
                     CobaltRav1e.cobalt_rav1e_encoder_destroy(enc);
@@ -251,7 +269,10 @@ public final class Av1VideoCodec implements VideoCodec {
                             + params.width() + "x" + params.height());
         }
         var planar = frame.pixels();
-        // TODO: honor forceKeyFrame; rav1e's C API cannot force a key frame on the next frame.
+        if (forceKeyFrame && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "av1 encoder cannot force a key frame on the next frame; it falls on the configured interval");
+        }
         var pixels = encodeStagingFor(planar.length);
         MemorySegment.copy(planar, 0, pixels, ValueLayout.JAVA_BYTE, 0, planar.length);
         int sendRc;
@@ -259,9 +280,11 @@ public final class Av1VideoCodec implements VideoCodec {
             sendRc = CobaltRav1e.cobalt_rav1e_encoder_send(encoderCtx, pixels, planar.length,
                     params.width(), params.height());
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "av1 native encoder send call failed", t);
             throw new WhatsAppCallException.Av1("cobalt_rav1e_encoder_send failed", t);
         }
         if (sendRc != CobaltRav1e.COBALT_RAV1E_OK()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "av1 encoder send failed, rc={0}", sendRc);
             throw WhatsAppCallException.Av1.fromErr("cobalt_rav1e_encoder_send", sendRc);
         }
         return drainPacket(frame);
@@ -284,9 +307,11 @@ public final class Av1VideoCodec implements VideoCodec {
         try {
             rc = CobaltRav1e.cobalt_rav1e_encoder_receive(encoderCtx, outBufCell, outLenCell, outIsKeyCell, outPacketCell);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "av1 native encoder receive call failed", t);
             throw new WhatsAppCallException.Av1("cobalt_rav1e_encoder_receive failed", t);
         }
         if (rc != CobaltRav1e.COBALT_RAV1E_OK()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "av1 encoder receive failed, rc={0}", rc);
             throw WhatsAppCallException.Av1.fromErr("cobalt_rav1e_encoder_receive", rc);
         }
         var packet = outPacketCell.get(CobaltRav1e.C_POINTER, 0);
@@ -311,6 +336,7 @@ public final class Av1VideoCodec implements VideoCodec {
         if (keyFrame) {
             keyFramesEncoded++;
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "av1 packet encoded, bytes={0} keyFrame={1}", bytes.length, keyFrame);
         return new EncodedVideoFrame(bytes, VideoDecoderCapability.AV1, keyFrame,
                 source.width(), source.height(), source.ptsMicros());
     }
@@ -352,6 +378,7 @@ public final class Av1VideoCodec implements VideoCodec {
             rc = sendData(data, payload.length);
         }
         if (rc != CobaltDav1d.COBALT_DAV1D_OK()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "av1 decoder send data failed, rc={0}", rc);
             throw WhatsAppCallException.Av1.fromErr("cobalt_dav1d_send_data", rc);
         }
         if (result == null) {
@@ -359,6 +386,7 @@ public final class Av1VideoCodec implements VideoCodec {
         }
         if (result != null) {
             framesDecoded++;
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "av1 picture decoded, payload bytes={0}", payload.length);
         }
         return result;
     }
@@ -375,6 +403,7 @@ public final class Av1VideoCodec implements VideoCodec {
         try {
             return CobaltDav1d.cobalt_dav1d_send_data(decoderCtx, data, len);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "av1 native send data call failed", t);
             throw new WhatsAppCallException.Av1("cobalt_dav1d_send_data failed", t);
         }
     }
@@ -391,12 +420,14 @@ public final class Av1VideoCodec implements VideoCodec {
         try {
             rc = CobaltDav1d.cobalt_dav1d_get_picture(decoderCtx, picCell);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "av1 native get picture call failed", t);
             throw new WhatsAppCallException.Av1("cobalt_dav1d_get_picture failed", t);
         }
         if (rc == CobaltDav1d.COBALT_DAV1D_EAGAIN()) {
             return null;
         }
         if (rc != CobaltDav1d.COBALT_DAV1D_OK()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "av1 decoder get picture failed, rc={0}", rc);
             throw WhatsAppCallException.Av1.fromErr("cobalt_dav1d_get_picture", rc);
         }
         var pic = picCell.get(CobaltDav1d.C_POINTER, 0);
@@ -425,10 +456,12 @@ public final class Av1VideoCodec implements VideoCodec {
     private VideoFrame copyPicture(MemorySegment pic, long ptsMicros) {
         var layout = CobaltDav1d.cobalt_dav1d_pic_layout(pic);
         if (layout != CobaltDav1d.COBALT_DAV1D_LAYOUT_I420()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "av1 decode rejected, unsupported layout {0}", layout);
             throw new WhatsAppCallException.Av1("unsupported AV1 layout " + layout + "; only I420 is supported");
         }
         var bitDepth = CobaltDav1d.cobalt_dav1d_pic_bitdepth(pic);
         if (bitDepth != 8) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "av1 decode rejected, unsupported bit depth {0}", bitDepth);
             throw new WhatsAppCallException.Av1("unsupported AV1 bit depth " + bitDepth + "; only 8-bit is built");
         }
         var width = CobaltDav1d.cobalt_dav1d_pic_width(pic);
@@ -472,9 +505,12 @@ public final class Av1VideoCodec implements VideoCodec {
     @Override
     public void requestKeyFrame() {
         ensureOpen();
-        // TODO: rav1e's C API cannot force a key frame on the next frame; key frames fall on the
-        //  configured interval only.
         keyFrameRequests++;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "av1 key frame requested (total {0}); rav1e cannot force it on the next frame, it falls on the configured interval",
+                    keyFrameRequests);
+        }
     }
 
     /**
@@ -498,8 +534,16 @@ public final class Av1VideoCodec implements VideoCodec {
         if (params.width() != this.params.width() || params.height() != this.params.height()) {
             throw new IllegalArgumentException("cannot change geometry on a live AV1 encoder");
         }
-        // TODO: live reconfigure rav1e's rate control; its C API exposes no live reconfiguration, so a
-        //  changed bitrate or quantizer takes effect only when the codec is recreated.
+        if (Log.DEBUG) {
+            if (params.targetBitrate() != this.params.targetBitrate()) {
+                LOGGER.log(Level.DEBUG,
+                        "av1 rate control change (bitrate {0}->{1}) does not take effect until the codec is recreated; rav1e exposes no live reconfiguration",
+                        this.params.targetBitrate(), params.targetBitrate());
+            } else {
+                LOGGER.log(Level.DEBUG, "av1 codec params updated, bitrate={0} fps={1}",
+                        params.targetBitrate(), params.frameRate());
+            }
+        }
         this.params = params;
     }
 
@@ -533,6 +577,7 @@ public final class Av1VideoCodec implements VideoCodec {
         } catch (Throwable ignored) {
         }
         arena.close();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "av1 codec closed");
     }
 
     /**

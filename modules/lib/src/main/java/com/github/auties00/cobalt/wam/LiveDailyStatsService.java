@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.wam;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.privacy.DefenseModePrivacyValue;
@@ -23,6 +24,7 @@ import com.github.auties00.cobalt.wam.type.UsernameState;
 
 import java.io.File;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Locale;
@@ -65,6 +67,11 @@ import java.util.function.Consumer;
  */
 @WhatsAppWebModule(moduleName = "WAWebDailyWamEvent")
 public final class LiveDailyStatsService implements DailyStatsService {
+    /**
+     * The logger for {@link LiveDailyStatsService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveDailyStatsService.class);
+
     /**
      * The minimum wall-clock gap, in milliseconds, between two successive
      * {@code Daily} emissions.
@@ -212,12 +219,14 @@ public final class LiveDailyStatsService implements DailyStatsService {
     @Override
     public void start() {
         if (!started.compareAndSet(false, true)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "daily stats worker already started, ignoring start");
             return;
         }
         stopped = false;
         worker = Thread.ofVirtual()
                 .name("daily-stats")
                 .start(this::run);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "daily stats worker started");
     }
 
     /**
@@ -235,6 +244,7 @@ public final class LiveDailyStatsService implements DailyStatsService {
         if (thread != null) {
             thread.interrupt();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "daily stats worker stopped");
     }
 
     /**
@@ -253,11 +263,13 @@ public final class LiveDailyStatsService implements DailyStatsService {
                 var wamStore = client.store().wamStore();
                 var last = wamStore.lastDailyStatsTimestamp();
                 if (last.isEmpty() || Duration.between(last.get(), now).toMillis() >= DAILY_INTERVAL_MILLIS) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "daily stats rolling-day gate open, last run {0}", last.orElse(null));
                     runDailyStats();
                     wamStore.setLastDailyStatsTimestamp(now);
                 }
                 Thread.sleep(RECHECK_INTERVAL_MILLIS);
             } catch (InterruptedException _) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "daily stats worker loop interrupted");
                 Thread.currentThread().interrupt();
                 return;
             }
@@ -321,6 +333,10 @@ public final class LiveDailyStatsService implements DailyStatsService {
         var storageCache = storageCacheBytes();
         var storageUsage = storageUsageBytes(messageCount, storageCache);
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "computing daily stats: contacts={0} messages={1}", contactCount, messageCount);
+        }
+
         var builder = new DailyEventBuilder()
                 .languageCode(languageCode)
                 .locationCode(locationCode)
@@ -368,6 +384,8 @@ public final class LiveDailyStatsService implements DailyStatsService {
         wamService.commit(new TestAnonymousIdLessEventBuilder().build());
         wamService.commit(new WebDynamicSamplingTestEventWithSamplingEventBuilder().build());
         wamService.commit(new WebDynamicSamplingTestEventWithoutSamplingEventBuilder().build());
+
+        if (Log.INFO) LOGGER.log(Level.INFO, "daily stats event committed");
     }
 
     /**

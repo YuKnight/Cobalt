@@ -1,12 +1,15 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.privacy.PrivateProcessingSettingAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code private_processing_setting} app-state action that
@@ -34,6 +37,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * and apply path are inferred from the protobuf shape (single mandatory enum).
  */
 public final class PrivateProcessingSettingHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link PrivateProcessingSettingHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(PrivateProcessingSettingHandler.class);
 
     /**
      * Constructs the private processing setting sync handler.
@@ -95,10 +102,14 @@ public final class PrivateProcessingSettingHandler implements WebAppStateActionH
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof PrivateProcessingSettingAction action)
                 || action.privateProcessingStatus().isEmpty()) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "private processing setting mutation malformed: missing status");
             return MutationApplicationResult.malformed();
         }
 
         client.store().settingsStore().setPrivateProcessingStatus(action.privateProcessingStatus().get());
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "private processing setting: status set to {0}", action.privateProcessingStatus().get());
         return MutationApplicationResult.success();
     }
 }

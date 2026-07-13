@@ -10,6 +10,9 @@ import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code merchant_payment_partner} app-state sync action that
@@ -39,6 +42,11 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * incoming sync without restarting the client.
  */
 public final class MerchantPaymentPartnerHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link MerchantPaymentPartnerHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(MerchantPaymentPartnerHandler.class);
+
     /**
      * The {@link ABPropsService} consulted before every mutation to gate the
      * handler on {@link ABProp#PAYMENTS_BR_MERCHANT_PSP_ACCOUNT_STATUS_SYNC}.
@@ -94,10 +102,12 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         var platform = client.store().accountStore().device().platform();
         if (platform != ClientPlatformType.IOS_BUSINESS && platform != ClientPlatformType.ANDROID_BUSINESS) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "merchant payment partner mutation unsupported, platform={0}", platform);
             return MutationApplicationResult.unsupported();
         }
 
         if (!abPropsService.getBool(ABProp.PAYMENTS_BR_MERCHANT_PSP_ACCOUNT_STATUS_SYNC)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "merchant payment partner mutation unsupported, ab prop disabled");
             return MutationApplicationResult.unsupported();
         }
 
@@ -106,10 +116,12 @@ public final class MerchantPaymentPartnerHandler implements WebAppStateActionHan
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof MerchantPaymentPartnerAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "merchant payment partner mutation has malformed action value");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().businessStore().setMerchantPaymentPartner(action);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "merchant payment partner applied");
         return MutationApplicationResult.success();
     }
 }

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -23,6 +25,11 @@ import java.util.List;
  * {@link RemoveRecentStickerAction#lastStickerSentTs()} value.
  */
 public final class RemoveRecentStickerMutationFactory {
+    /**
+     * The logger for {@link RemoveRecentStickerMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(RemoveRecentStickerMutationFactory.class);
+
     /**
      * Constructs a remove-recent-sticker mutation factory.
      *
@@ -54,6 +61,7 @@ public final class RemoveRecentStickerMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebStickersRemoveRecentSyncAction", exports = "generateRemoveStickerMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getRemoveRecentStickerMutation(String stickerHash) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building remove-recent-sticker mutation, hash={0}", stickerHash);
         var timestamp = Instant.now();
         var action = new RemoveRecentStickerActionBuilder()
                 .lastStickerSentTs(timestamp)

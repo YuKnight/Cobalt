@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -32,6 +34,11 @@ import java.util.function.Consumer;
  * owns no timers.
  */
 public final class ImuDataController {
+    /**
+     * The logger for {@link ImuDataController}.
+     */
+    private static final System.Logger LOGGER = Log.get(ImuDataController.class);
+
     /**
      * The application data stream sender local IMU samples are published through.
      */
@@ -79,6 +86,10 @@ public final class ImuDataController {
     public void publish(ImuSample sample) {
         Objects.requireNonNull(sample, "sample cannot be null");
         latestOutbound = sample;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "publishing imu sample len={0} timestampMicros={1}",
+                    sample.payload().length, sample.timestampMicros());
+        }
         streamSender.accept(sample);
     }
 
@@ -95,6 +106,9 @@ public final class ImuDataController {
         Objects.requireNonNull(participant, "participant cannot be null");
         Objects.requireNonNull(sample, "sample cannot be null");
         latestInbound.put(participant, sample);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "received imu sample from {0} len={1}", participant, sample.payload().length);
+        }
         inboundObserver.accept(participant, sample);
     }
 

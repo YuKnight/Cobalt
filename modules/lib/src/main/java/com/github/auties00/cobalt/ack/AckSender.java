@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.ack;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -27,6 +29,11 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebReceiptAck")
 @WhatsAppWebModule(moduleName = "WAWebCreateNackFromStanza")
 public final class AckSender {
+    /**
+     * The logger for {@link AckSender}.
+     */
+    private static final System.Logger LOGGER = Log.get(AckSender.class);
+
     /**
      * The {@link LinkedWhatsAppClient} that ships the assembled ack stanza fire-and-forget through
      * {@link LinkedWhatsAppClient#sendNodeWithNoResponse(Stanza)}.
@@ -133,6 +140,10 @@ public final class AckSender {
             default -> null;
         };
         if (cls == null) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "nack synthesis skipped: unsupported stanza tag={0}",
+                        inbound.description());
+            }
             return false;
         }
         return ack(cls, inbound).error(reason).send();
@@ -147,7 +158,7 @@ public final class AckSender {
      * @implNote This implementation routes through
      * {@link LinkedWhatsAppClient#sendNodeWithNoResponse(Stanza)} so the ack is sent fire-and-forget; the
      * socket layer raises a
-     * {@link com.github.auties00.cobalt.exception.WhatsAppSessionException.Closed} when the
+     * {@link com.github.auties00.cobalt.exception.linked.WhatsAppSessionException.Closed} when the
      * connection is down at the time of the send.
      *
      * @param ack the assembled {@code <ack>} stanza

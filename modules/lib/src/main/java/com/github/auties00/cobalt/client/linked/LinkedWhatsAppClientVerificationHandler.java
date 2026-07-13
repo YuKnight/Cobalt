@@ -20,7 +20,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.google.zxing.client.j2se.MatrixToImageWriter.writeToPath;
-import static java.lang.System.Logger.Level.INFO;
 import static java.nio.file.Files.createTempFile;
 
 /**
@@ -67,21 +66,17 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
          * @apiNote
          * A QR-scan or pairing-code link completes without a passkey, but the connected session can
          * still be challenged with an integrity checkpoint that only a passkey assertion (or a logout)
-         * satisfies. Override the default through {@link QrCode#withPasskeyAuthenticator} or
-         * {@link PairingCode#withPasskeyAuthenticator}, or the {@code toTerminal}/{@code toFile} factory
-         * overloads that take one, to answer the checkpoint with a different authenticator (for example
-         * a relay to a browser).
-         *
-         * @implSpec
-         * The default renders the assertion's QR on the terminal through
-         * {@link LinkedWhatsAppClientPasskeyAuthenticator#toTerminal()}, so any web client can answer
-         * a checkpoint out of the box by scanning it with the phone that holds the passkey.
+         * satisfies. Every factory-built handler carries an authenticator to answer that checkpoint: the
+         * no-argument {@code toTerminal}/{@code toFile} factories default it to
+         * {@link LinkedWhatsAppClientPasskeyAuthenticator#toTerminal()}, so any web client can answer a
+         * checkpoint out of the box by scanning it with the phone that holds the passkey, while the
+         * overloads that take one carry the given authenticator (for example a relay to a browser). Use
+         * {@link QrCode#withPasskeyAuthenticator} or {@link PairingCode#withPasskeyAuthenticator} to swap
+         * the authenticator on an existing handler.
          *
          * @return the passkey authenticator; never {@code null}
          */
-        default LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator() {
-            return LinkedWhatsAppClientPasskeyAuthenticator.toTerminal();
-        }
+        LinkedWhatsAppClientPasskeyAuthenticator passkeyAuthenticator();
 
         /**
          * Encodes a QR payload into a {@link BitMatrix} suitable
@@ -107,113 +102,133 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
         }
 
         /**
-         * A verification handler that renders the QR code produced
-         * during the companion-linking flow.
+         * Renders a QR payload as a JPEG image at the given path.
+         *
+         * <p>The QR matrix is generated at 500 pixels with a 5-module margin for scan-friendliness.
+         *
+         * @param qr   the payload to encode
+         * @param path the destination path where the QR code image is saved
+         * @throws UncheckedIOException if the image cannot be written to the path
+         */
+        private static void renderQrToFile(String qr, Path path) {
+            try {
+                var matrix = createMatrix(qr, 500, 5);
+                writeToPath(matrix, "jpg", path);
+            } catch (IOException exception) {
+                throw new UncheckedIOException("Cannot save QR code to file", exception);
+            }
+        }
+
+        /**
+         * Creates the temporary JPEG file a QR image is rendered into when no path is supplied.
+         *
+         * <p>The file is created up front so the write happens off the verification path.
+         *
+         * @return the created temporary file path
+         * @throws UncheckedIOException if the temporary file cannot be created
+         */
+        private static Path createQrTempFile() {
+            try {
+                return createTempFile("qr", ".jpg");
+            } catch (IOException exception) {
+                throw new UncheckedIOException("Cannot create temp file for QR handler", exception);
+            }
+        }
+
+        /**
+         * A consumer that reacts to the file path where a QR code has been rendered.
          *
          * @apiNote
-         * The handler receives the raw QR payload as a string. The
-         * static factory methods provide common renderers (terminal,
-         * temporary file, desktop viewer); custom rendering is
-         * supported via a target-typed lambda.
+         * Combine with a rendering target such as
+         * {@link java.nio.file.Files#createTempFile(String, String, java.nio.file.attribute.FileAttribute[])}
+         * to decide what to do with the resulting image: ignore it, log its location, or open it in a
+         * desktop viewer.
          */
-        @FunctionalInterface
-        non-sealed interface QrCode extends Web {
+        interface ToFile extends Consumer<Path> {
             /**
-             * Returns a handler that renders the QR code as ASCII art
-             * on standard output.
+             * Returns a consumer that ignores the rendered file path and takes no action.
              *
              * @apiNote
-             * Useful in headless or CI environments. Terminals that do
-             * not support UTF block-drawing characters render the
-             * output as garbled symbols.
+             * Useful when the application owns the file lifecycle elsewhere (for example a separate
+             * thread that polls the path).
              *
-             * @return the terminal-rendering handler
+             * @return the no-op consumer
              */
-            static QrCode toTerminal() {
-                return qr -> {
-                    var matrix = createMatrix(qr, 10, 0);
-                    QrTerminal.print(matrix, true);
-                };
+            static ToFile discard() {
+                return ignored -> {};
             }
 
             /**
+             * Returns a consumer that logs the rendered file path through the system logger at
+             * {@link System.Logger.Level#INFO}.
+             *
+             * @return the logging consumer
+             */
+            static ToFile toTerminal() {
+                return path -> {};
+            }
+
+            /**
+             * Returns a consumer that opens the rendered file with the default desktop image viewer.
+             *
+             * @apiNote
+             * Silently no-ops on hosts where {@link Desktop} is not supported (typical headless
+             * servers). Throws if the viewer fails to launch on a supported host.
+             *
+             * @return the desktop-opening consumer
+             * @throws RuntimeException if the file cannot be opened via {@link Desktop}
+             */
+            static ToFile toDesktop() {
+                return path -> {
+                    try {
+                        if (!Desktop.isDesktopSupported()) {
+                            return;
+                        }
+                        Desktop.getDesktop().open(path.toFile());
+                    } catch (Throwable throwable) {
+                        throw new RuntimeException("Cannot open file with desktop", throwable);
+                    }
+                };
+            }
+        }
+
+        /**
+         * A verification handler that renders the QR code produced during the companion-linking flow.
+         *
+         * @apiNote
+         * The handler receives the raw QR payload as a string. The static factory methods provide common
+         * renderers (terminal, temporary file, fixed path); each carries a passkey authenticator for
+         * answering a server-pushed integrity checkpoint, defaulting to a terminal QR when none is given.
+         */
+        non-sealed interface QrCode extends Web {
+            /**
              * Returns a handler that renders the QR code as ASCII art on standard output and carries the
              * given passkey authenticator for answering a server-pushed integrity checkpoint.
+             *
+             * @apiNote
+             * Useful in headless or CI environments. Terminals that do not support UTF block-drawing
+             * characters render the output as garbled symbols.
              *
              * @param authenticator the passkey authenticator to attach; never {@code null}
              * @return the terminal-rendering handler carrying the authenticator
              * @throws NullPointerException if {@code authenticator} is {@code null}
              */
             static QrCode toTerminal(LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
-                return toTerminal().withPasskeyAuthenticator(authenticator);
+                Objects.requireNonNull(authenticator, "authenticator must not be null");
+                return of(qr -> {
+                    var matrix = createMatrix(qr, 10, 0);
+                    QrTerminal.print(matrix, true);
+                }, authenticator);
             }
 
             /**
-             * Returns a handler that writes the QR code to a temporary
-             * JPEG file and forwards the file path to the supplied
-             * consumer.
+             * Returns a handler that renders the QR code as ASCII art on standard output, carrying a
+             * terminal-QR passkey authenticator for answering a server-pushed integrity checkpoint.
              *
-             * @apiNote
-             * Useful when the host process can render an image but not
-             * ASCII art. The temporary file is created up front so the
-             * write happens off the verification path.
-             *
-             * @param fileConsumer the consumer that receives the path
-             *                     of the rendered file
-             * @return the file-rendering handler
-             * @throws UncheckedIOException if the temporary file cannot
-             *                              be created
+             * @return the terminal-rendering handler
              */
-            static QrCode toFile(QrCode.ToFile fileConsumer) {
-                try {
-                    var file = createTempFile("qr", ".jpg");
-                    return toFile(file, fileConsumer);
-                } catch (IOException exception) {
-                    throw new UncheckedIOException("Cannot create temp file for QR handler", exception);
-                }
-            }
-
-            /**
-             * Returns a handler that writes the QR code to the supplied
-             * path and forwards it to the supplied consumer.
-             *
-             * @apiNote
-             * Use when the rendering target is a fixed path (e.g. a
-             * shared volume or a web-served asset). The QR matrix is
-             * generated at 500 pixels with a 5-module margin for
-             * scan-friendliness.
-             *
-             * @param path         the destination path where the QR
-             *                     code image is saved
-             * @param fileConsumer the consumer that receives the path
-             *                     of the rendered file
-             * @return the file-rendering handler
-             */
-            static QrCode toFile(Path path, QrCode.ToFile fileConsumer) {
-                return qr -> {
-                    try {
-                        var matrix = createMatrix(qr, 500, 5);
-                        writeToPath(matrix, "jpg", path);
-                        fileConsumer.accept(path);
-                    } catch (IOException exception) {
-                        throw new UncheckedIOException("Cannot save QR code to file", exception);
-                    }
-                };
-            }
-
-            /**
-             * Returns a handler that writes the QR code to a temporary JPEG file, forwards the file path
-             * to the supplied consumer, and carries the given passkey authenticator for answering a
-             * server-pushed integrity checkpoint.
-             *
-             * @param fileConsumer  the consumer that receives the path of the rendered file
-             * @param authenticator the passkey authenticator to attach; never {@code null}
-             * @return the file-rendering handler carrying the authenticator
-             * @throws NullPointerException if {@code authenticator} is {@code null}
-             * @throws UncheckedIOException if the temporary file cannot be created
-             */
-            static QrCode toFile(QrCode.ToFile fileConsumer, LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
-                return toFile(fileConsumer).withPasskeyAuthenticator(authenticator);
+            static QrCode toTerminal() {
+                return toTerminal(LinkedWhatsAppClientPasskeyAuthenticator.toTerminal());
             }
 
             /**
@@ -221,20 +236,80 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
              * consumer, and carries the given passkey authenticator for answering a server-pushed
              * integrity checkpoint.
              *
+             * @apiNote
+             * Use when the rendering target is a fixed path (for example a shared volume or a web-served
+             * asset). The QR matrix is generated at 500 pixels with a 5-module margin for
+             * scan-friendliness.
+             *
              * @param path          the destination path where the QR code image is saved
              * @param fileConsumer  the consumer that receives the path of the rendered file
              * @param authenticator the passkey authenticator to attach; never {@code null}
              * @return the file-rendering handler carrying the authenticator
-             * @throws NullPointerException if {@code authenticator} is {@code null}
+             * @throws NullPointerException if {@code path}, {@code fileConsumer}, or {@code authenticator}
+             *                              is {@code null}
              */
-            static QrCode toFile(Path path, QrCode.ToFile fileConsumer, LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
-                return toFile(path, fileConsumer).withPasskeyAuthenticator(authenticator);
+            static QrCode toFile(Path path, ToFile fileConsumer, LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
+                Objects.requireNonNull(path, "path must not be null");
+                Objects.requireNonNull(fileConsumer, "fileConsumer must not be null");
+                Objects.requireNonNull(authenticator, "authenticator must not be null");
+                return of(qr -> {
+                    renderQrToFile(qr, path);
+                    fileConsumer.accept(path);
+                }, authenticator);
             }
 
             /**
-             * Returns a handler that renders the QR code exactly as this one does and also carries the
-             * given passkey authenticator, so the linked session can answer a server-pushed integrity
-             * checkpoint instead of logging out.
+             * Returns a handler that writes the QR code to a temporary JPEG file, forwards the file path
+             * to the supplied consumer, and carries the given passkey authenticator for answering a
+             * server-pushed integrity checkpoint.
+             *
+             * @apiNote
+             * Useful when the host process can render an image but not ASCII art. The temporary file is
+             * created up front so the write happens off the verification path.
+             *
+             * @param fileConsumer  the consumer that receives the path of the rendered file
+             * @param authenticator the passkey authenticator to attach; never {@code null}
+             * @return the file-rendering handler carrying the authenticator
+             * @throws NullPointerException if {@code fileConsumer} or {@code authenticator} is
+             *                              {@code null}
+             * @throws UncheckedIOException if the temporary file cannot be created
+             */
+            static QrCode toFile(ToFile fileConsumer, LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
+                return toFile(createQrTempFile(), fileConsumer, authenticator);
+            }
+
+            /**
+             * Returns a handler that writes the QR code to the supplied path, forwards it to the supplied
+             * consumer, and carries a terminal-QR passkey authenticator for answering a server-pushed
+             * integrity checkpoint.
+             *
+             * @param path         the destination path where the QR code image is saved
+             * @param fileConsumer the consumer that receives the path of the rendered file
+             * @return the file-rendering handler
+             * @throws NullPointerException if {@code path} or {@code fileConsumer} is {@code null}
+             */
+            static QrCode toFile(Path path, ToFile fileConsumer) {
+                return toFile(path, fileConsumer, LinkedWhatsAppClientPasskeyAuthenticator.toTerminal());
+            }
+
+            /**
+             * Returns a handler that writes the QR code to a temporary JPEG file, forwards the file path
+             * to the supplied consumer, and carries a terminal-QR passkey authenticator for answering a
+             * server-pushed integrity checkpoint.
+             *
+             * @param fileConsumer the consumer that receives the path of the rendered file
+             * @return the file-rendering handler
+             * @throws NullPointerException if {@code fileConsumer} is {@code null}
+             * @throws UncheckedIOException if the temporary file cannot be created
+             */
+            static QrCode toFile(ToFile fileConsumer) {
+                return toFile(fileConsumer, LinkedWhatsAppClientPasskeyAuthenticator.toTerminal());
+            }
+
+            /**
+             * Returns a handler that renders the QR code exactly as this one does but carries the given
+             * passkey authenticator instead, so the linked session answers a server-pushed integrity
+             * checkpoint with it rather than this handler's authenticator.
              *
              * @param authenticator the passkey authenticator to attach; never {@code null}
              * @return a handler that renders as this one and carries the authenticator
@@ -242,11 +317,22 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
              */
             default QrCode withPasskeyAuthenticator(LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
                 Objects.requireNonNull(authenticator, "authenticator must not be null");
-                var self = this;
+                return of(this::handle, authenticator);
+            }
+
+            /**
+             * Builds a QR handler that presents the raw QR payload through the given renderer and carries
+             * the given passkey authenticator.
+             *
+             * @param renderer      the action that presents the raw QR payload
+             * @param authenticator the passkey authenticator the handler carries
+             * @return the composed handler
+             */
+            private static QrCode of(Consumer<String> renderer, LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
                 return new QrCode() {
                     @Override
                     public void handle(String value) {
-                        self.handle(value);
+                        renderer.accept(value);
                     }
 
                     @Override
@@ -255,94 +341,19 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
                     }
                 };
             }
-
-            /**
-             * A consumer that reacts to the file path where a QR code
-             * has been rendered.
-             *
-             * @apiNote
-             * Combine with a rendering target such as
-             * {@link java.nio.file.Files#createTempFile(String, String, java.nio.file.attribute.FileAttribute[])}
-             * to decide what to do with the resulting image: ignore it,
-             * log its location, or open it in a desktop viewer.
-             */
-            interface ToFile extends Consumer<Path> {
-                /**
-                 * Returns a consumer that ignores the rendered file
-                 * path and takes no action.
-                 *
-                 * @apiNote
-                 * Useful when the application owns the file lifecycle
-                 * elsewhere (for example a separate thread that polls
-                 * the path).
-                 *
-                 * @return the no-op consumer
-                 */
-                static QrCode.ToFile discard() {
-                    return ignored -> {};
-                }
-
-                /**
-                 * Returns a consumer that logs the rendered file path
-                 * through the system logger at {@link System.Logger.Level#INFO}.
-                 *
-                 * @return the logging consumer
-                 */
-                static QrCode.ToFile toTerminal() {
-                    return path -> System.getLogger(QrCode.class.getName())
-                            .log(INFO, "Saved QR code at %s".formatted(path));
-                }
-
-                /**
-                 * Returns a consumer that opens the rendered file with
-                 * the default desktop image viewer.
-                 *
-                 * @apiNote
-                 * Silently no-ops on hosts where {@link Desktop} is not
-                 * supported (typical headless servers). Throws if the
-                 * viewer fails to launch on a supported host.
-                 *
-                 * @return the desktop-opening consumer
-                 * @throws RuntimeException if the file cannot be opened
-                 *                          via {@link Desktop}
-                 */
-                static QrCode.ToFile toDesktop() {
-                    return path -> {
-                        try {
-                            if (!Desktop.isDesktopSupported()) {
-                                return;
-                            }
-                            Desktop.getDesktop().open(path.toFile());
-                        } catch (Throwable throwable) {
-                            throw new RuntimeException("Cannot open file with desktop", throwable);
-                        }
-                    };
-                }
-            }
         }
 
         /**
-         * A verification handler that surfaces the short pairing code
-         * produced during the companion-linking flow.
+         * A verification handler that surfaces the short pairing code produced during the
+         * companion-linking flow.
          *
          * @apiNote
-         * Pairing codes are typed into the Linked Devices screen on
-         * the primary device instead of scanning a QR code. The handler
-         * receives the code as a plain string and is responsible for
-         * presenting it.
+         * Pairing codes are typed into the Linked Devices screen on the primary device instead of
+         * scanning a QR code. The handler receives the code as a plain string and is responsible for
+         * presenting it; it also carries a passkey authenticator for answering a server-pushed integrity
+         * checkpoint, defaulting to a terminal QR when none is given.
          */
-        @FunctionalInterface
         non-sealed interface PairingCode extends Web {
-            /**
-             * Returns a handler that prints the pairing code on
-             * standard output.
-             *
-             * @return the terminal-printing handler
-             */
-            static PairingCode toTerminal() {
-                return System.out::println;
-            }
-
             /**
              * Returns a handler that prints the pairing code on standard output and carries the given
              * passkey authenticator for answering a server-pushed integrity checkpoint.
@@ -352,13 +363,24 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
              * @throws NullPointerException if {@code authenticator} is {@code null}
              */
             static PairingCode toTerminal(LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
-                return toTerminal().withPasskeyAuthenticator(authenticator);
+                Objects.requireNonNull(authenticator, "authenticator must not be null");
+                return of(System.out::println, authenticator);
             }
 
             /**
-             * Returns a handler that prints the pairing code exactly as this one does and also carries
-             * the given passkey authenticator, so the linked session can answer a server-pushed integrity
-             * checkpoint instead of logging out.
+             * Returns a handler that prints the pairing code on standard output, carrying a terminal-QR
+             * passkey authenticator for answering a server-pushed integrity checkpoint.
+             *
+             * @return the terminal-printing handler
+             */
+            static PairingCode toTerminal() {
+                return toTerminal(LinkedWhatsAppClientPasskeyAuthenticator.toTerminal());
+            }
+
+            /**
+             * Returns a handler that prints the pairing code exactly as this one does but carries the
+             * given passkey authenticator instead, so the linked session answers a server-pushed
+             * integrity checkpoint with it rather than this handler's authenticator.
              *
              * @param authenticator the passkey authenticator to attach; never {@code null}
              * @return a handler that prints as this one and carries the authenticator
@@ -366,11 +388,22 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
              */
             default PairingCode withPasskeyAuthenticator(LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
                 Objects.requireNonNull(authenticator, "authenticator must not be null");
-                var self = this;
+                return of(this::handle, authenticator);
+            }
+
+            /**
+             * Builds a pairing-code handler that presents the code through the given renderer and carries
+             * the given passkey authenticator.
+             *
+             * @param renderer      the action that presents the pairing code
+             * @param authenticator the passkey authenticator the handler carries
+             * @return the composed handler
+             */
+            private static PairingCode of(Consumer<String> renderer, LinkedWhatsAppClientPasskeyAuthenticator authenticator) {
                 return new PairingCode() {
                     @Override
                     public void handle(String value) {
-                        self.handle(value);
+                        renderer.accept(value);
                     }
 
                     @Override
@@ -393,7 +426,8 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
          * the primary, and {@link #confirmVerificationCode(String)} reports whether the codes matched.
          * The same {@link #passkeyAuthenticator()} also answers a server-pushed integrity checkpoint on
          * the connected session. A client linked through {@link QrCode} or {@link PairingCode} answers a
-         * checkpoint with its own {@link #passkeyAuthenticator()} too, which defaults to a terminal QR.
+         * checkpoint with its own {@link #passkeyAuthenticator()} too, which its no-argument factories
+         * default to a terminal QR.
          */
         non-sealed interface Passkey extends Web {
             /**
@@ -451,6 +485,51 @@ public sealed interface LinkedWhatsAppClientVerificationHandler {
             static Passkey toQr(Consumer<String> onQrCode) {
                 Objects.requireNonNull(onQrCode, "onQrCode must not be null");
                 return of(LinkedWhatsAppClientPasskeyAuthenticator.toQr(onQrCode));
+            }
+
+            /**
+             * Returns a handler whose authenticator drives Warden's cross-device hybrid transport,
+             * rendering each ceremony's {@code FIDO:/...} QR code as a JPEG image at the supplied path and
+             * forwarding the path to the given consumer.
+             *
+             * <p>The user scans the rendered QR with the phone that holds the {@code whatsapp.com}
+             * passkey, which then produces the assertion over an encrypted tunnel. The returned handler
+             * auto-confirms the short verification code and prints it on standard output; implement
+             * {@link Passkey} directly and override {@link #confirmVerificationCode(String)} to compare
+             * it by hand.
+             *
+             * @param path         the destination path where the ceremony QR image is saved
+             * @param fileConsumer the consumer that receives the path of the rendered file
+             * @return the file-rendering handler
+             * @throws NullPointerException if {@code path} or {@code fileConsumer} is {@code null}
+             */
+            static Passkey toFile(Path path, ToFile fileConsumer) {
+                Objects.requireNonNull(path, "path must not be null");
+                Objects.requireNonNull(fileConsumer, "fileConsumer must not be null");
+                return of(LinkedWhatsAppClientPasskeyAuthenticator.toQr(fidoUrl -> {
+                    renderQrToFile(fidoUrl, path);
+                    fileConsumer.accept(path);
+                }));
+            }
+
+            /**
+             * Returns a handler whose authenticator drives Warden's cross-device hybrid transport,
+             * rendering each ceremony's {@code FIDO:/...} QR code as a temporary JPEG file and forwarding
+             * the file path to the given consumer.
+             *
+             * <p>The user scans the rendered QR with the phone that holds the {@code whatsapp.com}
+             * passkey, which then produces the assertion over an encrypted tunnel. The returned handler
+             * auto-confirms the short verification code and prints it on standard output; implement
+             * {@link Passkey} directly and override {@link #confirmVerificationCode(String)} to compare
+             * it by hand.
+             *
+             * @param fileConsumer the consumer that receives the path of the rendered file
+             * @return the file-rendering handler
+             * @throws NullPointerException if {@code fileConsumer} is {@code null}
+             * @throws UncheckedIOException if the temporary file cannot be created
+             */
+            static Passkey toFile(ToFile fileConsumer) {
+                return toFile(createQrTempFile(), fileConsumer);
             }
 
             /**

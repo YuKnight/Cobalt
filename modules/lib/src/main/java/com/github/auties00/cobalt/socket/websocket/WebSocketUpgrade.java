@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.socket.websocket;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +34,11 @@ import java.util.Base64;
  * terminator and inline byte-literal checks for the mandatory headers.
  */
 public final class WebSocketUpgrade {
+
+    /**
+     * The logger for {@link WebSocketUpgrade}.
+     */
+    private static final System.Logger LOGGER = Log.get(WebSocketUpgrade.class);
 
     /**
      * Holds the WebSocket protocol GUID used when computing the
@@ -197,10 +204,18 @@ public final class WebSocketUpgrade {
      *                     exceeds {@link #MAX_RESPONSE_SIZE} bytes
      */
     public static ByteBuffer upgrade(Socket socket, String path, String host, int port, String userAgent) throws IOException {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "starting websocket upgrade to {0}:{1}{2}", host, port, path);
+        }
         var key = createWebSocketKey();
         var expectedAccept = computeExpectedAccept(key);
         sendUpgradeRequest(socket, path, host, port, key, userAgent);
-        return readUpgradeResponse(socket, expectedAccept);
+        var leftover = readUpgradeResponse(socket, expectedAccept);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "websocket upgrade succeeded, leftover={0} byte(s)",
+                    leftover != null ? leftover.remaining() : 0);
+        }
+        return leftover;
     }
 
     /**
@@ -331,6 +346,9 @@ public final class WebSocketUpgrade {
         while (headerEnd < 0) {
             if (filled == buffer.length) {
                 if (buffer.length >= MAX_RESPONSE_SIZE) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "websocket upgrade response exceeds {0} bytes", MAX_RESPONSE_SIZE);
+                    }
                     throw new IOException("WebSocket upgrade response exceeds " + MAX_RESPONSE_SIZE + " bytes");
                 }
                 var grown = new byte[Math.min(buffer.length * 2, MAX_RESPONSE_SIZE)];
@@ -412,6 +430,9 @@ public final class WebSocketUpgrade {
         }
         var statusCode = (d1 - '0') * 100 + (d2 - '0') * 10 + (d3 - '0');
         if (statusCode != EXPECTED_STATUS_CODE) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "websocket upgrade failed with status code {0}", statusCode);
+            }
             throw new IOException("WebSocket upgrade failed with status code " + statusCode);
         }
     }
@@ -465,9 +486,16 @@ public final class WebSocketUpgrade {
         }
 
         if (!foundUpgrade || !foundConnection) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "websocket upgrade response is missing mandatory headers, upgrade={0} connection={1}",
+                        foundUpgrade, foundConnection);
+            }
             throw new IOException("WebSocket upgrade response is missing mandatory headers");
         }
         if (!foundAccept) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "websocket upgrade failed: invalid sec-websocket-accept");
+            }
             throw new IOException("WebSocket upgrade failed: invalid Sec-WebSocket-Accept");
         }
     }

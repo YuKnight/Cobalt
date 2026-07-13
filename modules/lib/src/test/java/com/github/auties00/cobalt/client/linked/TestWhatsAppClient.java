@@ -17,6 +17,7 @@ import com.github.auties00.cobalt.model.call.CallEndReason;
 import com.github.auties00.cobalt.exception.WhatsAppException;
 import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsappWeb.WhatsAppWebGraphQlOperation;
 import com.github.auties00.cobalt.listener.linked.*;
 import com.github.auties00.cobalt.model.bot.profile.BotDirectory;
 import com.github.auties00.cobalt.model.bot.profile.BotProfile;
@@ -24,6 +25,7 @@ import com.github.auties00.cobalt.model.business.BusinessBroadcastBillingAccount
 import com.github.auties00.cobalt.model.business.BusinessBroadcastGenAiRecommendation;
 import com.github.auties00.cobalt.model.business.BusinessBroadcastGenAiRecommendationQuery;
 import com.github.auties00.cobalt.model.business.BusinessBroadcastQuota;
+import com.github.auties00.cobalt.model.business.BusinessBroadcastQuotaData;
 import com.github.auties00.cobalt.model.business.BusinessBroadcastTargetInfo;
 import com.github.auties00.cobalt.model.business.BusinessDataSharingConsent;
 import com.github.auties00.cobalt.model.business.BusinessSignedUserInfo;
@@ -53,6 +55,7 @@ import com.github.auties00.cobalt.model.business.ads.BusinessAdCreationRootQuery
 import com.github.auties00.cobalt.model.business.ads.BusinessAdCreationScreen;
 import com.github.auties00.cobalt.model.business.ads.BusinessAdCreationSummary;
 import com.github.auties00.cobalt.model.business.ads.BusinessAdDraft;
+import com.github.auties00.cobalt.model.business.ads.LwiBoostedComponentInput;
 import com.github.auties00.cobalt.model.business.ads.BusinessAdEmailOnboardingConfirmation;
 import com.github.auties00.cobalt.model.business.ads.BusinessAdEmailVerificationCodeRequest;
 import com.github.auties00.cobalt.model.business.ads.BusinessAdEstimatedReachQuery;
@@ -84,6 +87,10 @@ import com.github.auties00.cobalt.model.business.ai.BusinessAiProductInfoEdit;
 import com.github.auties00.cobalt.model.business.ai.BusinessAiReplyBotSchedule;
 import com.github.auties00.cobalt.model.business.ai.BusinessAiReplySettings;
 import com.github.auties00.cobalt.model.business.ai.BusinessAiRule;
+import com.github.auties00.cobalt.model.business.ai.AiChatHistoryUploadRequest;
+import com.github.auties00.cobalt.model.business.ai.AiFaqEntry;
+import com.github.auties00.cobalt.model.business.ai.AiLeadGenFlowInput;
+import com.github.auties00.cobalt.model.business.ai.AiRuleInput;
 import com.github.auties00.cobalt.model.business.cart.BusinessCartRefresh;
 import com.github.auties00.cobalt.model.business.cart.BusinessCartRefreshOptions;
 import com.github.auties00.cobalt.model.business.cart.BusinessRefreshedCart;
@@ -95,6 +102,7 @@ import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogCollecti
 import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogMutationResult;
 import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogProductCreate;
 import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogProductEdit;
+import com.github.auties00.cobalt.model.business.catalog.CatalogProductInfo;
 import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogProductVisibility;
 import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogEntry;
 import com.github.auties00.cobalt.model.business.catalog.BusinessCatalogPage;
@@ -137,6 +145,8 @@ import com.github.auties00.cobalt.model.business.support.SupportMessageFeedbackK
 import com.github.auties00.cobalt.model.business.support.SupportMessageFeedbackSubmission;
 import com.github.auties00.cobalt.model.chat.group.GroupSuspensionAppeal;
 import com.github.auties00.cobalt.model.business.waa.NativeMachineLearningModelManifest;
+import com.github.auties00.cobalt.model.business.waa.ClientCapabilityMetadata;
+import com.github.auties00.cobalt.model.business.waa.ModelRequestMetadata;
 import com.github.auties00.cobalt.model.business.waa.WhatsAppAdsAccountTypeReset;
 import com.github.auties00.cobalt.model.business.waa.WhatsAppAdsAdAccount;
 import com.github.auties00.cobalt.model.business.waa.WhatsAppAdsEligibility;
@@ -348,12 +358,12 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public JSONObject sendGraphQl(WhatsAppGraphQlOperation.Request request, String sessionCookie, String lsdToken) {
+    public JSONObject sendGraphQl(WhatsAppWebGraphQlOperation.Request request, String sessionCookie, String lsdToken) {
         throw new UnsupportedOperationException("TestWhatsAppClient: sendGraphQl(..) is not stubbed");
     }
 
     @Override
-    public JSONObject sendGraphQl(WhatsAppGraphQlOperation.Request request) {
+    public JSONObject sendGraphQl(WhatsAppWebGraphQlOperation.Request request) {
         throw new UnsupportedOperationException("TestWhatsAppClient: sendGraphQl(..) is not stubbed");
     }
 
@@ -374,6 +384,11 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
 
     @Override
     public JSONObject sendGraphQl(FacebookGraphQlOperation.Request request) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: sendGraphQl(..) is not stubbed");
+    }
+
+    @Override
+    public JSONObject sendGraphQl(WhatsAppGraphQlOperation.Request request) {
         throw new UnsupportedOperationException("TestWhatsAppClient: sendGraphQl(..) is not stubbed");
     }
 
@@ -569,6 +584,21 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
+    public Call startCall(JidProvider targetProvider, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: startCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call startCall(JidProvider targetProvider, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: startCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call startCall(JidProvider targetProvider, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: startCall(..) is not stubbed");
+    }
+
+    @Override
     public Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn,
                            VideoOutput videoOut, VideoInput videoIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: acceptCall(..) is not stubbed");
@@ -576,6 +606,21 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
 
     @Override
     public Call acceptCall(IncomingCall offer, AudioOutput audioOut, AudioInput audioIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: acceptCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call acceptCall(IncomingCall offer, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: acceptCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call acceptCall(IncomingCall offer, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: acceptCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call acceptCall(IncomingCall offer, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: acceptCall(..) is not stubbed");
     }
 
@@ -742,6 +787,21 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
+    public Call joinCallLink(URI link, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinCallLink(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinCallLink(URI link, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinCallLink(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinCallLink(URI link, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinCallLink(..) is not stubbed");
+    }
+
+    @Override
     public Call joinGroupCall(IncomingCall call, AudioOutput audioOut, AudioInput audioIn, VideoOutput videoOut, VideoInput videoIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
     }
@@ -752,12 +812,42 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
+    public Call joinGroupCall(IncomingCall call, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinGroupCall(IncomingCall call, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinGroupCall(IncomingCall call, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
+    }
+
+    @Override
     public Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn, VideoOutput videoOut, VideoInput videoIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
     }
 
     @Override
     public Call joinGroupCall(JidProvider group, AudioOutput audioOut, AudioInput audioIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinGroupCall(JidProvider group, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinGroupCall(JidProvider group, AudioOutput audioOut, VideoOutput videoOut, VideoInput videoIn) {
+        throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
+    }
+
+    @Override
+    public Call joinGroupCall(JidProvider group, VideoOutput videoOut, AudioInput audioIn, VideoInput videoIn) {
         throw new UnsupportedOperationException("TestWhatsAppClient: joinGroupCall(..) is not stubbed");
     }
 
@@ -2789,7 +2879,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessProduct> addCatalogProduct(JidProvider bizJid, String productInfoJson) {
+    public Optional<BusinessProduct> addCatalogProduct(JidProvider bizJid, CatalogProductInfo productInfo) {
         throw new UnsupportedOperationException("TestWhatsAppClient: addCatalogProduct(..) is not stubbed");
     }
 
@@ -2799,7 +2889,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessProduct> editCatalogProduct(JidProvider bizJid, String productId, String productInfoJson) {
+    public Optional<BusinessProduct> editCatalogProduct(JidProvider bizJid, String productId, CatalogProductInfo productInfo) {
         throw new UnsupportedOperationException("TestWhatsAppClient: editCatalogProduct(..) is not stubbed");
     }
 
@@ -2954,7 +3044,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessAiMutationResult> createAiChatHistory(String inputJson) {
+    public Optional<BusinessAiMutationResult> createAiChatHistory(AiChatHistoryUploadRequest input) {
         throw new UnsupportedOperationException("TestWhatsAppClient: createAiChatHistory(..) is not stubbed");
     }
 
@@ -2974,7 +3064,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessAiMutationResult> updateAiExampleResponses(String faqJson) {
+    public Optional<BusinessAiMutationResult> updateAiExampleResponses(List<AiFaqEntry> faq) {
         throw new UnsupportedOperationException("TestWhatsAppClient: updateAiExampleResponses(..) is not stubbed");
     }
 
@@ -3024,12 +3114,12 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessAiLeadGenForm> createAiLeadGenFlow(String requestJson) {
+    public Optional<BusinessAiLeadGenForm> createAiLeadGenFlow(AiLeadGenFlowInput request) {
         throw new UnsupportedOperationException("TestWhatsAppClient: createAiLeadGenFlow(..) is not stubbed");
     }
 
     @Override
-    public Optional<BusinessAiLeadGenForm> updateAiLeadGenFlow(String requestJson) {
+    public Optional<BusinessAiLeadGenForm> updateAiLeadGenFlow(AiLeadGenFlowInput request) {
         throw new UnsupportedOperationException("TestWhatsAppClient: updateAiLeadGenFlow(..) is not stubbed");
     }
 
@@ -3094,12 +3184,12 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessAiRule> createAiRule(String requestJson) {
+    public Optional<BusinessAiRule> createAiRule(AiRuleInput request) {
         throw new UnsupportedOperationException("TestWhatsAppClient: createAiRule(..) is not stubbed");
     }
 
     @Override
-    public Optional<BusinessAiRule> updateAiRule(String requestJson) {
+    public Optional<BusinessAiRule> updateAiRule(AiRuleInput request) {
         throw new UnsupportedOperationException("TestWhatsAppClient: updateAiRule(..) is not stubbed");
     }
 
@@ -3194,7 +3284,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessBroadcastTargetInfo> queryBroadcastBusinessInfo(String inputJson) {
+    public Optional<BusinessBroadcastTargetInfo> queryBroadcastBusinessInfo(Boolean shouldReturnAdAccount) {
         throw new UnsupportedOperationException("TestWhatsAppClient: queryBroadcastBusinessInfo(..) is not stubbed");
     }
 
@@ -3204,7 +3294,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessBroadcastQuota> queryBroadcastQuota(String dataJson) {
+    public Optional<BusinessBroadcastQuota> queryBroadcastQuota(BusinessBroadcastQuotaData data) {
         throw new UnsupportedOperationException("TestWhatsAppClient: queryBroadcastQuota(..) is not stubbed");
     }
 
@@ -3284,7 +3374,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<NativeMachineLearningModelManifest> queryNativeMlModelManifest(String modelRequestMetadatasJson, String clientCapabilityMetadataJson) {
+    public Optional<NativeMachineLearningModelManifest> queryNativeMlModelManifest(List<ModelRequestMetadata> modelRequestMetadatas, ClientCapabilityMetadata clientCapabilityMetadata) {
         throw new UnsupportedOperationException("TestWhatsAppClient: queryNativeMlModelManifest(..) is not stubbed");
     }
 
@@ -3459,12 +3549,12 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessAdDraft> createAdDraft(String inputJson) {
+    public Optional<BusinessAdDraft> createAdDraft(LwiBoostedComponentInput input) {
         throw new UnsupportedOperationException("TestWhatsAppClient: createAdDraft(..) is not stubbed");
     }
 
     @Override
-    public Optional<BusinessAdDraft> editAdDraft(String inputJson) {
+    public Optional<BusinessAdDraft> editAdDraft(LwiBoostedComponentInput input) {
         throw new UnsupportedOperationException("TestWhatsAppClient: editAdDraft(..) is not stubbed");
     }
 
@@ -3494,7 +3584,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessBoostedComponent> createBoostedComponent(String inputJson) {
+    public Optional<BusinessBoostedComponent> createBoostedComponent(LwiBoostedComponentInput input) {
         throw new UnsupportedOperationException("TestWhatsAppClient: createBoostedComponent(..) is not stubbed");
     }
 
@@ -3504,7 +3594,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessAdBudgetOptions> queryAdBudgetOptions(String inputJson) {
+    public Optional<BusinessAdBudgetOptions> queryAdBudgetOptions(String legacyAdAccountId, Long budget, String currency) {
         throw new UnsupportedOperationException("TestWhatsAppClient: queryAdBudgetOptions(..) is not stubbed");
     }
 
@@ -3629,7 +3719,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public Optional<BusinessAdCreationSummary> queryAdCreationSummaryContent(String assetId, String budgetJson) {
+    public Optional<BusinessAdCreationSummary> queryAdCreationSummaryContent(String assetId, Long budget, String budgetType, String currency, Integer durationInDays) {
         throw new UnsupportedOperationException("TestWhatsAppClient: queryAdCreationSummaryContent(..) is not stubbed");
     }
 

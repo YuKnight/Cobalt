@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -16,6 +17,7 @@ import com.github.auties00.cobalt.wam.type.AudienceManagementActionType;
 import com.github.auties00.cobalt.wam.type.AudiencePredicateTypeEnum;
 import com.github.auties00.cobalt.wam.type.AudienceResolutionTriggerType;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,6 +51,11 @@ import java.util.Objects;
  * callable from any embedder regardless of the SMB feature gate.
  */
 public final class BusinessBroadcastCampaignMutationFactory {
+    /**
+     * The logger for {@link BusinessBroadcastCampaignMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(BusinessBroadcastCampaignMutationFactory.class);
+
     /**
      * Holds the WAM telemetry service used to commit the
      * {@link com.github.auties00.cobalt.wam.event.AudienceManagementEvent}
@@ -98,6 +105,7 @@ public final class BusinessBroadcastCampaignMutationFactory {
             BusinessBroadcastCampaignAction action,
             Instant timestamp
     ) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building business broadcast campaign mutation id={0}", campaignId);
         var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)
                 .businessBroadcastCampaignAction(action)
@@ -148,6 +156,7 @@ public final class BusinessBroadcastCampaignMutationFactory {
      */
     @WhatsAppWebExport(moduleName = "WAWebBroadcastCampaignSync", exports = "getDeleteCampaignMutation", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getDeleteCampaignMutation(String campaignId, Instant timestamp) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building business broadcast campaign delete mutation id={0}", campaignId);
         var value = new SyncActionValueBuilder()
                 .timestamp(timestamp)
                 .build();
@@ -204,6 +213,7 @@ public final class BusinessBroadcastCampaignMutationFactory {
             AudienceEventSurfaceType surface,
             String extraData
     ) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "committing audience management event action={0} predicate={1} trigger={2}", action, predicate, trigger);
         var builder = new AudienceManagementEventBuilder()
                 .audienceManagementAction(action)
                 .audiencePredicateType(predicate)

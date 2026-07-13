@@ -4,14 +4,18 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Objects;
+import com.github.auties00.cobalt.calls.stream.AudioFrame;
+import com.github.auties00.cobalt.calls.stream.AudioInput;
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoInput;
 import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
+import com.github.auties00.cobalt.log.Log;
 
 /**
  * Records the remote video of a call to a raw YUV4MPEG2 (Y4M) file.
@@ -28,11 +32,19 @@ import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
  * rather than corrupting the file. A frame delivered in {@link VideoPixelFormat#NV12} is deinterleaved to
  * I420 before it is written.
  *
+ * <p>As a {@link VideoInput} it is also an {@link AudioInput}; the inbound audio is discarded, since Y4M
+ * records only video. Pass a separate audio sink through the input-only call overloads to record audio too.
+ *
  * @implNote This implementation writes the frames raw and uncompressed, so the file grows at roughly
  * {@code width*height*1.5} bytes per frame; it is a diagnostic and bridging sink, not a space efficient
  * recording format.
  */
 public final class Y4mVideoInput implements VideoInput {
+    /**
+     * The logger for {@link Y4mVideoInput}.
+     */
+    private static final System.Logger LOGGER = Log.get(Y4mVideoInput.class);
+
     /**
      * The frame rate written into the Y4M header, since the container carries no per frame timing and the
      * engine's presentation timestamps are not preserved.
@@ -55,7 +67,7 @@ public final class Y4mVideoInput implements VideoInput {
     private final OutputStream out;
 
     /**
-     * Whether the sink has been ended, after which a frame is dropped and {@link #read()} returns.
+     * Whether the sink has been ended, after which a frame is dropped and {@link #readVideo()} returns.
      */
     private boolean closed;
 
@@ -78,7 +90,7 @@ public final class Y4mVideoInput implements VideoInput {
     /**
      * Opens the given path for writing, truncating any existing file.
      *
-     * <p>The Y4M header is deferred to the first {@link #offer(VideoFrame)}, since the stream geometry is
+     * <p>The Y4M header is deferred to the first {@link #offerVideo(VideoFrame)}, since the stream geometry is
      * only known once a frame arrives.
      *
      * @param path the output file path; never {@code null}
@@ -93,6 +105,7 @@ public final class Y4mVideoInput implements VideoInput {
                     StandardOpenOption.TRUNCATE_EXISTING,
                     StandardOpenOption.WRITE));
         } catch (IOException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to open Y4M sink", e);
             throw new IllegalStateException("failed to open Y4M sink at " + path, e);
         }
     }
@@ -109,7 +122,7 @@ public final class Y4mVideoInput implements VideoInput {
      * @throws UncheckedIOException if the underlying write fails
      */
     @Override
-    public void offer(VideoFrame frame) {
+    public void offerVideo(VideoFrame frame) {
         Objects.requireNonNull(frame, "frame cannot be null");
         synchronized (lock) {
             if (closed) {
@@ -120,12 +133,18 @@ public final class Y4mVideoInput implements VideoInput {
                     width = frame.width();
                     height = frame.height();
                     out.write(header(width, height));
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "Y4M sink locked geometry {0}x{1}", width, height);
                 } else if (frame.width() != width || frame.height() != height) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "dropping Y4M frame {0}x{1}, locked geometry is {2}x{3}",
+                                frame.width(), frame.height(), width, height);
+                    }
                     return;
                 }
                 out.write(FRAME_MARKER);
                 out.write(i420(frame));
             } catch (IOException e) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to write Y4M frame", e);
                 throw new UncheckedIOException("failed to write Y4M frame", e);
             }
         }
@@ -141,7 +160,7 @@ public final class Y4mVideoInput implements VideoInput {
      * @throws InterruptedException if the calling thread is interrupted while waiting
      */
     @Override
-    public VideoFrame read() throws InterruptedException {
+    public VideoFrame readVideo() throws InterruptedException {
         synchronized (lock) {
             while (!closed) {
                 lock.wait();
@@ -153,7 +172,39 @@ public final class Y4mVideoInput implements VideoInput {
     /**
      * {@inheritDoc}
      *
-     * <p>Marks the sink ended, flushes and closes the file, and wakes a pending {@link #read()}. Idempotent.
+     * <p>Drops the frame: this sink records only video, so the inbound audio is discarded.
+     *
+     * @param frame {@inheritDoc}
+     * @throws NullPointerException if {@code frame} is {@code null}
+     */
+    @Override
+    public void offerAudio(AudioFrame frame) {
+        Objects.requireNonNull(frame, "frame cannot be null");
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The audio side is not read from: this blocks until {@link #shutdown()} and then returns
+     * {@code null}, sharing the video side's lock.
+     *
+     * @return {@code null} once the sink has been ended
+     * @throws InterruptedException if the calling thread is interrupted while waiting
+     */
+    @Override
+    public AudioFrame readAudio() throws InterruptedException {
+        synchronized (lock) {
+            while (!closed) {
+                lock.wait();
+            }
+            return null;
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Marks the sink ended, flushes and closes the file, and wakes a pending {@link #readVideo()}. Idempotent.
      *
      * @throws UncheckedIOException if flushing or closing the file fails
      */
@@ -164,10 +215,12 @@ public final class Y4mVideoInput implements VideoInput {
                 return;
             }
             closed = true;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "finalizing Y4M sink");
             lock.notifyAll();
             try {
                 out.close();
             } catch (IOException e) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to finalise Y4M file", e);
                 throw new UncheckedIOException("failed to finalise Y4M file", e);
             }
         }
@@ -203,6 +256,7 @@ public final class Y4mVideoInput implements VideoInput {
         if (scratch == null || scratch.length != pixels.length) {
             scratch = new byte[pixels.length];
             i420Scratch = scratch;
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "reallocated Y4M scratch buffer, size {0}", pixels.length);
         }
         System.arraycopy(pixels, 0, scratch, 0, lumaBytes);
         for (var i = 0; i < chromaSamples; i++) {

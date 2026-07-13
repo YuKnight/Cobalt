@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.Optional;
@@ -48,6 +50,9 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAMediaCrypto")
 @WhatsAppWebModule(moduleName = "WAWebCryptoEncryptMedia")
 abstract sealed class MediaUploadInputStream extends MediaInputStream {
+    /** The logger for {@link MediaUploadInputStream}. */
+    private static final System.Logger LOGGER = Log.get(MediaUploadInputStream.class);
+
     /**
      * Constructs a new upload stream wrapping the given raw plaintext
      * stream.
@@ -397,6 +402,8 @@ abstract sealed class MediaUploadInputStream extends MediaInputStream {
             this.ciphertextBuffer = new byte[BUFFER_LENGTH + CBC_BLOCK_SIZE];
             this.outputBuffer = new byte[BUFFER_LENGTH];
             this.plaintextLength = 0;
+
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "encrypted media upload stream initialized, keyName={0}", keyName);
         }
 
         /**
@@ -497,6 +504,10 @@ abstract sealed class MediaUploadInputStream extends MediaInputStream {
                         plaintextHash = plaintextDigest.digest();
                         ciphertextHash = ciphertextDigest.digest();
 
+                        if (Log.DEBUG) {
+                            LOGGER.log(Level.DEBUG, "encrypted media upload finished, plaintextLength={0}", plaintextLength);
+                        }
+
                         finalized = true;
                         break;
                     }
@@ -508,6 +519,7 @@ abstract sealed class MediaUploadInputStream extends MediaInputStream {
                     processChunk(ciphertextLen);
                 }
             } catch (GeneralSecurityException exception) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "media encryption failed", exception);
                 throw new IOException("Cannot encrypt data", exception);
             }
         }
@@ -653,6 +665,7 @@ abstract sealed class MediaUploadInputStream extends MediaInputStream {
                 this.plaintextDigest = MessageDigest.getInstance("SHA-256");
                 this.plaintextLength = 0;
             } catch (GeneralSecurityException exception) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "plaintext media upload stream init failed", exception);
                 throw new InternalError("Cannot initialize stream", exception);
             }
         }
@@ -678,6 +691,7 @@ abstract sealed class MediaUploadInputStream extends MediaInputStream {
             } else if (!finalized) {
                 finalized = true;
                 plaintextHash = plaintextDigest.digest();
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "plaintext media upload finished, plaintextLength={0}", plaintextLength);
             }
             return ch;
         }
@@ -706,6 +720,7 @@ abstract sealed class MediaUploadInputStream extends MediaInputStream {
             } else if (!finalized) {
                 finalized = true;
                 plaintextHash = plaintextDigest.digest();
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "plaintext media upload finished, plaintextLength={0}", plaintextLength);
             }
             return result;
         }

@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.model.business.auth.BusinessSignupMetadataBuil
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the WhatsApp Business signup-metadata query built by
+ * Parses the graph.whatsapp.com GraphQL response of the WhatsApp Business signup-metadata query built by
  * {@link SignupMetadataWhatsAppGraphQlRequest} into a {@link BusinessSignupMetadata}.
  *
  * <p>Reads the linked root {@code wa_signup_metadata} and projects its scalars (server-issued signup
@@ -31,14 +31,14 @@ public final class SignupMetadataWhatsAppGraphQlResponse implements WhatsAppGrap
      *
      * <p>Reserved for the static parser.
      *
-     * @param metadata the parsed signup metadata, or {@code null} when the relay omitted the field
+     * @param metadata the parsed signup metadata, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private SignupMetadataWhatsAppGraphQlResponse(BusinessSignupMetadata metadata) {
         this.metadata = metadata;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code wa_signup_metadata} and projects it onto a
      * {@link BusinessSignupMetadata}; the returned {@link Optional} is empty when {@code data} or

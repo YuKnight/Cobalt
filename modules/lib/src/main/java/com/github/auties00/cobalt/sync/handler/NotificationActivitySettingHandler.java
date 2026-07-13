@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.WhatsAppLinkedClientErrorHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.setting.NotificationActivitySettingAction;
@@ -9,6 +10,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSettingsStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code notificationActivitySetting} app-state action that
@@ -34,6 +37,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * and the version and apply path are inferred from sibling settings handlers.
  */
 public final class NotificationActivitySettingHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link NotificationActivitySettingHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(NotificationActivitySettingHandler.class);
 
     /**
      * Constructs a stateless {@link NotificationActivitySettingHandler} for
@@ -96,15 +103,21 @@ public final class NotificationActivitySettingHandler implements WebAppStateActi
     @Override
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "notification activity setting: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof NotificationActivitySettingAction action)
                 || action.notificationActivitySetting().isEmpty()) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "notification activity setting mutation malformed: missing value");
             return MutationApplicationResult.malformed();
         }
 
         client.store().settingsStore().setNotificationActivitySetting(action.notificationActivitySetting().get());
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "notification activity setting: updated to {0}", action.notificationActivitySetting().get());
 
         return MutationApplicationResult.success();
     }

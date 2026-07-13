@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.transport.dtls;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 
 import java.util.Objects;
 

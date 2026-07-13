@@ -13,7 +13,8 @@ import com.github.auties00.cobalt.listener.MessageStatusListener;
 import com.github.auties00.cobalt.listener.NewMessageListener;
 import com.github.auties00.cobalt.listener.linked.LinkedNewStatusListener;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.MessageService;
@@ -112,6 +113,7 @@ import com.github.auties00.cobalt.model.message.context.ContextInfo;
 import com.github.auties00.cobalt.model.chat.ChatDisappearingMode;
 
 import java.io.ByteArrayInputStream;
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -163,11 +165,8 @@ import java.util.zip.GZIPInputStream;
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleMessagingStanza")
 @WhatsAppWebModule(moduleName = "WAWebCommsHandleWorkerCompatibleStanza")
 public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
-    /**
-     * Logger used for unstructured diagnostic output on parse failures,
-     * receive-pipeline failures, and protocol-message helper failures.
-     */
-    private static final System.Logger LOGGER = System.getLogger(MessageStreamHandler.class.getName());
+    /** The logger for {@link MessageStreamHandler}. */
+    private static final System.Logger LOGGER = Log.get(MessageStreamHandler.class);
 
     /**
      * Retry-count threshold (inclusive) that triggers the
@@ -561,6 +560,7 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
         ackSender.sendAck(AckClass.MESSAGE, node);
 
         if ("medianotify".equals(node.getAttributeAsString("type", null))) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "medianotify stanza from {0}, skipping", from);
             return;
         }
 
@@ -577,9 +577,9 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
                     whatsapp.store().accountStore().jid().orElse(null),
                     whatsapp.store().accountStore().lid().orElse(null));
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to parse incoming message stanza: {0}",
-                    exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "failed to parse incoming message stanza from " + Log.jid(String.valueOf(from)), exception);
+            }
             emitUnknownStanzaMetric(node);
             emitIncomingMessageDropFromNode(node, MessageDropReasonType.INVALID_STANZA);
             sendNack(node, "487");
@@ -601,9 +601,9 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
                 try {
                     storeIncomingMessage(info);
                 } catch (RuntimeException storeFailure) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "Failed to persist incoming message {0}: {1}",
-                            stanza.id(), storeFailure.getMessage());
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "failed to persist incoming message id=" + stanza.id(), storeFailure);
+                    }
                     emitIncomingMessageDropForDbFailure(stanza);
                     return;
                 }
@@ -625,6 +625,10 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
                 var postProcessingNanos = System.nanoTime() - postProcessingStartNanos;
                 maybeEmitMessageProcessingPerf(stanza, preProcessingNanos, parsingNanos,
                         processingNanos, dbStoringNanos, postProcessingNanos);
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "processed incoming message {0} chat={1} quarantined={2}",
+                            stanza.id(), stanza.chatJid(), quarantined);
+                }
             }
 
             if (info == null) {
@@ -640,18 +644,16 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
                 receiptHandler.sendDeliveryReceipt(stanza, info);
             }
         } catch (WhatsAppMessageException.Receive exception) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Incoming message {0} failed: {1}",
-                    stanza.id(),
-                    exception.getMessage());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "incoming message id=" + stanza.id() + " failed", exception);
+            }
             emitIncomingMessageDropFromStanza(stanza, exception);
             emitMdBadDeviceSentMessageIfApplicable(stanza, exception);
             handleReceiveFailure(stanza, exception);
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Incoming message {0} failed unexpectedly: {1}",
-                    stanza.id(),
-                    exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "incoming message id=" + stanza.id() + " failed unexpectedly", exception);
+            }
             emitIncomingMessageDropFromStanza(stanza, null);
             sendNack(node, "500");
         }
@@ -691,11 +693,15 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
             notifyMessageReceived(info, quoted);
             if (info instanceof NewsletterMessageInfo newsletterInfo) {
                 emitMessageReceiveForNewsletterMessage(newsletterInfo);
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "processed newsletter message {0}", newsletterInfo.key().id().orElse(null));
+                }
             }
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle newsletter message stanza: {0}",
-                    exception.getMessage());
+            if (Log.WARNING) {
+                var from = stanza.getAttributeAsJid("from").orElse(null);
+                LOGGER.log(Level.WARNING, "failed to handle newsletter message stanza from " + Log.jid(String.valueOf(from)), exception);
+            }
             wamService.commit(new IncomingMessageDropEventBuilder()
                     .messageDropReason(MessageDropReasonType.INVALID_PROTOBUF)
                     .e2eDestination(E2eDestination.CHANNEL)
@@ -729,18 +735,16 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
             WhatsAppMessageException.Receive exception
     ) {
         if (exception instanceof WhatsAppMessageException.Receive.HsmMismatch) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "HSM mismatch for message {0}, no receipt sent",
-                    stanza.id());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "hsm mismatch for message {0}, no receipt sent", stanza.id());
             return;
         }
 
         var errorCode = exception.errorCode().orElse(null);
         if (errorCode != null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "NACK (" + errorCode + ") for message " + stanza.id()
-                            + " from " + stanza.senderJid(),
-                    exception);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "nack (" + errorCode + ") for message " + stanza.id()
+                        + " from " + Log.jid(String.valueOf(stanza.senderJid())), exception);
+            }
             receiptHandler.sendNackReceipt(stanza, parseErrorCode(errorCode));
             return;
         }
@@ -752,6 +756,9 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
                     exception.retryReason(),
                     nextRetryCount
             );
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "sent retry receipt for message {0}, attempt {1}", stanza.id(), nextRetryCount);
+            }
             maybeEmitMessageHighRetryCount(stanza, nextRetryCount);
             surfaceUndecryptableMessage(stanza, exception, nextRetryCount);
             return;
@@ -798,12 +805,18 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
             storeIncomingMessage(placeholder);
             emitPlaceholderActivityAdd(stanza, exception);
             notifyMessageReceived(placeholder, Optional.empty());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "stored ciphertext placeholder for undecryptable message {0} from {1}",
+                        stanza.id(), stanza.senderJid());
+            }
         }
 
         if (retryCount == MAX_MESSAGE_RETRY_COUNT) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Message {0} from {1} still undecryptable after {2} retries: {3}",
-                    stanza.id(), stanza.senderJid(), retryCount, exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "message id=" + stanza.id() + " from "
+                        + Log.jid(String.valueOf(stanza.senderJid())) + " still undecryptable after "
+                        + retryCount + " retries", exception);
+            }
             whatsapp.handleFailure(exception);
         }
     }
@@ -3230,9 +3243,9 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
             }
 
             if (keyId.length != 6) {
-                LOGGER.log(System.Logger.Level.ERROR,
-                        "syncd: fatal error: key share key id has invalid bytelength of {0}",
-                        keyId.length);
+                if (Log.ERROR) {
+                    LOGGER.log(Level.ERROR, "syncd: fatal error: key share key id has invalid bytelength of {0}", keyId.length);
+                }
                 continue;
             }
 
@@ -3243,6 +3256,10 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
             return;
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "handling app state sync key share from device {0} with {1} validated keys",
+                    senderDeviceId, validatedKeys.size());
+        }
         syncKeyRotationService.handleKeyShare(senderDeviceId, validatedKeys);
     }
 
@@ -3326,11 +3343,15 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
                     .senderJid(self)
                     .build();
             whatsapp.sendPeerMessage(sender.get(), response);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "answered app state sync key request from {0} with {1} keys",
+                        sender.orElse(null), keysToShare.size());
+            }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Failed to answer app state sync key request from {0}: {1}",
-                    sender,
-                    throwable.getMessage());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "failed to answer app state sync key request from "
+                        + Log.jid(String.valueOf(sender.orElse(null))), throwable);
+            }
         }
     }
 
@@ -3384,9 +3405,9 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
         try {
             decoded = snapshotRecoveryService.decodeRecoverySnapshot(recovery);
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to decode snapshot recovery payload: {0}",
-                    exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "failed to decode snapshot recovery payload, session=" + sessionId, exception);
+            }
             wamService.commit(new NonMessagePeerDataOperationResponseEventBuilder()
                     .peerDataRequestType(PeerDataRequestType.SYNCD_SNAPSHOT_RECOVERY)
                     .peerDataRequestSessionId(sessionId)
@@ -3399,9 +3420,13 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
             return;
         }
 
-        decoded.collectionName()
-                .flatMap(SyncPatchType::of)
-                .ifPresent(collectionName -> snapshotRecoveryService.resolveRecovery(collectionName, decoded));
+        var collectionName = decoded.collectionName().flatMap(SyncPatchType::of).orElse(null);
+        if (collectionName != null) {
+            snapshotRecoveryService.resolveRecovery(collectionName, decoded);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "resolved snapshot recovery for collection {0}, session={1}", collectionName, sessionId);
+            }
+        }
 
         wamService.commit(new NonMessagePeerDataOperationResponseEventBuilder()
                 .peerDataRequestType(PeerDataRequestType.SYNCD_SNAPSHOT_RECOVERY)
@@ -3442,9 +3467,9 @@ public final class MessageStreamHandler extends SocketStreamHandler.Ordered {
         try (var protobufStream = new BufferedProtobufInputStream(new GZIPInputStream(new ByteArrayInputStream(payload)))) {
             return Optional.of(LIDMigrationMappingSyncPayloadSpec.decode(protobufStream));
         } catch (Exception exception) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to decode LID migration mapping payload: {0}",
-                    exception.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "failed to decode lid migration mapping payload, bytes=" + payload.length, exception);
+            }
             return Optional.empty();
         }
     }

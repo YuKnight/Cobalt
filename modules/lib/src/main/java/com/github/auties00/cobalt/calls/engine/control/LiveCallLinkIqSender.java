@@ -2,11 +2,13 @@ package com.github.auties00.cobalt.calls.engine.control;
 
 import com.github.auties00.cobalt.calls.signaling.CallMessage;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.JidServer;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -34,6 +36,11 @@ import java.util.Objects;
  * @param whatsapp the owning client whose id correlated send carries the call link IQ
  */
 public record LiveCallLinkIqSender(LinkedWhatsAppClient whatsapp) implements CallLinkIqSender {
+    /**
+     * The logger for {@link LiveCallLinkIqSender}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveCallLinkIqSender.class);
+
     /**
      * The wire element tag of the call signaling envelope and of its acknowledgement.
      */
@@ -71,12 +78,17 @@ public record LiveCallLinkIqSender(LinkedWhatsAppClient whatsapp) implements Cal
                 .description(CALL_ELEMENT)
                 .attribute(TO_ATTRIBUTE, JidServer.call())
                 .content(action);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending call-link iq action={0}", action.description());
         Stanza reply;
         try {
             reply = whatsapp.sendNode(builder);
         } catch (RuntimeException exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "call-link iq send failed action=" + action.description(), exception);
+            }
             throw new WhatsAppCallException.DataChannel("could not send call-link IQ", exception);
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call-link iq reply received action={0}", action.description());
         return reply.getChild(action.description())
                 .or(reply::getChild)
                 .orElse(reply);

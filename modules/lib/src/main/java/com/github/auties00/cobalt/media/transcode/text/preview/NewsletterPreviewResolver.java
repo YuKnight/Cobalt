@@ -1,12 +1,14 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.model.newsletter.NewsletterLinkPreview;
 
+import java.lang.System.Logger.Level;
 import java.util.Base64;
 
 /**
@@ -21,13 +23,16 @@ import java.util.Base64;
  */
 @WhatsAppWebModule(moduleName = "WAWebNewsletterFetchLinkPreviewAction")
 public final class NewsletterPreviewResolver {
+    /** The logger for {@link NewsletterPreviewResolver}. */
+    private static final System.Logger LOGGER = Log.get(NewsletterPreviewResolver.class);
+
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private NewsletterPreviewResolver() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -66,6 +71,7 @@ public final class NewsletterPreviewResolver {
         }
         var response = querySafely(client, url);
         if (response == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "newsletter link preview unavailable");
             return false;
         }
         response.title().ifPresent(message::setTitle);
@@ -85,6 +91,7 @@ public final class NewsletterPreviewResolver {
         if (response.thumbnailHeight().isPresent()) {
             message.setThumbnailHeight(response.thumbnailHeight().getAsInt());
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "newsletter link preview resolved");
         return true;
     }
 
@@ -105,7 +112,8 @@ public final class NewsletterPreviewResolver {
             LinkedWhatsAppClient client, String url) {
         try {
             return client.queryNewsletterLinkPreview(url).orElse(null);
-        } catch (RuntimeException _) {
+        } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "newsletter link preview query failed", e);
             return null;
         }
     }
@@ -125,6 +133,7 @@ public final class NewsletterPreviewResolver {
         try {
             return Base64.getDecoder().decode(base64);
         } catch (IllegalArgumentException malformed) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "newsletter preview thumbnail base64 decode failed");
             return null;
         }
     }

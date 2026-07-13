@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.media.transcode.text.link;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -9,6 +10,7 @@ import com.github.auties00.cobalt.model.device.pairing.ClientPlatformType;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
+import java.lang.System.Logger.Level;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,6 +39,9 @@ import java.util.regex.PatternSyntaxException;
 @WhatsAppWebModule(moduleName = "WAWebPaymentLinkUrlMetaData")
 @WhatsAppWebModule(moduleName = "WAWebMobilePlatforms")
 public final class DeepLinkParser {
+    /** The logger for {@link DeepLinkParser}. */
+    private static final System.Logger LOGGER = Log.get(DeepLinkParser.class);
+
     /**
      * Caches parsed payment-link regex maps keyed by the raw AB-prop value.
      *
@@ -197,10 +202,10 @@ public final class DeepLinkParser {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private DeepLinkParser() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -302,6 +307,7 @@ public final class DeepLinkParser {
         var smb = isSmb(client);
         for (var entry : regexMap.entrySet()) {
             if (entry.getKey().matcher(url).find()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "payment link matched, smb={0}", smb);
                 return new DeepLink.PaymentLink(entry.getValue(), smb);
             }
         }
@@ -338,11 +344,14 @@ public final class DeepLinkParser {
                 }
                 try {
                     out.put(Pattern.compile(entry.getKey()), psp);
-                } catch (PatternSyntaxException _) {
+                } catch (PatternSyntaxException invalid) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "payment link regex entry invalid, skipped", invalid);
                 }
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "payment link regex list parsed, entries={0}", out.size());
             return Map.copyOf(out);
         } catch (RuntimeException malformed) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "payment link regex list malformed", malformed);
             return Map.of();
         }
     }

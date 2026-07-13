@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.calls.config;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -36,6 +38,24 @@ public enum VoipSettingsType {
      * The video call overlay keyed under {@linkplain #code() code} {@code 2}.
      */
     VIDEO(2, "video");
+
+    /**
+     * Resolves an engine target settings code to its set, backing {@link #ofCode(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #code}, so a code resolves to its
+     * set in constant time rather than by scanning {@link #values()}.
+     */
+    private static final Map<Integer, VoipSettingsType> BY_CODE;
+
+    static {
+        var byCode = new HashMap<Integer, VoipSettingsType>();
+        for (var type : values()) {
+            if (byCode.put(type.code, type) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_CODE = Map.copyOf(byCode);
+    }
 
     /**
      * The integer target settings code the engine indexes this set by.
@@ -82,15 +102,12 @@ public enum VoipSettingsType {
     /**
      * Returns the target settings set whose {@linkplain #code() code} equals the given value.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_CODE} map rather than
+     * scanning {@link #values()}.
      * @param code the engine target settings code to resolve
      * @return the matching set, or {@link Optional#empty()} if no set matches
      */
     public static Optional<VoipSettingsType> ofCode(int code) {
-        for (var type : values()) {
-            if (type.code == code) {
-                return Optional.of(type);
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(BY_CODE.get(code));
     }
 }

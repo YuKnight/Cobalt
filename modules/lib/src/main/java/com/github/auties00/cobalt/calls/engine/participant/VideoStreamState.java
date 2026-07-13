@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Enumerates the video stream states the wa-voip engine tracks for each participant.
  *
@@ -146,6 +149,26 @@ public enum VideoStreamState {
     private static final VideoStreamState[] VALUES = values();
 
     /**
+     * Resolves an engine wire ordinal to its state, backing {@link #ofWireOrdinal(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #wireOrdinal}, so a wire ordinal
+     * resolves to its state in constant time rather than by scanning {@link #VALUES}. A wire ordinal with
+     * no entry, including the unused {@code 13..19} padding slots, falls back to {@link #UNKNOWN_PEER} in
+     * {@link #ofWireOrdinal(int)}.
+     */
+    private static final Map<Integer, VideoStreamState> BY_WIRE_ORDINAL;
+
+    static {
+        var byWireOrdinal = new HashMap<Integer, VideoStreamState>();
+        for (var state : VALUES) {
+            if (byWireOrdinal.put(state.wireOrdinal, state) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_WIRE_ORDINAL = Map.copyOf(byWireOrdinal);
+    }
+
+    /**
      * The integer value the wa-voip engine stores and transmits for this state.
      */
     private final int wireOrdinal;
@@ -180,16 +203,14 @@ public enum VideoStreamState {
      * {@code 13..19} padding slots, resolves to {@link #UNKNOWN_PEER}, mirroring the
      * engine's treatment of an unresolved or out of range video state.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_WIRE_ORDINAL} map rather than
+     * scanning {@link #VALUES}.
      * @param wireOrdinal the engine wire ordinal to resolve
      * @return the matching state, or {@link #UNKNOWN_PEER} if no state matches
      */
     public static VideoStreamState ofWireOrdinal(int wireOrdinal) {
-        for (var state : VALUES) {
-            if (state.wireOrdinal == wireOrdinal) {
-                return state;
-            }
-        }
-        return UNKNOWN_PEER;
+        var state = BY_WIRE_ORDINAL.get(wireOrdinal);
+        return state != null ? state : UNKNOWN_PEER;
     }
 
     /**

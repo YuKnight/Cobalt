@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the cross-posting eligibility-check mutation built by
+ * Parses the graph.whatsapp.com GraphQL response of the cross-posting eligibility-check mutation built by
  * {@link WaffleXeWhatsAppGraphQlRequest} into a {@link CrossPostingEligibility}.
  *
  * <p>Reads the linked root {@code waffle_xe_root} and projects its per-purpose public keys, the
@@ -43,7 +43,7 @@ public final class WaffleXeWhatsAppGraphQlResponse implements WhatsAppGraphQlOpe
      *
      * <p>Reserved for the static parser.
      *
-     * @param eligibility the parsed eligibility tree, or {@code null} when the relay omitted the
+     * @param eligibility the parsed eligibility tree, or {@code null} when the graph.whatsapp.com endpoint omitted the
      *                    field
      */
     private WaffleXeWhatsAppGraphQlResponse(CrossPostingEligibility eligibility) {
@@ -51,7 +51,7 @@ public final class WaffleXeWhatsAppGraphQlResponse implements WhatsAppGraphQlOpe
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code waffle_xe_root} and projects it onto a
      * {@link CrossPostingEligibility}; the returned {@link Optional} is empty when {@code data} or

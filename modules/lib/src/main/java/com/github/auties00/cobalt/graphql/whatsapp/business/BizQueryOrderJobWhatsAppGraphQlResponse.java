@@ -20,11 +20,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the query-order query built by {@link BizQueryOrderJobWhatsAppGraphQlRequest}.
+ * Parses the graph.whatsapp.com GraphQL response of the query-order query built by {@link BizQueryOrderJobWhatsAppGraphQlRequest}.
  *
  * <p>Carries the {@code xwa_checkout_get_order_info.order} projection mapped onto a Cobalt
  * {@link BusinessOrder} with its nested {@link BusinessOrderItem} list, decoded from the unwrapped
- * GraphQL {@code data} object the relay returns and ready to be displayed in an order-detail view.
+ * GraphQL {@code data} object the graph.whatsapp.com endpoint returns and ready to be displayed in an order-detail view.
  *
  * @implNote This implementation only models the GraphQL response shape; the legacy
  * {@code fb:thrift_iq} reply parsed by WA Web's {@code WAWebBizQueryOrderJob.queryOrderResponse}
@@ -44,7 +44,7 @@ public final class BizQueryOrderJobWhatsAppGraphQlResponse implements WhatsAppGr
     /**
      * Constructs a parsed order response.
      *
-     * <p>Instances are produced by {@link #of(JSONObject)} after projecting the relay payload.
+     * <p>Instances are produced by {@link #of(JSONObject)} after projecting the graph.whatsapp.com endpoint payload.
      *
      * @param order the structured order detail
      */
@@ -53,7 +53,7 @@ public final class BizQueryOrderJobWhatsAppGraphQlResponse implements WhatsAppGr
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked chain {@code xwa_checkout_get_order_info -> order} directly off {@code data}
      * and projects it onto a Cobalt {@link BusinessOrder}.

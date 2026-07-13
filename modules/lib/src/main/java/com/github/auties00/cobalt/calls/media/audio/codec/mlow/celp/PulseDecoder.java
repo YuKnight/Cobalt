@@ -3,7 +3,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.celp;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowEntropyWrapper;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowRangeDecoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PulseTables;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 
 /**
@@ -41,6 +43,11 @@ import java.util.Arrays;
  * relative to the first windowed entry.
  */
 public final class PulseDecoder {
+    /**
+     * The logger for {@link PulseDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(PulseDecoder.class);
+
     /**
      * Maximum number of pulse signs packed into a single uniform range coder symbol.
      *
@@ -248,6 +255,9 @@ public final class PulseDecoder {
                 sfPulses[3] = (short) (nPulses - nPulsesFirsthalf - sfPulses[2]);
             }
             if (sfPulses[0] == -1 || sfPulses[2] == -1) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "mlow pulse decode: corrupt fcb split, treating frame as pulse-free");
+                }
                 Arrays.fill(sfPulses, (short) 0);
                 return 0;
             }
@@ -255,6 +265,9 @@ public final class PulseDecoder {
             sfPulses[0] = (short) decodeSplit2Subfrs(decoder, tables, nPulses, maxSubfrPulses);
             sfPulses[1] = (short) (nPulses - sfPulses[0]);
             if (sfPulses[0] == -1) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "mlow pulse decode: corrupt fcb split, treating frame as pulse-free");
+                }
                 Arrays.fill(sfPulses, (short) 0);
                 return 0;
             }

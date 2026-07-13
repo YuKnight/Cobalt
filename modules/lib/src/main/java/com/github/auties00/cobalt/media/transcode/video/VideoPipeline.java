@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.video;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.util.ffmpeg.AVChannelLayout;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecContext;
@@ -26,6 +27,7 @@ import com.github.auties00.cobalt.model.message.media.VideoMessage;
 import com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -51,6 +53,9 @@ import java.nio.file.Path;
  * matrix.
  */
 public final class VideoPipeline {
+    /** The logger for {@link VideoPipeline}. */
+    private static final System.Logger LOGGER = Log.get(VideoPipeline.class);
+
     /**
      * Holds the maximum vertical resolution in pixels for the
      * {@link SettingsSyncAction.MediaQualitySetting#STANDARD} quality preset.
@@ -174,6 +179,10 @@ public final class VideoPipeline {
         var hd = quality == SettingsSyncAction.MediaQualitySetting.HD;
         var videoBitrate = hd ? VIDEO_BITRATE_HD : VIDEO_BITRATE_STANDARD;
         var audioBitrate = hd ? AUDIO_BITRATE_HD : AUDIO_BITRATE_STANDARD;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "video transcode starting, quality={0}, videoBitrate={1}, audioBitrate={2}",
+                    quality, videoBitrate, audioBitrate);
+        }
         try (var arena = Arena.ofShared()) {
             return new Run(arena, source, hd, videoBitrate, audioBitrate).execute(provider);
         }
@@ -437,12 +446,14 @@ public final class VideoPipeline {
                 try {
                     outputPath = outputBridge.release();
                 } catch (IOException e) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "video transcode failed to flush output", e);
                     throw new WhatsAppMediaException.Processing("failed to flush video output", e);
                 }
                 var outputLength = 0L;
                 try {
                     outputLength = Files.size(outputPath);
                 } catch (IOException e) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "video transcode failed to size output", e);
                     throw new WhatsAppMediaException.Processing("failed to size video output", e);
                 }
                 var thumbnail = encodeThumbnail();
@@ -457,9 +468,15 @@ public final class VideoPipeline {
                     }
                 }
                 success = true;
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "video transcode finished, width={0}, height={1}, seconds={2}, bytes={3}, thumbnail={4}",
+                            encodedWidth, encodedHeight, durationSeconds, outputLength, thumbnail != null);
+                }
                 return new MediaPayload.OfPath(outputPath, outputLength, true);
             } finally {
                 if (!success && outputPath != null) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "video transcode failed, discarding partial output");
                     try {
                         Files.deleteIfExists(outputPath);
                     } catch (IOException ignored) {
@@ -498,6 +515,7 @@ public final class VideoPipeline {
                     Ffmpeg.avformat_find_stream_info(inFmtCtx, MemorySegment.NULL));
             videoStreamIndex = pickStream(inFmtCtx, Ffmpeg.AVMEDIA_TYPE_VIDEO());
             if (videoStreamIndex < 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "video transcode input has no video stream");
                 throw new WhatsAppMediaException.Processing("no video stream in video source");
             }
             audioStreamIndex = pickStream(inFmtCtx, Ffmpeg.AVMEDIA_TYPE_AUDIO());
@@ -512,6 +530,10 @@ public final class VideoPipeline {
             }
             if (audioStreamIndex >= 0) {
                 audioDecCtx = openDecoder(streamPointer(inFmtCtx, audioStreamIndex));
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "video transcode input opened, videoStream={0}, hasAudio={1}, frameRate={2}/{3}",
+                        videoStreamIndex, audioStreamIndex >= 0, frameRateNum, frameRateDen);
             }
         }
 
@@ -606,6 +628,10 @@ public final class VideoPipeline {
             } else {
                 encodedHeight = roundEven(srcH);
                 encodedWidth = roundEven(srcW);
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "video encoder resolution {0}x{1} -> {2}x{3}, hd={4}",
+                        srcW, srcH, encodedWidth, encodedHeight, hd);
             }
             var encoder = FFmpegError.requireNonNull("avcodec_find_encoder_by_name(libopenh264)",
                     Ffmpeg.avcodec_find_encoder_by_name(arena.allocateFrom("libopenh264")));

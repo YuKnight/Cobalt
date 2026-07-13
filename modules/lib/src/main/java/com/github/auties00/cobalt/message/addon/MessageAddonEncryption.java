@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.addon;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,7 @@ import javax.crypto.KDF;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.HKDFParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
@@ -46,6 +48,11 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAUseCaseSecret")
 public final class MessageAddonEncryption {
     /**
+     * The logger for {@link MessageAddonEncryption}.
+     */
+    private static final System.Logger LOGGER = Log.get(MessageAddonEncryption.class);
+
+    /**
      * Holds the size of the AES-GCM initialisation vector, in bytes.
      */
     private static final int AES_GCM_IV_SIZE = 12;
@@ -75,10 +82,10 @@ public final class MessageAddonEncryption {
     /**
      * Prevents instantiation of this static helper class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private MessageAddonEncryption() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -149,8 +156,15 @@ public final class MessageAddonEncryption {
             }
 
             var ciphertext = cipher.doFinal(plaintext);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "addon encrypted use case={0} stanza={1} sender={2}",
+                        useCaseType, stanzaId, addonSender);
+            }
             return new MessageEncryptedAddon(ciphertext, iv);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "addon encrypt failed use case=" + useCaseType + " stanza=" + stanzaId, e);
+            }
             throw new RuntimeException("Failed to encrypt add-on", e);
         }
     }
@@ -222,8 +236,16 @@ public final class MessageAddonEncryption {
                 cipher.updateAAD(aad);
             }
 
-            return cipher.doFinal(encryptedAddon.ciphertext());
+            var plaintext = cipher.doFinal(encryptedAddon.ciphertext());
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "addon decrypted use case={0} stanza={1} sender={2}",
+                        useCaseType, stanzaId, addonSender);
+            }
+            return plaintext;
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "addon decrypt failed use case=" + useCaseType + " stanza=" + stanzaId, e);
+            }
             throw new RuntimeException("Failed to decrypt add-on", e);
         }
     }

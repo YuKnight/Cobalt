@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,9 +15,9 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 /**
  * Maintains per-campaign delivery statistics from {@code business_broadcast_insights_sync} sync mutations.
@@ -37,11 +38,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebBusinessBroadcastInsightsSync")
 public final class BusinessBroadcastInsightsHandler implements WebAppStateActionHandler {
     /**
-     * The handler-scoped {@link Logger} used to record per-batch counter summaries.
-     *
-     * <p>Records the SET, REMOVE, and malformed counts per batch.
+     * The logger for {@link BusinessBroadcastInsightsHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(BusinessBroadcastInsightsHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(BusinessBroadcastInsightsHandler.class);
 
     /**
      * Constructs the singleton broadcast-insights handler.
@@ -91,15 +90,18 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() <= 1) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast insights mutation malformed: index size={0}", indexArray.size());
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             var campaignId = indexArray.getString(1);
             if (campaignId == null || campaignId.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast insights mutation malformed: missing campaign id");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (mutation.operation() == SyncdOperation.SET) {
                 if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof BusinessBroadcastInsightsAction action)) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast insights mutation malformed: missing action value campaign={0}", campaignId);
                     return SyncdIndexUtils.malformedActionValue(collectionName().name());
                 }
 
@@ -111,16 +113,20 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
                         .repliedCount(action.repliedCount().isPresent() ? action.repliedCount().getAsInt() : null)
                         .quickReplyCount(action.quickReplyCount().isPresent() ? action.quickReplyCount().getAsInt() : null)
                         .build());
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "broadcast insights upserted: campaign={0}", campaignId);
                 return MutationApplicationResult.success();
             }
 
             if (mutation.operation() == SyncdOperation.REMOVE) {
                 client.store().businessStore().removeBusinessBroadcastInsight(campaignId);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "broadcast insights removed: campaign={0}", campaignId);
                 return MutationApplicationResult.success();
             }
 
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast insights mutation failed: unexpected operation={0}", mutation.operation());
             return MutationApplicationResult.failed();
         } catch (Exception e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast insights mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -163,13 +169,13 @@ public final class BusinessBroadcastInsightsHandler implements WebAppStateAction
             results.add(result);
         }
         if (setCount > 0) {
-            LOGGER.warning("BBI SyncD received " + setCount + " SET operations");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "BBI SyncD received {0} SET operations", setCount);
         }
         if (removeCount > 0) {
-            LOGGER.warning("BBI SyncD received " + removeCount + " REMOVE operations");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "BBI SyncD received {0} REMOVE operations", removeCount);
         }
         if (malformedCount > 0) {
-            LOGGER.warning("BBI sync: " + malformedCount + " malformed mutations");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "BBI sync: {0} malformed mutations", malformedCount);
         }
         return results;
     }

@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.calls.transport.srtp;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.SrtpAfbStreamInfo;
 import com.github.auties00.cobalt.model.call.datachannel.SrtpAfbStreamInfoBuilder;
 import com.github.auties00.cobalt.model.call.datachannel.SrtpAfbStreams;
 import com.github.auties00.cobalt.model.call.datachannel.SrtpAfbStreamsBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -32,6 +34,11 @@ import java.util.Map;
  */
 public final class SrtpAfbStreamTracker {
     /**
+     * The logger for {@link SrtpAfbStreamTracker}.
+     */
+    private static final System.Logger LOGGER = Log.get(SrtpAfbStreamTracker.class);
+
+    /**
      * Holds the per stream index watermarks keyed by SSRC, in first seen order.
      */
     private final Map<Integer, Watermark> streams;
@@ -54,6 +61,9 @@ public final class SrtpAfbStreamTracker {
      * @param rtpIndex the rollover extended RTP packet index
      */
     public void recordRtp(int ssrc, long rtpIndex) {
+        if (Log.DEBUG && !streams.containsKey(ssrc)) {
+            LOGGER.log(Level.DEBUG, "afb stream tracking started, ssrc={0}", ssrc);
+        }
         var watermark = streams.computeIfAbsent(ssrc, _ -> new Watermark());
         if (rtpIndex > watermark.rtpIndex) {
             watermark.rtpIndex = rtpIndex;
@@ -71,6 +81,9 @@ public final class SrtpAfbStreamTracker {
      * @param rtcpIndex the SRTCP index, treated as an unsigned 31 bit value
      */
     public void recordRtcp(int ssrc, int rtcpIndex) {
+        if (Log.DEBUG && !streams.containsKey(ssrc)) {
+            LOGGER.log(Level.DEBUG, "afb stream tracking started, ssrc={0}", ssrc);
+        }
         var watermark = streams.computeIfAbsent(ssrc, _ -> new Watermark());
         if (Integer.compareUnsigned(rtcpIndex, watermark.rtcpIndex) > 0) {
             watermark.rtcpIndex = rtcpIndex;
@@ -91,6 +104,9 @@ public final class SrtpAfbStreamTracker {
      * Forgets every tracked stream.
      */
     public void clear() {
+        if (Log.DEBUG && !streams.isEmpty()) {
+            LOGGER.log(Level.DEBUG, "afb stream tracker cleared, {0} stream(s) forgotten", streams.size());
+        }
         streams.clear();
     }
 

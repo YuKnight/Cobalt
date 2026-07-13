@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,12 +14,12 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that fetches the shimmed (redirect-wrapped) website links advertised on a
+ * Builds the graph.whatsapp.com GraphQL query that fetches the shimmed (redirect-wrapped) website links advertised on a
  * WhatsApp Business profile.
  *
  * <p>The single {@code bizJid} GraphQL variable names the business account whose profile websites are
  * being read. WhatsApp Web's {@code WAWebBizGetProfileShimlinksQuery} passes the business
- * {@link Jid} straight through; the relay returns one link-shim record per advertised website under
+ * {@link Jid} straight through; the graph.whatsapp.com endpoint returns one link-shim record per advertised website under
  * {@code xwa_whatsapp_smb_get_profile_linkshims}. The reply is consumed through
  * {@link BizGetProfileShimlinksWhatsAppGraphQlResponse}.
  *
@@ -31,10 +33,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebBizGetProfileShimlinksQuery")
 public final class BizGetProfileShimlinksWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebBizGetProfileShimlinksQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -109,5 +111,21 @@ public final class BizGetProfileShimlinksWhatsAppGraphQlRequest implements Whats
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,8 @@ import com.github.auties00.cobalt.model.sync.action.device.AgentAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Reconciles the business-account device-agent roster with sync mutations from the server.
@@ -39,6 +42,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebAgentSync")
 public final class AgentActionHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link AgentActionHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(AgentActionHandler.class);
 
     /**
      * Constructs the singleton agent action handler.
@@ -106,11 +113,13 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
         }
 
         if (mutation.operation() == SyncdOperation.REMOVE) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "agent action: removing agent id={0}", agentId);
             client.store().businessStore().removeAgentState(agentId);
             return MutationApplicationResult.success();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "agent action: unsupported operation {0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
@@ -118,6 +127,9 @@ public final class AgentActionHandler implements WebAppStateActionHandler {
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "agent action: upserting agent id={0}, deviceId={1}, deleted={2}",
+                    agentId, action.deviceID().isPresent() ? action.deviceID().getAsInt() : null, action.isDeleted());
         client.store().businessStore().putAgentState(new AgentStateBuilder()
                 .agentId(agentId)
                 .name(action.name().orElse(null))

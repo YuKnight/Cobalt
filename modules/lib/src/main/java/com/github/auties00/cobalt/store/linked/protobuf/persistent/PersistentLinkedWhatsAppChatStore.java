@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.chat.Chat;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMute;
@@ -15,6 +16,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.lang.System.Logger.Level;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -30,7 +32,7 @@ import static java.util.Objects.requireNonNullElseGet;
  *
  * <p>Chat and newsletter entries carry metadata only (jid, name, unread counters, ephemeral
  * settings); message bodies live in {@link PersistentMessageStore}, wired in by
- * {@link #attachMessageStore(PersistentMessageStore)} after construction or deserialisation.
+ * {@link #setMessageStore(PersistentMessageStore)} after construction or deserialisation.
  *
  * @implNote
  * The {@code chats} and {@code newsletters} maps are package-private so the generated
@@ -41,6 +43,11 @@ import static java.util.Objects.requireNonNullElseGet;
 @ProtobufMessage
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhatsAppChatStore {
+    /**
+     * The logger for {@link PersistentLinkedWhatsAppChatStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(PersistentLinkedWhatsAppChatStore.class);
+
     /**
      * The map of chat JIDs to their metadata-only {@link PersistentChat} entries.
      */
@@ -55,7 +62,7 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
 
     /**
      * The MVStore facade backing every message-bearing accessor; wired by
-     * {@link #attachMessageStore(PersistentMessageStore)}, not persisted.
+     * {@link #setMessageStore(PersistentMessageStore)}, not persisted.
      */
     private volatile PersistentMessageStore messageStore;
 
@@ -79,17 +86,23 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
     }
 
     /**
-     * Wires the MVStore facade into this store and into every existing chat and newsletter entry.
+     * Sets the MVStore facade on this store and on every existing chat and newsletter entry.
+     *
+     * <p>The facade opens only after this store is built or deserialised, so it cannot be a constructor
+     * argument; the persistent store sets it once, before the store is handed back.
      *
      * @param messageStore the freshly opened MVStore facade
      */
-    void attachMessageStore(PersistentMessageStore messageStore) {
+    void setMessageStore(PersistentMessageStore messageStore) {
         this.messageStore = messageStore;
         for (var chat : chats.values()) {
-            chat.attach(messageStore);
+            chat.setMessageStore(messageStore);
         }
         for (var newsletter : newsletters.values()) {
-            newsletter.attach(messageStore);
+            newsletter.setMessageStore(messageStore);
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "message store set: {0} chats, {1} newsletters", chats.size(), newsletters.size());
         }
     }
 
@@ -104,6 +117,7 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
 
     @Override
     public Optional<Chat> findChatByJid(JidProvider jid) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "resolving chat for {0}", jid);
         return switch (jid) {
             case null -> Optional.empty();
             case Chat chat -> Optional.of(chat);
@@ -138,6 +152,7 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
 
     @Override
     public Optional<? extends MessageInfo> findMessageById(JidProvider provider, String id) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "looking up message {0} for {1}", id, provider);
         return provider == null || id == null ? Optional.empty() : switch (provider) {
             case Chat chat -> findMessageById(chat, id);
             case Newsletter newsletter -> findMessageById(newsletter, id);
@@ -168,6 +183,7 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
         } catch (NumberFormatException _) {
             // Fall through to the scan below.
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "falling back to full newsletter scan for message {0}", id);
         try (var stream = newsletter.messages()) {
             return stream
                     .filter(entry -> Objects.equals(id, entry.key().id().orElse(null)))
@@ -194,8 +210,9 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
         var chat = new PersistentChatBuilder()
                 .jid(chatJid)
                 .build();
-        chat.attach(messageStore);
+        chat.setMessageStore(messageStore);
         chats.put(chatJid, chat);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat created: {0}", chatJid);
         return chat;
     }
 
@@ -220,6 +237,7 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
             removed = Optional.ofNullable(chats.remove(targetJid));
         }
         removed.ifPresent(chat -> messageStore.removeChatMessages(chat.jid()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat removed: {0}, found={1}", targetJid, removed.isPresent());
         return removed;
     }
 
@@ -227,12 +245,18 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
     public ChatMessageInfo addStatus(ChatMessageInfo messageInfo) {
         Objects.requireNonNull(messageInfo, "messageInfo cannot be null");
         messageStore.putStatusMessage(messageInfo);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "status message added");
         return messageInfo;
     }
 
     @Override
     public Optional<ChatMessageInfo> removeStatus(String id) {
-        return id == null ? Optional.empty() : messageStore.removeStatusMessage(id);
+        if (id == null) {
+            return Optional.empty();
+        }
+        var removed = messageStore.removeStatusMessage(id);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "status message {0} removed: {1}", id, removed.isPresent());
+        return removed;
     }
 
     @Override
@@ -260,8 +284,9 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
         var newsletter = new PersistentNewsletterBuilder()
                 .jid(newsletterJid)
                 .build();
-        newsletter.attach(messageStore);
+        newsletter.setMessageStore(messageStore);
         newsletters.put(newsletter.jid(), newsletter);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "newsletter created: {0}", newsletterJid);
         return newsletter;
     }
 
@@ -274,6 +299,7 @@ public final class PersistentLinkedWhatsAppChatStore extends ProtobufLinkedWhats
         if (removed != null) {
             messageStore.removeNewsletterMessages(removed.jid());
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "newsletter removed: {0}, found={1}", newsletterJid, removed != null);
         return Optional.ofNullable(removed);
     }
 

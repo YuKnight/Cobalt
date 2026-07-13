@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.neteq;
 
 import java.util.Random;
 import com.github.auties00.cobalt.calls.media.audio.neteq.decoder.ComfortNoiseDecoder;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Generates RFC 3389 comfort noise from a silence insertion descriptor payload, the shaped background
@@ -87,6 +90,11 @@ public final class ComfortNoiseGenerator {
      * {@code 0.4}.
      */
     private static final int REFL_BETA_COMP_NEW_P = 13107;
+
+    /**
+     * The logger for {@link ComfortNoiseGenerator}.
+     */
+    private static final System.Logger LOGGER = Log.get(ComfortNoiseGenerator.class);
 
     /**
      * The white noise excitation source, deterministically seeded for reproducibility.
@@ -195,6 +203,7 @@ public final class ComfortNoiseGenerator {
      */
     public void update(byte[] sidPayload) {
         if (sidPayload == null || sidPayload.length == 0) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "calls cng update: empty payload, reusing last descriptor");
             return;
         }
         var length = Math.min(sidPayload.length, LPC_ORDER + 1);
@@ -213,6 +222,7 @@ public final class ComfortNoiseGenerator {
             targetReflectionQ15[i] = 0;
         }
         hasDescriptor = true;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls cng descriptor updated: level={0} order={1}", level, order);
     }
 
     /**
@@ -231,6 +241,9 @@ public final class ComfortNoiseGenerator {
         var out = new short[Math.max(frameSamples, 0)];
         if (!hasDescriptor) {
             firstFrame = false;
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "calls cng generate: no descriptor yet, emitting silence, samples={0}", out.length);
+            }
             return out;
         }
         var scale = updateParametersAndScale();
@@ -239,6 +252,7 @@ public final class ComfortNoiseGenerator {
             out[i] = clampToShort(synthesize(excitation));
         }
         firstFrame = false;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "calls cng generate: samples={0}", out.length);
         return out;
     }
 
@@ -253,6 +267,7 @@ public final class ComfortNoiseGenerator {
         java.util.Arrays.fill(usedReflectionQ15, 0);
         usedEnergy = 0;
         firstFrame = true;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls cng reset");
     }
 
     /**

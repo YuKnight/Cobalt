@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.text;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaConnectionService;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.media.transcode.text.link.DeepLinkParser;
@@ -30,6 +31,7 @@ import com.github.auties00.cobalt.wam.type.WebcDisplayStatusType;
 import it.auties.linkpreview.LinkPreview;
 import it.auties.linkpreview.LinkPreviewMedia;
 
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.security.MessageDigest;
@@ -78,6 +80,9 @@ import java.util.Set;
 @WhatsAppWebModule(moduleName = "WAWebGenMinimalLinkPreviewChatAction")
 @WhatsAppWebModule(moduleName = "WAWebWebcLinkPreviewDisplayWamEvent")
 public final class TextPipeline {
+    /** The logger for {@link TextPipeline}. */
+    private static final System.Logger LOGGER = Log.get(TextPipeline.class);
+
     /**
      * Holds the country-code sentinel used when no phone country code can be
      * extracted from a JID.
@@ -216,20 +221,30 @@ public final class TextPipeline {
             return;
         }
         if (isSuspicious(chatJid, match)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview dropped, suspicious idn host");
             return;
         }
         if (!isPreviewable(chatJid, match.domain())) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview dropped, domain not previewable");
             return;
         }
         var newsletterChat = chatJid != null && chatJid.hasNewsletterServer();
         var cached = cache.get(match.href(), newsletterChat).orElse(null);
         if (cached != null) {
-            if (!LinkPreviewCache.isNegative(cached)) {
+            var negative = LinkPreviewCache.isNegative(cached);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "link preview cache hit, newsletter={0}, negative={1}",
+                        newsletterChat, negative);
+            }
+            if (!negative) {
                 copyPreviewFields(cached, message);
             }
             return;
         }
         var command = DeepLinkParser.parse(client, abPropsService, match.href());
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "link preview deep link dispatch, type={0}", command.getClass().getSimpleName());
+        }
         var attached = false;
         switch (command) {
             case DeepLinkParser.DeepLink.GroupInvite groupInvite ->
@@ -257,6 +272,9 @@ public final class TextPipeline {
                 attachRichPreview(match, message);
                 attached = true;
             }
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "link preview resolved, newsletter={0}, attached={1}", newsletterChat, attached);
         }
         cacheCurrentMessage(match.href(), newsletterChat, attached, message);
     }
@@ -348,7 +366,8 @@ public final class TextPipeline {
         }
         try {
             return domain != null && client.isNewsletterDomainPreviewable(domain);
-        } catch (RuntimeException _) {
+        } catch (RuntimeException failure) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "newsletter domain previewable check failed", failure);
             return false;
         }
     }
@@ -380,6 +399,7 @@ public final class TextPipeline {
      */
     private void attachRichPreview(Linkify.Match match, ExtendedTextMessage message) {
         if (!abPropsService.getBool(ABProp.WEB_LINK_PREVIEW_SYNC_ENABLED)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview rich fetch skipped, sync disabled");
             attachMinimal(match, message);
             emitLinkPreviewDisplay(WebcDisplayStatusType.SHOWED_PREVIEW_TO_USER, false, false, true);
             return;
@@ -388,12 +408,14 @@ public final class TextPipeline {
         try {
             uri = URI.create(match.href());
         } catch (IllegalArgumentException malformed) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "link preview url malformed", malformed);
             attachMinimal(match, message);
             emitLinkPreviewDisplay(WebcDisplayStatusType.PREVIEW_MALFORMED, false, false, true);
             return;
         }
         var preview = LinkPreview.createPreview(uri).orElse(null);
         if (preview == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview not found via http fetch");
             attachMinimal(match, message);
             emitLinkPreviewDisplay(WebcDisplayStatusType.PREVIEW_NOT_FOUND, true, false, true);
             return;
@@ -405,6 +427,7 @@ public final class TextPipeline {
         message.setDoNotPlayInline(Boolean.TRUE);
         uploadThumbnail(message, thumbnailBytes);
         var respondedHq = message.thumbnailDirectPath().isPresent();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "link preview rich fetch complete, hqThumbnail={0}", respondedHq);
         emitLinkPreviewDisplay(WebcDisplayStatusType.SHOWED_PREVIEW_TO_USER, true, respondedHq, !respondedHq);
     }
 
@@ -478,13 +501,17 @@ public final class TextPipeline {
         try {
             try (var payload = new MediaPayload.OfBytes(thumbnailBytes)) {
                 if (mediaConnectionService.upload(message, payload)) {
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "link preview thumbnail uploaded, bytes={0}", thumbnailBytes.length);
+                    }
                     return;
                 }
             }
         } catch (InterruptedException interrupted) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "link preview thumbnail upload interrupted", interrupted);
             Thread.currentThread().interrupt();
-        } catch (Throwable _) {
-            // fall through to the inline-only fallback below
+        } catch (Throwable failure) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "link preview thumbnail upload failed, falling back to inline only", failure);
         }
         message.setThumbnailSha256(sha256(thumbnailBytes));
     }

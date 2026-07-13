@@ -1,7 +1,7 @@
 package com.github.auties00.cobalt.calls.transport.dtls;
 
-import com.github.auties00.cobalt.util.X509CertificateGenerator;
-import com.github.auties00.cobalt.util.X509CertificateSpec;
+import com.github.auties00.cobalt.util.certificate.X509CertificateGenerator;
+import com.github.auties00.cobalt.util.certificate.X509CertificateSpec;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

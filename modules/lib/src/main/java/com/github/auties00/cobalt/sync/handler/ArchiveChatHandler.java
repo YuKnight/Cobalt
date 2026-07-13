@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -16,6 +17,8 @@ import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatAction;
 import com.github.auties00.cobalt.model.sync.action.chat.ArchiveChatActionBuilder;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Flips the archive state of a chat in the local store in response to an {@code archive} sync mutation.
@@ -36,6 +39,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebArchiveChatSync")
 public final class ArchiveChatHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link ArchiveChatHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(ArchiveChatHandler.class);
 
     /**
      * Constructs the singleton archive-chat handler.
@@ -110,12 +117,15 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
 
             var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "archive chat: orphan chat={0}", chatJid);
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
             chat.get().setArchived(action.archived());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "archive chat: set archived={0} for chat={1}", action.archived(), chatJid);
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "archive chat mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -195,6 +205,8 @@ public final class ArchiveChatHandler implements WebAppStateActionHandler {
                         localMutation.timestamp(),
                         localMutation.actionVersion()
                 );
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "archive chat: merged conflicting mutations, archived={0}, localWins={1}", archived, localWins);
                 yield ConflictResolution.merged(merged);
             }
         };

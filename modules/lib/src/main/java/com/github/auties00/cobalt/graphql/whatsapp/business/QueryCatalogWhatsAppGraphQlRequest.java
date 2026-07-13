@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,14 +14,14 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that reads one page of a WhatsApp Business catalog's products.
+ * Builds the graph.whatsapp.com GraphQL query that reads one page of a WhatsApp Business catalog's products.
  *
  * <p>A catalog is the flat storefront attached to a business account; this query fetches the page of
  * products it contains together with their core metadata, status, media and variant info. The single
  * {@code request} GraphQL variable nests a {@code product_catalog} object that
  * {@code WAWebQueryCatalog} fills from the guest browse path: the catalog-owner {@link Jid}, the
  * shop-source opt-in, the requested image dimensions, the page size and cursor, and the optional
- * direct-connection, session and variant selectors. The relay returns the products under
+ * direct-connection, session and variant selectors. The graph.whatsapp.com endpoint returns the products under
  * {@code xwa_product_catalog_get_product_catalog}; the reply is consumed through
  * {@link QueryCatalogWhatsAppGraphQlResponse}.
  *
@@ -28,10 +30,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebQueryCatalogQuery")
 public final class QueryCatalogWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebQueryCatalogQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -61,13 +63,13 @@ public final class QueryCatalogWhatsAppGraphQlRequest implements WhatsAppGraphQl
     private final boolean allowShopSource;
 
     /**
-     * The requested image width in pixels used when the relay rewrites image URLs, or {@code null} to
+     * The requested image width in pixels used when the graph.whatsapp.com endpoint rewrites image URLs, or {@code null} to
      * omit it.
      */
     private final Integer width;
 
     /**
-     * The requested image height in pixels used when the relay rewrites image URLs, or {@code null}
+     * The requested image height in pixels used when the graph.whatsapp.com endpoint rewrites image URLs, or {@code null}
      * to omit it.
      */
     private final Integer height;
@@ -114,7 +116,7 @@ public final class QueryCatalogWhatsAppGraphQlRequest implements WhatsAppGraphQl
      * <p>All values populate the nested {@code product_catalog} object. The {@code allowShopSource}
      * flag selects the WhatsApp shop source surface and is serialized as the enum literal
      * {@code ALLOWSHOPSOURCE_TRUE} or {@code ALLOWSHOPSOURCE_FALSE}. Every other value that is
-     * {@code null} is emitted as explicit JSON {@code null}, matching the relay document shape, except
+     * {@code null} is emitted as explicit JSON {@code null}, matching the graph.whatsapp.com endpoint document shape, except
      * for the {@link Jid} which is omitted when {@code null}.
      *
      * @param jid                           the catalog-owning business account, or {@code null} to
@@ -138,9 +140,9 @@ public final class QueryCatalogWhatsAppGraphQlRequest implements WhatsAppGraphQl
      *                                      {@code null} when not requested
      */
     public QueryCatalogWhatsAppGraphQlRequest(Jid jid, boolean allowShopSource, Integer width, Integer height,
-                                              String directConnectionEncryptedInfo, Integer limit, String after,
-                                              String catalogSessionId, String variantInfoFields,
-                                              Integer variantThumbnailHeight, Integer variantThumbnailWidth) {
+                                                 String directConnectionEncryptedInfo, Integer limit, String after,
+                                                 String catalogSessionId, String variantInfoFields,
+                                                 Integer variantThumbnailHeight, Integer variantThumbnailWidth) {
         this.jid = jid;
         this.allowShopSource = allowShopSource;
         this.width = width;
@@ -271,5 +273,21 @@ public final class QueryCatalogWhatsAppGraphQlRequest implements WhatsAppGraphQl
         } else {
             writer.writeString(value);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

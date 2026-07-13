@@ -1,9 +1,12 @@
 package com.github.auties00.cobalt.util;
 
+import com.github.auties00.cobalt.log.Log;
+
 import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.ShortBufferException;
+import java.lang.System.Logger.Level;
 import java.nio.ByteOrder;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -37,6 +40,11 @@ import java.util.Objects;
  * same ownership model as the datagram streams that drive it.
  */
 public final class AesGcmStreamCipher {
+    /**
+     * The logger for {@link AesGcmStreamCipher}.
+     */
+    private static final System.Logger LOGGER = Log.get(AesGcmStreamCipher.class);
+
     /**
      * Holds the length, in bytes, of the GCM authentication tag this cipher produces and verifies.
      */
@@ -226,6 +234,7 @@ public final class AesGcmStreamCipher {
         this.ciphertextLength = 0;
         this.keystreamOffset = BLOCK_LENGTH;
         this.tagHoldbackLength = 0;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "aes-gcm init: encrypting={0} nonce={1}", forEncryption, nonce);
     }
 
     /**
@@ -318,12 +327,15 @@ public final class AesGcmStreamCipher {
         if (encrypting) {
             ensureCapacity(output, outputOffset, TAG_LENGTH);
             System.arraycopy(tag, 0, output, outputOffset, TAG_LENGTH);
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "aes-gcm doFinal: encryption complete, ciphertextLength={0}", ciphertextLength);
             return TAG_LENGTH;
         }
         if (tagHoldbackLength != TAG_LENGTH
                 || !MessageDigest.isEqual(tag, Arrays.copyOf(tagHoldback, TAG_LENGTH))) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "aes-gcm tag verification failed, ciphertextLength={0}", ciphertextLength);
             throw new AEADBadTagException("GCM tag mismatch");
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "aes-gcm doFinal: decryption verified, ciphertextLength={0}", ciphertextLength);
         return 0;
     }
 

@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.registration.push.apns;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.courier.ApnsPayloadTag;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 
 /**
  * Hands the WhatsApp verification code received over the APNS courier stream to the caller of
@@ -23,6 +25,11 @@ import java.io.IOException;
  *           virtual-thread friendly and cheaper than the lock-based alternatives.
  */
 final class ApnsPushCode {
+    /**
+     * The logger for {@link ApnsPushCode}.
+     */
+    private static final System.Logger LOGGER = Log.get(ApnsPushCode.class);
+
     /**
      * Guards {@link #code} and {@link #closed}.
      *
@@ -101,6 +108,7 @@ final class ApnsPushCode {
         synchronized (lock) {
             if (this.code == null) {
                 this.code = code;
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns push code stored {0}", Log.code(code));
                 lock.notifyAll();
             }
         }
@@ -117,6 +125,7 @@ final class ApnsPushCode {
             if (closed) {
                 return;
             }
+            if (Log.DEBUG && code == null) LOGGER.log(Level.DEBUG, "apns push code holder closed before delivery");
             closed = true;
             lock.notifyAll();
         }

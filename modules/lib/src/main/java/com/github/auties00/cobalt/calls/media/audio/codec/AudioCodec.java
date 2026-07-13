@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.media.audio.codec;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.MLowAudioCodec;
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusAudioCodec;
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.OpusCodecParams;

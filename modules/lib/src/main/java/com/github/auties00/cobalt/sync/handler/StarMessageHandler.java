@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -15,6 +16,8 @@ import com.github.auties00.cobalt.model.sync.action.contact.StarAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
+
 /**
  * Toggles the starred flag on a single message in response to a cross-device
  * {@code star} mutation.
@@ -26,6 +29,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebStarMessageSync")
 public final class StarMessageHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link StarMessageHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(StarMessageHandler.class);
 
     /**
      * Constructs the handler.
@@ -136,6 +143,7 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
 
             var message = client.store().chatStore().findMessageById(chatJid, messageId);
             if (message.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "star message: orphan message chat={0} id={1}", chatJid, messageId);
                 return MutationApplicationResult.orphan(
                         SyncdIndexUtils.serializeMessageKey(msgKey),
                         "Msg"
@@ -144,8 +152,10 @@ public final class StarMessageHandler implements WebAppStateActionHandler {
 
             var found = message.get();
             starMessage(found, starred);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "star message: set starred={0} for chat={1} id={2}", starred, chatJid, messageId);
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "star message mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.graphql.facebook.FacebookGraphQlOperation;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
+import com.github.auties00.cobalt.model.business.ads.LwiBoostedComponentInput;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -13,26 +14,21 @@ import java.io.UncheckedIOException;
 /**
  * Builds the Facebook GraphQL query that renders the audience section of the WhatsApp Business ad-creation flow.
  *
- * <p>The query takes seven GraphQL variables. The {@code input} object is the
- * {@code CTWABoostedComponentInput} WhatsApp Web passes to
- * {@code lwi.boosted_component(caller: "AUDIENCE_SECTION_RENDERING", input: $input)}; it is declared
- * opaquely in the compiled document and no caller building it is present in the analysed bundle, so
- * the caller supplies it already JSON-encoded. The {@code objective}, {@code budget},
- * {@code budget_type} and {@code duration_in_seconds} variables parameterise the
- * {@code audiences_v2} suggestion set; {@code adAccountID} is the Facebook ad-account legacy id used
- * to look up saved audiences; {@code savedAudienceCount} is the Relay connection page size requested
- * for the saved-audience list. The query returns the suggested audiences, the template target spec,
- * and the paged saved audiences; the reply is consumed through
- * {@link BizAdCreationAudienceSectionFacebookGraphQlResponse}.
+ * <p>The query takes seven GraphQL variables. The {@code input} is the {@link LwiBoostedComponentInput}
+ * WhatsApp Web passes to
+ * {@code lwi.boosted_component(caller: "AUDIENCE_SECTION_RENDERING", input: $input)} (the query
+ * re-sends the boosted-component input). The {@code objective}, {@code budget}, {@code budget_type} and
+ * {@code duration_in_seconds} variables parameterise the {@code audiences_v2} suggestion set;
+ * {@code adAccountID} is the Facebook ad-account legacy id used to look up saved audiences;
+ * {@code savedAudienceCount} is the Relay connection page size requested for the saved-audience list.
+ * The query returns the suggested audiences, the template target spec, and the paged saved audiences;
+ * the reply is consumed through {@link BizAdCreationAudienceSectionFacebookGraphQlResponse}.
  *
- * @implNote This implementation accepts the {@code input} object as a caller-supplied, already
- * JSON-encoded object literal because the {@code CTWABoostedComponentInput} field names are not
- * present in the JS bundle of snapshot {@code 1040120866}; the value is emitted verbatim as the
- * {@code input} variable. Once a caller that builds the object surfaces, replace this with typed
- * scalar fields mirroring that construction. The {@code budget} and {@code duration_in_seconds}
- * variables are modelled as {@link Long} amounts and {@code savedAudienceCount} as an {@link Integer}
- * page size; {@code objective} and {@code budget_type} are kept as {@link String} because their
- * closed value sets are not confirmable from the static bundle.
+ * @implNote This implementation maps the typed {@code input} object to its snake_case JSON shape by
+ * {@link BizAdInputJson}. The {@code budget} and {@code duration_in_seconds} variables are modelled as
+ * {@link Long} amounts and {@code savedAudienceCount} as an {@link Integer} page size; {@code objective}
+ * and {@code budget_type} are kept as {@link String} because their closed value sets are not
+ * confirmable from the static bundle.
  *
  * @see BizAdCreationAudienceSectionFacebookGraphQlResponse
  */
@@ -58,10 +54,10 @@ public final class BizAdCreationAudienceSectionFacebookGraphQlRequest implements
     public static final String OPERATION_NAME = "WAWebBizAdCreationAudienceSectionQuery";
 
     /**
-     * The pre-encoded JSON of the {@code input} GraphQL object identifying the boosted component, or
-     * {@code null} to omit it.
+     * The {@code input} GraphQL object identifying the boosted component the audience suggestions are
+     * computed for, or {@code null} to omit it.
      */
-    private final String inputJson;
+    private final LwiBoostedComponentInput input;
 
     /**
      * The {@code objective} GraphQL variable naming the campaign objective, or {@code null} to omit
@@ -101,14 +97,10 @@ public final class BizAdCreationAudienceSectionFacebookGraphQlRequest implements
     /**
      * Constructs an audience-section query request.
      *
-     * <p>The {@code inputJson} is the already-JSON-encoded {@code input} object identifying the
-     * boosted component; its field names are defined by the server-side
-     * {@code CTWABoostedComponentInput} type and are not modelled here (see the class
-     * {@code @implNote}). Each value that is {@code null} omits its variable from the serialized
-     * object.
+     * <p>The {@code input} identifies the boosted component the suggestions are computed for. Each
+     * value that is {@code null} omits its variable from the serialized object.
      *
-     * @param inputJson          the already-JSON-encoded {@code input} object, or {@code null} to
-     *                           omit the variable
+     * @param input              the boosted-component input, or {@code null} to omit the variable
      * @param objective          the campaign objective, or {@code null} to omit the variable
      * @param budget             the budget amount in minor units, or {@code null} to omit the
      *                           variable
@@ -120,8 +112,8 @@ public final class BizAdCreationAudienceSectionFacebookGraphQlRequest implements
      * @param savedAudienceCount the requested saved-audience page size, or {@code null} to omit the
      *                           variable
      */
-    public BizAdCreationAudienceSectionFacebookGraphQlRequest(String inputJson, String objective, Long budget, String budgetType, Long durationInSeconds, String adAccountId, Integer savedAudienceCount) {
-        this.inputJson = inputJson;
+    public BizAdCreationAudienceSectionFacebookGraphQlRequest(LwiBoostedComponentInput input, String objective, Long budget, String budgetType, Long durationInSeconds, String adAccountId, Integer savedAudienceCount) {
+        this.input = input;
         this.objective = objective;
         this.budget = budget;
         this.budgetType = budgetType;
@@ -149,21 +141,21 @@ public final class BizAdCreationAudienceSectionFacebookGraphQlRequest implements
     /**
      * {@inheritDoc}
      *
-     * @implNote This implementation emits {@code {"input": <inputJson>, "objective": <objective>,
+     * @implNote This implementation emits {@code {"input": {...}, "objective": <objective>,
      * "budget": <budget>, "budget_type": <budgetType>, "duration_in_seconds": <durationInSeconds>,
      * "adAccountID": <adAccountId>, "savedAudienceCount": <savedAudienceCount>}}, writing each
      * variable only when its value is non-null and emitting {@code "{}"} when all are {@code null}.
-     * The {@code input} value is spliced in as a raw JSON value via
-     * {@link JSONWriter#writeRaw(String)} because it is supplied already encoded.
+     * The {@code input} object is mapped by
+     * {@link BizAdInputJson#writeLwiBoostedComponentInput(JSONWriter, LwiBoostedComponentInput)}.
      */
     @Override
     public String variables() {
         try (var writer = JSONWriter.ofUTF8()) {
             writer.startObject();
-            if (inputJson != null) {
+            if (input != null) {
                 writer.writeName("input");
                 writer.writeColon();
-                writer.writeRaw(inputJson);
+                BizAdInputJson.writeLwiBoostedComponentInput(writer, input);
             }
 
             if (objective != null) {

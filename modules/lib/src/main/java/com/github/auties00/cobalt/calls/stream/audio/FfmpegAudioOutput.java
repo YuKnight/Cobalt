@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.calls.stream.audio;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.ffmpeg.AVChannelLayout;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecParameters;
 import com.github.auties00.cobalt.util.ffmpeg.AVFormatContext;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.util.ffmpeg.Ffmpeg;
 import com.github.auties00.cobalt.util.ffmpeg.FFmpegError;
 import com.github.auties00.cobalt.util.ffmpeg.FFmpegLoader;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -38,19 +40,19 @@ import com.github.auties00.cobalt.calls.stream.ffmpeg.FfmpegIoWatchdog;
  * frames, and buffering them for the consumer.
  *
  * <p>A background thread decodes the input ahead of the consumer into a bounded read ahead buffer, and each
- * {@link #take()} returns one buffered 10 ms frame of 160 samples as soon as one is available; the source
+ * {@link #takeAudio()} returns one buffered 10 ms frame of 160 samples as soon as one is available; the source
  * does not pace itself, since the engine's send seam is the wall clock cadence gate at the wire. Decoding
  * ahead keeps that paced sender supplied across the jitter of the demux, decode, and resample steps, which
  * is otherwise worst at the codec's cold start and would starve the sender into choppy playback. Subframe
  * audio is never lost: the leftover samples from a decode that does not land on a 10 ms boundary are carried
  * into the next decode. When the input ends, the trailing partial frame (if any) is dropped and
- * {@link #take()} returns {@code null} to signal end of stream. {@link #shutdown()} stops the decoder thread
+ * {@link #takeAudio()} returns {@code null} to signal end of stream. {@link #shutdown()} stops the decoder thread
  * and releases the native demuxer, decoder, and resampler.
  *
  * <p>Every blocking demux operation is bounded by the optional read timeout passed to the constructor.
  * A local file source passes {@code null}, since a file read does not stall; a network source passes its
  * timeout, and an {@code av_read_frame} that the {@link FfmpegIoWatchdog} aborts is surfaced as an
- * {@link IllegalStateException} from {@link #take()} rather than being mistaken for a clean end of input.
+ * {@link IllegalStateException} from {@link #takeAudio()} rather than being mistaken for a clean end of input.
  *
  * @implNote This implementation decodes ahead into a one second read ahead buffer and stamps each frame with
  * the {@link AudioFrame#ptsMicros()} microsecond clock the engine's send seam paces transmission against,
@@ -58,6 +60,11 @@ import com.github.auties00.cobalt.calls.stream.ffmpeg.FfmpegIoWatchdog;
  */
 public abstract sealed class FfmpegAudioOutput implements AudioOutput
         permits FfmpegAudioOutput.File, FfmpegAudioOutput.Uri {
+    /**
+     * The logger for {@link FfmpegAudioOutput}.
+     */
+    private static final System.Logger LOGGER = Log.get(FfmpegAudioOutput.class);
+
     /**
      * Holds the output sample rate, in Hz, that the call layer expects.
      *
@@ -87,7 +94,7 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
      *
      * @implNote This implementation reads up to one second ahead so the jitter of the demux, decode, and
      * resample steps, which is worst during the codec's cold start, never starves the call's paced sender.
-     * The buffer fills during the seconds of call setup that precede the first {@link #take()}, so the read
+     * The buffer fills during the seconds of call setup that precede the first {@link #takeAudio()}, so the read
      * ahead latency is hidden behind connection establishment.
      */
     private static final int PREFETCH_FRAMES = 100;
@@ -181,7 +188,7 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
     private final int streamIndex;
 
     /**
-     * Holds the queue of decoded and resampled 10 ms frames not yet emitted by {@link #take()}.
+     * Holds the queue of decoded and resampled 10 ms frames not yet emitted by {@link #takeAudio()}.
      */
     private final Deque<short[]> readyFrames = new ArrayDeque<>();
 
@@ -205,18 +212,18 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
     private boolean drained;
 
     /**
-     * Holds the failure that ended the background decode, surfaced from {@link #take()}, or {@code null}
+     * Holds the failure that ended the background decode, surfaced from {@link #takeAudio()}, or {@code null}
      * while the decode is healthy.
      *
      * <p>Set on the decoder thread when a demux, decode, or resample step fails (including a watchdog
-     * timeout) and read on the pump thread, so it is {@code volatile}; it lets {@link #take()} distinguish
+     * timeout) and read on the pump thread, so it is {@code volatile}; it lets {@link #takeAudio()} distinguish
      * a failed stream, which throws, from a cleanly drained one, which returns {@code null}.
      */
     private volatile RuntimeException decodeFailure;
 
     /**
      * Holds decoded 10 ms frames produced by the background {@link #decoderThread} and consumed by
-     * {@link #take()}, bounding the read ahead to {@link #PREFETCH_FRAMES} frames.
+     * {@link #takeAudio()}, bounding the read ahead to {@link #PREFETCH_FRAMES} frames.
      */
     private final BlockingQueue<AudioFrame> prefetch = new ArrayBlockingQueue<>(PREFETCH_FRAMES + 1);
 
@@ -285,8 +292,13 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
             this.packet = FFmpegError.requireNonNull("av_packet_alloc", Ffmpeg.av_packet_alloc());
             this.frame = FFmpegError.requireNonNull("av_frame_alloc", Ffmpeg.av_frame_alloc());
         } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "audio source open failed", e);
             arena.close();
             throw e;
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "audio source opened: stream={0} readTimeout={1}",
+                    streamIndex, readTimeout);
         }
         this.decoderThread = Thread.ofPlatform()
                 .name("ffmpeg-audio-decoder")
@@ -297,13 +309,13 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
     /**
      * {@inheritDoc}
      *
-     * <p>A demuxed media source produces its frames inside {@link #take()} from the decoder and ignores
+     * <p>A demuxed media source produces its frames inside {@link #takeAudio()} from the decoder and ignores
      * application writes, so this does nothing.
      *
      * @param frame the frame that would be written; ignored
      */
     @Override
-    public void write(AudioFrame frame) {
+    public void writeAudio(AudioFrame frame) {
     }
 
     /**
@@ -323,10 +335,10 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
      * down.
      *
      * <p>Runs on the background {@link #decoderThread}: all FFmpeg decode calls happen here, on a single
-     * thread, while {@link #take()} only reads the buffered result. Blocks on a full buffer to bound the
+     * thread, while {@link #takeAudio()} only reads the buffered result. Blocks on a full buffer to bound the
      * read ahead and exits when the input drains, when {@link #shutdown()} sets the closed flag, when
      * interrupted, or when a demux, decode, or resample step fails. A failure is recorded in
-     * {@link #decodeFailure} and an end marker is enqueued so a waiting {@link #take()} unblocks and
+     * {@link #decodeFailure} and an end marker is enqueued so a waiting {@link #takeAudio()} unblocks and
      * rethrows it.
      */
     private void decodeLoop() {
@@ -334,6 +346,7 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
             while (!closed.get()) {
                 var next = decodeNext();
                 if (next == null) {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio input drained");
                     prefetch.put(END);
                     return;
                 }
@@ -342,6 +355,7 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (RuntimeException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "audio decode failed", e);
             decodeFailure = e;
             try {
                 prefetch.put(END);
@@ -371,7 +385,7 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
      * soon as one is available.
      */
     @Override
-    public AudioFrame take() {
+    public AudioFrame takeAudio() {
         if (closed.get()) {
             return null;
         }
@@ -427,6 +441,7 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
         if (!closed.compareAndSet(false, true)) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio source shutdown");
         watchdog.cancel();
         var decoder = decoderThread;
         if (decoder != null) {
@@ -482,7 +497,7 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
      *
      * <p>Reads one packet, arming the watchdog around the read when a read timeout is configured; on
      * end of input it flushes the decoder and marks the stream drained, and on a read the watchdog aborts it
-     * throws so {@link #take()} surfaces the timeout. Otherwise it feeds packets belonging to the chosen
+     * throws so {@link #takeAudio()} surfaces the timeout. Otherwise it feeds packets belonging to the chosen
      * audio stream to the decoder and drains the resulting frames.
      *
      * @throws IllegalStateException if a configured read timeout aborts the demux read, or the decoder
@@ -498,10 +513,14 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
         }
         if (read < 0) {
             if (readTimeout != null && watchdog.fired()) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "audio input read timed out after {0}", readTimeout);
+                }
                 throw new IllegalStateException("input read timed out after " + readTimeout);
             }
             var failure = watchdog.readFailure();
             if (failure != null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "audio input read failed: {0}", failure);
                 throw new IllegalStateException("input read failed: " + failure);
             }
             Ffmpeg.avcodec_send_packet(codecCtx, MemorySegment.NULL);
@@ -516,8 +535,11 @@ public abstract sealed class FfmpegAudioOutput implements AudioOutput
             }
             var sent = Ffmpeg.avcodec_send_packet(codecCtx, packet);
             if (sent < 0 && !FFmpegError.isAgain(sent)) {
-                throw new IllegalStateException("avcodec_send_packet failed: "
-                        + FFmpegError.describe(sent));
+                var description = FFmpegError.describe(sent);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "avcodec_send_packet failed: {0}", description);
+                }
+                throw new IllegalStateException("avcodec_send_packet failed: " + description);
             }
             drainDecoder(false);
         } finally {

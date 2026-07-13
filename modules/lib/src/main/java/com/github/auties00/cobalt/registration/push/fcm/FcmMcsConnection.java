@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.registration.push.fcm;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.fcm.mcs.*;
 
 import javax.net.ssl.SSLSocket;
@@ -7,7 +8,6 @@ import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -36,12 +36,9 @@ import java.util.List;
  */
 final class FcmMcsConnection {
     /**
-     * Logger shared with the rest of the FCM client.
-     *
-     * <p>Uses the same logger name {@code cobalt.fcm} as {@link FcmRegistration} so consumers can configure verbosity
-     * for the whole subsystem in one place.
+     * The logger for {@link FcmMcsConnection}.
      */
-    private static final Logger LOG = System.getLogger("cobalt.fcm");
+    private static final System.Logger LOGGER = Log.get(FcmMcsConnection.class);
 
     /**
      * MCS gateway hostname, identical for every Android device.
@@ -236,6 +233,7 @@ final class FcmMcsConnection {
      * stop flag.
      */
     void start() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting mcs listener thread");
         this.listenerThread = Thread.startVirtualThread(this::listenLoop);
     }
 
@@ -245,6 +243,7 @@ final class FcmMcsConnection {
      * <p>Idempotent; called by {@link FcmClient#close()}.
      */
     void close() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing mcs connection");
         stopped = true;
         var s = socket;
         if (s != null) {
@@ -280,8 +279,9 @@ final class FcmMcsConnection {
                 if (stopped) {
                     return;
                 }
-                LOG.log(Level.WARNING, () -> "MCS connection lost; reconnecting in "
-                        + RECONNECT_BACKOFF_MS + " ms", ex);
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "mcs connection lost; reconnecting in " + RECONNECT_BACKOFF_MS + " ms", ex);
+                }
                 try {
                     Thread.sleep(RECONNECT_BACKOFF_MS);
                 } catch (InterruptedException sleepInterrupted) {
@@ -304,6 +304,7 @@ final class FcmMcsConnection {
     private void connectAndListen() throws Exception {
         streamId = 0;
         lastStreamIdReported = -1;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "connecting to mcs host={0} port={1}", MCS_HOST, MCS_PORT);
         var sock = (SSLSocket) SSLSocketFactory.getDefault().createSocket(MCS_HOST, MCS_PORT);
         sock.setTcpNoDelay(true);
         sock.setKeepAlive(true);
@@ -322,7 +323,7 @@ final class FcmMcsConnection {
         if (serverVersion < 0) {
             throw new IOException("MCS server closed before sending version");
         }
-        LOG.log(Level.DEBUG, () -> "MCS server version=" + serverVersion);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mcs server version={0}", serverVersion);
 
         var loginPacket = readFrame(in);
         if (loginPacket.tag != TAG_LOGIN_RESPONSE) {
@@ -330,10 +331,11 @@ final class FcmMcsConnection {
         }
         var login = FcmMcsLoginResponseSpec.decode(loginPacket.payload);
         if (login.error() != null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "mcs login refused (code={0})", login.error().code());
             throw new IOException("MCS login refused: code="
                     + login.error().code() + " message=" + login.error().message());
         }
-        LOG.log(Level.INFO, () -> "MCS logged in (server_ts=" + login.serverTimestamp() + ")");
+        if (Log.INFO) LOGGER.log(Level.INFO, "mcs logged in (server_ts={0})", login.serverTimestamp());
         streamId = 1;
         startHeartbeatLoop(out);
 
@@ -369,13 +371,14 @@ final class FcmMcsConnection {
                 }
             }
             case TAG_HEARTBEAT_ACK, TAG_IQ_STANZA -> {
-                if (LOG.isLoggable(Level.TRACE)) {
-                    LOG.log(Level.TRACE, "MCS ack/iq tag={0}", frame.tag);
-                }
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "mcs ack/iq tag={0}", frame.tag);
             }
             case TAG_CLOSE -> throw new IOException("MCS server requested close");
-            default -> LOG.log(Level.WARNING, "MCS unknown tag {0} ({1} B)",
-                    frame.tag, frame.payload.length);
+            default -> {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "mcs unknown tag {0} ({1} b)", frame.tag, frame.payload.length);
+                }
+            }
         }
     }
 
@@ -390,6 +393,7 @@ final class FcmMcsConnection {
      */
     private void dispatchDataMessage(byte[] payload) {
         var stanza = FcmMcsDataMessageStanzaSpec.decode(payload);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mcs data message received ({0} bytes)", payload.length);
         var pid = stanza.persistentId();
         if (pid != null && !pid.isEmpty()) {
             synchronized (sessionLock) {
@@ -405,6 +409,7 @@ final class FcmMcsConnection {
         }
         for (var entry : stanza.appData()) {
             if (PUSH_CODE_APP_DATA_KEY.equals(entry.key())) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "fcm push code extracted from mcs data message");
                 pushCode.deliver(entry.value());
                 return;
             }
@@ -441,6 +446,7 @@ final class FcmMcsConnection {
             synchronized (writeLock) {
                 writeFrame(out, TAG_IQ_STANZA, encoded);
             }
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "mcs stream-ack sent (stream_id={0})", streamId);
             lastStreamIdReported = streamId;
         }
     }
@@ -499,6 +505,7 @@ final class FcmMcsConnection {
                     synchronized (writeLock) {
                         writeFrame(out, TAG_HEARTBEAT_PING, encoded);
                     }
+                    if (Log.TRACE) LOGGER.log(Level.TRACE, "mcs heartbeat ping sent (stream_id={0})", streamId);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     return;

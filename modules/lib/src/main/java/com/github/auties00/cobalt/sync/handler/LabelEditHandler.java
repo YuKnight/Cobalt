@@ -21,7 +21,9 @@ import com.github.auties00.cobalt.wam.type.LabelSyncDeviceRoleType;
 import com.github.auties00.cobalt.wam.type.LabelSyncDirectionType;
 import com.github.auties00.cobalt.wam.type.LabelSyncResultType;
 import com.github.auties00.cobalt.wam.type.LabelSyncTypeEnum;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
@@ -49,6 +51,10 @@ import javax.crypto.spec.SecretKeySpec;
  */
 @WhatsAppWebModule(moduleName = "WAWebLabelSync")
 public final class LabelEditHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link LabelEditHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(LabelEditHandler.class);
 
     /**
      * Holds the fixed HMAC key WA Web salts every label-sync hash with.
@@ -176,12 +182,14 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof LabelEditAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "label edit mutation has malformed action value, label={0}", labelId);
             emitLabelSyncTracking(client, labelId, LabelSyncResultType.FAILED_MISSING_ACTION, false, null);
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         if (action.deleted()) {
             client.store().settingsStore().removeLabel(labelId);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "label deleted, label={0}", labelId);
             emitLabelSyncTracking(client, labelId, LabelSyncResultType.SUCCESS, false, predefinedId(action));
             return MutationApplicationResult.success();
         }
@@ -193,6 +201,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
         if (type == LabelEditAction.ListType.SERVER_ASSIGNED) {
             // TODO: persist the server-assigned label id to predefined id mapping; Cobalt has
             //       no equivalent store field yet, so the predefinedId association is dropped.
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "label server-assigned mapping not persisted, label={0}", labelId);
             emitLabelSyncTracking(client, labelId, LabelSyncResultType.SUCCESS, true, predefinedId(action));
             return MutationApplicationResult.success();
         }
@@ -214,6 +223,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
             if (action.isImmutable()) {
                 existing.setImmutable(Boolean.TRUE);
             }
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "label updated, label={0}", labelId);
         } else {
             var label = new LabelBuilder()
                     .id(labelId)
@@ -226,6 +236,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
                     .isImmutable(action.isImmutable() ? Boolean.TRUE : null)
                     .build();
             client.store().settingsStore().addLabel(label);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "label created, label={0}", labelId);
         }
 
         emitLabelSyncTracking(client, labelId, LabelSyncResultType.SUCCESS, true, predefinedId(action));
@@ -314,6 +325,7 @@ public final class LabelEditHandler implements WebAppStateActionHandler {
             }
             return hex.toString();
         } catch (Exception e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "label sync hash generation failed", e);
             return "hash_generation_failed";
         }
     }

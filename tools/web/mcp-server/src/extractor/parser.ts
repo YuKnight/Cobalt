@@ -3,6 +3,24 @@ import type { ParsedModule } from "../types/module.js";
 const MODULE_PATTERN =
   /__d\("([^"]+)",\s*(\[[^\]]*]),\s*\(?function\(([^)]*)\)/g;
 
+const FACTORY_SIGNATURE =
+  /^\s*(?:async\s+)?function\b\s*\*?\s*[A-Za-z0-9_$]*\s*\(([^)]*)\)/;
+
+/**
+ * Reports whether a Haste module name belongs to the WhatsApp application surface.
+ *
+ * Keeps every module whose name references WhatsApp ({@code WA}) or the Comet
+ * click-to-WhatsApp ads layer ({@code LWI}) - including the {@code use*} React-compiler hooks,
+ * {@code convert*} helpers, and {@code *.react} components - while excluding pure third-party
+ * vendor modules (react, relay-runtime, scheduler, and the like). The older
+ * {@code name.startsWith("WA") && !name.endsWith(".react")} rule silently dropped the entire
+ * business/ads surface (the {@code use*}/{@code LWI*} modules and every component that builds a
+ * GraphQL input), which never made it into the catalog.
+ */
+export function isWhatsAppModule(name: string): boolean {
+  return /WA|LWI/.test(name);
+}
+
 export function extractFunctionBody(
   content: string,
   startIndex: number
@@ -217,7 +235,7 @@ export function parseModules(content: string): ParsedModule[] {
   let match: RegExpExecArray | null;
   while ((match = MODULE_PATTERN.exec(content))) {
     const [fullMatch, name, depsStr, paramsStr] = match;
-    if (!name.startsWith("WA") || name.endsWith(".react")) continue;
+    if (!isWhatsAppModule(name)) continue;
 
     const funcStart = match.index + fullMatch.length;
 
@@ -246,4 +264,34 @@ export function parseModules(content: string): ParsedModule[] {
   }
 
   return modules;
+}
+
+/**
+ * Builds a {@link ParsedModule} from a module definition captured live in the browser.
+ *
+ * Takes the module name and dependency array as recorded by the {@code __d} define-hook, plus the
+ * factory function's {@code Function.prototype.toString()} source, and extracts the same body and
+ * export set that {@link parseModules} derives from re-fetched bundle text. Reading straight from
+ * the runtime {@code __d} registry avoids the file-based pipeline's failure modes: it is immune to
+ * factory-shape variations (named factories, wrapped {@code (function(){})} forms), to lazily
+ * force-loaded chunks whose network response was never captured, and to Node-side re-fetch failures.
+ * Returns {@code null} when {@code factorySource} carries no braced function body to extract.
+ */
+export function parseRuntimeModule(
+  name: string,
+  dependencies: string[],
+  factorySource: string
+): ParsedModule | null {
+  const signature = factorySource.match(FACTORY_SIGNATURE);
+  const params = signature
+    ? signature[1].split(",").map((p) => p.trim()).filter(Boolean)
+    : [];
+
+  const body = extractFunctionBody(factorySource, 0);
+  if (!body) return null;
+
+  const exportsParam = params[params.length - 1];
+  const exports = exportsParam ? extractExportNames(body, exportsParam) : [];
+
+  return { name, dependencies, exports, body };
 }

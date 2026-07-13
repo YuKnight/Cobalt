@@ -3,11 +3,14 @@ package com.github.auties00.cobalt.calls.signaling.receive;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Acknowledges an inbound VoIP {@code <receipt>} stanza back to the server.
@@ -28,10 +31,9 @@ import com.github.auties00.cobalt.stream.SocketStreamHandler;
 @WhatsAppWebModule(moduleName = "WAWebHandleVoipCallReceipt")
 public final class CallReceiptReceiver extends SocketStreamHandler.Concurrent {
     /**
-     * Records warnings for unrecognized or malformed inbound call receipt stanzas that are dropped
-     * without acknowledgement.
+     * The logger for {@link CallReceiptReceiver}.
      */
-    private static final System.Logger LOGGER = System.getLogger(CallReceiptReceiver.class.getName());
+    private static final System.Logger LOGGER = Log.get(CallReceiptReceiver.class);
 
     /**
      * Holds the WhatsApp client whose store supplies the local user's device JID for the outbound
@@ -77,29 +79,31 @@ public final class CallReceiptReceiver extends SocketStreamHandler.Concurrent {
     @Override
     public void handle(Stanza stanza) {
         if (!stanza.hasChild("offer", "accept", "reject")) {
-            LOGGER.log(System.Logger.Level.WARNING, "Parsing Error: Unrecognized call stanza: {0}", stanza);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "unrecognized call receipt stanza: {0}", stanza);
             return;
         }
 
         var from = stanza.getAttributeAsJid("from", null);
         if (from == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "Parsing Error: missing from attribute in call receipt: {0}", stanza);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "call receipt missing from attribute: {0}", stanza);
             return;
         }
 
         var stanzaId = stanza.getAttributeAsString("id", null);
         if (stanzaId == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "Parsing Error: missing id attribute in call receipt: {0}", stanza);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "call receipt missing id attribute: {0}", stanza);
             return;
         }
 
         var meDevicePn = whatsapp.store().accountStore().jid().orElse(null);
         if (meDevicePn == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping call receipt ack: local jid not yet available");
             return;
         }
 
         ackSender.ack(AckClass.RECEIPT, stanza)
                 .from(meDevicePn.toUserJid())
                 .send();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent call receipt ack id={0}", stanzaId);
     }
 }

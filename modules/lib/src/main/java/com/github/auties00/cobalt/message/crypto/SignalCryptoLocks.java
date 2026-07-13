@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.message.crypto;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.libsignal.SignalProtocolAddress;
 import com.github.auties00.libsignal.groups.SignalSenderKeyName;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -29,6 +31,11 @@ import java.util.function.Supplier;
  * session and sender-key state the store already holds.
  */
 public final class SignalCryptoLocks {
+    /**
+     * The logger for {@link SignalCryptoLocks}.
+     */
+    private static final System.Logger LOGGER = Log.get(SignalCryptoLocks.class);
+
     /**
      * Holds one lock per pairwise Signal session, keyed by the device {@link SignalProtocolAddress}.
      */
@@ -63,6 +70,9 @@ public final class SignalCryptoLocks {
     public <T> T withSession(SignalProtocolAddress address, Supplier<T> action) {
         Objects.requireNonNull(address, "address cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "acquiring session lock user={0} device={1}", Log.jid(address.name()), address.id());
+        }
         return withLock(sessionLocks, address, action);
     }
 
@@ -81,6 +91,9 @@ public final class SignalCryptoLocks {
     public void withSession(SignalProtocolAddress address, Runnable action) {
         Objects.requireNonNull(address, "address cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "acquiring session lock user={0} device={1}", Log.jid(address.name()), address.id());
+        }
         withLock(sessionLocks, address, action);
     }
 
@@ -100,6 +113,10 @@ public final class SignalCryptoLocks {
     public <T> T withSenderKey(SignalSenderKeyName senderKeyName, Supplier<T> action) {
         Objects.requireNonNull(senderKeyName, "senderKeyName cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "acquiring sender-key lock group={0} sender={1}",
+                    Log.jid(senderKeyName.groupId()), Log.jid(senderKeyName.sender().name()));
+        }
         return withLock(senderKeyLocks, senderKeyName, action);
     }
 
@@ -118,6 +135,10 @@ public final class SignalCryptoLocks {
     public void withSenderKey(SignalSenderKeyName senderKeyName, Runnable action) {
         Objects.requireNonNull(senderKeyName, "senderKeyName cannot be null");
         Objects.requireNonNull(action, "action cannot be null");
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "acquiring sender-key lock group={0} sender={1}",
+                    Log.jid(senderKeyName.groupId()), Log.jid(senderKeyName.sender().name()));
+        }
         withLock(senderKeyLocks, senderKeyName, action);
     }
 

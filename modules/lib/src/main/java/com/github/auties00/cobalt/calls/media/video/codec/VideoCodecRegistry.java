@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.media.video.codec;
 
 import com.github.auties00.cobalt.calls.capability.VideoDecoderCapability;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -39,6 +41,11 @@ import com.github.auties00.cobalt.calls.media.video.codec.vpx.VpxVideoCodec;
  * {@link VideoCodecParams#codec()}.
  */
 public final class VideoCodecRegistry {
+    /**
+     * The logger for {@link VideoCodecRegistry}.
+     */
+    private static final System.Logger LOGGER = Log.get(VideoCodecRegistry.class);
+
     /**
      * The codecs this build can both encode and decode, advertised to peers and intersected during
      * negotiation.
@@ -113,12 +120,18 @@ public final class VideoCodecRegistry {
      */
     public VideoCodec open(VideoCodecParams params) {
         Objects.requireNonNull(params, "params cannot be null");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "opening video codec {0}, {1}x{2}", params.codec(), params.width(), params.height());
+        }
         return switch (params.codec()) {
             case H264 -> new H264VideoCodec(params);
             case VP8, VP9 -> new VpxVideoCodec(params);
             case AV1 -> new Av1VideoCodec(params);
-            case H265 -> throw new IllegalArgumentException(
-                    "H265 is not supported by this build: no H.265 codec is wired in");
+            case H265 -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "video codec open rejected, H265 is not supported by this build");
+                throw new IllegalArgumentException(
+                        "H265 is not supported by this build: no H.265 codec is wired in");
+            }
         };
     }
 
@@ -149,8 +162,13 @@ public final class VideoCodecRegistry {
         Objects.requireNonNull(self, "self cannot be null");
         Objects.requireNonNull(peer, "peer cannot be null");
         var localCapable = VideoDecoderCapability.intersect(SUPPORTED, self);
-        return VideoDecoderCapability.negotiate(localCapable, peer)
-                .map(chosen -> open(retarget(baseParams, chosen)));
+        var negotiated = VideoDecoderCapability.negotiate(localCapable, peer);
+        if (negotiated.isEmpty()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "video codec negotiation failed, no codec common to local, self, and peer sets");
+            return Optional.empty();
+        }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "video codec negotiated: {0}", negotiated.get());
+        return negotiated.map(chosen -> open(retarget(baseParams, chosen)));
     }
 
     /**

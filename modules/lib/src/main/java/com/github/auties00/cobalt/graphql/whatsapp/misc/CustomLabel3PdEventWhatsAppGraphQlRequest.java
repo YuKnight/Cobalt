@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.misc;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,14 +14,14 @@ import java.io.UncheckedIOException;
 import java.util.List;
 
 /**
- * Builds the relay query that maps a batch of custom chat labels to their click-to-WhatsApp (CTWA)
+ * Builds the graph.whatsapp.com GraphQL query that maps a batch of custom chat labels to their click-to-WhatsApp (CTWA)
  * third-party conversion events.
  *
  * <p>The query takes two GraphQL variables. The {@code custom_labels} list carries the custom-label
  * objects to resolve, each a single-field object {@code {"custom_label": <name>}}; WhatsApp Web's
  * {@code WAWebCustomLabels3pdSignalUtils} collects these from the chat's predefined-id-free labels.
  * The {@code expt_group} carries the CTWA custom-label algorithm experiment group, sourced from the
- * {@code ctwa_custom_label_algorithm} AB-prop config value. The relay returns the matching conversion
+ * {@code ctwa_custom_label_algorithm} AB-prop config value. The graph.whatsapp.com endpoint returns the matching conversion
  * events under {@code xwa_get_3pd_event}; the reply is consumed through
  * {@link CustomLabel3PdEventWhatsAppGraphQlResponse}.
  *
@@ -28,10 +30,10 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebCustomLabel3pdEventQuery")
 public final class CustomLabel3PdEventWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebCustomLabel3pdEventQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -135,5 +137,21 @@ public final class CustomLabel3PdEventWhatsAppGraphQlRequest implements WhatsApp
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.device.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.device.info.DeviceListBuilder;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +47,7 @@ public final class DeviceUSyncResponseParser {
     /**
      * Holds the logger used to trace per-user and protocol-level parse warnings.
      */
-    private static final System.Logger LOGGER = System.getLogger(DeviceUSyncResponseParser.class.getName());
+    private static final System.Logger LOGGER = Log.get(DeviceUSyncResponseParser.class);
 
     /**
      * Holds the ADV validator used to verify {@code <key-index-list>} signatures and to read the
@@ -95,6 +97,7 @@ public final class DeviceUSyncResponseParser {
     public List<DeviceListResult> parse(Stanza responseStanza) {
         var usyncNode = responseStanza.getChild("usync");
         if (usyncNode.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "usync response has no usync envelope");
             return List.of();
         }
 
@@ -105,8 +108,9 @@ public final class DeviceUSyncResponseParser {
             var error = globalErrorNode.get();
             var errorCode = error.getAttributeAsInt("code", 0);
             var errorText = error.getAttributeAsString("text", "Unknown error");
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "USync global error: code={0}, text={1}", errorCode, errorText);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "usync global error: code={0}, text={1}", errorCode, errorText);
+            }
             var errorResult = new DeviceListResult.Error(null, errorCode, errorText, true);
             return List.of(errorResult);
         }
@@ -119,19 +123,23 @@ public final class DeviceUSyncResponseParser {
                 .map(error -> {
                     var errorCode = error.getAttributeAsInt("code", 0);
                     var errorText = error.getAttributeAsString("text", "Unknown error");
-                    LOGGER.log(System.Logger.Level.WARNING, "USync devices error: code={0}, text={1}", errorCode, errorText);
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "usync devices error: code={0}, text={1}", errorCode, errorText);
                     return (DeviceListResult) new DeviceListResult.Error(null, errorCode, errorText, false);
                 });
 
         var listNode = usync.getChild("list");
         if (listNode.isEmpty()) {
-            return protocolErrorStream.toList();
+            var results = protocolErrorStream.toList();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsed usync response: no list node, {0} protocol errors", results.size());
+            return results;
         }
 
         var userResults = listNode.get().streamChildren("user")
                 .flatMap(userNode -> parseUserDevices(userNode, usernameMap));
-        return Stream.concat(protocolErrorStream, userResults)
+        var results = Stream.concat(protocolErrorStream, userResults)
                 .toList();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsed usync response: {0} results", results.size());
+        return results;
     }
 
     /**
@@ -159,11 +167,13 @@ public final class DeviceUSyncResponseParser {
             adaptation = WhatsAppAdaptation.DIRECT)
     public Map<Jid, Jid> parseLidMappings(Stanza responseStanza) {
         Objects.requireNonNull(responseStanza, "responseStanza cannot be null");
-        return responseStanza.streamChild("usync")
+        var mappings = responseStanza.streamChild("usync")
                 .flatMap(usync -> usync.streamChild("list"))
                 .flatMap(list -> list.streamChildren("user"))
                 .flatMap(this::parseLidEntry)
                 .collect(Collectors.toUnmodifiableMap(LidEntry::phoneJid, LidEntry::lid, (first, _) -> first));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsed {0} lid mappings from usync response", mappings.size());
+        return mappings;
     }
 
     /**
@@ -270,8 +280,9 @@ public final class DeviceUSyncResponseParser {
             var error = errorChild.get();
             var errorCode = error.getAttributeAsInt("code", 0);
             var errorText = error.getAttributeAsString("text", "Unknown error");
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "USync user devices error for {0}: code={1}, text={2}", userJid, errorCode, errorText);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "usync user devices error for {0}: code={1}, text={2}", userJid, errorCode, errorText);
+            }
             return Stream.of(new DeviceListResult.Error(userJid, errorCode, errorText, false));
         }
 
@@ -319,6 +330,9 @@ public final class DeviceUSyncResponseParser {
             adaptation = WhatsAppAdaptation.DIRECT)
     private Stream<DeviceListResult> parseOmittedResult(Jid userJid, Stanza deviceListStanza, Stanza keyIndexListStanza) {
         if (deviceListStanza != null && hasCompanionDevices(deviceListStanza)) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "dropping omitted usync result for {0}: companion devices without signed key index", userJid);
+            }
             return Stream.empty();
         }
 
@@ -397,8 +411,9 @@ public final class DeviceUSyncResponseParser {
                 ? advValidatorService.verifySKeyIndexWithAccSigKey(signedKeyIndexBytes)
                 : advValidatorService.decodeSignedKeyIndexBytes(userJid, signedKeyIndexBytes);
         if (validatedInfo.isEmpty()) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Key index list signature verification failed for {0}, skipping", userJid);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "key index list signature verification failed for {0}, skipping", userJid);
+            }
             return Stream.empty();
         }
 
@@ -423,6 +438,7 @@ public final class DeviceUSyncResponseParser {
                 .validIndexes(info.validIndexes())
                 .build();
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "usync full device list parsed for {0}: {1} devices", userJid, devices.size());
         return Stream.of(new DeviceListResult.Full(deviceList, info.accountSignatureKey().orElse(null), username));
     }
 
@@ -511,9 +527,9 @@ public final class DeviceUSyncResponseParser {
         var keyIndex = keyIndexMap.getOrDefault(deviceId, 0);
 
         if (validIndexes != null && !validIndexes.isEmpty() && keyIndex != 0 && !validIndexes.contains(keyIndex)) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Device {0} has keyIndex {1} not in validIndexes {2}, excluding",
-                    deviceId, keyIndex, validIndexes);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "device {0} has keyIndex {1} not in validIndexes {2}, excluding", deviceId, keyIndex, validIndexes);
+            }
             return Stream.empty();
         }
 

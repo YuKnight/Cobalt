@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.engine.event;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -12,9 +15,9 @@ import java.util.Objects;
  */
 public final class LiveCallLifecycleEventSink implements CallLifecycleEventSink {
     /**
-     * Logger that receives one trace line per emitted lifecycle event, keyed by this class's name.
+     * The logger for {@link LiveCallLifecycleEventSink}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveCallLifecycleEventSink.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveCallLifecycleEventSink.class);
 
     /**
      * {@inheritDoc}
@@ -27,6 +30,6 @@ public final class LiveCallLifecycleEventSink implements CallLifecycleEventSink 
     @Override
     public void emit(CallEventType eventType, byte[] payload) {
         Objects.requireNonNull(eventType, "eventType cannot be null");
-        LOGGER.log(System.Logger.Level.TRACE, "calls lifecycle event {0}", eventType);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "calls lifecycle event {0}", eventType);
     }
 }

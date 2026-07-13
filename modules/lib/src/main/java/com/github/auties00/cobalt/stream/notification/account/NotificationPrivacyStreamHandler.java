@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.stream.notification.account;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.ack.AckClass;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.migration.LidMigrationService;
 import com.github.auties00.cobalt.listener.linked.internal.LinkedTrustedContactTokenListener;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Arrays;
 
@@ -32,7 +34,7 @@ final class NotificationPrivacyStreamHandler extends SocketStreamHandler.Concurr
     /**
      * Logs warnings about malformed stanzas and debug messages about unknown token types.
      */
-    private static final System.Logger LOGGER = System.getLogger(NotificationPrivacyStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationPrivacyStreamHandler.class);
 
     /**
      * Holds the client used for store reads and presence re-subscription.
@@ -74,10 +76,9 @@ final class NotificationPrivacyStreamHandler extends SocketStreamHandler.Concurr
         try {
             handleNotification(stanza);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Cannot handle privacy_token notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "<missing>"),
-                    throwable.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "cannot handle privacy_token notification " + stanza.getAttributeAsString("id", "<missing>"),
+                    throwable);
         } finally {
             sendNotificationAck(stanza);
         }
@@ -116,8 +117,10 @@ final class NotificationPrivacyStreamHandler extends SocketStreamHandler.Concurr
             var type = tokenNode.getAttributeAsString("type", "");
             switch (type) {
                 case "trusted_contact" -> handleTrustedContactToken(senderPn, senderLid, tokenNode);
-                default -> LOGGER.log(System.Logger.Level.DEBUG,
-                        "incomingPrivacyTokensParser - receiving an unknown type: {0}", type);
+                default -> {
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                            "incomingPrivacyTokensParser - receiving an unknown type: {0}", type);
+                }
             }
         }
     }
@@ -155,8 +158,8 @@ final class NotificationPrivacyStreamHandler extends SocketStreamHandler.Concurr
         try {
             whatsapp.subscribeToPresence(senderPn);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Cannot resubscribe to presence for tc token sender {0}: {1}",
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "cannot resubscribe to presence for tc token sender {0}: {1}",
                     senderPn,
                     throwable.getMessage());
         }
@@ -193,6 +196,7 @@ final class NotificationPrivacyStreamHandler extends SocketStreamHandler.Concurr
 
         chat.setTcToken(tcTokenContent);
         chat.setTcTokenTimestamp(tokenTimestamp);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "updated trusted-contact token for {0}, {1} bytes", chat.jid(), tcTokenContent.length);
 
         var peer = (senderLid != null ? senderLid : senderPn).toUserJid();
         for (var listener : whatsapp.store().listeners()) {

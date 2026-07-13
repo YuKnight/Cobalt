@@ -9,7 +9,7 @@ import com.github.auties00.cobalt.calls.stream.AudioOutput;
  * Transmits continuous silence as the local audio of a call.
  *
  * <p>This is the generated {@link AudioOutput} returned by {@link AudioOutput#fromSilence()}, the default
- * audio fill. Every {@link #take()} yields an {@link AudioFrame} of all zero signed 16 bit samples over one
+ * audio fill. Every {@link #takeAudio()} yields an {@link AudioFrame} of all zero signed 16 bit samples over one
  * shared immutable buffer, with a presentation timestamp that never decreases. The stream never ends on its
  * own; it keeps producing silence until the call engine shuts it down. The default profile emits frames of
  * 160 samples spanning 10 ms each, matching the call media format. Because the samples are constant, every
@@ -17,7 +17,7 @@ import com.github.auties00.cobalt.calls.stream.AudioOutput;
  * the call runs.
  *
  * <p>The emitted PCM is true digital silence, not comfort noise; a producer that needs audible comfort
- * noise should layer a noise generator on top. Because {@link #take()} never returns {@code null}, the
+ * noise should layer a noise generator on top. Because {@link #takeAudio()} never returns {@code null}, the
  * call treats this as an endless stream, so the engine swaps it out rather than relying on it to signal the
  * end of the stream.
  *
@@ -34,7 +34,7 @@ public final class SilenceAudioOutput implements AudioOutput {
      * Holds the constant all zero PCM samples, shared by every emitted frame since silence never changes.
      *
      * <p>The buffer is never mutated, so sharing one array across every frame is safe under the
-     * {@link AudioOutput#take()} borrow contract even for a consumer that retains a frame: a stale reference
+     * {@link AudioOutput#takeAudio()} borrow contract even for a consumer that retains a frame: a stale reference
      * always reads silence.
      */
     private final short[] silence;
@@ -52,7 +52,7 @@ public final class SilenceAudioOutput implements AudioOutput {
     private final AtomicLong ptsMicros = new AtomicLong();
 
     /**
-     * Marks the source ended so {@link #take()} returns {@code null}.
+     * Marks the source ended so {@link #takeAudio()} returns {@code null}.
      */
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -89,13 +89,13 @@ public final class SilenceAudioOutput implements AudioOutput {
     /**
      * {@inheritDoc}
      *
-     * <p>A generated source produces its frames inside {@link #take()} and ignores application writes, so
+     * <p>A generated source produces its frames inside {@link #takeAudio()} and ignores application writes, so
      * this does nothing.
      *
      * @param frame the frame that would be written; ignored
      */
     @Override
-    public void write(AudioFrame frame) {
+    public void writeAudio(AudioFrame frame) {
     }
 
     /**
@@ -112,7 +112,7 @@ public final class SilenceAudioOutput implements AudioOutput {
      * shared immutable buffer, so a steady silence stream allocates only the small frame record.
      */
     @Override
-    public AudioFrame take() {
+    public AudioFrame takeAudio() {
         if (closed.get()) {
             return null;
         }
@@ -123,7 +123,7 @@ public final class SilenceAudioOutput implements AudioOutput {
     /**
      * {@inheritDoc}
      *
-     * <p>Marks the source ended so the next {@link #take()} returns {@code null}. Idempotent.
+     * <p>Marks the source ended so the next {@link #takeAudio()} returns {@code null}. Idempotent.
      */
     @Override
     public void shutdown() {

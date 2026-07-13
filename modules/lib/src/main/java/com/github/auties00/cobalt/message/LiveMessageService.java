@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.message;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.cobalt.message.receive.LiveMessageReceivingService;
@@ -20,6 +21,7 @@ import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.wam.WamService;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +40,9 @@ import java.util.Objects;
  * dispatch, into one facade that owns no state of its own.
  */
 public final class LiveMessageService implements MessageService {
+    /** The logger for {@link LiveMessageService}. */
+    private static final System.Logger LOGGER = Log.get(LiveMessageService.class);
+
     /**
      * Holds the {@link MessageDecryption} used by
      * {@link #processCall(Jid, MessageEncryptionType, byte[])}.
@@ -174,6 +179,7 @@ public final class LiveMessageService implements MessageService {
                     : deviceService.queryUserLid(peer.toUserJid()).map(Jid::toUserJid).orElse(null);
         }
         if (peerLid == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "call peer addressing failed, no lid resolved for {0}", peer);
             throw new IllegalStateException("Cannot place a call: no LID is known for peer "
                     + peer.toUserJid() + "; WhatsApp rejects phone-number-addressed call offers");
         }
@@ -190,8 +196,10 @@ public final class LiveMessageService implements MessageService {
         // primary device so the offer still addresses the peer, matching WA Web's getFanOutList primary
         // fallback.
         if (peerDeviceJids.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call peer {0} has no synced devices, falling back to primary device", peerLid);
             peerDeviceJids.add(peerLid.withDevice(0));
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call peer addressing resolved for {0}, devices={1}", peerLid, peerDeviceJids.size());
         return new CallPeerAddressing(peerLid, peerDeviceJids);
     }
 
@@ -200,7 +208,10 @@ public final class LiveMessageService implements MessageService {
         Objects.requireNonNull(senderJid, "senderJid cannot be null");
         Objects.requireNonNull(encType, "encType cannot be null");
         Objects.requireNonNull(ciphertext, "ciphertext cannot be null");
-        return decryption.decryptFromDevice(ciphertext, senderJid, encType);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "decrypting call payload from {0}, type={1}, bytes={2}", senderJid, encType, ciphertext.length);
+        var plaintext = decryption.decryptFromDevice(ciphertext, senderJid, encType);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call payload decrypted from {0}, bytes={1}", senderJid, plaintext.length);
+        return plaintext;
     }
 
 }

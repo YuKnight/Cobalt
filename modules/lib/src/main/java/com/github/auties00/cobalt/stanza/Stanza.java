@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.stanza;
 
-import com.github.auties00.cobalt.exception.WhatsAppMalformedJidException;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -1742,7 +1741,7 @@ public sealed interface Stanza {
             try {
                 var result = Jid.of(content);
                 return Optional.of(result);
-            }catch (WhatsAppMalformedJidException exception) {
+            }catch (IllegalArgumentException exception) {
                 return Optional.empty();
             }
         }
@@ -2092,7 +2091,7 @@ public sealed interface Stanza {
             try {
                 var result = Jid.of(ProtobufString.lazy(content));
                 return Optional.of(result);
-            } catch (WhatsAppMalformedJidException exception) {
+            } catch (IllegalArgumentException exception) {
                 return Optional.empty();
             }
         }
@@ -2317,7 +2316,7 @@ public sealed interface Stanza {
         public Optional<Jid> toContentJid() {
             try {
                 return Optional.of(Jid.of(ProtobufString.lazy(toContentBytes().orElseThrow())));
-            } catch (WhatsAppMalformedJidException exception) {
+            } catch (IllegalArgumentException exception) {
                 return Optional.empty();
             }
         }

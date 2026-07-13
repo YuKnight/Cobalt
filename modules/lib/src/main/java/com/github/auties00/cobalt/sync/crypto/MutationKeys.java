@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.sync.crypto;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,7 @@ import javax.crypto.spec.HKDFParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.DestroyFailedException;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
@@ -49,6 +51,11 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebSyncdEncryptionManager")
 @WhatsAppWebModule(moduleName = "WAWebSyncdKeyCache")
 public final class MutationKeys implements AutoCloseable {
+    /**
+     * The logger for {@link MutationKeys}.
+     */
+    private static final System.Logger LOGGER = Log.get(MutationKeys.class);
+
     /**
      * The HKDF info string consumed by {@link #ofSyncKey(byte[])}.
      */
@@ -244,6 +251,7 @@ public final class MutationKeys implements AutoCloseable {
         }
 
         if (syncKey.length != 32) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "invalid sync key length {0}, expected 32", syncKey.length);
             throw new IllegalArgumentException("Sync key must be 32 bytes, got " + syncKey.length);
         }
 
@@ -254,6 +262,8 @@ public final class MutationKeys implements AutoCloseable {
                     .thenExpand(HKDF_INFO.getBytes(StandardCharsets.UTF_8), DERIVED_KEY_LENGTH);
             var derivedBytes = kdf.deriveData(params);
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "derived mutation keys via hkdf-sha256");
+
             return new MutationKeys(
                     new SecretKeySpec(derivedBytes, 0, INDEX_KEY_END, "HmacSHA256"),
                     new SecretKeySpec(derivedBytes, INDEX_KEY_END, VALUE_ENCRYPTION_KEY_END - INDEX_KEY_END, "AES"),
@@ -262,6 +272,7 @@ public final class MutationKeys implements AutoCloseable {
                     new SecretKeySpec(derivedBytes, SNAPSHOT_MAC_KEY_END, PATCH_MAC_KEY_END - SNAPSHOT_MAC_KEY_END, "HmacSHA256")
             );
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to derive mutation keys", e);
             throw new InternalError("Failed to derive keys", e);
         }
     }

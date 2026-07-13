@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.transport.srtp;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 import com.github.auties00.cobalt.model.call.datachannel.SrtpAfbStreams;
 import com.github.auties00.cobalt.calls.transport.subscription.RtcpRxSubscriptionTable;
 

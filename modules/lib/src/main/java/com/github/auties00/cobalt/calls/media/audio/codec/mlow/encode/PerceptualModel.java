@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.dsp.Pffft;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Perceptual weighting spectral model of the MLow speech encoder.
@@ -56,6 +59,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.dsp.Pffft;
  * selection is fixed to the 20 ms perceptual window, the only window the 60 ms high rate scope uses.
  */
 public final class PerceptualModel {
+    /**
+     * The logger for {@link PerceptualModel}.
+     */
+    private static final System.Logger LOGGER = Log.get(PerceptualModel.class);
+
     /**
      * Length of the perceptual weighting FFT, {@code 512 + 64} samples.
      */
@@ -138,6 +146,9 @@ public final class PerceptualModel {
      * rolling buffer.
      */
     public void reset() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "perceptual model reset");
+        }
         java.util.Arrays.fill(buffer, 0.0f);
     }
 
@@ -160,6 +171,10 @@ public final class PerceptualModel {
      * @param lenR        the number of autocorrelation lags to write
      */
     public void model(float[] xsubfr, int xsubfrLen, boolean isLastSubfr, float[] r, int lenR) {
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "perceptual model analysis span xsubfrLen={0} isLastSubfr={1} lenR={2}",
+                    xsubfrLen, isLastSubfr, lenR);
+        }
         int retain = NFFT - xsubfrLen;
         System.arraycopy(buffer, xsubfrLen - SHORTER, buffer, 0, retain);
         System.arraycopy(xsubfr, 0, buffer, retain, xsubfrLen);

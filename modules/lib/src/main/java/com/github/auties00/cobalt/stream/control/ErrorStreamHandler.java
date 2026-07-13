@@ -1,11 +1,14 @@
 package com.github.auties00.cobalt.stream.control;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stream.SocketStreamHandler;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stream.NodeStreamService;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Handles top-level {@code <error>} stanzas that report stanza-level protocol problems not scoped to a specific
@@ -21,9 +24,10 @@ import com.github.auties00.cobalt.stream.NodeStreamService;
 @WhatsAppWebModule(moduleName = "WABackendHandleError")
 public final class ErrorStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * The system logger used to record the diagnostic line for every inbound {@code <error>} stanza.
+     * The logger for {@link ErrorStreamHandler}, used to record the diagnostic line for every inbound
+     * {@code <error>} stanza.
      */
-    private static final System.Logger LOGGER = System.getLogger(ErrorStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(ErrorStreamHandler.class);
 
     /**
      * The reason code emitted by the server when the client sent a stanza that failed validation against the SMAX
@@ -61,15 +65,15 @@ public final class ErrorStreamHandler extends SocketStreamHandler.Concurrent {
     public void handle(Stanza stanza) {
         var code = stanza.getAttributeAsInt("code", null);
         if (code == null) {
-            LOGGER.log(System.Logger.Level.WARNING, "Received error stanza without code: {0}", stanza);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "received error stanza without code: {0}", stanza);
             return;
         }
 
         if (code == SMAX_INVALID_CODE) {
-            LOGGER.log(System.Logger.Level.ERROR, "Invalid stanza sent (smax-invalid)");
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "invalid stanza sent (smax-invalid)");
             return;
         }
 
-        LOGGER.log(System.Logger.Level.ERROR, "Unknown error code: {0}", code);
+        if (Log.ERROR) LOGGER.log(Level.ERROR, "unknown error code: {0}", code);
     }
 }

@@ -1,8 +1,11 @@
 package com.github.auties00.cobalt.socket.websocket;
 
+import com.github.auties00.cobalt.log.Log;
+
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -45,6 +48,11 @@ import static com.github.auties00.cobalt.socket.websocket.WebSocketFrameConstant
  * thread's streaming-mode frame.
  */
 public final class WebSocketFrameOutputStream extends FilterOutputStream {
+
+    /**
+     * The logger for {@link WebSocketFrameOutputStream}.
+     */
+    private static final System.Logger LOGGER = Log.get(WebSocketFrameOutputStream.class);
 
     /**
      * Holds the masker selected once at class-load time, shared by every
@@ -161,6 +169,9 @@ public final class WebSocketFrameOutputStream extends FilterOutputStream {
         streamingRemaining = payloadSize;
         streamingMaskKey = maskKey;
         streamingMaskOffset = 0;
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "begin streaming websocket frame, payloadSize={0}", payloadSize);
+        }
     }
 
     /**
@@ -263,6 +274,10 @@ public final class WebSocketFrameOutputStream extends FilterOutputStream {
             }
             pendingControlOpcode = opcode;
             pendingControlLength = length;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "deferring websocket control frame opcode=0x{0} until streaming frame completes",
+                        Integer.toHexString(opcode));
+            }
             return;
         }
         writeFrame(opcode, payload, 0, length);
@@ -324,6 +339,9 @@ public final class WebSocketFrameOutputStream extends FilterOutputStream {
             out.write(src, off, len);
         }
         out.flush();
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "wrote websocket frame opcode=0x{0} length={1}", Integer.toHexString(opcode), len);
+        }
     }
 
     /**

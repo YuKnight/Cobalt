@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,6 +15,8 @@ import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppSyncStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code external_web_beta} app-state sync action that toggles the
@@ -37,6 +40,11 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebExternalWebBetaSync")
 public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link ExternalWebBetaHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(ExternalWebBetaHandler.class);
+
     /**
      * The {@link ABPropsService} consulted before every mutation to gate the
      * handler on {@link ABProp#EXTERNAL_BETA_CAN_JOIN}.
@@ -101,6 +109,7 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebExternalWebBetaSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (!abPropsService.getBool(ABProp.EXTERNAL_BETA_CAN_JOIN)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "external web beta: ab-prop disabled");
             return MutationApplicationResult.unsupported();
         }
 
@@ -109,11 +118,13 @@ public final class ExternalWebBetaHandler implements WebAppStateActionHandler {
         }
 
         if (!(mutation.value().flatMap(SyncActionValue::action).orElse(null) instanceof ExternalWebBetaAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "external web beta: mutation value is not an ExternalWebBetaAction");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
         client.store().syncStore().setExternalWebBeta(action.isOptIn());
         client.store().accountStore().setReleaseChannel(action.isOptIn() ? ClientPayload.ClientReleaseChannel.BETA : ClientPayload.ClientReleaseChannel.RELEASE);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "external web beta: opt-in={0}", action.isOptIn());
         return MutationApplicationResult.success();
     }
 }

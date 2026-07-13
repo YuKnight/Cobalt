@@ -1,8 +1,12 @@
 package com.github.auties00.cobalt.calls.stream.video;
 
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.calls.stream.AudioFrame;
+import com.github.auties00.cobalt.calls.stream.AudioOutput;
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoOutput;
 import com.github.auties00.cobalt.calls.stream.VideoPixelFormat;
@@ -12,7 +16,7 @@ import com.github.auties00.cobalt.calls.stream.audio.SilenceAudioOutput;
  * Transmits a solid color as the local video of a call.
  *
  * <p>This is the generated {@link VideoOutput} returned by {@link VideoOutput#fromColor(int)} and, for
- * black, {@link VideoOutput#fromBlank()}. Every {@link #take()} yields a {@link VideoFrame} of one constant
+ * black, {@link VideoOutput#fromBlank()}. Every {@link #takeVideo()} yields a {@link VideoFrame} of one constant
  * color in {@link VideoPixelFormat#I420 I420} at the advertised geometry, with a presentation timestamp that
  * never decreases. The stream never ends on its own; it keeps producing the color until the call engine
  * shuts it down, so it is the video counterpart of {@link SilenceAudioOutput}: it makes a call a video call
@@ -24,6 +28,11 @@ import com.github.auties00.cobalt.calls.stream.audio.SilenceAudioOutput;
  * pixels for any individual frame regardless of how long the call runs.
  */
 public final class ColorVideoOutput implements VideoOutput {
+    /**
+     * The logger for {@link ColorVideoOutput}.
+     */
+    private static final System.Logger LOGGER = Log.get(ColorVideoOutput.class);
+
     /**
      * Holds the default frame width in pixels the color factories advertise.
      */
@@ -87,9 +96,15 @@ public final class ColorVideoOutput implements VideoOutput {
     private final AtomicLong ptsMicros = new AtomicLong();
 
     /**
-     * Marks the source ended so {@link #take()} returns {@code null}.
+     * Marks the source ended so {@link #takeVideo()} returns {@code null}.
      */
     private final AtomicBoolean closed = new AtomicBoolean();
+
+    /**
+     * Holds the composed silence audio companion supplying the audio side of this source, since a generated
+     * color picture carries no audio; the inherited {@link AudioOutput} methods delegate to it.
+     */
+    private final AudioOutput audio = AudioOutput.fromSilence();
 
     /**
      * Constructs a solid color source at the default {@value #DEFAULT_WIDTH} by {@value #DEFAULT_HEIGHT}
@@ -117,7 +132,7 @@ public final class ColorVideoOutput implements VideoOutput {
     /**
      * Constructs a solid color source at the given color and geometry.
      *
-     * <p>Converts the color to I420 and fills the plane buffer once; each {@link #take()} then reuses it.
+     * <p>Converts the color to I420 and fills the plane buffer once; each {@link #takeVideo()} then reuses it.
      *
      * @param rgb        the color as packed {@code 0xRRGGBB}
      * @param width      the frame width in pixels; even and at least {@code 2}
@@ -146,18 +161,21 @@ public final class ColorVideoOutput implements VideoOutput {
         this.bitrateBps = bitrateBps;
         this.frameDurationMicros = 1_000_000L / fps;
         this.pixels = i420(rgb, width, height);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "color video output created, {0}x{1}@{2}fps", width, height, fps);
+        }
     }
 
     /**
      * {@inheritDoc}
      *
-     * <p>A generated source produces its frames inside {@link #take()} and ignores application writes, so
+     * <p>A generated source produces its frames inside {@link #takeVideo()} and ignores application writes, so
      * this does nothing.
      *
      * @param frame the frame that would be written; ignored
      */
     @Override
-    public void write(VideoFrame frame) {
+    public void writeVideo(VideoFrame frame) {
     }
 
     /**
@@ -173,7 +191,7 @@ public final class ColorVideoOutput implements VideoOutput {
      * color is transmitted at its natural rate without this stream having to sleep.
      */
     @Override
-    public VideoFrame take() {
+    public VideoFrame takeVideo() {
         if (closed.get()) {
             return null;
         }
@@ -184,11 +202,51 @@ public final class ColorVideoOutput implements VideoOutput {
     /**
      * {@inheritDoc}
      *
-     * <p>Marks the source ended so the next {@link #take()} returns {@code null}. Idempotent.
+     * <p>Marks the source ended so the next {@link #takeVideo()} returns {@code null}, and ends the audio
+     * companion. Idempotent.
      */
     @Override
     public void shutdown() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "shutting down color video output");
         closed.set(true);
+        audio.shutdown();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Ignored: the audio companion generates its own frames inside {@link #takeAudio()}.
+     *
+     * @param frame the frame that would be written; ignored
+     * @throws InterruptedException if the calling thread is interrupted while waiting for buffer space
+     */
+    @Override
+    public void writeAudio(AudioFrame frame) throws InterruptedException {
+        audio.writeAudio(frame);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Yields a silence frame from the composed audio companion, so a solid color video call carries
+     * silent audio unless the caller supplies a separate audio source.
+     *
+     * @return a silence frame; never {@code null} until shut down
+     * @throws InterruptedException if the calling thread is interrupted while waiting
+     */
+    @Override
+    public AudioFrame takeAudio() throws InterruptedException {
+        return audio.takeAudio();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @return {@code false}; generated silence is not live acoustic capture
+     */
+    @Override
+    public boolean isLiveCapture() {
+        return audio.isLiveCapture();
     }
 
     /**

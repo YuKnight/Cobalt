@@ -2,8 +2,9 @@ package com.github.auties00.cobalt.message.send;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.icdc.IcdcResult;
-import com.github.auties00.cobalt.exception.WhatsAppCorruptedStoreException;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCorruptedStoreException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.ack.AckResult;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
@@ -87,6 +88,7 @@ import com.github.auties00.cobalt.wam.type.StickerSendMessageType;
 import com.github.auties00.cobalt.wam.type.StickerSendOriginType;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -112,10 +114,9 @@ import java.util.function.Supplier;
 @WhatsAppWebModule(moduleName = "WAWebBackendJobsCommon")
 abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSender, GroupMessageSender, StatusMessageSender, BroadcastMessageSender, NewsletterMessageSender, PeerMessageSender {
     /**
-     * Surfaces per-device encryption failures raised inside
-     * {@link #encryptForDevices}.
+     * The logger for {@link MessageSender}.
      */
-    private static final System.Logger LOGGER = System.getLogger(MessageSender.class.getName());
+    private static final System.Logger LOGGER = Log.get(MessageSender.class);
 
     /**
      * Dispatches wire stanzas and surfaces fatal store-persistence failures to
@@ -210,6 +211,9 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
         var container = messageInfo.message();
         emitMessageSendPerfEvent(chatJid, container, perf, ack);
         emitContentSendTelemetry(chatJid, container, ack);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "send to {0} finished, success={1}", chatJid, ack.isSuccess());
+        }
         return ack;
     }
 
@@ -259,6 +263,9 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
         Objects.requireNonNull(conversationKey, "conversationKey");
         Objects.requireNonNull(task, "task");
         var lock = sendLocks.computeIfAbsent(conversationKey, _ -> new ReentrantLock());
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "acquiring send lock for {0}", Log.jid(conversationKey));
+        }
         lock.lock();
         try {
             return task.get();
@@ -323,6 +330,9 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
         try {
             store.save();
         } catch (IOException ex) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "store persistence failed after send", ex);
+            }
             client.handleFailure(new WhatsAppCorruptedStoreException(ex));
         }
     }
@@ -426,13 +436,18 @@ abstract sealed class MessageSender<T extends MessageInfo> permits UserMessageSe
                 results.add(payload);
                 emitE2eMessageSendEvent(device, container, true, payload.type(), 0);
             } catch (Exception e) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Encryption fail for {0}: {1}", device, e.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "device encryption failed for " + Log.jid(device.toString()), e);
+                }
                 emitE2eMessageSendEvent(device, container, false, null, 0);
             }
         }
 
         store.signalStore().updateIdentityRange(devices);
+
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "encrypted for {0}/{1} devices for {2}", results.size(), devices.size(), destinationJid);
+        }
 
         return results;
     }

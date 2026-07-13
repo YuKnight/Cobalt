@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -29,6 +31,11 @@ import java.util.Objects;
  * on the caller-supplied identifier and timestamp.
  */
 public final class NuxActionMutationFactory {
+    /**
+     * The logger for {@link NuxActionMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(NuxActionMutationFactory.class);
+
     /**
      * Constructs a NUX-action mutation factory.
      *
@@ -63,6 +70,7 @@ public final class NuxActionMutationFactory {
     public SyncPendingMutation getNuxMutation(String nuxKey, Instant timestamp, boolean acknowledged) {
         Objects.requireNonNull(nuxKey, "nuxKey cannot be null");
         Objects.requireNonNull(timestamp, "timestamp cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building nux mutation key={0} acknowledged={1}", nuxKey, acknowledged);
         var action = new NuxActionBuilder()
                 .acknowledged(acknowledged)
                 .build();

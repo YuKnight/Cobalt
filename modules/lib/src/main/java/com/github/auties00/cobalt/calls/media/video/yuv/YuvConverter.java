@@ -73,8 +73,9 @@ public sealed interface YuvConverter permits ScalarYuvConverter, VectorYuvConver
         module.addReads(vectorModule.get());
 
         try {
-            return new VectorYuvConverter();
-        } catch (Throwable _) {
+            var converter = new VectorYuvConverter();
+            return converter;
+        } catch (Throwable t) {
             return new ScalarYuvConverter();
         }
     }

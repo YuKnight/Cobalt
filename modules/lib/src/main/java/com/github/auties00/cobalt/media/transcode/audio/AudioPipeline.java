@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.media.transcode.audio;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.media.MediaPayload;
 import com.github.auties00.cobalt.util.ffmpeg.AVChannelLayout;
 import com.github.auties00.cobalt.util.ffmpeg.AVCodecContext;
@@ -21,6 +22,7 @@ import com.github.auties00.cobalt.model.message.media.AudioMessage;
 import com.github.auties00.cobalt.model.sync.action.setting.SettingsSyncAction;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -52,6 +54,9 @@ import java.nio.file.Path;
  * format.
  */
 public final class AudioPipeline {
+    /** The logger for {@link AudioPipeline}. */
+    private static final System.Logger LOGGER = Log.get(AudioPipeline.class);
+
     /**
      * Holds the sample rate of the encoded output in Hz.
      */
@@ -122,19 +127,31 @@ public final class AudioPipeline {
         var bitrate = quality == SettingsSyncAction.MediaQualitySetting.HD
                 ? AAC_BITRATE_HD
                 : AAC_BITRATE_STANDARD;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting audio transcode, quality={0}, bitrate={1}", quality, bitrate);
         try (var arena = Arena.ofShared()) {
-            var result = transcode(arena, source, bitrate);
+            EncodedAudio result;
+            try {
+                result = transcode(arena, source, bitrate);
+            } catch (WhatsAppMediaException.Processing failure) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "audio transcode failed", failure);
+                throw failure;
+            }
             var durationSeconds = Math.max(1, result.durationSeconds);
             long outputLength;
             try {
                 outputLength = Files.size(result.path);
             } catch (IOException e) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to size audio output", e);
                 throw new WhatsAppMediaException.Processing("failed to size audio output", e);
             }
             provider.setMediaSize(outputLength);
             if (provider instanceof AudioMessage audio) {
                 audio.setMimetype("audio/mp4");
                 audio.setSeconds(durationSeconds);
+            }
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "audio transcode complete, durationSeconds={0}, size={1}",
+                        durationSeconds, outputLength);
             }
             return new MediaPayload.OfPath(result.path, outputLength, true);
         }

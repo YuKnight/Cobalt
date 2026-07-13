@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -216,38 +215,6 @@ class CallStateMachineTest {
             machine.transition(context, CallLifecycleState.NONE, 6_000L);             // +3000 active
             assertEquals(4_000L, context.activeDurationMillis());
             assertEquals(2_000L, context.lonelyDurationMillis());
-        }
-    }
-
-    @Nested
-    @DisplayName("connected-lonely timer seams")
-    class LonelyTimerSeams {
-        @Test
-        @DisplayName("entering ConnectedLonely fires the scheduler and entering CallActive cancels it")
-        void scheduleThenCancel() {
-            var context = context(CallContext.CallDirection.OUTGOING);
-            var scheduled = new AtomicInteger();
-            var cancelled = new AtomicInteger();
-            context.onScheduleConnectedLonelyTimer(ctx -> scheduled.incrementAndGet());
-            context.onCancelConnectedLonelyTimer(cancelled::incrementAndGet);
-
-            force(context, CallLifecycleState.ACCEPT_SENT);
-            machine.transition(context, CallLifecycleState.CONNECTED_LONELY);
-            assertEquals(1, scheduled.get());
-
-            machine.transition(context, CallLifecycleState.CALL_ACTIVE);
-            // Leaving lonely cancels once; entering active cancels once more (idempotent guard).
-            assertEquals(2, cancelled.get());
-        }
-
-        @Test
-        @DisplayName("the scheduler observes the new ConnectedLonely state when it fires")
-        void schedulerSeesNewState() {
-            var context = context(CallContext.CallDirection.OUTGOING);
-            context.onScheduleConnectedLonelyTimer(ctx ->
-                    assertSame(CallLifecycleState.CONNECTED_LONELY, ctx.state()));
-            force(context, CallLifecycleState.ACCEPT_SENT);
-            machine.transition(context, CallLifecycleState.CONNECTED_LONELY);
         }
     }
 

@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -15,6 +16,8 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,6 +51,10 @@ import java.util.List;
  */
 @WhatsAppWebModule(moduleName = "WAWebBroadcastListSync")
 public final class BusinessBroadcastAssociationHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link BusinessBroadcastAssociationHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(BusinessBroadcastAssociationHandler.class);
 
     /**
      * Constructs the singleton broadcast-association handler.
@@ -106,26 +113,31 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
     @WhatsAppWebExport(moduleName = "WAWebBroadcastListSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "broadcast association mutation unsupported: operation={0}", mutation.operation());
             return MutationApplicationResult.unsupported();
         }
 
         var indexArray = JSON.parseArray(mutation.index());
         if (indexArray.size() < 3) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast association mutation malformed: index size={0}", indexArray.size());
             return MutationApplicationResult.malformed();
         }
 
         var listId = indexArray.getString(1);
         var recipientJidString = indexArray.getString(2);
         if (listId == null || listId.isBlank() || recipientJidString == null || recipientJidString.isBlank()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast association mutation malformed: missing list id or recipient jid");
             return MutationApplicationResult.malformed();
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof BusinessBroadcastAssociationAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "broadcast association mutation malformed: missing action value");
             return MutationApplicationResult.malformed();
         }
 
         var existing = client.store().businessStore().findBusinessBroadcastList(listId).orElse(null);
         if (existing == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "broadcast association mutation orphaned: list not found id={0}", listId);
             return MutationApplicationResult.orphan(listId, "BroadcastList");
         }
 
@@ -152,6 +164,7 @@ public final class BusinessBroadcastAssociationHandler implements WebAppStateAct
 
         existing.setParticipants(participants.isEmpty() ? null : participants);
         client.store().businessStore().putBusinessBroadcastList(existing);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "broadcast association applied: list={0} recipient={1} deleted={2}", listId, recipientJid, action.deleted());
         return MutationApplicationResult.success();
     }
 }

@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.media.transcode.avio;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.ffmpeg.AVIOContext;
 import com.github.auties00.cobalt.util.ffmpeg.FFmpegError;
 import com.github.auties00.cobalt.util.ffmpeg.Ffmpeg;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -30,7 +32,7 @@ import java.nio.channels.SeekableByteChannel;
  * {@link IOException} is reported to libavformat as {@code AVERROR_EOF} and stashed in
  * {@link #lastError()}. The owning pipeline inspects {@link #lastError()} after the FFmpeg call
  * returns and converts a stashed error into a
- * {@link com.github.auties00.cobalt.exception.WhatsAppMediaException.Processing}.
+ * {@link com.github.auties00.cobalt.exception.linked.WhatsAppMediaException.Processing}.
  *
  * @implNote This implementation wraps the native AVIO buffer slice as a direct
  * {@link java.nio.ByteBuffer} via {@link MemorySegment#asByteBuffer()} and hands it straight to
@@ -41,6 +43,9 @@ import java.nio.channels.SeekableByteChannel;
  * {@link #AVSEEK_SIZE} flag from {@code libavformat/avio.h}.
  */
 public final class AvioReadBuffer implements AutoCloseable {
+    /** The logger for {@link AvioReadBuffer}. */
+    private static final System.Logger LOGGER = Log.get(AvioReadBuffer.class);
+
     /**
      * Describes the {@code read_packet} upcall signature {@code int (*)(void *opaque, uint8_t *buf, int buf_size)}.
      *
@@ -187,7 +192,7 @@ public final class AvioReadBuffer implements AutoCloseable {
      * <p>Because the read and seek upcalls cannot throw across the native boundary, a channel-level
      * I/O error is reported to libavformat as {@code AVERROR_EOF} and stashed here. The owning
      * pipeline inspects this value after FFmpeg returns and converts a non-null result into a
-     * {@link com.github.auties00.cobalt.exception.WhatsAppMediaException.Processing}.
+     * {@link com.github.auties00.cobalt.exception.linked.WhatsAppMediaException.Processing}.
      *
      * @return the last channel exception, or {@code null} if none occurred
      */
@@ -212,6 +217,7 @@ public final class AvioReadBuffer implements AutoCloseable {
      */
     @SuppressWarnings("unused")
     int readPacket(MemorySegment opaque, MemorySegment buf, int bufSize) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "avio read: bufSize={0}", bufSize);
         try {
             var dst = buf.reinterpret(bufSize).asByteBuffer();
             dst.limit(bufSize);
@@ -219,6 +225,7 @@ public final class AvioReadBuffer implements AutoCloseable {
             return read > 0 ? read : Ffmpeg.AVERROR_EOF();
         } catch (IOException e) {
             lastError = e;
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "avio read failed: bufSize=" + bufSize, e);
             return Ffmpeg.AVERROR_EOF();
         }
     }
@@ -245,6 +252,7 @@ public final class AvioReadBuffer implements AutoCloseable {
      */
     @SuppressWarnings("unused")
     long seek(MemorySegment opaque, long offset, int whence) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "avio seek: offset={0} whence={1}", offset, whence);
         try {
             if ((whence & AVSEEK_SIZE) != 0) {
                 return channel.size();
@@ -257,12 +265,16 @@ public final class AvioReadBuffer implements AutoCloseable {
                 default -> -1L;
             };
             if (newPosition < 0 || newPosition > size) {
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "avio seek out of bounds: target={0} size={1}", newPosition, size);
+                }
                 return -1L;
             }
             channel.position(newPosition);
             return newPosition;
         } catch (IOException e) {
             lastError = e;
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "avio seek failed: offset=" + offset, e);
             return -1L;
         }
     }

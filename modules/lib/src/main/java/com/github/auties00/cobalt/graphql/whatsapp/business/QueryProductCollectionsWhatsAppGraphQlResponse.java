@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.graphql.whatsapp.business;
 
+import com.github.auties00.cobalt.graphql.whatsappWeb.business.CatalogProductParser;
+
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.github.auties00.cobalt.graphql.WhatsAppGraphQlClient;
@@ -15,12 +17,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the product-collections query built by
+ * Parses the graph.whatsapp.com GraphQL response of the product-collections query built by
  * {@link QueryProductCollectionsWhatsAppGraphQlRequest}.
  *
  * <p>Carries the {@code xwa_product_catalog_get_collections.collections} array projected onto Cobalt
  * {@link BusinessCatalog} values, paired with the {@code paging.after} cursor needed to drive
- * subsequent pages, decoded from the unwrapped GraphQL {@code data} object the relay returns.
+ * subsequent pages, decoded from the unwrapped GraphQL {@code data} object the graph.whatsapp.com endpoint returns.
  *
  * @implNote This implementation drops the WA Web {@code status_info}, {@code can_appeal},
  * {@code reject_reason} and {@code commerce_url} fields because the Cobalt {@link BusinessCatalog}
@@ -37,7 +39,7 @@ public final class QueryProductCollectionsWhatsAppGraphQlResponse implements Wha
     private final List<BusinessCatalog> collections;
 
     /**
-     * Holds the {@code paging.after} cursor, or the empty string when the relay reported no further
+     * Holds the {@code paging.after} cursor, or the empty string when the graph.whatsapp.com endpoint reported no further
      * pages.
      */
     private final String afterCursor;
@@ -45,10 +47,10 @@ public final class QueryProductCollectionsWhatsAppGraphQlResponse implements Wha
     /**
      * Constructs a parsed collections response.
      *
-     * <p>Instances are produced by {@link #of(JSONObject)} after projecting the relay payload.
+     * <p>Instances are produced by {@link #of(JSONObject)} after projecting the graph.whatsapp.com endpoint payload.
      *
      * @param collections the parsed business catalogs
-     * @param afterCursor the {@code paging.after} cursor, or the empty string when the relay reported
+     * @param afterCursor the {@code paging.after} cursor, or the empty string when the graph.whatsapp.com endpoint reported
      *                    no further pages
      */
     private QueryProductCollectionsWhatsAppGraphQlResponse(List<BusinessCatalog> collections, String afterCursor) {
@@ -57,7 +59,7 @@ public final class QueryProductCollectionsWhatsAppGraphQlResponse implements Wha
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_product_catalog_get_collections} directly off {@code data},
      * projecting each collection through {@link #parseCollections(JSONArray)}.
@@ -104,10 +106,10 @@ public final class QueryProductCollectionsWhatsAppGraphQlResponse implements Wha
      * Returns the {@code paging.after} cursor usable to request the next page of collections.
      *
      * <p>Pass the returned value as the {@code after} argument of the next
-     * {@link QueryProductCollectionsWhatsAppGraphQlRequest}. An empty {@link Optional} means the relay did not
+     * {@link QueryProductCollectionsWhatsAppGraphQlRequest}. An empty {@link Optional} means the graph.whatsapp.com endpoint did not
      * advertise a continuation cursor, so callers should stop pagination.
      *
-     * @return an {@link Optional} carrying the cursor when the relay returned a non-empty value, or
+     * @return an {@link Optional} carrying the cursor when the graph.whatsapp.com endpoint returned a non-empty value, or
      *         empty otherwise
      */
     public Optional<String> afterCursor() {

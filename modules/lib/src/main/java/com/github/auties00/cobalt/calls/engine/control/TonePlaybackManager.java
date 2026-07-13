@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 import com.github.auties00.cobalt.calls.engine.control.event.PlayCallTone;
@@ -25,6 +28,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.PlayCallTone;
  * mask. Mutual exclusion over the mask and the last played tone is provided by a {@link ReentrantLock}.
  */
 public final class TonePlaybackManager {
+    /**
+     * The logger for {@link TonePlaybackManager}.
+     */
+    private static final System.Logger LOGGER = Log.get(TonePlaybackManager.class);
+
     /**
      * The event sink the tone to play event is emitted into.
      */
@@ -139,6 +147,7 @@ public final class TonePlaybackManager {
     private void reevaluate() {
         var next = ToneType.highestPriority(activeMask);
         if (next != playing) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "tone playback {0} -> {1}", playing, next);
             playing = next;
             events.emit(new PlayCallTone(next));
         }

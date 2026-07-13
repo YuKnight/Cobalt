@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.receive;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.message.MessageStatus;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 
 /**
@@ -33,10 +35,9 @@ import java.time.Instant;
 @WhatsAppWebModule(moduleName = "WAWebHandleNewsletterMsg")
 final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageInfo> {
     /**
-     * Logger used for the receive-completion trace and the missing-plaintext skip
-     * branch.
+     * The logger for {@link NewsletterMessageReceiver}.
      */
-    private static final System.Logger LOGGER = System.getLogger(NewsletterMessageReceiver.class.getName());
+    private static final System.Logger LOGGER = Log.get(NewsletterMessageReceiver.class);
 
     /**
      * Constructs a newsletter receiver bound to the given store.
@@ -78,8 +79,8 @@ final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageI
                 .flatMap(Stanza::toContentBytes)
                 .orElse(null);
         if (plaintext == null || plaintext.length == 0) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Newsletter message {0} has no plaintext content", id);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "newsletter message {0} has no plaintext content", id);
             return null;
         }
 
@@ -102,8 +103,8 @@ final class NewsletterMessageReceiver extends MessageReceiver<NewsletterMessageI
                 .status(MessageStatus.DELIVERED)
                 .build();
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Processed newsletter message {0} from {1}", id, fromJid);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                "processed newsletter message {0} from {1}", id, fromJid);
         return info;
     }
 }

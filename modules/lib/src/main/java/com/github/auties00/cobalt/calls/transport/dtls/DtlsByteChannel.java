@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.dtls;
 
+import com.github.auties00.cobalt.log.Log;
+
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.channels.ByteChannel;
 import java.nio.channels.ClosedChannelException;
@@ -30,6 +33,11 @@ import java.util.Objects;
  *           that moves one datagram per read and per write, which is exactly the shape this adapter exposes.
  */
 public final class DtlsByteChannel implements ByteChannel {
+    /**
+     * The logger for {@link DtlsByteChannel}.
+     */
+    private static final System.Logger LOGGER = Log.get(DtlsByteChannel.class);
+
     /**
      * The wait for one inbound DTLS record, in milliseconds. On a timeout the read keeps waiting, so a short
      * value only bounds how promptly a {@link #close()} unblocks a parked reader without busy spinning.
@@ -88,6 +96,9 @@ public final class DtlsByteChannel implements ByteChannel {
         var bytes = new byte[length];
         src.get(bytes);
         dtls.send(bytes, 0, length);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "dtls byte channel wrote {0} bytes", length);
+        }
         return length;
     }
 
@@ -125,6 +136,9 @@ public final class DtlsByteChannel implements ByteChannel {
                 continue;
             }
             dst.put(receiveBuffer, 0, read);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "dtls byte channel read {0} bytes", read);
+            }
             return read;
         }
     }
@@ -143,6 +157,9 @@ public final class DtlsByteChannel implements ByteChannel {
             return;
         }
         closed = true;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "dtls byte channel closed");
+        }
         dtls.close();
     }
 }

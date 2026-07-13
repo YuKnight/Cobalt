@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.calls.engine.control;
 
 import com.github.auties00.cobalt.calls.signaling.link.LinkQueryStanza;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -31,6 +33,26 @@ public enum CallLinkQueryAction {
     LINK_EDIT("link_edit");
 
     /**
+     * Resolves a wire literal to its action, backing {@link #ofWire(String)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #wireValue}, so a literal resolves
+     * to its action in constant time rather than by scanning {@link #values()}. Keys are the raw literals,
+     * so matching is case sensitive, preserving the {@link String#equals(Object)} semantics this lookup
+     * replaces.
+     */
+    private static final Map<String, CallLinkQueryAction> BY_WIRE;
+
+    static {
+        var byWire = new HashMap<String, CallLinkQueryAction>();
+        for (var action : values()) {
+            if (byWire.put(action.wireValue, action) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_WIRE = Map.copyOf(byWire);
+    }
+
+    /**
      * Holds the wire literal this action stamps into the {@code action} attribute.
      */
     private final String wireValue;
@@ -56,15 +78,12 @@ public enum CallLinkQueryAction {
     /**
      * Looks up the query action whose {@linkplain #wireValue() wire literal} equals the given value.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_WIRE} map rather than
+     * scanning {@link #values()}; a {@code null} literal maps to no entry and yields an empty result.
      * @param wireValue the {@code action} attribute literal to resolve, or {@code null}
      * @return the matching query action, or an empty result when the literal names no action
      */
     public static Optional<CallLinkQueryAction> ofWire(String wireValue) {
-        for (var action : values()) {
-            if (action.wireValue.equals(wireValue)) {
-                return Optional.of(action);
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(BY_WIRE.get(wireValue));
     }
 }

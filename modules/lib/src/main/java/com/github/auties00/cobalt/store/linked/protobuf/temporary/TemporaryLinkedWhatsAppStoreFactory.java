@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf.temporary;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.store.linked.protobuf.*;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
@@ -9,6 +10,7 @@ import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevice;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.libsignal.key.SignalIdentityKeyPair;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -32,6 +34,11 @@ import java.util.UUID;
  * scalars.
  */
 public final class TemporaryLinkedWhatsAppStoreFactory implements LinkedWhatsAppStoreFactory {
+    /**
+     * The logger for {@link TemporaryLinkedWhatsAppStoreFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(TemporaryLinkedWhatsAppStoreFactory.class);
+
     /**
      * The singleton instance.
      *
@@ -154,6 +161,7 @@ public final class TemporaryLinkedWhatsAppStoreFactory implements LinkedWhatsApp
      * @return a freshly built store
      */
     private static LinkedWhatsAppStore newStore(LinkedWhatsAppClientType clientType, UUID uuid, Long phoneNumber, SignalIdentityKeyPair noiseKeyPair, SignalIdentityKeyPair identityKeyPair, byte[] identityId, Jid jid) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating temporary store for {0} session {1}", clientType, uuid);
         var device = switch (clientType) {
             case WEB -> LinkedWhatsAppClientDevice.desktop();
             case MOBILE -> LinkedWhatsAppClientDevice.ios(false);
@@ -177,7 +185,7 @@ public final class TemporaryLinkedWhatsAppStoreFactory implements LinkedWhatsApp
                 new ProtobufLinkedWhatsAppSettingsStoreBuilder().build(),
                 null,
                 new ProtobufLinkedWebSessionStoreBuilder().build(),
-                new ProtobufLinkedWhatsAppWamStoreBuilder().build(),
+                new TemporaryLinkedWhatsAppWamStore(null, null, null, null, null, null),
                 new TemporaryLinkedWhatsAppChatStore(null, null));
     }
 }

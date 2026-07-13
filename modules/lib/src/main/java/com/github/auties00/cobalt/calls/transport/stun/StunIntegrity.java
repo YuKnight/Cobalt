@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.transport.stun;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.Objects;
@@ -41,6 +43,11 @@ import com.github.auties00.cobalt.calls.transport.warp.WarpCodecSupport;
  * RFC fixes. Applying the length rewrite to a copy leaves the caller's prefix buffer untouched.
  */
 public final class StunIntegrity {
+    /**
+     * The logger for {@link StunIntegrity}.
+     */
+    private static final System.Logger LOGGER = Log.get(StunIntegrity.class);
+
     /**
      * Holds the JCA algorithm name of the {@code MESSAGE-INTEGRITY} primitive.
      */
@@ -94,6 +101,9 @@ public final class StunIntegrity {
         try {
             return Mac.getInstance(HMAC_ALGORITHM);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "cannot create stun message-integrity hmac-sha1 engine", e);
+            }
             throw new WhatsAppCallException.Srtp("Cannot create STUN MESSAGE-INTEGRITY HMAC-SHA1", e);
         }
     });
@@ -130,6 +140,9 @@ public final class StunIntegrity {
             mac.init(new SecretKeySpec(password, HMAC_ALGORITHM));
             return mac.doFinal(adjusted);
         } catch (GeneralSecurityException e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "stun message-integrity computation failed", e);
+            }
             throw new WhatsAppCallException.Srtp("Cannot compute STUN MESSAGE-INTEGRITY", e);
         }
     }
@@ -154,6 +167,67 @@ public final class StunIntegrity {
         var adjusted = withLengthThrough(prefix, FINGERPRINT_ATTR_SIZE);
         var crc = new CRC32();
         crc.update(adjusted);
+        var value = (crc.getValue() ^ FINGERPRINT_XOR) & 0xFFFFFFFFL;
+        var out = new byte[4];
+        WarpCodecSupport.putU32(out, 0, (int) value);
+        return out;
+    }
+
+    /**
+     * Computes the {@code MESSAGE-INTEGRITY} HMAC SHA1 over the leading bytes of an in place STUN buffer.
+     *
+     * <p>Unlike {@link #computeMessageIntegrity(byte[], byte[])}, this overload neither copies the buffer
+     * nor rewrites its length field: it HMAC SHA1s {@code buffer[0..prefixLen)} exactly as it stands, so the
+     * caller must have already written the header length field to the value the message carries once the
+     * twenty four byte integrity attribute is appended. It exists for the single buffer
+     * {@link StunMessage#finalizeWithIntegrity(byte[])} path, which sizes one buffer and writes the header,
+     * attributes, and both integrity attributes in place rather than appending grown copies.
+     *
+     * @param buffer    the STUN buffer whose header and preceding attributes occupy {@code buffer[0..prefixLen)}
+     * @param prefixLen the number of leading bytes the HMAC covers, the header plus preceding attributes
+     * @param password  the ICE password keying the HMAC, in raw bytes
+     * @return the HMAC SHA1 tag of {@value #MESSAGE_INTEGRITY_LENGTH} bytes
+     * @throws NullPointerException       if {@code buffer} or {@code password} is {@code null}
+     * @throws IndexOutOfBoundsException  if {@code prefixLen} is negative or runs past {@code buffer}
+     * @throws WhatsAppCallException.Srtp if the platform cannot compute HMAC SHA1
+     */
+    public static byte[] computeMessageIntegrity(byte[] buffer, int prefixLen, byte[] password) {
+        Objects.requireNonNull(buffer, "buffer cannot be null");
+        Objects.requireNonNull(password, "password cannot be null");
+        Objects.checkFromIndexSize(0, prefixLen, buffer.length);
+        try {
+            var mac = HMAC.get();
+            mac.init(new SecretKeySpec(password, HMAC_ALGORITHM));
+            mac.update(buffer, 0, prefixLen);
+            return mac.doFinal();
+        } catch (GeneralSecurityException e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "stun message-integrity computation failed", e);
+            }
+            throw new WhatsAppCallException.Srtp("Cannot compute STUN MESSAGE-INTEGRITY", e);
+        }
+    }
+
+    /**
+     * Computes the {@code FINGERPRINT} value over the leading bytes of an in place STUN buffer.
+     *
+     * <p>Unlike {@link #computeFingerprint(byte[])}, this overload neither copies the buffer nor rewrites
+     * its length field: it CRC32s {@code buffer[0..prefixLen)} exactly as it stands and XORs the checksum
+     * with {@code 0x5354554E}, so the caller must have already written the header length field to the value
+     * the message carries once the eight byte fingerprint attribute is appended. It serves the single buffer
+     * {@link StunMessage#finalizeWithIntegrity(byte[])} path.
+     *
+     * @param buffer    the STUN buffer whose header and preceding attributes occupy {@code buffer[0..prefixLen)}
+     * @param prefixLen the number of leading bytes the CRC covers, the header plus preceding attributes
+     * @return the fingerprint value of {@value #FINGERPRINT_LENGTH} bytes, big endian
+     * @throws NullPointerException       if {@code buffer} is {@code null}
+     * @throws IndexOutOfBoundsException  if {@code prefixLen} is negative or runs past {@code buffer}
+     */
+    public static byte[] computeFingerprint(byte[] buffer, int prefixLen) {
+        Objects.requireNonNull(buffer, "buffer cannot be null");
+        Objects.checkFromIndexSize(0, prefixLen, buffer.length);
+        var crc = new CRC32();
+        crc.update(buffer, 0, prefixLen);
         var value = (crc.getValue() ^ FINGERPRINT_XOR) & 0xFFFFFFFFL;
         var out = new byte[4];
         WarpCodecSupport.putU32(out, 0, (int) value);
@@ -191,7 +265,11 @@ public final class StunIntegrity {
         var expected = computeMessageIntegrity(prefix, password);
         var actual = Arrays.copyOfRange(
                 message, integrityOffset + 4, integrityOffset + 4 + MESSAGE_INTEGRITY_LENGTH);
-        return java.security.MessageDigest.isEqual(expected, actual);
+        var matches = java.security.MessageDigest.isEqual(expected, actual);
+        if (!matches && Log.WARNING) {
+            LOGGER.log(Level.WARNING, "stun message-integrity mismatch at offset {0}", integrityOffset);
+        }
+        return matches;
     }
 
     /**
@@ -218,7 +296,11 @@ public final class StunIntegrity {
         var prefix = Arrays.copyOf(message, fingerprintOffset);
         var expected = computeFingerprint(prefix);
         var actual = Arrays.copyOfRange(message, fingerprintOffset + 4, message.length);
-        return Arrays.equals(expected, actual);
+        var matches = Arrays.equals(expected, actual);
+        if (!matches && Log.WARNING) {
+            LOGGER.log(Level.WARNING, "stun fingerprint mismatch");
+        }
+        return matches;
     }
 
     /**

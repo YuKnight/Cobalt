@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.engine.timer;
 
 import com.github.auties00.cobalt.calls.util.TimerEntry;
 import com.github.auties00.cobalt.calls.util.TimerHeap;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.EnumMap;
 import java.util.Map;
@@ -45,6 +47,11 @@ import java.util.concurrent.locks.ReentrantLock;
  * deadline before it reschedules so a timer never holds two outstanding deadlines.
  */
 public final class CallTimers {
+    /**
+     * The logger for {@link CallTimers}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallTimers.class);
+
     /**
      * Names the eleven per call timers and binds each to its nominal period.
      *
@@ -376,6 +383,7 @@ public final class CallTimers {
             var entry = heap.schedule(System.nanoTime(), delay, callback);
             entries.put(timer, new Armed(entry, callback));
             wakeup.signal();
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "armed timer {0} for call {1} in {2}ms", timer, callId, delay.toMillis());
         } finally {
             lock.unlock();
         }
@@ -406,12 +414,14 @@ public final class CallTimers {
         lock.lock();
         try {
             if (!running) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "timer {0} not armed for call {1}: driver already stopped", timer, callId);
                 return false;
             }
             cancelLocked(timer);
             var entry = heap.schedule(System.nanoTime(), delay, callback);
             entries.put(timer, new Armed(entry, callback));
             wakeup.signal();
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "armed timer {0} for call {1} in {2}ms", timer, callId, delay.toMillis());
             return true;
         } finally {
             lock.unlock();
@@ -433,7 +443,9 @@ public final class CallTimers {
         Objects.requireNonNull(timer, "timer cannot be null");
         lock.lock();
         try {
-            return cancelLocked(timer);
+            var cancelled = cancelLocked(timer);
+            if (cancelled && Log.DEBUG) LOGGER.log(Level.DEBUG, "cancelled timer {0} for call {1}", timer, callId);
+            return cancelled;
         } finally {
             lock.unlock();
         }
@@ -486,6 +498,7 @@ public final class CallTimers {
         } finally {
             lock.unlock();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "stopping timer driver for call {0}", callId);
         joinDriver(current);
     }
 
@@ -512,6 +525,7 @@ public final class CallTimers {
      * when the driver is not already running.
      */
     private void startDriver() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting timer driver for call {0}", callId);
         running = true;
         driver = Thread.ofVirtual()
                 .name(DRIVER_THREAD_NAME_PREFIX + callId)
@@ -625,6 +639,7 @@ public final class CallTimers {
                 return armed.callback();
             }
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "fired timer entry superseded for call {0}", callId);
         return null;
     }
 
@@ -641,8 +656,7 @@ public final class CallTimers {
         try {
             callback.run();
         } catch (RuntimeException exception) {
-            System.getLogger(CallTimers.class.getName())
-                    .log(System.Logger.Level.WARNING, "Call timer callback threw for call " + callId, exception);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "timer callback threw for call " + callId, exception);
         }
     }
 }

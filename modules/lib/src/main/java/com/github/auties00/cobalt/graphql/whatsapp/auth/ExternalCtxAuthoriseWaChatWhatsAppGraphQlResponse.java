@@ -10,7 +10,7 @@ import com.github.auties00.cobalt.model.business.auth.ExternalChatDeepLinkAuthor
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the external deep-link chat-authorisation mutation built by
+ * Parses the graph.whatsapp.com GraphQL response of the external deep-link chat-authorisation mutation built by
  * {@link ExternalCtxAuthoriseWaChatWhatsAppGraphQlRequest} into an
  * {@link ExternalChatDeepLinkAuthorization}.
  *
@@ -31,14 +31,14 @@ public final class ExternalCtxAuthoriseWaChatWhatsAppGraphQlResponse implements 
      *
      * <p>Reserved for the static parser.
      *
-     * @param authorization the parsed authorisation, or {@code null} when the relay omitted the field
+     * @param authorization the parsed authorisation, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private ExternalCtxAuthoriseWaChatWhatsAppGraphQlResponse(ExternalChatDeepLinkAuthorization authorization) {
         this.authorization = authorization;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_external_ctx_authorise_wa_chat} and projects it onto an
      * {@link ExternalChatDeepLinkAuthorization}; the returned {@link Optional} is empty when

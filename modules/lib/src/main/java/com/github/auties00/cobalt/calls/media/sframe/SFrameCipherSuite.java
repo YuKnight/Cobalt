@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.calls.media.sframe;
 
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Enumerates the five SFrame cipher suites the call media path can negotiate, each binding a
@@ -64,6 +66,24 @@ public enum SFrameCipherSuite {
      * Suite {@code 4}: EVP cipher id {@code 1}, eight byte truncated {@code HMAC-SHA256} tag.
      */
     SUITE_4(4, 1, 8);
+
+    /**
+     * Resolves a wire suite index to its suite, backing {@link #ofIndex(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #index}, so a parsed suite index
+     * resolves to its constant in constant time rather than by scanning {@link #values()}.
+     */
+    private static final Map<Integer, SFrameCipherSuite> BY_INDEX;
+
+    static {
+        var byIndex = new HashMap<Integer, SFrameCipherSuite>();
+        for (var suite : values()) {
+            if (byIndex.put(suite.index, suite) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_INDEX = Map.copyOf(byIndex);
+    }
 
     /**
      * Holds the AES encryption key length, in bytes, shared by every suite ({@code AES-128}).
@@ -158,17 +178,18 @@ public enum SFrameCipherSuite {
     /**
      * Returns the suite for the given wire index.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_INDEX} map rather than
+     * scanning {@link #values()}.
      * @param index the suite index in {@code 0..4}
      * @return the matching suite
      * @throws IllegalArgumentException if {@code index} is outside {@code 0..4}
      */
     public static SFrameCipherSuite ofIndex(int index) {
-        for (var suite : values()) {
-            if (suite.index == index) {
-                return suite;
-            }
+        var suite = BY_INDEX.get(index);
+        if (suite == null) {
+            throw new IllegalArgumentException("Unknown SFrame cipher suite index: " + index);
         }
-        throw new IllegalArgumentException("Unknown SFrame cipher suite index: " + index);
+        return suite;
     }
 
     /**

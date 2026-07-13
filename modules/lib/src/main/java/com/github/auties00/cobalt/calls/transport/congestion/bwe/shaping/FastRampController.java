@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.shaping;
 
 import com.github.auties00.cobalt.calls.util.RttEstimator;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -26,6 +28,11 @@ import java.util.Deque;
  * settings, so they are supplied by the caller through the constructor.
  */
 public final class FastRampController {
+    /**
+     * The logger for {@link FastRampController}.
+     */
+    private static final System.Logger LOGGER = Log.get(FastRampController.class);
+
     /**
      * Smoothing factor for the round trip time exponential moving average.
      */
@@ -124,6 +131,10 @@ public final class FastRampController {
         }
         if (rampActive && isCongested(lossRatio)) {
             rampActive = false;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "fast ramp deactivated: rtt={0}ms loss={1} smoothedRtt={2}ms",
+                        rttMs, lossRatio, rttEstimator.estimate());
+            }
         }
         return rampActive;
     }
@@ -209,5 +220,8 @@ public final class FastRampController {
     public void reset() {
         rampActive = true;
         slopeWindow.clear();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "fast ramp controller reset");
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -29,6 +31,11 @@ import java.util.Objects;
  * callers re-publish on demand via the public client setter.
  */
 public final class RecentEmojiWeightsMutationFactory {
+    /**
+     * The logger for {@link RecentEmojiWeightsMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(RecentEmojiWeightsMutationFactory.class);
+
     /**
      * Constructs a recent-emoji-weights mutation factory.
      *
@@ -58,6 +65,7 @@ public final class RecentEmojiWeightsMutationFactory {
     @WhatsAppWebExport(moduleName = "WAWebRecentEmojiCollection", exports = "increment", adaptation = WhatsAppAdaptation.ADAPTED)
     public SyncPendingMutation getRecentEmojiWeightsMutation(List<RecentEmojiWeight> usage) {
         Objects.requireNonNull(usage, "usage cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building recent emoji weights mutation, count={0}", usage.size());
         var timestamp = Instant.now();
         var action = new RecentEmojiWeightsActionBuilder()
                 .weights(usage)

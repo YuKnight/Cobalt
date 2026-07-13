@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.congestion.ratecontrol;
 
 import com.github.auties00.cobalt.calls.media.video.codec.VideoCodecParams;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Turns the combined bandwidth estimate target into the video encoder's target bitrate and forward
@@ -27,6 +30,11 @@ import com.github.auties00.cobalt.calls.media.video.codec.VideoCodecParams;
  * bounded by {@link #MAX_KEY_FEC_RATIO} and {@link #MAX_DELTA_FEC_RATIO}.
  */
 public final class VideoRateController {
+    /**
+     * The logger for {@link VideoRateController}.
+     */
+    private static final System.Logger LOGGER = Log.get(VideoRateController.class);
+
     /**
      * The maximum forward error correction ratio applied to key frames, in {@code [0, 1]}.
      *
@@ -103,7 +111,14 @@ public final class VideoRateController {
 
         var newTarget = (int) targetBps;
         var updated = newTarget == params.targetBitrate() ? params : params.withTargetBitrate(newTarget);
-        return new VideoRateResult(updated, keyFecRatio, deltaFecRatio, sctpBufferController.isCongested());
+        var congested = sctpBufferController.isCongested();
+        if (congested && Log.WARNING) {
+            LOGGER.log(Level.WARNING, "video rate clamped: sctp send buffer congested, target={0}bps", newTarget);
+        } else if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "video rate applied: target={0}bps keyFec={1} deltaFec={2}",
+                    newTarget, keyFecRatio, deltaFecRatio);
+        }
+        return new VideoRateResult(updated, keyFecRatio, deltaFecRatio, congested);
     }
 
     /**

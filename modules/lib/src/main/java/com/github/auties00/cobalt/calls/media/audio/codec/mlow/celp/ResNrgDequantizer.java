@@ -3,6 +3,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.celp;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowEntropyWrapper;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.entropy.MlowRangeDecoder;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.NrgResTables;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Decodes and dequantizes the residual energy and fixed codebook gain parameters of an MLow unvoiced low
@@ -42,6 +45,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.NrgResTabl
  * {@link #dequantizeResnrg(int, int)} is computed in single precision {@code float}.
  */
 public final class ResNrgDequantizer {
+    /**
+     * The logger for {@link ResNrgDequantizer}.
+     */
+    private static final System.Logger LOGGER = Log.get(ResNrgDequantizer.class);
+
     /**
      * Residual energy bias added before the logarithm in the forward quantizer and subtracted back out
      * after the inverse power.
@@ -146,6 +154,9 @@ public final class ResNrgDequantizer {
             if (sfPulses[i] > 0) {
                 fcbgIdx[i] = decodeFcbgOffset(decoder, tableIx, dbqQ14[i], sfPulses[i]);
             }
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "resnrg decode: subframes={0} frameQi={1} shapeQi={2}", numSubfr, frameQi, shapeQi);
         }
         return new DecodeResult(frameQi, shapeQi, dbqQ14, fcbgIdx);
     }

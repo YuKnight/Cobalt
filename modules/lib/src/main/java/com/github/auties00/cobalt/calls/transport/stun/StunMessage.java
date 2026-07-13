@@ -1,7 +1,9 @@
 package com.github.auties00.cobalt.calls.transport.stun;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.net.Inet6Address;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -51,6 +53,11 @@ import com.github.auties00.cobalt.calls.transport.warp.WarpCodecSupport;
  * @param attributes    the ordered attribute list; never {@code null}
  */
 public record StunMessage(int messageType, int magicCookie, byte[] transactionId, List<Attribute> attributes) {
+    /**
+     * The logger for {@link StunMessage}.
+     */
+    private static final System.Logger LOGGER = Log.get(StunMessage.class);
+
     /**
      * The RFC 8489 magic cookie, present on the ICE path.
      */
@@ -162,6 +169,18 @@ public record StunMessage(int messageType, int magicCookie, byte[] transactionId
     public static final int ADDRESS_FAMILY_IPV6 = 0x02;
 
     /**
+     * The total on wire size, in bytes, of a {@link StunAttributeType#MESSAGE_INTEGRITY} attribute: the four
+     * byte type length header plus the {@value StunIntegrity#MESSAGE_INTEGRITY_LENGTH} byte HMAC value.
+     */
+    private static final int MESSAGE_INTEGRITY_ATTR_SIZE = ATTRIBUTE_PADDING + StunIntegrity.MESSAGE_INTEGRITY_LENGTH;
+
+    /**
+     * The total on wire size, in bytes, of a {@link StunAttributeType#FINGERPRINT} attribute: the four byte
+     * type length header plus the {@value StunIntegrity#FINGERPRINT_LENGTH} byte CRC32 value.
+     */
+    private static final int FINGERPRINT_ATTR_SIZE = ATTRIBUTE_PADDING + StunIntegrity.FINGERPRINT_LENGTH;
+
+    /**
      * Canonicalizes the record components, validating the transaction id length and copying the mutable
      * fields defensively.
      *
@@ -210,37 +229,24 @@ public record StunMessage(int messageType, int magicCookie, byte[] transactionId
     /**
      * Serializes this message to its wire bytes exactly as its attributes stand.
      *
-     * <p>The header is written first, then each attribute as a type, length, value triple padded with
-     * zero bytes to the next four byte boundary, and finally the header's length field is patched to
-     * the total attribute section length, which counts attribute values and their padding but not the
-     * header. This method does not add or recompute any integrity attribute; use
-     * {@link #finalizeWithIntegrity(byte[])} to produce an integrity protected message.
+     * <p>The header is written first, its length field set to the attribute section length (which counts
+     * attribute values and their padding but not the header), then each attribute is written in place after
+     * it as a type, length, value triple padded with zero bytes to the next four byte boundary. This method
+     * does not add or recompute any integrity attribute; use {@link #finalizeWithIntegrity(byte[])} to
+     * produce an integrity protected message.
      *
      * @return the serialized STUN message bytes
      */
-    // TODO: add package private ownership transfer seams to size the final buffer once and skip the
-    //  redundant clones on the single transport thread encode/decode path: Attribute.ofOwned(type,
-    //  ownedValue) (no defensive clone of a caller owned value), an encodedLength()/encodeInto(dest,off)
-    //  pair here so encode() and finalizeWithIntegrity() write straight into one right sized buffer
-    //  instead of building a List<byte[]> and re copying, and a StunIntegrity.computeMessageIntegrity(
-    //  buffer, prefixLen) overload so finalizeWithIntegrity does not re encode the prefix. The public
-    //  ctors and value()/transactionId() keep cloning for external callers. Deferred: correctness rests on
-    //  the "IceAgent/CallTransportController drive this from a single transport thread" invariant and on
-    //  every same package writer honoring the no alias contract, which is not locally provable here.
     public byte[] encode() {
-        var body = new ArrayList<byte[]>(attributes.size());
         var attributeSectionLength = 0;
         for (var attribute : attributes) {
-            var encoded = attribute.encode();
-            body.add(encoded);
-            attributeSectionLength += encoded.length;
+            attributeSectionLength += attribute.encodedLength();
         }
         var out = new byte[HEADER_LENGTH + attributeSectionLength];
         writeHeader(out, attributeSectionLength);
         var cursor = HEADER_LENGTH;
-        for (var encoded : body) {
-            System.arraycopy(encoded, 0, out, cursor, encoded.length);
-            cursor += encoded.length;
+        for (var attribute : attributes) {
+            cursor += attribute.encodeInto(out, cursor);
         }
         return out;
     }
@@ -269,15 +275,39 @@ public record StunMessage(int messageType, int magicCookie, byte[] transactionId
         Objects.requireNonNull(password, "password cannot be null");
         if (attribute(StunAttributeType.MESSAGE_INTEGRITY).isPresent()
                 || attribute(StunAttributeType.FINGERPRINT).isPresent()) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "stun message type=0x{0} already carries an integrity attribute, refusing to finalize",
+                        Integer.toHexString(messageType));
+            }
             throw new IllegalStateException(
                     "message already carries a MESSAGE-INTEGRITY or FINGERPRINT attribute");
         }
-        var prefix = encode();
-        var integrity = StunIntegrity.computeMessageIntegrity(prefix, password);
-        var withIntegrity = appendAttribute(
-                prefix, StunAttributeType.MESSAGE_INTEGRITY.value(), integrity);
-        var fingerprint = StunIntegrity.computeFingerprint(withIntegrity);
-        return appendAttribute(withIntegrity, StunAttributeType.FINGERPRINT.value(), fingerprint);
+        var attributeSectionLength = 0;
+        for (var attribute : attributes) {
+            attributeSectionLength += attribute.encodedLength();
+        }
+        var prefixLength = HEADER_LENGTH + attributeSectionLength;
+        var fingerprintOffset = prefixLength + MESSAGE_INTEGRITY_ATTR_SIZE;
+        var out = new byte[fingerprintOffset + FINGERPRINT_ATTR_SIZE];
+
+        // The MESSAGE-INTEGRITY HMAC is taken with the header length field spanning through the integrity
+        // attribute, so the header is stamped with that length before the attributes are written and hashed.
+        writeHeader(out, attributeSectionLength + MESSAGE_INTEGRITY_ATTR_SIZE);
+        var cursor = HEADER_LENGTH;
+        for (var attribute : attributes) {
+            cursor += attribute.encodeInto(out, cursor);
+        }
+        var integrity = StunIntegrity.computeMessageIntegrity(out, prefixLength, password);
+        writeIntegrityAttribute(out, prefixLength, StunAttributeType.MESSAGE_INTEGRITY.value(), integrity);
+
+        // The FINGERPRINT CRC is taken with the header length field spanning through the fingerprint
+        // attribute, so the length field is advanced to its final value before the CRC covers the prefix.
+        WarpCodecSupport.putU16(out, LENGTH_FIELD_OFFSET,
+                attributeSectionLength + MESSAGE_INTEGRITY_ATTR_SIZE + FINGERPRINT_ATTR_SIZE);
+        var fingerprint = StunIntegrity.computeFingerprint(out, fingerprintOffset);
+        writeIntegrityAttribute(out, fingerprintOffset, StunAttributeType.FINGERPRINT.value(), fingerprint);
+        return out;
     }
 
     /**
@@ -299,6 +329,9 @@ public record StunMessage(int messageType, int magicCookie, byte[] transactionId
     public static StunMessage decode(byte[] message) {
         Objects.requireNonNull(message, "message cannot be null");
         if (message.length < HEADER_LENGTH) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "stun message of {0} bytes is shorter than the header", message.length);
+            }
             throw new WhatsAppCallException.Rtp(
                     "STUN message of " + message.length + " bytes is shorter than the " + HEADER_LENGTH
                             + "-byte header");
@@ -309,6 +342,11 @@ public record StunMessage(int messageType, int magicCookie, byte[] transactionId
         var transactionId = Arrays.copyOfRange(message, 8, HEADER_LENGTH);
         var end = HEADER_LENGTH + attributeSectionLength;
         if (end > message.length) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "stun attribute section length {0} exceeds the {1} available bytes",
+                        attributeSectionLength, message.length - HEADER_LENGTH);
+            }
             throw new WhatsAppCallException.Rtp("STUN attribute section length " + attributeSectionLength
                     + " exceeds the " + (message.length - HEADER_LENGTH) + " available bytes");
         }
@@ -319,12 +357,21 @@ public record StunMessage(int messageType, int magicCookie, byte[] transactionId
             var valueLength = readUnsignedShort(message, cursor + 2);
             var valueStart = cursor + ATTRIBUTE_PADDING;
             if (valueStart + valueLength > end) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "stun attribute value of {0} bytes at offset {1} runs past the attribute section",
+                            valueLength, valueStart);
+                }
                 throw new WhatsAppCallException.Rtp("STUN attribute value of " + valueLength
                         + " bytes at offset " + valueStart + " runs past the attribute section");
             }
             var value = Arrays.copyOfRange(message, valueStart, valueStart + valueLength);
             attributes.add(new Attribute(typeValue, value));
             cursor = valueStart + paddedLength(valueLength);
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "stun message decoded, type=0x{0}, attributes={1}",
+                    Integer.toHexString(messageType), attributes.size());
         }
         return new StunMessage(messageType, magicCookie, transactionId, attributes);
     }
@@ -343,26 +390,22 @@ public record StunMessage(int messageType, int magicCookie, byte[] transactionId
     }
 
     /**
-     * Appends one attribute to an already serialized message and patches the header length field.
+     * Writes one integrity attribute, a four byte type length header and its value, into an already sized
+     * buffer at a given offset.
      *
-     * <p>The value is assumed to need no padding; the two integrity attributes are both multiples of
-     * four bytes. The returned buffer is the message plus the four byte attribute header and the value,
-     * with the header length field rewritten to include the new attribute.
+     * <p>The value is assumed to need no padding; the two integrity attributes are both multiples of four
+     * bytes. The header length field is not touched here: {@link #finalizeWithIntegrity(byte[])} owns it
+     * across the two integrity computations, since each computation requires a different length value.
      *
-     * @param message   the already serialized message bytes
+     * @param out       the destination buffer, sized to hold the attribute at {@code offset}
+     * @param offset    the byte offset at which the attribute's type length header begins
      * @param typeValue the sixteen bit attribute type value
      * @param value     the attribute value bytes
-     * @return the message with the attribute appended and the length field patched
      */
-    private static byte[] appendAttribute(byte[] message, int typeValue, byte[] value) {
-        var out = Arrays.copyOf(message, message.length + ATTRIBUTE_PADDING + value.length);
-        var cursor = message.length;
-        WarpCodecSupport.putU16(out, cursor, typeValue);
-        WarpCodecSupport.putU16(out, cursor + 2, value.length);
-        System.arraycopy(value, 0, out, cursor + ATTRIBUTE_PADDING, value.length);
-        var attributeSectionLength = out.length - HEADER_LENGTH;
-        WarpCodecSupport.putU16(out, LENGTH_FIELD_OFFSET, attributeSectionLength);
-        return out;
+    private static void writeIntegrityAttribute(byte[] out, int offset, int typeValue, byte[] value) {
+        WarpCodecSupport.putU16(out, offset, typeValue);
+        WarpCodecSupport.putU16(out, offset + 2, value.length);
+        System.arraycopy(value, 0, out, offset + ATTRIBUTE_PADDING, value.length);
     }
 
     /**
@@ -531,17 +574,47 @@ public record StunMessage(int messageType, int magicCookie, byte[] transactionId
         }
 
         /**
+         * Returns the on wire length of this attribute, the four byte type length header plus the value
+         * padded to the next four byte boundary.
+         *
+         * @return the padded on wire attribute length, in bytes
+         */
+        public int encodedLength() {
+            return ATTRIBUTE_PADDING + paddedLength(value.length);
+        }
+
+        /**
+         * Writes this attribute's wire bytes into {@code dest} starting at {@code off} and returns the
+         * number of bytes written.
+         *
+         * <p>The type length header and value are written, then the value is zero padded to the next four
+         * byte boundary; the padding bytes are zeroed explicitly so writing into a reused buffer cannot
+         * leave stale bytes in the padding.
+         *
+         * @param dest the destination buffer, with at least {@link #encodedLength()} bytes free at {@code off}
+         * @param off  the byte offset at which to begin writing
+         * @return the number of bytes written, equal to {@link #encodedLength()}
+         */
+        public int encodeInto(byte[] dest, int off) {
+            WarpCodecSupport.putU16(dest, off, typeValue);
+            WarpCodecSupport.putU16(dest, off + 2, value.length);
+            System.arraycopy(value, 0, dest, off + ATTRIBUTE_PADDING, value.length);
+            var padded = paddedLength(value.length);
+            for (var index = value.length; index < padded; index++) {
+                dest[off + ATTRIBUTE_PADDING + index] = 0;
+            }
+            return ATTRIBUTE_PADDING + padded;
+        }
+
+        /**
          * Serializes this attribute to its wire bytes, the type, length, value triple followed by zero
          * padding to the next four byte boundary.
          *
          * @return the padded attribute bytes
          */
         public byte[] encode() {
-            var padded = (value.length + ATTRIBUTE_PADDING - 1) & ~(ATTRIBUTE_PADDING - 1);
-            var out = new byte[ATTRIBUTE_PADDING + padded];
-            WarpCodecSupport.putU16(out, 0, typeValue);
-            WarpCodecSupport.putU16(out, 2, value.length);
-            System.arraycopy(value, 0, out, ATTRIBUTE_PADDING, value.length);
+            var out = new byte[encodedLength()];
+            encodeInto(out, 0);
             return out;
         }
 

@@ -1,10 +1,13 @@
 package com.github.auties00.cobalt.calls.platform.audio;
 
+import com.github.auties00.cobalt.log.Log;
+
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.SourceDataLine;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -30,6 +33,11 @@ import java.util.Arrays;
  * inside the driver. The pulled samples are signed 16 bit PCM, the format the rendered source produces.
  */
 public final class LiveAudioPlaybackDriver implements AudioPlaybackDriver {
+    /**
+     * The logger for {@link LiveAudioPlaybackDriver}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveAudioPlaybackDriver.class);
+
     /**
      * Guards the lifecycle transitions and the line and thread fields against concurrent driver calls.
      */
@@ -135,6 +143,7 @@ public final class LiveAudioPlaybackDriver implements AudioPlaybackDriver {
             try {
                 opened = openLine(deviceId, sampleRate, framesPerBuffer, channelCount);
             } catch (LineUnavailableException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot open playback device " + deviceId, e);
                 throw new IllegalStateException("cannot open playback device", e);
             }
             this.line = opened;
@@ -142,6 +151,9 @@ public final class LiveAudioPlaybackDriver implements AudioPlaybackDriver {
             this.framesPerBuffer = framesPerBuffer;
             this.channelCount = channelCount;
             this.state = AudioDriverState.INITIALIZED;
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "audio playback initialized: rate={0} frames={1} channels={2}",
+                        sampleRate, framesPerBuffer, channelCount);
         }
     }
 
@@ -165,12 +177,14 @@ public final class LiveAudioPlaybackDriver implements AudioPlaybackDriver {
             try {
                 line.start();
             } catch (RuntimeException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot start playback device", e);
                 throw new IllegalStateException("cannot start playback device", e);
             }
             this.state = AudioDriverState.ACTIVE;
             this.playbackThread = Thread.ofVirtual()
                     .name("calls-audio-playback")
                     .start(this::playbackLoop);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio playback started");
         }
     }
 
@@ -202,6 +216,7 @@ public final class LiveAudioPlaybackDriver implements AudioPlaybackDriver {
             playbackThread = null;
         }
         joinQuietly(toJoin);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio playback stopped");
     }
 
     /**
@@ -229,6 +244,7 @@ public final class LiveAudioPlaybackDriver implements AudioPlaybackDriver {
         synchronized (lock) {
             closeLineLocked();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio playback driver closed");
     }
 
     /**
@@ -255,7 +271,8 @@ public final class LiveAudioPlaybackDriver implements AudioPlaybackDriver {
             if (s != null) {
                 try {
                     produced = s.requestAudio(pcm, blockSamples);
-                } catch (RuntimeException _) {
+                } catch (RuntimeException e) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "rendered audio source failed", e);
                     produced = 0;
                 }
             }
@@ -274,10 +291,12 @@ public final class LiveAudioPlaybackDriver implements AudioPlaybackDriver {
             }
             try {
                 l.write(bytes, 0, bytes.length);
-            } catch (RuntimeException _) {
+            } catch (RuntimeException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "playback line write failed", e);
                 break;
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio playback loop exited");
     }
 
     /**

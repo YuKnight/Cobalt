@@ -2,11 +2,13 @@ package com.github.auties00.cobalt.socket.tunnel;
 
 import com.github.auties00.cobalt.client.WhatsAppClientProxy;
 import com.github.auties00.cobalt.client.WhatsAppClientProxyAuthenticator;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.System.Logger.Level;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -32,6 +34,11 @@ import java.nio.charset.StandardCharsets;
  * that choice rather than a separate flag.
  */
 public final class SocksTunnel {
+
+    /**
+     * The logger for {@link SocksTunnel}.
+     */
+    private static final System.Logger LOGGER = Log.get(SocksTunnel.class);
 
     /**
      * Holds the SOCKS protocol version 4 byte.
@@ -214,6 +221,10 @@ public final class SocksTunnel {
      */
     public static Socket tunnel(Socket raw, String targetHost, int targetPort,
                                 WhatsAppClientProxy.Socks proxy) throws IOException {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "opening socks tunnel to {0}:{1} via {2}",
+                    targetHost, targetPort, proxy.getClass().getSimpleName());
+        }
         var in = raw.getInputStream();
         var out = raw.getOutputStream();
         switch (proxy) {
@@ -225,6 +236,9 @@ public final class SocksTunnel {
                     performSocks5Handshake(in, out, v5, targetHost, targetPort);
             case WhatsAppClientProxy.Socks.V5.Remote v5h ->
                     performSocks5Handshake(in, out, v5h, targetHost, targetPort);
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "socks tunnel established to {0}:{1}", targetHost, targetPort);
         }
         return raw;
     }
@@ -339,6 +353,10 @@ public final class SocksTunnel {
         var status = reply[1] & 0xFF;
         if (status != SOCKS4_REQUEST_GRANTED) {
             var reason = getSocks4ReplyReason(status);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "socks4 proxy request failed: {0} (code=0x{1})",
+                        reason, Integer.toHexString(status));
+            }
             throw new IOException("SOCKS4 proxy request failed: " + reason + " (Code: 0x" + Integer.toHexString(status) + ")");
         }
     }
@@ -398,14 +416,23 @@ public final class SocksTunnel {
 
         var chosenMethod = serverChoice[1] & 0xFF;
         if (chosenMethod == METHOD_NO_ACCEPTABLE) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "socks5 proxy rejected all offered authentication methods");
+            }
             throw new IOException("SOCKS5 proxy rejected all offered authentication methods");
         }
         if (chosenMethod != METHOD_NO_AUTH) {
             if (authenticatorOpt.isEmpty()) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "socks5 proxy requires authentication but no credentials configured");
+                }
                 throw new IOException("Missing credentials for authentication: please provide them in the proxy configuration");
             }
             var authenticator = authenticatorOpt.get();
             if (authenticator.methodId() != chosenMethod) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "socks5 proxy selected unsupported authentication method {0}", chosenMethod);
+                }
                 throw new IOException("Proxy selected unsupported authentication method: " + chosenMethod);
             }
             switch (authenticator) {
@@ -430,6 +457,9 @@ public final class SocksTunnel {
                         throw new IOException("Unsupported SOCKS5 auth sub-negotiation version: " + authVersion);
                     }
                     if (authResponse[1] != AUTH_SUCCESS) {
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING, "socks5 proxy authentication failed");
+                        }
                         throw new IOException("SOCKS proxy authentication failed.");
                     }
                 }
@@ -534,6 +564,9 @@ public final class SocksTunnel {
         var replyCode = replyInfo[1];
         if (replyCode != SOCKS5_REPLY_SUCCESS) {
             var reason = getSocks5ReplyReason(replyCode);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "socks5 proxy request failed: {0} (code={1})", reason, (int) replyCode);
+            }
             throw new IOException("SOCKS proxy request failed: " + reason + " (Code: " + replyCode + ")");
         }
 

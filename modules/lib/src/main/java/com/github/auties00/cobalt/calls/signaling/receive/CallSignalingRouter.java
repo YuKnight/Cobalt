@@ -1,14 +1,16 @@
 package com.github.auties00.cobalt.calls.signaling.receive;
 
-import com.github.auties00.cobalt.model.jid.Jid;
-import com.github.auties00.cobalt.stanza.Stanza;
-
-import java.util.Objects;
-import java.util.Optional;
 import com.github.auties00.cobalt.calls.signaling.CallStanza;
 import com.github.auties00.cobalt.calls.signaling.SignalingType;
 import com.github.auties00.cobalt.calls.signaling.incall.RaiseHandStanza;
 import com.github.auties00.cobalt.calls.signaling.session.RingingStanza;
+import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.model.jid.Jid;
+import com.github.auties00.cobalt.stanza.Stanza;
+
+import java.lang.System.Logger.Level;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Classifies an inbound {@code <call>} child element into its signaling type and a routing verdict.
@@ -43,14 +45,9 @@ import com.github.auties00.cobalt.calls.signaling.session.RingingStanza;
  */
 public final class CallSignalingRouter {
     /**
-     * The wire attribute naming the call identifier on a {@code <call>} child element.
+     * The logger for {@link CallSignalingRouter}.
      */
-    private static final String CALL_ID_ATTRIBUTE = "call-id";
-
-    /**
-     * The wire attribute naming the call creator's device JID on a {@code <call>} child element.
-     */
-    private static final String CALL_CREATOR_ATTRIBUTE = "call-creator";
+    private static final System.Logger LOGGER = Log.get(CallSignalingRouter.class);
 
     /**
      * Classifies how the receiver must route an inbound {@code <call>} child element.
@@ -148,36 +145,55 @@ public final class CallSignalingRouter {
      *       empty for a decodable tag that carries no ordinal.</li>
      * </ul>
      *
-     * @param payload      the single child element of the {@code <call>} stanza
+     * @param description  the wire tag (element description) of the {@code <call>} child element
+     * @param callId       the payload's {@code call-id} attribute, or {@code null} when absent
+     * @param callCreator  the payload's {@code call-creator} device JID, or {@code null} when absent
      * @param senderLid    the {@code sender_lid} attribute from the {@code <call>} envelope, or
      *                     {@code null} when the stanza is not LID addressed
      * @param callExists   whether a call object already exists for the payload's call identifier
      * @return the classification verdict; never {@code null}
-     * @throws NullPointerException if {@code payload} is {@code null}
+     * @throws NullPointerException if {@code description} is {@code null}
      */
-    public Verdict classify(Stanza payload, Jid senderLid, boolean callExists) {
-        Objects.requireNonNull(payload, "payload cannot be null");
+    public Verdict classify(String description, String callId, Jid callCreator, Jid senderLid, boolean callExists) {
+        Objects.requireNonNull(description, "description cannot be null");
 
-        var callId = payload.getAttributeAsString(CALL_ID_ATTRIBUTE, null);
-        var callCreator = payload.getAttributeAsJid(CALL_CREATOR_ATTRIBUTE, null);
         var callCreatorOpt = Optional.ofNullable(callCreator);
         if (callId == null || callId.isEmpty() || isAllZeroCallId(callId) || callCreator == null) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "dropping call payload {0}: missing or invalid call-id/call-creator",
+                        description);
+            }
             return new Verdict(Disposition.DROP, Optional.empty(), Optional.ofNullable(callId), callCreatorOpt);
         }
 
-        var type = SignalingType.ofWireTag(payload.description());
-        if (type.isEmpty() && !CallStanza.isKnownTag(payload.description())) {
+        var type = SignalingType.ofWireTag(description);
+        if (type.isEmpty() && !CallStanza.isKnownTag(description)) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "dropping call payload {0} for call {1}: unknown signaling tag",
+                        description, callId);
+            }
             return new Verdict(Disposition.DROP, Optional.empty(), Optional.of(callId), callCreatorOpt);
         }
 
         if (!isLidAddressed(senderLid, callCreator)) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "dropping call payload {0} for call {1}: not lid addressed",
+                        description, callId);
+            }
             return new Verdict(Disposition.DROP, type, Optional.of(callId), callCreatorOpt);
         }
 
         if (!callExists) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "buffering call payload {0} for call {1}: call not yet created",
+                        description, callId);
+            }
             return new Verdict(Disposition.BUFFER, type, Optional.of(callId), callCreatorOpt);
         }
 
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "processing call payload {0} for call {1}", description, callId);
+        }
         return new Verdict(Disposition.PROCESS, type, Optional.of(callId), callCreatorOpt);
     }
 

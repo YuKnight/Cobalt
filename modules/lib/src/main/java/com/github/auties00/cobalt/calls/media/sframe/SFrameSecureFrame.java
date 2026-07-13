@@ -1,6 +1,8 @@
 package com.github.auties00.cobalt.calls.media.sframe;
 
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -33,6 +35,11 @@ import java.util.Objects;
  * path; a group rekey installs a new chain key under a new key id through the provider.
  */
 public final class SFrameSecureFrame {
+    /**
+     * The logger for {@link SFrameSecureFrame}.
+     */
+    private static final System.Logger LOGGER = Log.get(SFrameSecureFrame.class);
+
     /**
      * Holds the key provider resolving the cipher for each key id in this direction.
      */
@@ -125,6 +132,7 @@ public final class SFrameSecureFrame {
         var cipher = keyProvider.cipherForKeyId(sealKeyId, counter);
         if (cipher == null) {
             errorFrames++;
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe seal failed, no chain key for key id {0}", sealKeyId);
             throw new IllegalStateException("No SFrame chain key installed for key id " + sealKeyId);
         }
         var trailer = SFrameHeaderCodec.writeTrailer(sealKeyId, counter);
@@ -134,6 +142,7 @@ public final class SFrameSecureFrame {
         System.arraycopy(trailer, 0, frame, bodyLength, trailer.length);
         totalFrames++;
         totalBytes += plaintext.length;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "sframe frame sealed, keyId={0} counter={1} bytes={2}", sealKeyId, counter, plaintext.length);
         return frame;
     }
 
@@ -155,6 +164,7 @@ public final class SFrameSecureFrame {
         if (trailerLength < 0) {
             invalidParamFrames++;
             errorFrames++;
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe open rejected, malformed trailer length, frame bytes={0}", frame.length);
             return null;
         }
         var trailerStart = frame.length - trailerLength;
@@ -162,28 +172,33 @@ public final class SFrameSecureFrame {
         if (trailer == null) {
             invalidParamFrames++;
             errorFrames++;
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe open rejected, malformed trailer, frame bytes={0}", frame.length);
             return null;
         }
         var counter = trailer.counter();
         if (!replayWindow.isAcceptable(counter)) {
             duplicateFrames++;
             errorFrames++;
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe open rejected, replayed counter {0} for key id {1}", counter, trailer.keyId());
             return null;
         }
         var cipher = keyProvider.cipherForKeyId(trailer.keyId(), counter);
         if (cipher == null) {
             missingKeyFrames++;
             errorFrames++;
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe open rejected, no key for key id {0}", trailer.keyId());
             return null;
         }
         var plaintext = cipher.openFrame(frame, trailerStart, counter);
         if (plaintext == null) {
             errorFrames++;
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sframe open rejected, authentication failed for key id {0} counter {1}", trailer.keyId(), counter);
             return null;
         }
         replayWindow.accept(counter);
         totalFrames++;
         totalBytes += plaintext.length;
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "sframe frame opened, keyId={0} counter={1} bytes={2}", trailer.keyId(), counter, plaintext.length);
         return plaintext;
     }
 

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.config.param;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -31,6 +34,11 @@ import java.util.Set;
  */
 public final class DynVoipParamUpdater {
     /**
+     * The logger for {@link DynVoipParamUpdater}.
+     */
+    private static final System.Logger LOGGER = Log.get(DynVoipParamUpdater.class);
+
+    /**
      * The keys already written in the current round, which later rules must not clobber.
      */
     private final Set<VoipParamKey> updated;
@@ -53,6 +61,9 @@ public final class DynVoipParamUpdater {
      * carrying over the previous round's writes.
      */
     public void beginRound() {
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "dynamic voip param round reset, previousCount={0}", updated.size());
+        }
         updated.clear();
     }
 
@@ -83,6 +94,9 @@ public final class DynVoipParamUpdater {
                 override.writeOnto(params);
                 written++;
             }
+        }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "applied dynamic voip param overrides, matched={0}, written={1}", overrides.size(), written);
         }
         return written;
     }
@@ -178,6 +192,9 @@ public final class DynVoipParamUpdater {
                 case ARRAY, ARRAY_COUNT, UNKNOWN -> {
                     // Array parameters carry no scalar dynamic override, and an unmodelled key has no
                     // typed override to apply.
+                    if (Log.TRACE) {
+                        LOGGER.log(Level.TRACE, "dynamic voip param override skipped, unsupported type for key={0}", key);
+                    }
                 }
             }
         }

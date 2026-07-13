@@ -3,10 +3,12 @@ package com.github.auties00.cobalt.calls.signaling.receive;
 import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.Set;
 
@@ -35,6 +37,11 @@ import java.util.Set;
  * {@code call-id} and {@code call-creator} for the receipt.
  */
 public final class CallSignalingAcknowledger {
+    /**
+     * The logger for {@link CallSignalingAcknowledger}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallSignalingAcknowledger.class);
+
     /**
      * The wire attribute naming the call identifier on a {@code <call>} child element and on a receipt
      * child.
@@ -146,9 +153,11 @@ public final class CallSignalingAcknowledger {
         if (usesReceipt(tag) && callId != null && callCreator != null && from != null) {
             return sendReceipt(envelope, from, callId, callCreator, tag);
         }
-        return ackSender.ack(AckClass.CALL, envelope)
+        var sent = ackSender.ack(AckClass.CALL, envelope)
                 .type(tag)
                 .send();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent call ack type={0} result={1}", tag, sent);
+        return sent;
     }
 
     /**
@@ -171,6 +180,10 @@ public final class CallSignalingAcknowledger {
         var self = resolveReceiptFrom(to);
         var stanzaId = envelope.getAttributeAsString(ID_ATTRIBUTE, null);
         if (self == null || stanzaId == null) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "dropping call receipt {0} for call {1}: missing local identity or stanza id",
+                        childTag, callId);
+            }
             return false;
         }
         var child = new StanzaBuilder()
@@ -186,6 +199,7 @@ public final class CallSignalingAcknowledger {
                 .content(child)
                 .build();
         whatsapp.sendNodeWithNoResponse(receipt);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent call receipt {0} for call {1}", childTag, callId);
         return true;
     }
 
@@ -205,9 +219,11 @@ public final class CallSignalingAcknowledger {
      */
     public boolean sendAck(Stanza envelope, String payloadTag) {
         Objects.requireNonNull(envelope, "envelope cannot be null");
-        return ackSender.ack(AckClass.CALL, envelope)
+        var sent = ackSender.ack(AckClass.CALL, envelope)
                 .type(payloadTag)
                 .send();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sent call ack type={0} result={1}", payloadTag, sent);
+        return sent;
     }
 
     /**

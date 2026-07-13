@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.stream;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -23,11 +25,6 @@ import java.util.concurrent.Executors;
  * @see Ordered
  */
 public sealed interface SocketStreamHandler permits SocketStreamHandler.Concurrent, SocketStreamHandler.Ordered {
-    /**
-     * The system logger used to report handler failures that escape a handler's work method.
-     */
-    System.Logger LOGGER = System.getLogger(SocketStreamHandler.class.getName());
-
     /**
      * Schedules handling of the given inbound stanza off the socket-reader thread.
      *
@@ -59,23 +56,25 @@ public sealed interface SocketStreamHandler permits SocketStreamHandler.Concurre
      * Invokes the given handler's work method, catching any {@link Throwable} so a failure never escapes
      * onto the scheduling thread's uncaught path.
      *
-     * <p>Shared by both shapes so the failure-logging policy lives in one place.
+     * <p>Shared by both shapes so the failure-logging policy lives in one place; each shape passes its own
+     * {@link System.Logger} so the record is attributed to the concrete implementation rather than to this
+     * interface.
      *
      * @param handler the handler whose {@code handle} method runs
      * @param stanza    the stanza to pass to the work method
+     * @param logger  the concrete implementation's logger used to record a caught failure
      */
-    private static void runHandle(SocketStreamHandler handler, Stanza stanza) {
+    private static void runHandle(SocketStreamHandler handler, Stanza stanza, System.Logger logger) {
         try {
             switch (handler) {
                 case Concurrent concurrent -> concurrent.handle(stanza);
                 case Ordered ordered -> ordered.handle(stanza);
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Handler {0} failed for stanza {1}: {2}",
-                    handler.getClass().getSimpleName(),
-                    stanza.description(),
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                logger.log(Level.WARNING, "handler {0} failed for stanza {1}: {2}",
+                        handler.getClass().getSimpleName(), stanza.description(), throwable.getMessage());
+            }
         }
     }
 
@@ -88,15 +87,20 @@ public sealed interface SocketStreamHandler permits SocketStreamHandler.Concurre
      */
     abstract non-sealed class Concurrent implements SocketStreamHandler {
         /**
+         * The logger for {@link Concurrent}.
+         */
+        private static final System.Logger LOGGER = Log.get(Concurrent.class);
+
+        /**
          * {@inheritDoc}
          *
          * @implNote
          * This implementation starts a fresh virtual thread that invokes {@link #handle(Stanza)} through
-         * {@link SocketStreamHandler#runHandle(SocketStreamHandler, Stanza)}.
+         * {@link SocketStreamHandler#runHandle(SocketStreamHandler, Stanza, System.Logger)}.
          */
         @Override
         public final void handleAsync(Stanza stanza) {
-            Thread.startVirtualThread(() -> runHandle(this, stanza));
+            Thread.startVirtualThread(() -> runHandle(this, stanza, LOGGER));
         }
 
         /**
@@ -128,6 +132,11 @@ public sealed interface SocketStreamHandler permits SocketStreamHandler.Concurre
      */
     abstract non-sealed class Ordered implements SocketStreamHandler {
         /**
+         * The logger for {@link Ordered}.
+         */
+        private static final System.Logger LOGGER = Log.get(Ordered.class);
+
+        /**
          * Holds one in-flight chain per ordering key; a new stanza for a key chains onto its tail so the
          * two never run concurrently. Holds at most one (constantly replaced) entry per key and is cleared
          * by {@link #reset()} between connections.
@@ -153,10 +162,11 @@ public sealed interface SocketStreamHandler permits SocketStreamHandler.Concurre
         @Override
         public final void handleAsync(Stanza stanza) {
             var key = orderingKey(stanza);
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "enqueueing stanza {0} on ordering key {1}", stanza.description(), Log.jid(key));
             chains.compute(key, (ignoredKey, previous) -> {
                 var base = previous != null ? previous : CompletableFuture.<Void>completedFuture(null);
                 return base.handleAsync((ignoredResult, ignoredError) -> {
-                    runHandle(this, stanza);
+                    runHandle(this, stanza, LOGGER);
                     return null;
                 }, executor);
             });
@@ -171,6 +181,7 @@ public sealed interface SocketStreamHandler permits SocketStreamHandler.Concurre
          */
         @Override
         public void reset() {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "clearing {0} ordered stanza chains", chains.size());
             chains.clear();
         }
 

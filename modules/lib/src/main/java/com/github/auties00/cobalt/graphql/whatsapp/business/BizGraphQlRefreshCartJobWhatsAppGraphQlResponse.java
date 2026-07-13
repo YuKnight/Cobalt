@@ -24,12 +24,12 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the refresh-cart query built by
+ * Parses the graph.whatsapp.com GraphQL response of the refresh-cart query built by
  * {@link BizGraphQlRefreshCartJobWhatsAppGraphQlRequest} into a {@link BusinessRefreshedCart}.
  *
  * <p>Reads the linked {@code xwa_checkout_refresh_cart} root and projects its {@code cart} child onto
  * the Cobalt domain model: each refreshed product's identity, price, currency, thumbnail, sale window,
- * and per-line cap, plus the cart-level price breakdown. The relay's richer per-product detail
+ * and per-line cap, plus the cart-level price breakdown. The graph.whatsapp.com endpoint's richer per-product detail
  * (variant matrices, compliance, moderation, full media galleries) is not surfaced by this projection.
  *
  * @see BizGraphQlRefreshCartJobWhatsAppGraphQlRequest
@@ -37,7 +37,7 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebBizGraphQLRefreshCartJobQuery")
 public final class BizGraphQlRefreshCartJobWhatsAppGraphQlResponse implements WhatsAppGraphQlOperation.Response {
     /**
-     * Default per-line cart-item cap WhatsApp applies when the relay omits a per-product override.
+     * Default per-line cart-item cap WhatsApp applies when the graph.whatsapp.com endpoint omits a per-product override.
      */
     private static final int DEFAULT_MAX_AVAILABLE = 99;
 
@@ -51,14 +51,14 @@ public final class BizGraphQlRefreshCartJobWhatsAppGraphQlResponse implements Wh
      *
      * <p>Reserved for the static parser.
      *
-     * @param cart the parsed refreshed cart, or {@code null} when the relay omitted the field
+     * @param cart the parsed refreshed cart, or {@code null} when the graph.whatsapp.com endpoint omitted the field
      */
     private BizGraphQlRefreshCartJobWhatsAppGraphQlResponse(BusinessRefreshedCart cart) {
         this.cart = cart;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_checkout_refresh_cart} and projects its {@code cart} child
      * onto a {@link BusinessRefreshedCart}; the returned {@link Optional} is empty when {@code data} or
@@ -190,7 +190,7 @@ public final class BizGraphQlRefreshCartJobWhatsAppGraphQlResponse implements Wh
     }
 
     /**
-     * Parses the relay's stringified {@code max_available} into the per-line cap.
+     * Parses the graph.whatsapp.com endpoint's stringified {@code max_available} into the per-line cap.
      *
      * @param raw the raw {@code max_available} string, or {@code null}
      * @return the parsed cap, or {@value #DEFAULT_MAX_AVAILABLE} when the value is missing or not a

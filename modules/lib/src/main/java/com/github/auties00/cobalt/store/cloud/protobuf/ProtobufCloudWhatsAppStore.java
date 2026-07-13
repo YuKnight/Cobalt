@@ -1,13 +1,17 @@
 package com.github.auties00.cobalt.store.cloud.protobuf;
 
+import com.github.auties00.cobalt.log.Log;
+import com.github.auties00.cobalt.model.mixin.PathMixin;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 import com.github.auties00.cobalt.util.BufferedProtobufOutputStream;
 import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
+import it.auties.protobuf.builtin.ProtobufLazyMixin;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -19,8 +23,6 @@ import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Stream;
-
-import static java.lang.System.Logger.Level.WARNING;
 
 /**
  * The protobuf-backed implementation of {@link CloudWhatsAppStore}.
@@ -118,24 +120,26 @@ public final class ProtobufCloudWhatsAppStore implements CloudWhatsAppStore {
     final ConcurrentMap<String, String> lastInboundMessageIdByChat;
 
     /**
-     * The logger used to report a failed {@link #save()}.
+     * The session directory this store serialises to, or {@code null} when the store has no durable
+     * backing (the transient variant).
+     *
+     * <p>Persisted as a {@link ProtobufType#STRING} through {@link PathMixin} so a restored store reopens
+     * the same directory without a separate wiring step; the persistent factory supplies it through the
+     * builder on creation and the deserializer restores it on load. The transient factory leaves it unset
+     * so {@link #save()} and {@link #delete()} are no-ops.
      */
-    private static final System.Logger logger = System.getLogger(ProtobufCloudWhatsAppStore.class.getName());
+    @ProtobufProperty(index = 13, type = ProtobufType.STRING, mixins = {PathMixin.class, ProtobufLazyMixin.class})
+    Path storeDirectory;
+
+    /**
+     * The logger for {@link ProtobufCloudWhatsAppStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufCloudWhatsAppStore.class);
 
     /**
      * The name of the metadata file written under the session directory.
      */
     private static final String STORE_FILE = "store.proto";
-
-    /**
-     * The session directory this store serialises to, or {@code null} when the store has no durable
-     * backing.
-     *
-     * <p>Not a protobuf property: the location is environment-specific and is supplied at runtime by the
-     * persistent factory through {@link #attachPersistence(Path)}, never serialised into the snapshot
-     * itself.
-     */
-    private Path storeDirectory;
 
     /**
      * Constructs a new Cloud store.
@@ -153,11 +157,13 @@ public final class ProtobufCloudWhatsAppStore implements CloudWhatsAppStore {
      * @param appId                     the Meta app id used by the Resumable Upload API, or {@code null}
      * @param lastInboundMessageIdByChat the last inbound message id per chat, or {@code null} for an
      *                                   empty map
+     * @param storeDirectory            the session directory this store serialises to, or {@code null}
+     *                                  for the transient variant
      */
     ProtobufCloudWhatsAppStore(String accessToken, String phoneNumberId, String whatsappBusinessAccountId,
                                String businessId, String apiVersion, String appSecret, String webhookVerifyToken,
                                String webhookBindAddress, Integer webhookPort, String webhookPath, String appId,
-                               ConcurrentMap<String, String> lastInboundMessageIdByChat) {
+                               ConcurrentMap<String, String> lastInboundMessageIdByChat, Path storeDirectory) {
         this.accessToken = accessToken;
         this.phoneNumberId = phoneNumberId;
         this.whatsappBusinessAccountId = whatsappBusinessAccountId;
@@ -170,6 +176,7 @@ public final class ProtobufCloudWhatsAppStore implements CloudWhatsAppStore {
         this.webhookPath = webhookPath;
         this.appId = appId;
         this.lastInboundMessageIdByChat = Objects.requireNonNullElseGet(lastInboundMessageIdByChat, ConcurrentHashMap::new);
+        this.storeDirectory = storeDirectory;
     }
 
     @Override
@@ -311,20 +318,6 @@ public final class ProtobufCloudWhatsAppStore implements CloudWhatsAppStore {
     }
 
     /**
-     * Binds this store to the session directory it serialises to.
-     *
-     * @apiNote
-     * Internal hook called by {@link com.github.auties00.cobalt.store.cloud.protobuf.PersistentCloudWhatsAppStoreFactory}
-     * immediately after the store is built or deserialised; the in-memory variant produced by the
-     * temporary factory leaves this unset so {@link #save()} and {@link #delete()} are no-ops.
-     *
-     * @param storeDirectory the per-session directory, or {@code null} to detach the durable backing
-     */
-    void attachPersistence(Path storeDirectory) {
-        this.storeDirectory = storeDirectory;
-    }
-
-    /**
      * {@inheritDoc}
      *
      * @implNote
@@ -349,12 +342,13 @@ public final class ProtobufCloudWhatsAppStore implements CloudWhatsAppStore {
                     ProtobufCloudWhatsAppStoreSpec.encode(this, stream);
                 }
                 Files.move(tempFile, path, StandardCopyOption.REPLACE_EXISTING);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "saved cloud store snapshot");
             } catch (IOException | RuntimeException error) {
                 Files.deleteIfExists(tempFile);
                 throw error;
             }
         } catch (IOException error) {
-            logger.log(WARNING, "Error while serializing Cloud store", error);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to save cloud store snapshot", error);
         }
     }
 
@@ -385,8 +379,10 @@ public final class ProtobufCloudWhatsAppStore implements CloudWhatsAppStore {
                 }
             });
         } catch (UncheckedIOException error) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to delete cloud store directory", error.getCause());
             throw error.getCause();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "deleted cloud store directory");
     }
 
     /**
@@ -409,7 +405,8 @@ public final class ProtobufCloudWhatsAppStore implements CloudWhatsAppStore {
                 && Objects.equals(webhookPort, that.webhookPort)
                 && Objects.equals(webhookPath, that.webhookPath)
                 && Objects.equals(appId, that.appId)
-                && Objects.equals(lastInboundMessageIdByChat, that.lastInboundMessageIdByChat);
+                && Objects.equals(lastInboundMessageIdByChat, that.lastInboundMessageIdByChat)
+                && Objects.equals(storeDirectory, that.storeDirectory);
     }
 
     /**
@@ -421,6 +418,6 @@ public final class ProtobufCloudWhatsAppStore implements CloudWhatsAppStore {
     public int hashCode() {
         return Objects.hash(accessToken, phoneNumberId, whatsappBusinessAccountId, businessId, apiVersion,
                 appSecret, webhookVerifyToken, webhookBindAddress, webhookPort, webhookPath, appId,
-                lastInboundMessageIdByChat);
+                lastInboundMessageIdByChat, storeDirectory);
     }
 }

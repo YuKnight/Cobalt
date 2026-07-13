@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.sync.action.SyncActionValueBuilder;
@@ -10,6 +11,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -27,6 +29,11 @@ import java.util.Objects;
  * parameter because the WA Web bundle assumes the caller never passes {@code null}.
  */
 public final class QuickReplyMutationFactory {
+    /**
+     * The logger for {@link QuickReplyMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(QuickReplyMutationFactory.class);
+
     /**
      * Constructs a quick-reply mutation factory.
      *
@@ -57,6 +64,7 @@ public final class QuickReplyMutationFactory {
     public SyncPendingMutation getQuickReplyDeleteMutation(String quickReplyId, Instant timestamp) {
         Objects.requireNonNull(quickReplyId, "quickReplyId cannot be null");
         Objects.requireNonNull(timestamp, "timestamp cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building quick reply delete mutation id={0}", quickReplyId);
         var action = new QuickReplyActionBuilder()
                 .deleted(true)
                 .keywords(List.of())
@@ -113,6 +121,7 @@ public final class QuickReplyMutationFactory {
         Objects.requireNonNull(message, "message cannot be null");
         Objects.requireNonNull(keywords, "keywords cannot be null");
         Objects.requireNonNull(timestamp, "timestamp cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building quick reply add-or-edit mutation id={0} count={1}", quickReplyId, count);
         var action = new QuickReplyActionBuilder()
                 .deleted(false)
                 .keywords(keywords)

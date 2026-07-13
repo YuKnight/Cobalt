@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.client.linked.info;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -27,6 +29,11 @@ import java.util.HexFormat;
  * @see WhatsAppMobileClientInfo
  */
 final class WhatsAppIosClientInfo implements WhatsAppMobileClientInfo {
+    /**
+     * The logger for {@link WhatsAppIosClientInfo}.
+     */
+    private static final System.Logger LOGGER = Log.get(WhatsAppIosClientInfo.class);
+
     /**
      * Holds the App Store lookup URL that returns JSON metadata for the consumer WhatsApp bundle.
      */
@@ -173,6 +180,7 @@ final class WhatsAppIosClientInfo implements WhatsAppMobileClientInfo {
      * @throws RuntimeException if the HTTP exchange fails
      */
     private static WhatsAppIosClientInfo queryIpaInfo(boolean business) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "querying app store for ios client info, business {0}", business);
         try(var httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.ALWAYS)
                 .build()) {
@@ -189,12 +197,18 @@ final class WhatsAppIosClientInfo implements WhatsAppMobileClientInfo {
             var jsonObject = JSON.parseObject(response.body());
             var results = jsonObject.getJSONArray("results");
             if (results == null || results.isEmpty()) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "app store lookup returned no results for ios client info, business {0}", business);
+                }
                 return null;
             }
 
             var result = results.getJSONObject(0);
             var version = result.getString("version");
             if (version == null) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "app store lookup missing version field for ios client info, business {0}", business);
+                }
                 return null;
             }
 
@@ -203,8 +217,14 @@ final class WhatsAppIosClientInfo implements WhatsAppMobileClientInfo {
             }
 
             var parsedVersion = ClientAppVersion.of(version);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "resolved ios client info, business {0}, version {1}", business, parsedVersion);
+            }
             return new WhatsAppIosClientInfo(parsedVersion, business);
         } catch (IOException | InterruptedException e) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "failed to query ios version, business " + business, e);
+            }
             throw new RuntimeException("Cannot query iOS version", e);
         }
     }

@@ -8,6 +8,7 @@ import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.MessageStatusListener;
 import com.github.auties00.cobalt.listener.NewMessageListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo;
 import com.github.auties00.cobalt.model.chat.ChatMessageInfo.StubType;
@@ -24,6 +25,7 @@ import com.github.auties00.cobalt.stream.message.PaymentMessageStatus;
 import com.github.auties00.cobalt.stream.message.PaymentMessageTransactionType;
 import com.github.auties00.cobalt.util.RandomIdUtils;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -42,9 +44,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebPaymentNotificationParser")
 final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurrent {
     /**
-     * Logs warnings about malformed stanzas and unsupported services such as Novi payments.
+     * The logger for {@link NotificationPaymentStreamHandler}.
      */
-    private static final System.Logger LOGGER = System.getLogger(NotificationPaymentStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationPaymentStreamHandler.class);
 
     /**
      * Reads the store, looks up messages, and writes orphan-payment records.
@@ -91,10 +93,11 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
                 stanza.getChild("transaction").ifPresent(this::handlePaymentTransaction);
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle payment notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "[missing-id]"),
-                    throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "failed to handle payment notification id=" + stanza.getAttributeAsString("id", "[missing-id]"),
+                        throwable);
+            }
         } finally {
             sendNotificationAck(stanza);
         }
@@ -119,9 +122,11 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
     private void handlePaymentInvite(Stanza stanza, Stanza invite) {
         var type = invite.getAttributeAsString("type", null);
         var service = invite.getAttributeAsString("service", null);
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Received payment invite notification type={0} service={1} id={2}",
-                type, service, stanza.getAttributeAsString("id", "[missing-id]"));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "received payment invite notification type={0} service={1} id={2}",
+                    type, service, stanza.getAttributeAsString("id", "[missing-id]"));
+        }
         if (!"account-set-up".equals(type)) {
             return;
         }
@@ -184,7 +189,9 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
     private void handlePaymentTransaction(Stanza transaction) {
         var service = transaction.getAttributeAsString("service", null);
         if (service != null && service.equalsIgnoreCase("NOVI")) {
-            LOGGER.log(System.Logger.Level.WARNING, "Payment notification from Novi not supported.");
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "payment notification from Novi not supported");
+            }
             return;
         }
 
@@ -203,6 +210,11 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
 
         var message = findPaymentMessage(remote, participant, messageId, fromMe);
         if (!(message instanceof ChatMessageInfo chatMessageInfo)) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "recording orphan payment notification for message id={0}, referenced message not yet in store",
+                        messageId);
+            }
             whatsapp.store().businessStore().addOrphanPaymentNotification(new OrphanPaymentNotificationBuilder()
                     .messageId(messageId)
                     .receiverJid(receiver)
@@ -246,6 +258,11 @@ final class NotificationPaymentStreamHandler extends SocketStreamHandler.Concurr
         paymentInfo.setStatus(mapPaymentStatus(type, status, fromMe));
         paymentInfo.setTxnStatus(mapTxnStatus(type, status, fromMe));
         chatMessageInfo.setPaymentInfo(paymentInfo);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "applied payment transaction type={0} status={1} -> {2}",
+                    type, status, paymentInfo.status().orElse(PaymentInfo.Status.UNKNOWN_STATUS));
+        }
 
         paymentInfo.requestMessageKey().ifPresent(requestKey -> {
             var requestIdOpt = requestKey.id();

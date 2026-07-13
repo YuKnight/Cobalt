@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.neteq;
 
 import com.github.auties00.cobalt.calls.media.audio.pipeline.AudioDecoderReceiver;
 import com.github.auties00.cobalt.calls.stream.AudioFrame;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -82,6 +84,11 @@ import com.github.auties00.cobalt.calls.media.video.jitter.AvSyncFeedbackSink;
  * payload type registry rather than hardwired.
  */
 public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, AvSyncFeedbackSink {
+    /**
+     * The logger for {@link LiveNetEq}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveNetEq.class);
+
     /**
      * The call audio sample rate in hertz, fixed at 16 kHz mono to match the public call audio format.
      *
@@ -406,6 +413,11 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
         this.insertTickBySequence = new HashMap<>();
         this.waitTimeSumMillis = 0;
         this.waitTimeCount = 0;
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "neteq: initialized, get period={0}ms min delay={1}ms max delay={2}ms",
+                    config.getPeriodMs(), minimumDelayMillis, maximumDelayMillis);
+        }
     }
 
     /**
@@ -425,6 +437,13 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
             if (packetBuffer.insert(packet)) {
                 insertTickBySequence.put(packet.sequenceNumber(), pullTick);
                 pruneStaleInsertTicks();
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "neteq: packet inserted seq={0} size={1}",
+                            packet.sequenceNumber(), packet.payload().length);
+                }
+            } else if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "neteq: packet discarded (duplicate or stale) seq={0}",
+                        packet.sequenceNumber());
             }
             delayManager.update(packet.arrivalMillis(), config.getPeriodMs());
             nackTracker.updateLastReceived(packet.sequenceNumber(), packet.arrivalMillis());
@@ -474,6 +493,9 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
         lock.lock();
         try {
             comfortNoisePayloadTypes.add(payloadType);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "neteq: registered comfort noise payload type={0}", payloadType);
+            }
         } finally {
             lock.unlock();
         }
@@ -494,6 +516,9 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
         lock.lock();
         try {
             telephoneEventPayloadTypes.add(payloadType);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "neteq: registered telephone event payload type={0}", payloadType);
+            }
         } finally {
             lock.unlock();
         }
@@ -637,6 +662,7 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
         lock.lock();
         try {
             this.currentRttMillis = Math.max(0, rttMillis);
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "neteq: rtt updated to {0}ms", currentRttMillis);
         } finally {
             lock.unlock();
         }
@@ -654,6 +680,10 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
         try {
             this.minimumDelayMillis = Math.max(0, minimumDelayMillis);
             this.maximumDelayMillis = Math.max(this.maximumDelayMillis, this.minimumDelayMillis);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "neteq: minimum delay set to {0}ms (max now {1}ms)",
+                        this.minimumDelayMillis, this.maximumDelayMillis);
+            }
         } finally {
             lock.unlock();
         }
@@ -670,6 +700,9 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
         lock.lock();
         try {
             this.maximumDelayMillis = Math.max(maximumDelayMillis, this.minimumDelayMillis);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "neteq: maximum delay set to {0}ms", this.maximumDelayMillis);
+            }
         } finally {
             lock.unlock();
         }
@@ -687,6 +720,7 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
         lock.lock();
         try {
             this.avSyncCorrectionMillis = correctionMillis;
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "neteq: avsync correction set to {0}ms", correctionMillis);
         } finally {
             lock.unlock();
         }
@@ -714,6 +748,10 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
     public void flush() {
         lock.lock();
         try {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "neteq: flushing buffer, dropping {0} queued packets after stall",
+                        packetBuffer.size());
+            }
             packetBuffer.clear();
             delayManager.reset();
             decisionLogic.reset();
@@ -798,6 +836,15 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
             pullTick++;
             var operation = chooseOperation();
             var decision = materialize(operation);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "neteq: decision={0} buffer span={1}ms target={2}ms",
+                        decision.operation(),
+                        packetBuffer.spanMillis(packetBuffer.approximateSamplesPerPacket()),
+                        effectiveTargetMillis());
+            }
+            if (decision.operation() != lastOperation && Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "neteq: operation {0} -> {1}", lastOperation, decision.operation());
+            }
             lastOperation = decision.operation();
             countOperation(decision.operation());
             return decision;
@@ -1019,11 +1066,14 @@ public final class LiveNetEq implements AudioDecoderReceiver.NetEqAudioSource, A
         lastFrameVoiceActive = false;
         if (decision.fecPayload() != null) {
             expand.notifyDecoded();
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "neteq: concealment via fec reconstruction");
             return fit(decoder.decode(decision.fecPayload(), frameSamples, true).samples(), frameSamples);
         }
         if (config.enableCodecPlc() && decoderAdvertisesPlc()) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "neteq: concealment via codec plc");
             return fit(decoder.conceal(frameSamples), frameSamples);
         }
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "neteq: concealment via built-in expander");
         return expand.process(syncBuffer, frameSamples);
     }
 

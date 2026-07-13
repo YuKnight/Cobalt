@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,8 @@ import com.github.auties00.cobalt.model.sync.action.bot.BotWelcomeRequestAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Tracks whether the per-bot welcome message has been requested for a given bot chat.
@@ -32,6 +35,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebBotWelcomeRequestSync")
 public final class BotWelcomeRequestHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link BotWelcomeRequestHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(BotWelcomeRequestHandler.class);
 
     /**
      * Constructs the singleton bot-welcome-request handler.
@@ -86,10 +93,12 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
     @WhatsAppWebExport(moduleName = "WAWebBotWelcomeRequestSync", exports = "default", adaptation = WhatsAppAdaptation.ADAPTED)
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         if (mutation.operation() == SyncdOperation.REMOVE) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "bot welcome request mutation unsupported: REMOVE operation");
             return MutationApplicationResult.unsupported();
         }
 
         if (mutation.operation() != SyncdOperation.SET) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "bot welcome request mutation failed: unexpected operation={0}", mutation.operation());
             return MutationApplicationResult.failed();
         }
 
@@ -97,24 +106,29 @@ public final class BotWelcomeRequestHandler implements WebAppStateActionHandler 
             var indexArray = JSON.parseArray(mutation.index());
             var chatJidString = indexArray.getString(1);
             if (chatJidString == null || chatJidString.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "bot welcome request mutation malformed: missing chat jid in index");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof BotWelcomeRequestAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "bot welcome request mutation malformed: missing action value");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var chatJid = Jid.of(chatJidString);
             var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "bot welcome request mutation orphaned: chat not found {0}", chatJid);
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
             var resolvedJid = chat.get().toJid();
             client.store().businessStore().putBotWelcomeRequestState(new BotWelcomeRequestStateBuilder().botJid(resolvedJid).requested(action.isSent()).build());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "bot welcome request state updated: bot={0} requested={1}", resolvedJid, action.isSent());
 
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "bot welcome request mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

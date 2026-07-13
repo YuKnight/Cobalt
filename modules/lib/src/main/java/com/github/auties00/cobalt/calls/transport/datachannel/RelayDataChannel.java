@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.calls.transport.datachannel;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.sctp.Message;
 import com.github.auties00.sctp.PayloadProtocolId;
 import com.github.auties00.sctp.SctpImplementation;
@@ -10,6 +11,7 @@ import com.github.auties00.sctp.exception.AssociationAbortedException;
 import com.github.auties00.sctp.exception.SendException;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
@@ -226,11 +228,9 @@ public final class RelayDataChannel implements LiveRelayTransport.DataChannel {
     private static final byte[] POISON = new byte[0];
 
     /**
-     * Logs the DTLS handshake and SCTP connect stages so a relay leg that stalls after ICE nomination shows
-     * exactly which step did not complete (DTLS ClientHello sent, first relay record received, handshake
-     * done, SCTP connected) rather than only the bring up thread's generic relay bind failure.
+     * The logger for {@link RelayDataChannel}.
      */
-    private static final System.Logger LOGGER = System.getLogger(RelayDataChannel.class.getName());
+    private static final System.Logger LOGGER = Log.get(RelayDataChannel.class);
 
     /**
      * Guards the one time log of the first outbound DTLS record so the handshake's first ClientHello is
@@ -309,11 +309,13 @@ public final class RelayDataChannel implements LiveRelayTransport.DataChannel {
         var datagramTransport = new RelayDatagramTransport();
         SctpSocket localSocket = null;
         try {
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls relay data-channel connect: starting DTLS handshake to {0}", relayAddress);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "relay data channel connect: starting dtls handshake to {0}", relayAddress);
+            }
             var dtls = handshake(datagramTransport);
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls relay DTLS handshake complete; connecting SCTP on port {0}", SCTP_PORT);
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "relay dtls handshake complete, connecting sctp on port {0}", SCTP_PORT);
+            }
             var channel = new DtlsByteChannel(dtls);
             localSocket = SctpSocket.builder(channel)
                     .name("calls-relay-sctp")
@@ -329,15 +331,26 @@ public final class RelayDataChannel implements LiveRelayTransport.DataChannel {
             this.stream = localSocket.selectStream(CHANNEL_STREAM);
             startReceivePump(localSocket);
             ready.set(true);
-            LOGGER.log(System.Logger.Level.INFO, "calls relay data channel ready (SCTP connected)");
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "relay data channel ready, sctp connected");
+            }
         } catch (WhatsAppCallException exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "relay data channel connect failed", exception);
+            }
             closeSocketQuietly(localSocket);
             throw exception;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "relay data channel bring-up interrupted", exception);
+            }
             closeSocketQuietly(localSocket);
             throw new WhatsAppCallException.DataChannel("relay data channel bring-up interrupted", exception);
         } catch (IOException | AssociationAbortedException | RuntimeException exception) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "relay data channel bring-up failed", exception);
+            }
             closeSocketQuietly(localSocket);
             throw new WhatsAppCallException.DataChannel("relay data channel bring-up failed", exception);
         }
@@ -433,9 +446,11 @@ public final class RelayDataChannel implements LiveRelayTransport.DataChannel {
         if (closed.get() || ppid == DcepMessage.PPID_DCEP) {
             return;
         }
-        LOGGER.log(System.Logger.Level.INFO, String.format(
-                "data-channel IN #%d: type=0x%s len=%d ppid=%d stream=%d",
-                inboundMessages.incrementAndGet(), messageType(payload), payload.length, ppid, streamId));
+        var count = inboundMessages.incrementAndGet();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "relay data-channel in #{0}: type=0x{1} len={2} ppid={3} stream={4}",
+                    count, messageType(payload), payload.length, ppid, streamId);
+        }
         var consumer = messageConsumer.get();
         if (consumer != null) {
             consumer.accept(payload);
@@ -484,20 +499,22 @@ public final class RelayDataChannel implements LiveRelayTransport.DataChannel {
                     .trySend(ByteBuffer.wrap(message));
             var rtp = message.length > 0 && (message[0] & 0xC0) == 0x80;
             if (!rtp) {
-                LOGGER.log(System.Logger.Level.INFO, String.format(
-                        "data-channel OUT ctrl: type=0x%s len=%d accepted=%b buffered=%d",
-                        messageType(message), message.length, accepted, bufferedAmount()));
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "relay data-channel out ctrl: type=0x{0} len={1} accepted={2} buffered={3}",
+                            messageType(message), message.length, accepted, bufferedAmount());
+                }
             } else {
                 var count = outboundMedia.incrementAndGet();
-                if (count == 1 || count % 100 == 0) {
-                    LOGGER.log(System.Logger.Level.INFO, String.format(
-                            "data-channel OUT media #%d: len=%d accepted=%b buffered=%d",
-                            count, message.length, accepted, bufferedAmount()));
+                if ((count == 1 || count % 100 == 0) && Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "relay data-channel out media #{0}: len={1} accepted={2} buffered={3}",
+                            count, message.length, accepted, bufferedAmount());
                 }
             }
             return accepted;
         } catch (SendException | AssociationAbortedException exception) {
-            LOGGER.log(System.Logger.Level.INFO, "data-channel OUT send threw: " + exception);
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "relay data-channel send failed", exception);
+            }
             return false;
         }
     }
@@ -550,9 +567,9 @@ public final class RelayDataChannel implements LiveRelayTransport.DataChannel {
         if (closed.get()) {
             return;
         }
-        if (firstInboundDtlsLogged.compareAndSet(false, true)) {
-            LOGGER.log(System.Logger.Level.INFO,
-                    "calls relay first inbound DTLS record from relay ({0} bytes)", record.length);
+        var firstInbound = firstInboundDtlsLogged.compareAndSet(false, true);
+        if (firstInbound && Log.INFO) {
+            LOGGER.log(Level.INFO, "relay first inbound dtls record from relay: {0} bytes", record.length);
         }
         // A non blocking offer keeps the socket reader thread from stalling; a record dropped because the
         // bounded queue is momentarily full is recovered by the DTLS retransmission.
@@ -632,9 +649,9 @@ public final class RelayDataChannel implements LiveRelayTransport.DataChannel {
                 return;
             }
             var sent = egress.send(record, relayAddress);
-            if (firstOutboundDtlsLogged.compareAndSet(false, true)) {
-                LOGGER.log(System.Logger.Level.INFO,
-                        "calls relay first outbound DTLS record (ClientHello) to {0}: {1} of {2} bytes accepted",
+            var firstOutbound = firstOutboundDtlsLogged.compareAndSet(false, true);
+            if (firstOutbound && Log.INFO) {
+                LOGGER.log(Level.INFO, "relay first outbound dtls record (clienthello) to {0}: {1} of {2} bytes accepted",
                         relayAddress, sent, record.length);
             }
         }

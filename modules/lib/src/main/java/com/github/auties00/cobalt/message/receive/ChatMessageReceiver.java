@@ -1,7 +1,8 @@
 package com.github.auties00.cobalt.message.receive;
 
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
-import com.github.auties00.cobalt.exception.WhatsAppMessageException.Receive.InvalidDeviceSentMessage.DsmErrorType;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException.Receive.InvalidDeviceSentMessage.DsmErrorType;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.addon.EncMessageFactory;
 import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
@@ -71,6 +72,7 @@ import com.github.auties00.cobalt.wam.type.QbmFlag;
 import com.github.auties00.cobalt.wam.type.ReportingTokenValidationFailureReason;
 import com.github.auties00.cobalt.wam.type.StructuredMessageClass;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -119,9 +121,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebMsgProcessingApiUtils")
 final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
     /**
-     * Logger used for per-stage decryption and protobuf-processing diagnostics.
+     * The logger for {@link ChatMessageReceiver}.
      */
-    private static final System.Logger LOGGER = System.getLogger(ChatMessageReceiver.class.getName());
+    private static final System.Logger LOGGER = Log.get(ChatMessageReceiver.class);
 
     /**
      * The {@code bizFeatureEnabled} dimension reported for the click-to-WhatsApp
@@ -223,14 +225,14 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         var stanza = MessageReceiveStanzaParser.parse(node, selfJid, selfLidJid);
 
         if (stanza.isUnavailable()) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Skipping unavailable (fanout) message {0}", stanza.id());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "skipping unavailable (fanout) message {0}", stanza.id());
             return null;
         }
 
         if (stanza.encs().isEmpty()) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Message {0} has no encrypted payloads", stanza.id());
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "message {0} has no encrypted payloads", stanza.id());
             return null;
         }
 
@@ -244,8 +246,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
             plaintext = decryptPayloads(stanza);
         } catch (WhatsAppMessageException.Receive e) {
             if (isExpiredStatus(stanza)) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Skipping decryption error for expired status {0}", stanza.id());
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "skipping decryption error for expired status {0}", stanza.id());
                 return null;
             }
             throw e;
@@ -323,8 +325,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
             var selectedHashes = EncMessageFactory.decryptPollVote(poll.vote().get(), pollCreation, voterJid);
             poll.setSelectedOptions(matchSelectedOptions(creation, selectedHashes));
         } catch (RuntimeException exception) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Could not auto-decrypt poll vote {0}: {1}", stanza.id(), exception.getMessage());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "could not auto-decrypt poll vote {0}: {1}", stanza.id(), exception.getMessage());
             commit(new MessageSecretErrorsEventBuilder()
                     .messageSecretAllowedList(MessageSecretAllowedType.MESSAGE_POLL)
                     .messageSecretError(MessageSecretErrorType.DECRYPTION_ERROR)
@@ -501,8 +503,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         var encs = stanza.encs();
         if (encs.size() == 2
                 && encs.getFirst().e2eType() == MessageEncryptionType.SKMSG) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Message {0}: SKMSG is out of order (should not be first of two encs)",
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "message {0}: skmsg is out of order (should not be first of two encs)",
                     stanza.id());
         }
     }
@@ -542,8 +544,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
 
         var deviceIdentityBytes = stanza.deviceIdentity().orElse(null);
         if (deviceIdentityBytes == null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Companion device {0} sent PKMSG without device-identity",
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "companion device {0} sent pkmsg without device-identity",
                     stanza.senderJid());
             throw new WhatsAppMessageException.Receive.AdvFailure(
                     "Missing device-identity for companion device: "
@@ -566,8 +568,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                     primaryJid.toSignalAddress());
 
             if (storedKey.isEmpty()) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "No stored identity for primary {0}, accepting ADV",
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "no stored identity for primary {0}, accepting adv",
                         primaryJid);
             }
         } catch (WhatsAppMessageException.Receive e) {
@@ -617,8 +619,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                 if (plaintext == null) {
                     plaintext = decrypted;
                 }
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Decrypted message {0} via {1}",
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                        "decrypted message {0} via {1}",
                         stanza.id(), enc.e2eType());
             } catch (WhatsAppMessageException.Receive e) {
                 messageDecryptor.handleError(enc, e);
@@ -787,8 +789,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         try {
             store.save();
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to flush signal store: {0}", e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to flush signal store", e);
         }
     }
 
@@ -850,16 +851,16 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         var distributionData = skdm.axolotlSenderKeyDistributionMessage()
                 .orElse(null);
         if (distributionData == null || distributionData.length == 0) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Sender key distribution missing data for {0}",
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "sender key distribution missing data for {0}",
                     stanza.id());
             return;
         }
 
         var groupJid = stanza.chatJid();
         if (!Objects.equals(groupJid, skdmGroupJid)) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Sender key distribution group ID mismatch: stanza={0}, proto={1}",
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "sender key distribution group id mismatch: stanza={0}, proto={1}",
                     groupJid, skdmGroupJid);
             return;
         }
@@ -867,13 +868,12 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         try {
             decryption.processSenderKeyDistribution(
                     groupJid, stanza.senderJid(), distributionData);
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Processed sender key distribution from {0} for {1}",
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "processed sender key distribution from {0} for {1}",
                     stanza.senderJid(), groupJid);
         } catch (Exception e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to process sender key distribution for {0}: {1}",
-                    stanza.id(), e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING,
+                    "failed to process sender key distribution for " + stanza.id(), e);
         }
     }
 
@@ -1186,8 +1186,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
         if (!channelsInvite || container.content() instanceof NewsletterFollowerInviteMessage) {
             return;
         }
-        LOGGER.log(System.Logger.Level.WARNING,
-                "Dropping message {0} with channels-invitation context source but non-invite content",
+        if (Log.WARNING) LOGGER.log(Level.WARNING,
+                "dropping message {0} with channels-invitation context source but non-invite content",
                 stanza.id());
         commit(new BroadcastInvalidChannelsContextSourceMessageDropEventBuilder()
                 .wasDropped(true)
@@ -1265,8 +1265,8 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
                         ReportingTokenValidationFailureReason.MISMATCH_REPORTING_TOKEN);
             }
         } catch (Exception exception) {
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Reporting-token validation error for {0}: {1}", stanza.id(), exception.getMessage());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "reporting-token validation error for {0}: {1}", stanza.id(), exception.getMessage());
         }
     }
 

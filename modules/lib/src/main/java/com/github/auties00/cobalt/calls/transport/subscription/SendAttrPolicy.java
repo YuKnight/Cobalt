@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.subscription;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,6 +36,11 @@ import com.github.auties00.cobalt.calls.transport.warp.WarpParticipantReport;
  *           trigger lives in the rate control layer.
  */
 public final class SendAttrPolicy {
+    /**
+     * The logger for {@link SendAttrPolicy}.
+     */
+    private static final System.Logger LOGGER = Log.get(SendAttrPolicy.class);
+
     /**
      * The maximum age, in milliseconds, of a downlink bandwidth sample for it to be attached.
      *
@@ -90,13 +98,22 @@ public final class SendAttrPolicy {
         }
 
         var report = inputs.participantReport();
+        var reportAttached = false;
         if (report.isPresent() && isParticipantReportDue(inputs.nowMs(), inputs.participantReportMinIntervalMs())) {
             attributes.add(new WarpAttribute.ParticipantReport(report.get()));
             lastParticipantReportMs = inputs.nowMs();
+            reportAttached = true;
         }
 
         if (attributes.size() == 1 && !inputs.controlPacketDue()) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "warp send attributes skipped, no control packet due");
+            }
             return Optional.empty();
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "warp send attributes chosen, count={0}, participantReport={1}",
+                    attributes.size(), reportAttached);
         }
         return Optional.of(new WarpMessage.Piggybacked(attributes));
     }

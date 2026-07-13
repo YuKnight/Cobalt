@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -18,6 +19,7 @@ import com.github.auties00.cobalt.wam.event.Lid11MigrationLifecycleEventBuilder;
 import com.github.auties00.cobalt.wam.type.MigrationStageEnum;
 import com.github.auties00.cobalt.wam.WamService;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -47,6 +49,11 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebDeviceCapabilitiesSync")
 public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link DeviceCapabilitiesHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(DeviceCapabilitiesHandler.class);
+
     /**
      * The legacy device-component value identifying the primary device in
      * the JID string parsed from the mutation index.
@@ -165,6 +172,7 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
                 ? entry
                 : null;
         if (capabilities == null || deviceJidString == null || deviceJidString.isBlank()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "device capabilities: skipping mutation, missing device jid or payload");
             return MutationApplicationResult.success();
         }
 
@@ -174,18 +182,22 @@ public final class DeviceCapabilitiesHandler implements WebAppStateActionHandler
                 .orElse(null);
         client.store().contactStore().putDeviceCapabilitiesEntry(new DeviceCapabilitiesEntryBuilder().deviceJid(deviceJid).capabilities(capabilities).build());
         if (Objects.equals(previous, capabilities)) {
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "device capabilities: unchanged for {0}", deviceJid);
             return MutationApplicationResult.success();
         }
 
         if (deviceJid.device() == PRIMARY_DEVICE) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "device capabilities: primary device capabilities updated {0}", deviceJid);
             client.store().contactStore().setPrimaryDeviceCapabilities(capabilities);
             capabilities.userHasAvatar()
                     .ifPresent(avatar -> client.store().accountStore().setHasAvatar(avatar.userHasAvatar()));
             capabilities.lidMigration()
                     .flatMap(DeviceCapabilities.LIDMigration::chatDbMigrationTimestamp)
                     .ifPresent(timestamp -> {
+                        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "device capabilities: observed chat db migration timestamp {0}", timestamp);
                         lidMigrationService.observeChatDbMigrationTimestamp(timestamp);
                         if (!lidMigrationService.isLidMigrated()) {
+                            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "device capabilities: committing lid 1:1 migration lifecycle event");
                             this.wamService.commit(new Lid11MigrationLifecycleEventBuilder()
                                     .migrationStage(MigrationStageEnum.COMPANION_RECEIVED_DEVICE_CAPABILITY)
                                     .isLocally1x1MigratedFromDb(lidMigrationService.isLidMigrated())

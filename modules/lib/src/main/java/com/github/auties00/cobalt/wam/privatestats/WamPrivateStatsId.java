@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.wam.privatestats;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.util.DataUtils;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -41,6 +43,11 @@ import java.util.function.LongSupplier;
 @WhatsAppWebModule(moduleName = "WAWebWamPrivateStats")
 @WhatsAppWebModule(moduleName = "WAWebWamGlobals")
 public final class WamPrivateStatsId {
+    /**
+     * The logger for {@link WamPrivateStatsId}.
+     */
+    private static final System.Logger LOGGER = Log.get(WamPrivateStatsId.class);
+
     /**
      * The number of seconds in a UTC day.
      *
@@ -162,6 +169,7 @@ public final class WamPrivateStatsId {
                 var newEntry = new Entry(entry.key, entry.keyHashInt, entry.rotationDays, value, now);
                 mapEntry.setValue(newEntry);
                 rotated.add(new RotationInfo(entry.keyHashInt, entry.rotationDays));
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "wam private stats id rotated key={0} hash={1}", entry.key, entry.keyHashInt);
             }
         }
         return rotated;

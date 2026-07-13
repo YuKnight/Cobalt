@@ -8,26 +8,29 @@ import com.github.auties00.cobalt.calls.engine.LifecycleController;
  * <p>Each call owns a fixed set of timers, one per {@link CallTimerKind}, that fire after
  * engine defined intervals and drive lifetime decisions (the lonely caller timeout, the connection
  * watchdog, and the rest). This seam lets the {@link LifecycleController} arm and cancel those timers
- * by kind without depending on how they are scheduled or on the bodies of the callbacks they run. The
- * controller arms the timers it drives directly as a call advances (the lonely caller timer and the
- * watchdog when an outbound call starts) and cancels every timer when the call tears down; each timer's
- * callback action belongs to the scheduler, which the controller never invokes directly.
+ * by kind without depending on how they are scheduled. The controller arms every timer it drives as a
+ * call advances (the lonely caller timer and the watchdog when an outbound call starts, the connected
+ * lonely timer when the call enters that state) and cancels every timer when the call tears down; the
+ * scheduler holds no reference to the controller, so the controller supplies each timer's fire action at
+ * arm time.
  *
  * @apiNote This is an internal engine collaborator, not a public surface; embedders never call it.
  */
 public interface CallTimerScheduler {
     /**
-     * Arms the given timer for the identified call.
+     * Arms the given timer for the identified call, running {@code action} when it fires.
      *
-     * <p>The timer fires after the interval defined for its {@link CallTimerKind} and runs its callback,
-     * which the scheduler owns. Arming a timer that is already armed for the call re arms it at a fresh
-     * deadline rather than stacking a second entry.
+     * <p>The timer fires after the interval defined for its {@link CallTimerKind} and runs {@code action}:
+     * once for a terminal timer (the lonely timeouts) or on each tick for a repeating timer (the watchdog
+     * and heartbeat). Arming a timer that is already armed for the call re arms it at a fresh deadline
+     * rather than stacking a second entry.
      *
      * @param callId the identifier of the call whose timer is being armed
      * @param kind   the timer to arm
-     * @throws NullPointerException if {@code callId} or {@code kind} is {@code null}
+     * @param action the fire action the controller supplies, run when the timer fires
+     * @throws NullPointerException if {@code callId}, {@code kind}, or {@code action} is {@code null}
      */
-    void arm(String callId, CallTimerKind kind);
+    void arm(String callId, CallTimerKind kind, Runnable action);
 
     /**
      * Cancels the given timer for the identified call.

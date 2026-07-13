@@ -24,8 +24,6 @@ import java.util.OptionalInt;
  * list further when both a Facebook page and a WhatsApp Business page are
  * linked. The {@link #draftPageId() draft page id} selects the page whose
  * most recent unpublished draft is read. The
- * {@link #optionsJson() options} are passed verbatim as a JSON-encoded
- * object because the field set is defined by the server. The
  * {@link #pageSize() page size} and {@link #afterCursor() cursor} window
  * the boosted-ads list.
  */
@@ -59,14 +57,6 @@ public final class BusinessAdManagementRootQuery {
     final String draftPageId;
 
     /**
-     * JSON-encoded boosted-ads connection options. The field set is
-     * defined by the server and is carried verbatim. Unset omits the
-     * variable.
-     */
-    @ProtobufProperty(index = 4, type = ProtobufType.STRING)
-    final String optionsJson;
-
-    /**
      * Maximum number of boosted-ad entries to return in the forward
      * page. Mirrors the standard forward-pagination count. Unset omits
      * the variable.
@@ -91,17 +81,14 @@ public final class BusinessAdManagementRootQuery {
      * @param secondaryPageId the secondary page identifier, or
      *                        {@code null}
      * @param draftPageId     the draft page identifier, or {@code null}
-     * @param optionsJson     the JSON-encoded connection options, or
-     *                        {@code null}
      * @param pageSize        the forward-pagination count, or {@code null}
      * @param afterCursor     the forward-pagination cursor, or {@code null}
      */
     public BusinessAdManagementRootQuery(String primaryPageId, String secondaryPageId, String draftPageId,
-                                         String optionsJson, Integer pageSize, String afterCursor) {
+                                         Integer pageSize, String afterCursor) {
         this.primaryPageId = primaryPageId;
         this.secondaryPageId = secondaryPageId;
         this.draftPageId = draftPageId;
-        this.optionsJson = optionsJson;
         this.pageSize = pageSize;
         this.afterCursor = afterCursor;
     }
@@ -137,15 +124,6 @@ public final class BusinessAdManagementRootQuery {
     }
 
     /**
-     * Returns the JSON-encoded boosted-ads connection options.
-     *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
-     */
-    public Optional<String> optionsJson() {
-        return Optional.ofNullable(optionsJson);
-    }
-
-    /**
      * Returns the forward-pagination page size.
      *
      * @return an {@link OptionalInt} carrying the size, or empty when
@@ -173,14 +151,13 @@ public final class BusinessAdManagementRootQuery {
         return Objects.equals(primaryPageId, that.primaryPageId)
                 && Objects.equals(secondaryPageId, that.secondaryPageId)
                 && Objects.equals(draftPageId, that.draftPageId)
-                && Objects.equals(optionsJson, that.optionsJson)
                 && Objects.equals(pageSize, that.pageSize)
                 && Objects.equals(afterCursor, that.afterCursor);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(primaryPageId, secondaryPageId, draftPageId, optionsJson, pageSize,
+        return Objects.hash(primaryPageId, secondaryPageId, draftPageId, pageSize,
                 afterCursor);
     }
 
@@ -190,7 +167,6 @@ public final class BusinessAdManagementRootQuery {
                 "primaryPageId=" + primaryPageId + ", " +
                 "secondaryPageId=" + secondaryPageId + ", " +
                 "draftPageId=" + draftPageId + ", " +
-                "optionsJson=" + optionsJson + ", " +
                 "pageSize=" + pageSize + ", " +
                 "afterCursor=" + afterCursor + ']';
     }

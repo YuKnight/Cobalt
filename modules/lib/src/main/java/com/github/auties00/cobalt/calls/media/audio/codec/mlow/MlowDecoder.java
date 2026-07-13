@@ -7,7 +7,9 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.LpcInterpolator;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.SubframeLpc;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.param.ParamDecoder;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,6 +54,11 @@ import java.util.List;
  * matching the float tolerance carried from the filter and LPC stages.
  */
 public final class MlowDecoder {
+    /**
+     * The logger for {@link MlowDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(MlowDecoder.class);
+
     /**
      * Linear prediction order of the MLow short term filter, and the count of synthesis memory history samples
      * carried across frames.
@@ -275,6 +282,7 @@ public final class MlowDecoder {
         prevNrgres = 0.0f;
         tiltState[0] = 0.0f;
         lastToc = null;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls mlow decoder: stream reset");
     }
 
     /**
@@ -332,6 +340,7 @@ public final class MlowDecoder {
      */
     public float[] decodeFloat(byte[] packet) {
         if (packet == null || packet.length < 1) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow decode: empty packet");
             throw new IllegalArgumentException("empty MLow packet");
         }
         int toc = packet[0] & 0xFF;
@@ -394,6 +403,7 @@ public final class MlowDecoder {
      */
     public DecodeResult decodeWithSynthesis(byte[] packet, boolean lpcPostfilterEnabled, boolean fecRecovery) {
         if (packet == null || packet.length < 1) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow decode: empty packet");
             throw new IllegalArgumentException("empty MLow packet");
         }
         List<PacketSynthesis> packets = new ArrayList<>();
@@ -422,6 +432,7 @@ public final class MlowDecoder {
     private void decodeMultiframeWithSynthesis(byte[] packet, List<PacketSynthesis> out,
                                                boolean lpcPostfilterEnabled) {
         if (packet.length < 2) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow decode: truncated multiframe packet");
             throw new IllegalArgumentException("truncated multiframe MLow packet");
         }
         int numFrames = packet[1] & 0xFF;
@@ -484,6 +495,9 @@ public final class MlowDecoder {
     private PacketSynthesis decodeFrameWithSynthesis(byte[] packet, int offset, int length,
                                                      boolean lpcPostfilterEnabled, boolean fecRecovery) {
         MlowTocByte tocByte = MlowTocByte.decode(packet[offset] & 0xFF);
+        if (fecRecovery && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "calls mlow decode: fec recovery, bytes={0}", length);
+        }
         plc.reset(tocByte.sid());
         lastToc = tocByte;
         ParamDecoder.DecodedFrame[] decodedFrames =
@@ -536,6 +550,7 @@ public final class MlowDecoder {
      * @return the concealed packet's pre postfilter synthesis and decode parameters, a single element result
      */
     public DecodeResult concealWithSynthesis(int packetSamples, boolean lpcPostfilterEnabled) {
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow packet loss concealment: samples={0}", packetSamples);
         boolean lowRate = lastToc != null && lastToc.lowRate();
         int frameLength = 20 * CELP_FS_KHZ;
         int numFrames = packetSamples / frameLength;
@@ -881,6 +896,7 @@ public final class MlowDecoder {
      */
     private float[] decodeMultiframe(byte[] packet) {
         if (packet.length < 2) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow decode: truncated multiframe packet");
             throw new IllegalArgumentException("truncated multiframe MLow packet");
         }
         int numFrames = packet[1] & 0xFF;

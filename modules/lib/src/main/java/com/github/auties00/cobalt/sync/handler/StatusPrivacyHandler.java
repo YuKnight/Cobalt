@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -15,6 +16,8 @@ import com.github.auties00.cobalt.model.sync.action.media.StatusPrivacyAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,6 +34,10 @@ import java.util.List;
  */
 @WhatsAppWebModule(moduleName = "WAWebStatusPrivacySettingSync")
 public final class StatusPrivacyHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link StatusPrivacyHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(StatusPrivacyHandler.class);
 
     /**
      * Constructs the handler.
@@ -90,6 +97,8 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
     @WhatsAppWebExport(moduleName = "WAWebStatusPrivacySettingSync", exports = "applyMutations", adaptation = WhatsAppAdaptation.ADAPTED)
     public List<MutationApplicationResult> applyMutationBatch(LinkedWhatsAppClient client, List<DecryptedMutation.Trusted> mutations) {
         if (mutations.size() != 1) {
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "status privacy: unexpected batch size={0}, expected 1", mutations.size());
             var malformed = new ArrayList<MutationApplicationResult>(mutations.size());
             for (var i = 0; i < mutations.size(); i++) {
                 malformed.add(MutationApplicationResult.malformed());
@@ -105,6 +114,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
         try {
             return List.of(applySetMutation(client, last));
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "status privacy mutation batch failed", e);
             return List.of(MutationApplicationResult.failed());
         }
     }
@@ -128,6 +138,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
         try {
             return applySetMutation(client, mutation);
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "status privacy mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }
@@ -165,6 +176,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
 
         var mode = action.mode().orElse(null);
         if (mode == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "status privacy: malformed mutation, missing mode");
             return SyncdIndexUtils.malformedActionValue(collectionName().name());
         }
 
@@ -190,6 +202,7 @@ public final class StatusPrivacyHandler implements WebAppStateActionHandler {
 
         if (setting != null) {
             client.store().settingsStore().setStatusPrivacy(setting);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "status privacy: set mode={0}", mode);
         }
         return MutationApplicationResult.success();
     }

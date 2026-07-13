@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.device.icdc;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
@@ -40,6 +42,11 @@ import java.util.*;
 @WhatsAppWebModule(moduleName = "WAWebIdentityIcdcApi")
 @WhatsAppWebModule(moduleName = "WAWebIdentityApiUtils")
 public final class IcdcComputer {
+
+    /**
+     * The logger for {@link IcdcComputer}.
+     */
+    private static final System.Logger LOGGER = Log.get(IcdcComputer.class);
 
     /**
      * Holds the lower bound for the truncated hash length.
@@ -207,6 +214,11 @@ public final class IcdcComputer {
             }
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "computed icdc for {0}: hasCompanionDevices={1}, hashLen={2}, accountType={3}",
+                    userJid, hasCompanionDevices, keyHash != null ? keyHash.length : 0, accountType);
+        }
+
         return new IcdcResult(keyHash, resultTimestamp, keyIndexes, accountType);
     }
 
@@ -234,6 +246,10 @@ public final class IcdcComputer {
             exports = "identityKeysToBinary",
             adaptation = WhatsAppAdaptation.DIRECT)
     static byte[] computeIdentityHash(List<byte[]> identityKeys, int hashLength) {
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "computing identity hash from {0} keys, target length {1}",
+                    identityKeys.size(), hashLength);
+        }
         try {
             var sorted = new ArrayList<>(identityKeys);
             sorted.sort(IcdcComputer::compareKeyBytes);

@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 /**
  * Exercises the behavioural state machine of {@link WamService} through a
- * {@link TestableWamService} subclass that stubs the four abstract
+ * {@link TestableWamService} subclass that stubs the four protected
  * timing/scheduling hooks, validating commit dispatch and channel routing,
  * the sampling-override surface, the {@code WAWebWamInitQueue} pre-init
  * fallback, close idempotency, per-channel sequence-number wrap, retry and
@@ -116,7 +116,7 @@ class WamServiceTest {
 
     /**
      * Commit-dispatch tests covering {@link WamChannel#REGULAR} routing
-     * after {@link WamService#markInitializedForTesting()} flips the
+     * after {@link LiveWamService#markInitializedForTesting()} flips the
      * service into the post-init phase; the pre-init deferral path is
      * covered by {@link InitQueueReplay}.
      */
@@ -200,9 +200,9 @@ class WamServiceTest {
     /**
      * Init-queue tests covering the {@code WAWebWamInitQueue} fallback
      * path: a commit that arrives before {@link WamService#initialize()}
-     * (or {@link WamService#markInitializedForTesting()}) has run is
+     * (or {@link LiveWamService#markInitializedForTesting()}) has run is
      * deferred to the init queue and replayed when
-     * {@link WamService#drainInitQueue()} runs, so validation, sampling,
+     * {@link LiveWamService#drainInitQueue()} runs, so validation, sampling,
      * and dispatch all happen at drain time against the live runtime, not
      * at the original commit point.
      */
@@ -325,7 +325,7 @@ class WamServiceTest {
     }
 
     /**
-     * Tests covering {@link WamService#checkMidCycleUpload()}, the
+     * Tests covering {@link LiveWamService#checkMidCycleUpload()}, the
      * five-second serialize tick's threshold-driven early-flush behaviour.
      */
     @Nested
@@ -470,7 +470,7 @@ class WamServiceTest {
     }
 
     /**
-     * Test double for {@link WamService} that stubs the four abstract
+     * Test double for {@link WamService} that stubs the four protected
      * timing/scheduling hooks with deterministic capture lists: tests
      * inspect {@link #sleepRequests} and {@link #scheduledRunnables} after
      * exercising the service, and neither {@link #sleep(long)} nor
@@ -478,7 +478,7 @@ class WamServiceTest {
      * schedules. The virtual clock advances on each {@link #sleep(long)}
      * so the connectivity-wait deadline check terminates deterministically.
      */
-    private static final class TestableWamService extends WamService {
+    private static final class TestableWamService extends LiveWamService {
         private final AtomicReference<Instant> now = new AtomicReference<>(Instant.ofEpochSecond(1_747_000_000L));
 
         final List<Long> sleepRequests = new ArrayList<>();
@@ -513,7 +513,7 @@ class WamServiceTest {
 
     /**
      * One captured
-     * {@link WamService#scheduleRecurring(Runnable, long, long)}
+     * {@link LiveWamService#scheduleRecurring(Runnable, long, long)}
      * invocation; tests pop entries off
      * {@link TestableWamService#scheduledRunnables} and assert the
      * captured task and timing arguments against the production call site.
@@ -740,7 +740,7 @@ class WamServiceTest {
      * in-memory store and a controllable response sequence; the captured
      * {@link TestableWamService#sleepRequests} are asserted against the
      * exponential-backoff delays computed by
-     * {@link WamService#computeBackoffDelay(int)}.
+     * {@link LiveWamService#computeBackoffDelay(int)}.
      */
     @Nested
     @DisplayName("retry / backoff")
@@ -753,14 +753,14 @@ class WamServiceTest {
         @DisplayName("computeBackoffDelay clamps low/high and lies within the 10% jitter band")
         void backoffFormulaBounds() {
             for (var attempt = 0; attempt < 4; attempt++) {
-                var actual = WamService.computeBackoffDelay(attempt);
+                var actual = LiveWamService.computeBackoffDelay(attempt);
                 assertTrue(actual >= 1_000 && actual <= 1_100,
                         "attempt=" + attempt + " should clamp to base [1000, 1100], was " + actual);
             }
-            var mid = WamService.computeBackoffDelay(10);
+            var mid = LiveWamService.computeBackoffDelay(10);
             assertTrue(mid >= 1_024 && mid <= (long) (1_024 * 1.1),
                     "attempt=10 should be in [1024, ~1126], was " + mid);
-            var clamped = WamService.computeBackoffDelay(20);
+            var clamped = LiveWamService.computeBackoffDelay(20);
             assertTrue(clamped >= 120_000 && clamped <= (long) (120_000 * 1.1),
                     "attempt=20 should clamp to max [120_000, 132_000], was " + clamped);
         }

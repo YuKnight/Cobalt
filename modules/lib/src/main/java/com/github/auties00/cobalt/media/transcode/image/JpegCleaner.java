@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.media.transcode.image;
 
-import com.github.auties00.cobalt.exception.WhatsAppMediaException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMediaException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 
 import java.io.ByteArrayOutputStream;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +35,9 @@ import java.nio.charset.StandardCharsets;
 @WhatsAppWebModule(moduleName = "WAWebMediaJpeg")
 @WhatsAppWebModule(moduleName = "WAProgressiveJpegMarkers")
 public final class JpegCleaner {
+    /** The logger for {@link JpegCleaner}. */
+    private static final System.Logger LOGGER = Log.get(JpegCleaner.class);
+
     /**
      * Length in bytes of the synthetic JFIF APP0 header emitted before any retained segment.
      */
@@ -184,7 +189,7 @@ public final class JpegCleaner {
      * Prevents instantiation; the type exposes only the static {@link #clean(byte[])} entry point.
      */
     private JpegCleaner() {
-        throw new UnsupportedOperationException();
+        throw new AssertionError();
     }
 
     /**
@@ -210,6 +215,7 @@ public final class JpegCleaner {
      */
     @WhatsAppWebExport(moduleName = "WAWebMediaJpeg", exports = "cleanJPEG", adaptation = WhatsAppAdaptation.DIRECT)
     public static byte[] clean(byte[] source) throws WhatsAppMediaException.Processing {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cleaning jpeg: bytes={0}", source.length);
         var input = ByteBuffer.wrap(source).order(ByteOrder.BIG_ENDIAN);
         var output = new ByteArrayOutputStream(source.length) {
             @Override
@@ -223,6 +229,7 @@ public final class JpegCleaner {
         var app0Seen = false;
         var eoiSeen = false;
         if (readUnsigned8(input) != MARKER_PREFIX || readUnsigned8(input) != MARKER_SOI) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "jpeg missing SOI marker at start of file");
             throw new WhatsAppMediaException.Processing("SOI marker not at the start of the file");
         }
         var currentMarker = -1;
@@ -295,6 +302,7 @@ public final class JpegCleaner {
                         prev = cur;
                     }
                     if (nextMarker < 0) {
+                        if (Log.WARNING) LOGGER.log(Level.WARNING, "jpeg sos stream truncated before next marker");
                         throw new WhatsAppMediaException.Processing("Premature end of SOS stream");
                     }
                     var markerBytesAlreadyConsumed = MARKER_SIZE;
@@ -326,9 +334,17 @@ public final class JpegCleaner {
                         output.write(source, segmentStart, totalBytes);
                         input.position(segmentStart + totalBytes);
                     } else if (currentMarker >= MARKER_APP_LO && currentMarker <= MARKER_APP_HI) {
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING, "jpeg unexpected APP marker: 0x{0}",
+                                    Integer.toHexString(currentMarker));
+                        }
                         throw new WhatsAppMediaException.Processing(
                                 "Received unexpected APP marker 0x" + Integer.toHexString(currentMarker));
                     } else {
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING, "jpeg unrecognised marker: 0x{0}",
+                                    Integer.toHexString(currentMarker));
+                        }
                         throw new WhatsAppMediaException.Processing(
                                 "Did not understand marker: 0x" + Integer.toHexString(currentMarker));
                     }
@@ -340,6 +356,7 @@ public final class JpegCleaner {
             }
         }
         if (!eoiSeen) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "jpeg truncated: no EOI tag found");
             throw new WhatsAppMediaException.Processing("No EOI tag found");
         }
         var jfifPrefix = buildJfifPrefix(props);
@@ -347,6 +364,7 @@ public final class JpegCleaner {
         var result = new byte[jfifPrefix.length + body.length];
         System.arraycopy(jfifPrefix, 0, result, 0, jfifPrefix.length);
         System.arraycopy(body, 0, result, jfifPrefix.length, body.length);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "jpeg cleaned: outputBytes={0}", result.length);
         return result;
     }
 

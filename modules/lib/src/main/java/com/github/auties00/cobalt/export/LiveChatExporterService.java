@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.export;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -40,6 +41,7 @@ import com.github.auties00.cobalt.wam.type.WebcMessageQueryDirection;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -71,6 +73,11 @@ import java.util.zip.ZipOutputStream;
  */
 @WhatsAppWebModule(moduleName = "WAWebExportChatAction")
 public final class LiveChatExporterService implements ChatExporterService {
+    /**
+     * The logger for {@link LiveChatExporterService}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveChatExporterService.class);
+
     /**
      * The maximum size, in bytes, of a media attachment that the exporter
      * will download. Attachments larger than this are skipped and rendered
@@ -171,6 +178,9 @@ public final class LiveChatExporterService implements ChatExporterService {
         var dateRangeUsed = options.startDate().isPresent() || options.endDate().isPresent();
         var startMs = System.currentTimeMillis();
         try {
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "chat export started: chat={0}, mode={1}, dateRangeUsed={2}", chat.jid(), exportMode, dateRangeUsed);
+            }
             var title = resolveTitle(chat, chatTitle);
 
             List<ChatMessageInfo> collected;
@@ -179,6 +189,7 @@ public final class LiveChatExporterService implements ChatExporterService {
                 collected = stream.toList();
             }
             commitMessageQuery(chat.jid(), collected, System.currentTimeMillis() - queryStartMs);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat export loaded {0} messages for {1}", collected.size(), chat.jid());
 
             var start = options.startDate().orElse(null);
             var end = options.endDate().orElse(null);
@@ -203,6 +214,10 @@ public final class LiveChatExporterService implements ChatExporterService {
             List<ChatMessageInfo> messages = hasMoreHistory
                     ? filtered.subList(filtered.size() - limit, filtered.size())
                     : filtered;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "chat export filtered to {0} messages, capped to {1}, hasMoreHistory={2}",
+                        filtered.size(), messages.size(), hasMoreHistory);
+            }
 
             var downloadedMediaMsgIds = new HashSet<String>();
             var mediaCount = 0;
@@ -214,6 +229,7 @@ public final class LiveChatExporterService implements ChatExporterService {
                             mediaCount++;
                         }
                     }
+                    if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat export bundled {0} media attachments", mediaCount);
                 }
 
                 var txt = formatPlainText(messages, options.includeMedia(), hasMoreHistory, downloadedMediaMsgIds)
@@ -226,6 +242,7 @@ public final class LiveChatExporterService implements ChatExporterService {
                 throw new UncheckedIOException("Failed to assemble the chat export archive", exception);
             }
 
+            var durationMs = System.currentTimeMillis() - startMs;
             wamService.commit(new ChatExportEventBuilder()
                     .chatType(chatType)
                     .exportMode(exportMode)
@@ -233,10 +250,17 @@ public final class LiveChatExporterService implements ChatExporterService {
                     .exportMessageCount(messages.size())
                     .mediaCount(mediaCount)
                     .exportFileSizeBytes((int) countingOutput.bytesWritten())
-                    .exportDurationMs((int) (System.currentTimeMillis() - startMs))
+                    .exportDurationMs((int) durationMs)
                     .exportDateRangeUsed(dateRangeUsed ? 1 : 0)
                     .build());
+            if (Log.INFO) {
+                LOGGER.log(Level.INFO, "chat export completed: chat={0}, messages={1}, media={2}, bytes={3}, durationMs={4}",
+                        chat.jid(), messages.size(), mediaCount, countingOutput.bytesWritten(), durationMs);
+            }
         } catch (RuntimeException error) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "chat export failed for " + Log.jid(chat.jid().toString()), error);
+            }
             wamService.commit(new ChatExportEventBuilder()
                     .chatType(chatType)
                     .exportMode(exportMode)
@@ -412,12 +436,14 @@ public final class LiveChatExporterService implements ChatExporterService {
             try (var in = client.downloadMedia(media)) {
                 bytes = in.readNBytes((int) MAX_MEDIA_BYTES + 1);
             }
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
             // A single failed media transfer is non-fatal: the message is
             // still exported, rendered as an omitted attachment.
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "chat export media download failed, omitting attachment", exception);
             return false;
         }
         if (bytes.length > MAX_MEDIA_BYTES) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "chat export media exceeds size limit, omitting attachment: bytes={0}", bytes.length);
             return false;
         }
         putEntry(zip, "media/" + mediaFileName(info, content), bytes);

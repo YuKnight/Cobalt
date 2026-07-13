@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.calls.signaling;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.crypto.MessageEncryptedPayload;
 import com.github.auties00.cobalt.model.jid.Jid;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.StanzaBuilder;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -98,6 +100,11 @@ import com.github.auties00.cobalt.calls.signaling.waitingroom.WaitingRoomUpdateS
  * decoder enforces the attributes it requires.
  */
 public final class CallStanza {
+    /**
+     * The logger for {@link CallStanza}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallStanza.class);
+
     /**
      * The wire element tag of the call signaling envelope.
      */
@@ -380,6 +387,8 @@ public final class CallStanza {
         Objects.requireNonNull(message, "message cannot be null");
         Objects.requireNonNull(to, "to cannot be null");
         Objects.requireNonNull(id, "id cannot be null");
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "call stanza built: id={0} type={1} to={2}", id, message.type(), to);
         return new StanzaBuilder()
                 .description(ELEMENT)
                 .attribute(TO_ATTRIBUTE, to)
@@ -470,6 +479,11 @@ public final class CallStanza {
         Objects.requireNonNull(callId, "callId cannot be null");
         Objects.requireNonNull(destinationPayloads, "destinationPayloads cannot be null");
         Objects.requireNonNull(deviceIdentity, "deviceIdentity cannot be null");
+
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG,
+                    "call offer built: id={0} target={1} video={2} group={3} destinations={4}",
+                    callId, target, video, groupJid != null, destinationPayloads.size());
 
         var capabilityBytes = capability != null ? capability : DEFAULT_CAPABILITY_BYTES;
 
@@ -696,10 +710,18 @@ public final class CallStanza {
      */
     public static Optional<CallMessage> parse(Stanza payload) {
         Objects.requireNonNull(payload, "payload cannot be null");
-        var decoder = DECODERS.get(payload.description());
+        var tag = payload.description();
+        var decoder = DECODERS.get(tag);
         if (decoder == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call stanza tag not decodable: {0}", tag);
             return Optional.empty();
         }
-        return Optional.ofNullable(decoder.apply(payload));
+        var decoded = decoder.apply(payload);
+        if (decoded == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call stanza element undecodable: {0}", tag);
+        } else if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "call stanza parsed: tag={0} type={1}", tag, decoded.type());
+        }
+        return Optional.ofNullable(decoded);
     }
 }

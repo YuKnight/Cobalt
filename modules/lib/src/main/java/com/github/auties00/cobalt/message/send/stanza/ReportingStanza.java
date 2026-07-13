@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.stanza;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.send.token.ReportingToken;
 import com.github.auties00.cobalt.message.send.token.ReportingTokenContent;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
@@ -18,6 +19,7 @@ import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import com.github.auties00.cobalt.model.props.ABProp;
 import com.github.auties00.cobalt.props.ABPropsService;
 
+import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
 import java.util.Objects;
 
@@ -36,9 +38,9 @@ import java.util.Objects;
 @WhatsAppWebModule(moduleName = "WAWebMessagePluginGenerateReportingTokenContent")
 public final class ReportingStanza {
     /**
-     * Logs reporting-token generation failures.
+     * The logger for {@link ReportingStanza}.
      */
-    private static final System.Logger LOGGER = System.getLogger(ReportingStanza.class.getName());
+    private static final System.Logger LOGGER = Log.get(ReportingStanza.class);
 
     /**
      * Holds the AB-props service consulted for the sender reporting token version.
@@ -83,16 +85,19 @@ public final class ReportingStanza {
     public Stanza build(ChatMessageInfo messageInfo, Jid selfJid, Jid remoteJid) {
         var senderVersion = getSenderReportingTokenVersion();
         if (!isReportingTokenSendingEnabled(senderVersion)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reporting stanza build skipped: sender reporting disabled");
             return null;
         }
 
         var message = messageInfo.message().content();
         if (!isMsgTypeCompatible(message)) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reporting stanza build skipped: incompatible message type");
             return null;
         }
 
         var messageSecret = messageInfo.messageSecret().orElse(null);
         if (messageSecret == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reporting stanza build skipped: no message secret");
             return null;
         }
 
@@ -101,6 +106,7 @@ public final class ReportingStanza {
 
         var id = messageInfo.key().id();
         if (id.isEmpty()) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reporting stanza build skipped: message has no id");
             return null;
         }
 
@@ -114,9 +120,11 @@ public final class ReportingStanza {
                     senderVersion
             );
             if (reportingToken.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reporting stanza build skipped: token generation returned empty");
                 return null;
             }
 
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "reporting stanza built id={0} version={1}", id.get(), senderVersion);
             var reportingBody = new StanzaBuilder()
                     .description("reporting_token")
                     .attribute("v", String.valueOf(reportingToken.get().version()))
@@ -127,8 +135,7 @@ public final class ReportingStanza {
                     .content(reportingBody)
                     .build();
         } catch (GeneralSecurityException e) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to generate reporting token: {0}", e.getMessage());
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "reporting token generation failed for message " + id.get(), e);
             return null;
         }
     }

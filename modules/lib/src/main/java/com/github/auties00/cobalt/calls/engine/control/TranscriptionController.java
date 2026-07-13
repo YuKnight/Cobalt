@@ -1,8 +1,10 @@
 package com.github.auties00.cobalt.calls.engine.control;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.datachannel.LiveTranscriptionInfo;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.engine.control.event.TranscriptReceived;
 
@@ -23,6 +25,11 @@ import com.github.auties00.cobalt.calls.engine.control.event.TranscriptReceived;
  * fragment stream with no sender.
  */
 public final class TranscriptionController {
+    /**
+     * The logger for {@link TranscriptionController}.
+     */
+    private static final System.Logger LOGGER = Log.get(TranscriptionController.class);
+
     /**
      * The event sink transcript events are emitted into.
      */
@@ -58,7 +65,12 @@ public final class TranscriptionController {
         Objects.requireNonNull(fragment, "fragment cannot be null");
         var caption = fragment.caption().orElse(null);
         if (caption == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "dropping transcript fragment from {0}, no caption", sender);
             return false;
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "transcript fragment from {0}, id={1}", sender,
+                    fragment.transcriptId().orElse(0));
         }
         events.emit(new TranscriptReceived(sender, caption, fragment.language(),
                 fragment.transcriptId().orElse(0)));

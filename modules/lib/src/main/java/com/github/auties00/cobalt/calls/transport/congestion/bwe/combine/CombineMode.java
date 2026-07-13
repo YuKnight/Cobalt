@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.congestion.bwe.combine;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Selects how the {@link BitrateCombiner} fuses the sender side estimate with the remote receiver
  * estimate into one combined target.
@@ -63,6 +66,25 @@ public enum CombineMode {
     EARLY_CONGESTION(7);
 
     /**
+     * Resolves a voip parameter selector integer to its mode, backing {@link #ofValue(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #value}, so a selector resolves to
+     * its mode in constant time rather than by scanning {@link #values()}. A selector with no entry falls
+     * back to {@link #MIN_FLOOR} in {@link #ofValue(int)}.
+     */
+    private static final Map<Integer, CombineMode> BY_VALUE;
+
+    static {
+        var byValue = new HashMap<Integer, CombineMode>();
+        for (var mode : values()) {
+            if (byValue.put(mode.value, mode) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_VALUE = Map.copyOf(byValue);
+    }
+
+    /**
      * The integer the voip parameter uses to select this mode.
      */
     private final int value;
@@ -93,15 +115,13 @@ public enum CombineMode {
      * configuration selects, so an unknown selector degrades to that default rather than to a more or
      * less aggressive fusion.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_VALUE} map rather than
+     * scanning {@link #values()}.
      * @param value the selector integer read from the voip parameters
      * @return the matching mode, or {@link #MIN_FLOOR} when none matches
      */
     public static CombineMode ofValue(int value) {
-        for (var mode : values()) {
-            if (mode.value == value) {
-                return mode;
-            }
-        }
-        return MIN_FLOOR;
+        var mode = BY_VALUE.get(value);
+        return mode != null ? mode : MIN_FLOOR;
     }
 }

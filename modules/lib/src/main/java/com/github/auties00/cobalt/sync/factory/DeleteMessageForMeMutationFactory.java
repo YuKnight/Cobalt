@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +33,11 @@ import java.util.List;
  * Cobalt does not run that live-message model so the caller hands the data in already projected.
  */
 public final class DeleteMessageForMeMutationFactory {
+    /**
+     * The logger for {@link DeleteMessageForMeMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(DeleteMessageForMeMutationFactory.class);
+
     /**
      * Creates an instance with no collaborators.
      *
@@ -78,6 +85,7 @@ public final class DeleteMessageForMeMutationFactory {
             boolean fromMe,
             Jid participant
     ) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building delete message for me mutation chat={0} id={1} fromMe={2}", remoteJid, id, fromMe);
         var action = new DeleteMessageForMeActionBuilder()
                 .deleteMedia(deleteMedia)
                 .messageTimestamp(messageTimestamp)
@@ -139,6 +147,7 @@ public final class DeleteMessageForMeMutationFactory {
             List<Instant> messageTimestamps,
             List<Boolean> isGroupMessages
     ) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building batch delete for me mutations count={0}", keys.size());
         var now = Instant.now();
         var results = new ArrayList<SyncPendingMutation>(keys.size());
         for (var i = 0; i < keys.size(); i++) {
@@ -152,6 +161,7 @@ public final class DeleteMessageForMeMutationFactory {
 
             var remoteJid = key.parentJid().orElse(null);
             if (remoteJid == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "skipping delete for me mutation with no parent jid id={0}", key.id().orElse(""));
                 continue;
             }
 

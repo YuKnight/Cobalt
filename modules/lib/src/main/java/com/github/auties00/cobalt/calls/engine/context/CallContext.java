@@ -1,16 +1,18 @@
 package com.github.auties00.cobalt.calls.engine.context;
 
 import com.github.auties00.cobalt.calls.engine.participant.CallMembership;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.Call;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 import com.github.auties00.cobalt.calls.engine.state.CallLifecycleState;
 import com.github.auties00.cobalt.calls.engine.state.CallStateMachine;
 import com.github.auties00.cobalt.calls.engine.state.CallLinkState;
@@ -44,9 +46,7 @@ import com.github.auties00.cobalt.calls.telemetry.CallResult;
  * {@link CallLifecycleState#toPublic()}. The heavyweight media and transport objects, and the per call
  * timers, are not modeled as typed fields here because they are owned by sibling subsystems; the context
  * holds them only as opaque {@linkplain #attachResource(AutoCloseable) resource} slots it closes on
- * teardown and as the {@linkplain #onScheduleConnectedLonelyTimer(Consumer) lonely timer} scheduling and
- * cancelling seams the state machine drives, so this class stays decoupled from those subsystems while
- * still owning their lifecycle.
+ * teardown, so this class stays decoupled from those subsystems while still owning their lifecycle.
  *
  * <p>This class is not thread safe by itself; callers serialize through {@link #lock()}. It is an
  * internal engine collaborator and is never exposed to embedders, who observe a call only through the
@@ -60,9 +60,9 @@ import com.github.auties00.cobalt.calls.telemetry.CallResult;
  */
 public final class CallContext {
     /**
-     * Logs context allocation and teardown, mirroring the engine's per call lifecycle logging.
+     * The logger for {@link CallContext}.
      */
-    private static final System.Logger LOGGER = System.getLogger(CallContext.class.getName());
+    private static final System.Logger LOGGER = Log.get(CallContext.class);
 
     /**
      * The shared call id random source.
@@ -226,6 +226,17 @@ public final class CallContext {
     private boolean companionTerminated;
 
     /**
+     * The wall clock instant the call was placed (outgoing) or accepted (incoming), stamped once when the
+     * call reaches that lifecycle point, or {@code null} until then.
+     *
+     * <p>This is the call's start instant for the call history record, distinct from the per segment
+     * {@link #activeSegmentStartMillis} accumulator timestamps: it marks the offer/placement (or accept)
+     * moment the {@code CallLog} records as its start time, whereas the segment timestamps only measure
+     * elapsed active and lonely durations.
+     */
+    private Instant startedAt;
+
+    /**
      * The accumulated time, in milliseconds, the call has spent in the active state across segments.
      */
     private long activeDurationMillis;
@@ -249,26 +260,14 @@ public final class CallContext {
     private long lonelySegmentStartMillis;
 
     /**
-     * The seam invoked to schedule the connected lonely timer on entering the lonely state, or
-     * {@code null} when no scheduler is wired.
-     */
-    private Consumer<CallContext> scheduleConnectedLonelyTimer;
-
-    /**
-     * The seam invoked to cancel the connected lonely timer on leaving the lonely state, or {@code null}
-     * when no canceller is wired.
-     */
-    private Runnable cancelConnectedLonelyTimer;
-
-    /**
      * Constructs a call context with a freshly generated call id and the given identity and topology.
      *
      * <p>The context starts in {@link CallLifecycleState#NONE} with {@link CallLinkState#NONE}, no
      * recorded result, no accept received, no media started, zeroed duration accumulators, the default
      * {@linkplain ConnectedLonelyConfig#defaults() connected lonely configuration}, and a fresh
      * {@link CallMembership}. The projected {@link Call} is created in the public phase the initial state
-     * projects to. The lonely timer seams are unset until {@link #onScheduleConnectedLonelyTimer(Consumer)}
-     * and {@link #onCancelConnectedLonelyTimer(Runnable)} wire them.
+     * projects to. The connected lonely timer is armed and cancelled by the lifecycle controller around
+     * its state transitions, not through this context.
      *
      * @param role     the manager role this context occupies
      * @param direction the direction of the call
@@ -325,6 +324,7 @@ public final class CallContext {
         this.acceptReceived = false;
         this.mediaStarted = false;
         this.companionTerminated = false;
+        this.startedAt = null;
         this.activeDurationMillis = 0L;
         this.lonelyDurationMillis = 0L;
         this.activeSegmentStartMillis = -1L;
@@ -515,7 +515,9 @@ public final class CallContext {
      * @throws NullPointerException if {@code state} is {@code null}
      */
     public void state(CallLifecycleState state) {
-        this.state = Objects.requireNonNull(state, "state cannot be null");
+        Objects.requireNonNull(state, "state cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} state {1} -> {2}", callId, this.state, state);
+        this.state = state;
         call.setState(state.toPublic());
     }
 
@@ -563,8 +565,35 @@ public final class CallContext {
      * @throws NullPointerException if {@code result} is {@code null}
      */
     public void result(CallResult result) {
-        this.result = Objects.requireNonNull(result, "result cannot be null");
+        Objects.requireNonNull(result, "result cannot be null");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} result {1}", callId, result);
+        this.result = result;
         call.setEndReason(result.toEndReason());
+    }
+
+    /**
+     * Stamps the call's start instant the first time the call is placed or accepted.
+     *
+     * <p>Records {@link Instant#now()} as {@link #startedAt()} on the first invocation and is a no op on
+     * every later one, so the earliest placed/accepted moment is kept. The lifecycle controller calls this
+     * on the transition into the placing ({@link CallLifecycleState#CALLING}) or accepted
+     * ({@link CallLifecycleState#ACCEPT_SENT}) state, under the call lock, so the call history record can
+     * stamp the real start time rather than the teardown time.
+     */
+    public void markStarted() {
+        if (startedAt == null) {
+            startedAt = Instant.now();
+        }
+    }
+
+    /**
+     * Returns the instant the call was placed or accepted, if it has reached that point.
+     *
+     * @return an {@link Optional} holding the start instant, or empty when the call was never placed or
+     *         accepted
+     */
+    public Optional<Instant> startedAt() {
+        return Optional.ofNullable(startedAt);
     }
 
     /**
@@ -721,58 +750,6 @@ public final class CallContext {
     }
 
     /**
-     * Registers the seam that schedules the connected lonely timer on entering the lonely state.
-     *
-     * <p>The state machine invokes this seam, passing this context, when a transition enters
-     * {@link CallLifecycleState#CONNECTED_LONELY}; the lifecycle controller wires it to the call's timer
-     * subsystem. A second registration replaces the first; passing {@code null} clears the seam, after
-     * which entering the lonely state schedules nothing.
-     *
-     * @param scheduler the scheduling seam, or {@code null} to clear it
-     */
-    public void onScheduleConnectedLonelyTimer(Consumer<CallContext> scheduler) {
-        this.scheduleConnectedLonelyTimer = scheduler;
-    }
-
-    /**
-     * Registers the seam that cancels the connected lonely timer on leaving the lonely state.
-     *
-     * <p>The state machine invokes this seam when a transition leaves {@link CallLifecycleState#CONNECTED_LONELY}
-     * or enters {@link CallLifecycleState#CALL_ACTIVE}; the lifecycle controller wires it to the call's timer
-     * subsystem. A second registration replaces the first; passing {@code null} clears the seam, after
-     * which leaving the lonely state cancels nothing.
-     *
-     * @param canceller the cancelling seam, or {@code null} to clear it
-     */
-    public void onCancelConnectedLonelyTimer(Runnable canceller) {
-        this.cancelConnectedLonelyTimer = canceller;
-    }
-
-    /**
-     * Invokes the connected lonely scheduling seam, if one is wired.
-     *
-     * <p>Called by the state machine on entering the connected lonely state. With no scheduler wired this
-     * does nothing, so the state machine can drive the transition before the timer subsystem is attached.
-     */
-    public void fireScheduleConnectedLonelyTimer() {
-        if (scheduleConnectedLonelyTimer != null) {
-            scheduleConnectedLonelyTimer.accept(this);
-        }
-    }
-
-    /**
-     * Invokes the connected lonely cancelling seam, if one is wired.
-     *
-     * <p>Called by the state machine on leaving the connected lonely state or entering the active state.
-     * With no canceller wired this does nothing.
-     */
-    public void fireCancelConnectedLonelyTimer() {
-        if (cancelConnectedLonelyTimer != null) {
-            cancelConnectedLonelyTimer.run();
-        }
-    }
-
-    /**
      * Attaches a per call resource to be closed when this context tears down.
      *
      * <p>The context closes attached resources in reverse attachment order during {@link #close()},
@@ -800,18 +777,16 @@ public final class CallContext {
      * attached; the call's timers are stopped by the timer subsystem, not here.
      */
     public void close() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing call {0} context, {1} resource(s)", callId, resources.size());
         for (var index = resources.size() - 1; index >= 0; index--) {
             var resource = resources.get(index);
             try {
                 resource.close();
             } catch (Exception exception) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "Failed to close call resource for call " + callId, exception);
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to close call resource for call " + callId, exception);
             }
         }
         resources.clear();
-        scheduleConnectedLonelyTimer = null;
-        cancelConnectedLonelyTimer = null;
     }
 
     @Override

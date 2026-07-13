@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.exchange;
 
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,12 +12,11 @@ import com.github.auties00.cobalt.model.sync.data.SyncdPatch;
 import com.github.auties00.cobalt.model.sync.data.SyncdPatchSpec;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.SequencedCollection;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Parses incoming {@code <iq xmlns="w:sync:app:state">} response stanzas into
@@ -44,10 +44,9 @@ import java.util.logging.Logger;
 @WhatsAppWebModule(moduleName = "WAWebSyncdValidateServerSyncProtobuf")
 public final class MutationResponseParser {
     /**
-     * Holds the diagnostic logger used for the {@link Level#FINE FINE}-level
-     * {@code clientDebugData} dump emitted by {@link #logClientDebugData(SyncdPatch)}.
+     * The logger for {@link MutationResponseParser}.
      */
-    private static final Logger LOGGER = Logger.getLogger(MutationResponseParser.class.getName());
+    private static final System.Logger LOGGER = Log.get(MutationResponseParser.class);
 
     /**
      * Parses a single-collection sync response.
@@ -129,6 +128,10 @@ public final class MutationResponseParser {
 
         var snapshotRef = snapshotNode.map(this::parseSnapshotReference).orElse(null);
         var patches = patchesNode.map(this::parsePatches).orElse(List.of());
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "parsed sync response for {0}: version={1}, hasMore={2}, patches={3}, snapshot={4}",
+                    patchType, version, hasMore, patches.size(), snapshotRef != null);
+        }
         return new MutationSyncResponse(patchType, version, hasMore, patches, snapshotRef, collectionError);
     }
 
@@ -175,6 +178,7 @@ public final class MutationResponseParser {
         for (var collectionNode : collectionNodes) {
             results.add(parseCollectionNode(collectionNode));
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsed {0} collections from batched sync response", results.size());
         return results;
     }
 
@@ -226,6 +230,10 @@ public final class MutationResponseParser {
         if (type.isPresent() && type.get().equals("error")) {
             collectionError = buildCollectionError(collectionStanza);
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "parsed collection {0}: version={1}, hasMore={2}, patches={3}, snapshot={4}, error={5}",
+                    patchType, version, hasMore, patches.size(), snapshotRef != null, collectionError != null);
+        }
         return new MutationSyncResponse(patchType, version, hasMore, patches, snapshotRef, collectionError);
     }
 
@@ -246,6 +254,8 @@ public final class MutationResponseParser {
         var errorCode = errorNode
                 .flatMap(e -> e.getAttributeAsString("code"))
                 .orElse("unknown");
+
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "collection-level sync error code {0}", errorCode);
 
         return switch (errorCode) {
             case "409" -> new WhatsAppWebAppStateSyncException.Conflict(
@@ -276,12 +286,16 @@ public final class MutationResponseParser {
      */
     private void handleIqLevelError(int errorCode, String errorText, Stanza errorStanza) {
         switch (errorCode) {
-            case 400, 404, 405, 406 -> throw new WhatsAppWebAppStateSyncException.UnexpectedError(
-                    "IQ-level fatal error " + errorCode + ": " + errorText, null);
+            case 400, 404, 405, 406 -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "iq-level fatal sync error {0}: {1}", errorCode, errorText);
+                throw new WhatsAppWebAppStateSyncException.UnexpectedError(
+                        "IQ-level fatal error " + errorCode + ": " + errorText, null);
+            }
             default -> {
                 var serverBackoffMs = errorStanza != null
                         ? errorStanza.getAttributeAsLong("backoff", null)
                         : null;
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "iq-level retryable sync error {0}: {1}, backoff={2}", errorCode, errorText, serverBackoffMs);
                 throw new WhatsAppWebAppStateSyncException.RetryableServerError(
                         String.valueOf(errorCode), serverBackoffMs);
             }
@@ -320,6 +334,7 @@ public final class MutationResponseParser {
         try {
             return ExternalBlobReferenceSpec.decode(snapshotBytes);
         } catch (Exception e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "external blob reference protobuf deserialization failed", e);
             throw new WhatsAppWebAppStateSyncException.UnexpectedError(
                     "syncd: external blob reference protobuf deserialization failed: " + e.getMessage(), e);
         }
@@ -327,7 +342,7 @@ public final class MutationResponseParser {
 
     /**
      * Decodes every {@code <patch>} child of the supplied {@code <patches>} stanza into a
-     * {@link SyncdPatch}, logging each patch's debug data at {@link Level#FINE FINE}.
+     * {@link SyncdPatch}, logging each patch's debug data at {@link Level#DEBUG DEBUG}.
      *
      * <p>Used by both parse modes. Returns an empty collection when the {@code <patches>} parent
      * has no children; a missing patch content or undecodable patch protobuf is fatal.
@@ -363,6 +378,7 @@ public final class MutationResponseParser {
                 logClientDebugData(patch);
                 patches.add(patch);
             } catch (Exception e) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "patch protobuf deserialization failed", e);
                 throw new WhatsAppWebAppStateSyncException.UnexpectedError(
                         "syncd: patch protobuf deserialization failed: " + e.getMessage(), e);
             }
@@ -373,27 +389,27 @@ public final class MutationResponseParser {
 
     /**
      * Logs the decoded {@code currentLthash} and {@code newLthash} of the supplied patch at
-     * {@link Level#FINE FINE} for diagnostic cross-checking.
+     * {@link Level#DEBUG DEBUG} for diagnostic cross-checking.
      *
      * <p>Lets a developer correlate the server's reported LT-hash transition against Cobalt's
      * locally computed {@link com.github.auties00.cobalt.sync.crypto.MutationLTHash} state when
      * chasing a desync.
      *
      * @implNote
-     * This implementation is a no-op when {@link Level#FINE FINE} is disabled. Decoding the
+     * This implementation is a no-op when {@link Log#DEBUG} is disabled. Decoding the
      * debug data itself is best-effort and does not throw.
      *
      * @param patch the patch whose debug data should be logged; never {@code null}
      */
     private void logClientDebugData(SyncdPatch patch) {
-        if (!LOGGER.isLoggable(Level.FINE)) {
+        if (!Log.DEBUG) {
             return;
         }
         patch.decodedClientDebugData().ifPresent(debug -> {
             var hex = HexFormat.of();
             var current = debug.currentLthash().map(hex::formatHex).orElse("<none>");
             var next = debug.newLthash().map(hex::formatHex).orElse("<none>");
-            LOGGER.fine(() -> "patch debug: currentLthash=" + current + " newLthash=" + next);
+            LOGGER.log(Level.DEBUG, "patch debug: currentLthash={0}, newLthash={1}", current, next);
         });
     }
 }

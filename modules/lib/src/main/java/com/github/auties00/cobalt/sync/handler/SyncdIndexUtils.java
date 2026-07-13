@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -14,11 +15,11 @@ import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.logging.Logger;
 
 /**
  * Helpers shared across the sync-action handlers for building and parsing
@@ -56,9 +57,9 @@ public final class SyncdIndexUtils {
     public static final int MUTATION_NAME_INDEX = 0;
 
     /**
-     * The logger used for the malformed-index diagnostic paths.
+     * The logger for {@link SyncdIndexUtils}.
      */
-    private static final Logger LOGGER = Logger.getLogger(SyncdIndexUtils.class.getName());
+    private static final System.Logger LOGGER = Log.get(SyncdIndexUtils.class);
 
     /**
      * Hides the constructor of this utility class.
@@ -106,12 +107,12 @@ public final class SyncdIndexUtils {
         try {
             var parsed = JSON.parseArray(index);
             if (parsed == null || parsed.size() < 1) {
-                LOGGER.warning(() -> "[syncd] invalid empty index for collection " + collectionName);
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "invalid empty index for collection={0}", collectionName);
                 return null;
             }
             return parsed;
         } catch (Throwable throwable) {
-            LOGGER.warning(() -> "[syncd] invalid index for collection " + collectionName);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "invalid index for collection={0}", collectionName);
             return null;
         }
     }
@@ -360,7 +361,7 @@ public final class SyncdIndexUtils {
     @WhatsAppWebExport(moduleName = "WAWebSyncdIndexUtils", exports = "syncKeyToMsgKey", adaptation = WhatsAppAdaptation.ADAPTED)
     static Optional<MessageKey> syncKeyToMsgKey(LinkedWhatsAppStore store, String remote, String id, String fromMe, String participant) {
         if (remote == null || remote.isEmpty()) {
-            LOGGER.warning("syncKeyToMsgKey: invalid remote value");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "syncKeyToMsgKey: invalid remote value");
             return Optional.empty();
         }
 
@@ -368,7 +369,8 @@ public final class SyncdIndexUtils {
         try {
             remoteJid = Jid.of(remote);
         } catch (Exception e) {
-            LOGGER.warning("syncKeyToMsgKey: invalid remote value: " + remote);
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "syncKeyToMsgKey: invalid remote value={0}", Log.jid(remote));
             return Optional.empty();
         }
 
@@ -380,13 +382,14 @@ public final class SyncdIndexUtils {
                 participantJid = store.accountStore().jid().orElse(null);
             } else {
                 if (participant == null || participant.isEmpty()) {
-                    LOGGER.warning("syncKeyToMsgKey: invalid participant value");
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "syncKeyToMsgKey: invalid participant value");
                     return Optional.empty();
                 }
                 try {
                     participantJid = Jid.of(participant);
                 } catch (Exception e) {
-                    LOGGER.warning("syncKeyToMsgKey: invalid participant value: " + participant);
+                    if (Log.WARNING)
+                        LOGGER.log(Level.WARNING, "syncKeyToMsgKey: invalid participant value={0}", Log.jid(participant));
                     return Optional.empty();
                 }
             }
@@ -418,7 +421,8 @@ public final class SyncdIndexUtils {
     static Optional<MessageKey> getMsgKeyFromStarActionIndex(LinkedWhatsAppStore store, String index) {
         var parsed = JSON.parseArray(index);
         if (parsed == null || parsed.size() < 5) {
-            LOGGER.warning("[sync-action] star action index malformed, cannot create MsgKey");
+            if (Log.WARNING)
+                LOGGER.log(Level.WARNING, "star action index malformed, cannot create MsgKey");
             return Optional.empty();
         }
         var result = syncKeyToMsgKey(
@@ -429,7 +433,7 @@ public final class SyncdIndexUtils {
                 parsed.getString(4)
         );
         if (result.isEmpty()) {
-            LOGGER.warning("[sync-action] star index malformed, MsgKey failed");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "star index malformed, MsgKey failed");
         }
         return result;
     }
@@ -451,7 +455,8 @@ public final class SyncdIndexUtils {
      */
     @WhatsAppWebExport(moduleName = "WAWebSyncdIndexUtils", exports = "malformedActionIndex", adaptation = WhatsAppAdaptation.ADAPTED)
     static MutationApplicationResult malformedActionIndex(String collectionName, String actionName) {
-        LOGGER.fine(() -> "malformedActionIndex: collection=" + collectionName + ", action=" + actionName);
+        if (Log.DEBUG)
+            LOGGER.log(Level.DEBUG, "malformed action index: collection={0}, action={1}", collectionName, actionName);
         return MutationApplicationResult.malformed();
     }
 

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.factory;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.List;
 
@@ -30,6 +32,11 @@ import java.util.List;
  * infrastructure that lives at a higher layer in Cobalt.
  */
 public final class MarkChatAsReadMutationFactory {
+    /**
+     * The logger for {@link MarkChatAsReadMutationFactory}.
+     */
+    private static final System.Logger LOGGER = Log.get(MarkChatAsReadMutationFactory.class);
+
     /**
      * Constructs a mark-chat-as-read mutation factory.
      *
@@ -68,6 +75,7 @@ public final class MarkChatAsReadMutationFactory {
             Jid chatJid,
             SyncActionMessageRange messageRange
     ) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "building mark chat as read mutation chat={0} read={1}", chatJid, read);
         var action = new MarkChatAsReadActionBuilder()
                 .read(read)
                 .messageRange(messageRange)

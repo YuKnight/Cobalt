@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.ads;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,7 +14,7 @@ import java.io.UncheckedIOException;
 import java.util.List;
 
 /**
- * Builds the relay query that fetches Meta AI search type-ahead suggestions for a partial query.
+ * Builds the graph.whatsapp.com GraphQL query that fetches Meta AI search type-ahead suggestions for a partial query.
  *
  * <p>The operation takes a single {@code param} GraphQL variable of type
  * {@code XWAMetaAISearchTypeaheadInput}. WhatsApp Web's
@@ -20,7 +22,7 @@ import java.util.List;
  * {@code WAWebGetMetaAISearchSuggestionsAction}: a {@code query} prefix string, the current
  * {@code locale}, the optional {@code exp_config} experiment-bucket list pulled from the
  * {@code ai_experiment_graphql_config} AB property, and the {@code capabilities} list (for example
- * {@code "TEXT"}). The relay returns the suggestions under {@code xwa_genai_meta_ai_search_typeahead};
+ * {@code "TEXT"}). The graph.whatsapp.com endpoint returns the suggestions under {@code xwa_genai_meta_ai_search_typeahead};
  * the reply is consumed through {@link FetchMetaAiSearchTypeAheadSuggestionsWhatsAppGraphQlResponse}.
  *
  * @see FetchMetaAiSearchTypeAheadSuggestionsWhatsAppGraphQlResponse
@@ -28,10 +30,10 @@ import java.util.List;
 @WhatsAppWebModule(moduleName = "WAWebFetchMetaAISearchTypeAheadSuggestionsQuery")
 public final class FetchMetaAiSearchTypeAheadSuggestionsWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebFetchMetaAISearchTypeAheadSuggestionsQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -170,5 +172,21 @@ public final class FetchMetaAiSearchTypeAheadSuggestionsWhatsAppGraphQlRequest i
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.WWW;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

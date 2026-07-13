@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the single-product query built by
+ * Parses the graph.whatsapp.com GraphQL response of the single-product query built by
  * {@link QueryCatalogProductWhatsAppGraphQlRequest}.
  *
  * <p>Exposes the linked chain {@code xwa_product_catalog_get_product -> product_catalog -> product},
@@ -24,7 +24,7 @@ import java.util.OptionalInt;
 @WhatsAppWebModule(moduleName = "WAWebQueryCatalogProductQuery")
 public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAppGraphQlOperation.Response {
     /**
-     * Holds the parsed product, or {@code null} when the relay omitted any link in the
+     * Holds the parsed product, or {@code null} when the graph.whatsapp.com endpoint omitted any link in the
      * {@code xwa_product_catalog_get_product -> product_catalog -> product} chain.
      */
     private final Product product;
@@ -34,14 +34,14 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
      *
      * <p>Reserved for the static parser.
      *
-     * @param product the parsed product, or {@code null} when the relay omitted it
+     * @param product the parsed product, or {@code null} when the graph.whatsapp.com endpoint omitted it
      */
     private QueryCatalogProductWhatsAppGraphQlResponse(Product product) {
         this.product = product;
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked chain {@code xwa_product_catalog_get_product -> product_catalog -> product};
      * the returned {@link Optional} is empty when {@code data} is {@code null}, and the wrapped
@@ -65,7 +65,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
     /**
      * Returns the parsed product.
      *
-     * @return the parsed {@link Product}, or empty when the relay omitted any link in the response
+     * @return the parsed {@link Product}, or empty when the graph.whatsapp.com endpoint omitted any link in the response
      *         chain
      */
     public Optional<Product> product() {
@@ -73,7 +73,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
     }
 
     /**
-     * Enumerates the closed set of {@code product_availability} values the catalog relay returns.
+     * Enumerates the closed set of {@code product_availability} values the graph.whatsapp.com catalog endpoint returns.
      *
      * <p>The constants mirror the wire literals WhatsApp Web maps onto its in-stock model in
      * {@code WAWebBizParseProductGraphql}; any value outside this set, including a missing field,
@@ -96,7 +96,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         AVAILABLE_FOR_ANOTHER_POSTCODE,
 
         /**
-         * The relay returned no availability or a value outside the known set.
+         * The graph.whatsapp.com endpoint returned no availability or a value outside the known set.
          */
         UNKNOWN;
 
@@ -122,7 +122,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
     }
 
     /**
-     * Wraps a single {@code XWACatalogProduct} returned by the catalog relay.
+     * Wraps a single {@code XWACatalogProduct} returned by the graph.whatsapp.com catalog endpoint.
      *
      * <p>Carries the product's identifiers, core metadata and the linked status, sale-price, media,
      * compliance and variant sub-objects. Numeric-valued fields that WhatsApp Web serializes as
@@ -280,7 +280,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the product id.
          *
-         * @return the product id, or empty when the relay omitted the field
+         * @return the product id, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> id() {
             return Optional.ofNullable(id);
@@ -289,7 +289,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the merchant-assigned retailer id.
          *
-         * @return the retailer id, or empty when the relay omitted the field
+         * @return the retailer id, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> retailerId() {
             return Optional.ofNullable(retailerId);
@@ -300,7 +300,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
          *
          * <p>WhatsApp Web treats the product as hidden when this equals {@code "ISHIDDEN_TRUE"}.
          *
-         * @return the {@code is_hidden} literal, or empty when the relay omitted the field
+         * @return the {@code is_hidden} literal, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> isHidden() {
             return Optional.ofNullable(isHidden);
@@ -309,7 +309,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns whether the product is sanctioned.
          *
-         * @return {@code true} when the relay flagged the product as sanctioned, {@code false}
+         * @return {@code true} when the graph.whatsapp.com endpoint flagged the product as sanctioned, {@code false}
          *         otherwise or when the field was omitted
          */
         public boolean isSanctioned() {
@@ -319,7 +319,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the parsed product-availability verdict.
          *
-         * @return the availability verdict, {@link ProductAvailability#UNKNOWN} when the relay omitted
+         * @return the availability verdict, {@link ProductAvailability#UNKNOWN} when the graph.whatsapp.com endpoint omitted
          *         the field
          */
         public ProductAvailability productAvailability() {
@@ -329,7 +329,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the maximum available quantity.
          *
-         * @return the maximum available quantity as a numeric string, or empty when the relay omitted
+         * @return the maximum available quantity as a numeric string, or empty when the graph.whatsapp.com endpoint omitted
          *         the field
          */
         public Optional<String> maxAvailable() {
@@ -339,7 +339,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the product name.
          *
-         * @return the product name, or empty when the relay omitted the field
+         * @return the product name, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> name() {
             return Optional.ofNullable(name);
@@ -348,7 +348,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the product description.
          *
-         * @return the product description, or empty when the relay omitted the field
+         * @return the product description, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> description() {
             return Optional.ofNullable(description);
@@ -357,7 +357,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the product URL.
          *
-         * @return the product URL, or empty when the relay omitted the field
+         * @return the product URL, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> url() {
             return Optional.ofNullable(url);
@@ -366,7 +366,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the shimmed (signed) product URL.
          *
-         * @return the shimmed URL, or empty when the relay omitted the field
+         * @return the shimmed URL, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> shimmedUrl() {
             return Optional.ofNullable(shimmedUrl);
@@ -375,7 +375,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the ISO 4217 currency code.
          *
-         * @return the currency code, or empty when the relay omitted the field
+         * @return the currency code, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> currency() {
             return Optional.ofNullable(currency);
@@ -384,7 +384,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the price in the smallest currency unit.
          *
-         * @return the price as a numeric string, or empty when the relay omitted the field
+         * @return the price as a numeric string, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> price() {
             return Optional.ofNullable(price);
@@ -393,7 +393,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the linked status-info sub-object.
          *
-         * @return the parsed {@link StatusInfo}, or empty when the relay omitted the field
+         * @return the parsed {@link StatusInfo}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<StatusInfo> statusInfo() {
             return Optional.ofNullable(statusInfo);
@@ -402,7 +402,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the linked sale-price sub-object.
          *
-         * @return the parsed {@link SalePrice}, or empty when the relay omitted the field
+         * @return the parsed {@link SalePrice}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<SalePrice> salePrice() {
             return Optional.ofNullable(salePrice);
@@ -411,7 +411,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the linked media sub-object.
          *
-         * @return the parsed {@link Media}, or empty when the relay omitted the field
+         * @return the parsed {@link Media}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<Media> media() {
             return Optional.ofNullable(media);
@@ -423,7 +423,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
          * <p>WhatsApp Web treats the product as belonging to the checkmark collection when this equals
          * {@code "true"}.
          *
-         * @return the {@code belongs_to} literal, or empty when the relay omitted the field
+         * @return the {@code belongs_to} literal, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> belongsTo() {
             return Optional.ofNullable(belongsTo);
@@ -432,7 +432,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the {@code compliance_category} wire enum literal.
          *
-         * @return the compliance-category literal, or empty when the relay omitted the field
+         * @return the compliance-category literal, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> complianceCategory() {
             return Optional.ofNullable(complianceCategory);
@@ -441,7 +441,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the linked compliance-info sub-object.
          *
-         * @return the parsed {@link ComplianceInfo}, or empty when the relay omitted the field
+         * @return the parsed {@link ComplianceInfo}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<ComplianceInfo> complianceInfo() {
             return Optional.ofNullable(complianceInfo);
@@ -450,7 +450,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the linked variant-info sub-object.
          *
-         * @return the parsed {@link VariantInfo}, or empty when the relay omitted the field
+         * @return the parsed {@link VariantInfo}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<VariantInfo> variantInfo() {
             return Optional.ofNullable(variantInfo);
@@ -547,7 +547,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
          *
          * <p>WhatsApp Web treats a rejected product as appealable when this equals {@code "true"}.
          *
-         * @return the {@code can_appeal} literal, or empty when the relay omitted the field
+         * @return the {@code can_appeal} literal, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> canAppeal() {
             return Optional.ofNullable(canAppeal);
@@ -558,9 +558,9 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
          *
          * <p>WhatsApp Web's {@code asProductReviewType} recognises {@code APPROVED}, {@code PENDING}
          * and {@code REJECTED} and defaults a missing value to {@code APPROVED}; the field is kept as
-         * a string because the relay consumes it leniently rather than enforcing the closed set.
+         * a string because the graph.whatsapp.com endpoint consumes it leniently rather than enforcing the closed set.
          *
-         * @return the review status literal, or empty when the relay omitted the field
+         * @return the review status literal, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> status() {
             return Optional.ofNullable(status);
@@ -620,7 +620,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the sale price.
          *
-         * @return the sale price as a numeric string, or empty when the relay omitted the field
+         * @return the sale price as a numeric string, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> price() {
             return Optional.ofNullable(price);
@@ -629,7 +629,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the sale start date.
          *
-         * @return the start date as an ISO 8601 string, or empty when the relay omitted the field
+         * @return the start date as an ISO 8601 string, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> startDate() {
             return Optional.ofNullable(startDate);
@@ -638,7 +638,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the sale end date.
          *
-         * @return the end date as an ISO 8601 string, or empty when the relay omitted the field
+         * @return the end date as an ISO 8601 string, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> endDate() {
             return Optional.ofNullable(endDate);
@@ -691,7 +691,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the product images.
          *
-         * @return the product images, empty when the relay returned none
+         * @return the product images, empty when the graph.whatsapp.com endpoint returned none
          */
         public List<Image> images() {
             return images;
@@ -700,7 +700,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the product videos.
          *
-         * @return the product videos, empty when the relay returned none
+         * @return the product videos, empty when the graph.whatsapp.com endpoint returned none
          */
         public List<Video> videos() {
             return videos;
@@ -768,7 +768,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the image id.
          *
-         * @return the image id, or empty when the relay omitted the field
+         * @return the image id, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> id() {
             return Optional.ofNullable(id);
@@ -777,7 +777,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the optional original dimensions.
          *
-         * @return the parsed {@link OriginalDimensions}, or empty when the relay omitted the field
+         * @return the parsed {@link OriginalDimensions}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<OriginalDimensions> originalDimensions() {
             return Optional.ofNullable(originalDimensions);
@@ -786,7 +786,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the original-size image CDN URL.
          *
-         * @return the original image URL, or empty when the relay omitted the field
+         * @return the original image URL, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> originalImageUrl() {
             return Optional.ofNullable(originalImageUrl);
@@ -795,7 +795,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the requested-size image CDN URL.
          *
-         * @return the requested image URL, or empty when the relay omitted the field
+         * @return the requested image URL, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> requestImageUrl() {
             return Optional.ofNullable(requestImageUrl);
@@ -869,7 +869,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the original height in pixels.
          *
-         * @return the height, or empty when the relay omitted the field
+         * @return the height, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public OptionalInt height() {
             return height == null ? OptionalInt.empty() : OptionalInt.of(height);
@@ -878,7 +878,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the original width in pixels.
          *
-         * @return the width, or empty when the relay omitted the field
+         * @return the width, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public OptionalInt width() {
             return width == null ? OptionalInt.empty() : OptionalInt.of(width);
@@ -938,7 +938,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the video id.
          *
-         * @return the video id, or empty when the relay omitted the field
+         * @return the video id, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> id() {
             return Optional.ofNullable(id);
@@ -947,7 +947,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the original video CDN URL.
          *
-         * @return the original video URL, or empty when the relay omitted the field
+         * @return the original video URL, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> originalVideoUrl() {
             return Optional.ofNullable(originalVideoUrl);
@@ -956,7 +956,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the thumbnail CDN URL.
          *
-         * @return the thumbnail URL, or empty when the relay omitted the field
+         * @return the thumbnail URL, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> thumbnailUrl() {
             return Optional.ofNullable(thumbnailUrl);
@@ -1035,7 +1035,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the ISO country code of origin.
          *
-         * @return the country code of origin, or empty when the relay omitted the field
+         * @return the country code of origin, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> countryCodeOrigin() {
             return Optional.ofNullable(countryCodeOrigin);
@@ -1044,7 +1044,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the importer name.
          *
-         * @return the importer name, or empty when the relay omitted the field
+         * @return the importer name, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> importerName() {
             return Optional.ofNullable(importerName);
@@ -1053,7 +1053,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the linked importer-address sub-object.
          *
-         * @return the parsed {@link ImporterAddress}, or empty when the relay omitted the field
+         * @return the parsed {@link ImporterAddress}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<ImporterAddress> importerAddress() {
             return Optional.ofNullable(importerAddress);
@@ -1136,7 +1136,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the first street line.
          *
-         * @return the first street line, or empty when the relay omitted the field
+         * @return the first street line, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> street1() {
             return Optional.ofNullable(street1);
@@ -1145,7 +1145,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the second street line.
          *
-         * @return the second street line, or empty when the relay omitted the field
+         * @return the second street line, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> street2() {
             return Optional.ofNullable(street2);
@@ -1154,7 +1154,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the postal code.
          *
-         * @return the postal code, or empty when the relay omitted the field
+         * @return the postal code, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> postalCode() {
             return Optional.ofNullable(postalCode);
@@ -1163,7 +1163,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the city.
          *
-         * @return the city, or empty when the relay omitted the field
+         * @return the city, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> city() {
             return Optional.ofNullable(city);
@@ -1172,7 +1172,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the region.
          *
-         * @return the region, or empty when the relay omitted the field
+         * @return the region, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> region() {
             return Optional.ofNullable(region);
@@ -1181,7 +1181,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the ISO country code.
          *
-         * @return the country code, or empty when the relay omitted the field
+         * @return the country code, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> countryCode() {
             return Optional.ofNullable(countryCode);
@@ -1251,7 +1251,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the linked listing-details sub-object.
          *
-         * @return the parsed {@link ListingDetails}, or empty when the relay omitted the field
+         * @return the parsed {@link ListingDetails}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<ListingDetails> listingDetails() {
             return Optional.ofNullable(listingDetails);
@@ -1260,7 +1260,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the linked availability sub-object.
          *
-         * @return the parsed {@link Availability}, or empty when the relay omitted the field
+         * @return the parsed {@link Availability}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<Availability> availability() {
             return Optional.ofNullable(availability);
@@ -1269,7 +1269,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the variant types.
          *
-         * @return the variant types, empty when the relay returned none
+         * @return the variant types, empty when the graph.whatsapp.com endpoint returned none
          */
         public List<VariantType> types() {
             return types;
@@ -1278,7 +1278,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the variant properties.
          *
-         * @return the variant properties, empty when the relay returned none
+         * @return the variant properties, empty when the graph.whatsapp.com endpoint returned none
          */
         public List<VariantProperty> variantProperties() {
             return variantProperties;
@@ -1341,7 +1341,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the variant-aware description.
          *
-         * @return the description, or empty when the relay omitted the field
+         * @return the description, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> description() {
             return Optional.ofNullable(description);
@@ -1353,7 +1353,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
          * <p>Kept as a string because WhatsApp Web passes this field through verbatim, so its closed
          * value set cannot be confirmed from the bundle.
          *
-         * @return the multi-price literal, or empty when the relay omitted the field
+         * @return the multi-price literal, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> multiPrice() {
             return Optional.ofNullable(multiPrice);
@@ -1362,7 +1362,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the lowest variant price.
          *
-         * @return the lowest price as a numeric string, or empty when the relay omitted the field
+         * @return the lowest price as a numeric string, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> lowestPrice() {
             return Optional.ofNullable(lowestPrice);
@@ -1408,7 +1408,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the per-variant availability listings.
          *
-         * @return the listings, empty when the relay returned none
+         * @return the listings, empty when the graph.whatsapp.com endpoint returned none
          */
         public List<AvailabilityListing> listing() {
             return listing;
@@ -1469,7 +1469,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns whether this variant combination is available.
          *
-         * @return {@code true} when the relay flagged this combination as available, {@code false}
+         * @return {@code true} when the graph.whatsapp.com endpoint flagged this combination as available, {@code false}
          *         otherwise or when the field was omitted
          */
         public boolean isAvailable() {
@@ -1479,7 +1479,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the option set defining this variant combination.
          *
-         * @return the options, empty when the relay returned none
+         * @return the options, empty when the graph.whatsapp.com endpoint returned none
          */
         public List<AvailabilityOption> options() {
             return options;
@@ -1488,7 +1488,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the resolved product id for this variant combination.
          *
-         * @return the product id, or empty when the relay omitted the field
+         * @return the product id, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> productId() {
             return Optional.ofNullable(productId);
@@ -1560,7 +1560,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the option name.
          *
-         * @return the option name, or empty when the relay omitted the field
+         * @return the option name, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> name() {
             return Optional.ofNullable(name);
@@ -1569,7 +1569,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the option value.
          *
-         * @return the option value, or empty when the relay omitted the field
+         * @return the option value, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> value() {
             return Optional.ofNullable(value);
@@ -1640,7 +1640,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the variant type name.
          *
-         * @return the variant type name, or empty when the relay omitted the field
+         * @return the variant type name, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> name() {
             return Optional.ofNullable(name);
@@ -1649,7 +1649,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the selectable options for this variant type.
          *
-         * @return the options, empty when the relay returned none
+         * @return the options, empty when the graph.whatsapp.com endpoint returned none
          */
         public List<VariantTypeOption> options() {
             return options;
@@ -1721,7 +1721,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the option value.
          *
-         * @return the option value, or empty when the relay omitted the field
+         * @return the option value, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> value() {
             return Optional.ofNullable(value);
@@ -1730,7 +1730,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the linked thumbnail image.
          *
-         * @return the parsed thumbnail {@link Image}, or empty when the relay omitted the field
+         * @return the parsed thumbnail {@link Image}, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<Image> thumbnailMedia() {
             return Optional.ofNullable(thumbnailMedia);
@@ -1802,7 +1802,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the property name.
          *
-         * @return the property name, or empty when the relay omitted the field
+         * @return the property name, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> name() {
             return Optional.ofNullable(name);
@@ -1811,7 +1811,7 @@ public final class QueryCatalogProductWhatsAppGraphQlResponse implements WhatsAp
         /**
          * Returns the property value.
          *
-         * @return the property value, or empty when the relay omitted the field
+         * @return the property value, or empty when the graph.whatsapp.com endpoint omitted the field
          */
         public Optional<String> value() {
             return Optional.ofNullable(value);

@@ -1,7 +1,6 @@
 package com.github.auties00.cobalt.client.linked;
 
 import com.github.auties00.cobalt.exception.WhatsAppException;
-import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -11,8 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.function.BiConsumer;
-
-import static java.lang.System.Logger.Level.ERROR;
 
 /**
  * A pluggable strategy for reacting to failures raised by a
@@ -134,13 +131,6 @@ public interface WhatsAppLinkedClientErrorHandler {
      */
     private static WhatsAppLinkedClientErrorHandler defaultErrorHandler(BiConsumer<LinkedWhatsAppClient, WhatsAppException> printer) {
         return (whatsapp, exception) -> {
-            var logger = System.getLogger("ErrorHandler");
-            var jid = whatsapp.store()
-                    .accountStore()
-                    .jid()
-                    .map(Jid::user)
-                    .orElse("UNKNOWN");
-            logger.log(ERROR, "[{0}] An error occurred", jid, exception);
             if (printer != null) {
                 printer.accept(whatsapp, exception);
             }

@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.rtcp;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.transport.warp.WarpCodecSupport;
 
@@ -25,6 +28,11 @@ import com.github.auties00.cobalt.calls.transport.warp.WarpCodecSupport;
  * (a non positive value), which the caller treats as "no signal this feedback".
  */
 public final class RtcpFeedbackParser {
+    /**
+     * The logger for {@link RtcpFeedbackParser}.
+     */
+    private static final System.Logger LOGGER = Log.get(RtcpFeedbackParser.class);
+
     /**
      * Holds the length, in bytes, of the RTCP common header that prefixes every record.
      *
@@ -250,6 +258,9 @@ public final class RtcpFeedbackParser {
                         // key frame; the media session arms the encoder when this is set.
                         keyFrameRequested = true;
                         found = true;
+                        if (Log.DEBUG) {
+                            LOGGER.log(Level.DEBUG, "rtcp key frame requested, fmt={0}", feedbackFormat);
+                        }
                     } else {
                         var bps = parseRemb(packet, offset, recordLength);
                         if (bps >= 0) {
@@ -272,7 +283,15 @@ public final class RtcpFeedbackParser {
             offset += recordLength;
         }
         if (!found) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "rtcp packet carried no recognised feedback, length={0}", length);
+            }
             return null;
+        }
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE,
+                    "rtcp feedback parsed, hasLoss={0} hasRtt={1} hasRemoteBwe={2} keyFrameRequested={3}",
+                    fractionLost >= 0, rttNs >= 0, remoteBweBps >= 0, keyFrameRequested);
         }
         return new RtcpFeedback(fractionLost, cumulativeLost, rttNs, remoteBweBps, arrivalMs,
                 keyFrameRequested);

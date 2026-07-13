@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.silk;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Converts normalized line spectral frequencies (NLSFs) into linear prediction filter coefficients in
  * integer fixed point, the conversion the MLow speech codec uses to rebuild the short term whitening filter.
@@ -48,6 +52,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.silk;
  * returns {@code 32} for a zero input.
  */
 public final class SilkNlsf2a {
+    /**
+     * The logger for {@link SilkNlsf2a}.
+     */
+    private static final System.Logger LOGGER = Log.get(SilkNlsf2a.class);
+
     /**
      * Q domain of the cosine root vector and the convolution polynomials, the value {@code 16}.
      *
@@ -313,6 +322,10 @@ public final class SilkNlsf2a {
         }
 
         if (i == 10) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "lpc fit exhausted 10 chirp retries, saturating coefficients to int16, order={0}", d);
+            }
             for (int k = 0; k < d; k++) {
                 aQOut[k] = (short) sat16(rshiftRound(aQIn[k], qIn - qOut));
                 aQIn[k] = aQOut[k] << (qIn - qOut);

@@ -2,12 +2,16 @@ package com.github.auties00.cobalt.cloud;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.github.auties00.cobalt.exception.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudAuthException;
+import com.github.auties00.cobalt.exception.cloud.WhatsAppCloudApiException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -27,14 +31,19 @@ import java.util.Objects;
  * an {@code appsecret_proof} (an {@code HmacSHA256} of the access token keyed by the app secret) when
  * an app secret is configured, and parses the response with fastjson2. A non-2xx status with a Graph
  * {@code error} envelope is mapped to {@link WhatsAppCloudException}: an OAuth failure (HTTP 401 or
- * Graph error code 190) becomes a {@link WhatsAppCloudException.CloudAuthException}, every other
- * rejection a {@link WhatsAppCloudException.CloudApiException} carrying the code, subcode, and
+ * Graph error code 190) becomes a {@link WhatsAppCloudAuthException}, every other
+ * rejection a {@link WhatsAppCloudApiException} carrying the code, subcode, and
  * {@code fbtrace_id}.
  *
  * <p>The transport is stateless beyond its credentials and is safe to share across threads, mirroring
  * the {@code FacebookGraphQlClient} design.
  */
 public final class CloudApiClient {
+    /**
+     * The logger for {@link CloudApiClient}.
+     */
+    private static final System.Logger LOGGER = Log.get(CloudApiClient.class);
+
     /**
      * The HTTP client used for every request, reused across dispatches for connection pooling.
      */
@@ -117,6 +126,10 @@ public final class CloudApiClient {
         Objects.requireNonNull(apiVersion, "apiVersion must not be null");
         this.appSecret = appSecret;
         this.baseUri = URI.create("https://graph.facebook.com/" + apiVersion + "/");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "cloud api client initialized, base {0}, appsecret proof enabled {1}",
+                    baseUri, appSecret != null);
+        }
     }
 
     /**
@@ -252,6 +265,7 @@ public final class CloudApiClient {
      * @throws WhatsAppCloudException if the request fails or the endpoint reports an error
      */
     public JSONObject uploadMedia(String phoneNumberId, byte[] data, String mimeType, String filename) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "uploading media, size {0}, mime type {1}", data.length, mimeType);
         var boundary = "cobalt" + Long.toHexString(data.length) + "x" + Integer.toHexString(mimeType.hashCode());
         var body = multipartBody(boundary, mimeType, filename, data);
         var request = HttpRequest.newBuilder(buildUri(phoneNumberId + "/media", Map.of()))
@@ -309,16 +323,21 @@ public final class CloudApiClient {
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
             var status = response.statusCode();
             if (status < 200 || status >= 300) {
-                throw new WhatsAppCloudException.CloudApiException(status, 0, 0,
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "media download failed, status {0}", status);
+                throw new WhatsAppCloudApiException(status, 0, 0,
                         "media download failed", null);
             }
-            return response.body();
+            var body = response.body();
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "media download finished, size {0}", body.length);
+            return body;
         } catch (IOException exception) {
-            throw new WhatsAppCloudException.CloudApiException(
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "media download failed", exception);
+            throw new WhatsAppCloudApiException(
                     "media download failed: " + exception.getMessage());
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new WhatsAppCloudException.CloudApiException("media download interrupted");
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "media download interrupted", exception);
+            throw new WhatsAppCloudApiException("media download interrupted");
         }
     }
 
@@ -341,6 +360,9 @@ public final class CloudApiClient {
      * @throws WhatsAppCloudException if the request fails or the endpoint reports an error
      */
     public String createUploadSession(String appId, long fileLength, String fileType, String fileName) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "creating resumable upload session, file length {0}, type {1}", fileLength, fileType);
+        }
         var encoded = new StringBuilder();
         appendParam(encoded, "file_length", Long.toString(fileLength));
         appendParam(encoded, "file_type", fileType);
@@ -353,7 +375,9 @@ public final class CloudApiClient {
                 .POST(HttpRequest.BodyPublishers.noBody())
                 .build();
         var json = send(request, "POST " + appId + "/uploads");
-        return json.getString("id");
+        var sessionId = json.getString("id");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "created resumable upload session {0}", Log.token(sessionId));
+        return sessionId;
     }
 
     /**
@@ -376,6 +400,10 @@ public final class CloudApiClient {
      * @throws WhatsAppCloudException if the request fails or the endpoint reports an error
      */
     public String uploadToSession(String uploadSessionId, long fileOffset, byte[] data) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "uploading to resumable session {0}, offset {1}, size {2}",
+                    Log.token(uploadSessionId), fileOffset, data.length);
+        }
         var uri = sessionUri(uploadSessionId);
         var request = HttpRequest.newBuilder(uri)
                 .header("Authorization", "OAuth " + accessToken)
@@ -406,7 +434,9 @@ public final class CloudApiClient {
                 .GET()
                 .build();
         var json = send(request, "GET " + uploadSessionId);
-        return json.getLongValue("file_offset");
+        var offset = json.getLongValue("file_offset");
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "resumable session {0} offset {1}", Log.token(uploadSessionId), offset);
+        return offset;
     }
 
     /**
@@ -494,7 +524,8 @@ public final class CloudApiClient {
             var raw = mac.doFinal(accessToken.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(raw);
         } catch (GeneralSecurityException exception) {
-            throw new WhatsAppCloudException.CloudAuthException("failed to compute appsecret_proof", exception);
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to compute appsecret_proof", exception);
+            throw new WhatsAppCloudAuthException("failed to compute appsecret_proof", exception);
         }
     }
 
@@ -592,15 +623,22 @@ public final class CloudApiClient {
      * @throws WhatsAppCloudException if the request fails or the endpoint reports an error
      */
     private JSONObject send(HttpRequest request, String opName) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sending cloud api request, method {0}", request.method());
         HttpResponse<String> response;
         try {
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (IOException exception) {
-            throw new WhatsAppCloudException.CloudApiException(
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "cloud api request failed, method " + request.method(), exception);
+            }
+            throw new WhatsAppCloudApiException(
                     opName + " failed: " + exception.getMessage());
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new WhatsAppCloudException.CloudApiException(opName + " interrupted");
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "cloud api request interrupted, method " + request.method(), exception);
+            }
+            throw new WhatsAppCloudApiException(opName + " interrupted");
         }
         return parse(response, opName);
     }
@@ -622,12 +660,14 @@ public final class CloudApiClient {
             var body = response.body();
             json = body == null || body.isBlank() ? new JSONObject() : JSON.parseObject(body);
         } catch (RuntimeException exception) {
-            throw new WhatsAppCloudException.CloudApiException(status, 0, 0,
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "failed to parse cloud api response, status " + status, exception);
+            throw new WhatsAppCloudApiException(status, 0, 0,
                     "failed to parse " + opName + " response", null);
         }
 
         var error = json.getJSONObject("error");
         if (status >= 200 && status < 300 && error == null) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "cloud api response received, status {0}", status);
             return json;
         }
 
@@ -636,8 +676,13 @@ public final class CloudApiClient {
         var message = error != null ? error.getString("message") : status + " response for " + opName;
         var fbtraceId = error != null ? error.getString("fbtrace_id") : null;
         if (status == 401 || code == 190) {
-            throw new WhatsAppCloudException.CloudAuthException(opName + " unauthorized: " + message);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "cloud api unauthorized, status {0}", status);
+            throw new WhatsAppCloudAuthException(opName + " unauthorized: " + message);
         }
-        throw new WhatsAppCloudException.CloudApiException(status, code, subcode, message, fbtraceId);
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "cloud api error, status {0}, code {1}, subcode {2}, fbtrace {3}",
+                    status, code, subcode, fbtraceId);
+        }
+        throw new WhatsAppCloudApiException(status, code, subcode, message, fbtraceId);
     }
 }

@@ -17,14 +17,12 @@ import java.util.Optional;
  * chosen budget, audience, and placement. This input carries the
  * parameters the server uses to compute that projection.
  *
- * <p>The {@link #targetingSpecAudienceJson() audience targeting},
- * {@link #optimizationGoalInputJson() optimisation goal},
- * {@link #audienceOptionAudienceJson() chosen audience option}, and
- * {@link #configuredPlacementSpecJson() placement specification} are each
- * JSON-encoded objects whose field sets are defined by the server-side
- * input types and are therefore carried verbatim as strings. The
- * {@link #adAccountId() ad account}, {@link #currency() currency}, and
- * {@link #postId() promoted post id} scope the estimate. The
+ * <p>The {@link #targetingSpecAudience() audience targeting},
+ * {@link #optimizationGoalInput() optimisation goal},
+ * {@link #audienceOptionAudience() chosen audience option}, and
+ * {@link #configuredPlacementSpec() placement specification} parameterise
+ * the estimate. The {@link #adAccountId() ad account}, {@link #currency()
+ * currency}, and {@link #postId() promoted post id} scope it. The
  * {@link #flowId() flow id} is an opaque correlator the editor mints to
  * group all telemetry, drafts, and queries belonging to one ad-creation
  * funnel run; the {@link #flow() flow name} is the textual step inside
@@ -40,34 +38,28 @@ public final class BusinessAdEstimatedReachQuery {
     final String adAccountId;
 
     /**
-     * JSON-encoded audience targeting specification. The field set is
-     * defined by the server and is carried verbatim. Unset omits the
-     * variable.
+     * Audience targeting specification. Unset omits the variable.
      */
-    @ProtobufProperty(index = 2, type = ProtobufType.STRING)
-    final String targetingSpecAudienceJson;
+    @ProtobufProperty(index = 2, type = ProtobufType.MESSAGE)
+    final TargetingSpec targetingSpecAudience;
 
     /**
-     * JSON-encoded optimisation goal. The field set is defined by the
-     * server and is carried verbatim. Unset omits the variable.
+     * Optimisation goal. Unset omits the variable.
      */
-    @ProtobufProperty(index = 3, type = ProtobufType.STRING)
-    final String optimizationGoalInputJson;
+    @ProtobufProperty(index = 3, type = ProtobufType.MESSAGE)
+    final OptimizationGoalInput optimizationGoalInput;
 
     /**
-     * JSON-encoded chosen audience option. The field set is defined by
-     * the server and is carried verbatim. Unset omits the variable.
+     * Chosen audience option. Unset omits the variable.
      */
-    @ProtobufProperty(index = 4, type = ProtobufType.STRING)
-    final String audienceOptionAudienceJson;
+    @ProtobufProperty(index = 4, type = ProtobufType.MESSAGE)
+    final AdsLwiAudience audienceOptionAudience;
 
     /**
-     * JSON-encoded configured placement specification. The field set is
-     * defined by the server and is carried verbatim. Unset omits the
-     * variable.
+     * Configured placement specification. Unset omits the variable.
      */
-    @ProtobufProperty(index = 5, type = ProtobufType.STRING)
-    final String configuredPlacementSpecJson;
+    @ProtobufProperty(index = 5, type = ProtobufType.MESSAGE)
+    final PlacementSpec configuredPlacementSpec;
 
     /**
      * Billing currency the estimate is expressed in. Unset omits the
@@ -102,35 +94,26 @@ public final class BusinessAdEstimatedReachQuery {
      * argument may be {@code null} to omit the corresponding variable from
      * the request.
      *
-     * @param adAccountId                 the advertising-account identifier,
-     *                                    or {@code null}
-     * @param targetingSpecAudienceJson   the JSON-encoded audience targeting,
-     *                                    or {@code null}
-     * @param optimizationGoalInputJson   the JSON-encoded optimisation goal,
-     *                                    or {@code null}
-     * @param audienceOptionAudienceJson  the JSON-encoded chosen audience
-     *                                    option, or {@code null}
-     * @param configuredPlacementSpecJson the JSON-encoded configured
-     *                                    placement, or {@code null}
-     * @param currency                    the billing currency, or
-     *                                    {@code null}
-     * @param postId                      the promoted post identifier, or
-     *                                    {@code null}
-     * @param flowId                      the funnel-run correlator, or
-     *                                    {@code null}
-     * @param flow                        the funnel-step name, or
-     *                                    {@code null}
+     * @param adAccountId             the advertising-account identifier, or {@code null}
+     * @param targetingSpecAudience   the audience targeting, or {@code null}
+     * @param optimizationGoalInput   the optimisation goal, or {@code null}
+     * @param audienceOptionAudience  the chosen audience option, or {@code null}
+     * @param configuredPlacementSpec the configured placement, or {@code null}
+     * @param currency                the billing currency, or {@code null}
+     * @param postId                  the promoted post identifier, or {@code null}
+     * @param flowId                  the funnel-run correlator, or {@code null}
+     * @param flow                    the funnel-step name, or {@code null}
      */
-    public BusinessAdEstimatedReachQuery(String adAccountId, String targetingSpecAudienceJson,
-                                         String optimizationGoalInputJson,
-                                         String audienceOptionAudienceJson,
-                                         String configuredPlacementSpecJson, String currency,
+    public BusinessAdEstimatedReachQuery(String adAccountId, TargetingSpec targetingSpecAudience,
+                                         OptimizationGoalInput optimizationGoalInput,
+                                         AdsLwiAudience audienceOptionAudience,
+                                         PlacementSpec configuredPlacementSpec, String currency,
                                          String postId, String flowId, String flow) {
         this.adAccountId = adAccountId;
-        this.targetingSpecAudienceJson = targetingSpecAudienceJson;
-        this.optimizationGoalInputJson = optimizationGoalInputJson;
-        this.audienceOptionAudienceJson = audienceOptionAudienceJson;
-        this.configuredPlacementSpecJson = configuredPlacementSpecJson;
+        this.targetingSpecAudience = targetingSpecAudience;
+        this.optimizationGoalInput = optimizationGoalInput;
+        this.audienceOptionAudience = audienceOptionAudience;
+        this.configuredPlacementSpec = configuredPlacementSpec;
         this.currency = currency;
         this.postId = postId;
         this.flowId = flowId;
@@ -140,54 +123,52 @@ public final class BusinessAdEstimatedReachQuery {
     /**
      * Returns the advertising-account identifier.
      *
-     * @return an {@link Optional} carrying the identifier, or empty when
-     *         unset
+     * @return an {@link Optional} carrying the identifier, or empty when unset
      */
     public Optional<String> adAccountId() {
         return Optional.ofNullable(adAccountId);
     }
 
     /**
-     * Returns the JSON-encoded audience targeting specification.
+     * Returns the audience targeting specification.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an {@link Optional} carrying the targeting spec, or empty when unset
      */
-    public Optional<String> targetingSpecAudienceJson() {
-        return Optional.ofNullable(targetingSpecAudienceJson);
+    public Optional<TargetingSpec> targetingSpecAudience() {
+        return Optional.ofNullable(targetingSpecAudience);
     }
 
     /**
-     * Returns the JSON-encoded optimisation goal.
+     * Returns the optimisation goal.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an {@link Optional} carrying the optimisation goal, or empty when unset
      */
-    public Optional<String> optimizationGoalInputJson() {
-        return Optional.ofNullable(optimizationGoalInputJson);
+    public Optional<OptimizationGoalInput> optimizationGoalInput() {
+        return Optional.ofNullable(optimizationGoalInput);
     }
 
     /**
-     * Returns the JSON-encoded chosen audience option.
+     * Returns the chosen audience option.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an {@link Optional} carrying the audience option, or empty when unset
      */
-    public Optional<String> audienceOptionAudienceJson() {
-        return Optional.ofNullable(audienceOptionAudienceJson);
+    public Optional<AdsLwiAudience> audienceOptionAudience() {
+        return Optional.ofNullable(audienceOptionAudience);
     }
 
     /**
-     * Returns the JSON-encoded configured placement specification.
+     * Returns the configured placement specification.
      *
-     * @return an {@link Optional} carrying the JSON, or empty when unset
+     * @return an {@link Optional} carrying the placement spec, or empty when unset
      */
-    public Optional<String> configuredPlacementSpecJson() {
-        return Optional.ofNullable(configuredPlacementSpecJson);
+    public Optional<PlacementSpec> configuredPlacementSpec() {
+        return Optional.ofNullable(configuredPlacementSpec);
     }
 
     /**
      * Returns the billing currency.
      *
-     * @return an {@link Optional} carrying the currency, or empty when
-     *         unset
+     * @return an {@link Optional} carrying the currency, or empty when unset
      */
     public Optional<String> currency() {
         return Optional.ofNullable(currency);
@@ -196,8 +177,7 @@ public final class BusinessAdEstimatedReachQuery {
     /**
      * Returns the identifier of the promoted post.
      *
-     * @return an {@link Optional} carrying the identifier, or empty when
-     *         unset
+     * @return an {@link Optional} carrying the identifier, or empty when unset
      */
     public Optional<String> postId() {
         return Optional.ofNullable(postId);
@@ -206,8 +186,7 @@ public final class BusinessAdEstimatedReachQuery {
     /**
      * Returns the funnel-run correlator.
      *
-     * @return an {@link Optional} carrying the correlator, or empty when
-     *         unset
+     * @return an {@link Optional} carrying the correlator, or empty when unset
      */
     public Optional<String> flowId() {
         return Optional.ofNullable(flowId);
@@ -228,10 +207,10 @@ public final class BusinessAdEstimatedReachQuery {
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (BusinessAdEstimatedReachQuery) obj;
         return Objects.equals(adAccountId, that.adAccountId)
-                && Objects.equals(targetingSpecAudienceJson, that.targetingSpecAudienceJson)
-                && Objects.equals(optimizationGoalInputJson, that.optimizationGoalInputJson)
-                && Objects.equals(audienceOptionAudienceJson, that.audienceOptionAudienceJson)
-                && Objects.equals(configuredPlacementSpecJson, that.configuredPlacementSpecJson)
+                && Objects.equals(targetingSpecAudience, that.targetingSpecAudience)
+                && Objects.equals(optimizationGoalInput, that.optimizationGoalInput)
+                && Objects.equals(audienceOptionAudience, that.audienceOptionAudience)
+                && Objects.equals(configuredPlacementSpec, that.configuredPlacementSpec)
                 && Objects.equals(currency, that.currency)
                 && Objects.equals(postId, that.postId)
                 && Objects.equals(flowId, that.flowId)
@@ -240,8 +219,8 @@ public final class BusinessAdEstimatedReachQuery {
 
     @Override
     public int hashCode() {
-        return Objects.hash(adAccountId, targetingSpecAudienceJson, optimizationGoalInputJson,
-                audienceOptionAudienceJson, configuredPlacementSpecJson, currency, postId, flowId,
+        return Objects.hash(adAccountId, targetingSpecAudience, optimizationGoalInput,
+                audienceOptionAudience, configuredPlacementSpec, currency, postId, flowId,
                 flow);
     }
 
@@ -249,10 +228,10 @@ public final class BusinessAdEstimatedReachQuery {
     public String toString() {
         return "BusinessAdEstimatedReachQuery[" +
                 "adAccountId=" + adAccountId + ", " +
-                "targetingSpecAudienceJson=" + targetingSpecAudienceJson + ", " +
-                "optimizationGoalInputJson=" + optimizationGoalInputJson + ", " +
-                "audienceOptionAudienceJson=" + audienceOptionAudienceJson + ", " +
-                "configuredPlacementSpecJson=" + configuredPlacementSpecJson + ", " +
+                "targetingSpecAudience=" + targetingSpecAudience + ", " +
+                "optimizationGoalInput=" + optimizationGoalInput + ", " +
+                "audienceOptionAudience=" + audienceOptionAudience + ", " +
+                "configuredPlacementSpec=" + configuredPlacementSpec + ", " +
                 "currency=" + currency + ", " +
                 "postId=" + postId + ", " +
                 "flowId=" + flowId + ", " +

@@ -1,6 +1,5 @@
 package com.github.auties00.cobalt.calls.engine.participant;
 
-import com.github.auties00.cobalt.calls.jid.CallDeviceJid;
 import com.github.auties00.cobalt.model.jid.Jid;
 
 import java.util.ArrayList;
@@ -98,7 +97,7 @@ public final class CallParticipant {
     /**
      * Holds this participant's active device JID, or {@code null} until a device is pinned.
      */
-    private CallDeviceJid activeDeviceJid;
+    private Jid activeDeviceJid;
 
     /**
      * Holds this participant's device infos, keyed positionally with the active device kept
@@ -372,7 +371,7 @@ public final class CallParticipant {
      * @return an {@code Optional} holding the active device JID, or empty if no device has
      *         been pinned
      */
-    public Optional<CallDeviceJid> activeDeviceJid() {
+    public Optional<Jid> activeDeviceJid() {
         return Optional.ofNullable(activeDeviceJid);
     }
 
@@ -382,7 +381,7 @@ public final class CallParticipant {
      * @param activeDeviceJid the active device JID, or {@code null} to clear it
      * @return this participant
      */
-    public CallParticipant activeDeviceJid(CallDeviceJid activeDeviceJid) {
+    public CallParticipant activeDeviceJid(Jid activeDeviceJid) {
         this.activeDeviceJid = activeDeviceJid;
         return this;
     }
@@ -440,7 +439,7 @@ public final class CallParticipant {
      *         matches
      * @throws NullPointerException if {@code deviceJid} is {@code null}
      */
-    public Optional<CallDeviceInfo> device(CallDeviceJid deviceJid) {
+    public Optional<CallDeviceInfo> device(Jid deviceJid) {
         Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
         for (var device : devices) {
             if (device.deviceJid().equals(deviceJid)) {
@@ -457,7 +456,7 @@ public final class CallParticipant {
      * @return {@code true} if a device info was removed
      * @throws NullPointerException if {@code deviceJid} is {@code null}
      */
-    public boolean removeDevice(CallDeviceJid deviceJid) {
+    public boolean removeDevice(Jid deviceJid) {
         Objects.requireNonNull(deviceJid, "deviceJid cannot be null");
         return devices.removeIf(device -> device.deviceJid().equals(deviceJid));
     }
@@ -568,7 +567,7 @@ public final class CallParticipant {
                 state.isAllocated(),
                 platform,
                 userJid,
-                activeDeviceJid == null ? null : activeDeviceJid.jid(),
+                activeDeviceJid,
                 resolvedVideoState,
                 deviceVideoEnabled,
                 screenSharing,

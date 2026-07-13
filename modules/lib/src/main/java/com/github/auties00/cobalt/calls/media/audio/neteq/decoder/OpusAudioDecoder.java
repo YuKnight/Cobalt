@@ -1,9 +1,11 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq.decoder;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.opus.bindings.CobaltOpus;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.util.NativeLibLoader;
 
+import java.lang.System.Logger.Level;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -37,6 +39,11 @@ import com.github.auties00.cobalt.calls.media.audio.neteq.LiveNetEq;
  * into the typed {@code cobalt_opus_decoder_reset_state}.
  */
 public final class OpusAudioDecoder implements AudioDecoder {
+    /**
+     * The logger for {@link OpusAudioDecoder}.
+     */
+    private static final System.Logger LOGGER = Log.get(OpusAudioDecoder.class);
+
     static {
         NativeLibLoader.load("cobalt-native", Arena.global());
     }
@@ -123,10 +130,12 @@ public final class OpusAudioDecoder implements AudioDecoder {
             }
             this.pcmBuffer = arena.allocate((long) MAX_FRAME_SAMPLES * channels * 2);
         } catch (RuntimeException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "opus decoder create failed sampleRate=" + sampleRate + " channels=" + channels, e);
             destroyState();
             arena.close();
             throw e;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opus decoder created sampleRate={0} channels={1}", sampleRate, channels);
     }
 
     /**
@@ -148,9 +157,11 @@ public final class OpusAudioDecoder implements AudioDecoder {
             try {
                 samples = CobaltOpus.cobalt_opus_decode(state, data, payload.length, pcmBuffer, frameSamples, fec ? 1 : 0);
             } catch (Throwable t) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "cobalt_opus_decode failed frameSamples=" + frameSamples + " fec=" + fec, t);
                 throw new WhatsAppCallException.Opus("cobalt_opus_decode failed", t);
             }
             if (samples < 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "opus decode failed rc={0} frameSamples={1} fec={2}", samples, frameSamples, fec);
                 throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decode", samples);
             }
             return copyOut(samples);
@@ -176,9 +187,11 @@ public final class OpusAudioDecoder implements AudioDecoder {
             try {
                 samples = CobaltOpus.cobalt_opus_decode(state, data, payload.length, pcmBuffer, frameSamples, fec ? 1 : 0);
             } catch (Throwable t) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "cobalt_opus_decode failed frameSamples=" + frameSamples + " fec=" + fec, t);
                 throw new WhatsAppCallException.Opus("cobalt_opus_decode failed", t);
             }
             if (samples < 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "opus decode failed rc={0} frameSamples={1} fec={2}", samples, frameSamples, fec);
                 throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decode", samples);
             }
             return copyOutInto(samples, destination);
@@ -206,9 +219,11 @@ public final class OpusAudioDecoder implements AudioDecoder {
             try {
                 samples = CobaltOpus.cobalt_opus_decode(state, data, payload.length, pcmBuffer, frameSamples, fec ? 1 : 0);
             } catch (Throwable t) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "cobalt_opus_decode failed frameSamples=" + frameSamples + " fec=" + fec, t);
                 throw new WhatsAppCallException.Opus("cobalt_opus_decode failed", t);
             }
             if (samples < 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "opus decode failed rc={0} frameSamples={1} fec={2}", samples, frameSamples, fec);
                 throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decode", samples);
             }
             var pcm = copyOut(samples);
@@ -244,9 +259,11 @@ public final class OpusAudioDecoder implements AudioDecoder {
             try {
                 samples = CobaltOpus.cobalt_opus_decode(state, data, payload.length, pcmBuffer, frameSamples, fec ? 1 : 0);
             } catch (Throwable t) {
+                if (Log.ERROR) LOGGER.log(Level.ERROR, "cobalt_opus_decode failed frameSamples=" + frameSamples + " fec=" + fec, t);
                 throw new WhatsAppCallException.Opus("cobalt_opus_decode failed", t);
             }
             if (samples < 0) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "opus decode failed rc={0} frameSamples={1} fec={2}", samples, frameSamples, fec);
                 throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decode", samples);
             }
             var length = copyOutInto(samples, destination);
@@ -276,9 +293,11 @@ public final class OpusAudioDecoder implements AudioDecoder {
         try {
             samples = CobaltOpus.cobalt_opus_decode(state, MemorySegment.NULL, 0, pcmBuffer, frameSamples, 0);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "cobalt_opus_decode (PLC) failed frameSamples=" + frameSamples, t);
             throw new WhatsAppCallException.Opus("cobalt_opus_decode (PLC) failed", t);
         }
         if (samples < 0) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "opus plc conceal failed rc={0} frameSamples={1}", samples, frameSamples);
             throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decode (PLC)", samples);
         }
         return copyOut(samples);
@@ -298,9 +317,11 @@ public final class OpusAudioDecoder implements AudioDecoder {
         try {
             samples = CobaltOpus.cobalt_opus_decode(state, MemorySegment.NULL, 0, pcmBuffer, frameSamples, 0);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "cobalt_opus_decode (PLC) failed frameSamples=" + frameSamples, t);
             throw new WhatsAppCallException.Opus("cobalt_opus_decode (PLC) failed", t);
         }
         if (samples < 0) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "opus plc conceal failed rc={0} frameSamples={1}", samples, frameSamples);
             throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decode (PLC)", samples);
         }
         return copyOutInto(samples, destination);
@@ -340,13 +361,16 @@ public final class OpusAudioDecoder implements AudioDecoder {
     @Override
     public void reset() {
         requireOpen();
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "opus decoder reset");
         int rc;
         try {
             rc = CobaltOpus.cobalt_opus_decoder_reset_state(state);
         } catch (Throwable t) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "cobalt_opus_decoder_reset_state failed", t);
             throw new WhatsAppCallException.Opus("cobalt_opus_decoder_reset_state failed", t);
         }
         if (rc != CobaltOpus.COBALT_OPUS_OK()) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "opus decoder reset failed rc={0}", rc);
             throw WhatsAppCallException.Opus.fromErr("cobalt_opus_decoder_reset_state", rc);
         }
     }

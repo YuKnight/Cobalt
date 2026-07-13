@@ -2,6 +2,9 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.postfilter;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.dsp.Pffft;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Runs the deterministic MLow decode postfilter chain (the harmonic, LPC, and high pass postfilters) over the
@@ -53,6 +56,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
  * same {@value #LPC_POST_IMPZ_LEN}-point real FFT ({@link Pffft}) as the reference.
  */
 public final class MlowDecodePostfilter {
+    /**
+     * The logger for {@link MlowDecodePostfilter}.
+     */
+    private static final System.Logger LOGGER = Log.get(MlowDecodePostfilter.class);
+
     /**
      * The linear prediction order {@code SMPL_LPC_ORDER}.
      */
@@ -317,6 +325,9 @@ public final class MlowDecodePostfilter {
      * between the packets of one continuous stream, which must thread state.
      */
     public void reset() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "postfilter chain reset");
+        }
         java.util.Arrays.fill(lpcStateMa, 0.0f);
         java.util.Arrays.fill(lpcStateAr, 0.0f);
         java.util.Arrays.fill(hpStateLoEmph1, 0.0f);
@@ -363,6 +374,11 @@ public final class MlowDecodePostfilter {
     public void process(float[] synthesis, int numFrames, float[][][] lpc, int numSubframes, int subframeLength,
                         float[] lagsPerPacket, float[] normalizedBitratePerFrame, boolean voiced, boolean lowRate,
                         boolean lpcPostfilterEnabled) {
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE,
+                    "postfilter packet: frames={0} subframes={1} voiced={2} lowRate={3} lpcPostfilter={4}",
+                    numFrames, numSubframes, voiced, lowRate, lpcPostfilterEnabled);
+        }
         int frameLength = numSubframes * subframeLength;
         int lagsPerFrame = frameLength / HARM_LAG_SUBFR_LEN;
         int packetLen = numFrames * frameLength;

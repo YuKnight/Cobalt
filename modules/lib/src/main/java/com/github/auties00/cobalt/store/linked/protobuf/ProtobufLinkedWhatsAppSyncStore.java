@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.store.linked.protobuf;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.device.sync.MissingDeviceSyncKey;
 import com.github.auties00.cobalt.model.device.sync.PendingDeviceSync;
 import com.github.auties00.cobalt.model.message.system.appstate.AppStateSyncKey;
@@ -22,6 +23,7 @@ import it.auties.protobuf.annotation.ProtobufMessage;
 import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -59,6 +61,11 @@ import static java.util.Objects.requireNonNullElseGet;
 @ProtobufMessage
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public final class ProtobufLinkedWhatsAppSyncStore implements LinkedWhatsAppSyncStore {
+    /**
+     * The logger for {@link ProtobufLinkedWhatsAppSyncStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(ProtobufLinkedWhatsAppSyncStore.class);
+
     /**
      * Whether app-state patch MACs are verified during sync.
      */
@@ -331,6 +338,10 @@ public final class ProtobufLinkedWhatsAppSyncStore implements LinkedWhatsAppSync
             metadata.setLastErrorTimestamp(null);
             metadata.setMacMismatch(false);
         }
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "sync store loaded: reset {0} collection state machines to up_to_date",
+                    this.webAppStateCollections.size());
+        }
         this.pendingDeviceSyncs = pendingDeviceSyncs == null
                 ? new CopyOnWriteArrayList<>()
                 : new CopyOnWriteArrayList<>(pendingDeviceSyncs);
@@ -597,6 +608,7 @@ public final class ProtobufLinkedWhatsAppSyncStore implements LinkedWhatsAppSync
 
     @Override
     public void addWebAppStateKeys(Collection<AppStateSyncKey> keys) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "adding {0} app-state sync keys", keys.size());
         for (var key : keys) {
             var hasKeyData = key.keyData()
                     .flatMap(AppStateSyncKeyData::keyData)
@@ -613,6 +625,7 @@ public final class ProtobufLinkedWhatsAppSyncStore implements LinkedWhatsAppSync
 
     @Override
     public void expireAppStateKeys(Instant threshold) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "expiring app-state keys older than {0}", threshold);
         for (var entry : appStateKeysMap.entrySet()) {
             var key = entry.getValue();
             var timestamp = key.keyData()
@@ -626,6 +639,7 @@ public final class ProtobufLinkedWhatsAppSyncStore implements LinkedWhatsAppSync
 
     @Override
     public void expireAppStateKeysByEpoch(int epoch) {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "expiring app-state keys for epoch {0}", epoch);
         for (var key : appStateKeysMap.values()) {
             if (SyncKeyUtils.getKeyEpoch(key) != epoch) {
                 continue;
@@ -718,12 +732,14 @@ public final class ProtobufLinkedWhatsAppSyncStore implements LinkedWhatsAppSync
 
     @Override
     public void addMissingSyncKey(MissingDeviceSyncKey missingKey) {
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "app-state sync key missing: {0}", missingKey.keyId());
         missingSyncKeysMap.put(HexFormat.of().formatHex(missingKey.keyId()), missingKey);
     }
 
     @Override
     public void addMissingSyncKeys(Collection<MissingDeviceSyncKey> missingKeys) {
         Objects.requireNonNull(missingKeys, "missingKeys cannot be null");
+        if (Log.WARNING) LOGGER.log(Level.WARNING, "{0} app-state sync keys missing", missingKeys.size());
         for (var missingKey : missingKeys) {
             this.missingSyncKeysMap.put(HexFormat.of().formatHex(missingKey.keyId()), missingKey);
         }
@@ -815,6 +831,10 @@ public final class ProtobufLinkedWhatsAppSyncStore implements LinkedWhatsAppSync
     @Override
     public void markWebAppStateDirty(SyncPatchType collectionName) {
         webAppStateCollections.compute(collectionName, (_, current) -> {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "sync collection {0} state {1} -> dirty", collectionName,
+                        current == null ? null : current.state());
+            }
             if (current == null) {
                 return new SyncCollectionMetadataBuilder()
                         .name(collectionName)
@@ -844,104 +864,113 @@ public final class ProtobufLinkedWhatsAppSyncStore implements LinkedWhatsAppSync
 
     @Override
     public void markWebAppStateInFlight(SyncPatchType collectionName) {
-        webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadataBuilder()
-                        .name(current.name())
-                        .version(current.version())
-                        .ltHash(current.ltHash())
-                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
-                        .state(SyncCollectionState.IN_FLIGHT)
-                        .retryCount(current.retryCount())
-                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
-                        .macMismatch(current.macMismatch())
-                        .bootstrapped(current.bootstrapped())
-                        .build()
-        );
+        webAppStateCollections.computeIfPresent(collectionName, (_, current) -> {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sync collection {0} state {1} -> in_flight", collectionName, current.state());
+            return new SyncCollectionMetadataBuilder()
+                    .name(current.name())
+                    .version(current.version())
+                    .ltHash(current.ltHash())
+                    .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                    .state(SyncCollectionState.IN_FLIGHT)
+                    .retryCount(current.retryCount())
+                    .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
+                    .macMismatch(current.macMismatch())
+                    .bootstrapped(current.bootstrapped())
+                    .build();
+        });
     }
 
     @Override
     public void markWebAppStateUpToDate(SyncPatchType collectionName) {
-        webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadataBuilder()
-                        .name(current.name())
-                        .version(current.version())
-                        .ltHash(current.ltHash())
-                        .lastSyncTimestamp(Instant.now())
-                        .state(SyncCollectionState.UP_TO_DATE)
-                        .retryCount(0)
-                        .lastErrorTimestamp(null)
-                        .macMismatch(current.macMismatch())
-                        .bootstrapped(current.bootstrapped())
-                        .build()
-        );
+        webAppStateCollections.computeIfPresent(collectionName, (_, current) -> {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sync collection {0} state {1} -> up_to_date", collectionName, current.state());
+            return new SyncCollectionMetadataBuilder()
+                    .name(current.name())
+                    .version(current.version())
+                    .ltHash(current.ltHash())
+                    .lastSyncTimestamp(Instant.now())
+                    .state(SyncCollectionState.UP_TO_DATE)
+                    .retryCount(0)
+                    .lastErrorTimestamp(null)
+                    .macMismatch(current.macMismatch())
+                    .bootstrapped(current.bootstrapped())
+                    .build();
+        });
     }
 
     @Override
     public void markWebAppStatePending(SyncPatchType collectionName) {
-        webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadataBuilder()
-                        .name(current.name())
-                        .version(current.version())
-                        .ltHash(current.ltHash())
-                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
-                        .state(SyncCollectionState.PENDING)
-                        .retryCount(current.retryCount())
-                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
-                        .macMismatch(current.macMismatch())
-                        .bootstrapped(current.bootstrapped())
-                        .build()
-        );
+        webAppStateCollections.computeIfPresent(collectionName, (_, current) -> {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sync collection {0} state {1} -> pending", collectionName, current.state());
+            return new SyncCollectionMetadataBuilder()
+                    .name(current.name())
+                    .version(current.version())
+                    .ltHash(current.ltHash())
+                    .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                    .state(SyncCollectionState.PENDING)
+                    .retryCount(current.retryCount())
+                    .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
+                    .macMismatch(current.macMismatch())
+                    .bootstrapped(current.bootstrapped())
+                    .build();
+        });
     }
 
     @Override
     public void markWebAppStateBlocked(SyncPatchType collectionName) {
-        webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadataBuilder()
-                        .name(current.name())
-                        .version(current.version())
-                        .ltHash(current.ltHash())
-                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
-                        .state(SyncCollectionState.BLOCKED)
-                        .retryCount(current.retryCount())
-                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
-                        .macMismatch(current.macMismatch())
-                        .bootstrapped(current.bootstrapped())
-                        .build()
-        );
+        webAppStateCollections.computeIfPresent(collectionName, (_, current) -> {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sync collection {0} state {1} -> blocked", collectionName, current.state());
+            return new SyncCollectionMetadataBuilder()
+                    .name(current.name())
+                    .version(current.version())
+                    .ltHash(current.ltHash())
+                    .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                    .state(SyncCollectionState.BLOCKED)
+                    .retryCount(current.retryCount())
+                    .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
+                    .macMismatch(current.macMismatch())
+                    .bootstrapped(current.bootstrapped())
+                    .build();
+        });
     }
 
     @Override
     public void markWebAppStateErrorRetry(SyncPatchType collectionName) {
-        webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadataBuilder()
-                        .name(current.name())
-                        .version(current.version())
-                        .ltHash(current.ltHash())
-                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
-                        .state(SyncCollectionState.ERROR_RETRY)
-                        .retryCount(current.retryCount() + 1)
-                        .lastErrorTimestamp(current.lastErrorTimestamp().orElseGet(Instant::now))
-                        .macMismatch(current.macMismatch())
-                        .bootstrapped(current.bootstrapped())
-                        .build()
-        );
+        webAppStateCollections.computeIfPresent(collectionName, (_, current) -> {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "sync collection {0} state {1} -> error_retry, attempt {2}",
+                        collectionName, current.state(), current.retryCount() + 1);
+            }
+            return new SyncCollectionMetadataBuilder()
+                    .name(current.name())
+                    .version(current.version())
+                    .ltHash(current.ltHash())
+                    .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                    .state(SyncCollectionState.ERROR_RETRY)
+                    .retryCount(current.retryCount() + 1)
+                    .lastErrorTimestamp(current.lastErrorTimestamp().orElseGet(Instant::now))
+                    .macMismatch(current.macMismatch())
+                    .bootstrapped(current.bootstrapped())
+                    .build();
+        });
     }
 
     @Override
     public void markWebAppStateErrorFatal(SyncPatchType collectionName) {
-        webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadataBuilder()
-                        .name(current.name())
-                        .version(current.version())
-                        .ltHash(current.ltHash())
-                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
-                        .state(SyncCollectionState.ERROR_FATAL)
-                        .retryCount(current.retryCount())
-                        .lastErrorTimestamp(null)
-                        .macMismatch(current.macMismatch())
-                        .bootstrapped(current.bootstrapped())
-                        .build()
-        );
+        webAppStateCollections.computeIfPresent(collectionName, (_, current) -> {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "sync collection {0} state {1} -> error_fatal", collectionName, current.state());
+            return new SyncCollectionMetadataBuilder()
+                    .name(current.name())
+                    .version(current.version())
+                    .ltHash(current.ltHash())
+                    .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                    .state(SyncCollectionState.ERROR_FATAL)
+                    .retryCount(current.retryCount())
+                    .lastErrorTimestamp(null)
+                    .macMismatch(current.macMismatch())
+                    .bootstrapped(current.bootstrapped())
+                    .build();
+        });
     }
 
     @Override
@@ -952,41 +981,44 @@ public final class ProtobufLinkedWhatsAppSyncStore implements LinkedWhatsAppSync
 
     @Override
     public void markWebAppStateMacMismatch(SyncPatchType collectionName) {
-        webAppStateCollections.computeIfPresent(collectionName, (_, current) ->
-                new SyncCollectionMetadataBuilder()
-                        .name(current.name())
-                        .version(current.version())
-                        .ltHash(current.ltHash())
-                        .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
-                        .state(current.state())
-                        .retryCount(current.retryCount())
-                        .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
-                        .macMismatch(true)
-                        .bootstrapped(current.bootstrapped())
-                        .build()
-        );
+        webAppStateCollections.computeIfPresent(collectionName, (_, current) -> {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "sync collection {0} mac mismatch detected", collectionName);
+            return new SyncCollectionMetadataBuilder()
+                    .name(current.name())
+                    .version(current.version())
+                    .ltHash(current.ltHash())
+                    .lastSyncTimestamp(current.lastSyncTimestamp().orElse(null))
+                    .state(current.state())
+                    .retryCount(current.retryCount())
+                    .lastErrorTimestamp(current.lastErrorTimestamp().orElse(null))
+                    .macMismatch(true)
+                    .bootstrapped(current.bootstrapped())
+                    .build();
+        });
     }
 
     @Override
     public SyncCollectionMetadata findWebAppState(SyncPatchType collectionName) {
-        return webAppStateCollections.computeIfAbsent(collectionName, key ->
-                new SyncCollectionMetadataBuilder()
-                        .name(key)
-                        .version(0)
-                        .ltHash(MutationLTHash.copy(MutationLTHash.EMPTY_HASH))
-                        .lastSyncTimestamp(null)
-                        .state(SyncCollectionState.UP_TO_DATE)
-                        .retryCount(0)
-                        .lastErrorTimestamp(null)
-                        .macMismatch(false)
-                        .bootstrapped(false)
-                        .build()
-        );
+        return webAppStateCollections.computeIfAbsent(collectionName, key -> {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "creating new sync collection metadata for {0}", key);
+            return new SyncCollectionMetadataBuilder()
+                    .name(key)
+                    .version(0)
+                    .ltHash(MutationLTHash.copy(MutationLTHash.EMPTY_HASH))
+                    .lastSyncTimestamp(null)
+                    .state(SyncCollectionState.UP_TO_DATE)
+                    .retryCount(0)
+                    .lastErrorTimestamp(null)
+                    .macMismatch(false)
+                    .bootstrapped(false)
+                    .build();
+        });
     }
 
     @Override
     public void updateWebAppStateVersion(SyncPatchType collectionName, long newVersion, byte[] newLtHash) {
         var copiedHash = MutationLTHash.copy(newLtHash);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "sync collection {0} advanced to version {1}", collectionName, newVersion);
         webAppStateCollections.compute(collectionName, (_, current) ->
                 new SyncCollectionMetadataBuilder()
                         .name(collectionName)

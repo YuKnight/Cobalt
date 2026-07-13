@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,13 +13,13 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that fetches the flat WhatsApp Business profile-category typeahead list.
+ * Builds the graph.whatsapp.com GraphQL query that fetches the flat WhatsApp Business profile-category typeahead list.
  *
  * <p>The single {@code query_params} GraphQL variable is an object carrying the typeahead
  * {@code query} prefix, the request {@code locale}, and two fixed discriminators: an
  * {@code operation} of {@code "PROFILE_TYPEAHEAD"} and a {@code version} of {@code "V_1"}. WhatsApp
  * Web's {@code WAWebBizGetCategoriesQuery.getBusinessCategories(query, locale)} fills it from those
- * two caller inputs. The relay returns the matching categories under the linked
+ * two caller inputs. The graph.whatsapp.com endpoint returns the matching categories under the linked
  * {@code whatsapp_catkit_typeahead_proxy}; the reply is consumed through
  * {@link BizGetCategoriesWhatsAppGraphQlResponse}.
  *
@@ -26,10 +28,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebBizGetCategoriesQuery")
 public final class BizGetCategoriesWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebBizGetCategoriesQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -143,5 +145,21 @@ public final class BizGetCategoriesWhatsAppGraphQlRequest implements WhatsAppGra
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

@@ -3,7 +3,9 @@ package com.github.auties00.cobalt.calls.engine.info;
 import com.github.auties00.cobalt.calls.engine.context.CallManager;
 import com.github.auties00.cobalt.calls.telemetry.CallResult;
 import com.github.auties00.cobalt.calls.engine.event.CallEventType;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.time.Duration;
 import java.util.Objects;
 
@@ -20,6 +22,11 @@ import java.util.Objects;
  */
 public record LiveCallInfoUpdater(CallManager manager, CallInfoManager infoManager)
         implements CallInfoUpdater {
+    /**
+     * The logger for {@link LiveCallInfoUpdater}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveCallInfoUpdater.class);
+
     /**
      * Rejects a null manager or info manager.
      *
@@ -46,6 +53,10 @@ public record LiveCallInfoUpdater(CallManager manager, CallInfoManager infoManag
         Objects.requireNonNull(eventType, "eventType cannot be null");
         var context = manager.getByCallId(callId).orElse(null);
         if (context == null) {
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "call info update skipped, unknown call {0} for event {1}",
+                        callId, eventType);
+            }
             return;
         }
         context.lock().lock();
@@ -56,6 +67,10 @@ public record LiveCallInfoUpdater(CallManager manager, CallInfoManager infoManag
             // TODO: report the real setup duration once connected state timestamp accounting is threaded through the context
             infoManager.updateForEvent(eventType, context.state(), result, active, lonely,
                     Duration.ZERO, null);
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "call info refreshed for call {0}, event {1}, state {2}, result {3}",
+                        callId, eventType, context.state(), result);
+            }
         } finally {
             context.lock().unlock();
         }

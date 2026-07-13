@@ -16,11 +16,9 @@ import java.util.OptionalInt;
  *
  * <p>An edit identifies the catalog and the target product, optionally
  * resizes the rendered product thumbnails, and carries the changed
- * product fields. The changed fields are supplied as a pre-encoded JSON
- * object literal because the field set varies per product and is not yet
- * modelled as fixed typed fields. The thumbnail width and height are
- * independently optional; leaving either unset lets the server pick a
- * default size.
+ * product fields as a typed {@link CatalogProductInfo}. The thumbnail width
+ * and height are independently optional; leaving either unset lets the
+ * server pick a default size.
  */
 @ProtobufMessage(name = "BusinessCatalogProductEdit")
 public final class BusinessCatalogProductEdit {
@@ -51,11 +49,11 @@ public final class BusinessCatalogProductEdit {
     final Integer thumbnailHeight;
 
     /**
-     * Pre-encoded JSON object literal carrying the changed product
-     * fields. Unset omits the product body from the request.
+     * The changed product fields. Unset omits the product body from the
+     * request.
      */
-    @ProtobufProperty(index = 5, type = ProtobufType.STRING)
-    final String productInfoJson;
+    @ProtobufProperty(index = 5, type = ProtobufType.MESSAGE)
+    final CatalogProductInfo productInfo;
 
     /**
      * Constructs a new {@code BusinessCatalogProductEdit}.
@@ -64,17 +62,17 @@ public final class BusinessCatalogProductEdit {
      * @param productId       the identifier of the product to edit; required
      * @param thumbnailWidth  the requested thumbnail width, or {@code null}
      * @param thumbnailHeight the requested thumbnail height, or {@code null}
-     * @param productInfoJson the pre-encoded changed fields, or {@code null}
+     * @param productInfo     the changed product fields, or {@code null}
      * @throws NullPointerException if {@code businessJid} or {@code productId}
      *                              is {@code null}
      */
     public BusinessCatalogProductEdit(Jid businessJid, String productId, Integer thumbnailWidth,
-                                      Integer thumbnailHeight, String productInfoJson) {
+                                      Integer thumbnailHeight, CatalogProductInfo productInfo) {
         this.businessJid = Objects.requireNonNull(businessJid, "businessJid cannot be null");
         this.productId = Objects.requireNonNull(productId, "productId cannot be null");
         this.thumbnailWidth = thumbnailWidth;
         this.thumbnailHeight = thumbnailHeight;
-        this.productInfoJson = productInfoJson;
+        this.productInfo = productInfo;
     }
 
     /**
@@ -85,15 +83,15 @@ public final class BusinessCatalogProductEdit {
      * @param productId       the identifier of the product to edit; required
      * @param thumbnailWidth  the requested thumbnail width, or {@code null}
      * @param thumbnailHeight the requested thumbnail height, or {@code null}
-     * @param productInfoJson the pre-encoded changed fields, or {@code null}
+     * @param productInfo     the changed product fields, or {@code null}
      * @throws NullPointerException if {@code businessJid} or {@code productId}
      *                              is {@code null}
      */
     public BusinessCatalogProductEdit(JidProvider businessJid, String productId,
                                       Integer thumbnailWidth, Integer thumbnailHeight,
-                                      String productInfoJson) {
+                                      CatalogProductInfo productInfo) {
         this(Objects.requireNonNull(businessJid, "businessJid cannot be null").toJid(),
-                productId, thumbnailWidth, thumbnailHeight, productInfoJson);
+                productId, thumbnailWidth, thumbnailHeight, productInfo);
     }
 
     /**
@@ -133,12 +131,12 @@ public final class BusinessCatalogProductEdit {
     }
 
     /**
-     * Returns the pre-encoded JSON of the changed fields.
+     * Returns the changed product fields.
      *
-     * @return an {@link Optional} carrying the JSON body, or empty when unset
+     * @return an {@link Optional} carrying the product fields, or empty when unset
      */
-    public Optional<String> productInfoJson() {
-        return Optional.ofNullable(productInfoJson);
+    public Optional<CatalogProductInfo> productInfo() {
+        return Optional.ofNullable(productInfo);
     }
 
     @Override
@@ -150,12 +148,12 @@ public final class BusinessCatalogProductEdit {
                 && Objects.equals(productId, that.productId)
                 && Objects.equals(thumbnailWidth, that.thumbnailWidth)
                 && Objects.equals(thumbnailHeight, that.thumbnailHeight)
-                && Objects.equals(productInfoJson, that.productInfoJson);
+                && Objects.equals(productInfo, that.productInfo);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(businessJid, productId, thumbnailWidth, thumbnailHeight, productInfoJson);
+        return Objects.hash(businessJid, productId, thumbnailWidth, thumbnailHeight, productInfo);
     }
 
     @Override
@@ -165,6 +163,6 @@ public final class BusinessCatalogProductEdit {
                 "productId=" + productId + ", " +
                 "thumbnailWidth=" + thumbnailWidth + ", " +
                 "thumbnailHeight=" + thumbnailHeight + ", " +
-                "productInfoJson=" + productInfoJson + ']';
+                "productInfo=" + productInfo + ']';
     }
 }

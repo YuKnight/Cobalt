@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.graphql.whatsapp.business;
 
 import com.alibaba.fastjson2.JSONWriter;
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,13 +14,13 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 
 /**
- * Builds the relay query that fetches the details of a single WhatsApp Business order.
+ * Builds the graph.whatsapp.com GraphQL query that fetches the details of a single WhatsApp Business order.
  *
  * <p>The single {@code request} GraphQL variable wraps an {@code order} object naming the order to
  * fetch. WhatsApp Web's {@code WAWebBizQueryOrderJob.queryOrder} fills it from the calling user's
  * personal-number {@link Jid}, the order's server id, the secrecy {@code token} fronting the order,
  * the requested thumbnail {@code image_dimensions}, and an optional direct-connection encrypted info
- * blob. The relay returns the full order projection under {@code xwa_checkout_get_order_info}; the
+ * blob. The graph.whatsapp.com endpoint returns the full order projection under {@code xwa_checkout_get_order_info}; the
  * reply is consumed through {@link BizQueryOrderJobWhatsAppGraphQlResponse}.
  *
  * @see BizQueryOrderJobWhatsAppGraphQlResponse
@@ -26,10 +28,10 @@ import java.io.UncheckedIOException;
 @WhatsAppWebModule(moduleName = "WAWebBizQueryOrderJobQuery")
 public final class BizQueryOrderJobWhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebBizQueryOrderJobQuery.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -196,5 +198,21 @@ public final class BizQueryOrderJobWhatsAppGraphQlRequest implements WhatsAppGra
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

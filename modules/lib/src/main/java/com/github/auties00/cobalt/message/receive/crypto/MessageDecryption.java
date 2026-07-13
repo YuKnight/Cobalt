@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.message.receive.crypto;
 
-import com.github.auties00.cobalt.exception.WhatsAppMessageException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppMessageException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.message.MessageEncryptionType;
 import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
 import com.github.auties00.cobalt.message.send.bot.BotMessageSecret;
@@ -24,6 +25,7 @@ import javax.crypto.KDF;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.HKDFParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
@@ -67,6 +69,11 @@ import java.util.Optional;
 @WhatsAppWebModule(moduleName = "WAWebCryptoLibrary")
 @WhatsAppWebModule(moduleName = "WASignalGroupCipher")
 public final class MessageDecryption {
+    /**
+     * The logger for {@link MessageDecryption}.
+     */
+    private static final System.Logger LOGGER = Log.get(MessageDecryption.class);
+
     /**
      * Holds the smallest valid PKCS#7 padding length used by the Signal protocol
      * payload format.
@@ -594,6 +601,8 @@ public final class MessageDecryption {
         cryptoLocks.withSenderKey(senderKeyName, () -> {
             groupCipher.process(senderKeyName, distributionMsg);
         });
+        if (Log.TRACE) LOGGER.log(Level.TRACE,
+                "installed sender key distribution for group {0} from {1}", groupJid, senderJid);
     }
 
     /**
@@ -696,6 +705,8 @@ public final class MessageDecryption {
             }
             return Optional.of(identityKey.toEncodedPoint());
         } catch (ProtobufDeserializationException | IllegalArgumentException e) {
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG,
+                    "failed to extract identity key from pkmsg: {0}", e.getMessage());
             return Optional.empty();
         }
     }

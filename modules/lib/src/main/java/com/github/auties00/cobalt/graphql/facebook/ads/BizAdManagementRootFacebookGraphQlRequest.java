@@ -21,10 +21,8 @@ import java.io.UncheckedIOException;
  * @implNote This implementation models {@code page_id_1}, {@code page_id_2}, and {@code draft_page_id}
  * as {@link String} Facebook page ids rather than {@link com.github.auties00.cobalt.model.jid.Jid}
  * values: they are numeric Facebook Graph object ids, not WhatsApp addresses. The {@code options}
- * variable is accepted as a caller-supplied, already JSON-encoded object literal and spliced in
- * verbatim because the compiled {@code WAWebBizAdManagementRootQuery} document of snapshot
- * {@code 1040120866} declares it as an opaque {@code LocalArgument} with no field-level type
- * information.
+ * variable is always the empty object {@code {}} the client sends, so it is emitted as a constant and
+ * carries no field.
  *
  * @see BizAdManagementRootFacebookGraphQlResponse
  */
@@ -68,12 +66,6 @@ public final class BizAdManagementRootFacebookGraphQlRequest implements Facebook
     private final String draftPageId;
 
     /**
-     * The {@code options} GraphQL variable: the already-JSON-encoded boosted-ads connection options
-     * object, or {@code null} to omit it.
-     */
-    private final String optionsJson;
-
-    /**
      * The {@code first} GraphQL variable: the maximum number of boosted-ad edges to return in the
      * forward page, or {@code null} to omit it.
      */
@@ -96,18 +88,15 @@ public final class BizAdManagementRootFacebookGraphQlRequest implements Facebook
      *                    {@code null} to omit the variable
      * @param draftPageId the Facebook page id whose latest CTWA draft is read, or {@code null} to omit
      *                    the variable
-     * @param optionsJson the already-JSON-encoded connection options object, or {@code null} to omit
-     *                    the variable
      * @param first       the maximum number of boosted-ad edges to return, or {@code null} to omit the
      *                    variable
      * @param after       the forward-pagination cursor, or {@code null} to omit the variable
      */
     public BizAdManagementRootFacebookGraphQlRequest(String pageId1, String pageId2, String draftPageId,
-                                           String optionsJson, Integer first, String after) {
+                                           Integer first, String after) {
         this.pageId1 = pageId1;
         this.pageId2 = pageId2;
         this.draftPageId = draftPageId;
-        this.optionsJson = optionsJson;
         this.first = first;
         this.after = after;
     }
@@ -132,10 +121,9 @@ public final class BizAdManagementRootFacebookGraphQlRequest implements Facebook
      * {@inheritDoc}
      *
      * @implNote This implementation emits {@code {"page_id_1": ..., "page_id_2": ..., "draft_page_id":
-     * ..., "options": ..., "first": ..., "after": ...}}, writing each variable only when its value is
-     * non-null and emitting {@code "{}"} when all are {@code null}. The {@code options} value is
-     * spliced in as a raw JSON value via {@link JSONWriter#writeRaw(String)} because it is supplied
-     * already encoded.
+     * ..., "options": {}, "first": ..., "after": ...}}, writing each page/pagination variable only when
+     * its value is non-null and always emitting {@code options} as the constant empty object the client
+     * sends.
      */
     @Override
     public String variables() {
@@ -159,11 +147,10 @@ public final class BizAdManagementRootFacebookGraphQlRequest implements Facebook
                 writer.writeString(draftPageId);
             }
 
-            if (optionsJson != null) {
-                writer.writeName("options");
-                writer.writeColon();
-                writer.writeRaw(optionsJson);
-            }
+            writer.writeName("options");
+            writer.writeColon();
+            writer.startObject();
+            writer.endObject();
 
             if (first != null) {
                 writer.writeName("first");

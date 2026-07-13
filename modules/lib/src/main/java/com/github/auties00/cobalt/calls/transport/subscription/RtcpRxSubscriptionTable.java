@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.subscription;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +33,11 @@ import java.util.List;
  * can request feedback for.
  */
 public final class RtcpRxSubscriptionTable {
+    /**
+     * The logger for {@link RtcpRxSubscriptionTable}.
+     */
+    private static final System.Logger LOGGER = Log.get(RtcpRxSubscriptionTable.class);
+
     /**
      * The fixed number of feedback subscriptions the table can hold.
      *
@@ -78,13 +86,26 @@ public final class RtcpRxSubscriptionTable {
         for (var i = 0; i < entries.size(); i++) {
             if (entries.get(i).mediaSsrc() == mediaSsrc) {
                 entries.set(i, new RtcpRxSubscriptionEntry(peerSsrc, mediaSsrc, flags));
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "rtcp rx feedback subscription updated, mediaSsrc={0}, flags=0x{1}",
+                            mediaSsrc, Integer.toHexString(flags));
+                }
                 return true;
             }
         }
         if (entries.size() >= MAX_ENTRIES) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "rtcp rx feedback table full ({0} entries), rejecting subscribe for mediaSsrc={1}",
+                        MAX_ENTRIES, mediaSsrc);
+            }
             return false;
         }
         entries.add(new RtcpRxSubscriptionEntry(peerSsrc, mediaSsrc, flags));
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "rtcp rx feedback subscription added, mediaSsrc={0}, flags=0x{1}",
+                    mediaSsrc, Integer.toHexString(flags));
+        }
         return true;
     }
 
@@ -102,6 +123,9 @@ public final class RtcpRxSubscriptionTable {
         for (var i = 0; i < entries.size(); i++) {
             if (entries.get(i).mediaSsrc() == mediaSsrc) {
                 entries.remove(i);
+                if (Log.TRACE) {
+                    LOGGER.log(Level.TRACE, "rtcp rx feedback subscription removed, mediaSsrc={0}", mediaSsrc);
+                }
                 return true;
             }
         }
@@ -147,6 +171,9 @@ public final class RtcpRxSubscriptionTable {
      * call; after this call {@link #isEmpty()} is {@code true}.
      */
     public void clear() {
+        if (Log.DEBUG && !entries.isEmpty()) {
+            LOGGER.log(Level.DEBUG, "rtcp rx feedback table cleared, {0} entrie(s) forgotten", entries.size());
+        }
         entries.clear();
     }
 }

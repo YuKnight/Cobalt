@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.platform.video;
 
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
 import com.github.auties00.cobalt.calls.stream.VideoOutput;
+import com.github.auties00.cobalt.log.Log;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -13,7 +15,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * {@link VideoCaptureDriver} and pumps frames from a host {@link VideoOutput} acting as the operating
  * system camera. {@link #initDriver(String, VideoSink)} binds a source for the named device through the
  * installed {@link CameraSourceFactory} and latches the sink; {@link #start(VideoCaptureCapability)}
- * spins a virtual thread capture pump that repeatedly {@linkplain VideoOutput#take() pulls} frames from
+ * spins a virtual thread capture pump that repeatedly {@linkplain VideoOutput#takeVideo() pulls} frames from
  * the source and forwards each through {@link #sendVideoToSink(VideoFrame)}; {@link #stop()} ends the
  * pump and the bound source. A frame whose dimensions differ from the previously forwarded frame is
  * dropped, a frame offered while not {@link State#RUNNING} is dropped, and a sink that throws is logged
@@ -30,9 +32,9 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
     /**
-     * Logs lifecycle transitions, dropped frames, and sink errors.
+     * The logger for {@link LiveVideoCaptureDriver}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveVideoCaptureDriver.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveVideoCaptureDriver.class);
 
     /**
      * Names the result code a forwarded frame returns when the sink accepts it.
@@ -55,7 +57,7 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
      *
      * <p>This is the seam between the driver's state machine and the concrete camera backend: an embedder
      * installs a factory that opens the named operating system camera and returns it as a
-     * {@link VideoOutput} whose {@link VideoOutput#take()} yields raw frames. It is a single abstract
+     * {@link VideoOutput} whose {@link VideoOutput#takeVideo()} yields raw frames. It is a single abstract
      * method type so a lambda or a method reference to a stream factory satisfies it.
      */
     @FunctionalInterface
@@ -64,7 +66,7 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
          * Opens the named camera and returns it as a frame source.
          *
          * <p>Binds the operating system camera identified by {@code deviceId} and returns a
-         * {@link VideoOutput} whose {@link VideoOutput#take()} delivers its captured frames. The returned
+         * {@link VideoOutput} whose {@link VideoOutput#takeVideo()} delivers its captured frames. The returned
          * source is owned by the driver and {@linkplain VideoOutput#shutdown() shut down} when the driver
          * stops.
          *
@@ -87,9 +89,13 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
     private final ReentrantLock lock;
 
     /**
-     * Holds the current lifecycle state, only ever mutated under {@link #lock}.
+     * Holds the current lifecycle state.
+     *
+     * <p>Mutated only under {@link #lock}, and declared {@code volatile} so {@link #selectCamera(String)}
+     * can fast-fail its {@link State#VOID} guard with a lock-free read before opening the replacement
+     * source, then re-validate authoritatively under the lock.
      */
-    private State state;
+    private volatile State state;
 
     /**
      * Holds the latched sink, or {@code null} before {@link #initDriver(String, VideoSink)} and after a
@@ -173,6 +179,7 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
             this.lastWidth = -1;
             this.lastHeight = -1;
             this.state = State.INITIALIZED;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "video capture driver initialized");
         } finally {
             lock.unlock();
         }
@@ -197,6 +204,9 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
             this.pump = Thread.ofVirtual()
                     .name("calls-video-capture-" + capability.width() + "x" + capability.height())
                     .start(this::pumpLoop);
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "video capture started: {0}x{1} maxFps={2}",
+                        capability.width(), capability.height(), capability.maxFps());
         } finally {
             lock.unlock();
         }
@@ -216,19 +226,20 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
         lock.lock();
         try {
             if (state != State.RUNNING) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "send_video_data_to_sink dropped: driver not running, state " + state);
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "send_video_data_to_sink dropped: driver not running, state {0}",
+                            state);
                 return SINK_DROPPED;
             }
             if (sink == null) {
-                LOGGER.log(System.Logger.Level.WARNING, "send_video_data_to_sink dropped: sink is null");
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "send_video_data_to_sink dropped: sink is null");
                 return SINK_DROPPED;
             }
             if (lastWidth != -1 && (frame.width() != lastWidth || frame.height() != lastHeight)) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "send_video_data_to_sink dropped: frame size changed from "
-                                + lastWidth + "x" + lastHeight + " to "
-                                + frame.width() + "x" + frame.height());
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG,
+                            "send_video_data_to_sink dropped: frame size changed from {0}x{1} to {2}x{3}",
+                            lastWidth, lastHeight, frame.width(), frame.height());
                 return SINK_DROPPED;
             }
             this.lastWidth = frame.width();
@@ -240,12 +251,12 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
         try {
             var code = target.accept(frame);
             if (code != SINK_OK) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "send_video_data_to_sink: sink returned error code " + code);
+                if (Log.DEBUG)
+                    LOGGER.log(Level.DEBUG, "send_video_data_to_sink: sink returned error code {0}", code);
             }
             return code;
         } catch (RuntimeException e) {
-            LOGGER.log(System.Logger.Level.WARNING, "send_video_data_to_sink: exception calling sink", e);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "send_video_data_to_sink: exception calling sink", e);
             return SINK_DROPPED;
         }
     }
@@ -283,6 +294,7 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
         if (toClose != null) {
             toClose.shutdown();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "video capture stopped");
     }
 
     /**
@@ -295,20 +307,22 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
     @Override
     public void selectCamera(String deviceId) {
         Objects.requireNonNull(deviceId, "deviceId cannot be null");
-        // TODO: open the replacement source before taking the lock so the (potentially slow) camera open
-        //  does not run under the lock. It is kept under the lock here because the VOID guard must reject
-        //  before any source is opened; opening before the lock would open (and then have to close) a
-        //  camera on the VOID rejection path, an observable device side effect the current
-        //  guard before open ordering does not have. Moving it out needs the guard read hoisted (a
-        //  volatile state or a preliminary check) without reintroducing a check then open race.
+        // Fast-fail the VOID guard with a lock-free read so no camera is opened on the rejection path, then
+        // open the (potentially slow) replacement outside the lock. The lock is held only to swap the field,
+        // and re-checks the guard authoritatively: if the driver raced to VOID the speculatively opened
+        // source is closed so the rejection path still leaves no device open.
+        if (state == State.VOID) {
+            throw new IllegalStateException("select_camera requires a bound device, was VOID");
+        }
+        var next = Objects.requireNonNull(sourceFactory.open(deviceId),
+                "camera source factory returned null");
         VideoOutput previous;
         lock.lock();
         try {
             if (state == State.VOID) {
+                next.shutdown();
                 throw new IllegalStateException("select_camera requires a bound device, was VOID");
             }
-            var next = Objects.requireNonNull(sourceFactory.open(deviceId),
-                    "camera source factory returned null");
             previous = this.source;
             this.source = next;
             this.lastWidth = -1;
@@ -319,16 +333,19 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
         if (previous != null) {
             previous.shutdown();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "video capture camera selected");
     }
 
     /**
      * Pulls frames from the bound source and forwards them until the driver leaves {@link State#RUNNING}.
      *
      * <p>Runs on the capture pump virtual thread spun by {@link #start(VideoCaptureCapability)}. Each
-     * iteration {@linkplain VideoOutput#take() takes} the next frame from the source and forwards it
-     * through {@link #sendVideoToSink(VideoFrame)}; a {@code null} frame signals the source ended and
-     * exits the loop, and an interrupt from {@link #stop()} exits the loop. The loop reads {@code state}
-     * and {@code source} under {@link #lock} so a concurrent {@link #stop()} or
+     * iteration {@linkplain VideoOutput#takeVideo() takes} the next frame from the source and forwards it
+     * through {@link #sendVideoToSink(VideoFrame)}; an interrupt from {@link #stop()} exits the loop cleanly.
+     * A camera never cleanly drains on its own, so a {@code null} frame or a device read fault while the
+     * driver is still {@link State#RUNNING} is an operating system device revocation, which enters
+     * {@link State#INTERRUPTED} through {@link #enterInterrupted(RuntimeException)}. The loop reads
+     * {@code state} and {@code source} under {@link #lock} so a concurrent {@link #stop()} or
      * {@link #selectCamera(String)} is observed cleanly.
      */
     private void pumpLoop() {
@@ -348,24 +365,53 @@ public final class LiveVideoCaptureDriver implements VideoCaptureDriver {
             }
             VideoFrame frame;
             try {
-                frame = current.take();
+                frame = current.takeVideo();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
+            } catch (RuntimeException e) {
+                enterInterrupted(e);
+                return;
             }
-            // TODO: surface an OS camera revocation under a running capture as State.INTERRUPTED.
-            //  WhatsApp's driver never writes the INTERRUPTED state in any of its methods; INTERRUPTED
-            //  exists only so stop() tolerates it, and no state transition targets it. The "interrupted"
-            //  behavior that exists is at the call/peer layer (a peer interrupted by a phone call), not a
-            //  driver level device revocation state, and there is no host call to interrupt the driver.
-            //  Wiring this edge on a null take() (end of stream) or a device fault would invent a
-            //  transition WhatsApp does not have, so this loop exits cleanly instead; resolve only once a
-            //  capture backend exposes a distinguishable device revocation signal and the owner of the
-            //  edge is known.
             if (frame == null) {
+                enterInterrupted(null);
                 return;
             }
             sendVideoToSink(frame);
+        }
+    }
+
+    /**
+     * Transitions a running driver into {@link State#INTERRUPTED} on an operating system device revocation
+     * and notifies the latched sink.
+     *
+     * <p>Called by {@link #pumpLoop()} when the capture source ended or faulted without a {@link #stop()}.
+     * The state is flipped under {@link #lock} guarded by a {@link State#RUNNING} check so a concurrent
+     * {@link #stop()}, which sets {@link State#INITIALIZED} under the same lock before it unblocks the pump,
+     * is not mistaken for a revocation and the transition is made at most once. When the transition is made
+     * the latched {@link VideoSink} is notified through {@link VideoSink#onInterrupted()} outside the lock so
+     * the engine can react.
+     *
+     * @param cause the device fault that ended the capture, or {@code null} when the source returned end of
+     *              stream
+     */
+    private void enterInterrupted(RuntimeException cause) {
+        VideoSink latched;
+        lock.lock();
+        try {
+            if (state != State.RUNNING) {
+                return;
+            }
+            this.state = State.INTERRUPTED;
+            latched = sink;
+        } finally {
+            lock.unlock();
+        }
+        if (Log.WARNING) {
+            LOGGER.log(Level.WARNING, "video capture device revoked, entering INTERRUPTED", cause);
+        }
+        if (latched != null) {
+            latched.onInterrupted();
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.registration.push.apns.plist.xml;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistArrayValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistBooleanValue;
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistDataValue;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistString
 import com.github.auties00.cobalt.registration.push.apns.plist.value.PlistValue;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,6 +39,11 @@ import java.util.LinkedHashMap;
  * survives the round-trip.
  */
 public final class PlistXmlParser {
+    /**
+     * The logger for {@link PlistXmlParser}.
+     */
+    private static final System.Logger LOGGER = Log.get(PlistXmlParser.class);
+
     /**
      * Holds the source bytes being parsed.
      */
@@ -70,6 +77,7 @@ public final class PlistXmlParser {
      * @throws IOException if the source is malformed or contains an unrecognised element
      */
     public static PlistValue parse(byte[] data) throws IOException {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "parsing xml plist ({0} bytes)", data.length);
         return new PlistXmlParser(data).parseRoot();
     }
 
@@ -160,7 +168,10 @@ public final class PlistXmlParser {
             case "date" -> new PlistDateValue(Instant.parse(readTextAndClose("date").trim()));
             case "dict" -> selfClose ? new PlistDictionaryValue(new LinkedHashMap<>()) : parseDict();
             case "array" -> selfClose ? new PlistArrayValue(new ArrayList<>()) : parseArray();
-            default -> throw new IOException("unknown plist element <" + tagName + ">");
+            default -> {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "unknown plist element <{0}>", tagName);
+                throw new IOException("unknown plist element <" + tagName + ">");
+            }
         };
     }
 

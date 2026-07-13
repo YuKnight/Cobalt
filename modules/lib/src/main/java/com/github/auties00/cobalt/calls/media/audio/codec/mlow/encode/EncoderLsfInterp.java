@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.NlsfBridge;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Encodes one line spectral frequency (LSF) vector per frame into per subframe interpolated LSF vectors and
@@ -61,6 +64,11 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.NlsfBridge;
  * the nominal last subframe vector.
  */
 public final class EncoderLsfInterp {
+    /**
+     * The logger for {@link EncoderLsfInterp}.
+     */
+    private static final System.Logger LOGGER = Log.get(EncoderLsfInterp.class);
+
     /**
      * Linear prediction order of the MLow short term filter: the LSF vector length and the number of predictor
      * taps following the leading unity coefficient.
@@ -166,6 +174,9 @@ public final class EncoderLsfInterp {
      */
     public void reset() {
         java.util.Arrays.fill(prevLsf, 0.0f);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "lsf interpolator reset");
+        }
     }
 
     /**
@@ -219,6 +230,9 @@ public final class EncoderLsfInterp {
         System.arraycopy(prevLsf, 0, pristine, 0, LPC_ORDER);
         if (pristine[LPC_ORDER - 1] == 0.0f) {
             System.arraycopy(qlsf, 0, pristine, 0, LPC_ORDER);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "lsf interpolate: reset frame, carry seeded from current lsf");
+            }
         }
         return interpolate(qlsf, pristine, interpol);
     }
@@ -270,6 +284,9 @@ public final class EncoderLsfInterp {
             prevFactor = factor;
         }
         float[] carry = ilsf.clone();
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "lsf candidate interpolated: subframes={0}", numSubfr);
+        }
         return new Candidate(lsfs, lpc, carry);
     }
 
@@ -298,6 +315,9 @@ public final class EncoderLsfInterp {
      */
     public void commit(Candidate winner) {
         System.arraycopy(winner.prevLsf(), 0, prevLsf, 0, LPC_ORDER);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "lsf interpolation carry committed");
+        }
     }
 
     /**
@@ -355,6 +375,9 @@ public final class EncoderLsfInterp {
             iter++;
             bweExpand(a, 1.0f - iter * 0.001f);
         } while (!isStable(a));
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "lpc filter unstable, bandwidth expansion applied: iterations={0}", iter);
+        }
     }
 
     /**

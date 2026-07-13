@@ -2,7 +2,7 @@ package com.github.auties00.cobalt.calls.media.video.codec;
 
 import com.github.auties00.cobalt.calls.capability.VideoDecoderCapability;
 import com.github.auties00.cobalt.calls.stream.VideoFrame;
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SegmentAllocator;

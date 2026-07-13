@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
  * <p>The {@code /graphql/} relay and the {@code /auth/token/} canonical exchange both speak the same FB
  * anti-CSRF dialect: every response is prefixed with the {@code for(;;);} anti-JSON-hijack guard, and
  * every request carries a {@code jazoest} checksum derived from the {@code lsd} token. This class
- * centralises those two computations so {@link WhatsAppGraphQlClient} and the credential-acquisition
+ * centralises those two computations so {@link WhatsAppWebGraphQlClient} and the credential-acquisition
  * subsystem do not each carry their own copy.
  */
 @WhatsAppWebModule(moduleName = "WAWebXControllerFetchUtils")
@@ -29,7 +29,7 @@ public final class WhatsAppGraphQlHttpSupport {
      * <p>All behaviour is exposed through static methods.
      */
     private WhatsAppGraphQlHttpSupport() {
-        throw new AssertionError("WhatsAppWebGraphQlHttpSupport is not instantiable");
+        throw new AssertionError("WhatsAppGraphQlHttpSupport is not instantiable");
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.call.CallLog;
 import com.github.auties00.cobalt.model.jid.Jid;
@@ -11,6 +12,7 @@ import com.github.auties00.cobalt.model.sync.action.call.DeleteIndividualCallLog
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
 
+import java.lang.System.Logger.Level;
 import java.util.List;
 
 /**
@@ -45,6 +47,11 @@ import java.util.List;
  */
 @WhatsAppWebModule(moduleName = "WAWebCallLogSync")
 public final class DeleteIndividualCallLogHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link DeleteIndividualCallLogHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(DeleteIndividualCallLogHandler.class);
+
     /**
      * Constructs the individual-call-log-deletion app-state handler.
      *
@@ -115,17 +122,20 @@ public final class DeleteIndividualCallLogHandler implements WebAppStateActionHa
     public MutationApplicationResult applyMutation(LinkedWhatsAppClient client, DecryptedMutation.Trusted mutation) {
         try {
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof DeleteIndividualCallLogAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete individual call log: mutation value is not a DeleteIndividualCallLogAction");
                 return MutationApplicationResult.malformed();
             }
 
             var peer = action.peerJid().orElse(null);
             if (peer == null) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "delete individual call log: missing peer jid");
                 return MutationApplicationResult.malformed();
             }
 
             removeMatching(client, peer, action.isIncoming());
             return MutationApplicationResult.success();
         } catch (Exception exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "delete individual call log: failed to apply mutation", exception);
             return MutationApplicationResult.failed();
         }
     }
@@ -147,6 +157,7 @@ public final class DeleteIndividualCallLogHandler implements WebAppStateActionHa
      */
     private void removeMatching(LinkedWhatsAppClient client, Jid peer, boolean isIncoming) {
         var chatStore = client.store().chatStore();
+        var removedCount = 0;
         for (var log : List.copyOf(chatStore.callLogStates())) {
             var callId = log.callId().orElse(null);
             if (callId == null) {
@@ -154,8 +165,10 @@ public final class DeleteIndividualCallLogHandler implements WebAppStateActionHa
             }
             if (log.isIncoming() == isIncoming && matchesPeer(log, peer)) {
                 chatStore.removeCallLog(callId);
+                removedCount++;
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "delete individual call log: removed {0} entries for peer={1} incoming={2}", removedCount, peer, isIncoming);
     }
 
     /**

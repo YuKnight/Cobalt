@@ -1,6 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.opus;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.AudioCodec;
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Drives the Opus in band forward error correction scheme by mapping observed receive loss onto the
@@ -31,6 +34,11 @@ public final class OpusInbandFecPacker {
     private static final int MAX_LOSS_PERCENT = 100;
 
     /**
+     * The logger for {@link OpusInbandFecPacker}.
+     */
+    private static final System.Logger LOGGER = Log.get(OpusInbandFecPacker.class);
+
+    /**
      * Constructs an in band FEC packer.
      *
      * <p>The packer carries no state beyond its policy; one instance serves a stream for its lifetime.
@@ -54,7 +62,12 @@ public final class OpusInbandFecPacker {
         // TODO: WhatsApp derives the encoder's expected loss from a rate controller that combines several
         //  link signals with field trial constants the server does not push; pass the measured loss through
         //  directly until those signals and constants are recovered.
-        return Math.clamp(measuredLossPercent, MIN_LOSS_PERCENT, MAX_LOSS_PERCENT);
+        var clamped = Math.clamp(measuredLossPercent, MIN_LOSS_PERCENT, MAX_LOSS_PERCENT);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "calls opus fec encoder loss percent: measured={0} applied={1}",
+                    measuredLossPercent, clamped);
+        }
+        return clamped;
     }
 
     /**
@@ -69,6 +82,7 @@ public final class OpusInbandFecPacker {
      * @return {@code true} to decode the next packet's FEC, {@code false} to conceal the gap
      */
     public boolean shouldDecodeFec(boolean nextPacketAvailable) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "calls opus fec decode decision: nextPacketAvailable={0}", nextPacketAvailable);
         return nextPacketAvailable;
     }
 }

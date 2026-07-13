@@ -1,5 +1,9 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
+
 /**
  * Encoder per frame voiced/unvoiced signal mode classifier of the MLow speech codec.
  *
@@ -56,6 +60,11 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode;
  * entire coded frame, so the order here is load bearing.
  */
 final class SignalModeClassifier {
+    /**
+     * The logger for {@link SignalModeClassifier}.
+     */
+    private static final System.Logger LOGGER = Log.get(SignalModeClassifier.class);
+
     /**
      * Linear prediction power spectrum bin count.
      *
@@ -162,6 +171,9 @@ final class SignalModeClassifier {
      * between independent streams so a new stream's first frame sees no carry over.
      */
     void reset() {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "signal mode classifier reset");
+        }
         voicingPrev = 0.0f;
         lastLagPrev = 0.0f;
         nrgLoBgn = 0.0f;
@@ -229,6 +241,11 @@ final class SignalModeClassifier {
         voicingStrength += carry * VUV_HYST;
         voicingPrev = tanhf(3.0f * voicingStrength);
         lastLagPrev = lags[LAGS_LEN - 1];
+
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "signal mode classify pitchCorr={0} avgLag={1} harmStrength={2} spActProb={3} strength={4}",
+                    pitchCorr, avgLag, harmStrength, spActProb, voicingStrength);
+        }
 
         return voicingStrength;
     }

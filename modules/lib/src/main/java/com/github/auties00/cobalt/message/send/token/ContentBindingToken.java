@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.token;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -9,6 +10,7 @@ import javax.crypto.KDF;
 import javax.crypto.Mac;
 import javax.crypto.spec.HKDFParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.*;
@@ -26,6 +28,11 @@ import java.util.*;
 @WhatsAppWebModule(moduleName = "WAWebMsgRcatUtils")
 @WhatsAppWebModule(moduleName = "WAWebUtilsYoutubeUrlParser")
 public final class ContentBindingToken {
+    /**
+     * The logger for {@link ContentBindingToken}.
+     */
+    private static final System.Logger LOGGER = Log.get(ContentBindingToken.class);
+
     /**
      * The info suffix appended to the HKDF-Expand info parameter when deriving
      * the per-recipient nonce.
@@ -60,10 +67,10 @@ public final class ContentBindingToken {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private ContentBindingToken() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -241,6 +248,8 @@ public final class ContentBindingToken {
             var tag = hmacTruncated(nonce, contentId);
             result.put(recipientJid, tag);
         }
+
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "content binding tags generated count={0}", result.size());
         return Collections.unmodifiableMap(result);
     }
 

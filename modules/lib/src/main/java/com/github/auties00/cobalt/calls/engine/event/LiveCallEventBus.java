@@ -2,7 +2,9 @@ package com.github.auties00.cobalt.calls.engine.event;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.WhatsAppListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.CallInteraction;
+import com.github.auties00.cobalt.model.call.CallScreenShareState;
 import com.github.auties00.cobalt.listener.linked.LinkedCallEndedListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallInteractionListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallLinkAdmittedListener;
@@ -12,10 +14,14 @@ import com.github.auties00.cobalt.listener.linked.LinkedCallListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallMuteChangedListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallParticipantsChangedListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallPeerStateChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallPeerVideoPermissionChangedListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallPreacceptListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallScreenShareChangedListener;
+import com.github.auties00.cobalt.listener.linked.LinkedCallTranscriptListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallVideoStateChangedListener;
 import com.github.auties00.cobalt.listener.linked.LinkedCallVideoUpgradeRequestListener;
 
+import java.lang.System.Logger.Level;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Objects;
@@ -57,9 +63,9 @@ import java.util.function.Consumer;
  */
 public final class LiveCallEventBus {
     /**
-     * Logs a listener dispatch failure so it is recorded without reaching the call engine.
+     * The logger for {@link LiveCallEventBus}.
      */
-    private static final System.Logger LOGGER = System.getLogger(LiveCallEventBus.class.getName());
+    private static final System.Logger LOGGER = Log.get(LiveCallEventBus.class);
 
     /**
      * The event types the gate admits to listeners.
@@ -157,18 +163,22 @@ public final class LiveCallEventBus {
      *
      * @implNote This implementation gates on {@link CallEvent#type()}, then switches over the sealed
      * {@link CallEvent} hierarchy to route each family to its public callbacks. The
-     * {@link CallEvent.StateChanged}, {@link CallEvent.CallLinkStateChanged},
-     * {@link CallEvent.ScreenShareChanged}, {@link CallEvent.PeerVideoPermissionChanged},
-     * {@link CallEvent.Transcript}, and {@link CallEvent.Generic} families have no public callback and
-     * so reach the gate but dispatch nothing. The exhaustive {@code switch} needs no default branch.
+     * {@link CallEvent.StateChanged}, {@link CallEvent.CallLinkStateChanged}, and
+     * {@link CallEvent.Generic} families have no public callback and so reach the gate but dispatch
+     * nothing. The exhaustive {@code switch} needs no default branch.
      * @param event the event to publish
      * @throws NullPointerException if {@code event} is {@code null}
      */
     public void emit(CallEvent event) {
         Objects.requireNonNull(event, "event cannot be null");
         if (!shouldEmit(event.type())) {
+            if (Log.TRACE) {
+                LOGGER.log(Level.TRACE, "call event {0} for call {1} suppressed by gate",
+                        event.type(), event.callId());
+            }
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call event {0} for call {1} emitted", event.type(), event.callId());
         switch (event) {
             case CallEvent.IncomingOffer e -> dispatch(LinkedCallListener.class,
                     listener -> listener.onCall(whatsapp, e.incoming()));
@@ -215,38 +225,28 @@ public final class LiveCallEventBus {
                 // callbacks are emitted from the WaitingRoomAdmitted and WaitingRoomDenied events that do
                 // carry it; the lifecycle controller consumes the substate advance itself.
             }
-            case CallEvent.ScreenShareChanged ignored -> {
-                // TODO: dispatch the screen share change to a host listener. WhatsApp delivers screen share
-                //  start, stop, and fail to the host; onCallVideoStateChanged means a camera toggle, not
-                //  screen share, so this needs a new LinkedCallScreenShareChangedListener (in
-                //  listener/linked) carrying the participant JID and the ScreenShareChanged.State. No such
-                //  listener type exists, so the event is gated in for parity with the host facing set but
-                //  currently reaches no callback.
+            case CallEvent.ScreenShareChanged e -> {
+                var state = switch (e.state()) {
+                    case STARTED -> CallScreenShareState.STARTED;
+                    case STOPPED -> CallScreenShareState.STOPPED;
+                    case FAILED -> CallScreenShareState.FAILED;
+                };
+                dispatch(LinkedCallScreenShareChangedListener.class,
+                        listener -> listener.onCallScreenShareChanged(
+                                whatsapp, e.callId(), e.participantJid(), state));
             }
-            case CallEvent.PeerVideoPermissionChanged ignored -> {
-                // TODO: dispatch the peer video permission change to a host listener. WhatsApp delivers the
-                //  peer video permission grant and revoke to the host; this needs a new
-                //  LinkedCallPeerVideoPermissionChangedListener (in listener/linked) carrying the peer JID and
-                //  the permitted flag. No such listener type exists, so the event is gated in for parity but
-                //  currently reaches no callback.
-            }
-            case CallEvent.Transcript ignored -> {
-                // TODO: dispatch the live transcription fragment to a host listener. WhatsApp delivers the
-                //  received transcript to the host; this needs a new LinkedCallTranscriptListener (in
-                //  listener/linked) carrying the speaker JID, text, language, and sequence. No such listener
-                //  type exists, so the event is gated in for parity but currently reaches no callback.
-            }
+            case CallEvent.PeerVideoPermissionChanged e -> dispatch(
+                    LinkedCallPeerVideoPermissionChangedListener.class,
+                    listener -> listener.onCallPeerVideoPermissionChanged(
+                            whatsapp, e.callId(), e.peerJid(), e.permitted()));
+            case CallEvent.Transcript e -> dispatch(LinkedCallTranscriptListener.class,
+                    listener -> listener.onCallTranscript(
+                            whatsapp, e.callId(), e.speakerJid(), e.text(), e.language(), e.sequence()));
             case CallEvent.Generic ignored -> {
-                // TODO: provide a raw event egress for the host facing ids that carry no typed CallEvent
-                //  record (call waiting state change, add extension received, success, and failure, lobby
-                //  self state change, play call tone, mute request failed, grid ranking change, video
-                //  rendering state, lid caller display info, bot presence, link query acked, waiting room
-                //  deny acked, and the 1on1 and joinable call log updates). WhatsApp forwards every host
-                //  facing id to the host without a per id filter, so each is delivered; here they can only be
-                //  built as CallEvent.Generic and reach no callback. A faithful fix is a new
-                //  onCallRawEvent(CallEventType, callId) host listener (in listener/linked) plus typed
-                //  CallEvent records for the ids the application needs; neither exists yet, so a gated in
-                //  Generic event is currently dropped.
+                // Untyped host-facing ids reach the bus as a Generic event and are intentionally not
+                // surfaced to a public callback: only the typed CallEvent families map to a listener. There
+                // is deliberately no raw onCallRawEvent egress, so a host-facing id that carries no typed
+                // CallEvent record and dedicated listener is dropped here rather than delivered untyped.
             }
         }
     }
@@ -297,9 +297,10 @@ public final class LiveCallEventBus {
                     try {
                         action.accept(typed);
                     } catch (RuntimeException exception) {
-                        LOGGER.log(System.Logger.Level.WARNING,
-                                "Call event listener threw " + exception.getClass().getSimpleName()
-                                        + ": " + exception.getMessage());
+                        if (Log.WARNING) {
+                            LOGGER.log(Level.WARNING, "call event listener threw "
+                                    + exception.getClass().getSimpleName(), exception);
+                        }
                     }
                 });
             }

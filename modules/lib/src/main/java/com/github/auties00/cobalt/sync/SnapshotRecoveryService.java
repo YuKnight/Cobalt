@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.sync;
 
-import com.github.auties00.cobalt.exception.WhatsAppWebAppStateSyncException;
+import com.github.auties00.cobalt.exception.linked.web.WhatsAppWebAppStateSyncException;
 import com.github.auties00.cobalt.model.message.system.peer.PeerDataOperationRequestResponseMessage;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.data.SyncdSnapshotRecovery;

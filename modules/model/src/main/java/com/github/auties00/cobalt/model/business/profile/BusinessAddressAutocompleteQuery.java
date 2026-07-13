@@ -14,58 +14,58 @@ import java.util.Optional;
  * <p>When a merchant edits a Business profile and types the registered
  * place of operation, the address picker streams place suggestions ranked
  * by relevance to the partial text. This input carries the parameters that
- * select which suggestions the server returns: the partial-address
- * {@link #query() query text}, an optional {@link #locale() locale} so the
- * response is translated and sorted for the right language, and an
- * optional {@link #country() country bias} so suggestions in the merchant's
- * country come first.
- *
- * <p>Field shape: the {@code query}, {@code locale} and {@code country}
- * fields are derived from WhatsApp Business address-autocomplete
- * conventions. They are best-guess and may not cover every server-accepted
- * field; additional optional fields will be added as they surface in live
- * request captures.
+ * select which suggestions the server returns: the {@link #center() map
+ * center} to bias suggestions around, the partial-address {@link #query()
+ * query text}, and the {@link #useCaseId() use-case identifier} scoping the
+ * lookup.
  */
 @ProtobufMessage(name = "BusinessAddressAutocompleteQuery")
 public final class BusinessAddressAutocompleteQuery {
     /**
+     * Map center the typeahead biases suggestions around. Unset omits the
+     * field.
+     */
+    @ProtobufProperty(index = 1, type = ProtobufType.MESSAGE)
+    final BusinessGeoPoint center;
+
+    /**
      * Partial address text the merchant has typed so far. The server uses
      * this text to retrieve and rank place suggestions. Required by the
-     * autocomplete backend; an unset value omits the variable and yields
-     * an empty suggestion list.
+     * autocomplete backend; an unset value omits the field and yields an
+     * empty suggestion list.
      */
-    @ProtobufProperty(index = 1, type = ProtobufType.STRING)
+    @ProtobufProperty(index = 2, type = ProtobufType.STRING)
     final String query;
 
     /**
-     * IETF BCP 47 language tag (for example {@code en-US}, {@code pt-BR})
-     * the server should localise suggestions to. Unset omits the variable
-     * so the server applies its default locale.
-     */
-    @ProtobufProperty(index = 2, type = ProtobufType.STRING)
-    final String locale;
-
-    /**
-     * ISO 3166-1 alpha-2 country code (for example {@code IN}, {@code BR})
-     * to bias the suggestions toward. Unset omits the variable so the
-     * server does not apply a country bias.
+     * Use-case identifier scoping the address lookup on the server. Unset
+     * omits the field.
      */
     @ProtobufProperty(index = 3, type = ProtobufType.STRING)
-    final String country;
+    final String useCaseId;
 
     /**
      * Constructs a new {@code BusinessAddressAutocompleteQuery}. Every
-     * argument may be {@code null} to omit the corresponding variable from
-     * the request.
+     * argument may be {@code null} to omit the corresponding field from the
+     * request.
      *
-     * @param query   the partial address text, or {@code null}
-     * @param locale  the BCP 47 language tag, or {@code null}
-     * @param country the ISO 3166-1 alpha-2 country code, or {@code null}
+     * @param center    the map center to bias suggestions around, or {@code null}
+     * @param query     the partial address text, or {@code null}
+     * @param useCaseId the use-case identifier, or {@code null}
      */
-    public BusinessAddressAutocompleteQuery(String query, String locale, String country) {
+    public BusinessAddressAutocompleteQuery(BusinessGeoPoint center, String query, String useCaseId) {
+        this.center = center;
         this.query = query;
-        this.locale = locale;
-        this.country = country;
+        this.useCaseId = useCaseId;
+    }
+
+    /**
+     * Returns the map center the typeahead biases suggestions around.
+     *
+     * @return an {@link Optional} carrying the center, or empty when unset
+     */
+    public Optional<BusinessGeoPoint> center() {
+        return Optional.ofNullable(center);
     }
 
     /**
@@ -79,22 +79,13 @@ public final class BusinessAddressAutocompleteQuery {
     }
 
     /**
-     * Returns the BCP 47 language tag the response should be localised to.
+     * Returns the use-case identifier scoping the lookup.
      *
-     * @return an {@link Optional} carrying the locale, or empty when unset
+     * @return an {@link Optional} carrying the use-case identifier, or empty
+     *         when unset
      */
-    public Optional<String> locale() {
-        return Optional.ofNullable(locale);
-    }
-
-    /**
-     * Returns the ISO 3166-1 alpha-2 country code biasing the suggestions.
-     *
-     * @return an {@link Optional} carrying the country code, or empty when
-     *         unset
-     */
-    public Optional<String> country() {
-        return Optional.ofNullable(country);
+    public Optional<String> useCaseId() {
+        return Optional.ofNullable(useCaseId);
     }
 
     @Override
@@ -102,21 +93,21 @@ public final class BusinessAddressAutocompleteQuery {
         if (obj == this) return true;
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (BusinessAddressAutocompleteQuery) obj;
-        return Objects.equals(query, that.query)
-                && Objects.equals(locale, that.locale)
-                && Objects.equals(country, that.country);
+        return Objects.equals(center, that.center)
+                && Objects.equals(query, that.query)
+                && Objects.equals(useCaseId, that.useCaseId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(query, locale, country);
+        return Objects.hash(center, query, useCaseId);
     }
 
     @Override
     public String toString() {
         return "BusinessAddressAutocompleteQuery[" +
+                "center=" + center + ", " +
                 "query=" + query + ", " +
-                "locale=" + locale + ", " +
-                "country=" + country + ']';
+                "useCaseId=" + useCaseId + ']';
     }
 }

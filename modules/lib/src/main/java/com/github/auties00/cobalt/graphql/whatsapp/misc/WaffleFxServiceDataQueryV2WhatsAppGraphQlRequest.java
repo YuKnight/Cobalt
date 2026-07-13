@@ -1,16 +1,17 @@
 package com.github.auties00.cobalt.graphql.whatsapp.misc;
 
 import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlOperation;
+import com.github.auties00.cobalt.graphql.whatsapp.WhatsAppGraphQlEnvironment;
+import java.util.Optional;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 
 /**
- * Builds the relay mutation that fetches the caller's Waffle FX service data for the cross-posting
+ * Builds the graph.whatsapp.com GraphQL mutation that fetches the caller's Waffle FX service data for the cross-posting
  * and FB/IG account-linking surfaces.
  *
- * <p>The operation takes no variables; it asks the relay for the linked-services snapshot tied to the
- * authenticated WhatsApp Web session, returned under {@code waffle_fx_service_data}. The snapshot
+ * <p>The operation takes no variables; it asks the graph.whatsapp.com endpoint for the linked-services snapshot returned under {@code waffle_fx_service_data}. The snapshot
  * carries the per-destination cross-posting account list, the additional-feature-set eligibility, and
  * the foreground-app-to-WhatsApp link eligibility flags. The reply is consumed through
  * {@link WaffleFxServiceDataQueryV2WhatsAppGraphQlResponse}.
@@ -20,10 +21,10 @@ import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 @WhatsAppWebModule(moduleName = "WAWebWaffleFXServiceDataQueryV2Mutation")
 public final class WaffleFxServiceDataQueryV2WhatsAppGraphQlRequest implements WhatsAppGraphQlOperation.Request {
     /**
-     * The persisted document identifier the relay maps to the server-side compiled GraphQL document
+     * The persisted document identifier the graph.whatsapp.com endpoint maps to the server-side compiled GraphQL document
      * for this operation.
      *
-     * <p>Emitted as the {@code doc_id} field of the url-encoded request body.
+     * <p>Emitted as the {@code doc_id} field of the JSON request body.
      */
     @WhatsAppWebExport(moduleName = "WAWebWaffleFXServiceDataQueryV2Mutation.graphql", exports = "params.id",
             adaptation = WhatsAppAdaptation.DIRECT)
@@ -71,5 +72,21 @@ public final class WaffleFxServiceDataQueryV2WhatsAppGraphQlRequest implements W
     @Override
     public String variables() {
         return "{}";
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public WhatsAppGraphQlEnvironment environment() {
+        return WhatsAppGraphQlEnvironment.CATALOG;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<String> accessToken() {
+        return Optional.empty();
     }
 }

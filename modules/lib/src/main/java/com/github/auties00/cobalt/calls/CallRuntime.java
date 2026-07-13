@@ -5,10 +5,12 @@ import com.github.auties00.cobalt.calls.stream.AudioOutput;
 import com.github.auties00.cobalt.calls.stream.VideoInput;
 import com.github.auties00.cobalt.calls.stream.VideoOutput;
 import com.github.auties00.cobalt.calls.telemetry.CallStats;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.call.Call;
 import com.github.auties00.cobalt.model.call.CallEndReason;
 import com.github.auties00.cobalt.model.call.CallState;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -27,6 +29,11 @@ import java.util.Objects;
  * the service owns those steps because they touch the service's registry and the WAM emitter.
  */
 public final class CallRuntime {
+    /**
+     * The logger for {@link CallRuntime}.
+     */
+    private static final System.Logger LOGGER = Log.get(CallRuntime.class);
+
     /**
      * Holds the public data view this runtime drives.
      */
@@ -174,6 +181,7 @@ public final class CallRuntime {
         Objects.requireNonNull(reason, "reason cannot be null");
         synchronized (this) {
             if (ended) {
+                if (Log.TRACE) LOGGER.log(Level.TRACE, "call {0} end ignored, already ended", call.callId());
                 return;
             }
             ended = true;
@@ -181,6 +189,7 @@ public final class CallRuntime {
             call.setEndReason(reason);
             stats.markEnded();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "call {0} ended, reason={1}", call.callId(), reason);
         audioOut.shutdown();
         audioIn.shutdown();
         videoOut.shutdown();

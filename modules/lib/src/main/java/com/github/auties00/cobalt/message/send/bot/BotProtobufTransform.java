@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.send.bot;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,6 +13,7 @@ import com.github.auties00.cobalt.model.message.system.ProtocolMessage;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.util.Objects;
 
 /**
@@ -28,6 +30,11 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebE2EProtoGenerator")
 public final class BotProtobufTransform {
+    /**
+     * The logger for {@link BotProtobufTransform}.
+     */
+    private static final System.Logger LOGGER = Log.get(BotProtobufTransform.class);
+
     /**
      * Holds the store consulted for LID-to-PN lookups when retargeting FBID-bot
      * participants.
@@ -104,7 +111,12 @@ public final class BotProtobufTransform {
         }
 
         store.contactStore().findLidByPhone(participant.get())
-                .ifPresent(contextInfo::setQuotedMessageSenderJid);
+                .ifPresent(lid -> {
+                    contextInfo.setQuotedMessageSenderJid(lid);
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "upgraded quoted sender to lid for fbid bot");
+                    }
+                });
     }
 
     /**
@@ -135,7 +147,12 @@ public final class BotProtobufTransform {
             return;
         }
 
-        store.contactStore().findLidByPhone(participant).ifPresent(key::setSenderJid);
+        store.contactStore().findLidByPhone(participant).ifPresent(lid -> {
+            key.setSenderJid(lid);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "upgraded protocol key sender to lid for fbid bot invoke");
+            }
+        });
     }
 
     /**

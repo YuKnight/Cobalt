@@ -11,7 +11,7 @@ import com.github.auties00.cobalt.model.business.postcode.BusinessPostcodeVerifi
 import java.util.Optional;
 
 /**
- * Parses the WhatsApp Web GraphQL response of the verify-postcode query built by
+ * Parses the graph.whatsapp.com GraphQL response of the verify-postcode query built by
  * {@link GraphQlVerifyPostcodeJobWhatsAppGraphQlRequest} into a {@link BusinessPostcodeVerification}.
  *
  * <p>Reads the linked root {@code xwa_product_catalog_get_verify_postcode} and flattens its nested
@@ -33,7 +33,7 @@ public final class GraphQlVerifyPostcodeJobWhatsAppGraphQlResponse implements Wh
      *
      * <p>Reserved for the static parser.
      *
-     * @param verification the parsed postcode verification, or {@code null} when the relay omitted
+     * @param verification the parsed postcode verification, or {@code null} when the graph.whatsapp.com endpoint omitted
      *                     the field
      */
     private GraphQlVerifyPostcodeJobWhatsAppGraphQlResponse(BusinessPostcodeVerification verification) {
@@ -41,7 +41,7 @@ public final class GraphQlVerifyPostcodeJobWhatsAppGraphQlResponse implements Wh
     }
 
     /**
-     * Parses the WhatsApp Web GraphQL response from the unwrapped GraphQL {@code data} object.
+     * Parses the graph.whatsapp.com GraphQL response from the unwrapped GraphQL {@code data} object.
      *
      * <p>Reads the linked root {@code xwa_product_catalog_get_verify_postcode} and projects it onto
      * a {@link BusinessPostcodeVerification}; the returned {@link Optional} is empty when

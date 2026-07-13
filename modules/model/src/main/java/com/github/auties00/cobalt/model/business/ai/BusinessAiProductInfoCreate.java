@@ -13,15 +13,14 @@ import java.util.Optional;
  * describe to customers.
  *
  * <p>A new AI product info entry carries the product's display name, an
- * optional description, and a structured price expressed as a sub-object
- * JSON literal so the AI agent can reproduce tiered or range pricing rather
- * than just a single scalar. Product imagery comes from two parallel
- * sources: local file paths uploaded fresh through the WhatsApp Business
- * media pipeline, and references to images already uploaded that the
- * merchant is reusing for the new product so the bot does not re-upload
- * them. The thumbnail width and height bound the rendered product
- * thumbnails; the WhatsApp Business app sends both as decimal pixel strings
- * so they are kept as {@link String}s here too.
+ * optional description, and a price expressed as the merchant entered it.
+ * Product imagery comes from two parallel sources: local file paths uploaded
+ * fresh through the WhatsApp Business media pipeline, and
+ * {@link #existingImages() references to images already uploaded} that the
+ * merchant is reusing for the new product so the bot does not re-upload them.
+ * The thumbnail width and height bound the rendered product thumbnails; the
+ * WhatsApp Business app sends both as decimal pixel strings so they are kept as
+ * {@link String}s here too.
  */
 @ProtobufMessage(name = "BusinessAiProductInfoCreate")
 public final class BusinessAiProductInfoCreate {
@@ -32,11 +31,11 @@ public final class BusinessAiProductInfoCreate {
     final String name;
 
     /**
-     * Pre-encoded JSON object literal carrying the structured product
-     * price (tiered, range, or scalar). Unset emits a JSON {@code null}.
+     * Price of the product as the merchant entered it. Unset emits a JSON
+     * {@code null}.
      */
     @ProtobufProperty(index = 2, type = ProtobufType.STRING)
-    final String priceJson;
+    final String complexPrice;
 
     /**
      * Free-form product description. Unset emits a JSON {@code null}.
@@ -53,12 +52,12 @@ public final class BusinessAiProductInfoCreate {
     final List<String> localImageFilePaths;
 
     /**
-     * Pre-encoded JSON array of references to images already uploaded for
-     * this merchant that the new product reuses. Unset omits the
-     * references from the request.
+     * References to images already uploaded for this merchant that the new
+     * product reuses. Defaults to {@link List#of()} when unset; only non-empty
+     * lists are written to the wire.
      */
-    @ProtobufProperty(index = 5, type = ProtobufType.STRING)
-    final String existingImageReferencesJson;
+    @ProtobufProperty(index = 5, type = ProtobufType.MESSAGE)
+    final List<AiProductImage> existingImages;
 
     /**
      * Requested thumbnail width as a decimal pixel string. Unset omits
@@ -77,28 +76,28 @@ public final class BusinessAiProductInfoCreate {
     /**
      * Constructs a new {@code BusinessAiProductInfoCreate}.
      *
-     * @param name                        the product display name; required
-     * @param priceJson                   the pre-encoded structured price, or {@code null}
-     * @param description                 the product description, or {@code null}
-     * @param localImageFilePaths         the local image paths to upload; never
-     *                                    {@code null}, defaults to {@link List#of()}
-     * @param existingImageReferencesJson the pre-encoded JSON array of
-     *                                    existing image references, or {@code null}
-     * @param thumbnailWidthPx            the thumbnail width pixel string, or {@code null}
-     * @param thumbnailHeightPx           the thumbnail height pixel string, or {@code null}
+     * @param name                the product display name; required
+     * @param complexPrice        the product price, or {@code null}
+     * @param description         the product description, or {@code null}
+     * @param localImageFilePaths the local image paths to upload; never
+     *                            {@code null}, defaults to {@link List#of()}
+     * @param existingImages      the references to already-uploaded images;
+     *                            {@code null} treated as empty
+     * @param thumbnailWidthPx    the thumbnail width pixel string, or {@code null}
+     * @param thumbnailHeightPx   the thumbnail height pixel string, or {@code null}
      * @throws NullPointerException if {@code name} or
      *                              {@code localImageFilePaths} is {@code null}
      */
-    public BusinessAiProductInfoCreate(String name, String priceJson, String description,
+    public BusinessAiProductInfoCreate(String name, String complexPrice, String description,
                                        List<String> localImageFilePaths,
-                                       String existingImageReferencesJson,
+                                       List<AiProductImage> existingImages,
                                        String thumbnailWidthPx, String thumbnailHeightPx) {
         this.name = Objects.requireNonNull(name, "name cannot be null");
-        this.priceJson = priceJson;
+        this.complexPrice = complexPrice;
         this.description = description;
         this.localImageFilePaths = Objects.requireNonNull(localImageFilePaths,
                 "localImageFilePaths cannot be null");
-        this.existingImageReferencesJson = existingImageReferencesJson;
+        this.existingImages = existingImages == null ? List.of() : List.copyOf(existingImages);
         this.thumbnailWidthPx = thumbnailWidthPx;
         this.thumbnailHeightPx = thumbnailHeightPx;
     }
@@ -113,12 +112,12 @@ public final class BusinessAiProductInfoCreate {
     }
 
     /**
-     * Returns the pre-encoded structured price JSON.
+     * Returns the price of the product as the merchant entered it.
      *
-     * @return an {@link Optional} carrying the price JSON, or empty when unset
+     * @return an {@link Optional} carrying the price, or empty when unset
      */
-    public Optional<String> priceJson() {
-        return Optional.ofNullable(priceJson);
+    public Optional<String> complexPrice() {
+        return Optional.ofNullable(complexPrice);
     }
 
     /**
@@ -140,12 +139,13 @@ public final class BusinessAiProductInfoCreate {
     }
 
     /**
-     * Returns the pre-encoded existing image references JSON.
+     * Returns the references to already-uploaded images the product reuses.
      *
-     * @return an {@link Optional} carrying the references JSON, or empty when unset
+     * @return an unmodifiable view of the image references; never {@code null},
+     *         possibly empty
      */
-    public Optional<String> existingImageReferencesJson() {
-        return Optional.ofNullable(existingImageReferencesJson);
+    public List<AiProductImage> existingImages() {
+        return existingImages;
     }
 
     /**
@@ -172,28 +172,28 @@ public final class BusinessAiProductInfoCreate {
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (BusinessAiProductInfoCreate) obj;
         return Objects.equals(name, that.name)
-                && Objects.equals(priceJson, that.priceJson)
+                && Objects.equals(complexPrice, that.complexPrice)
                 && Objects.equals(description, that.description)
                 && Objects.equals(localImageFilePaths, that.localImageFilePaths)
-                && Objects.equals(existingImageReferencesJson, that.existingImageReferencesJson)
+                && Objects.equals(existingImages, that.existingImages)
                 && Objects.equals(thumbnailWidthPx, that.thumbnailWidthPx)
                 && Objects.equals(thumbnailHeightPx, that.thumbnailHeightPx);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, priceJson, description, localImageFilePaths,
-                existingImageReferencesJson, thumbnailWidthPx, thumbnailHeightPx);
+        return Objects.hash(name, complexPrice, description, localImageFilePaths,
+                existingImages, thumbnailWidthPx, thumbnailHeightPx);
     }
 
     @Override
     public String toString() {
         return "BusinessAiProductInfoCreate[" +
                 "name=" + name + ", " +
-                "priceJson=" + priceJson + ", " +
+                "complexPrice=" + complexPrice + ", " +
                 "description=" + description + ", " +
                 "localImageFilePaths=" + localImageFilePaths + ", " +
-                "existingImageReferencesJson=" + existingImageReferencesJson + ", " +
+                "existingImages=" + existingImages + ", " +
                 "thumbnailWidthPx=" + thumbnailWidthPx + ", " +
                 "thumbnailHeightPx=" + thumbnailHeightPx + ']';
     }

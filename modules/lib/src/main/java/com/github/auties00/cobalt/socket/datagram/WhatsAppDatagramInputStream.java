@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.socket.datagram;
 
-import com.github.auties00.cobalt.exception.WhatsAppSessionException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppSessionException;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.stanza.Stanza;
 import com.github.auties00.cobalt.stanza.binary.StanzaReader;
 import com.github.auties00.cobalt.util.AesGcmStreamCipher;
@@ -11,6 +12,7 @@ import javax.crypto.ShortBufferException;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.System.Logger.Level;
 import java.nio.ByteOrder;
 import java.security.GeneralSecurityException;
 import java.util.Objects;
@@ -60,6 +62,11 @@ import java.util.Objects;
  * and is then reset to {@link #NO_ACTIVE_DATAGRAM}.
  */
 public final class WhatsAppDatagramInputStream extends FilterInputStream {
+
+    /**
+     * The logger for {@link WhatsAppDatagramInputStream}.
+     */
+    private static final System.Logger LOGGER = Log.get(WhatsAppDatagramInputStream.class);
 
     /**
      * Holds the size in bytes of the AES-GCM authentication tag.
@@ -204,6 +211,7 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
     public void setReadKey(SecretKey key) {
         this.readKey = Objects.requireNonNull(key, "key");
         this.readCounter = 0;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "datagram input stream read key installed");
     }
 
     /**
@@ -239,9 +247,12 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
         var length = readWireLength();
         if (length < 0) {
             endOfStream = true;
+            if (Log.TRACE) LOGGER.log(Level.TRACE, "datagram input stream reached end of stream");
             return -1;
         }
-        return startDatagram(length);
+        var plaintextLength = startDatagram(length);
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "datagram length wire={0} plaintext={1}", length, plaintextLength);
+        return plaintextLength;
     }
 
     /**
@@ -401,9 +412,11 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
         var key = readKey;
         var min = key == null ? MIN_PRE_HANDSHAKE_DATAGRAM_LENGTH : MIN_POST_HANDSHAKE_DATAGRAM_LENGTH;
         if (length < min) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "datagram length {0} below minimum {1}", length, min);
             throw new IOException("Datagram length " + length + " is below the minimum of " + min);
         }
         if (length > MAX_DATAGRAM_LENGTH) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "datagram length {0} exceeds maximum {1}", length, MAX_DATAGRAM_LENGTH);
             throw new IOException("Datagram length " + length + " exceeds the maximum of " + MAX_DATAGRAM_LENGTH);
         }
         if (key != null) {
@@ -461,6 +474,7 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
             var produced = cipher.doFinal(plaintextChunk, plaintextChunkEnd);
             plaintextChunkEnd += produced;
         } catch (GeneralSecurityException exception) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "datagram authentication tag verification failed", exception);
             throw new WhatsAppSessionException.BadMac("AES-GCM datagram authentication failed", exception);
         }
     }
@@ -473,6 +487,7 @@ public final class WhatsAppDatagramInputStream extends FilterInputStream {
      */
     @Override
     public void close() throws IOException {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing datagram input stream");
         in.close();
     }
 }

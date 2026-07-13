@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -12,10 +13,11 @@ import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppChatStore;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppContactStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.logging.Logger;
 
 /**
  * Applies the {@code favorites} app-state sync action that replaces the user's
@@ -39,10 +41,9 @@ import java.util.logging.Logger;
 public final class FavoritesHandler implements WebAppStateActionHandler {
 
     /**
-     * The {@link Logger} that records the malformed and unsupported mutation
-     * tallies after {@link #applyMutationBatch} completes.
+     * The logger for {@link FavoritesHandler}.
      */
-    private static final Logger LOGGER = Logger.getLogger(FavoritesHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(FavoritesHandler.class);
 
     /**
      * Constructs a new singleton {@link FavoritesHandler}.
@@ -122,11 +123,11 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
             results.add(MutationApplicationResult.success());
         }
 
-        if (unsupportedCount > 0) {
-            LOGGER.warning("favorites sync: " + unsupportedCount + " operations not supported");
+        if (unsupportedCount > 0 && Log.WARNING) {
+            LOGGER.log(Level.WARNING, "favorites sync: {0} operations not supported", unsupportedCount);
         }
-        if (malformedCount > 0) {
-            LOGGER.warning("favorites sync: " + malformedCount + " malformed mutations");
+        if (malformedCount > 0 && Log.WARNING) {
+            LOGGER.log(Level.WARNING, "favorites sync: {0} malformed mutations", malformedCount);
         }
 
         if (latest != null) {
@@ -197,6 +198,7 @@ public final class FavoritesHandler implements WebAppStateActionHandler {
             favorites.add(resolved);
         }
 
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "favorites sync: replacing favorites with {0} entries", favorites.size());
         client.store().chatStore().setFavoriteChats(favorites);
     }
 

@@ -7,9 +7,11 @@ import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.device.DeviceService;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.model.jid.Jid;
 
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,10 +37,9 @@ import java.util.List;
 public final class NotificationDeviceStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
-     * Logs warnings about malformed stanzas and errors surfaced by the per-entry processing loop.
+     * The logger for {@link NotificationDeviceStreamHandler}.
      */
-    private static final System.Logger LOGGER =
-            System.getLogger(NotificationDeviceStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationDeviceStreamHandler.class);
 
     /**
      * Provides store reads and LID-PN mapping registration.
@@ -95,8 +96,9 @@ public final class NotificationDeviceStreamHandler extends SocketStreamHandler.C
                 .map(Jid::toUserJid)
                 .orElse(null);
         if (userJid == null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Skipping devices notification without from attribute");
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "skipping devices notification without from attribute");
+            }
             return;
         }
 
@@ -109,8 +111,9 @@ public final class NotificationDeviceStreamHandler extends SocketStreamHandler.C
                 .or(() -> stanza.getChild("update"))
                 .orElse(null);
         if (actionNode == null) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "[devices] notif missing \"remove\" or \"add\" stanza");
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "[devices] notif missing \"remove\" or \"add\" stanza");
+            }
             return;
         }
         var actionType = actionNode.description();
@@ -133,13 +136,19 @@ public final class NotificationDeviceStreamHandler extends SocketStreamHandler.C
             entries.add(secondaryJid);
         }
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "[devices] handling {0} notification for {1} entries", actionType, entries.size());
+        }
+
         for (var entryJid : entries) {
             try {
                 processDeviceEntry(entryJid, actionType, actionNode, hash);
             } catch (Throwable throwable) {
-                LOGGER.log(System.Logger.Level.WARNING,
-                        "handleDevicesNotification - {0} error: {1}",
-                        actionType, throwable.getMessage());
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING,
+                            "handleDevicesNotification - " + actionType + " error for " + Log.jid(entryJid.toString()),
+                            throwable);
+                }
             }
         }
 
@@ -175,14 +184,18 @@ public final class NotificationDeviceStreamHandler extends SocketStreamHandler.C
             }
             case "update" -> {
                 if (hash == null) {
-                    LOGGER.log(System.Logger.Level.WARNING,
-                            "[devices] update notification missing hash for {0}", entryJid);
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "[devices] update notification missing hash for {0}", entryJid);
+                    }
                     return;
                 }
                 deviceService.getDeviceLists(List.of(entryJid), "notification", null, false);
             }
-            default -> LOGGER.log(System.Logger.Level.WARNING,
-                    "handleDevicesNotification - unknown notification type: {0}", actionType);
+            default -> {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "handleDevicesNotification - unknown notification type: {0}", actionType);
+                }
+            }
         }
     }
 

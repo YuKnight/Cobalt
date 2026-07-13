@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -28,6 +31,11 @@ import java.util.Objects;
  * floor stays at zero unless {@link NetEqConfig#enablePeakDetector()} is set.
  */
 public final class DelayManager {
+    /**
+     * The logger for {@link DelayManager}.
+     */
+    private static final System.Logger LOGGER = Log.get(DelayManager.class);
+
     /**
      * The number of inter arrival deviation buckets the histogram spans.
      *
@@ -120,6 +128,10 @@ public final class DelayManager {
             updatePeakFloor(deviationPackets);
         }
         recomputeTarget(packetMillis);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "delay manager: deviation={0} packets target={1}ms peak floor={2} packets",
+                    deviationPackets, targetLevelMillis, peakFloorPackets);
+        }
     }
 
     /**
@@ -151,6 +163,7 @@ public final class DelayManager {
         peakFloorPackets = 0;
         previousArrivalMillis = -1;
         targetLevelMillis = clampTarget(Math.max(config.initMinE2eDelayMs(), config.minDelayMs()));
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "delay manager: reset, target={0}ms", targetLevelMillis);
     }
 
     /**

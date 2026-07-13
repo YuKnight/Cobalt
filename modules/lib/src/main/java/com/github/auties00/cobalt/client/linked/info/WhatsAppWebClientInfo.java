@@ -1,11 +1,13 @@
 package com.github.auties00.cobalt.client.linked.info;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
 import com.github.auties00.cobalt.model.device.pairing.ClientAppVersion;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -26,6 +28,11 @@ import java.net.http.HttpResponse;
  */
 @WhatsAppWebModule(moduleName = "WAWebBuildConstants")
 final class WhatsAppWebClientInfo implements LinkedWhatsAppClientInfo {
+    /**
+     * The logger for {@link WhatsAppWebClientInfo}.
+     */
+    private static final System.Logger LOGGER = Log.get(WhatsAppWebClientInfo.class);
+
     /**
      * Holds the resolved web client identity once it has been scraped.
      *
@@ -115,6 +122,7 @@ final class WhatsAppWebClientInfo implements LinkedWhatsAppClientInfo {
      * @throws RuntimeException      if the underlying HTTP exchange fails
      */
     private static WhatsAppWebClientInfo queryWebInfo() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "scraping web landing page for client_revision");
         try(var httpClient = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.ALWAYS)
                 .build()) {
@@ -131,6 +139,9 @@ final class WhatsAppWebClientInfo implements LinkedWhatsAppClientInfo {
                     .build();
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if(response.statusCode() != 200) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "web landing page query returned status {0}", response.statusCode());
+                }
                 throw new IllegalStateException("Cannot query web version: status code " + response.statusCode());
             }
             try (var inputStream = response.body()) {
@@ -145,6 +156,9 @@ final class WhatsAppWebClientInfo implements LinkedWhatsAppClientInfo {
                                 clientVersion += value - '0';
                             }
                             var version = new ClientAppVersion(2, 3000, clientVersion);
+                            if (Log.DEBUG) {
+                                LOGGER.log(Level.DEBUG, "resolved web client info, version {0}", version);
+                            }
                             return new WhatsAppWebClientInfo(version);
                         }
                     } else {
@@ -154,9 +168,16 @@ final class WhatsAppWebClientInfo implements LinkedWhatsAppClientInfo {
                         }
                     }
                 }
-                throw new IllegalStateException("Cannot find client_revision in web update response");
+                var notFound = new IllegalStateException("Cannot find client_revision in web update response");
+                if (Log.ERROR) {
+                    LOGGER.log(Level.ERROR, "client_revision marker not found in web response", notFound);
+                }
+                throw notFound;
             }
         } catch (IOException | InterruptedException exception) {
+            if (Log.ERROR) {
+                LOGGER.log(Level.ERROR, "failed to query web version", exception);
+            }
             throw new RuntimeException("Cannot query web version", exception);
         }
     }

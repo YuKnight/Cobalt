@@ -1,6 +1,6 @@
 package com.github.auties00.cobalt.calls.transport.datachannel;
 
-import com.github.auties00.cobalt.exception.WhatsAppCallException;
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

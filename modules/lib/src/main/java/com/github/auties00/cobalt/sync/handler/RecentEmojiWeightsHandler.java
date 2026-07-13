@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.model.sync.mutation.MutationApplicationResult;
 import com.github.auties00.cobalt.model.sync.SyncPatchType;
 import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeight;
@@ -8,6 +9,8 @@ import com.github.auties00.cobalt.model.sync.action.media.RecentEmojiWeightsActi
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code recent_emoji_weights_action} app-state action that
@@ -37,6 +40,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  * is persisted in one store write.
  */
 public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link RecentEmojiWeightsHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(RecentEmojiWeightsHandler.class);
 
     /**
      * Constructs the recent-emoji-weights sync handler.
@@ -103,11 +110,13 @@ public final class RecentEmojiWeightsHandler implements WebAppStateActionHandler
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof RecentEmojiWeightsAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "recent emoji weights mutation malformed: missing action value");
             return MutationApplicationResult.malformed();
         }
 
         var weights = action.weights();
         client.store().settingsStore().setRecentEmojiWeights(weights);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "recent emoji weights: persisted {0} entries", weights.size());
         return MutationApplicationResult.success();
     }
 }

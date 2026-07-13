@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.store.linked.protobuf.persistent;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientType;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.store.linked.protobuf.*;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStoreFactory;
 import com.github.auties00.cobalt.util.BufferedProtobufInputStream;
@@ -10,11 +11,10 @@ import it.auties.protobuf.annotation.ProtobufProperty;
 import it.auties.protobuf.model.ProtobufType;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-
-import static java.lang.System.Logger.Level.WARNING;
 
 /**
  * The {@link ProtobufWhatsAppStore} that persists session metadata to a single protobuf file on disk
@@ -42,6 +42,11 @@ import static java.lang.System.Logger.Level.WARNING;
 @ProtobufMessage
 final class PersistentStore extends ProtobufWhatsAppStore {
     /**
+     * The logger for {@link PersistentStore}.
+     */
+    private static final System.Logger LOGGER = Log.get(PersistentStore.class);
+
+    /**
      * The name of the metadata file written under the session directory.
      */
     private static final String STORE_FILE = "store.proto";
@@ -50,6 +55,36 @@ final class PersistentStore extends ProtobufWhatsAppStore {
      * The name of the MVStore message file under the session directory.
      */
     private static final String MESSAGES_FILE = "messages.mv";
+
+    /**
+     * The name of the MVStore WAM buffer file under the session directory.
+     */
+    private static final String WAM_BUFFERS_FILE = "wam.mv";
+
+    /**
+     * The persistence-variant WAM sub-store holding the serializable telemetry bookkeeping; its staged
+     * event buffers offload to the independent {@link PersistentWamBuffersStore} wired by
+     * {@link #setWamBuffersStore(PersistentWamBuffersStore)}.
+     *
+     * @implNote
+     * This field carries index 11, the index the WAM sub-store held on {@link ProtobufWhatsAppStore}
+     * before it became persistence-variant, so a {@code store.proto} written by the previous design still
+     * decodes its telemetry bookkeeping unchanged.
+     */
+    @ProtobufProperty(index = 11, type = ProtobufType.MESSAGE)
+    final PersistentLinkedWhatsAppWamStore wamStore;
+
+    /**
+     * The independent MVStore facade staged WAM event buffers offload to; wired by
+     * {@link #setWamBuffersStore(PersistentWamBuffersStore)}, not persisted, {@code null} until attached.
+     *
+     * @implNote
+     * This implementation holds the reference directly rather than reaching it through {@link #wamStore}
+     * because the sub-store exposes only its buffer-delegation surface, not the facade's lifecycle; the
+     * session owns the durability checkpoints and teardown driven from {@link #await()}, {@link #close()}
+     * and {@link #delete()}.
+     */
+    private volatile PersistentWamBuffersStore wamBuffersStore;
 
     /**
      * The persistence-variant chat sub-store holding the MVStore-backed chats and newsletters.
@@ -125,7 +160,7 @@ final class PersistentStore extends ProtobufWhatsAppStore {
      * @apiNote
      * Package-private and intended for the generated {@code PersistentStoreBuilder} and the protobuf
      * deserialiser. The MVStore facade is wired by {@link PersistentLinkedWhatsAppStoreFactory} via
-     * {@link #attachMessageStore(PersistentMessageStore)} immediately after construction.
+     * {@link #setMessageStore(PersistentMessageStore)} immediately after construction.
      *
      * @param signalStore           the signal sub-store
      * @param accountStore          the account sub-store
@@ -134,13 +169,14 @@ final class PersistentStore extends ProtobufWhatsAppStore {
      * @param settingsStore         the settings sub-store
      * @param directory             the session directory
      * @param webSessionStore       the web-GraphQL credential sub-store, or {@code null} for an empty one
-     * @param wamStore              the WAM telemetry sub-store, or {@code null} for an empty one
+     * @param wamStore              the persistent WAM sub-store, or {@code null} for an empty one
      * @param chatStore             the persistent chat sub-store, or {@code null} for an empty one
      */
-    PersistentStore(ProtobufLinkedWhatsAppSignalStore signalStore, ProtobufLinkedWhatsAppAccountStore accountStore, ProtobufLinkedWhatsAppContactStore contactStore, ProtobufLinkedWhatsAppSyncStore syncStore, ProtobufLinkedWhatsAppSettingsStore settingsStore, Path directory, ProtobufLinkedWebSessionStore webSessionStore, ProtobufLinkedWhatsAppWamStore wamStore, PersistentLinkedWhatsAppChatStore chatStore) {
-        super(signalStore, accountStore, contactStore, syncStore, settingsStore, directory, webSessionStore, wamStore);
-        this.chatStore = chatStore != null ? chatStore : new PersistentLinkedWhatsAppChatStore(null, null, null, null);
-        this.chatStore.bindContacts(contactStore());
+    PersistentStore(ProtobufLinkedWhatsAppSignalStore signalStore, ProtobufLinkedWhatsAppAccountStore accountStore, ProtobufLinkedWhatsAppContactStore contactStore, ProtobufLinkedWhatsAppSyncStore syncStore, ProtobufLinkedWhatsAppSettingsStore settingsStore, Path directory, ProtobufLinkedWebSessionStore webSessionStore, PersistentLinkedWhatsAppWamStore wamStore, PersistentLinkedWhatsAppChatStore chatStore) {
+        var resolvedChatStore = chatStore != null ? chatStore : new PersistentLinkedWhatsAppChatStore(null, null, null, null);
+        super(signalStore, accountStore, contactStore, syncStore, settingsStore, directory, webSessionStore, resolvedChatStore);
+        this.chatStore = resolvedChatStore;
+        this.wamStore = wamStore != null ? wamStore : new PersistentLinkedWhatsAppWamStoreBuilder().build();
     }
 
     @Override
@@ -148,16 +184,44 @@ final class PersistentStore extends ProtobufWhatsAppStore {
         return chatStore;
     }
 
+    @Override
+    public PersistentLinkedWhatsAppWamStore wamStore() {
+        return wamStore;
+    }
+
     /**
-     * Wires the MVStore facade into the persistent chat sub-store.
+     * Sets the MVStore message facade on the persistent chat sub-store.
+     *
+     * <p>The facade opens only after this store is built or deserialised, so it cannot be a constructor
+     * argument; the factory sets it here once, before the store is handed back.
      *
      * @apiNote
-     * Called by {@link PersistentLinkedWhatsAppStoreFactory} after construction or deserialisation.
+     * Called by {@link PersistentLinkedWhatsAppStoreFactory} after construction or deserialisation. The
+     * independent WAM buffer facade is wired separately by
+     * {@link #setWamBuffersStore(PersistentWamBuffersStore)}.
      *
-     * @param messageStore the freshly opened MVStore facade
+     * @param messageStore the freshly opened MVStore message facade
      */
-    void attachMessageStore(PersistentMessageStore messageStore) {
-        chatStore.attachMessageStore(messageStore);
+    void setMessageStore(PersistentMessageStore messageStore) {
+        chatStore.setMessageStore(messageStore);
+    }
+
+    /**
+     * Sets the independent MVStore WAM buffer facade, holding it for the session lifecycle and wiring the
+     * persistent WAM sub-store's buffer delegation to it.
+     *
+     * <p>The facade opens only after this store is built or deserialised, so it cannot be a constructor
+     * argument; the factory sets it here once, before the store is handed back.
+     *
+     * @apiNote
+     * Called by {@link PersistentLinkedWhatsAppStoreFactory} after construction or deserialisation,
+     * alongside {@link #setMessageStore(PersistentMessageStore)}.
+     *
+     * @param wamBuffersStore the freshly opened MVStore WAM buffer facade
+     */
+    void setWamBuffersStore(PersistentWamBuffersStore wamBuffersStore) {
+        this.wamBuffersStore = wamBuffersStore;
+        wamStore.setBuffersStore(wamBuffersStore);
     }
 
     /**
@@ -181,6 +245,20 @@ final class PersistentStore extends ProtobufWhatsAppStore {
     static Path messagesEnvPath(LinkedWhatsAppClientType clientType, Path baseDirectory, String sessionId) throws IOException {
         return getSessionDirectory(clientType, baseDirectory, sessionId)
                 .resolve(MESSAGES_FILE);
+    }
+
+    /**
+     * Returns the path to the MVStore WAM buffer file for the given session.
+     *
+     * @param clientType    the client type
+     * @param baseDirectory the root directory under which per-session folders are created
+     * @param sessionId     the session UUID string or phone-number string
+     * @return the MVStore WAM buffer file
+     * @throws IOException if the parent session directory cannot be created
+     */
+    static Path wamBuffersEnvPath(LinkedWhatsAppClientType clientType, Path baseDirectory, String sessionId) throws IOException {
+        return getSessionDirectory(clientType, baseDirectory, sessionId)
+                .resolve(WAM_BUFFERS_FILE);
     }
 
     /**
@@ -261,6 +339,7 @@ final class PersistentStore extends ProtobufWhatsAppStore {
         if (flusherThread != null) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "starting debounced store flusher thread");
         flusherThread = Thread.ofPlatform()
                 .name("cobalt-store-flusher")
                 .daemon(true)
@@ -344,8 +423,9 @@ final class PersistentStore extends ProtobufWhatsAppStore {
             try {
                 serializeStore();
                 storeHashCode = newHashCode;
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "serialized store snapshot");
             } catch (IOException error) {
-                logger.log(WARNING, "Error while serializing store", error);
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "error while serializing store", error);
             }
         }
     }
@@ -390,17 +470,21 @@ final class PersistentStore extends ProtobufWhatsAppStore {
      * {@inheritDoc}
      *
      * @implNote
-     * This implementation closes the message store, releasing its file handle, before recursively
-     * removing the session directory so the remove can succeed on Windows, where an open file cannot be
-     * unlinked.
+     * This implementation closes the message store and the WAM buffer store, releasing their file handles,
+     * before recursively removing the session directory so the remove can succeed on Windows, where an open
+     * file cannot be unlinked.
      */
     @Override
     public void delete() throws IOException {
+        if (Log.INFO) LOGGER.log(Level.INFO, "deleting session {0}", accountStore().uuid());
         stopFlusher();
         var folderPath = getSessionDirectory(accountStore().clientType(), directory(), accountStore().uuid().toString());
         var messageStore = chatStore.messageStore();
         if (messageStore != null) {
             messageStore.close();
+        }
+        if (wamBuffersStore != null) {
+            wamBuffersStore.close();
         }
         deleteRecursively(folderPath);
     }
@@ -428,11 +512,12 @@ final class PersistentStore extends ProtobufWhatsAppStore {
      * @implNote
      * This implementation serialises any pending debounced snapshot synchronously via
      * {@link #flushNow()} so callers that need the store durable on disk (rather than within the
-     * next {@link #FLUSH_MAX_DELAY_MILLIS} window) can block on it, then forces the message store to a
-     * durable checkpoint via {@link PersistentMessageStore#commit()} so message bodies written since the
-     * last background auto-commit are flushed on the same cadence (including from the client's JVM
-     * shutdown hook). The metadata snapshot itself decodes synchronously in
-     * {@link PersistentLinkedWhatsAppStoreFactory#load}, so there is no load-time work to await.
+     * next {@link #FLUSH_MAX_DELAY_MILLIS} window) can block on it, then forces the message store and the
+     * WAM buffer store to a durable checkpoint via {@link PersistentMessageStore#commit()} and
+     * {@link PersistentWamBuffersStore#commit()} so bodies and buffers written since the last background
+     * auto-commit are flushed on the same cadence (including from the client's JVM shutdown hook). The
+     * metadata snapshot itself decodes synchronously in {@link PersistentLinkedWhatsAppStoreFactory#load},
+     * so there is no load-time work to await.
      */
     @Override
     public void await() {
@@ -441,18 +526,26 @@ final class PersistentStore extends ProtobufWhatsAppStore {
         if (messageStore != null) {
             messageStore.commit();
         }
+        if (wamBuffersStore != null) {
+            wamBuffersStore.commit();
+        }
     }
 
     /**
-     * Closes the MVStore message store so the session can be shut down without being deleted.
+     * Closes the MVStore message store and WAM buffer store so the session can be shut down without being
+     * deleted.
      *
      * @apiNote
      * Called by the factory during ordinary shutdown.
      */
     void close() {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "closing session {0}", accountStore().uuid());
         var messageStore = chatStore.messageStore();
         if (messageStore != null) {
             messageStore.close();
+        }
+        if (wamBuffersStore != null) {
+            wamBuffersStore.close();
         }
     }
 }

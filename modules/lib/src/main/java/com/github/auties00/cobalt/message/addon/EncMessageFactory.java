@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.message.addon;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -19,6 +20,7 @@ import com.github.auties00.cobalt.model.message.text.CommentMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 import com.github.auties00.cobalt.model.message.text.ReactionMessageSpec;
 
+import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -49,13 +51,16 @@ import java.util.Objects;
  */
 @WhatsAppWebModule(moduleName = "WAWebAddonEncryption")
 public final class EncMessageFactory {
+    /** The logger for {@link EncMessageFactory}. */
+    private static final System.Logger LOGGER = Log.get(EncMessageFactory.class);
+
     /**
      * Prevents instantiation of this static factory.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private EncMessageFactory() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -113,6 +118,10 @@ public final class EncMessageFactory {
                 originalSender, selfJid.toUserJid(),
                 MessageAddonType.ENC_COMMENT);
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "encrypted comment addon for parent {0}, bytes={1}",
+                    parentKeyId, encrypted.ciphertext().length);
+        }
         return new EncCommentMessageBuilder()
                 .targetMessageKey(comment.targetMessageKey().orElse(null))
                 .encPayload(encrypted.ciphertext())
@@ -172,6 +181,10 @@ public final class EncMessageFactory {
                 originalSender, selfJid.toUserJid(),
                 MessageAddonType.ENC_REACTION);
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "encrypted reaction addon for parent {0}, bytes={1}",
+                    parentKeyId, encrypted.ciphertext().length);
+        }
         return new EncReactionMessageBuilder()
                 .targetMessageKey(reaction.key().orElse(null))
                 .encPayload(encrypted.ciphertext())
@@ -239,6 +252,7 @@ public final class EncMessageFactory {
                 optionHashes.add(digest.digest(option.getBytes(StandardCharsets.UTF_8)));
             }
         } catch (NoSuchAlgorithmException e) {
+            if (Log.ERROR) LOGGER.log(Level.ERROR, "poll vote encryption failed, sha-256 unavailable", e);
             throw new RuntimeException("SHA-256 not available", e);
         }
 
@@ -252,6 +266,10 @@ public final class EncMessageFactory {
                 originalSender, voterJid.toUserJid(),
                 MessageAddonType.POLL_VOTE);
 
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "encrypted poll vote for poll {0}, options={1}",
+                    pollKeyId, optionHashes.size());
+        }
         return new PollEncValueBuilder()
                 .encPayload(encrypted.ciphertext())
                 .encIv(encrypted.iv())
@@ -309,7 +327,12 @@ public final class EncMessageFactory {
                 originalSender, voterJid.toUserJid(),
                 MessageAddonType.POLL_VOTE);
 
-        return PollVoteMessageSpec.decode(plaintext).selectedOptions();
+        var selectedOptions = PollVoteMessageSpec.decode(plaintext).selectedOptions();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "decrypted poll vote for poll {0}, options={1}",
+                    pollKeyId, selectedOptions.size());
+        }
+        return selectedOptions;
     }
 
     /**

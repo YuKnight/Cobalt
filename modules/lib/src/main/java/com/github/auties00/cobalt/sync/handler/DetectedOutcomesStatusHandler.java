@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.sync.handler;
 
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -11,6 +12,8 @@ import com.github.auties00.cobalt.model.sync.action.setting.DetectedOutcomesStat
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Applies the {@code detectedOutcomeStatus} app-state sync action that
@@ -35,6 +38,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebDetectedOutcomesStatusSync")
 public final class DetectedOutcomesStatusHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link DetectedOutcomesStatusHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(DetectedOutcomesStatusHandler.class);
 
     /**
      * Constructs a new singleton {@link DetectedOutcomesStatusHandler}.
@@ -91,10 +98,12 @@ public final class DetectedOutcomesStatusHandler implements WebAppStateActionHan
         }
 
         if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof DetectedOutcomesStatusAction action)) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "detected outcomes status: mutation value is not a DetectedOutcomesStatusAction");
             return MutationApplicationResult.malformed();
         }
 
         client.store().businessStore().setDetectedOutcomesEnabled(action.isEnabled());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "detected outcomes status: set enabled={0}", action.isEnabled());
         return MutationApplicationResult.success();
     }
 }

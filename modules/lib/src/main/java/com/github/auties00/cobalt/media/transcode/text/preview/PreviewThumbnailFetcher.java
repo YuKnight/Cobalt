@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.media.transcode.text.preview;
 
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -10,6 +11,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -35,6 +37,9 @@ import javax.imageio.ImageWriteParam;
  */
 @WhatsAppWebModule(moduleName = "WAWebMediaDataUtils")
 public final class PreviewThumbnailFetcher {
+    /** The logger for {@link PreviewThumbnailFetcher}. */
+    private static final System.Logger LOGGER = Log.get(PreviewThumbnailFetcher.class);
+
     /**
      * Holds the maximum response size, in bytes, accepted by
      * {@link #download(HttpClient, URI, Duration)}.
@@ -69,10 +74,10 @@ public final class PreviewThumbnailFetcher {
     /**
      * Prevents instantiation of this utility class.
      *
-     * @throws UnsupportedOperationException always
+     * @throws AssertionError always
      */
     private PreviewThumbnailFetcher() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new AssertionError();
     }
 
     /**
@@ -109,15 +114,25 @@ public final class PreviewThumbnailFetcher {
                     .build();
             var response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
             if (response.statusCode() / 100 != 2) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "preview thumbnail download failed, status={0}", response.statusCode());
                 return null;
             }
             var body = response.body();
             if (body == null || body.length == 0 || body.length > MAX_BYTES) {
+                if (Log.WARNING) {
+                    LOGGER.log(Level.WARNING, "preview thumbnail download rejected, bytes={0}",
+                            body == null ? -1 : body.length);
+                }
                 return null;
             }
             var resized = tryResize(body);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "preview thumbnail downloaded, bytes={0}, resized={1}",
+                        body.length, resized != null);
+            }
             return resized != null ? resized : body;
-        } catch (Exception _) {
+        } catch (Exception e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "preview thumbnail download failed", e);
             return null;
         }
     }
@@ -147,6 +162,7 @@ public final class PreviewThumbnailFetcher {
         try {
             var sourceImage = ImageIO.read(new ByteArrayInputStream(source));
             if (sourceImage == null) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "preview thumbnail resize skipped, unrecognized image format");
                 return null;
             }
             var width = sourceImage.getWidth();
@@ -176,6 +192,7 @@ public final class PreviewThumbnailFetcher {
             var output = new ByteArrayOutputStream();
             var writers = ImageIO.getImageWritersByFormatName("jpeg");
             if (!writers.hasNext()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "preview thumbnail resize failed, no jpeg writer available");
                 return null;
             }
             var writer = writers.next();
@@ -192,7 +209,8 @@ public final class PreviewThumbnailFetcher {
                 writer.dispose();
             }
             return output.toByteArray();
-        } catch (NoClassDefFoundError | RuntimeException | IOException _) {
+        } catch (NoClassDefFoundError | RuntimeException | IOException e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "preview thumbnail resize failed, falling back to source bytes", e);
             return null;
         }
     }

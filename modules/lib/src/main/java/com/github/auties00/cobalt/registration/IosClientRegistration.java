@@ -3,8 +3,10 @@ package com.github.auties00.cobalt.registration;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientVerificationHandler;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDeviceAttestor;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClientDevicePushClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 
+import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.util.Locale;
@@ -62,6 +64,11 @@ import java.util.Objects;
  * @see MobileClientRegistration
  */
 final class IosClientRegistration extends MobileClientRegistration {
+    /**
+     * The logger for {@link IosClientRegistration}.
+     */
+    private static final System.Logger LOGGER = Log.get(IosClientRegistration.class);
+
     /**
      * The iOS attestor consulted before each outgoing request.
      *
@@ -127,6 +134,10 @@ final class IosClientRegistration extends MobileClientRegistration {
      */
     @Override
     protected HttpRequest createRequest(String path, String body, String authorizationHeader) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ios registration request path={0} attested={1}",
+                    path, authorizationHeader != null);
+        }
         var builder = HttpRequest.newBuilder()
                 .uri(URI.create("%s%s".formatted(MOBILE_REGISTRATION_ENDPOINT, path)))
                 .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -178,10 +189,17 @@ final class IosClientRegistration extends MobileClientRegistration {
     protected BodyAttestation attestBody(byte[] encBodyBytes) {
         var data = attestor.attest(store);
         if (data.attestation().isEmpty() || data.assertion().isEmpty() || data.keyId().isEmpty()) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "ios app attest incomplete, falling back to unattested request");
+            }
             return BodyAttestation.EMPTY;
         }
         var bodyAttestation = "{\"assertion\":\"" + data.assertion() + "\"}";
         var authorizationHeader = data.attestation() + "|" + data.keyId();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ios app attest produced assertion (len={0}) and attestation (len={1})",
+                    data.assertion().length(), data.attestation().length());
+        }
         return new BodyAttestation(bodyAttestation, authorizationHeader);
     }
 
@@ -205,6 +223,9 @@ final class IosClientRegistration extends MobileClientRegistration {
      */
     @Override
     protected String[] getRequestVerificationCodeParameters(String method) {
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ios verification code request method={0}", method);
+        }
         return new String[]{
                 "method", method,
                 "sim_mcc", "000",
@@ -238,8 +259,12 @@ final class IosClientRegistration extends MobileClientRegistration {
      */
     @Override
     protected String[] attestationFields() {
+        var pushToken = pushClient.getPushToken();
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "ios attestation fields push_token_present={0}", !pushToken.isEmpty());
+        }
         return new String[]{
-                "push_token", pushClient.getPushToken()
+                "push_token", pushToken
         };
     }
 

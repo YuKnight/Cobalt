@@ -2,6 +2,7 @@ package com.github.auties00.cobalt.sync.handler;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -13,6 +14,8 @@ import com.github.auties00.cobalt.model.sync.action.chat.ChatAssignmentAction;
 import com.github.auties00.cobalt.model.sync.data.SyncdOperation;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppBusinessStore;
 import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
+
+import java.lang.System.Logger.Level;
 
 /**
  * Routes a business chat to a specific agent in response to {@code agentChatAssignment} sync mutations.
@@ -36,6 +39,10 @@ import com.github.auties00.cobalt.sync.crypto.DecryptedMutation;
  */
 @WhatsAppWebModule(moduleName = "WAWebChatAssignmentSync")
 public final class ChatAssignmentHandler implements WebAppStateActionHandler {
+    /**
+     * The logger for {@link ChatAssignmentHandler}.
+     */
+    private static final System.Logger LOGGER = Log.get(ChatAssignmentHandler.class);
 
     /**
      * Constructs the singleton chat-assignment handler.
@@ -87,35 +94,42 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
         try {
             var indexArray = JSON.parseArray(mutation.index());
             if (indexArray.size() <= 1) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "chat assignment mutation malformed: index size={0}", indexArray.size());
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
             var chatJidString = indexArray.getString(1);
             if (chatJidString == null || chatJidString.isEmpty()) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "chat assignment mutation malformed: missing chat jid");
                 return SyncdIndexUtils.malformedActionIndex(collectionName().name(), actionName());
             }
 
             if (mutation.operation() != SyncdOperation.SET) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat assignment mutation unsupported: operation={0}", mutation.operation());
                 return MutationApplicationResult.unsupported();
             }
 
             if (!(mutation.value().flatMap(sav -> sav.action()).orElse(null) instanceof ChatAssignmentAction action)) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "chat assignment mutation malformed: missing action value");
                 return SyncdIndexUtils.malformedActionValue(collectionName().name());
             }
 
             var agentId = action.deviceAgentID().orElse("");
             if (!agentId.isEmpty() && client.store().businessStore().findAgentState(agentId).isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat assignment mutation orphaned: agent not found id={0}", agentId);
                 return MutationApplicationResult.orphan(agentId, "Agent");
             }
 
             var chatJid = Jid.of(chatJidString);
             var chat = client.store().chatStore().findChatByJid(chatJid);
             if (chat.isEmpty()) {
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat assignment mutation orphaned: chat not found {0}", chatJid);
                 return MutationApplicationResult.orphan(chatJidString, "Chat");
             }
 
             var resolvedChatJid = chat.get().toJid();
             if (agentId.isEmpty()) {
                 client.store().businessStore().removeChatAssignment(resolvedChatJid);
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat assignment removed: chat={0}", resolvedChatJid);
             } else {
                 var existing = client.store().businessStore().findChatAssignment(resolvedChatJid).orElse(null);
                 client.store().businessStore().putChatAssignment(new ChatAssignmentBuilder()
@@ -123,9 +137,11 @@ public final class ChatAssignmentHandler implements WebAppStateActionHandler {
                         .agentId(agentId)
                         .opened(existing != null && existing.opened())
                         .build());
+                if (Log.DEBUG) LOGGER.log(Level.DEBUG, "chat assignment upserted: chat={0} agent={1}", resolvedChatJid, agentId);
             }
             return MutationApplicationResult.success();
         } catch (Exception e) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "chat assignment mutation failed", e);
             return MutationApplicationResult.failed();
         }
     }

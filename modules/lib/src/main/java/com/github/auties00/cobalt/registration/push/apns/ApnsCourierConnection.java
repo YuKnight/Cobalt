@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.registration.push.apns;
 
 import com.alibaba.fastjson2.JSON;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.registration.push.apns.courier.ApnsBag;
 import com.github.auties00.cobalt.registration.push.apns.courier.ApnsCourierCrypto;
 import com.github.auties00.cobalt.registration.push.apns.courier.ApnsPacket;
@@ -15,7 +16,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.System.Logger;
 import java.lang.System.Logger.Level;
 import java.net.InetSocketAddress;
 import java.net.ProxySelector;
@@ -63,10 +63,9 @@ import java.util.function.Predicate;
  */
 final class ApnsCourierConnection {
     /**
-     * Holds the shared logger, named {@code cobalt.apns} so consumers can configure verbosity
-     * uniformly across the APNS client.
+     * The logger for {@link ApnsCourierConnection}.
      */
-    private static final Logger LOG = System.getLogger("cobalt.apns");
+    private static final System.Logger LOGGER = Log.get(ApnsCourierConnection.class);
 
     /**
      * Holds the URL of the courier bag.
@@ -336,9 +335,9 @@ final class ApnsCourierConnection {
      * @throws IOException on any HTTP, TLS, or protocol failure
      */
     void start() throws IOException {
-        LOG.log(Level.INFO, () -> "APNS bag -> " + BAG_URL);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns bag fetch starting");
         var bag = fetchBag();
-        LOG.log(Level.INFO, () -> "APNS courier handshake -> " + bag.hostname());
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns courier handshake -> {0}, hosts={1}", bag.hostname(), bag.hostCount());
 
         var courierIndex = 1 + random.nextInt(Math.max(1, bag.hostCount() - 1));
         var host = courierIndex + "-" + bag.hostname();
@@ -381,15 +380,20 @@ final class ApnsCourierConnection {
 
         var statusBytes = ready.fields().get(FIELD_STATUS);
         if (statusBytes == null || statusBytes.length == 0 || statusBytes[0] != 0) {
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING, "apns courier rejected connect, status={0}",
+                        statusBytes == null ? -1 : Byte.toUnsignedInt(statusBytes[0]));
+            }
             throw new IOException("APNS courier rejected CONNECT: status="
                     + (statusBytes == null ? "null" : Byte.toUnsignedInt(statusBytes[0])));
         }
         var token = ready.fields().get(FIELD_AUTH_TOKEN_READY);
         if (token == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apns ready missing auth token");
             throw new IOException("APNS READY missing auth token");
         }
         this.authToken = token;
-        LOG.log(Level.INFO, "APNS authenticated");
+        if (Log.INFO) LOGGER.log(Level.INFO, "apns courier authenticated");
 
         send(ApnsPayloadTag.STATE, Map.of(
                 0x01, new byte[]{0x01},
@@ -415,6 +419,7 @@ final class ApnsCourierConnection {
      *                     out, or the response omits the token field
      */
     String requestToken(String topic) throws IOException {
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns push token requested for topic {0}", topic);
         var topicHash = ApnsCourierCrypto.sha1(topic);
         var packet = exchange(
                 ApnsPayloadTag.GET_TOKEN,
@@ -426,8 +431,10 @@ final class ApnsCourierConnection {
                         && Arrays.equals(p.fields().get(FIELD_TOKEN_RESPONSE_TOPIC), topicHash));
         var bytes = packet.fields().get(FIELD_TOKEN);
         if (bytes == null) {
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apns token response missing token field for topic {0}", topic);
             throw new IOException("TOKEN_RESPONSE missing token field");
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns push token received, len={0}", bytes.length);
         return HexFormat.of().formatHex(bytes);
     }
 
@@ -441,6 +448,7 @@ final class ApnsCourierConnection {
         if (stopped) {
             return;
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns courier closing");
         stopped = true;
         var s = socket;
         if (s != null) {
@@ -535,7 +543,7 @@ final class ApnsCourierConnection {
             }
         } catch (IOException e) {
             if (!stopped) {
-                LOG.log(Level.WARNING, "APNS read pump terminated", e);
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "apns read pump terminated", e);
                 var disconnect = new IOException("APNS connection lost", e);
                 for (var p : pending.values()) {
                     p.fail(disconnect);
@@ -554,6 +562,7 @@ final class ApnsCourierConnection {
      * @param packet the just-decoded packet
      */
     private void dispatchPacket(ApnsPacket packet) {
+        if (Log.TRACE) LOGGER.log(Level.TRACE, "apns packet received, tag={0}", packet.tag());
         if (packet.tag() == ApnsPayloadTag.NOTIFICATION) {
             sendAckSafe(packet.fields().get(FIELD_NOTIFICATION_ID));
             deliverPushCode(packet);
@@ -586,10 +595,14 @@ final class ApnsCourierConnection {
         try {
             var json = JSON.parseObject(payload);
             if (json != null) {
-                pushCode.deliver(json.getString("regcode"));
+                var regcode = json.getString("regcode");
+                if (Log.DEBUG && regcode != null) {
+                    LOGGER.log(Level.DEBUG, "apns push code received {0}", Log.code(regcode));
+                }
+                pushCode.deliver(regcode);
             }
         } catch (Exception e) {
-            LOG.log(Level.DEBUG, "APNS notification payload not JSON or no regcode", e);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns notification payload not json or missing regcode", e);
         }
     }
 
@@ -612,7 +625,7 @@ final class ApnsCourierConnection {
                     FIELD_NOTIFICATION_ID, notificationId,
                     FIELD_ACK_STATUS, new byte[]{0x00}));
         } catch (IOException e) {
-            LOG.log(Level.WARNING, "APNS ack failed", e);
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apns ack failed", e);
         }
     }
 
@@ -782,8 +795,8 @@ final class ApnsCourierConnection {
             fields.put(fieldId, value);
         }
         var tag = ApnsPayloadTag.of(rawTag);
-        if (tag == null) {
-            LOG.log(Level.DEBUG, "APNS unknown tag {0} ({1} B)", rawTag, length);
+        if (tag == null && Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "apns unknown tag {0} ({1} b)", rawTag, length);
         }
         return new ApnsPacket(tag, fields);
     }
@@ -834,13 +847,16 @@ final class ApnsCourierConnection {
     private byte[] sendBytes(HttpRequest request) throws IOException {
         try {
             var response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "apns bag fetch -> status {0}", response.statusCode());
             if (response.statusCode() / 100 != 2) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "apns bag http failed, status={0}", response.statusCode());
                 throw new IOException("APNS bag HTTP " + response.statusCode() + ": "
                         + new String(response.body(), StandardCharsets.UTF_8));
             }
             return response.body();
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
+            if (Log.WARNING) LOGGER.log(Level.WARNING, "apns bag fetch interrupted", ie);
             throw new IOException("APNS bag interrupted", ie);
         }
     }

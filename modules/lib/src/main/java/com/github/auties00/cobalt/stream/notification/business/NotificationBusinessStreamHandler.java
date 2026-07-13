@@ -8,6 +8,7 @@ import com.github.auties00.cobalt.ack.AckClass;
 import com.github.auties00.cobalt.ack.AckSender;
 import com.github.auties00.cobalt.client.linked.LinkedWhatsAppClient;
 import com.github.auties00.cobalt.listener.linked.LinkedBusinessPrivacySettingChangedListener;
+import com.github.auties00.cobalt.log.Log;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebExport;
 import com.github.auties00.cobalt.meta.annotation.WhatsAppWebModule;
 import com.github.auties00.cobalt.meta.model.WhatsAppAdaptation;
@@ -28,6 +29,7 @@ import com.github.auties00.cobalt.wam.WamService;
 import com.github.auties00.cobalt.wam.event.CtwaActionBannerUnderstandEventBuilder;
 import com.github.auties00.cobalt.wam.type.PreferredLinkType;
 
+import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.Locale;
 
@@ -48,10 +50,9 @@ import java.util.Locale;
 public final class NotificationBusinessStreamHandler extends SocketStreamHandler.Concurrent {
 
     /**
-     * Logs warnings about malformed stanzas and debug messages about unsupported sub-types.
+     * The logger for {@link NotificationBusinessStreamHandler}.
      */
-    private static final System.Logger LOGGER =
-            System.getLogger(NotificationBusinessStreamHandler.class.getName());
+    private static final System.Logger LOGGER = Log.get(NotificationBusinessStreamHandler.class);
 
     /**
      * Reads the store and issues business-profile queries.
@@ -129,9 +130,11 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
         try {
             needsSideList = dispatch(stanza);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle business notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "[missing-id]"), throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "failed to handle business notification id=" + stanza.getAttributeAsString("id", "[missing-id]"),
+                        throwable);
+            }
         } finally {
             sendBusinessAck(stanza, needsSideList);
         }
@@ -151,9 +154,11 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
         try {
             handleSubscriptions(stanza);
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle digital_commerce_subscription notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "[missing-id]"), throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "failed to handle digital_commerce_subscription notification id=" + stanza.getAttributeAsString("id", "[missing-id]"),
+                        throwable);
+            }
         } finally {
             sendDigitalCommerceSubscriptionAck(stanza);
         }
@@ -192,20 +197,23 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
                     break;
                 }
 
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Bot profile update for {0}, category={1}",
-                        botJid,
-                        child.getAttributeAsString("category", null));
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG,
+                            "bot profile update for {0}, category={1}",
+                            Log.jid(botJid),
+                            child.getAttributeAsString("category", null));
+                }
             }
 
-            if (pruned) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Pruned bot profile update, full bot sync needed");
+            if (pruned && Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "pruned bot profile update, full bot sync needed");
             }
         } catch (Throwable throwable) {
-            LOGGER.log(System.Logger.Level.WARNING,
-                    "Failed to handle fb:update notification {0}: {1}",
-                    stanza.getAttributeAsString("id", "[missing-id]"), throwable.getMessage());
+            if (Log.WARNING) {
+                LOGGER.log(Level.WARNING,
+                        "failed to handle fb:update notification id=" + stanza.getAttributeAsString("id", "[missing-id]"),
+                        throwable);
+            }
         } finally {
             sendBotProfileAck(stanza);
         }
@@ -267,8 +275,9 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
             return false;
         }
 
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Received unknown business notification subtype");
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "received unknown business notification subtype");
+        }
         return false;
     }
 
@@ -306,9 +315,11 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
 
         // TODO: resolve the contact via hash and apply the remove locally. Today Cobalt requests side-list redistribution so a companion that owns the contact applies it instead.
         var hash = removeStanza.getAttributeAsString("hash", null);
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Cannot handle hash-based business removal (hash={0}), requesting side-list redistribution",
-                hash);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "cannot handle hash-based business removal (hash={0}), requesting side-list redistribution",
+                    Log.secret(hash));
+        }
         return true;
     }
 
@@ -341,9 +352,11 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
 
         // TODO: resolve the contact via hash. Today Cobalt requests side-list redistribution so a companion that owns the contact applies the verified-name change instead.
         var hash = verifiedNameStanza.getAttributeAsString("hash", null);
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Cannot handle hash-based verified name change (hash={0}), requesting side-list redistribution",
-                hash);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "cannot handle hash-based verified name change (hash={0}), requesting side-list redistribution",
+                    Log.secret(hash));
+        }
         return true;
     }
 
@@ -377,9 +390,11 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
         }
 
         // TODO: resolve the contact via hash. Today Cobalt requests side-list redistribution for the hash branch.
-        LOGGER.log(System.Logger.Level.DEBUG,
-                "Cannot handle hash-based business profile update (hash={0}), requesting side-list redistribution",
-                hash);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG,
+                    "cannot handle hash-based business profile update (hash={0}), requesting side-list redistribution",
+                    Log.secret(hash));
+        }
         return true;
     }
 
@@ -399,14 +414,16 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
                     .flatMap(product -> product.getChild("id").stream())
                     .flatMap(idNode -> idNode.toContentString().stream())
                     .toList();
-            if (!productIds.isEmpty()) {
-                LOGGER.log(System.Logger.Level.DEBUG,
-                        "Received product catalog notification for {0} products", productIds.size());
+            if (!productIds.isEmpty() && Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "received product catalog notification for {0} products", productIds.size());
             }
         } else if (catalogStanza.hasChild("collection")) {
             var collectionCount = catalogStanza.getChildren("collection").size();
-            LOGGER.log(System.Logger.Level.DEBUG,
-                    "Received collection catalog notification for {0} collections", collectionCount);
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG,
+                        "received collection catalog notification for {0} collections", collectionCount);
+            }
         }
     }
 
@@ -460,6 +477,9 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
                             .name(name)
                             .enabled("true".equalsIgnoreCase(enabled))
                             .build());
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "applied business feature flag {0}={1}", name, enabled);
+                    }
                 }
             });
         });
@@ -490,6 +510,9 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
                     builder.createdAt(Instant.ofEpochSecond(creationTime));
                 }
                 whatsapp.store().businessStore().putBusinessSubscription(builder.build());
+                if (Log.DEBUG) {
+                    LOGGER.log(Level.DEBUG, "applied business subscription id={0} status={1}", id, status);
+                }
             });
         });
     }
@@ -515,6 +538,9 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
             return;
         }
         whatsapp.store().businessStore().setBusinessPrivacySetting(consent);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "applied business data-sharing consent {0}", consent);
+        }
         BusinessDataSharingConsent.ofWire(consent).ifPresent(value -> {
             for (var listener : whatsapp.store().listeners()) {
                 if (listener instanceof LinkedBusinessPrivacySettingChangedListener typed) {
@@ -538,7 +564,12 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
     private void handleAdAccountNonce(Stanza stanza) {
         SmaxNonceNotificationResponse.of(stanza)
                 .map(SmaxNonceNotificationResponse.Notification::nonce)
-                .ifPresent(whatsapp.store().businessStore()::setBusinessAccountNonce);
+                .ifPresent(nonce -> {
+                    whatsapp.store().businessStore().setBusinessAccountNonce(nonce);
+                    if (Log.DEBUG) {
+                        LOGGER.log(Level.DEBUG, "stored ad-account nonce {0}", Log.token(nonce));
+                    }
+                });
     }
 
     /**
@@ -571,6 +602,10 @@ public final class NotificationBusinessStreamHandler extends SocketStreamHandler
                 .campaignId(adCreativeId)
                 .status(notification.status())
                 .build());
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "applied marketing campaign status {0} for ad group {1}",
+                    notification.status(), adGroupId);
+        }
     }
 
     /**

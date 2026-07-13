@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.opus;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Enumerates the five libopus audio bandwidth ceilings the call encoder can cap itself to, each a
  * standard {@code OPUS_BANDWIDTH_*} constant passed to the maximum bandwidth control.
@@ -42,6 +45,37 @@ public enum OpusBandwidth {
      * Fullband: 20 kHz audio bandwidth, libopus code {@code 1105}.
      */
     FULLBAND(4, 1105);
+
+    /**
+     * Resolves a call engine level index to its bandwidth, backing {@link #ofLevel(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #level}, so a level index resolves
+     * to its bandwidth in constant time rather than by scanning {@link #values()}.
+     */
+    private static final Map<Integer, OpusBandwidth> BY_LEVEL;
+
+    /**
+     * Resolves a libopus {@code OPUS_BANDWIDTH_*} code to its bandwidth, backing {@link #ofNative(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #code}, so a native code resolves
+     * to its bandwidth in constant time rather than by scanning {@link #values()}.
+     */
+    private static final Map<Integer, OpusBandwidth> BY_NATIVE;
+
+    static {
+        var byLevel = new HashMap<Integer, OpusBandwidth>();
+        var byNative = new HashMap<Integer, OpusBandwidth>();
+        for (var bandwidth : values()) {
+            if (byLevel.put(bandwidth.level, bandwidth) != null) {
+                throw new AssertionError("Conflict");
+            }
+            if (byNative.put(bandwidth.code, bandwidth) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_LEVEL = Map.copyOf(byLevel);
+        BY_NATIVE = Map.copyOf(byNative);
+    }
 
     /**
      * The libopus {@code OPUS_BANDWIDTH_NARROWBAND} base constant the level is added to.
@@ -93,32 +127,34 @@ public enum OpusBandwidth {
     /**
      * Returns the bandwidth for the given call engine level index.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_LEVEL} map rather than
+     * scanning {@link #values()}.
      * @param level the level index, {@code 0..4}
      * @return the matching bandwidth
      * @throws IllegalArgumentException if {@code level} is outside {@code 0..4}
      */
     public static OpusBandwidth ofLevel(int level) {
-        for (var bandwidth : values()) {
-            if (bandwidth.level == level) {
-                return bandwidth;
-            }
+        var bandwidth = BY_LEVEL.get(level);
+        if (bandwidth == null) {
+            throw new IllegalArgumentException("Unknown Opus bandwidth level: " + level);
         }
-        throw new IllegalArgumentException("Unknown Opus bandwidth level: " + level);
+        return bandwidth;
     }
 
     /**
      * Returns the bandwidth for the given libopus {@code OPUS_BANDWIDTH_*} code.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_NATIVE} map rather than
+     * scanning {@link #values()}.
      * @param code the native bandwidth code, one of {@code 1101..1105}
      * @return the matching bandwidth
      * @throws IllegalArgumentException if {@code code} is outside {@code 1101..1105}
      */
     public static OpusBandwidth ofNative(int code) {
-        for (var bandwidth : values()) {
-            if (bandwidth.code == code) {
-                return bandwidth;
-            }
+        var bandwidth = BY_NATIVE.get(code);
+        if (bandwidth == null) {
+            throw new IllegalArgumentException("Unknown Opus bandwidth code: " + code);
         }
-        throw new IllegalArgumentException("Unknown Opus bandwidth code: " + code);
+        return bandwidth;
     }
 }

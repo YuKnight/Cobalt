@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.calls.engine.control;
 
 import com.github.auties00.cobalt.calls.signaling.incall.ScreenShareStanza;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -35,6 +37,24 @@ public enum ScreenShareState {
     FAILED(ScreenShareStanza.STATE_FAILED);
 
     /**
+     * Resolves a numeric state code to its state, backing {@link #ofCode(int)}.
+     *
+     * <p>Built once at class initialization from each constant's {@link #code}, so a code resolves to its
+     * state in constant time rather than by scanning {@link #values()}.
+     */
+    private static final Map<Integer, ScreenShareState> BY_CODE;
+
+    static {
+        var byCode = new HashMap<Integer, ScreenShareState>();
+        for (var state : values()) {
+            if (byCode.put(state.code, state) != null) {
+                throw new AssertionError("Conflict");
+            }
+        }
+        BY_CODE = Map.copyOf(byCode);
+    }
+
+    /**
      * Holds the numeric state code the wire and the event carry for this transition.
      */
     private final int code;
@@ -60,15 +80,12 @@ public enum ScreenShareState {
     /**
      * Looks up the screen share state whose {@linkplain #code() code} equals the given value.
      *
+     * @implNote This implementation resolves through the prebuilt {@link #BY_CODE} map rather than
+     * scanning {@link #values()}.
      * @param code the numeric state code to resolve
      * @return the matching state, or an empty result when no state carries the code
      */
     public static Optional<ScreenShareState> ofCode(int code) {
-        for (var state : values()) {
-            if (state.code == code) {
-                return Optional.of(state);
-            }
-        }
-        return Optional.empty();
+        return Optional.ofNullable(BY_CODE.get(code));
     }
 }

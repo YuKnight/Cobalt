@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.Arrays;
 
 /**
@@ -41,6 +44,11 @@ import java.util.Arrays;
  * filter feedback, advanced by the {@code (seed + 2) & 255} parity counter.
  */
 public final class NetEqExpand {
+    /**
+     * The logger for {@link NetEqExpand}.
+     */
+    private static final System.Logger LOGGER = Log.get(NetEqExpand.class);
+
     /**
      * The decimated correlation buffer length the analysis builds, in four kilohertz samples.
      */
@@ -248,6 +256,7 @@ public final class NetEqExpand {
         Arrays.fill(arCoefficients, (short) 0);
         Arrays.fill(reflectionCoefficients, (short) 0);
         arCoefficients[0] = 4_096;
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "expand: reset");
     }
 
     /**
@@ -311,9 +320,17 @@ public final class NetEqExpand {
         if (firstExpand) {
             analyzeSignal(history);
             firstExpand = false;
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "expand: concealment run started, pitch lag={0} voice mix={1}",
+                        maxLag, voiceMixFactor);
+            }
         }
         var frame = synthesize(history, frameSamples);
         consecutiveExpands = Math.min(consecutiveExpands + 1, MAX_CONSECUTIVE_EXPANDS);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "expand: concealment frame {0} of run, samples={1}",
+                    consecutiveExpands, frameSamples);
+        }
         return frame;
     }
 
@@ -353,6 +370,10 @@ public final class NetEqExpand {
             voiceMixFactor = 0;
             selectMute();
             advanceSeed();
+            if (Log.DEBUG) {
+                LOGGER.log(Level.DEBUG, "expand: history too short to analyze, produced={0} needed={1}",
+                        produced, DOWNSAMPLE_LENGTH);
+            }
             return;
         }
 

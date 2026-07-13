@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.rtcp;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.List;
 import java.util.Objects;
 import com.github.auties00.cobalt.calls.transport.warp.WarpCodecSupport;
@@ -33,6 +36,11 @@ import com.github.auties00.cobalt.calls.transport.warp.WarpCodecSupport;
  *           one video call.
  */
 public final class RtcpReportBuilder {
+    /**
+     * The logger for {@link RtcpReportBuilder}.
+     */
+    private static final System.Logger LOGGER = Log.get(RtcpReportBuilder.class);
+
     /**
      * Holds the first byte's version and padding prefix shared by every record, the 2 bit version
      * {@code 2} in the high bits with the padding bit clear.
@@ -226,6 +234,10 @@ public final class RtcpReportBuilder {
             offset += REPORT_BLOCK_LENGTH;
         }
         System.arraycopy(sdes, 0, out, senderReportLength, sdes.length);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rtcp sender report with sdes built, senderSsrc={0} reportBlocks={1} bytes={2}",
+                    senderSsrc, reportBlocks.size(), out.length);
+        }
         return out;
     }
 
@@ -290,6 +302,10 @@ public final class RtcpReportBuilder {
         WarpCodecSupport.putU16(out, 16, AFB_PAYLOAD_LENGTH);
         putU48(out, 18, rtpIndex);
         WarpCodecSupport.putU32(out, 24, rtcpIndex);
+        if (Log.TRACE) {
+            LOGGER.log(Level.TRACE, "rtcp afb built, senderSsrc={0} mediaSsrc={1} rtpIndex={2} rtcpIndex={3}",
+                    senderSsrc, mediaSsrc, rtpIndex, rtcpIndex);
+        }
         return out;
     }
 
@@ -315,6 +331,9 @@ public final class RtcpReportBuilder {
         WarpCodecSupport.putU32(out, 8, mediaSsrc);
         WarpCodecSupport.putU16(out, 12, pid);
         WarpCodecSupport.putU16(out, 14, blp);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rtcp nack built, mediaSsrc={0} pid={1} blp={2}", mediaSsrc, pid, blp);
+        }
         return out;
     }
 
@@ -345,6 +364,9 @@ public final class RtcpReportBuilder {
         out[1] = (byte) PT_REMB_RESET;
         WarpCodecSupport.putU16(out, 2, out.length / 4 - 1);
         WarpCodecSupport.putU32(out, 4, ssrc);
+        if (Log.DEBUG) {
+            LOGGER.log(Level.DEBUG, "rtcp remb reset built, ssrc={0}", ssrc);
+        }
         return out;
     }
 

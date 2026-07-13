@@ -1,10 +1,13 @@
 package com.github.auties00.cobalt.calls.platform.audio;
 
+import com.github.auties00.cobalt.log.Log;
+
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.DataLine;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.TargetDataLine;
+import java.lang.System.Logger.Level;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Objects;
@@ -29,6 +32,11 @@ import java.util.Objects;
  * signed 16 bit PCM, the format the sink consumes.
  */
 public final class LiveAudioCaptureDriver implements AudioCaptureDriver {
+    /**
+     * The logger for {@link LiveAudioCaptureDriver}.
+     */
+    private static final System.Logger LOGGER = Log.get(LiveAudioCaptureDriver.class);
+
     /**
      * Guards the lifecycle transitions and the line and thread fields against concurrent driver calls.
      */
@@ -149,6 +157,7 @@ public final class LiveAudioCaptureDriver implements AudioCaptureDriver {
             try {
                 opened = openLine(deviceId, sampleRate, framesPerBuffer, channelCount);
             } catch (LineUnavailableException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot open capture device " + deviceId, e);
                 throw new IllegalStateException("cannot open capture device", e);
             }
             this.line = opened;
@@ -156,6 +165,9 @@ public final class LiveAudioCaptureDriver implements AudioCaptureDriver {
             this.channelCount = channelCount;
             this.deviceType = deviceType;
             this.state = AudioDriverState.INITIALIZED;
+            if (Log.DEBUG)
+                LOGGER.log(Level.DEBUG, "audio capture initialized: rate={0} frames={1} channels={2} type={3}",
+                        sampleRate, framesPerBuffer, channelCount, deviceType);
         }
     }
 
@@ -178,12 +190,14 @@ public final class LiveAudioCaptureDriver implements AudioCaptureDriver {
             try {
                 line.start();
             } catch (RuntimeException e) {
+                if (Log.WARNING) LOGGER.log(Level.WARNING, "cannot start capture device", e);
                 throw new IllegalStateException("cannot start capture device", e);
             }
             this.state = AudioDriverState.ACTIVE;
             this.captureThread = Thread.ofVirtual()
                     .name("calls-audio-capture")
                     .start(this::captureLoop);
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio capture started: type={0}", deviceType);
         }
     }
 
@@ -215,6 +229,7 @@ public final class LiveAudioCaptureDriver implements AudioCaptureDriver {
             captureThread = null;
         }
         joinQuietly(toJoin);
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio capture stopped");
     }
 
     /**
@@ -232,6 +247,7 @@ public final class LiveAudioCaptureDriver implements AudioCaptureDriver {
                 throw new IllegalStateException("cannot change device type while capture is active");
             }
             this.deviceType = deviceType;
+            if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio capture device type set to {0}", deviceType);
         }
     }
 
@@ -256,6 +272,7 @@ public final class LiveAudioCaptureDriver implements AudioCaptureDriver {
         synchronized (lock) {
             closeLineLocked();
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio capture driver closed");
     }
 
     /**
@@ -284,7 +301,8 @@ public final class LiveAudioCaptureDriver implements AudioCaptureDriver {
                 int n;
                 try {
                     n = l.read(readBuffer, total, readBuffer.length - total);
-                } catch (RuntimeException _) {
+                } catch (RuntimeException e) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "capture line read failed", e);
                     ended = true;
                     break;
                 }
@@ -307,10 +325,12 @@ public final class LiveAudioCaptureDriver implements AudioCaptureDriver {
             if (s != null) {
                 try {
                     s.onCapturedAudio(pcm, deviceType);
-                } catch (RuntimeException _) {
+                } catch (RuntimeException e) {
+                    if (Log.WARNING) LOGGER.log(Level.WARNING, "captured audio sink failed", e);
                 }
             }
         }
+        if (Log.DEBUG) LOGGER.log(Level.DEBUG, "audio capture loop exited");
     }
 
     /**

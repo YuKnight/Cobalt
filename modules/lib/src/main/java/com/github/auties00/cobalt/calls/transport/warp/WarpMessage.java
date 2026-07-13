@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.transport.warp;
 
+import com.github.auties00.cobalt.log.Log;
+
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -265,6 +268,9 @@ public sealed interface WarpMessage permits WarpMessage.Piggybacked, WarpMessage
      *                   encode
      */
     record Piggybacked(List<WarpAttribute> attributes) implements WarpMessage {
+        /** The logger for {@link Piggybacked}. */
+        private static final System.Logger LOGGER = Log.get(Piggybacked.class);
+
         /**
          * Canonicalizes the record component, copying the attribute list immutably and rejecting a
          * bandwidth report attribute.
@@ -279,6 +285,9 @@ public sealed interface WarpMessage permits WarpMessage.Piggybacked, WarpMessage
             attributes = List.copyOf(sorted);
             for (var attribute : attributes) {
                 if (attribute.flag() == WarpAttributeFlag.BANDWIDTH_REPORT) {
+                    if (Log.WARNING) {
+                        LOGGER.log(Level.WARNING, "piggybacked warp message rejected, carries a bandwidth report");
+                    }
                     throw new IllegalArgumentException("a piggybacked WARP message cannot carry a bandwidth report");
                 }
             }
