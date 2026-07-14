@@ -78,8 +78,14 @@ jobs:
             mingw-w64-${{ matrix.msys_pkg }}-yasm
             mingw-w64-${{ matrix.msys_pkg }}-lld
 
-      - name: Build natives
-        shell: ${{ contains(matrix.os, 'windows') && 'msys2 {0}' || 'bash' }}
+      - name: Build natives (Windows)
+        if: runner.os == 'Windows'
+        shell: 'msys2 {0}'
+        run: bash .github/scripts/build-natives.sh
+
+      - name: Build natives (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
         run: bash .github/scripts/build-natives.sh
 
       - name: Upload binaries
