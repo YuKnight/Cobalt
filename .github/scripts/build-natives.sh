@@ -198,6 +198,7 @@ build_openh264() {
     esac
     make -C "$OPENH264_SRC" OS="$make_os" ARCH="$make_arch" clean 2>/dev/null || true
     make -C "$OPENH264_SRC" OS="$make_os" ARCH="$make_arch" BUILDTYPE=Release \
+        CC="${CC:-cc}" CXX="${CXX:-c++}" \
         CFLAGS="${CFLAGS:-} $CODEC_EXTRA_CFLAGS $CXX_LEAN_CFLAGS" \
         -j "$JOBS" libopenh264.a
     [ -f "$OPENH264_SRC/libopenh264.a" ] || fail "openh264 static archive not produced"
