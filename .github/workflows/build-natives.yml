@@ -22,9 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-22.04
             classifier: linux-x86_64
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-22.04-arm
             classifier: linux-aarch64
           - os: windows-2025
             classifier: windows-x86_64
@@ -51,7 +51,8 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool pkg-config \
-            nasm yasm cmake git python3 lld meson ninja-build
+            nasm yasm cmake git python3 python3-pip lld ninja-build
+          sudo pip3 install meson
 
       - name: Install macOS deps
         if: runner.os == 'macOS'

@@ -36,6 +36,15 @@ case "$(${CC:-cc} -dumpmachine 2>/dev/null)" in
 esac
 CLASSIFIER="$OS-$ARCH"
 
+# Build for the oldest supported OS so the dylibs run on every macOS, not the runner's.
+if [ "$OS" = darwin ]; then
+    if [ "$ARCH" = aarch64 ]; then
+        export MACOSX_DEPLOYMENT_TARGET=11.0
+    else
+        export MACOSX_DEPLOYMENT_TARGET=10.13
+    fi
+fi
+
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$DIR/../.." && pwd)"
 DEPS="$ROOT/modules/lib/dependencies"
@@ -225,14 +234,8 @@ build_libvpx() {
         linux-aarch64)  target=arm64-linux-gcc ;;
         windows-x86_64) target=x86_64-win64-gcc ;;
         windows-aarch64) target=arm64-win64-gcc ;;
-        darwin-x86_64)
-            local dv; dv=$(uname -r | cut -d. -f1)
-            target="x86_64-darwin${dv}-gcc"
-            ;;
-        darwin-aarch64)
-            local dv; dv=$(uname -r | cut -d. -f1)
-            target="arm64-darwin${dv}-gcc"
-            ;;
+        darwin-x86_64)  target=x86_64-darwin17-gcc ;;
+        darwin-aarch64) target=arm64-darwin20-gcc ;;
     esac
     local b="$BUILD/build-libvpx"
     rm -rf "$b" && mkdir -p "$b"
