@@ -151,16 +151,17 @@ build_opus() {
     local b="$BUILD/build-opus"
     rm -rf "$b" && mkdir -p "$b"
     # Windows-on-ARM has no opus RTCD backend; NEON is baseline on ARMv8.
-    local opus_extra=()
+    local opus_extra=""
     if [ "$OS" = windows ] && [ "$ARCH" = aarch64 ]; then
-        opus_extra+=(--disable-rtcd)
+        opus_extra="--disable-rtcd"
     fi
+    # shellcheck disable=SC2086
     ( cd "$b" && CFLAGS="${CFLAGS:-} $C_CODEC_EXTRA_CFLAGS" \
         "$OPUS_SRC/configure" --prefix="$b/inst" \
         --disable-shared --enable-static --with-pic \
         --disable-doc --disable-extra-programs \
         --disable-deep-plc --disable-dred \
-        "${opus_extra[@]}" )
+        $opus_extra )
     make -C "$b" -j "$JOBS"
     make -C "$b" install
     # Vendor headers for compiling the shim; Java binds the shim header.
