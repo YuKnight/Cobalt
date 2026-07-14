@@ -487,10 +487,12 @@ build_webrtc_apm() {
 # Export exactly the functions listed in dependency generate.sh files.
 gen_exports() {
     local out="$1"
-    local gens
-    mapfile -t gens < <(find "$DEPS" -maxdepth 2 -name generate.sh -type f | sort)
-    [ "${#gens[@]}" -gt 0 ] || fail "no generate.sh under $DEPS/*/ to derive exports from"
+    local gens=()
     local g
+    while IFS= read -r g; do
+        gens+=("$g")
+    done < <(find "$DEPS" -maxdepth 2 -name generate.sh -type f | sort)
+    [ "${#gens[@]}" -gt 0 ] || fail "no generate.sh under $DEPS/*/ to derive exports from"
     for g in "${gens[@]}"; do
         # Ignore comments so prose cannot add fake symbols.
         awk '/^[[:space:]]*#/ { next } { for (i = 1; i <= NF; i++) if ($i == "--include-function") print $(i + 1) }' "$g"

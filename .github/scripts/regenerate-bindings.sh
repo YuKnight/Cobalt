@@ -12,8 +12,11 @@ ROOT="$(cd "$DIR/../.." && pwd)"
 
 OS="$(uname -s)"
 
-mapfile -t GENERATORS < <(find "$ROOT/modules/lib/dependencies" -maxdepth 2 -name generate.sh -type f | sort)
-[ "${#GENERATORS[@]}" -gt 0 ] || { echo "[regenerate-bindings] no generate.sh files found under modules/lib/dependencies/*/" >&2; ex1. it 1; }
+GENERATORS=()
+while IFS= read -r gen; do
+    GENERATORS+=("$gen")
+done < <(find "$ROOT/modules/lib/dependencies" -maxdepth 2 -name generate.sh -type f | sort)
+[ "${#GENERATORS[@]}" -gt 0 ] || { echo "[regenerate-bindings] no generate.sh files found under modules/lib/dependencies/*/" >&2; exit 1; }
 
 for gen in "${GENERATORS[@]}"; do
     dep="$(basename "$(dirname "$gen")")"
