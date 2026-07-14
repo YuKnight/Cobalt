@@ -45,7 +45,7 @@ import java.util.*;
  * state mutations to the server.
  *
  * <p>The builder sits at the heart of the syncd send pipeline. It loads the active sync key via
- * {@link SyncKeyUtils#findNewestKey(java.util.Collection)}, encrypts the compacted pending
+ * {@link SyncKeyUtils#findNewestKey(Collection)}, encrypts the compacted pending
  * mutations into {@link EncryptedMutation} records, computes the rolling {@code newLtHash},
  * derives the {@code snapshotMac} and {@code patchMac} via {@link MutationIntegrityVerifier},
  * and packages the result either as an inline {@code SyncdPatch} protobuf or an MMS-uploaded

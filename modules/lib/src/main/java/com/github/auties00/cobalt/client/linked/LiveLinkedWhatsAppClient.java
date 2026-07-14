@@ -12,6 +12,7 @@ import com.github.auties00.cobalt.bot.LiveBotCertificateRevocationService;
 import com.github.auties00.cobalt.bot.LiveBotSignatureVerificationService;
 import com.github.auties00.cobalt.calls.CallsService;
 import com.github.auties00.cobalt.calls.LiveCallsService;
+import com.github.auties00.cobalt.calls.engine.event.LiveCallEventBus;
 import com.github.auties00.cobalt.calls.stream.AudioInput;
 import com.github.auties00.cobalt.calls.stream.AudioOutput;
 import com.github.auties00.cobalt.calls.stream.VideoInput;
@@ -69,6 +70,9 @@ import com.github.auties00.cobalt.media.transcode.LiveMediaTranscoderService;
 import com.github.auties00.cobalt.media.transcode.MediaTranscoderService;
 import com.github.auties00.cobalt.message.LiveMessageService;
 import com.github.auties00.cobalt.message.MessageService;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
+import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.message.send.id.MessageIdGenerator;
 import com.github.auties00.cobalt.message.send.id.MessageIdVersion;
 import com.github.auties00.cobalt.message.send.stanza.NewsletterStanza;
@@ -365,6 +369,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.Collection;
 import java.util.List;
@@ -1023,10 +1028,10 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         }
         var sessionCipher = new SignalSessionCipher(store.signalStore());
         var groupCipher = new SignalGroupCipher(store.signalStore());
-        var cryptoLocks = new com.github.auties00.cobalt.message.crypto.SignalCryptoLocks();
-        var messageEncryption = new com.github.auties00.cobalt.message.send.crypto.MessageEncryption(
+        var cryptoLocks = new SignalCryptoLocks();
+        var messageEncryption = new MessageEncryption(
                 store, sessionCipher, groupCipher, cryptoLocks);
-        var messageDecryption = new com.github.auties00.cobalt.message.receive.crypto.MessageDecryption(
+        var messageDecryption = new MessageDecryption(
                 store, sessionCipher, groupCipher, cryptoLocks);
         this.abPropsService = new LiveABPropsService(this);
         this.tosService = new LiveTosService(this, abPropsService);
@@ -1110,7 +1115,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
         this.pendingSocketRequests = new ConcurrentHashMap<>();
         this.companionPairingService = new LiveCompanionPairingService(this, webVerificationHandler);
         this.shortcakePairingService = new LiveShortcakePairingService(this, webVerificationHandler, passkeyAuthenticator);
-        var calls2EventBus = new com.github.auties00.cobalt.calls.engine.event.LiveCallEventBus(this);
+        var calls2EventBus = new LiveCallEventBus(this);
         this.calls2CallLogSync = new CallLogSync(this, callLogMutationFactory, webAppStateService);
         this.callsService = new LiveCallsService(this, wamService, messageService, messageEncryption, deviceService, store, abPropsService, calls2EventBus, calls2CallLogSync);
         var ackSender = new AckSender(this);
@@ -4323,7 +4328,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * {@link #await(Duration)} after sending the IQ, and the client's internal listener pumps the
      * delivered token through {@link #complete(byte[])} when the privacy-token notification arrives.
      *
-     * @implNote This implementation mirrors {@link com.github.auties00.cobalt.socket.WhatsAppSocketStanza}:
+     * @implNote This implementation mirrors {@link WhatsAppSocketStanza}:
      * a {@code synchronized} block plus {@code wait}/{@code notifyAll} guarding a single value field is
      * the simplest correct hand-off, and parking a virtual thread is essentially free under Project Loom.
      */
@@ -5925,7 +5930,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public NewsletterDirectoryPage queryNewsletterDirectoryList(NewsletterDirectoryListQuery query) {
         Objects.requireNonNull(query, "query cannot be null");
-        Long limit = query.limit().isPresent() ? query.limit().getAsLong() : null;
+        var limit = query.limit().isPresent() ? query.limit().getAsLong() : null;
         var countryCodes = query.countryCodes().isEmpty() ? null : query.countryCodes();
         var categories = query.categories().isEmpty() ? null : query.categories();
         var request = new FetchNewsletterDirectoryListMexRequest(query.view(), countryCodes, categories, limit, query.cursorToken().orElse(null), query.fetchStatusMetadata());
@@ -6173,7 +6178,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public NewsletterDirectoryPage queryRecommendedNewsletters(RecommendedNewslettersQuery query) {
         Objects.requireNonNull(query, "query cannot be null");
-        Long limit = query.limit().isPresent() ? query.limit().getAsLong() : null;
+        var limit = query.limit().isPresent() ? query.limit().getAsLong() : null;
         var countryCodes = query.countryCodes().isEmpty() ? null : query.countryCodes();
         var request = new FetchRecommendedNewslettersMexRequest(limit, countryCodes, query.fetchStatusMetadata());
         var response = sendNode(request);
@@ -6243,7 +6248,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
             adaptation = WhatsAppAdaptation.ADAPTED)
     public List<NewsletterDirectoryEntry> querySimilarNewsletters(SimilarNewslettersQuery query) {
         Objects.requireNonNull(query, "query cannot be null");
-        Long limit = query.limit().isPresent() ? query.limit().getAsLong() : null;
+        var limit = query.limit().isPresent() ? query.limit().getAsLong() : null;
         var countryCodes = query.countryCodes().isEmpty() ? null : query.countryCodes();
         var request = new FetchSimilarNewslettersMexRequest(query.newsletter().toString(), limit, countryCodes, query.fetchStatusMetadata());
         var response = sendNode(request);
@@ -9236,7 +9241,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
                 .aboutRequestType(requestType)
                 .aboutEntrypoint(AboutEntrypointType.SETTINGS)
                 .aboutLength(aboutText.length())
-                .aboutLocale(java.util.Locale.getDefault().toLanguageTag())
+                .aboutLocale(Locale.getDefault().toLanguageTag())
                 .aboutPresetSelected(false)
                 .aboutDuration(durationMs)
                 .aboutOverallT(Instant.ofEpochMilli(durationMs))
@@ -18693,7 +18698,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
      * @param value the optional dimension
      * @return the decimal string, or {@code null} when the dimension is unset
      */
-    private static String stringDimension(java.util.OptionalInt value) {
+    private static String stringDimension(OptionalInt value) {
         return value.isPresent() ? String.valueOf(value.getAsInt()) : null;
     }
 
@@ -18972,7 +18977,7 @@ final class LiveLinkedWhatsAppClient implements LinkedWhatsAppClient {
     @Override
     public Optional<BusinessAiMutationResult> updateAiReplyBotEnabledTime(boolean enabled) {
         return updateAiReplyBotEnabledTime(new BusinessAiReplyBotSchedule(enabled,
-                java.time.ZoneId.systemDefault(), java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT));
+                ZoneId.systemDefault(), LocalTime.MIDNIGHT, LocalTime.MIDNIGHT));
     }
 
     /** {@inheritDoc} */

@@ -413,9 +413,9 @@ public final class NrgResTables {
      * @return a freshly allocated {@code int[3][4][]} of built CMFs
      */
     private static int[][][] buildFcbgOffsetCmf() {
-        int[][][] out = new int[FCBG_OFFSET_DCMF.length][FCB_G_OFFSET_CMFS][];
-        for (int subframeBin = 0; subframeBin < FCBG_OFFSET_DCMF.length; subframeBin++) {
-            for (int pulseBin = 0; pulseBin < FCB_G_OFFSET_CMFS; pulseBin++) {
+        var out = new int[FCBG_OFFSET_DCMF.length][FCB_G_OFFSET_CMFS][];
+        for (var subframeBin = 0; subframeBin < FCBG_OFFSET_DCMF.length; subframeBin++) {
+            for (var pulseBin = 0; pulseBin < FCB_G_OFFSET_CMFS; pulseBin++) {
                 out[subframeBin][pulseBin] = CmfBuilder.dcmfToCmf(FCBG_OFFSET_DCMF[subframeBin][pulseBin]);
             }
         }
@@ -434,8 +434,8 @@ public final class NrgResTables {
      * @return a freshly allocated {@code byte[]} of the same length, each entry the narrowed input
      */
     private static byte[] unsignedBytes(int... values) {
-        byte[] out = new byte[values.length];
-        for (int i = 0; i < values.length; i++) {
+        var out = new byte[values.length];
+        for (var i = 0; i < values.length; i++) {
             out[i] = (byte) values[i];
         }
         return out;
@@ -454,9 +454,9 @@ public final class NrgResTables {
      * @return a freshly allocated {@code byte[length]} filled with the narrowed value
      */
     private static byte[] constByte(int value, int length) {
-        byte[] out = new byte[length];
-        byte v = (byte) value;
-        for (int i = 0; i < length; i++) {
+        var out = new byte[length];
+        var v = (byte) value;
+        for (var i = 0; i < length; i++) {
             out[i] = v;
         }
         return out;

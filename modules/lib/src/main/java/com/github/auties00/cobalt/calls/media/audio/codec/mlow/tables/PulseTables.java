@@ -213,16 +213,16 @@ public final class PulseTables {
      * @return a freshly allocated {@code int[NUM_RUNLEN_CMFS][MAX_PULSES_PER_SF][]} of run-length CMFs
      */
     static int[][][] loadRunLenCmfs() {
-        int[][][] tables = new int[NUM_RUNLEN_CMFS][MAX_PULSES_PER_SF][];
-        for (int t = 0; t < NUM_RUNLEN_CMFS; t++) {
-            int maxSamples = (t + 1) * RUNLENGTH_STEP;
-            for (int nump = 1; nump <= MAX_PULSES_PER_SF; nump++) {
-                long plongerQ31 = ONE_Q31;
-                int[] pdf = new int[maxSamples];
-                for (int nums = 1; nums <= maxSamples; nums++) {
-                    long tmp = ONE_Q31 - (ONE_Q31 / (maxSamples - nums + 1));
-                    long p1Q31 = tmp;
-                    for (int i = 0; i < nump - 1; i++) {
+        var tables = new int[NUM_RUNLEN_CMFS][MAX_PULSES_PER_SF][];
+        for (var t = 0; t < NUM_RUNLEN_CMFS; t++) {
+            var maxSamples = (t + 1) * RUNLENGTH_STEP;
+            for (var nump = 1; nump <= MAX_PULSES_PER_SF; nump++) {
+                var plongerQ31 = ONE_Q31;
+                var pdf = new int[maxSamples];
+                for (var nums = 1; nums <= maxSamples; nums++) {
+                    var tmp = ONE_Q31 - (ONE_Q31 / (maxSamples - nums + 1));
+                    var p1Q31 = tmp;
+                    for (var i = 0; i < nump - 1; i++) {
                         p1Q31 = (p1Q31 * tmp) >> 31;
                     }
                     p1Q31 = ONE_Q31 - p1Q31;
@@ -233,8 +233,8 @@ public final class PulseTables {
                     } else {
                         logOutQ7 = -(lin2log((maxSamples << 10) / nump) - 10 * 128);
                     }
-                    int scaleFacQ15 = SCALE_MAX_Q15
-                            - (((SCALE_MAX_Q15 - SCALE_MIN_Q15) * sigmQ15((logOutQ7 >> 2) + SIGM_BIAS_Q5)) >> 15);
+                    var scaleFacQ15 = SCALE_MAX_Q15
+                                      - (((SCALE_MAX_Q15 - SCALE_MIN_Q15) * sigmQ15((logOutQ7 >> 2) + SIGM_BIAS_Q5)) >> 15);
                     p1Q31 = ONE_Q31 - log2lin(((scaleFacQ15 * (lin2log((int) (ONE_Q31 - p1Q31)) - 31 * 128)) >> 15) + 31 * 128);
                     p1Q31 = Math.min(p1Q31, PROB_CLAMP_Q31);
                     pdf[nums - 1] = (int) ((plongerQ31 * p1Q31) >> 31);
@@ -263,14 +263,14 @@ public final class PulseTables {
      * @return a freshly allocated {@code int[4 * MAX_PULSES_PER_SF - 1][]} of split CMFs
      */
     static int[][] loadSplitCmfs() {
-        int count = 4 * MAX_PULSES_PER_SF - 1;
-        int[][] cmfs = new int[count][];
-        for (int numPulses = 1; numPulses < 4 * MAX_PULSES_PER_SF; numPulses++) {
-            int minSplit = Math.max(numPulses - MAX_PULSES_PER_SF * 2, 0);
-            int maxSplit = numPulses - minSplit;
-            int n = maxSplit - minSplit + 1;
-            int[] pdf = new int[n];
-            for (int k = minSplit; k <= maxSplit; k++) {
+        var count = 4 * MAX_PULSES_PER_SF - 1;
+        var cmfs = new int[count][];
+        for (var numPulses = 1; numPulses < 4 * MAX_PULSES_PER_SF; numPulses++) {
+            var minSplit = Math.max(numPulses - MAX_PULSES_PER_SF * 2, 0);
+            var maxSplit = numPulses - minSplit;
+            var n = maxSplit - minSplit + 1;
+            var pdf = new int[n];
+            for (var k = minSplit; k <= maxSplit; k++) {
                 pdf[k - minSplit] = probSplitFast(k, numPulses);
             }
             cmfs[numPulses - 1] = pdfToCmf(pdf, n);
@@ -348,15 +348,15 @@ public final class PulseTables {
      * @return a freshly allocated CMF of length {@code n + 1}
      */
     private static int[] pdfToCmf(int[] pdf, int n) {
-        int maxval = 32767;
+        var maxval = 32767;
         long sump = 0;
-        for (int i = 0; i < n; i++) {
+        for (var i = 0; i < n; i++) {
             sump += pdf[i];
         }
-        int[] cmf = new int[n + 1];
+        var cmf = new int[n + 1];
         cmf[0] = 0;
-        for (int i = 0; i < n; i++) {
-            int p = (int) (((long) pdf[i] * (long) (maxval - n)) / sump) + 1;
+        for (var i = 0; i < n; i++) {
+            var p = (int) (((long) pdf[i] * (long) (maxval - n)) / sump) + 1;
             cmf[i + 1] = cmf[i] + p;
         }
         return cmf;
@@ -376,7 +376,7 @@ public final class PulseTables {
         if (n == 0) {
             return 0;
         }
-        int retQ15 = ((n << 1) + 1) * (lin2log(n) << 7);
+        var retQ15 = ((n << 1) + 1) * (lin2log(n) << 7);
         retQ15 -= LOG2_EXP1_Q15 * n;
         retQ15 += LOG2_2PI_Q14;
         retQ15 += LOG2_EXP1_Q15 / (12 * n);
@@ -397,12 +397,12 @@ public final class PulseTables {
      * @return the relative split probability, a positive density value
      */
     private static int probSplitFast(int k, int n) {
-        int tmpQ15 = stirling(n) - stirling(k) - stirling(n - k) - n * (1 << 15);
+        var tmpQ15 = stirling(n) - stirling(k) - stirling(n - k) - n * (1 << 15);
         if (tmpQ15 == 0) {
             return 1 << 30;
         }
         tmpQ15 = -tmpQ15;
-        int ret = log2lin(tmpQ15 >> 8);
+        var ret = log2lin(tmpQ15 >> 8);
         return (1 << 30) / ret;
     }
 
@@ -418,9 +418,9 @@ public final class PulseTables {
      * @return the approximate {@code 128 * log2(inLin)}
      */
     private static int lin2log(int inLin) {
-        int lz = inLin == 0 ? 32 : Integer.numberOfLeadingZeros(inLin);
-        int fracQ7 = ror32(inLin, 24 - lz) & 0x7f;
-        int smlawb = (int) (fracQ7 + (((long) (fracQ7 * (128 - fracQ7)) * (short) 179) >> 16));
+        var lz = inLin == 0 ? 32 : Integer.numberOfLeadingZeros(inLin);
+        var fracQ7 = ror32(inLin, 24 - lz) & 0x7f;
+        var smlawb = (int) (fracQ7 + (((long) (fracQ7 * (128 - fracQ7)) * (short) 179) >> 16));
         return smlawb + ((31 - lz) << 7);
     }
 
@@ -442,10 +442,10 @@ public final class PulseTables {
         } else if (inLogQ7 >= 3967) {
             return Integer.MAX_VALUE;
         }
-        int out = 1 << (inLogQ7 >> 7);
-        int fracQ7 = inLogQ7 & 0x7F;
-        int smulbb = (short) fracQ7 * (short) (128 - fracQ7);
-        int smlawb = (int) (fracQ7 + (((long) smulbb * (short) -174) >> 16));
+        var out = 1 << (inLogQ7 >> 7);
+        var fracQ7 = inLogQ7 & 0x7F;
+        var smulbb = (short) fracQ7 * (short) (128 - fracQ7);
+        var smlawb = (int) (fracQ7 + (((long) smulbb * (short) -174) >> 16));
         if (inLogQ7 < 2048) {
             out = out + ((int) ((long) out * smlawb) >> 7);
         } else {
@@ -497,7 +497,7 @@ public final class PulseTables {
         if (rot == 0) {
             return a32;
         } else if (rot < 0) {
-            int m = -rot;
+            var m = -rot;
             return (a32 << m) | (a32 >>> (32 - m));
         } else {
             return (a32 << (32 - rot)) | (a32 >>> rot);

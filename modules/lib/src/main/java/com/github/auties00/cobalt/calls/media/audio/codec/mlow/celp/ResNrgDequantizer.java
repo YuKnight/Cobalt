@@ -123,9 +123,9 @@ public final class ResNrgDequantizer {
      * @throws IllegalArgumentException if {@code numSubfr} is not 1, 2, or 4
      */
     public DecodeResult decode(MlowRangeDecoder decoder, int numSubfr, int[] sfPulses) {
-        int tableIx = numSubfrToIdx(numSubfr);
+        var tableIx = numSubfrToIdx(numSubfr);
         int frameQi;
-        int shapeQi = 0;
+        var shapeQi = 0;
         if (numSubfr == 1) {
             frameQi = MlowEntropyWrapper.decodeUpdate(decoder, NrgResTables.gain1Cmf());
         } else if (numSubfr == 2) {
@@ -136,21 +136,21 @@ public final class ResNrgDequantizer {
             shapeQi = MlowEntropyWrapper.decodeUpdate(decoder, NrgResTables.shapeCb4Cmf());
         }
 
-        int frameDbqQ14 = frameQi * (NrgResTables.NRG_STEP_DB_Q14[tableIx] & 0xFFFF);
+        var frameDbqQ14 = frameQi * (NrgResTables.NRG_STEP_DB_Q14[tableIx] & 0xFFFF);
         frameDbqQ14 += NrgResTables.RES_NRG_MIN_DB << 14;
 
-        int[] dbqQ14 = new int[numSubfr];
+        var dbqQ14 = new int[numSubfr];
         if (numSubfr == 1) {
             dbqQ14[0] = frameDbqQ14;
         } else {
-            short[] cb = numSubfr == 4 ? NrgResTables.SHAPE_CB_4_Q10 : NrgResTables.SHAPE_CB_2_Q10;
-            for (int i = 0; i < numSubfr; i++) {
+            var cb = numSubfr == 4 ? NrgResTables.SHAPE_CB_4_Q10 : NrgResTables.SHAPE_CB_2_Q10;
+            for (var i = 0; i < numSubfr; i++) {
                 dbqQ14[i] = frameDbqQ14 + cb[shapeQi * numSubfr + i] * 16;
             }
         }
 
-        int[] fcbgIdx = new int[numSubfr];
-        for (int i = 0; i < numSubfr; i++) {
+        var fcbgIdx = new int[numSubfr];
+        for (var i = 0; i < numSubfr; i++) {
             if (sfPulses[i] > 0) {
                 fcbgIdx[i] = decodeFcbgOffset(decoder, tableIx, dbqQ14[i], sfPulses[i]);
             }
@@ -177,13 +177,13 @@ public final class ResNrgDequantizer {
      * @return the decoded fixed codebook gain offset index, relative to the window start
      */
     private int decodeFcbgOffset(MlowRangeDecoder decoder, int tableIx, int dbqQ14, int nPulses) {
-        int nrgresDbq = (dbqQ14 + (1 << 13)) >> 14;
+        var nrgresDbq = (dbqQ14 + (1 << 13)) >> 14;
         nrgresDbq = Math.min(Math.max(nrgresDbq, NrgResTables.RES_NRG_MIN_DB), NrgResTables.RES_NRG_MAX_DB);
-        int minOffset = -nrgresDbq;
-        int maxOffset = UV_GAIN_IDX_LEN - nrgresDbq;
-        int cmfLen = maxOffset - minOffset + 2;
-        int cmfIx = Math.min(nPulses / N_PULSES_STEP, FCB_G_OFFSET_CMFS - 1);
-        int[] cmf = NrgResTables.fcbgOffsetCmf(tableIx, cmfIx);
+        var minOffset = -nrgresDbq;
+        var maxOffset = UV_GAIN_IDX_LEN - nrgresDbq;
+        var cmfLen = maxOffset - minOffset + 2;
+        var cmfIx = Math.min(nPulses / N_PULSES_STEP, FCB_G_OFFSET_CMFS - 1);
+        var cmf = NrgResTables.fcbgOffsetCmf(tableIx, cmfIx);
         return MlowEntropyWrapper.decodeUpdate(decoder, cmf, minOffset, cmfLen);
     }
 
@@ -200,8 +200,8 @@ public final class ResNrgDequantizer {
      * @return the linear residual energy, never negative, scaled by {@code fcbSubfrLen}
      */
     public static float dequantizeResnrg(int nrgresFrameDbqQ14, int fcbSubfrLen) {
-        float exponent = 0.1f * (nrgresFrameDbqQ14 / (float) (1 << 14));
-        float resnrg = powfFast(10.0f, exponent) - RES_NRG_BIAS;
+        var exponent = 0.1f * (nrgresFrameDbqQ14 / (float) (1 << 14));
+        var resnrg = powfFast(10.0f, exponent) - RES_NRG_BIAS;
         resnrg = Math.max(resnrg, 0.0f);
         resnrg *= fcbSubfrLen;
         return resnrg;
@@ -220,8 +220,8 @@ public final class ResNrgDequantizer {
      * @return the approximate value of {@code a} raised to {@code b}
      */
     private static float powfFast(float a, float b) {
-        int bits = Float.floatToRawIntBits(a);
-        int result = (int) (b * (bits - POWF_FAST_BIAS) + (float) POWF_FAST_BIAS);
+        var bits = Float.floatToRawIntBits(a);
+        var result = (int) (b * (bits - POWF_FAST_BIAS) + (float) POWF_FAST_BIAS);
         return Float.intBitsToFloat(result);
     }
 

@@ -70,7 +70,7 @@ public sealed interface CloudWhatsAppClient extends WhatsAppClient<CloudWhatsApp
      *
      * @apiNote
      * Supply {@link CloudWhatsAppStoreFactory#temporary()} for a RAM-only session or
-     * {@link CloudWhatsAppStoreFactory#persistent(java.nio.file.Path)} for a custom storage directory.
+     * {@link CloudWhatsAppStoreFactory#persistent(Path)} for a custom storage directory.
      *
      * @param storeFactory the factory that resolves the backing store
      * @return a fresh {@link CloudWhatsAppClientBuilder}

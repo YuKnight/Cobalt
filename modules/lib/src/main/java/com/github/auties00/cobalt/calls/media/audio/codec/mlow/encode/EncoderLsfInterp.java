@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.NlsfBridge;
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Encodes one line spectral frequency (LSF) vector per frame into per subframe interpolated LSF vectors and
@@ -173,7 +174,7 @@ public final class EncoderLsfInterp {
      * carry.
      */
     public void reset() {
-        java.util.Arrays.fill(prevLsf, 0.0f);
+        Arrays.fill(prevLsf, 0.0f);
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "lsf interpolator reset");
         }
@@ -225,8 +226,8 @@ public final class EncoderLsfInterp {
      * @return the candidate's per subframe interpolated LSF vectors, stabilized LPC filters, and carry
      */
     public Candidate interpolate(float[] qlsf, int numSubframes, int lsfInterpolIdx) {
-        float[] interpol = interpolRow(numSubframes, lsfInterpolIdx);
-        float[] pristine = new float[LPC_ORDER];
+        var interpol = interpolRow(numSubframes, lsfInterpolIdx);
+        var pristine = new float[LPC_ORDER];
         System.arraycopy(prevLsf, 0, pristine, 0, LPC_ORDER);
         if (pristine[LPC_ORDER - 1] == 0.0f) {
             System.arraycopy(qlsf, 0, pristine, 0, LPC_ORDER);
@@ -252,13 +253,13 @@ public final class EncoderLsfInterp {
      * @return the candidate's per subframe interpolated LSF vectors, stabilized LPC filters, and carry
      */
     public Candidate interpolate(float[] qlsf, float[] pristine, float[] interpol) {
-        int numSubfr = interpol.length;
-        float[][] lpc = new float[numSubfr][];
-        float[][] lsfs = new float[numSubfr][];
-        float[] ilsf = new float[LPC_ORDER];
-        float prevFactor = -1.0f;
-        for (int j = 0; j < numSubfr; j++) {
-            float factor = interpol[j];
+        var numSubfr = interpol.length;
+        var lpc = new float[numSubfr][];
+        var lsfs = new float[numSubfr][];
+        var ilsf = new float[LPC_ORDER];
+        var prevFactor = -1.0f;
+        for (var j = 0; j < numSubfr; j++) {
+            var factor = interpol[j];
             if (factor == prevFactor) {
                 // Repeated factor reuses the prior subframe's filter and interpolated vector verbatim. The LPC
                 // rows are read only downstream (computeReslpc and encodeSubframe only read the coefficients),
@@ -270,11 +271,11 @@ public final class EncoderLsfInterp {
                 if (factor == 1.0f) {
                     System.arraycopy(qlsf, 0, ilsf, 0, LPC_ORDER);
                 } else {
-                    float oneMinus = 1.0f - factor;
-                    for (int i = 0; i < LPC_ORDER; i++) {
+                    var oneMinus = 1.0f - factor;
+                    for (var i = 0; i < LPC_ORDER; i++) {
                         ilsf[i] = pristine[i] * oneMinus;
                     }
-                    for (int i = 0; i < LPC_ORDER; i++) {
+                    for (var i = 0; i < LPC_ORDER; i++) {
                         ilsf[i] += factor * qlsf[i];
                     }
                 }
@@ -283,7 +284,7 @@ public final class EncoderLsfInterp {
             }
             prevFactor = factor;
         }
-        float[] carry = ilsf.clone();
+        var carry = ilsf.clone();
         if (Log.TRACE) {
             LOGGER.log(Level.TRACE, "lsf candidate interpolated: subframes={0}", numSubfr);
         }
@@ -351,7 +352,7 @@ public final class EncoderLsfInterp {
      *         unity coefficient
      */
     private static float[] nlsf2aStabilize(float[] ilsf) {
-        float[] a = NlsfBridge.nlsf2a(ilsf);
+        var a = NlsfBridge.nlsf2a(ilsf);
         stabilize(a);
         return a;
     }
@@ -370,7 +371,7 @@ public final class EncoderLsfInterp {
         if (isStable(a)) {
             return;
         }
-        int iter = 0;
+        var iter = 0;
         do {
             iter++;
             bweExpand(a, 1.0f - iter * 0.001f);
@@ -392,13 +393,13 @@ public final class EncoderLsfInterp {
      */
     private static void bweExpand(float[] a, float bwe) {
         if (bwe <= 0.0f) {
-            for (int i = 1; i < LPC_ORDER + 1; i++) {
+            for (var i = 1; i < LPC_ORDER + 1; i++) {
                 a[i] = 0.0f;
             }
             return;
         }
-        float c = bwe;
-        for (int i = 1; i < LPC_ORDER + 1; i++) {
+        var c = bwe;
+        for (var i = 1; i < LPC_ORDER + 1; i++) {
             a[i] *= c;
             c *= bwe;
         }
@@ -421,19 +422,19 @@ public final class EncoderLsfInterp {
         if (a[LPC_ORDER] * a[LPC_ORDER] > MAX_RC_STABLE) {
             return false;
         }
-        double[] a0 = new double[LPC_ORDER];
-        double[] a1 = new double[LPC_ORDER];
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var a0 = new double[LPC_ORDER];
+        var a1 = new double[LPC_ORDER];
+        for (var i = 0; i < LPC_ORDER; i++) {
             a0[i] = a[i + 1];
         }
-        int m = LPC_ORDER - 1;
+        var m = LPC_ORDER - 1;
         while (true) {
-            double den = 1.0 - a0[m] * a0[m];
+            var den = 1.0 - a0[m] * a0[m];
             if (den == 0.0) {
                 return false;
             }
-            double invDen = 1.0 / den;
-            for (int k = 0; k < m; k++) {
+            var invDen = 1.0 / den;
+            for (var k = 0; k < m; k++) {
                 a1[k] = (a0[k] - a0[m] * a0[m - k - 1]) * invDen;
             }
             if (a1[m - 1] * a1[m - 1] > MAX_RC_STABLE) {
@@ -447,7 +448,7 @@ public final class EncoderLsfInterp {
                 return false;
             }
             invDen = 1.0 / den;
-            for (int k = 0; k < m; k++) {
+            for (var k = 0; k < m; k++) {
                 a0[k] = (a1[k] - a1[m] * a1[m - k - 1]) * invDen;
             }
             if (a0[m - 1] * a0[m - 1] > MAX_RC_STABLE) {

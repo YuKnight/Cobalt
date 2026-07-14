@@ -17,7 +17,9 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -280,8 +282,8 @@ public final class CloudWebhookServer {
      * @param rawQuery the raw query string, or {@code null}
      * @return a map of decoded parameter names to values
      */
-    private static java.util.Map<String, String> parseQuery(String rawQuery) {
-        var result = new java.util.HashMap<String, String>();
+    private static Map<String, String> parseQuery(String rawQuery) {
+        var result = new HashMap<String, String>();
         if (rawQuery == null || rawQuery.isBlank()) {
             return result;
         }

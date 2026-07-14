@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.model.cloud;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -236,7 +237,7 @@ public final class CloudCallSettings {
          * The Request-URI user parameters, or {@code null} when none are set. These are appended to the
          * SIP Request-URI as user parameters.
          */
-        private final java.util.Map<String, String> requestUriUserParams;
+        private final Map<String, String> requestUriUserParams;
 
         /**
          * The Meta app id associated with the server, present on read responses, or {@code null} when
@@ -254,13 +255,13 @@ public final class CloudCallSettings {
          * @param appId                the Meta app id, or {@code null} when absent
          */
         public SipServer(String hostname, Integer port, String sipUserPassword,
-                         java.util.Map<String, String> requestUriUserParams, Integer appId) {
+                         Map<String, String> requestUriUserParams, Integer appId) {
             this.hostname = hostname;
             this.port = port;
             this.sipUserPassword = sipUserPassword;
             this.requestUriUserParams = requestUriUserParams == null
-                    ? java.util.Map.of()
-                    : java.util.Map.copyOf(requestUriUserParams);
+                    ? Map.of()
+                    : Map.copyOf(requestUriUserParams);
             this.appId = appId;
         }
 
@@ -296,7 +297,7 @@ public final class CloudCallSettings {
          *
          * @return an unmodifiable map of user parameters, empty when none are set
          */
-        public java.util.Map<String, String> requestUriUserParams() {
+        public Map<String, String> requestUriUserParams() {
             return requestUriUserParams;
         }
 

@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Per subframe analysis by synthesis code excited linear prediction (CELP) encoder for the MLow speech codec.
@@ -377,9 +378,9 @@ public final class CelpEncoder {
      * independent streams.
      */
     public void reset() {
-        java.util.Arrays.fill(acbState, 0.0f);
-        java.util.Arrays.fill(stateWghtBuf, 0.0f);
-        java.util.Arrays.fill(stateErrLpcSyn, 0.0f);
+        Arrays.fill(acbState, 0.0f);
+        Arrays.fill(stateWghtBuf, 0.0f);
+        Arrays.fill(stateErrLpcSyn, 0.0f);
         prevAcbIdx[IDX_FEC] = prevAcbIdx[IDX_MAIN] = -1;
         prevFcbIdx[IDX_FEC] = prevFcbIdx[IDX_MAIN] = -1;
         subfrCnt = 0;
@@ -443,29 +444,29 @@ public final class CelpEncoder {
     public FrameExcitation encodeFrame(boolean voiced, int numsubfrs, int lagSfPerFcbSf, float[] reslpc,
                                        float[][] predcoefs, float[][] percWghtResp, float[] lags,
                                        short[] survPerSubframe, short[][] fcbPulsesMax, float[][] subfrImportance) {
-        int framelen = numsubfrs * fcbSubfrlen;
-        short[] pulses = new short[framelen];
-        int[] sfPulses = new int[numsubfrs];
-        int[] acbgIdx = new int[numsubfrs];
-        int[] fcbgIdx = new int[numsubfrs];
-        int nPulsesTotal = 0;
-        for (int sf = 0; sf < numsubfrs; sf++) {
-            int lagind = sf * lagSfPerFcbSf;
-            float[] subLags = new float[lagSfPerFcbSf];
+        var framelen = numsubfrs * fcbSubfrlen;
+        var pulses = new short[framelen];
+        var sfPulses = new int[numsubfrs];
+        var acbgIdx = new int[numsubfrs];
+        var fcbgIdx = new int[numsubfrs];
+        var nPulsesTotal = 0;
+        for (var sf = 0; sf < numsubfrs; sf++) {
+            var lagind = sf * lagSfPerFcbSf;
+            var subLags = new float[lagSfPerFcbSf];
             System.arraycopy(lags, lagind, subLags, 0, lagSfPerFcbSf);
-            short[] maxPulses = fcbPulsesMax[sf];
-            float[] importance = subfrImportance[sf];
-            SubframeExcitation se = encodeSubframe(voiced, reslpc, sf * fcbSubfrlen, predcoefs[sf],
+            var maxPulses = fcbPulsesMax[sf];
+            var importance = subfrImportance[sf];
+            var se = encodeSubframe(voiced, reslpc, sf * fcbSubfrlen, predcoefs[sf],
                     percWghtResp[sf], subLags, importance, maxPulses, survPerSubframe);
             sfPulses[sf] = se.nPulses();
             acbgIdx[sf] = se.acbgIdx();
             fcbgIdx[sf] = se.fcbgIdx();
             nPulsesTotal += se.nPulses();
-            short[] subPulses = se.pulses();
-            for (int i = 0; i < se.nPulses(); i++) {
-                short signed = subPulses[i];
-                int sign = 1 + 2 * (signed >> 15);
-                int pos = (signed * sign) - 1;
+            var subPulses = se.pulses();
+            for (var i = 0; i < se.nPulses(); i++) {
+                var signed = subPulses[i];
+                var sign = 1 + 2 * (signed >> 15);
+                var pos = (signed * sign) - 1;
                 pulses[sf * fcbSubfrlen + pos] += (short) sign;
             }
         }
@@ -499,68 +500,68 @@ public final class CelpEncoder {
     public SubframeExcitation encodeSubframe(boolean voiced, float[] reslpc, int resOff, float[] predcoef,
                                              float[] percWghtResp, float[] lags, float[] subfrImportance,
                                              short[] fcbPulsesMax, short[] survPerSubframe) {
-        int lResp = HR_PERC_RESP_LEN;
+        var lResp = HR_PERC_RESP_LEN;
 
         // Impulse response of the weighted synthesis filter: the weighting response run through the synthesis
         // filter, then windowed by Hanning.
-        float[] impLpcBuf = new float[LPC_ORDER + MAX_L_RESP];
+        var impLpcBuf = new float[LPC_ORDER + MAX_L_RESP];
         hpAr16(percWghtResp, 0, lResp, predcoef, impLpcBuf, LPC_ORDER);
-        int impLpc = LPC_ORDER;
-        for (int i = 0; i < lResp; i++) {
+        var impLpc = LPC_ORDER;
+        for (var i = 0; i < lResp; i++) {
             impLpcBuf[impLpc + i] *= hanningWin[i];
         }
 
         // Weighting column: autocorrelate the impulse response, then flip it into the symmetric column.
-        float[] impLpcRevBuf = impLpcRevScratch;
-        int impLpcRev = MAX_L_RESP - 1;
-        for (int i = 0; i < lResp; i++) {
+        var impLpcRevBuf = impLpcRevScratch;
+        var impLpcRev = MAX_L_RESP - 1;
+        for (var i = 0; i < lResp; i++) {
             impLpcRevBuf[impLpcRev + i] = impLpcBuf[impLpc + lResp - 1 - i];
         }
         // Zero the (lResp - 1) history samples preceding the reversed response.
-        for (int i = 0; i < lResp - 1; i++) {
+        for (var i = 0; i < lResp - 1; i++) {
             impLpcRevBuf[impLpcRev - 1 - i] = 0.0f;
         }
-        float[] phi = new float[fcbSubfrlen];
+        var phi = new float[fcbSubfrlen];
         percFiltMa(impLpcRevBuf, impLpcRev, lResp, impLpcBuf, impLpc, lResp, phi, 0);
         reverse(phi, lResp);
         // phi[lResp .. fcbSubfrlen) is already zero from allocation.
 
-        float[] phiFlip = new float[2 * MAX_SF_LEN + 1];
+        var phiFlip = new float[2 * MAX_SF_LEN + 1];
         phiFlip[MAX_SF_LEN] = phi[0];
-        for (int i = 0; i < lResp + 1; i++) {
+        for (var i = 0; i < lResp + 1; i++) {
             phiFlip[MAX_SF_LEN - i] = phi[i];
             phiFlip[MAX_SF_LEN + i] = phi[i];
         }
 
         // Weighted target cross correlation: the symmetric Toeplitz weighting times the LPC residual.
-        float[] dLpc = new float[fcbSubfrlen];
+        var dLpc = new float[fcbSubfrlen];
         multSymToepl2(phiFlip, MAX_SF_LEN - lResp + 1, lResp, reslpc, resOff, dLpc, 0, fcbSubfrlen);
 
         // Zero input response accounting.
         float werrIn;
-        float[] zirLpc = zirLpcScratch;
+        var zirLpc = zirLpcScratch;
         {
-            float[] zirTmpBuf = new float[fcbSubfrlen + 2 * MAX_L_RESP - 1];
-            int zirTmp = MAX_L_RESP - 1;
-            float[] htZirBuf = htZirScratch;
-            int htZir = MAX_L_RESP - 1;
+            var zirTmpBuf = new float[fcbSubfrlen + 2 * MAX_L_RESP - 1];
+            var zirTmp = MAX_L_RESP - 1;
+            var htZirBuf = htZirScratch;
+            var htZir = MAX_L_RESP - 1;
             // Clear the response samples; the preceding history comes from the weighting filter memory tail.
-            for (int i = 0; i < lResp; i++) {
+            for (var i = 0; i < lResp; i++) {
                 zirTmpBuf[zirTmp + i] = 0.0f;
             }
-            int stateLen = Math.max(LPC_ORDER, lResp - 1);
-            int stateWght = LPC_ORDER;
-            for (int i = 0; i < stateLen; i++) {
+            var stateLen = Math.max(LPC_ORDER, lResp - 1);
+            var stateWght = LPC_ORDER;
+            for (var i = 0; i < stateLen; i++) {
                 zirTmpBuf[zirTmp - stateLen + i] = stateWghtBuf[stateWght + fcbSubfrlen - stateLen + i];
             }
             // Short term synthesis filter in place over the response window.
             ar16InPlace(zirTmpBuf, zirTmp, lResp, predcoef);
             percFiltMa(zirTmpBuf, zirTmp, lResp, percWghtResp, 0, lResp, zirLpc, 0);
 
-            for (int i = 0; i < lResp; i++) {
+            for (var i = 0; i < lResp; i++) {
                 zirTmpBuf[zirTmp + i] = zirLpc[lResp - 1 - i];
             }
-            for (int i = 0; i < lResp - 1; i++) {
+            for (var i = 0; i < lResp - 1; i++) {
                 zirTmpBuf[zirTmp - 1 - i] = 0.0f;
             }
             percFiltMa(zirTmpBuf, zirTmp, lResp, impLpcBuf, impLpc, lResp, htZirBuf, htZir);
@@ -570,19 +571,19 @@ public final class CelpEncoder {
                       + 2.0f * dotProd(htZirBuf, htZir, reslpc, resOff, lResp)
                       + nrg(zirLpc, 0, lResp)
                     : 0.0f;
-            for (int i = 0; i < lResp; i++) {
+            for (var i = 0; i < lResp; i++) {
                 dLpc[i] += htZirBuf[htZir + i];
             }
         }
 
-        int nLags = fcbSubfrlen / LAG_SUBFRLEN;
-        float[] acbBasis = acbBasisScratch;
+        var nLags = fcbSubfrlen / LAG_SUBFRLEN;
+        var acbBasis = acbBasisScratch;
         float[] dTarget;
-        int acbgIdxMain = -1;
+        var acbgIdxMain = -1;
         AcbSearch.AcbParams acbParams;
         if (voiced) {
             synLtpBasis(lags, nLags, acbStateLen, acbBasis);
-            AcbSearch.Result acb = acbSearch.search(phiFlip, lResp, acbBasis, dLpc, werrIn, fcbSubfrlen, lowRate,
+            var acb = acbSearch.search(phiFlip, lResp, acbBasis, dLpc, werrIn, fcbSubfrlen, lowRate,
                     prevAcbIdx[IDX_MAIN]);
             acbgIdxMain = acb.acbIdx();
             dTarget = acb.dLtp();
@@ -594,35 +595,35 @@ public final class CelpEncoder {
         }
 
         // Weighted target energy for the per pulse weighted energy threshold.
-        float[] wtgtTmpBuf = new float[fcbSubfrlen + 2 * MAX_L_RESP - 1];
-        int wtgtTmp = MAX_L_RESP - 1;
-        float[] wtgt = new float[fcbSubfrlen + MAX_L_RESP];
+        var wtgtTmpBuf = new float[fcbSubfrlen + 2 * MAX_L_RESP - 1];
+        var wtgtTmp = MAX_L_RESP - 1;
+        var wtgt = new float[fcbSubfrlen + MAX_L_RESP];
         System.arraycopy(reslpc, resOff, wtgtTmpBuf, wtgtTmp, fcbSubfrlen);
         if (voiced) {
-            float[] acbGain = acbDequant(lowRate, acbgIdxMain);
-            float[] acb = new float[fcbSubfrlen];
+            var acbGain = acbDequant(lowRate, acbgIdxMain);
+            var acb = new float[fcbSubfrlen];
             acbSynthesize(fcbSubfrlen, acbBasis, acbGain, acb, 0.0f);
-            for (int i = 0; i < fcbSubfrlen; i++) {
+            for (var i = 0; i < fcbSubfrlen; i++) {
                 wtgtTmpBuf[wtgtTmp + i] += -RATE_ACB_SCALE * acb[i];
             }
         }
-        for (int i = 0; i < lResp; i++) {
+        for (var i = 0; i < lResp; i++) {
             wtgtTmpBuf[wtgtTmp + fcbSubfrlen + i] = 0.0f;
         }
-        for (int i = 0; i < lResp - 1; i++) {
+        for (var i = 0; i < lResp - 1; i++) {
             wtgtTmpBuf[wtgtTmp - 1 - i] = 0.0f;
         }
         percFiltMa(wtgtTmpBuf, wtgtTmp, fcbSubfrlen + lResp, impLpcBuf, impLpc, lResp, wtgt, 0);
-        for (int i = 0; i < lResp; i++) {
+        for (var i = 0; i < lResp; i++) {
             wtgt[i] += zirLpc[i];
         }
-        float nrgWtgt = nrg(wtgt, 0, fcbSubfrlen + lResp);
-        float[] wnrgPerPulse = wnrgPerPulseScratch;
-        for (int r = 0; r < MAX_RATES; r++) {
+        var nrgWtgt = nrg(wtgt, 0, fcbSubfrlen + lResp);
+        var wnrgPerPulse = wnrgPerPulseScratch;
+        for (var r = 0; r < MAX_RATES; r++) {
             wnrgPerPulse[r] = nrgWtgt / (subfrImportance[r] + 1.0e-3f);
         }
 
-        int iLag = (int) lags[nLags - 1];
+        var iLag = (int) lags[nLags - 1];
         int[] fcbPulsesMaxInt = {fcbPulsesMax[IDX_FEC], fcbPulsesMax[IDX_MAIN]};
         FcbSearch.Result fcb;
         if (fcbPulsesMax[IDX_MAIN] > 0) {
@@ -637,11 +638,11 @@ public final class CelpEncoder {
                     new float[MAX_RATES], new float[MAX_RATES]);
         }
 
-        int[] acbIdxOut = {acbgIdxMain, acbgIdxMain};
-        int[] gainIdxOut = {-1, -1};
-        float[][] excFcbPerRate = new float[MAX_RATES][];
-        for (int r = 0; r < MAX_RATES; r++) {
-            float[] excFcb = fcbSynthesize(fcb.pulses()[r], fcb.nPulses()[r], fcbSubfrlen);
+        var acbIdxOut = new int[]{acbgIdxMain, acbgIdxMain};
+        var gainIdxOut = new int[]{-1, -1};
+        var excFcbPerRate = new float[MAX_RATES][];
+        for (var r = 0; r < MAX_RATES; r++) {
+            var excFcb = fcbSynthesize(fcb.pulses()[r], fcb.nPulses()[r], fcbSubfrlen);
             if (fcb.nPulses()[r] > 0) {
                 float fcbgain;
                 if (voiced) {
@@ -651,7 +652,7 @@ public final class CelpEncoder {
                     if (lowRate) {
                         pitchSharp(excFcb, iLag, fcbSubfrlen);
                     }
-                    GainQuantizer.VoicedGains vg = gainQuantizer.quantizeVoiced(acbParams, fcb.fcbWnrg()[r],
+                    var vg = gainQuantizer.quantizeVoiced(acbParams, fcb.fcbWnrg()[r],
                             fcb.gainFromSearch()[r], excFcb, dLpc, fcbSubfrlen, lowRate,
                             prevAcbIdx[r], prevFcbIdx[r]);
                     acbIdxOut[r] = vg.acbIdx();
@@ -661,7 +662,7 @@ public final class CelpEncoder {
                     gainIdxOut[r] = GainQuantizer.quantizeUnvoiced(fcb.gainFromSearch()[r]);
                     fcbgain = gainQuantizer.unvoicedGain(gainIdxOut[r]);
                 }
-                for (int i = 0; i < fcbSubfrlen; i++) {
+                for (var i = 0; i < fcbSubfrlen; i++) {
                     excFcb[i] *= fcbgain;
                 }
             }
@@ -670,13 +671,13 @@ public final class CelpEncoder {
 
         // Reconstruct the primary rate point excitation and update the adaptive codebook ring.
         System.arraycopy(excFcbPerRate[IDX_MAIN], 0, excLpc, 0, fcbSubfrlen);
-        float[] resLtp = new float[fcbSubfrlen];
+        var resLtp = new float[fcbSubfrlen];
         System.arraycopy(reslpc, resOff, resLtp, 0, fcbSubfrlen);
         if (voiced) {
-            float[] acbGain = acbDequant(lowRate, acbIdxOut[IDX_MAIN]);
-            float[] acb = new float[fcbSubfrlen];
+            var acbGain = acbDequant(lowRate, acbIdxOut[IDX_MAIN]);
+            var acb = new float[fcbSubfrlen];
             acbSynthesize(fcbSubfrlen, acbBasis, acbGain, acb, 0.0f);
-            for (int i = 0; i < fcbSubfrlen; i++) {
+            for (var i = 0; i < fcbSubfrlen; i++) {
                 excLpc[i] += acb[i];
                 resLtp[i] -= acb[i];
             }
@@ -685,8 +686,8 @@ public final class CelpEncoder {
         System.arraycopy(excLpc, 0, acbState, acbStateLen - 2 * fcbSubfrlen, fcbSubfrlen);
 
         // Update the weighting filter zero input response memory.
-        float[] lpcResErr = new float[fcbSubfrlen];
-        for (int i = 0; i < fcbSubfrlen; i++) {
+        var lpcResErr = new float[fcbSubfrlen];
+        for (var i = 0; i < fcbSubfrlen; i++) {
             lpcResErr[i] = reslpc[resOff + i] - excLpc[i];
         }
         System.arraycopy(stateErrLpcSyn, 0, stateWghtBuf, 0, LPC_ORDER);
@@ -700,7 +701,7 @@ public final class CelpEncoder {
             prevFcbIdx[IDX_FEC] = prevFcbIdx[IDX_MAIN] = -1;
             subfrCnt = 0;
         } else {
-            for (int r = 0; r < MAX_RATES; r++) {
+            for (var r = 0; r < MAX_RATES; r++) {
                 prevAcbIdx[r] = voiced ? acbIdxOut[r] : -1;
                 prevFcbIdx[r] = voiced ? gainIdxOut[r] : -1;
             }
@@ -726,10 +727,10 @@ public final class CelpEncoder {
      * @return a freshly allocated excitation buffer with the scattered unit pulses
      */
     private static float[] fcbSynthesize(short[] pulses, int nPulses, int fcbSubfrlen) {
-        float[] fcb = new float[fcbSubfrlen];
-        for (int n = 0; n < nPulses; n++) {
-            int sign = 1 + 2 * (pulses[n] >> 15);
-            int pos = (pulses[n] * sign) - 1;
+        var fcb = new float[fcbSubfrlen];
+        for (var n = 0; n < nPulses; n++) {
+            var sign = 1 + 2 * (pulses[n] >> 15);
+            var pos = (pulses[n] * sign) - 1;
             fcb[pos] += sign;
         }
         return fcb;
@@ -750,7 +751,7 @@ public final class CelpEncoder {
      * @param len the subframe length in samples
      */
     private static void pitchSharp(float[] x, int lag, int len) {
-        for (int i = lag; i < len; i++) {
+        for (var i = lag; i < len; i++) {
             x[i] += x[i - lag] * PITCH_SHARPENING_COEF;
         }
     }
@@ -776,7 +777,7 @@ public final class CelpEncoder {
             Filters.ma(x, xOff, n, coef, coefLen, y, yOff);
             return;
         }
-        float[] c = new float[coefLen];
+        var c = new float[coefLen];
         System.arraycopy(coef, coefOff, c, 0, coefLen);
         Filters.ma(x, xOff, n, c, coefLen, y, yOff);
     }
@@ -849,13 +850,13 @@ public final class CelpEncoder {
      * @param yOff the offset of the first output sample in {@code y}; at least {@value #LPC_ORDER}
      */
     private static void hpAr16(float[] x, int xOff, int n, float[] coef, float[] y, int yOff) {
-        for (int sample = 0; sample < n; sample++) {
-            int b = yOff + sample;
+        for (var sample = 0; sample < n; sample++) {
+            var b = yOff + sample;
             float ym1  = y[b - 1],  ym2  = y[b - 2],  ym3  = y[b - 3],  ym4  = y[b - 4];
             float ym5  = y[b - 5],  ym6  = y[b - 6],  ym7  = y[b - 7],  ym8  = y[b - 8];
             float ym9  = y[b - 9],  ym10 = y[b - 10], ym11 = y[b - 11], ym12 = y[b - 12];
             float ym13 = y[b - 13], ym14 = y[b - 14], ym15 = y[b - 15], ym16 = y[b - 16];
-            float t = x[xOff + sample];
+            var t = x[xOff + sample];
             t = t - coef[14] * ym14;
             t = t - coef[2] * ym2;
             t = t - coef[12] * ym12;
@@ -878,30 +879,30 @@ public final class CelpEncoder {
      * @param acbBasis the interleaved center and side basis output
      */
     private void synLtpBasis(float[] lags, int numLags, int stateLen, float[] acbBasis) {
-        int pEnd = stateLen - numLags * LAG_SUBFRLEN;
-        for (int subfr = 0; subfr < numLags; subfr++) {
-            int iLag = (int) Math.floor(lags[subfr]);
-            int centerOut = subfr * LAG_SUBFRLEN;
-            int sideOut = (numLags + subfr) * LAG_SUBFRLEN;
+        var pEnd = stateLen - numLags * LAG_SUBFRLEN;
+        for (var subfr = 0; subfr < numLags; subfr++) {
+            var iLag = (int) Math.floor(lags[subfr]);
+            var centerOut = subfr * LAG_SUBFRLEN;
+            var sideOut = (numLags + subfr) * LAG_SUBFRLEN;
             if (iLag == lags[subfr]) {
-                for (int i = 0; i < LAG_SUBFRLEN; i++) {
+                for (var i = 0; i < LAG_SUBFRLEN; i++) {
                     acbState[pEnd + i] = acbState[pEnd + i - iLag];
                 }
                 System.arraycopy(acbState, pEnd, acbBasis, centerOut, LAG_SUBFRLEN);
-                int a = pEnd - iLag - 1;
-                int b = pEnd - iLag + 1;
-                for (int i = 0; i < LAG_SUBFRLEN; i++) {
+                var a = pEnd - iLag - 1;
+                var b = pEnd - iLag + 1;
+                for (var i = 0; i < LAG_SUBFRLEN; i++) {
                     acbBasis[sideOut + i] = acbState[a + i] + acbState[b + i];
                 }
             } else {
-                float first = dotProd(acbState, pEnd - 1 - iLag - LTP_INTERPOL_DELAY,
+                var first = dotProd(acbState, pEnd - 1 - iLag - LTP_INTERPOL_DELAY,
                         MiscTables.INTERPOL_KERNEL, 0, 2 * LTP_INTERPOL_DELAY);
                 interpol(acbState, pEnd - iLag - LTP_INTERPOL_DELAY, acbState, pEnd, LAG_SUBFRLEN);
-                float last = dotProd(acbState, pEnd + LAG_SUBFRLEN - iLag - LTP_INTERPOL_DELAY,
+                var last = dotProd(acbState, pEnd + LAG_SUBFRLEN - iLag - LTP_INTERPOL_DELAY,
                         MiscTables.INTERPOL_KERNEL, 0, 2 * LTP_INTERPOL_DELAY);
                 System.arraycopy(acbState, pEnd, acbBasis, centerOut, LAG_SUBFRLEN);
                 acbBasis[sideOut] = first + acbState[pEnd + 1];
-                for (int i = 0; i < LAG_SUBFRLEN - 2; i++) {
+                for (var i = 0; i < LAG_SUBFRLEN - 2; i++) {
                     acbBasis[sideOut + 1 + i] = acbState[pEnd + i] + acbState[pEnd + 2 + i];
                 }
                 acbBasis[sideOut + LAG_SUBFRLEN - 1] = acbState[pEnd + LAG_SUBFRLEN - 2] + last;
@@ -924,10 +925,10 @@ public final class CelpEncoder {
      */
     private static void acbSynthesize(int subfrLen, float[] acbBasis, float[] acbG, float[] acb, float highBoost) {
         adjustAcbGains(acbG, highBoost);
-        for (int i = 0; i < subfrLen; i++) {
+        for (var i = 0; i < subfrLen; i++) {
             acb[i] = acbBasis[i] * acbG[0];
         }
-        for (int i = 0; i < subfrLen; i++) {
+        for (var i = 0; i < subfrLen; i++) {
             acb[i] += acbBasis[subfrLen + i] * acbG[1];
         }
     }
@@ -944,9 +945,9 @@ public final class CelpEncoder {
         if (highBoost == 0.0f) {
             return;
         }
-        float f0 = acbG[0] + 2.0f * acbG[1];
-        float f1 = acbG[0] - acbG[1];
-        float absF1New = Math.min(Math.abs(f1) + highBoost, Math.abs(f0));
+        var f0 = acbG[0] + 2.0f * acbG[1];
+        var f1 = acbG[0] - acbG[1];
+        var absF1New = Math.min(Math.abs(f1) + highBoost, Math.abs(f0));
         f1 *= absF1New / (Math.abs(f1) + 1e-12f);
         acbG[0] = (f0 + 2.0f * f1) / 3.0f;
         acbG[1] = (f0 - f1) / 3.0f;
@@ -960,10 +961,10 @@ public final class CelpEncoder {
      * @return a freshly allocated {@value #ACBG_M} entry array of real tap gains
      */
     private static float[] acbDequant(boolean lowRate, int acbIdx) {
-        short[] cb = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
-        float[] acbG = new float[ACBG_M];
-        float scQ14 = 1.0f / (1 << 14);
-        for (int m = 0; m < ACBG_M; m++) {
+        var cb = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
+        var acbG = new float[ACBG_M];
+        var scQ14 = 1.0f / (1 << 14);
+        for (var m = 0; m < ACBG_M; m++) {
             acbG[m] = cb[acbIdx * ACBG_M + m] * scQ14;
         }
         return acbG;
@@ -996,17 +997,17 @@ public final class CelpEncoder {
      * @param n    the number of output samples
      */
     private static void interpol(float[] x, int xOff, float[] y, int yOff, int n) {
-        float[] kernel = MiscTables.INTERPOL_KERNEL;
-        for (int m = 0; m < n; m++) {
-            int b = xOff + m;
-            float t0 = (x[b] + x[b + 15]) * kernel[0];
-            float t1 = (x[b + 1] + x[b + 14]) * kernel[1];
-            float t2 = (x[b + 2] + x[b + 13]) * kernel[2];
-            float t3 = (x[b + 3] + x[b + 12]) * kernel[3];
-            float t4 = (x[b + 4] + x[b + 11]) * kernel[4];
-            float t5 = (x[b + 5] + x[b + 10]) * kernel[5];
-            float t6 = (x[b + 6] + x[b + 9]) * kernel[6];
-            float t7 = (x[b + 7] + x[b + 8]) * kernel[7];
+        var kernel = MiscTables.INTERPOL_KERNEL;
+        for (var m = 0; m < n; m++) {
+            var b = xOff + m;
+            var t0 = (x[b] + x[b + 15]) * kernel[0];
+            var t1 = (x[b + 1] + x[b + 14]) * kernel[1];
+            var t2 = (x[b + 2] + x[b + 13]) * kernel[2];
+            var t3 = (x[b + 3] + x[b + 12]) * kernel[3];
+            var t4 = (x[b + 4] + x[b + 11]) * kernel[4];
+            var t5 = (x[b + 5] + x[b + 10]) * kernel[5];
+            var t6 = (x[b + 6] + x[b + 9]) * kernel[6];
+            var t7 = (x[b + 7] + x[b + 8]) * kernel[7];
             y[yOff + m] = (((t0 + t1) + t4) + t6) + (((t2 + t3) + t5) + t7);
         }
     }
@@ -1025,8 +1026,8 @@ public final class CelpEncoder {
      */
     private static void multSymToepl2(float[] c, int cBase, int lResp, float[] x, int xOff,
                                       float[] y, int yOff, int n) {
-        int idx = 0;
-        int len = lResp;
+        var idx = 0;
+        var len = lResp;
         for (; idx < lResp - 1; idx++) {
             y[yOff + idx] = dotProd(c, cBase + lResp - 1 - idx, x, xOff, len++);
         }
@@ -1057,8 +1058,8 @@ public final class CelpEncoder {
      * @param l   the window length
      */
     private static void reverse(float[] x, int off, int l) {
-        for (int i = 0; i < l / 2; i++) {
-            float tmp = x[off + i];
+        for (var i = 0; i < l / 2; i++) {
+            var tmp = x[off + i];
             x[off + i] = x[off + l - i - 1];
             x[off + l - i - 1] = tmp;
         }
@@ -1096,19 +1097,19 @@ public final class CelpEncoder {
      * @return the accumulated single precision dot product
      */
     private static float dotProd(float[] a, int aOff, float[] b, int bOff, int len) {
-        float s0 = 0.0f;
-        float s1 = 0.0f;
-        float s2 = 0.0f;
-        float s3 = 0.0f;
-        int m = len & ~3;
-        int i = 0;
+        var s0 = 0.0f;
+        var s1 = 0.0f;
+        var s2 = 0.0f;
+        var s3 = 0.0f;
+        var m = len & ~3;
+        var i = 0;
         for (; i < m; i += 4) {
             s0 += a[aOff + i] * b[bOff + i];
             s1 += a[aOff + i + 1] * b[bOff + i + 1];
             s2 += a[aOff + i + 2] * b[bOff + i + 2];
             s3 += a[aOff + i + 3] * b[bOff + i + 3];
         }
-        float acc = (s0 + s2) + (s1 + s3);
+        var acc = (s0 + s2) + (s1 + s3);
         for (; i < len; i++) {
             acc += a[aOff + i] * b[bOff + i];
         }
@@ -1140,10 +1141,10 @@ public final class CelpEncoder {
      * @return a freshly allocated {@code percRespLen} entry window
      */
     private static float[] buildHanningWindow(int percRespLen) {
-        float[] win = new float[percRespLen];
-        float scale = 1.0f / (2 * HR_PERC_RESP_LEN + 1);
-        for (int i = 0; i < percRespLen; i++) {
-            float arg = SMPL_PI * (percRespLen + i + 1) * scale;
+        var win = new float[percRespLen];
+        var scale = 1.0f / (2 * HR_PERC_RESP_LEN + 1);
+        for (var i = 0; i < percRespLen; i++) {
+            var arg = SMPL_PI * (percRespLen + i + 1) * scale;
             win[i] = (float) StrictMath.sin((double) arg);
         }
         return win;
@@ -1161,14 +1162,14 @@ public final class CelpEncoder {
      * @return a freshly allocated {@value #MAX_SF_LEN} entry signature table
      */
     private static long[] seedSignatures() {
-        long[] table = new long[MAX_SF_LEN];
-        int nBitsRand = 15;
-        int reps = 64 / nBitsRand;
-        long seed = 1L;
-        for (int i = 0; i < MAX_SF_LEN; i++) {
+        var table = new long[MAX_SF_LEN];
+        var nBitsRand = 15;
+        var reps = 64 / nBitsRand;
+        var seed = 1L;
+        for (var i = 0; i < MAX_SF_LEN; i++) {
             seed = seed * RAND_MULT + RAND_INC;
-            long tmp = (seed >>> 16) & RAND_MAX;
-            for (int r = 1; r < reps; r++) {
+            var tmp = (seed >>> 16) & RAND_MAX;
+            for (var r = 1; r < reps; r++) {
                 seed = seed * RAND_MULT + RAND_INC;
                 tmp <<= nBitsRand;
                 tmp += (seed >>> 16) & RAND_MAX;

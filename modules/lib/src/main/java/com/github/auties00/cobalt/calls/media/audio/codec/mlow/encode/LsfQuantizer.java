@@ -236,24 +236,24 @@ public final class LsfQuantizer {
      */
     public QuantizedLsf quantCond(int surv, float[] a, float[] previousLsf, float[] lsf, float rdwAdj,
                                   int voiced, int lowRate) {
-        Stage1 dec = codebook.stage1(voiced);
-        LsfStage1 enc = search.stage1(voiced);
-        float[] mean = dec.mean();
-        float regCond = dec.regCond();
+        var dec = codebook.stage1(voiced);
+        var enc = search.stage1(voiced);
+        var mean = dec.mean();
+        var regCond = dec.regCond();
 
-        float[] lsfqPrev = new float[LPC_ORDER];
-        float[] st1CbHalf = new float[LPC_ORDER];
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var lsfqPrev = new float[LPC_ORDER];
+        var st1CbHalf = new float[LPC_ORDER];
+        for (var i = 0; i < LPC_ORDER; i++) {
             lsfqPrev[i] = previousLsf[i] + regCond * (mean[i] - previousLsf[i]);
             st1CbHalf[i] = 0.5f * lsfqPrev[i];
         }
-        float[] st1CbCinv = matrixMultTransp(enc.cInv(), lsfqPrev);
-        float[][] st1We = new float[LPC_ORDER][LPC_ORDER];
-        float[][] st1Wie = new float[LPC_ORDER][LPC_ORDER];
+        var st1CbCinv = matrixMultTransp(enc.cInv(), lsfqPrev);
+        var st1We = new float[LPC_ORDER][LPC_ORDER];
+        var st1Wie = new float[LPC_ORDER][LPC_ORDER];
         rotApplyWeight(dec.rotCond()[lowRate], lsfqPrev, st1We, st1Wie);
 
-        float bitsCond = enc.bitsCond()[CB_CENTROIDS];
-        CondParams cond = new CondParams(st1CbHalf, st1CbCinv, st1We, st1Wie, bitsCond);
+        var bitsCond = enc.bitsCond()[CB_CENTROIDS];
+        var cond = new CondParams(st1CbHalf, st1CbCinv, st1We, st1Wie, bitsCond);
         return quantCore(surv, a, lsf, rdwAdj, voiced, lowRate, cond);
     }
 
@@ -300,60 +300,60 @@ public final class LsfQuantizer {
             LOGGER.log(Level.TRACE, "lsf quant: surv={0} voiced={1} lowRate={2} cond={3}",
                     surv, voiced, lowRate, cond != null);
         }
-        Stage1 dec = codebook.stage1(voiced);
-        LsfStage1 enc = search.stage1(voiced);
+        var dec = codebook.stage1(voiced);
+        var enc = search.stage1(voiced);
 
-        float[] lsf = precomputedLsf != null ? precomputedLsf : A2nlsfBridge.a2nlsf(a);
-        float[] wlsf = spectralWeights(a, lsf);
+        var lsf = precomputedLsf != null ? precomputedLsf : A2nlsfBridge.a2nlsf(a);
+        var wlsf = spectralWeights(a, lsf);
 
-        float qstep = search.qstep(voiced, lowRate);
-        float qstepCond = qstep * search.condMult();
-        float[] minDist = dec.minDist();
+        var qstep = search.qstep(voiced, lowRate);
+        var qstepCond = qstep * search.condMult();
+        var minDist = dec.minDist();
 
-        int[] qim1 = vqTemp(lsf, dec.cbHalf(), enc.cbCinv(), cond, surv);
+        var qim1 = vqTemp(lsf, dec.cbHalf(), enc.cbCinv(), cond, surv);
 
-        int[] qi = new int[LPC_ORDER + 1];
-        float[] qlsfOut = new float[LPC_ORDER];
-        float[] bitsUsed = {0.0f};
-        float rdBest = FLT_MAX;
+        var qi = new int[LPC_ORDER + 1];
+        var qlsfOut = new float[LPC_ORDER];
+        var bitsUsed = new float[]{0.0f};
+        var rdBest = FLT_MAX;
 
-        for (int s1 = 0; s1 < surv; s1++) {
-            int qi1 = qim1[s1];
-            boolean isCond = qi1 == CB_CENTROIDS;
+        for (var s1 = 0; s1 < surv; s1++) {
+            var qi1 = qim1[s1];
+            var isCond = qi1 == CB_CENTROIDS;
 
-            float[] lsfq1 = new float[LPC_ORDER];
-            float[] half = isCond ? cond.cbHalf() : dec.cbHalf()[qi1];
-            for (int i = 0; i < LPC_ORDER; i++) {
+            var lsfq1 = new float[LPC_ORDER];
+            var half = isCond ? cond.cbHalf() : dec.cbHalf()[qi1];
+            for (var i = 0; i < LPC_ORDER; i++) {
                 lsfq1[i] = half[i] * 2.0f;
             }
 
-            float[] qerrIn = new float[LPC_ORDER];
-            for (int i = 0; i < LPC_ORDER; i++) {
+            var qerrIn = new float[LPC_ORDER];
+            for (var i = 0; i < LPC_ORDER; i++) {
                 qerrIn[i] = lsf[i] - lsfq1[i];
             }
-            float[][] wiePtr = isCond ? cond.wie() : enc.wie()[qi1];
-            float[] qerr = matrixMultTransp(wiePtr, qerrIn);
+            var wiePtr = isCond ? cond.wie() : enc.wie()[qi1];
+            var qerr = matrixMultTransp(wiePtr, qerrIn);
 
-            float invQstep = 1.0f / (qi1 < CB_CENTROIDS ? qstep : qstepCond);
-            for (int i = 0; i < LPC_ORDER; i++) {
+            var invQstep = 1.0f / (qi1 < CB_CENTROIDS ? qstep : qstepCond);
+            for (var i = 0; i < LPC_ORDER; i++) {
                 qerr[i] *= invQstep;
             }
 
-            float bits = cond == null ? enc.bits()[qi1] : enc.bitsCond()[qi1];
-            int[] minQiRow = search.minQi(voiced, lowRate, qi1);
-            int[] maxQiRow = search.maxQi(voiced, lowRate, qi1);
-            Stage2 st2 = codebook.stage2(voiced, lowRate, qi1);
-            float[][] qLvls = st2.qLvls();
-            float[][] numBits = search.stage2NumBits(voiced, lowRate, qi1);
+            var bits = cond == null ? enc.bits()[qi1] : enc.bitsCond()[qi1];
+            var minQiRow = search.minQi(voiced, lowRate, qi1);
+            var maxQiRow = search.maxQi(voiced, lowRate, qi1);
+            var st2 = codebook.stage2(voiced, lowRate, qi1);
+            var qLvls = st2.qLvls();
+            var numBits = search.stage2NumBits(voiced, lowRate, qi1);
 
-            int[] alt = new int[LPC_ORDER];
-            int[] qi2 = new int[LPC_ORDER];
-            float[] absQerr = new float[LPC_ORDER];
-            float[] qres = new float[LPC_ORDER];
-            for (int i = 0; i < LPC_ORDER; i++) {
-                int qi2i = roundf(qerr[i]);
-                int minQi = minQiRow[i];
-                int maxQi = maxQiRow[i];
+            var alt = new int[LPC_ORDER];
+            var qi2 = new int[LPC_ORDER];
+            var absQerr = new float[LPC_ORDER];
+            var qres = new float[LPC_ORDER];
+            for (var i = 0; i < LPC_ORDER; i++) {
+                var qi2i = roundf(qerr[i]);
+                var minQi = minQiRow[i];
+                var maxQi = maxQiRow[i];
                 qi2i = Math.min(qi2i, maxQi);
                 qi2i = Math.max(qi2i, minQi);
                 qerr[i] -= qi2i;
@@ -369,25 +369,25 @@ public final class LsfQuantizer {
                 qi2[i] = qi2i;
             }
 
-            int[] iAlt = getMaxiK(absQerr, LPC_ORDER, surv);
-            float[][] wePtr = isCond ? cond.we() : dec.we()[qi1];
-            float[] lsfq = matrixMultTransp(wePtr, qres);
-            for (int i = 0; i < LPC_ORDER; i++) {
+            var iAlt = getMaxiK(absQerr, LPC_ORDER, surv);
+            var wePtr = isCond ? cond.we() : dec.we()[qi1];
+            var lsfq = matrixMultTransp(wePtr, qres);
+            for (var i = 0; i < LPC_ORDER; i++) {
                 lsfq[i] += lsfq1[i];
             }
 
-            int surv2 = surv - s1;
-            int indChgd = -1;
-            float bits0 = bits;
-            float[] lsfqBase = lsfq.clone();
-            for (int s2 = 0; s2 < surv2; s2++) {
+            var surv2 = surv - s1;
+            var indChgd = -1;
+            var bits0 = bits;
+            var lsfqBase = lsfq.clone();
+            for (var s2 = 0; s2 < surv2; s2++) {
                 enforceMinDistance(lsfq, minDist);
-                float werr = werr(lsf, lsfq, wlsf);
-                float rd = 0.5f * LPC_ORDER * log2f(werr) * rdwAdj + bits;
+                var werr = werr(lsf, lsfq, wlsf);
+                var rd = 0.5f * LPC_ORDER * log2f(werr) * rdwAdj + bits;
                 if (rd < rdBest) {
                     rdBest = rd;
                     qi[0] = qi1;
-                    for (int i = 0; i < LPC_ORDER; i++) {
+                    for (var i = 0; i < LPC_ORDER; i++) {
                         qi[i + 1] = qi2[i];
                     }
                     bitsUsed[0] = bits;
@@ -400,12 +400,12 @@ public final class LsfQuantizer {
                     qi2[indChgd] -= alt[indChgd];
                 }
                 indChgd = iAlt[s2];
-                int qi2Old = qi2[indChgd];
+                var qi2Old = qi2[indChgd];
                 qi2[indChgd] += alt[indChgd];
-                int qi2New = qi2[indChgd];
-                float qlvlsDiff = qLvls[indChgd][qi2New] - qLvls[indChgd][qi2Old];
-                float[] weCol = wePtr[indChgd];
-                for (int i = 0; i < LPC_ORDER; i++) {
+                var qi2New = qi2[indChgd];
+                var qlvlsDiff = qLvls[indChgd][qi2New] - qLvls[indChgd][qi2Old];
+                var weCol = wePtr[indChgd];
+                for (var i = 0; i < LPC_ORDER; i++) {
                     lsfq[i] = lsfqBase[i] + qlvlsDiff * weCol[i];
                 }
                 bits = bits0 + numBits[indChgd][qi2New] - numBits[indChgd][qi2Old];
@@ -435,17 +435,17 @@ public final class LsfQuantizer {
      * @return the {@code surv} selected stage 1 centroid indices, in selection order
      */
     private static int[] vqTemp(float[] lsf, float[][] cbHalf, float[][] cbCinv, CondParams cond, int surv) {
-        int cbCentroids = CB_CENTROIDS;
-        float[] err = new float[CB_CENTROIDS + 1];
-        float[] tmp = new float[LPC_ORDER];
-        for (int s = 0; s < CB_CENTROIDS; s++) {
-            for (int i = 0; i < LPC_ORDER; i++) {
+        var cbCentroids = CB_CENTROIDS;
+        var err = new float[CB_CENTROIDS + 1];
+        var tmp = new float[LPC_ORDER];
+        for (var s = 0; s < CB_CENTROIDS; s++) {
+            for (var i = 0; i < LPC_ORDER; i++) {
                 tmp[i] = cbHalf[s][i] - lsf[i];
             }
             err[s] = -dotProd(tmp, cbCinv[s]);
         }
         if (cond != null) {
-            for (int i = 0; i < LPC_ORDER; i++) {
+            for (var i = 0; i < LPC_ORDER; i++) {
                 tmp[i] = cond.cbHalf()[i] - lsf[i];
             }
             err[CB_CENTROIDS] = -dotProd(tmp, cond.cbCinv());
@@ -469,19 +469,19 @@ public final class LsfQuantizer {
      * @return a freshly allocated spectral weight vector of {@value #LPC_ORDER} entries
      */
     private static float[] spectralWeights(float[] a, float[] lsf) {
-        float[] lsfw = new float[LPC_ORDER];
-        for (int i = 0; i < LPC_ORDER; i++) {
-            float eRe = (float) StrictMath.cos(lsf[i]);
-            float eIm = (float) StrictMath.sin(lsf[i]);
-            float accRe = 1.0f;
-            float accIm = 0.0f;
-            float pRe = eRe;
-            float pIm = eIm;
-            for (int j = 1; j < LPC_ORDER; j++) {
+        var lsfw = new float[LPC_ORDER];
+        for (var i = 0; i < LPC_ORDER; i++) {
+            var eRe = (float) StrictMath.cos(lsf[i]);
+            var eIm = (float) StrictMath.sin(lsf[i]);
+            var accRe = 1.0f;
+            var accIm = 0.0f;
+            var pRe = eRe;
+            var pIm = eIm;
+            for (var j = 1; j < LPC_ORDER; j++) {
                 accRe += pRe * a[j];
                 accIm -= pIm * a[j];
-                float nRe = eRe * pRe - eIm * pIm;
-                float nIm = eRe * pIm + eIm * pRe;
+                var nRe = eRe * pRe - eIm * pIm;
+                var nIm = eRe * pIm + eIm * pRe;
                 pRe = nRe;
                 pIm = nIm;
             }
@@ -489,14 +489,14 @@ public final class LsfQuantizer {
             accIm -= pIm * a[LPC_ORDER];
             lsfw[i] = accRe * accRe + accIm * accIm;
         }
-        float minLsfw = lsfw[0];
-        for (int i = 1; i < LPC_ORDER; i++) {
+        var minLsfw = lsfw[0];
+        for (var i = 1; i < LPC_ORDER; i++) {
             if (lsfw[i] < minLsfw) {
                 minLsfw = lsfw[i];
             }
         }
-        float scale = 1.0f / minLsfw;
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var scale = 1.0f / minLsfw;
+        for (var i = 0; i < LPC_ORDER; i++) {
             lsfw[i] = 1.0f / (float) Math.sqrt(lsfw[i] * scale);
         }
         return lsfw;
@@ -519,16 +519,16 @@ public final class LsfQuantizer {
      * @param wrot2 the destination inverse weighting matrix, {@value #LPC_ORDER} square
      */
     private static void rotApplyWeight(float[][] rot, float[] lsf, float[][] wrot1, float[][] wrot2) {
-        float[] lsfw = laroiaWeights(lsf);
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var lsfw = laroiaWeights(lsf);
+        for (var i = 0; i < LPC_ORDER; i++) {
             lsfw[i] = FastSqrt.sqrt(lsfw[i]);
         }
-        float[] lsfwInv = new float[LPC_ORDER];
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var lsfwInv = new float[LPC_ORDER];
+        for (var i = 0; i < LPC_ORDER; i++) {
             lsfwInv[i] = 1.0f / lsfw[i];
         }
-        for (int i = 0; i < LPC_ORDER; i++) {
-            for (int j = 0; j < LPC_ORDER; j++) {
+        for (var i = 0; i < LPC_ORDER; i++) {
+            for (var j = 0; j < LPC_ORDER; j++) {
                 wrot1[i][j] = rot[i][j] * lsfwInv[j];
                 wrot2[j][i] = rot[i][j] * lsfw[j];
             }
@@ -552,36 +552,36 @@ public final class LsfQuantizer {
      * @return a freshly allocated array of the {@code k} selected indices into {@code x}, in selection order
      */
     private static int[] getMaxiK(float[] x, int xLen, int k) {
-        int[] idx = new int[k];
-        float[] buf = new float[2 * xLen + 2];
-        byte[] flags = new byte[xLen / 2 + 1];
-        int[] is = new int[16];
-        int numHalves = 0;
-        int len = (xLen + 1) >> 1;
-        int bufPtr = 0;
-        for (int n = 0; n < xLen - len; n++) {
+        var idx = new int[k];
+        var buf = new float[2 * xLen + 2];
+        var flags = new byte[xLen / 2 + 1];
+        var is = new int[16];
+        var numHalves = 0;
+        var len = (xLen + 1) >> 1;
+        var bufPtr = 0;
+        for (var n = 0; n < xLen - len; n++) {
             buf[n] = Math.max(x[n], x[n + len]);
         }
         buf[xLen - len] = x[xLen - len];
         while ((len & 1) == 0) {
             bufPtr += len;
             len >>= 1;
-            for (int n = 0; n < len; n++) {
+            for (var n = 0; n < len; n++) {
                 buf[bufPtr + n] = Math.max(buf[bufPtr - 2 * len + n], buf[bufPtr - len + n]);
             }
             numHalves++;
         }
-        for (int kk = 0; kk < k; kk++) {
-            int i = 0;
-            float maxtmp = buf[bufPtr];
-            for (int n = 1; n < len; n++) {
-                float xtmp = buf[bufPtr + n];
+        for (var kk = 0; kk < k; kk++) {
+            var i = 0;
+            var maxtmp = buf[bufPtr];
+            for (var n = 1; n < len; n++) {
+                var xtmp = buf[bufPtr + n];
                 if (xtmp > maxtmp) {
                     maxtmp = xtmp;
                     i = n;
                 }
             }
-            for (int n = 0; n < numHalves; n++) {
+            for (var n = 0; n < numHalves; n++) {
                 is[n] = i;
                 bufPtr -= 2 * len;
                 if (buf[bufPtr + i] < buf[bufPtr + i + len]) {
@@ -589,8 +589,8 @@ public final class LsfQuantizer {
                 }
                 len <<= 1;
             }
-            float xtmp = -FLT_MAX;
-            int iFinal = i;
+            var xtmp = -FLT_MAX;
+            var iFinal = i;
             if (i + len < xLen) {
                 if (flags[i]++ == 0) {
                     if (x[i] < x[i + len]) {
@@ -610,7 +610,7 @@ public final class LsfQuantizer {
                 return idx;
             }
             buf[bufPtr + i] = xtmp;
-            for (int n = numHalves - 1; n >= 0; n--) {
+            for (var n = numHalves - 1; n >= 0; n--) {
                 i = is[n];
                 len >>= 1;
                 buf[bufPtr + i + 2 * len] = Math.max(buf[bufPtr + i], buf[bufPtr + i + len]);
@@ -635,40 +635,40 @@ public final class LsfQuantizer {
      *           units in the last place, which flips downstream quantizer reconstruction.
      */
     private static float[] matrixMultTransp(float[][] m, float[] x) {
-        float[] y = new float[LPC_ORDER];
-        float x0 = x[0];
+        var y = new float[LPC_ORDER];
+        var x0 = x[0];
 
         // Four lane partials per output element, indexed l = (j - 1) & 3, accumulated over the body
         // term span j in [1, 12]; the trailing j in [13, 15] form a scalar remainder.
-        float[] l0 = new float[LPC_ORDER];
-        float[] l1 = new float[LPC_ORDER];
-        float[] l2 = new float[LPC_ORDER];
-        float[] l3 = new float[LPC_ORDER];
-        int body = ((LPC_ORDER - 1) & ~3) + 1; // body terms are j = 1..12
-        for (int j = 1; j < body; j += 4) {
-            float xa = x[j];
-            float xb = x[j + 1];
-            float xc = x[j + 2];
-            float xd = x[j + 3];
-            float[] ma = m[j];
-            float[] mb = m[j + 1];
-            float[] mc = m[j + 2];
-            float[] md = m[j + 3];
-            for (int i = 0; i < LPC_ORDER; i++) {
+        var l0 = new float[LPC_ORDER];
+        var l1 = new float[LPC_ORDER];
+        var l2 = new float[LPC_ORDER];
+        var l3 = new float[LPC_ORDER];
+        var body = ((LPC_ORDER - 1) & ~3) + 1; // body terms are j = 1..12
+        for (var j = 1; j < body; j += 4) {
+            var xa = x[j];
+            var xb = x[j + 1];
+            var xc = x[j + 2];
+            var xd = x[j + 3];
+            var ma = m[j];
+            var mb = m[j + 1];
+            var mc = m[j + 2];
+            var md = m[j + 3];
+            for (var i = 0; i < LPC_ORDER; i++) {
                 l0[i] += ma[i] * xa;
                 l1[i] += mb[i] * xb;
                 l2[i] += mc[i] * xc;
                 l3[i] += md[i] * xd;
             }
         }
-        for (int i = 0; i < LPC_ORDER; i++) {
-            float hsum = (l0[i] + l2[i]) + (l1[i] + l3[i]);
+        for (var i = 0; i < LPC_ORDER; i++) {
+            var hsum = (l0[i] + l2[i]) + (l1[i] + l3[i]);
             y[i] = m[0][i] * x0 + hsum;
         }
-        for (int j = body; j < LPC_ORDER; j++) {
-            float xj = x[j];
-            float[] mj = m[j];
-            for (int i = 0; i < LPC_ORDER; i++) {
+        for (var j = body; j < LPC_ORDER; j++) {
+            var xj = x[j];
+            var mj = m[j];
+            for (var i = 0; i < LPC_ORDER; i++) {
                 y[i] += mj[i] * xj;
             }
         }
@@ -684,9 +684,9 @@ public final class LsfQuantizer {
      * @return the single precision weighted error
      */
     private static float werr(float[] x, float[] y, float[] w) {
-        float s = 0.0f;
-        for (int k = 0; k < LPC_ORDER; k++) {
-            float e = x[k] - y[k];
+        var s = 0.0f;
+        for (var k = 0; k < LPC_ORDER; k++) {
+            var e = x[k] - y[k];
             s += w[k] * e * e;
         }
         return s;
@@ -700,8 +700,8 @@ public final class LsfQuantizer {
      * @return the single precision inner product
      */
     private static float dotProd(float[] a, float[] b) {
-        float ret = 0.0f;
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var ret = 0.0f;
+        for (var i = 0; i < LPC_ORDER; i++) {
             ret += a[i] * b[i];
         }
         return ret;
@@ -718,14 +718,14 @@ public final class LsfQuantizer {
      * @return a freshly allocated weight vector of {@value #LPC_ORDER} entries
      */
     private static float[] laroiaWeights(float[] lsf) {
-        float[] invDelta = new float[LPC_ORDER + 1];
+        var invDelta = new float[LPC_ORDER + 1];
         invDelta[0] = 1.0f / Math.max(lsf[0], LAROIA_MIN_DIST);
-        for (int i = 1; i < LPC_ORDER; i++) {
+        for (var i = 1; i < LPC_ORDER; i++) {
             invDelta[i] = 1.0f / Math.max(lsf[i] - lsf[i - 1], LAROIA_MIN_DIST);
         }
         invDelta[LPC_ORDER] = 1.0f / Math.max(SMPL_PI - lsf[LPC_ORDER - 1], LAROIA_MIN_DIST);
-        float[] weight = new float[LPC_ORDER];
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var weight = new float[LPC_ORDER];
+        for (var i = 0; i < LPC_ORDER; i++) {
             weight[i] = invDelta[i] + invDelta[i + 1];
         }
         return weight;
@@ -746,16 +746,16 @@ public final class LsfQuantizer {
      * @param minDist the per position minimum spacings, {@value #LPC_ORDER}{@code  + 1} entries
      */
     private static void enforceMinDistance(float[] lsf, float[] minDist) {
-        float[] dlsfs = new float[LPC_ORDER + 1];
+        var dlsfs = new float[LPC_ORDER + 1];
         dlsfs[0] = (lsf[0] - 0.0f) - minDist[0];
-        for (int i = 1; i < LPC_ORDER; i++) {
+        for (var i = 1; i < LPC_ORDER; i++) {
             dlsfs[i] = (lsf[i] - lsf[i - 1]) - minDist[i];
         }
         dlsfs[LPC_ORDER] = (SMPL_PI - lsf[LPC_ORDER - 1]) - minDist[LPC_ORDER];
 
-        int minIx = 0;
-        float dm = dlsfs[0];
-        for (int i = 1; i < LPC_ORDER + 1; i++) {
+        var minIx = 0;
+        var dm = dlsfs[0];
+        for (var i = 1; i < LPC_ORDER + 1; i++) {
             if (dlsfs[i] < dm) {
                 dm = dlsfs[i];
                 minIx = i;
@@ -764,8 +764,8 @@ public final class LsfQuantizer {
         if (dm > 0.0f) {
             return;
         }
-        for (int k = 0; k < 1000; k++) {
-            float delta = k * 1.0e-6f - dm;
+        for (var k = 0; k < 1000; k++) {
+            var delta = k * 1.0e-6f - dm;
             dlsfs[minIx] += delta;
             if (minIx == 0) {
                 dlsfs[1] -= delta;
@@ -778,7 +778,7 @@ public final class LsfQuantizer {
             }
             minIx = 0;
             dm = dlsfs[0];
-            for (int i = 1; i < LPC_ORDER + 1; i++) {
+            for (var i = 1; i < LPC_ORDER + 1; i++) {
                 if (dlsfs[i] < dm) {
                     dm = dlsfs[i];
                     minIx = i;
@@ -786,7 +786,7 @@ public final class LsfQuantizer {
             }
             if (dm >= 0.0f) {
                 lsf[0] = dlsfs[0] + minDist[0];
-                for (int i = 1; i < LPC_ORDER; i++) {
+                for (var i = 1; i < LPC_ORDER; i++) {
                     lsf[i] = lsf[i - 1] + (dlsfs[i] + minDist[i]);
                 }
                 return;

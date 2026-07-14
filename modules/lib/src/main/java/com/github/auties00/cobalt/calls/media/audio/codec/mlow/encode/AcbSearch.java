@@ -125,32 +125,32 @@ public final class AcbSearch {
      */
     public Result search(float[] phiFlip, int lResp, float[] acbBasis, float[] dLpc, float werrIn,
                          int fcbSubfrlen, boolean lowRate, int prevAcbIdx) {
-        float[] acbBasisPhi = new float[ACBG_M * fcbSubfrlen];
-        float[] phiAcb = new float[ACBG_M * ACBG_M];
-        float[] dAcbLpc = new float[ACBG_M];
+        var acbBasisPhi = new float[ACBG_M * fcbSubfrlen];
+        var phiAcb = new float[ACBG_M * ACBG_M];
+        var dAcbLpc = new float[ACBG_M];
         // Offset of the first valid sample of the symmetric weighting column.
-        int symBase = MAX_SF_LEN - lResp + 1;
-        for (int m = 0; m < ACBG_M; m++) {
+        var symBase = MAX_SF_LEN - lResp + 1;
+        for (var m = 0; m < ACBG_M; m++) {
             multSymToepl2(phiFlip, symBase, lResp, acbBasis, m * fcbSubfrlen, acbBasisPhi, m * fcbSubfrlen, fcbSubfrlen);
-            for (int i = 0; i < ACBG_M; i++) {
+            for (var i = 0; i < ACBG_M; i++) {
                 phiAcb[m * ACBG_M + i] = dotProd(acbBasis, i * fcbSubfrlen, acbBasisPhi, m * fcbSubfrlen, fcbSubfrlen);
             }
             dAcbLpc[m] = dotProd(acbBasis, m * fcbSubfrlen, dLpc, 0, fcbSubfrlen);
         }
 
-        float bestRd = 1e30f;
-        int bestAcbgIdx = 0;
-        int transitionIdx = prevAcbIdx == -1 ? 0 : (prevAcbIdx + 1);
-        float[] acbgInvProb = lowRate ? gainCosts.acbgInvProbLr()[transitionIdx] : gainCosts.acbgInvProbHr()[transitionIdx];
-        short[] cbAcbgains = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
-        float[] acbGains = new float[ACBG_M];
-        for (int n = 0; n < ACBG_N; n++) {
-            for (int m = 0; m < ACBG_M; m++) {
+        var bestRd = 1e30f;
+        var bestAcbgIdx = 0;
+        var transitionIdx = prevAcbIdx == -1 ? 0 : (prevAcbIdx + 1);
+        var acbgInvProb = lowRate ? gainCosts.acbgInvProbLr()[transitionIdx] : gainCosts.acbgInvProbHr()[transitionIdx];
+        var cbAcbgains = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
+        var acbGains = new float[ACBG_M];
+        for (var n = 0; n < ACBG_N; n++) {
+            for (var m = 0; m < ACBG_M; m++) {
                 acbGains[m] = cbAcbgains[n * ACBG_M + m] * Q14_SCALE;
             }
-            float werrOut = werrIn + wnrg2(phiAcb, acbGains)
-                    - 2.0f * (dAcbLpc[0] * acbGains[0] + dAcbLpc[1] * acbGains[1]);
-            float rd = werrOut * acbgInvProb[n];
+            var werrOut = werrIn + wnrg2(phiAcb, acbGains)
+                          - 2.0f * (dAcbLpc[0] * acbGains[0] + dAcbLpc[1] * acbGains[1]);
+            var rd = werrOut * acbgInvProb[n];
             if (rd < bestRd) {
                 bestRd = rd;
                 bestAcbgIdx = n;
@@ -158,13 +158,13 @@ public final class AcbSearch {
         }
 
         // Fixed codebook target: dLtp = dLpc - g0*acbBasisPhi[0] - g1*acbBasisPhi[1].
-        float[] dLtp = new float[fcbSubfrlen];
-        float g = -cbAcbgains[bestAcbgIdx * ACBG_M] * Q14_SCALE;
-        for (int i = 0; i < fcbSubfrlen; i++) {
+        var dLtp = new float[fcbSubfrlen];
+        var g = -cbAcbgains[bestAcbgIdx * ACBG_M] * Q14_SCALE;
+        for (var i = 0; i < fcbSubfrlen; i++) {
             dLtp[i] = dLpc[i] + g * acbBasisPhi[i];
         }
         g = -cbAcbgains[bestAcbgIdx * ACBG_M + 1] * Q14_SCALE;
-        for (int i = 0; i < fcbSubfrlen; i++) {
+        for (var i = 0; i < fcbSubfrlen; i++) {
             dLtp[i] += g * acbBasisPhi[fcbSubfrlen + i];
         }
 
@@ -194,8 +194,8 @@ public final class AcbSearch {
      */
     private static void multSymToepl2(float[] c, int cBase, int lResp, float[] x, int xOff,
                                       float[] y, int yOff, int n) {
-        int idx = 0;
-        int len = lResp;
+        var idx = 0;
+        var len = lResp;
         for (; idx < lResp - 1; idx++) {
             y[yOff + idx] = dotProd(c, cBase + lResp - 1 - idx, x, xOff, len++);
         }
@@ -241,19 +241,19 @@ public final class AcbSearch {
      * @return the accumulated single precision dot product
      */
     private static float dotProd(float[] a, int aOff, float[] b, int bOff, int len) {
-        float s0 = 0.0f;
-        float s1 = 0.0f;
-        float s2 = 0.0f;
-        float s3 = 0.0f;
-        int m = len & ~3;
-        int i = 0;
+        var s0 = 0.0f;
+        var s1 = 0.0f;
+        var s2 = 0.0f;
+        var s3 = 0.0f;
+        var m = len & ~3;
+        var i = 0;
         for (; i < m; i += 4) {
             s0 += a[aOff + i] * b[bOff + i];
             s1 += a[aOff + i + 1] * b[bOff + i + 1];
             s2 += a[aOff + i + 2] * b[bOff + i + 2];
             s3 += a[aOff + i + 3] * b[bOff + i + 3];
         }
-        float acc = (s0 + s2) + (s1 + s3);
+        var acc = (s0 + s2) + (s1 + s3);
         for (; i < len; i++) {
             acc += a[aOff + i] * b[bOff + i];
         }

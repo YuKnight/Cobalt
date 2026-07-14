@@ -204,35 +204,35 @@ final class SignalModeClassifier {
      * @return the voicing strength; positive on this active voice path means voiced
      */
     float classify(float pitchCorr, float[] lags, float avgLag, float harmStrength, float[] f2, float spActProb) {
-        float corrStrength = invSigmoid(0.1f + 0.75f * Math.min(Math.max(pitchCorr, 0.0f), 1.0f));
+        var corrStrength = invSigmoid(0.1f + 0.75f * Math.min(Math.max(pitchCorr, 0.0f), 1.0f));
 
-        float vadReciprocal = 1.04f / (spActProb + 0.04f);
-        float vadStrength = (1.0f - vadReciprocal) * 0.04f;
+        var vadReciprocal = 1.04f / (spActProb + 0.04f);
+        var vadStrength = (1.0f - vadReciprocal) * 0.04f;
 
-        float nrgLo = spectralTiltEnergyLow(f2);
-        float nrgHi = spectralTiltEnergyHigh(f2);
+        var nrgLo = spectralTiltEnergyLow(f2);
+        var nrgHi = spectralTiltEnergyHigh(f2);
         if (vadReciprocal > 3.5f) {
-            float smthCoef = -0.5f * vadStrength;
+            var smthCoef = -0.5f * vadStrength;
             nrgLoBgn += smthCoef * (nrgLo - nrgLoBgn);
             nrgHiBgn += smthCoef * (nrgHi - nrgHiBgn);
         }
-        float tiltStrength = (Math.max(nrgLo - nrgLoBgn, 0.0f) - Math.max(nrgHi - nrgHiBgn, 0.0f))
-                / ((nrgLo + 1e-9f) + nrgHi);
-        float tiltSquared = tiltStrength * tiltStrength;
+        var tiltStrength = (Math.max(nrgLo - nrgLoBgn, 0.0f) - Math.max(nrgHi - nrgHiBgn, 0.0f))
+                           / ((nrgLo + 1e-9f) + nrgHi);
+        var tiltSquared = tiltStrength * tiltStrength;
 
-        float lagSigmoid = lagSigmoid(avgLag);
+        var lagSigmoid = lagSigmoid(avgLag);
 
-        float corrTerm = corrStrength * VUV_WEIGHTS[0];
-        float tiltTerm = (tiltStrength * VUV_WEIGHTS[2]) * tiltSquared;
-        float vadTerm = vadStrength * VUV_WEIGHTS[1];
-        float harmTerm = harmStrength * VUV_WEIGHTS[3];
-        float lagSigTerm = lagSigmoid * VUV_WEIGHTS[4];
-        float numerator = (tiltTerm + corrTerm) + ((vadTerm + harmTerm) - lagSigTerm);
-        float voicingStrength = numerator / WEIGHTS_SUM + VUV_BIAS;
+        var corrTerm = corrStrength * VUV_WEIGHTS[0];
+        var tiltTerm = (tiltStrength * VUV_WEIGHTS[2]) * tiltSquared;
+        var vadTerm = vadStrength * VUV_WEIGHTS[1];
+        var harmTerm = harmStrength * VUV_WEIGHTS[3];
+        var lagSigTerm = lagSigmoid * VUV_WEIGHTS[4];
+        var numerator = (tiltTerm + corrTerm) + ((vadTerm + harmTerm) - lagSigTerm);
+        var voicingStrength = numerator / WEIGHTS_SUM + VUV_BIAS;
 
-        float carry = voicingPrev;
+        var carry = voicingPrev;
         if (lastLagPrev > 0.0f) {
-            float tmp = log2f(lags[0] / lastLagPrev);
+            var tmp = log2f(lags[0] / lastLagPrev);
             if (tmp > 0.0f) {
                 tmp *= 0.5f;
             }
@@ -263,24 +263,24 @@ final class SignalModeClassifier {
      * @return the low band tilt energy
      */
     private static float spectralTiltEnergyLow(float[] f2) {
-        float l0 = 0.0f;
-        float l1 = 0.0f;
-        float l2 = 0.0f;
-        float l3 = 0.0f;
-        int i = 2;
+        var l0 = 0.0f;
+        var l1 = 0.0f;
+        var l2 = 0.0f;
+        var l3 = 0.0f;
+        var i = 2;
         for (; i + 3 < TRANSITION_IX; i += 4) {
             l0 += ((float) (TRANSITION_IX - i) * (float) (i + 3)) * f2[i];
             l1 += ((float) (TRANSITION_IX - (i + 1)) * (float) (i + 4)) * f2[i + 1];
             l2 += ((float) (TRANSITION_IX - (i + 2)) * (float) (i + 5)) * f2[i + 2];
             l3 += ((float) (TRANSITION_IX - (i + 3)) * (float) (i + 6)) * f2[i + 3];
         }
-        float lane0 = l0 + l2;
-        float lane1 = l1 + l3;
+        var lane0 = l0 + l2;
+        var lane1 = l1 + l3;
         for (; i + 1 < TRANSITION_IX; i += 2) {
             lane0 += ((float) (TRANSITION_IX - i) * (float) (i + 3)) * f2[i];
             lane1 += ((float) (TRANSITION_IX - (i + 1)) * (float) (i + 4)) * f2[i + 1];
         }
-        float sum = lane0 + lane1;
+        var sum = lane0 + lane1;
         for (; i < TRANSITION_IX; i++) {
             sum += ((float) (TRANSITION_IX - i) * (float) (i + 3)) * f2[i];
         }
@@ -300,18 +300,18 @@ final class SignalModeClassifier {
      * @return the high band tilt energy
      */
     private static float spectralTiltEnergyHigh(float[] f2) {
-        float l0 = 0.0f;
-        float l1 = 0.0f;
-        float l2 = 0.0f;
-        float l3 = 0.0f;
-        for (int i = TRANSITION_IX; i < F2_LEN; i += 4) {
+        var l0 = 0.0f;
+        var l1 = 0.0f;
+        var l2 = 0.0f;
+        var l3 = 0.0f;
+        for (var i = TRANSITION_IX; i < F2_LEN; i += 4) {
             l0 += ((float) (i - TRANSITION_IX) * (float) (i + 3)) * f2[i];
             l1 += ((float) ((i + 1) - TRANSITION_IX) * (float) (i + 4)) * f2[i + 1];
             l2 += ((float) ((i + 2) - TRANSITION_IX) * (float) (i + 5)) * f2[i + 2];
             l3 += ((float) ((i + 3) - TRANSITION_IX) * (float) (i + 6)) * f2[i + 3];
         }
-        float lane0 = l0 + l2;
-        float lane1 = l1 + l3;
+        var lane0 = l0 + l2;
+        var lane1 = l1 + l3;
         return lane1 + lane0;
     }
 
@@ -328,7 +328,7 @@ final class SignalModeClassifier {
      * @return the short lag sigmoid value in {@code [0, 1]}, before the sign flip
      */
     private static float lagSigmoid(float avgLag) {
-        float x = 0.25f * (38.0f - avgLag);
+        var x = 0.25f * (38.0f - avgLag);
         if (x > 80.0f) {
             return 1.0f;
         }
@@ -370,25 +370,25 @@ final class SignalModeClassifier {
      * @return {@code expf(x)} in single precision
      */
     private static float expf(float x) {
-        int bits = Float.floatToRawIntBits(x);
+        var bits = Float.floatToRawIntBits(x);
         if ((bits & 0x7fffffff) >= 0x7f800000) {
             return (float) Math.exp(x);
         }
         double xd = x;
-        double f = xd * 92.332482616893657;
+        var f = xd * 92.332482616893657;
         if (f >= 8192.0 || f < -9600.0) {
             return (float) Math.exp(x);
         }
-        int k = (int) Math.rint(f);
-        int idx = k & 0x3f;
-        int m = (k - idx) >> 6;
-        double r = xd - (double) k * 0.010830424696249145;
-        double poly = 0.16666666666666666 * r + 0.5;
+        var k = (int) Math.rint(f);
+        var idx = k & 0x3f;
+        var m = (k - idx) >> 6;
+        var r = xd - (double) k * 0.010830424696249145;
+        var poly = 0.16666666666666666 * r + 0.5;
         poly = r * r * poly;
         poly = poly + r;
-        double tableValue = Double.longBitsToDouble(EXP_TABLE[idx]);
+        var tableValue = Double.longBitsToDouble(EXP_TABLE[idx]);
         poly = poly * tableValue + tableValue;
-        double scale = Double.longBitsToDouble(((long) (m + 0x3ff)) << 52);
+        var scale = Double.longBitsToDouble(((long) (m + 0x3ff)) << 52);
         return (float) (poly * scale);
     }
 
@@ -408,12 +408,12 @@ final class SignalModeClassifier {
      * @return {@code logf(x)} in single precision
      */
     private static float logf(float x) {
-        int bits = Float.floatToRawIntBits(x);
+        var bits = Float.floatToRawIntBits(x);
         if ((bits & 0x7fffffff) >= 0x7f800000 || x <= 0.0f) {
             return (float) Math.log(x);
         }
-        float diff = x - 1.0f;
-        float absDiff = Float.intBitsToFloat(Float.floatToRawIntBits(diff) & 0x7fffffff);
+        var diff = x - 1.0f;
+        var absDiff = Float.intBitsToFloat(Float.floatToRawIntBits(diff) & 0x7fffffff);
         if (absDiff < 0.0625f) {
             // TODO: this atanh series branch is one unit in the last place high of the runtime logf on roughly
             //  78 of the 1.5M float arguments in [0.94, 1.06]; the runtime appears to route a few of these to
@@ -422,32 +422,32 @@ final class SignalModeClassifier {
             //  sigmoid argument lands near one) and never flips the voiced/unvoiced sign; observed at about one
             //  frame in 72000 under fuzzing weighted towards arguments near one and zero frames under realistic
             //  speech features.
-            float s = diff / (2.0f + diff);
-            float diffTimesS = diff * s;
-            float twoS = s + s;
-            float twoSSquared = twoS * twoS;
-            float twoSCubed = twoS * twoSSquared;
-            float poly = twoSSquared * 0.012500000186264515f;
+            var s = diff / (2.0f + diff);
+            var diffTimesS = diff * s;
+            var twoS = s + s;
+            var twoSSquared = twoS * twoS;
+            var twoSCubed = twoS * twoSSquared;
+            var poly = twoSSquared * 0.012500000186264515f;
             poly = poly + 0.0833333358168602f;
             poly = poly * twoSCubed;
             poly = poly - diffTimesS;
             return diff + poly;
         }
-        float exponent = (float) (((int) (bits >>> 23)) - 0x7f);
-        int combined = (bits & 0x7f0000) + ((bits & 0x8000) << 1);
-        int idx = combined >>> 16;
-        float mantissa = Float.intBitsToFloat((bits & 0x7fffff) | 0x3f000000);
-        float reduced = Float.intBitsToFloat(combined | 0x3f000000) - mantissa;
+        var exponent = (float) (((int) (bits >>> 23)) - 0x7f);
+        var combined = (bits & 0x7f0000) + ((bits & 0x8000) << 1);
+        var idx = combined >>> 16;
+        var mantissa = Float.intBitsToFloat((bits & 0x7fffff) | 0x3f000000);
+        var reduced = Float.intBitsToFloat(combined | 0x3f000000) - mantissa;
         reduced = reduced * Float.intBitsToFloat(LOGF_RECIP[idx]);
-        float poly = reduced * 0.3333333432674408f;
-        float reducedSquared = reduced * reduced;
+        var poly = reduced * 0.3333333432674408f;
+        var reducedSquared = reduced * reduced;
         poly = poly + 0.5f;
         poly = poly * reducedSquared;
-        float mantissaLog = reduced + poly;
-        float low = 3.194618329871446e-05f * exponent;
+        var mantissaLog = reduced + poly;
+        var low = 3.194618329871446e-05f * exponent;
         low = low - mantissaLog;
         low = low + Float.intBitsToFloat(LOGF_LO[idx]);
-        float high = 0.693115234375f * exponent;
+        var high = 0.693115234375f * exponent;
         high = high + Float.intBitsToFloat(LOGF_HI[idx]);
         return high + low;
     }
@@ -467,34 +467,34 @@ final class SignalModeClassifier {
      * @return {@code log2f(x)} in single precision
      */
     private static float log2f(float x) {
-        int bits = Float.floatToRawIntBits(x);
+        var bits = Float.floatToRawIntBits(x);
         if (bits == 0 || (bits & 0x7fffffff) >= 0x7f800000 || (bits >>> 31) != 0) {
             return (float) (Math.log(x) / 0.6931471805599453);
         }
-        int exponent = (int) ((bits >>> 23) & 0xff) - 126;
-        float mantissa = Float.intBitsToFloat((bits & 0x807fffff) | 0x3f000000);
-        short scaledExponent = (short) exponent;
-        float normalized = mantissa;
+        var exponent = (int) ((bits >>> 23) & 0xff) - 126;
+        var mantissa = Float.intBitsToFloat((bits & 0x807fffff) | 0x3f000000);
+        var scaledExponent = (short) exponent;
+        var normalized = mantissa;
         if (!(0.707106769f <= mantissa)) {
             normalized = mantissa + mantissa;
             scaledExponent = (short) (scaledExponent - 1);
         }
-        float exponentValue = (float) (int) scaledExponent;
-        float numerator = normalized - 1.0f;
-        float s = numerator / (normalized + 1.0f);
-        float sSquared = s * s;
-        float poly = sSquared * 0.29884401f;
+        var exponentValue = (float) (int) scaledExponent;
+        var numerator = normalized - 1.0f;
+        var s = numerator / (normalized + 1.0f);
+        var sSquared = s * s;
+        var poly = sSquared * 0.29884401f;
         poly = poly + 0.399765521f;
         poly = poly * sSquared;
         poly = poly + 0.666667938f;
         poly = poly * sSquared;
-        float correction = numerator - poly;
-        float scaledS = s * correction;
+        var correction = numerator - poly;
+        var scaledS = s * correction;
         scaledS = scaledS * 1.44269502f;
-        float low = numerator * 1.92596303e-08f;
-        float high = numerator * 1.44269502f;
+        var low = numerator * 1.92596303e-08f;
+        var high = numerator * 1.44269502f;
         low = low - scaledS;
-        float result = low + high;
+        var result = low + high;
         return result + exponentValue;
     }
 
@@ -508,8 +508,8 @@ final class SignalModeClassifier {
      * @return the sum of the first five entries
      */
     private static float sumVec5(float[] x) {
-        float sum = x[0];
-        for (int i = 1; i < 5; i++) {
+        var sum = x[0];
+        for (var i = 1; i < 5; i++) {
             sum += x[i];
         }
         return sum;
@@ -712,43 +712,43 @@ final class SignalModeClassifier {
      * @return {@code tanhf(x)} in single precision, bit identical to the linked runtime
      */
     private static float tanhf(float x) {
-        int bits = Float.floatToRawIntBits(x);
-        int absBits = bits & 0x7fffffff;
+        var bits = Float.floatToRawIntBits(x);
+        var absBits = bits & 0x7fffffff;
         if (absBits < 0x39000000) {
             return x;
         }
         if (absBits > 0x7f800000) {
             return x + x;
         }
-        float sign = 1.0f - 2.0f * (absBits != bits ? 1 : 0);
-        float ax = sign * x;
+        var sign = 1.0f - 2.0f * (absBits != bits ? 1 : 0);
+        var ax = sign * x;
         if (ax > 10.0f) {
             return sign;
         }
         if (1.0f < ax) {
-            float twoAx = ax + ax;
-            float scaled = twoAx * 46.1662407f;
-            float rounded = scaled <= 0.0f ? scaled - 0.5f : scaled + 0.5f;
-            int n = (int) rounded;
-            int idx = n & 31;
-            float tableHigh = TANHF_TABLE_HIGH[idx];
-            float tableLow = TANHF_TABLE_LOW[idx];
-            float reduced = twoAx - (float) n * 0.0216598511f;
-            float reducedLow = (float) (-n) * 9.98318228e-07f;
+            var twoAx = ax + ax;
+            var scaled = twoAx * 46.1662407f;
+            var rounded = scaled <= 0.0f ? scaled - 0.5f : scaled + 0.5f;
+            var n = (int) rounded;
+            var idx = n & 31;
+            var tableHigh = TANHF_TABLE_HIGH[idx];
+            var tableLow = TANHF_TABLE_LOW[idx];
+            var reduced = twoAx - (float) n * 0.0216598511f;
+            var reducedLow = (float) (-n) * 9.98318228e-07f;
 
-            int q1 = (n + (n >> 31 & 31)) >> 5;
-            int q2 = (q1 - (q1 >> 31)) >> 1;
-            int scaleHighExp = q1 - q2;
-            float scaleLow = Float.intBitsToFloat((q2 + 0x7f) << 23);
-            float scaleHigh = Float.intBitsToFloat((scaleHighExp + 0x7f) << 23);
+            var q1 = (n + (n >> 31 & 31)) >> 5;
+            var q2 = (q1 - (q1 >> 31)) >> 1;
+            var scaleHighExp = q1 - q2;
+            var scaleLow = Float.intBitsToFloat((q2 + 0x7f) << 23);
+            var scaleHigh = Float.intBitsToFloat((scaleHighExp + 0x7f) << 23);
 
-            float r = reducedLow + reduced;
-            float poly = r;
-            float rSquared = r * r;
+            var r = reducedLow + reduced;
+            var poly = r;
+            var rSquared = r * r;
             poly = poly * 0.166666672f;
             poly = poly + 0.5f;
             poly = poly * rSquared;
-            float tableSum = tableLow + tableHigh;
+            var tableSum = tableLow + tableHigh;
             poly = poly + reducedLow;
             poly = poly + reduced;
             poly = poly * tableSum;
@@ -757,12 +757,12 @@ final class SignalModeClassifier {
             poly = poly * scaleLow;
             poly = poly * scaleHigh;
             poly = poly + 1.0f;
-            float quotient = 2.0f / poly;
+            var quotient = 2.0f / poly;
             return (1.0f - quotient) * sign;
         }
 
-        float x2 = ax * ax;
-        float x3 = x2 * ax;
+        var x2 = ax * ax;
+        var x3 = x2 * ax;
         float p;
         float q;
         if (0.9f <= ax) {

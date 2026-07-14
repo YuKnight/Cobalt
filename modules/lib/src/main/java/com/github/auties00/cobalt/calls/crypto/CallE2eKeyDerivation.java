@@ -503,7 +503,7 @@ public final class CallE2eKeyDerivation {
      * <p>Both the SFrame base key and the SRTP master derivations mix the participant's device qualified LID
      * into the HKDF info (for example {@code 83116928594056:2@lid}). The device suffix is mandatory: a
      * primary device is rendered {@code user:0@lid}, not the bare {@code user@lid}. This is where the E2E
-     * info diverges from {@link com.github.auties00.cobalt.model.jid.Jid#toString()}, which omits a
+     * info diverges from {@link Jid#toString()}, which omits a
      * {@code 0} device; keying a primary device peer's inbound stream from {@code user@lid} would feed a
      * different {@code info} into HKDF, produce a different SRTP master, and leave the peer's media
      * undecodable (decrypting to noise). A nonprimary device renders identically to the JID string form.

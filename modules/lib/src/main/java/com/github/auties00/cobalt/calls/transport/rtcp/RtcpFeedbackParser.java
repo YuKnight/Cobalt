@@ -226,10 +226,10 @@ public final class RtcpFeedbackParser {
             throw new IllegalArgumentException("length " + length + " out of range for buffer " + packet.length);
         }
         var arrivalMs = System.nanoTime() / 1_000_000L;
-        double fractionLost = -1.0;
-        long cumulativeLost = -1L;
-        long rttNs = -1L;
-        long remoteBweBps = -1L;
+        var fractionLost = -1.0;
+        var cumulativeLost = -1L;
+        var rttNs = -1L;
+        var remoteBweBps = -1L;
         var keyFrameRequested = false;
         var found = false;
         var offset = 0;

@@ -114,7 +114,6 @@ public final class WamBuilderGenerator {
             }
         }
 
-        // build() method — returns the interface type, constructs *Impl
         builderBuilder.addMethod(generateBuildMethod(event));
 
         return JavaFile.builder(event.packageName(), builderBuilder.build())

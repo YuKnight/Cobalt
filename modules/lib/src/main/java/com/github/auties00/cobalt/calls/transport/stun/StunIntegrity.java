@@ -7,6 +7,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.lang.System.Logger.Level;
 import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.zip.CRC32;
@@ -38,7 +39,7 @@ import com.github.auties00.cobalt.calls.transport.warp.WarpCodecSupport;
  * time comparison.
  *
  * @implNote This implementation computes HMAC SHA1 through {@code Mac("HmacSHA1")} and CRC32 through
- * {@link java.util.zip.CRC32}, both exact standard algorithms (RFC 2104 HMAC over SHA-1, ISO 3309
+ * {@link CRC32}, both exact standard algorithms (RFC 2104 HMAC over SHA-1, ISO 3309
  * CRC32), rather than a native binding. The {@code 0x5354554E} constant is the ASCII {@code "STUN"} the
  * RFC fixes. Applying the length rewrite to a copy leaves the caller's prefix buffer untouched.
  */
@@ -265,7 +266,7 @@ public final class StunIntegrity {
         var expected = computeMessageIntegrity(prefix, password);
         var actual = Arrays.copyOfRange(
                 message, integrityOffset + 4, integrityOffset + 4 + MESSAGE_INTEGRITY_LENGTH);
-        var matches = java.security.MessageDigest.isEqual(expected, actual);
+        var matches = MessageDigest.isEqual(expected, actual);
         if (!matches && Log.WARNING) {
             LOGGER.log(Level.WARNING, "stun message-integrity mismatch at offset {0}", integrityOffset);
         }

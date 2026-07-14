@@ -328,13 +328,13 @@ final class LsfTables {
      * @return a freshly allocated array holding every chunk concatenated
      */
     private static int[] concat(int[]... chunks) {
-        int total = 0;
-        for (int[] chunk : chunks) {
+        var total = 0;
+        for (var chunk : chunks) {
             total += chunk.length;
         }
-        int[] out = new int[total];
-        int pos = 0;
-        for (int[] chunk : chunks) {
+        var out = new int[total];
+        var pos = 0;
+        for (var chunk : chunks) {
             System.arraycopy(chunk, 0, out, pos, chunk.length);
             pos += chunk.length;
         }

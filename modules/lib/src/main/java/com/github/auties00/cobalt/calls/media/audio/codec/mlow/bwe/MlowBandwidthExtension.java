@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.NlsfBridge;
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Deterministic parametric high band (above 16 kHz) bandwidth extension of the MLow speech codec.
@@ -268,15 +269,15 @@ public final class MlowBandwidthExtension {
      * sessions; do not call it between the packets of one continuous stream, which must thread state.
      */
     public void reset() {
-        java.util.Arrays.fill(specEnvState, 0.0f);
-        java.util.Arrays.fill(postMaState, 0.0f);
+        Arrays.fill(specEnvState, 0.0f);
+        Arrays.fill(postMaState, 0.0f);
         this.envSmth = 0.0f;
-        java.util.Arrays.fill(outState, 0.0f);
+        Arrays.fill(outState, 0.0f);
         this.randSeed = 0;
-        java.util.Arrays.fill(lbWghtMem, 0.0f);
-        java.util.Arrays.fill(hbLsfPrev, 0.0f);
-        java.util.Arrays.fill(filterbankSynState, 0.0f);
-        java.util.Arrays.fill(up3248State, 0.0f);
+        Arrays.fill(lbWghtMem, 0.0f);
+        Arrays.fill(hbLsfPrev, 0.0f);
+        Arrays.fill(filterbankSynState, 0.0f);
+        Arrays.fill(up3248State, 0.0f);
         this.hbParamDecoder.reset();
     }
 
@@ -346,54 +347,54 @@ public final class MlowBandwidthExtension {
             LOGGER.log(Level.TRACE, "mlow wideband decode: frames={0} frameLength={1} apiRate={2}",
                     frames.length, frameLength, apiSampleRateHz);
         }
-        int numFrames = frames.length;
-        int numHbSubframes = frameLength / HB_SF_LEN;
-        int packetLen16 = numFrames * frameLength;
-        int lowRateIx = lowRate ? 1 : 0;
+        var numFrames = frames.length;
+        var numHbSubframes = frameLength / HB_SF_LEN;
+        var packetLen16 = numFrames * frameLength;
+        var lowRateIx = lowRate ? 1 : 0;
 
         // yHb holds TOT_POSTFILT_DELAY leading delay samples then the packet's high band frames.
-        float[] yHb = new float[packetLen16 + TOT_POSTFILT_DELAY];
+        var yHb = new float[packetLen16 + TOT_POSTFILT_DELAY];
         // The weighting filter needs LB_WGHT_LEN-1 leading history samples, threaded through lbWghtMem,
         // so a per frame contiguous yPrePostfilter buffer suffices.
-        for (int frame = 0; frame < numFrames; frame++) {
-            HbFrameInput in = frames[frame];
-            int voiced = in.voiced() ? 1 : 0;
+        for (var frame = 0; frame < numFrames; frame++) {
+            var in = frames[frame];
+            var voiced = in.voiced() ? 1 : 0;
 
-            float[] yWght = new float[frameLength];
-            float[] lowNrgFrame = new float[1];
+            var yWght = new float[frameLength];
+            var lowNrgFrame = new float[1];
             hbWeightLowBand(numHbSubframes, in.yPrePostfilter(), yWght, lowNrgFrame);
 
-            float[] hbLsfq = new float[HB_LPC_ORDER];
+            var hbLsfq = new float[HB_LPC_ORDER];
             hbLsfDequant(in.params().lsfIdx(), voiced, lowRateIx, hbLsfq);
 
-            float[][] aHb = new float[MAX_N_SUBFR][HB_LPC_ORDER + 1];
+            var aHb = new float[MAX_N_SUBFR][HB_LPC_ORDER + 1];
             hbLsfInterpolate(hbLsfq, in.lsfInterpolIdx(), numSubframes, aHb);
-            for (int sf = 0; sf < numSubframes; sf++) {
+            for (var sf = 0; sf < numSubframes; sf++) {
                 bweExpand(aHb[sf], HB_LPC_BWE);
             }
 
-            float[] hbGains = new float[MAX_HB_SUBFR];
+            var hbGains = new float[MAX_HB_SUBFR];
             hbGainDequant(in.params().gainQi(), voiced, lowRateIx, numHbSubframes, hbGains, yWght,
                     lowNrgFrame[0]);
 
-            float[] hbExcGains = new float[MAX_HB_SUBFR];
+            var hbExcGains = new float[MAX_HB_SUBFR];
             hbDecode(in.lpcRes(), voiced, in.codedAsActiveVoice() ? 1 : 0, in.nyquistGain(), numHbSubframes,
                     numSubframes, hbGains, aHb, frame, numFrames, yHb, TOT_POSTFILT_DELAY + frame * frameLength,
                     hbExcGains, lowRateIx);
         }
 
         // Recombine the 16 kHz low band with the high band, offset past the leading delay, into the 32 kHz signal.
-        float[] y32 = new float[2 * packetLen16];
+        var y32 = new float[2 * packetLen16];
         filterbankSynthesis(lowBand, 0, yHb, TOT_POSTFILT_DELAY, packetLen16, y32);
 
         if (apiSampleRateHz == 32000) {
-            short[] out = new short[2 * packetLen16];
+            var out = new short[2 * packetLen16];
             floatToInt16(y32, out, 2 * packetLen16);
             return out;
         }
         // Full band: 32 kHz to 48 kHz, chunked per 10 ms low band frame (640 samples at 32 kHz).
-        int outLen = 3 * packetLen16;
-        short[] out = new short[outLen];
+        var outLen = 3 * packetLen16;
+        var out = new short[outLen];
         upsample32To48Chunked(y32, 2 * packetLen16, out);
         return out;
     }
@@ -433,17 +434,17 @@ public final class MlowBandwidthExtension {
         if (frame == 0) {
             System.arraycopy(outState, 0, y, yOff - TOT_POSTFILT_DELAY, TOT_POSTFILT_DELAY);
         }
-        for (int i = 0; i < numHbSubframes; i++) {
+        for (var i = 0; i < numHbSubframes; i++) {
             // The pulse block starts at noiseOff; the HB_LPC_ORDER samples before it carry the AR filter state.
-            float[] noiseBuf = new float[HB_SF_LEN + HB_LPC_ORDER];
-            int noiseOff = HB_LPC_ORDER;
+            var noiseBuf = new float[HB_SF_LEN + HB_LPC_ORDER];
+            var noiseOff = HB_LPC_ORDER;
             genRandPulses(noiseBuf, noiseOff, HB_SF_LEN);
 
             if (codedAsActiveVoice != 0) {
-                float[] env = new float[HB_SF_LEN];
+                var env = new float[HB_SF_LEN];
                 envSmth = getEnv(exc, i * HB_SF_LEN, HB_SF_LEN,
                         voiced != 0 ? HB_SMTH_COEF_V : HB_SMTH_COEF_UV, envSmth, env);
-                for (int n = 0; n < HB_SF_LEN; n++) {
+                for (var n = 0; n < HB_SF_LEN; n++) {
                     noiseBuf[noiseOff + n] *= env[n];
                 }
             } else {
@@ -451,19 +452,19 @@ public final class MlowBandwidthExtension {
             }
 
             // The impulse starts at impulseOff; the leading samples are the zeroed AR filter state.
-            float[] impulseBuf = new float[HB_IMP_LEN + HB_LPC_ORDER];
-            int impulseOff = HB_LPC_ORDER;
+            var impulseBuf = new float[HB_IMP_LEN + HB_LPC_ORDER];
+            var impulseOff = HB_LPC_ORDER;
             impulseBuf[impulseOff] = 1.0f;
-            float[] aPtr = aHb[i * numFcbSubframes / numHbSubframes];
+            var aPtr = aHb[i * numFcbSubframes / numHbSubframes];
             Filters.ar4(impulseBuf, impulseOff, HB_IMP_LEN, aPtr, impulseBuf, impulseOff);
             // scratch holds the weighted impulse response used to estimate the gain normalization.
-            float[] scratch = new float[HB_IMP_LEN];
+            var scratch = new float[HB_IMP_LEN];
             ma3State(impulseBuf, impulseOff, HB_IMP_LEN, HB_WGHT_COEF, scratch);
-            float nrgGain = nrg(scratch, 0, HB_IMP_LEN);
-            float scale = (float) Math.sqrt(hbGains[i]
-                    / ((nrgGain * nrg(noiseBuf, noiseOff, HB_SF_LEN)) / HB_SF_LEN + 1e-12f) + 1e-30f);
+            var nrgGain = nrg(scratch, 0, HB_IMP_LEN);
+            var scale = (float) Math.sqrt(hbGains[i]
+                                          / ((nrgGain * nrg(noiseBuf, noiseOff, HB_SF_LEN)) / HB_SF_LEN + 1e-12f) + 1e-30f);
             scale *= nyquistGain;
-            for (int n = 0; n < HB_SF_LEN; n++) {
+            for (var n = 0; n < HB_SF_LEN; n++) {
                 noiseBuf[noiseOff + n] *= scale;
             }
             System.arraycopy(specEnvState, 0, noiseBuf, noiseOff - HB_LPC_ORDER, HB_LPC_ORDER);
@@ -508,14 +509,14 @@ public final class MlowBandwidthExtension {
      */
     private void hbGainDequant(int gainQi, int voiced, int lowRate, int numHbSubframes, float[] hbGains,
                                float[] yWght, float lowNrgFrame) {
-        int framelen20 = numHbSubframes == MAX_HB_SUBFR ? 1 : 0;
-        float[] cb = MlowHbTables.gainCb(framelen20, voiced, lowRate);
-        int cbBase = numHbSubframes * gainQi;
-        float pwr = MlowHbTables.gainPwr(framelen20, voiced, lowRate);
-        for (int i = 0; i < numHbSubframes; i++) {
-            float lowNrgSubframe = nrg(yWght, i * HB_SF_LEN, HB_SF_LEN) / HB_SF_LEN + 1e-12f;
+        var framelen20 = numHbSubframes == MAX_HB_SUBFR ? 1 : 0;
+        var cb = MlowHbTables.gainCb(framelen20, voiced, lowRate);
+        var cbBase = numHbSubframes * gainQi;
+        var pwr = MlowHbTables.gainPwr(framelen20, voiced, lowRate);
+        for (var i = 0; i < numHbSubframes; i++) {
+            var lowNrgSubframe = nrg(yWght, i * HB_SF_LEN, HB_SF_LEN) / HB_SF_LEN + 1e-12f;
             lowNrgSubframe = lowNrgSubframe * powfFast(lowNrgFrame / lowNrgSubframe, pwr);
-            float hbWghtNrg = Math.min(genExp(cb[cbBase + i], GEN_LOG_PWR), 2.0f);
+            var hbWghtNrg = Math.min(genExp(cb[cbBase + i], GEN_LOG_PWR), 2.0f);
             hbWghtNrg *= lowNrgSubframe;
             hbGains[i] = hbWghtNrg;
         }
@@ -535,11 +536,11 @@ public final class MlowBandwidthExtension {
      * @param lowNrgFrame     a one element array receiving the frame level weighted energy
      */
     private void hbWeightLowBand(int numHbSubframes, float[] xPrePostfilter, float[] yWght, float[] lowNrgFrame) {
-        int framelen = numHbSubframes * HB_SF_LEN;
+        var framelen = numHbSubframes * HB_SF_LEN;
         // The weighting filter needs LB_WGHT_LEN-1 leading history samples; this input array reserves that
         // many leading slots, swaps in lbWghtMem, filters, then restores.
-        int hist = LB_WGHT_LEN - 1;
-        float[] work = new float[hist + framelen];
+        var hist = LB_WGHT_LEN - 1;
+        var work = new float[hist + framelen];
         System.arraycopy(xPrePostfilter, 0, work, hist, framelen);
         System.arraycopy(lbWghtMem, 0, work, 0, hist);
         Filters.ma9(work, hist, framelen, LB_WGHT_COEF, yWght, 0);
@@ -556,8 +557,8 @@ public final class MlowBandwidthExtension {
      * @param lsf     the high band LSF output, {@value #HB_LPC_ORDER} entries
      */
     private void hbLsfDequant(int qi, int voiced, int lowRate, float[] lsf) {
-        float[] cb = MlowHbTables.lsfCb(voiced, lowRate);
-        for (int i = 0; i < HB_LPC_ORDER; i++) {
+        var cb = MlowHbTables.lsfCb(voiced, lowRate);
+        for (var i = 0; i < HB_LPC_ORDER; i++) {
             lsf[i] = cb[qi * HB_LPC_ORDER + i];
         }
     }
@@ -578,29 +579,29 @@ public final class MlowBandwidthExtension {
      * @param aHb          the per subframe high band LPC output, indexed {@code aHb[subframe][tap]}
      */
     private void hbLsfInterpolate(float[] lsf, int interpolIdx, int numSubframes, float[][] aHb) {
-        float[] interpol = MlowLsfInterpolTables.factors(interpolIdx, numSubframes);
+        var interpol = MlowLsfInterpolTables.factors(interpolIdx, numSubframes);
         if (hbLsfPrev[HB_LPC_ORDER - 1] == 0.0f) {
             System.arraycopy(lsf, 0, hbLsfPrev, 0, HB_LPC_ORDER);
         }
-        float[] ilsf = new float[HB_LPC_ORDER];
-        float prevFactor = -1.0f;
-        for (int j = 0; j < numSubframes; j++) {
-            float factor = interpol[j];
+        var ilsf = new float[HB_LPC_ORDER];
+        var prevFactor = -1.0f;
+        for (var j = 0; j < numSubframes; j++) {
+            var factor = interpol[j];
             if (factor == prevFactor) {
                 System.arraycopy(aHb[j - 1], 0, aHb[j], 0, HB_LPC_ORDER + 1);
             } else {
                 if (factor == 1.0f) {
                     System.arraycopy(lsf, 0, ilsf, 0, HB_LPC_ORDER);
                 } else {
-                    float oneMinus = 1.0f - factor;
-                    for (int i = 0; i < HB_LPC_ORDER; i++) {
+                    var oneMinus = 1.0f - factor;
+                    for (var i = 0; i < HB_LPC_ORDER; i++) {
                         ilsf[i] = hbLsfPrev[i] * oneMinus;
                     }
-                    for (int i = 0; i < HB_LPC_ORDER; i++) {
+                    for (var i = 0; i < HB_LPC_ORDER; i++) {
                         ilsf[i] += factor * lsf[i];
                     }
                 }
-                float[] a = nlsf2aStabilize(ilsf);
+                var a = nlsf2aStabilize(ilsf);
                 System.arraycopy(a, 0, aHb[j], 0, HB_LPC_ORDER + 1);
             }
             prevFactor = factor;
@@ -618,7 +619,7 @@ public final class MlowBandwidthExtension {
      * @return a freshly allocated stabilized high band LPC filter, {@value #HB_LPC_ORDER}{@code  + 1} taps
      */
     private static float[] nlsf2aStabilize(float[] ilsf) {
-        float[] a = NlsfBridge.nlsf2a(ilsf, HB_LPC_ORDER);
+        var a = NlsfBridge.nlsf2a(ilsf, HB_LPC_ORDER);
         stabilize(a);
         return a;
     }
@@ -635,7 +636,7 @@ public final class MlowBandwidthExtension {
         if (isStable(a)) {
             return;
         }
-        int iter = 0;
+        var iter = 0;
         do {
             iter++;
             bweExpand(a, 1.0f - iter * 0.001f);
@@ -653,13 +654,13 @@ public final class MlowBandwidthExtension {
      */
     private static void bweExpand(float[] a, float bwe) {
         if (bwe <= 0.0f) {
-            for (int i = 1; i < HB_LPC_ORDER + 1; i++) {
+            for (var i = 1; i < HB_LPC_ORDER + 1; i++) {
                 a[i] = 0.0f;
             }
             return;
         }
-        float c = bwe;
-        for (int i = 1; i < HB_LPC_ORDER + 1; i++) {
+        var c = bwe;
+        for (var i = 1; i < HB_LPC_ORDER + 1; i++) {
             a[i] *= c;
             c *= bwe;
         }
@@ -676,23 +677,23 @@ public final class MlowBandwidthExtension {
      * @return {@code true} when the filter is stable
      */
     private static boolean isStable(float[] a) {
-        final float maxRcStable = 0.9995f;
+        final var maxRcStable = 0.9995f;
         if (a[HB_LPC_ORDER] * a[HB_LPC_ORDER] > maxRcStable) {
             return false;
         }
-        double[] a0 = new double[HB_LPC_ORDER];
-        double[] a1 = new double[HB_LPC_ORDER];
-        for (int i = 0; i < HB_LPC_ORDER; i++) {
+        var a0 = new double[HB_LPC_ORDER];
+        var a1 = new double[HB_LPC_ORDER];
+        for (var i = 0; i < HB_LPC_ORDER; i++) {
             a0[i] = a[i + 1];
         }
-        int m = HB_LPC_ORDER - 1;
+        var m = HB_LPC_ORDER - 1;
         while (true) {
-            double den = 1.0 - a0[m] * a0[m];
+            var den = 1.0 - a0[m] * a0[m];
             if (den == 0.0) {
                 return false;
             }
-            double invDen = 1.0 / den;
-            for (int k = 0; k < m; k++) {
+            var invDen = 1.0 / den;
+            for (var k = 0; k < m; k++) {
                 a1[k] = (a0[k] - a0[m] * a0[m - k - 1]) * invDen;
             }
             if (a1[m - 1] * a1[m - 1] > maxRcStable) {
@@ -706,7 +707,7 @@ public final class MlowBandwidthExtension {
                 return false;
             }
             invDen = 1.0 / den;
-            for (int k = 0; k < m; k++) {
+            for (var k = 0; k < m; k++) {
                 a0[k] = (a1[k] - a1[m] * a1[m - k - 1]) * invDen;
             }
             if (a0[m - 1] * a0[m - 1] > maxRcStable) {
@@ -733,19 +734,19 @@ public final class MlowBandwidthExtension {
      * @param y     the interleaved 32 kHz output, {@code 2 * len} samples
      */
     private void filterbankSynthesis(float[] xL, int xLOff, float[] xH, int xHOff, int len, float[] y) {
-        float[] sum = new float[len];
-        float[] diff = new float[len];
-        float[] out0 = new float[len];
-        float[] out1 = new float[len];
-        for (int i = 0; i < len; i++) {
+        var sum = new float[len];
+        var diff = new float[len];
+        var out0 = new float[len];
+        var out1 = new float[len];
+        for (var i = 0; i < len; i++) {
             sum[i] = xL[xLOff + i] + xH[xHOff + i];
         }
         Filters.allpass2(sum, 0, len, FILTERBANK_L_COEF, filterbankSynState, 0, out0, 0);
-        for (int i = 0; i < len; i++) {
+        for (var i = 0; i < len; i++) {
             diff[i] = xL[xLOff + i] - xH[xHOff + i];
         }
         Filters.allpass2(diff, 0, len, FILTERBANK_H_COEF, filterbankSynState, 4, out1, 0);
-        for (int i = 0; i < len; i++) {
+        for (var i = 0; i < len; i++) {
             y[2 * i] = out0[i];
             y[2 * i + 1] = out1[i];
         }
@@ -763,12 +764,12 @@ public final class MlowBandwidthExtension {
      * @param out the {@code int16} 48 kHz output, {@code 3 * len / 2} samples
      */
     private void upsample32To48Chunked(float[] y32, int len, short[] out) {
-        int numChunks = len / FRAME_LEN;
-        int y32Off = 0;
-        int outOff = 0;
-        float[] resampled = new float[3 * FRAME_LEN / 2];
-        short[] chunkOut = new short[3 * FRAME_LEN / 2];
-        for (int i = 0; i < numChunks; i++) {
+        var numChunks = len / FRAME_LEN;
+        var y32Off = 0;
+        var outOff = 0;
+        var resampled = new float[3 * FRAME_LEN / 2];
+        var chunkOut = new short[3 * FRAME_LEN / 2];
+        for (var i = 0; i < numChunks; i++) {
             upsample32To48(y32, y32Off, FRAME_LEN, resampled);
             floatToInt16(resampled, chunkOut, 3 * FRAME_LEN / 2);
             System.arraycopy(chunkOut, 0, out, outOff, 3 * FRAME_LEN / 2);
@@ -791,12 +792,12 @@ public final class MlowBandwidthExtension {
      * @param y     the 48 kHz output, {@code 3 * xLen / 2} samples
      */
     private void upsample32To48(float[] x, int xOff, int xLen, float[] y) {
-        int extra = FIR_N_32_48 - UP_2X_STATE_LEN;
-        float[] xtmp = new float[2 * xLen + extra];
+        var extra = FIR_N_32_48 - UP_2X_STATE_LEN;
+        var xtmp = new float[2 * xLen + extra];
         up2xFast(x, xOff, xLen, up3248State, xtmp, extra, 2 * xLen);
         System.arraycopy(up3248State, UP_2X_STATE_LEN, xtmp, 0, extra);
         System.arraycopy(xtmp, 2 * xLen, up3248State, UP_2X_STATE_LEN, extra);
-        for (int i = 0; i < xLen / 2; i++) {
+        for (var i = 0; i < xLen / 2; i++) {
             y[3 * i] = dotProd3248(xtmp, 4 * i, FIR_COEFS_32_48[0]);
             y[3 * i + 1] = dotProd3248(xtmp, 4 * i + 1, FIR_COEFS_32_48[1]);
             y[3 * i + 2] = dotProd3248(xtmp, 4 * i + 2, FIR_COEFS_32_48[2]);
@@ -819,21 +820,21 @@ public final class MlowBandwidthExtension {
      * @param yLen   the output length, {@code 2 * xLen}
      */
     private void up2xFast(float[] x, int xOff, int xLen, float[] state, float[] y, int yOff, int yLen) {
-        float statea = state[0];
-        float stateb = state[1];
-        float ca = AP_COEFS_32_48[0];
-        float cb = AP_COEFS_32_48[1];
-        float ca2 = ca * ca;
-        float cb2 = cb * cb;
-        float ca3 = ca + ca2;
-        float cb3 = cb + cb2;
-        for (int i = 0; i < xLen; i += 2) {
-            float x0 = x[xOff + i];
-            float x1 = x[xOff + i + 1];
-            float tmpa0 = ca * (x0 - statea);
-            float tmpb0 = cb * (x0 - stateb);
-            float tmpa1 = ca * x1 - ca3 * x0 + ca2 * statea;
-            float tmpb1 = cb * x1 - cb3 * x0 + cb2 * stateb;
+        var statea = state[0];
+        var stateb = state[1];
+        var ca = AP_COEFS_32_48[0];
+        var cb = AP_COEFS_32_48[1];
+        var ca2 = ca * ca;
+        var cb2 = cb * cb;
+        var ca3 = ca + ca2;
+        var cb3 = cb + cb2;
+        for (var i = 0; i < xLen; i += 2) {
+            var x0 = x[xOff + i];
+            var x1 = x[xOff + i + 1];
+            var tmpa0 = ca * (x0 - statea);
+            var tmpb0 = cb * (x0 - stateb);
+            var tmpa1 = ca * x1 - ca3 * x0 + ca2 * statea;
+            var tmpb1 = cb * x1 - cb3 * x0 + cb2 * stateb;
             y[yOff + 2 * i] = statea + tmpa0;
             y[yOff + 2 * i + 1] = stateb + tmpb0;
             y[yOff + 2 * i + 2] = x0 + tmpa0 + tmpa1;
@@ -854,8 +855,8 @@ public final class MlowBandwidthExtension {
      * @return the filtered sample
      */
     private static float dotProd3248(float[] a, int aOff, float[] coefs) {
-        float ret = 0.0f;
-        for (int i = 0; i < FIR_N_32_48; i++) {
+        var ret = 0.0f;
+        for (var i = 0; i < FIR_N_32_48; i++) {
             ret += a[aOff + i] * coefs[i];
         }
         return ret;
@@ -882,7 +883,7 @@ public final class MlowBandwidthExtension {
      * @param length   the block length
      */
     private void genRandPulses(float[] noise, int noiseOff, int length) {
-        int i = 0;
+        var i = 0;
         for (; i < length - 3; i += 4) {
             randSeed = RAND_INCREMENT + randSeed * RAND_MULTIPLIER;
             noise[noiseOff + i] = 8.1e-10f * (float) randSeed;
@@ -913,16 +914,16 @@ public final class MlowBandwidthExtension {
      */
     private static float getEnv(float[] exc, int excOff, int len, float smthCoef, float smthState, float[] env) {
         smthCoef *= smthCoef;
-        float state = smthState + 1e-8f;
+        var state = smthState + 1e-8f;
         state *= state;
-        float gainCoef = 1.0f - smthCoef;
-        float smthCoef2 = smthCoef * smthCoef;
-        float gainSmthCoef = gainCoef * smthCoef;
-        for (int i = 0; i < len - 3; i += 4) {
-            float tmp0 = exc[excOff + i] * exc[excOff + i] + exc[excOff + i + 1] * exc[excOff + i + 1];
-            float tmp1 = exc[excOff + i + 2] * exc[excOff + i + 2] + exc[excOff + i + 3] * exc[excOff + i + 3];
-            float y1 = gainCoef * tmp1 + gainSmthCoef * tmp0 + smthCoef2 * state;
-            float y0 = gainCoef * tmp0 + smthCoef * state;
+        var gainCoef = 1.0f - smthCoef;
+        var smthCoef2 = smthCoef * smthCoef;
+        var gainSmthCoef = gainCoef * smthCoef;
+        for (var i = 0; i < len - 3; i += 4) {
+            var tmp0 = exc[excOff + i] * exc[excOff + i] + exc[excOff + i + 1] * exc[excOff + i + 1];
+            var tmp1 = exc[excOff + i + 2] * exc[excOff + i + 2] + exc[excOff + i + 3] * exc[excOff + i + 3];
+            var y1 = gainCoef * tmp1 + gainSmthCoef * tmp0 + smthCoef2 * state;
+            var y0 = gainCoef * tmp0 + smthCoef * state;
             env[i] = env[i + 1] = (float) Math.sqrt(y0);
             env[i + 2] = env[i + 3] = (float) Math.sqrt(y1);
             state = y1;
@@ -939,8 +940,8 @@ public final class MlowBandwidthExtension {
      * @return the sum of squares
      */
     private static float nrg(float[] x, int off, int n) {
-        float nrg = 0.0f;
-        for (int i = 0; i < n; i++) {
+        var nrg = 0.0f;
+        for (var i = 0; i < n; i++) {
             nrg += x[off + i] * x[off + i];
         }
         return nrg;
@@ -971,8 +972,8 @@ public final class MlowBandwidthExtension {
      * @return the approximate {@code a} raised to {@code b}
      */
     private static float powfFast(float a, float b) {
-        int x = Float.floatToRawIntBits(a);
-        int mapped = (int) (b * (x - 1064866805) + 1064866805.0f);
+        var x = Float.floatToRawIntBits(a);
+        var mapped = (int) (b * (x - 1064866805) + 1064866805.0f);
         return Float.intBitsToFloat(mapped);
     }
 
@@ -995,8 +996,8 @@ public final class MlowBandwidthExtension {
      * @param n the count
      */
     private static void floatToInt16(float[] x, short[] y, int n) {
-        for (int i = 0; i < n; i++) {
-            float v = x[i] * 32767.0f;
+        for (var i = 0; i < n; i++) {
+            var v = x[i] * 32767.0f;
             if (v > 32767.0f) {
                 v = 32767.0f;
             } else if (v < -32767.0f) {

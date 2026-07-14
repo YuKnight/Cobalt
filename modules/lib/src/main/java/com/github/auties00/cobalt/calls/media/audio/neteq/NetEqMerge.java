@@ -67,13 +67,13 @@ public final class NetEqMerge {
      */
     static void rampSingle(short[] out, int outPos, short[] in, int inPos, int length, int increment,
                            int[] weightState) {
-        int weight = weightState[0] & 0xFFFF;
-        int q20 = (weight << 6) | 32;
-        for (int i = 0; i < length; i++) {
-            int blended = (in[inPos + i] * (weight & 0xFFFF) - (-8192)) >>> 14;
+        var weight = weightState[0] & 0xFFFF;
+        var q20 = (weight << 6) | 32;
+        for (var i = 0; i < length; i++) {
+            var blended = (in[inPos + i] * (weight & 0xFFFF) - (-8192)) >>> 14;
             out[outPos + i] = (short) blended;
             q20 = Math.max(increment + q20, 0);
-            int next = q20 >>> 6;
+            var next = q20 >>> 6;
             weight = Integer.compareUnsigned(next, 16384) >= 0 ? 16384 : next;
         }
         weightState[0] = weight;
@@ -105,11 +105,11 @@ public final class NetEqMerge {
      */
     static void rampBlend(short[] out, int outPos, short[] expanded, int expandedPos, short[] decoded,
                           int decodedPos, int length, int increment, int[] weightState) {
-        int weight = weightState[0] & 0xFFFF;
-        int complement = 16384 - weight;
-        for (int i = 0; i < length; i++) {
-            int blended = (expanded[expandedPos + i] * (short) weight
-                    + decoded[decodedPos + i] * (short) complement - (-8192)) >>> 14;
+        var weight = weightState[0] & 0xFFFF;
+        var complement = 16384 - weight;
+        for (var i = 0; i < length; i++) {
+            var blended = (expanded[expandedPos + i] * (short) weight
+                           + decoded[decodedPos + i] * (short) complement - (-8192)) >>> 14;
             out[outPos + i] = (short) blended;
             complement += increment;
             weight -= increment;
@@ -151,33 +151,33 @@ public final class NetEqMerge {
      */
     static int signalScaling(short[] expanded, short[] decoded, int decodedLength, int fsMult,
                              int expandWeight) {
-        int energyLength = Math.min(fsMult << 6, decodedLength);
-        int expandedMaxAbs = NetEqSignalProcessing.maxAbs16(expanded, 0, energyLength);
-        int decodedMaxAbs = NetEqSignalProcessing.maxAbs16(decoded, 0, energyLength);
-        int overflowDivisor = Integer.MAX_VALUE / energyLength;
+        var energyLength = Math.min(fsMult << 6, decodedLength);
+        var expandedMaxAbs = NetEqSignalProcessing.maxAbs16(expanded, 0, energyLength);
+        var decodedMaxAbs = NetEqSignalProcessing.maxAbs16(decoded, 0, energyLength);
+        var overflowDivisor = Integer.MAX_VALUE / energyLength;
 
-        int expandedShift = energyShift((expandedMaxAbs * expandedMaxAbs) / overflowDivisor);
-        int expandedEnergy = dotProductWithScale(expanded, expanded, energyLength, expandedShift);
-        int decodedShift = energyShift((decodedMaxAbs * decodedMaxAbs) / overflowDivisor);
-        int decodedEnergy = dotProductWithScale(decoded, decoded, energyLength, decodedShift);
+        var expandedShift = energyShift((expandedMaxAbs * expandedMaxAbs) / overflowDivisor);
+        var expandedEnergy = dotProductWithScale(expanded, expanded, energyLength, expandedShift);
+        var decodedShift = energyShift((decodedMaxAbs * decodedMaxAbs) / overflowDivisor);
+        var decodedEnergy = dotProductWithScale(decoded, decoded, energyLength, decodedShift);
 
-        int scale = 16384;
-        int diffDec = expandedShift - decodedShift;
-        int selDec = Integer.compareUnsigned(diffDec, expandedShift) <= 0 ? diffDec : 0;
-        int decodedAligned = decodedEnergy >> selDec;
-        int diffExp = decodedShift - expandedShift;
-        int selExp = Integer.compareUnsigned(diffExp, decodedShift) <= 0 ? diffExp : 0;
-        int expandedAligned = expandedEnergy >> selExp;
+        var scale = 16384;
+        var diffDec = expandedShift - decodedShift;
+        var selDec = Integer.compareUnsigned(diffDec, expandedShift) <= 0 ? diffDec : 0;
+        var decodedAligned = decodedEnergy >> selDec;
+        var diffExp = decodedShift - expandedShift;
+        var selExp = Integer.compareUnsigned(diffExp, decodedShift) <= 0 ? diffExp : 0;
+        var expandedAligned = expandedEnergy >> selExp;
 
         if (decodedAligned > expandedAligned) {
-            int norm = decodedAligned == 0
+            var norm = decodedAligned == 0
                     ? 0 : Integer.numberOfLeadingZeros(decodedAligned ^ (decodedAligned >> 31)) - 1;
-            int numerator = norm > 2 ? expandedAligned >> (3 - norm) : expandedAligned << (norm - 3);
-            int denominator = norm > 16 ? decodedAligned >> (17 - norm) : decodedAligned << (norm - 17);
+            var numerator = norm > 2 ? expandedAligned >> (3 - norm) : expandedAligned << (norm - 3);
+            var denominator = norm > 16 ? decodedAligned >> (17 - norm) : decodedAligned << (norm - 17);
             scale = NetEqSignalProcessing.sqrtFloor((numerator / denominator) << 14);
         }
 
-        int clamped = Math.min(scale, 16384);
+        var clamped = Math.min(scale, 16384);
         return Math.max(clamped, expandWeight);
     }
 
@@ -218,8 +218,8 @@ public final class NetEqMerge {
      * @return the scaled energy
      */
     private static int dotProductWithScale(short[] a, short[] b, int length, int shift) {
-        int sum = 0;
-        for (int i = 0; i < length; i++) {
+        var sum = 0;
+        for (var i = 0; i < length; i++) {
             sum += (a[i] * b[i]) >> shift;
         }
         return sum;

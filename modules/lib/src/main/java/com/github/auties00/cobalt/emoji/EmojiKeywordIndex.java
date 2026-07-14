@@ -53,14 +53,14 @@ final class EmojiKeywordIndex {
     static EmojiKeywordIndex load(String tag) {
         record Entry(String keyword, WhatsAppEmoji[] emojis) {
         }
-        try (DataInputStream in = EmojiResources.open("emoji_keywords_" + tag + ".bin")) {
-            int count = in.readInt();
+        try (var in = EmojiResources.open("emoji_keywords_" + tag + ".bin")) {
+            var count = in.readInt();
             List<Entry> entries = new ArrayList<>(count);
-            for (int i = 0; i < count; i++) {
-                String keyword = EmojiResources.readString(in).toLowerCase(Locale.ROOT);
-                int values = in.readInt();
+            for (var i = 0; i < count; i++) {
+                var keyword = EmojiResources.readString(in).toLowerCase(Locale.ROOT);
+                var values = in.readInt();
                 Set<WhatsAppEmoji> resolved = new LinkedHashSet<>();
-                for (int j = 0; j < values; j++) {
+                for (var j = 0; j < values; j++) {
                     WhatsAppEmoji.of(EmojiResources.readString(in)).ifPresent(resolved::add);
                 }
                 if (!resolved.isEmpty()) {
@@ -68,9 +68,9 @@ final class EmojiKeywordIndex {
                 }
             }
             entries.sort(Comparator.comparing(Entry::keyword));
-            String[] keywords = new String[entries.size()];
-            WhatsAppEmoji[][] emojis = new WhatsAppEmoji[entries.size()][];
-            for (int i = 0; i < entries.size(); i++) {
+            var keywords = new String[entries.size()];
+            var emojis = new WhatsAppEmoji[entries.size()][];
+            for (var i = 0; i < entries.size(); i++) {
                 keywords[i] = entries.get(i).keyword();
                 emojis[i] = entries.get(i).emojis();
             }
@@ -91,7 +91,7 @@ final class EmojiKeywordIndex {
         if (prefix.isEmpty()) {
             return;
         }
-        for (int i = lowerBound(prefix); i < keywords.length && keywords[i].startsWith(prefix); i++) {
+        for (var i = lowerBound(prefix); i < keywords.length && keywords[i].startsWith(prefix); i++) {
             Collections.addAll(out, emojis[i]);
         }
     }
@@ -103,10 +103,10 @@ final class EmojiKeywordIndex {
      * @return the lower-bound index into {@link #keywords}
      */
     private int lowerBound(String prefix) {
-        int low = 0;
-        int high = keywords.length;
+        var low = 0;
+        var high = keywords.length;
         while (low < high) {
-            int mid = (low + high) >>> 1;
+            var mid = (low + high) >>> 1;
             if (keywords[mid].compareTo(prefix) < 0) {
                 low = mid + 1;
             } else {

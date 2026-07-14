@@ -120,28 +120,28 @@ public final class NrgResQuantizer {
      * @throws IllegalArgumentException if {@code numSubfr} is not 1, 2, or 4
      */
     public Result quantize(float[] nrgres, int numSubfr) {
-        int tableIx = numSubfrToIdx(numSubfr);
+        var tableIx = numSubfrToIdx(numSubfr);
 
-        float nrgresFrameDb = 0.0f;
-        float[] nrgresDb = new float[numSubfr];
-        for (int i = 0; i < numSubfr; i++) {
+        var nrgresFrameDb = 0.0f;
+        var nrgresDb = new float[numSubfr];
+        for (var i = 0; i < numSubfr; i++) {
             nrgresDb[i] = Math.min(10.0f * log10f(nrgres[i] + RES_NRG_BIAS), NrgResTables.RES_NRG_MAX_DB);
             nrgresFrameDb += nrgresDb[i];
         }
         nrgresFrameDb /= numSubfr;
 
-        int stepQ14 = NrgResTables.NRG_STEP_DB_Q14[tableIx] & 0xFFFF;
-        int frameQi = roundfAwayFromZero(
+        var stepQ14 = NrgResTables.NRG_STEP_DB_Q14[tableIx] & 0xFFFF;
+        var frameQi = roundfAwayFromZero(
                 (nrgresFrameDb - NrgResTables.RES_NRG_MIN_DB) / (Q14_SCALE * stepQ14));
 
-        int frameDbqQ14 = frameQi * stepQ14;
+        var frameDbqQ14 = frameQi * stepQ14;
         frameDbqQ14 += NrgResTables.RES_NRG_MIN_DB << 14;
 
-        for (int i = 0; i < numSubfr; i++) {
+        for (var i = 0; i < numSubfr; i++) {
             nrgresDb[i] -= frameDbqQ14 * Q14_SCALE;
         }
 
-        int[] dbqQ14 = new int[numSubfr];
+        var dbqQ14 = new int[numSubfr];
         if (numSubfr == 1) {
             dbqQ14[0] = frameDbqQ14;
             if (Log.TRACE) {
@@ -150,14 +150,14 @@ public final class NrgResQuantizer {
             return new Result(frameQi, 0, dbqQ14);
         }
 
-        short[] cb = numSubfr == 4 ? NrgResTables.SHAPE_CB_4_Q10 : NrgResTables.SHAPE_CB_2_Q10;
-        int nVecs = cb.length / numSubfr;
-        float bestRd = 1e30f;
-        int shapeQi = 0;
-        for (int n = 0; n < nVecs; n++) {
-            float rd = 0.0f;
-            for (int i = 0; i < numSubfr; i++) {
-                float d = nrgresDb[i] - cb[n * numSubfr + i] * Q10_SCALE;
+        var cb = numSubfr == 4 ? NrgResTables.SHAPE_CB_4_Q10 : NrgResTables.SHAPE_CB_2_Q10;
+        var nVecs = cb.length / numSubfr;
+        var bestRd = 1e30f;
+        var shapeQi = 0;
+        for (var n = 0; n < nVecs; n++) {
+            var rd = 0.0f;
+            for (var i = 0; i < numSubfr; i++) {
+                var d = nrgresDb[i] - cb[n * numSubfr + i] * Q10_SCALE;
                 rd += d * d;
             }
             if (rd < bestRd) {
@@ -166,7 +166,7 @@ public final class NrgResQuantizer {
             }
         }
 
-        for (int i = 0; i < numSubfr; i++) {
+        for (var i = 0; i < numSubfr; i++) {
             dbqQ14[i] = frameDbqQ14 + cb[shapeQi * numSubfr + i] * 16;
         }
         if (Log.TRACE) {

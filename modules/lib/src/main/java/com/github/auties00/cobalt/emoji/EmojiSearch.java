@@ -64,14 +64,14 @@ final class EmojiSearch {
          * @throws UncheckedIOException if the resource cannot be read
          */
         private static List<String> load() {
-            try (InputStream in = EmojiResources.class.getResourceAsStream("emoji_keywords.index")) {
+            try (var in = EmojiResources.class.getResourceAsStream("emoji_keywords.index")) {
                 if (in == null) {
                     return List.of();
                 }
-                String text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                var text = new String(in.readAllBytes(), StandardCharsets.UTF_8);
                 List<String> tags = new ArrayList<>();
-                for (String line : text.split("\n")) {
-                    String tag = line.strip();
+                for (var line : text.split("\n")) {
+                    var tag = line.strip();
                     if (!tag.isEmpty()) {
                         tags.add(tag);
                     }
@@ -106,13 +106,13 @@ final class EmojiSearch {
          * @throws UncheckedIOException if the resource cannot be read
          */
         private static Map<WhatsAppEmoji, Integer> load() {
-            try (DataInputStream in = EmojiResources.openOptional("emoji_popular.bin")) {
+            try (var in = EmojiResources.openOptional("emoji_popular.bin")) {
                 if (in == null) {
                     return Map.of();
                 }
-                int count = in.readInt();
+                var count = in.readInt();
                 Map<WhatsAppEmoji, Integer> ranks = HashMap.newHashMap(count);
-                for (int i = 0; i < count; i++) {
+                for (var i = 0; i < count; i++) {
                     WhatsAppEmoji.of(EmojiResources.readString(in))
                             .ifPresent(emoji -> ranks.putIfAbsent(emoji, ranks.size()));
                 }
@@ -134,20 +134,20 @@ final class EmojiSearch {
         if (query == null || query.isBlank()) {
             return List.of();
         }
-        EmojiKeywordIndex index = indexFor(locale);
+        var index = indexFor(locale);
         if (index == null) {
             return List.of();
         }
 
         Map<WhatsAppEmoji, Integer> counts = new HashMap<>();
         Set<WhatsAppEmoji> wordMatches = new HashSet<>();
-        for (String word : query.strip().toLowerCase(Locale.ROOT).split("\\s+")) {
+        for (var word : query.strip().toLowerCase(Locale.ROOT).split("\\s+")) {
             if (word.isEmpty()) {
                 continue;
             }
             wordMatches.clear();
             index.collectPrefix(word, wordMatches);
-            for (WhatsAppEmoji emoji : wordMatches) {
+            for (var emoji : wordMatches) {
                 counts.merge(emoji, 1, Integer::sum);
             }
         }
@@ -170,7 +170,7 @@ final class EmojiSearch {
      * @return the keyword index, or {@code null} when no dictionary is available
      */
     private static EmojiKeywordIndex indexFor(Locale locale) {
-        String tag = resolveTag(locale);
+        var tag = resolveTag(locale);
         return tag == null ? null : INDICES.computeIfAbsent(tag, EmojiKeywordIndex::load);
     }
 
@@ -183,14 +183,14 @@ final class EmojiSearch {
      * @return the resolved tag, or {@code null} when no dictionary is available
      */
     private static String resolveTag(Locale locale) {
-        List<String> available = Tags.AVAILABLE;
+        var available = Tags.AVAILABLE;
         if (available.isEmpty()) {
             return null;
         }
-        String language = locale.getLanguage();
-        String country = locale.getCountry();
+        var language = locale.getLanguage();
+        var country = locale.getCountry();
         if (!country.isEmpty()) {
-            String exact = language + "_" + country;
+            var exact = language + "_" + country;
             if (available.contains(exact)) {
                 return exact;
             }
@@ -198,8 +198,8 @@ final class EmojiSearch {
         if (available.contains(language)) {
             return language;
         }
-        String prefix = language + "_";
-        for (String tag : available) {
+        var prefix = language + "_";
+        for (var tag : available) {
             if (tag.startsWith(prefix)) {
                 return tag;
             }

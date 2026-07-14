@@ -30,19 +30,19 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * {@snippet :
  *   try (var fcm = FcmClient.newSession()) {
- *       fcm.authenticate(device);                // device.platform() picks WA personal vs business
- *       String pushToken = fcm.getPushToken();   // hand to /v2/exist
- *       FcmSession saved = fcm.getSession();     // persist this somewhere
- *       String code = fcm.getPushCode();         // blocks for the push
- *   }
+ *     fcm.authenticate(device);                // device.platform() picks WA personal vs business
+ *     String pushToken = fcm.getPushToken();   // hand to /v2/exist
+ *     FcmSession saved = fcm.getSession();     // persist this somewhere
+ *     var code = fcm.getPushCode();         // blocks for the push
+ * }
  * }
  *
  * <p>Subsequent runs skip the registration:
  *
  * {@snippet :
  *   try (var fcm = FcmClient.loadSession(saved)) {
- *       String code = fcm.getPushCode();
- *   }
+ *     var code = fcm.getPushCode();
+ * }
  * }
  */
 public final class FcmClient implements LinkedWhatsAppClientDevicePushClient, AutoCloseable {

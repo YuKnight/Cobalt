@@ -44,11 +44,11 @@ public final class MlowEntropyWrapper {
      * @return the decoded symbol index in {@code [0, cmf.length - 1)}
      */
     public static int decodeUpdate(MlowRangeDecoder decoder, int[] cmf) {
-        int last = cmf.length - 1;
-        long base = cmf[0] & 0xFFFFFFFFL;
-        long total = (cmf[last] & 0xFFFFFFFFL) - base;
-        long cmfLow = decoder.decode(total) + base;
-        int s = 0;
+        var last = cmf.length - 1;
+        var base = cmf[0] & 0xFFFFFFFFL;
+        var total = (cmf[last] & 0xFFFFFFFFL) - base;
+        var cmfLow = decoder.decode(total) + base;
+        var s = 0;
         for (; s < last; s++) {
             if (Long.compareUnsigned(cmfLow, cmf[s + 1] & 0xFFFFFFFFL) < 0) {
                 break;
@@ -78,11 +78,11 @@ public final class MlowEntropyWrapper {
      * @return the decoded symbol index in {@code [0, len - 1)}, relative to the window start
      */
     public static int decodeUpdate(MlowRangeDecoder decoder, int[] cmf, int offset, int len) {
-        int last = offset + len - 1;
-        long base = cmf[offset] & 0xFFFFFFFFL;
-        long total = (cmf[last] & 0xFFFFFFFFL) - base;
-        long cmfLow = decoder.decode(total) + base;
-        int s = offset;
+        var last = offset + len - 1;
+        var base = cmf[offset] & 0xFFFFFFFFL;
+        var total = (cmf[last] & 0xFFFFFFFFL) - base;
+        var cmfLow = decoder.decode(total) + base;
+        var s = offset;
         for (; s < last; s++) {
             if (Long.compareUnsigned(cmfLow, cmf[s + 1] & 0xFFFFFFFFL) < 0) {
                 break;
@@ -104,7 +104,7 @@ public final class MlowEntropyWrapper {
      * @return the decoded value in {@code [0, n)}
      */
     public static int decodeUniform(MlowRangeDecoder decoder, int n) {
-        long cmfLow = decoder.decode(n);
+        var cmfLow = decoder.decode(n);
         decoder.update(cmfLow, cmfLow + 1, n);
         return (int) cmfLow;
     }
@@ -123,9 +123,9 @@ public final class MlowEntropyWrapper {
      * @param s       the symbol index to encode, in {@code [0, cmf.length - 1)}
      */
     public static void encodeUpdate(MlowRangeEncoder encoder, int[] cmf, int s) {
-        int last = cmf.length - 1;
-        long base = cmf[0] & 0xFFFFFFFFL;
-        long total = (cmf[last] & 0xFFFFFFFFL) - base;
+        var last = cmf.length - 1;
+        var base = cmf[0] & 0xFFFFFFFFL;
+        var total = (cmf[last] & 0xFFFFFFFFL) - base;
         encoder.encode((cmf[s] & 0xFFFFFFFFL) - base, (cmf[s + 1] & 0xFFFFFFFFL) - base, total);
     }
 

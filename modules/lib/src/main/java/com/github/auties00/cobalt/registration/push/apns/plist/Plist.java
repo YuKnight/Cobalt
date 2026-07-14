@@ -22,7 +22,7 @@ import java.lang.System.Logger.Level;
  * format-detection logic in one place, so adding a future format (for example
  * {@code bplist15} or OpenStep) is a single edit here. The package exposes only this
  * type and the
- * {@link com.github.auties00.cobalt.registration.push.apns.plist.value.PlistValue}
+ * {@link PlistValue}
  * value hierarchy.
  */
 public final class Plist {

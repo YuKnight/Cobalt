@@ -92,18 +92,18 @@ final class HarmonicPostfilterTables {
      */
     private HarmonicPostfilterTables() {
         this.lpFilters = new float[NUM_LP_FILT][FILTER_LEN];
-        float[] filtWin = new float[FB_DELAY];
-        float dOmega = HALF_PI / (FB_DELAY + 1.0f);
-        float omega = dOmega;
-        for (int i = 0; i < FB_DELAY; i++) {
+        var filtWin = new float[FB_DELAY];
+        var dOmega = HALF_PI / (FB_DELAY + 1.0f);
+        var omega = dOmega;
+        for (var i = 0; i < FB_DELAY; i++) {
             filtWin[i] = (float) Math.cos(omega) / (i + 1);
             omega += dOmega;
         }
-        int ixPrev = -1;
-        for (int lag = MIN_PITCH_LAG; lag <= MAX_PITCH_LAG; lag++) {
-            int ix = lagToFiltIx(lag);
+        var ixPrev = -1;
+        for (var lag = MIN_PITCH_LAG; lag <= MAX_PITCH_LAG; lag++) {
+            var ix = lagToFiltIx(lag);
             if (ix != ixPrev) {
-                float omega0 = 2.0f * PI / lag;
+                var omega0 = 2.0f * PI / lag;
                 createLpFilter(omega0, filtWin, lpFilters[ix]);
                 ixPrev = ix;
             }
@@ -145,11 +145,11 @@ final class HarmonicPostfilterTables {
      * @param bLP     the output filter row of length {@value #FILTER_LEN}; filled in place
      */
     private static void createLpFilter(float omega0, float[] filtWin, float[] bLP) {
-        float omegaC = Math.min(omega0 * NHARM_CUTOFF, CUTOFF_HZ / 16000.0f * PI);
-        float sumB = 0.0f;
-        float omegaCSum = omegaC;
-        for (int i = 0; i < FB_DELAY; i++) {
-            float b = filtWin[i] * (float) Math.sin(omegaCSum);
+        var omegaC = Math.min(omega0 * NHARM_CUTOFF, CUTOFF_HZ / 16000.0f * PI);
+        var sumB = 0.0f;
+        var omegaCSum = omegaC;
+        for (var i = 0; i < FB_DELAY; i++) {
+            var b = filtWin[i] * (float) Math.sin(omegaCSum);
             omegaCSum += omegaC;
             bLP[FB_DELAY + i + 1] = b;
             bLP[FB_DELAY - i - 1] = b;
@@ -157,8 +157,8 @@ final class HarmonicPostfilterTables {
         }
         bLP[FB_DELAY] = omegaC;
         sumB += omegaC;
-        float inv = 1.0f / sumB;
-        for (int i = 0; i < FILTER_LEN; i++) {
+        var inv = 1.0f / sumB;
+        for (var i = 0; i < FILTER_LEN; i++) {
             bLP[i] *= inv;
         }
     }

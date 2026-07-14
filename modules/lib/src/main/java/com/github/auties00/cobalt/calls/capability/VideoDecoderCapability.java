@@ -284,7 +284,7 @@ public enum VideoDecoderCapability {
      * @param peer the peer's advertised codec set
      * @return the intersection of the two sets, possibly empty
      * @implNote This implementation collects the result into a fresh {@link EnumSet} and narrows it with
-     * {@link EnumSet#retainAll(java.util.Collection)}; for this small enum both operands are backed by a
+     * {@link EnumSet#retainAll(Collection)}; for this small enum both operands are backed by a
      * single {@code long} bitmask, so the intersection resolves to a bitwise AND when the inputs are raw
      * {@link EnumSet}s. The returned set is itself a raw {@link EnumSet}, so downstream set operations
      * (such as {@link #negotiate(Set, Set)}) stay on that fast path.

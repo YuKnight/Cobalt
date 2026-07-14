@@ -115,10 +115,10 @@ public final class NetEqSignalProcessing {
      */
     static void crossCorrelation(int[] crossCorrelation, short[] seq1, short[] seq2,
                                  int length, int numCc, int shift, int step) {
-        for (int i = 0; i < numCc; i++) {
-            int sum = 0;
-            int base = i * step;
-            for (int k = 0; k < length; k++) {
+        for (var i = 0; i < numCc; i++) {
+            var sum = 0;
+            var base = i * step;
+            for (var k = 0; k < length; k++) {
                 sum += (seq1[k] * seq2[base + k]) >> shift;
             }
             crossCorrelation[i] = sum;
@@ -170,9 +170,9 @@ public final class NetEqSignalProcessing {
                 return -1;
             }
         }
-        int tapCount = coefficients.length;
-        int advance = tapCount - 1;
-        int delay = warmup ? warmupIndex : 0;
+        var tapCount = coefficients.length;
+        var advance = tapCount - 1;
+        var delay = warmup ? warmupIndex : 0;
         return downsampleFast(out, in, advance, inLength - advance, outLength,
                 coefficients, tapCount, factor, delay);
     }
@@ -208,20 +208,20 @@ public final class NetEqSignalProcessing {
         if (outLength == 0 || tapCount == 0) {
             return -1;
         }
-        int endIdx = (outLength - 1) * factor + 1 + delay;
+        var endIdx = (outLength - 1) * factor + 1 + delay;
         if (inLength < endIdx) {
             return -1;
         }
         if (endIdx <= delay) {
             return 0;
         }
-        int outPos = 0;
-        for (int i = delay; i < endIdx; i += factor) {
-            int acc = 2048;
-            for (int j = 0; j < tapCount; j++) {
+        var outPos = 0;
+        for (var i = delay; i < endIdx; i += factor) {
+            var acc = 2048;
+            for (var j = 0; j < tapCount; j++) {
                 acc += in[inOffset + i - j] * coeff[j];
             }
-            int v = acc >> 12;
+            var v = acc >> 12;
             if (v < -32768) {
                 v = -32768;
             } else if (v > 32767) {
@@ -251,12 +251,12 @@ public final class NetEqSignalProcessing {
         if (value <= 0) {
             return 0;
         }
-        int root = 0;
-        int bit = 1 << 30;
+        var root = 0;
+        var bit = 1 << 30;
         while (bit > value) {
             bit >>= 2;
         }
-        int rem = value;
+        var rem = value;
         while (bit != 0) {
             if (rem >= root + bit) {
                 rem -= root + bit;
@@ -290,12 +290,12 @@ public final class NetEqSignalProcessing {
         if (denHi == 0) {
             return -1;
         }
-        int negTwoHi = 0 - (denHi << 1);
-        int q = (int) (short) (0x1FFFFFFF / denHi);
-        int acc = q * negTwoHi - (((q * denLo) >> 14) & ~1) + 0x7FFFFFFF;
-        int r = (((acc >>> 1) & 0x7FFF) * q >> 15) + ((acc >> 16) * q);
-        int rHi = (r << 1) >> 16;
-        int numHi = numerator >> 16;
+        var negTwoHi = 0 - (denHi << 1);
+        var q = (int) (short) (0x1FFFFFFF / denHi);
+        var acc = q * negTwoHi - (((q * denLo) >> 14) & ~1) + 0x7FFFFFFF;
+        var r = (((acc >>> 1) & 0x7FFF) * q >> 15) + ((acc >> 16) * q);
+        var rHi = (r << 1) >> 16;
+        var numHi = numerator >> 16;
         return (rHi * numHi
                 + ((r & 0x7FFF) * numHi >> 15)
                 + (rHi * ((numerator >>> 1) & 0x7FFF) >> 15)) << 3;
@@ -324,11 +324,11 @@ public final class NetEqSignalProcessing {
      */
     static void peakDetection(short[] data, int dataLength, int fsMult,
                               int[] peakIndex, short[] peakValue) {
-        int byteScale = fsMult << 1;
-        int bound = dataLength - 1;
-        int bestVal = -32768;
-        int bestIdx = 0;
-        for (int j = 0; j < bound; j++) {
+        var byteScale = fsMult << 1;
+        var bound = dataLength - 1;
+        var bestVal = -32768;
+        var bestIdx = 0;
+        for (var j = 0; j < bound; j++) {
             int v = data[j];
             if (v > bestVal) {
                 bestVal = v;
@@ -336,7 +336,7 @@ public final class NetEqSignalProcessing {
             }
         }
         peakIndex[0] = bestIdx;
-        int endpoint = dataLength - 2;
+        var endpoint = dataLength - 2;
         if (bestIdx != 0 && bestIdx != endpoint) {
             parabolicFit(data, bestIdx - 1, fsMult, peakIndex, 0, peakValue);
         } else if (bestIdx == endpoint) {
@@ -384,29 +384,29 @@ public final class NetEqSignalProcessing {
      */
     static void parabolicFit(short[] data, int baseIndex, int fsMult,
                              int[] peakIndex, int indexSlot, short[] peakValue) {
-        short[] steps = stepTable(fsMult);
-        int top = parabolaCoeff(steps[fsMult]);
-        int next = parabolaCoeff(steps[fsMult - 1]);
-        int coeffStep = top - next;
+        var steps = stepTable(fsMult);
+        var top = parabolaCoeff(steps[fsMult]);
+        var next = parabolaCoeff(steps[fsMult - 1]);
+        var coeffStep = top - next;
 
         int s0 = data[baseIndex];
         int s1 = data[baseIndex + 1];
         int s2 = data[baseIndex + 2];
-        int b = (-3 * s0) + (s1 << 2) - s2;
-        int numerator = b * 120;
-        int mid = (top + next) / 2;
-        int a = s0 - (s1 << 1) + s2;
-        int negA = 0 - a;
+        var b = (-3 * s0) + (s1 << 2) - s2;
+        var numerator = b * 120;
+        var mid = (top + next) / 2;
+        var a = s0 - (s1 << 1) + s2;
+        var negA = 0 - a;
 
-        int storedIndex = peakIndex[indexSlot];
-        int counter = s1;
+        var storedIndex = peakIndex[indexSlot];
+        var counter = s1;
 
-        boolean leftTail = false;
-        boolean foundRight = false;
-        int fraction = 1;
+        var leftTail = false;
+        var foundRight = false;
+        var fraction = 1;
 
         if (numerator < mid * negA) {
-            int coeff = mid;
+            var coeff = mid;
             if (fsMult == 1) {
                 leftTail = true;
             } else {
@@ -432,7 +432,7 @@ public final class NetEqSignalProcessing {
                     peakIndex[indexSlot] = (fsMult * storedIndex) << 1;
                     return;
                 }
-                int coeff = mid + (firstStep << 1);
+                var coeff = mid + (firstStep << 1);
                 while (true) {
                     if (numerator < (short) coeff * negA) {
                         foundRight = true;
@@ -479,10 +479,10 @@ public final class NetEqSignalProcessing {
      */
     private static void writeRefinedValue(int stepEntry, int b, int a, int s0,
                                           short[] peakValue, int indexSlot) {
-        int record = (stepEntry & 0xFFFF) * 3;
+        var record = (stepEntry & 0xFFFF) * 3;
         int c1 = PARABOLA_COEFFICIENTS[record + 1];
         int c2 = PARABOLA_COEFFICIENTS[record + 2];
-        int value = (b * c2 + a * c1 + (s0 << 8)) / 256;
+        var value = (b * c2 + a * c1 + (s0 << 8)) / 256;
         peakValue[indexSlot] = (short) value;
     }
 
@@ -540,17 +540,17 @@ public final class NetEqSignalProcessing {
      * @return the signed extreme value, sign extended to a sixteen bit range
      */
     static int minMax(short[] in, int offset, int length) {
-        int min = 32767;
-        int max = -32768;
-        for (int i = 0; i < length; i++) {
+        var min = 32767;
+        var max = -32768;
+        for (var i = 0; i < length; i++) {
             int v = in[offset + i];
             min = Math.min((short) min, v);
             max = Math.max((short) max, v);
         }
-        int maxU = max & 0xFFFF;
+        var maxU = max & 0xFFFF;
         int minS = (short) min;
-        int inner = ((short) maxU < (0 - minS)) ? maxU : minS;
-        int result = (maxU == (minS & 0xFFFF)) ? maxU : inner;
+        var inner = ((short) maxU < (0 - minS)) ? maxU : minS;
+        var result = (maxU == (minS & 0xFFFF)) ? maxU : inner;
         return (short) result;
     }
 
@@ -570,10 +570,10 @@ public final class NetEqSignalProcessing {
      * @return the largest absolute value, in {@code [0, 32767]}
      */
     static int maxAbs16(short[] in, int offset, int length) {
-        int best = 0;
-        for (int i = 0; i < length; i++) {
+        var best = 0;
+        for (var i = 0; i < length; i++) {
             int v = in[offset + i];
-            int abs = (v ^ (v >> 31)) - (v >> 31);
+            var abs = (v ^ (v >> 31)) - (v >> 31);
             if (abs > best) {
                 best = abs;
             }
@@ -599,10 +599,10 @@ public final class NetEqSignalProcessing {
      * @return the largest absolute value, clamped to {@code Integer.MAX_VALUE}
      */
     static int maxAbs32(int[] in, int offset, int length) {
-        int best = 0;
-        for (int i = 0; i < length; i++) {
-            int v = in[offset + i];
-            int abs = v == Integer.MIN_VALUE ? Integer.MAX_VALUE : (v ^ (v >> 31)) - (v >> 31);
+        var best = 0;
+        for (var i = 0; i < length; i++) {
+            var v = in[offset + i];
+            var abs = v == Integer.MIN_VALUE ? Integer.MAX_VALUE : (v ^ (v >> 31)) - (v >> 31);
             if (Integer.compareUnsigned(abs, best) > 0) {
                 best = abs;
             }
@@ -630,9 +630,9 @@ public final class NetEqSignalProcessing {
      * @param shift  the signed shift amount, right when non negative, left when negative
      */
     static void vectorBitShift(short[] out, int outPos, int[] in, int inPos, int length, int shift) {
-        for (int i = 0; i < length; i++) {
-            int v = shift >= 0 ? in[inPos + i] >> shift : in[inPos + i] << (0 - shift);
-            int t = v <= -32768 ? -32768 : v;
+        for (var i = 0; i < length; i++) {
+            var v = shift >= 0 ? in[inPos + i] >> shift : in[inPos + i] << (0 - shift);
+            var t = v <= -32768 ? -32768 : v;
             t = t >= 32767 ? 32767 : t;
             out[outPos + i] = (short) t;
         }
@@ -667,16 +667,16 @@ public final class NetEqSignalProcessing {
      */
     static int crossCorrelationScaled(int[] crossCorrelation, short[] seq1, int seq1Pos, short[] seq2,
                                       int seq2Pos, int length, int numCc, int step) {
-        int extA = minMax(seq1, seq1Pos, length);
-        int product = (numCc - 1) * step;
-        int sign = product >> 31;
-        int absProduct = (product ^ sign) - sign;
-        int extB = minMax(seq2, seq2Pos + (product & sign), absProduct + length);
-        int ab = extA * extB;
-        int absAb = (ab ^ (ab >> 31)) - (ab >> 31);
-        long prod = ((long) absAb & 0xFFFFFFFFL) * ((long) length & 0xFFFFFFFFL);
-        int wrapped = (int) (prod >>> 31);
-        int shift = wrapped == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(wrapped);
+        var extA = minMax(seq1, seq1Pos, length);
+        var product = (numCc - 1) * step;
+        var sign = product >> 31;
+        var absProduct = (product ^ sign) - sign;
+        var extB = minMax(seq2, seq2Pos + (product & sign), absProduct + length);
+        var ab = extA * extB;
+        var absAb = (ab ^ (ab >> 31)) - (ab >> 31);
+        var prod = ((long) absAb & 0xFFFFFFFFL) * ((long) length & 0xFFFFFFFFL);
+        var wrapped = (int) (prod >>> 31);
+        var shift = wrapped == 0 ? 0 : 32 - Integer.numberOfLeadingZeros(wrapped);
         crossCorrelationShifted(crossCorrelation, seq1, seq1Pos, seq2, seq2Pos, length, numCc, shift, step);
         return shift;
     }
@@ -701,10 +701,10 @@ public final class NetEqSignalProcessing {
      */
     static void crossCorrelationShifted(int[] crossCorrelation, short[] seq1, int seq1Pos, short[] seq2,
                                         int seq2Pos, int length, int numCc, int shift, int step) {
-        for (int i = 0; i < numCc; i++) {
-            int sum = 0;
-            int base = seq2Pos + i * step;
-            for (int k = 0; k < length; k++) {
+        for (var i = 0; i < numCc; i++) {
+            var sum = 0;
+            var base = seq2Pos + i * step;
+            for (var k = 0; k < length; k++) {
                 sum += (seq1[seq1Pos + k] * seq2[base + k]) >> shift;
             }
             crossCorrelation[i] = sum;
@@ -732,12 +732,12 @@ public final class NetEqSignalProcessing {
      * @param length the number of output samples to produce
      */
     static void filterAr(short[] out, int outPos, short[] coeff, int order, int length) {
-        for (int i = 0; i < length; i++) {
-            int acc = 0;
-            for (int j = 0; j < order; j++) {
+        for (var i = 0; i < length; i++) {
+            var acc = 0;
+            for (var j = 0; j < order; j++) {
                 acc += out[outPos + i - j] * coeff[j];
             }
-            int clamped = acc <= -134217728 ? -134217728 : acc;
+            var clamped = acc <= -134217728 ? -134217728 : acc;
             clamped = clamped >= 134215679 ? 134215679 : clamped;
             out[outPos + i] = (short) ((clamped + 2048) >> 12);
         }
@@ -771,13 +771,13 @@ public final class NetEqSignalProcessing {
     static void filterArInput(short[] in, int inPos, short[] out, int outPos, short[] coeff, int order,
                               int length) {
         long coeff0 = coeff[0];
-        for (int i = 0; i < length; i++) {
+        for (var i = 0; i < length; i++) {
             long acc = 0;
-            for (int j = order - 1; j != 0; j--) {
+            for (var j = order - 1; j != 0; j--) {
                 acc += (long) out[outPos + i - j] * coeff[j];
             }
-            long v = (long) in[inPos + i] * coeff0 - acc;
-            long clamped = v <= -134217728L ? -134217728L : v;
+            var v = (long) in[inPos + i] * coeff0 - acc;
+            var clamped = v <= -134217728L ? -134217728L : v;
             clamped = clamped >= 134215679L ? 134215679L : clamped;
             out[outPos + i] = (short) ((clamped + 2048L) >>> 12);
         }
@@ -803,8 +803,8 @@ public final class NetEqSignalProcessing {
      */
     static void scaleVector(short[] out, int outPos, short[] in, int inPos, int scale, int add, int shift,
                             int length) {
-        int s = shift & 0xFFFF;
-        for (int i = 0; i < length; i++) {
+        var s = shift & 0xFFFF;
+        for (var i = 0; i < length; i++) {
             out[outPos + i] = (short) ((in[inPos + i] * scale + add) >> s);
         }
     }
@@ -842,9 +842,9 @@ public final class NetEqSignalProcessing {
             }
             return -1;
         }
-        int round = (1 << shift) >> 1;
-        for (int i = 0; i < length; i++) {
-            int v = (a[aPos + i] * weightA + round + b[bPos + i] * weightB) >> shift;
+        var round = (1 << shift) >> 1;
+        for (var i = 0; i < length; i++) {
+            var v = (a[aPos + i] * weightA + round + b[bPos + i] * weightB) >> shift;
             out[outPos + i] = (short) v;
         }
         return 0;
@@ -886,75 +886,75 @@ public final class NetEqSignalProcessing {
      * @return {@code 1} when the fitted model is stable, {@code 0} when a reflection coefficient is unstable
      */
     static int levinsonDurbin(int[] r, short[] a, short[] k, int order) {
-        int[] rHi = new int[order + 1];
-        int[] rLo = new int[order + 1];
-        int[] aHi = new int[order + 1];
-        int[] aLo = new int[order + 1];
-        int[] aHiPrev = new int[order + 1];
-        int[] aLoPrev = new int[order + 1];
+        var rHi = new int[order + 1];
+        var rLo = new int[order + 1];
+        var aHi = new int[order + 1];
+        var aLo = new int[order + 1];
+        var aHiPrev = new int[order + 1];
+        var aLoPrev = new int[order + 1];
 
-        int r0 = r[0];
-        int norm = r0 != 0 ? (Integer.numberOfLeadingZeros(r0 ^ (r0 >> 31)) - 1) & 0xFFFF : 0;
-        for (int i = 0; i <= order; i++) {
-            int x = r[i] << norm;
+        var r0 = r[0];
+        var norm = r0 != 0 ? (Integer.numberOfLeadingZeros(r0 ^ (r0 >> 31)) - 1) & 0xFFFF : 0;
+        for (var i = 0; i <= order; i++) {
+            var x = r[i] << norm;
             rHi[i] = (short) (x >>> 16);
             rLo[i] = (short) ((x & 0xFFFE) >>> 1);
         }
 
-        int r1 = r[1] << norm;
-        int signR1 = r1 >> 31;
-        int absR1 = (r1 ^ signR1) - signR1;
-        int denom = divW32W16(absR1, rHi[0], rLo[0]);
-        int k0 = r1 > 0 ? -denom : denom;
+        var r1 = r[1] << norm;
+        var signR1 = r1 >> 31;
+        var absR1 = (r1 ^ signR1) - signR1;
+        var denom = divW32W16(absR1, rHi[0], rLo[0]);
+        var k0 = r1 > 0 ? -denom : denom;
         k[0] = (short) (k0 >>> 16);
         aLoPrev[1] = (short) (k0 >> 20);
         aHiPrev[1] = (short) (((k0 >>> 4) - ((k0 >> 20) << 16)) >>> 1);
 
-        int result = 1;
+        var result = 1;
         if (order >= 2) {
-            int iterationGuard = order <= 1 ? 1 : order;
+            var iterationGuard = order <= 1 ? 1 : order;
 
-            int rLo0 = rLo[0];
-            int rHi0 = rHi[0];
-            int kHi0 = k0 >> 16;
-            int eTermPre = (((kHi0 * ((k0 >>> 1) & 0x7FFF)) >> 14) + kHi0 * kHi0) << 1;
-            int eAbs = (eTermPre ^ (eTermPre >> 31)) - (eTermPre >> 31);
-            int eComp = 0x7FFFFFFF ^ eAbs;
-            int eCompHi = eComp >>> 16;
-            int eCompLo = (eComp >>> 1) & 0x7FFF;
-            int eVal = (((rLo0 * eCompHi) >> 15) + eCompHi * rHi0 + ((eCompLo * rHi0) >> 15)) << 1;
-            int eShift = eVal == 0 ? 0 : Integer.numberOfLeadingZeros(eVal ^ (eVal >> 31)) - 1;
-            int eRun = eVal << eShift;
+            var rLo0 = rLo[0];
+            var rHi0 = rHi[0];
+            var kHi0 = k0 >> 16;
+            var eTermPre = (((kHi0 * ((k0 >>> 1) & 0x7FFF)) >> 14) + kHi0 * kHi0) << 1;
+            var eAbs = (eTermPre ^ (eTermPre >> 31)) - (eTermPre >> 31);
+            var eComp = 0x7FFFFFFF ^ eAbs;
+            var eCompHi = eComp >>> 16;
+            var eCompLo = (eComp >>> 1) & 0x7FFF;
+            var eVal = (((rLo0 * eCompHi) >> 15) + eCompHi * rHi0 + ((eCompLo * rHi0) >> 15)) << 1;
+            var eShift = eVal == 0 ? 0 : Integer.numberOfLeadingZeros(eVal ^ (eVal >> 31)) - 1;
+            var eRun = eVal << eShift;
 
-            int m = 2;
-            int iteration = 0;
+            var m = 2;
+            var iteration = 0;
             while (true) {
-                int eHi = eRun >> 16;
-                int eLo = (eRun >>> 1) & 0x7FFF;
+                var eHi = eRun >> 16;
+                var eLo = (eRun >>> 1) & 0x7FFF;
 
-                int acc = 0;
-                for (int p = 1; p != m; p++) {
-                    int rHiP = rHi[p];
-                    int back = m - p;
-                    int aLoBack = aLoPrev[back];
-                    int contrib = ((rHiP * aHiPrev[back]) >> 15)
-                            + rHiP * aLoBack
-                            + ((rLo[p] * aLoBack) >> 15);
+                var acc = 0;
+                for (var p = 1; p != m; p++) {
+                    var rHiP = rHi[p];
+                    var back = m - p;
+                    var aLoBack = aLoPrev[back];
+                    var contrib = ((rHiP * aHiPrev[back]) >> 15)
+                                  + rHiP * aLoBack
+                                  + ((rLo[p] * aLoBack) >> 15);
                     acc += contrib << 1;
                 }
 
-                int numPre = ((rHi[m] & 0xFFFF) << 16) + (acc << 4) + (rLo[m] << 1);
-                int absNum = (numPre ^ (numPre >> 31)) - (numPre >> 31);
-                int divResult = divW32W16(absNum, (short) eHi, eLo);
-                int kmSigned = numPre > 0 ? -divResult : divResult;
-                int kmShifted = kmSigned << eShift;
-                int sat = kmSigned > 0 ? 0x7FFFFFFF : 0x80000000;
-                int normKm = kmSigned == 0 ? 0 : Integer.numberOfLeadingZeros(kmSigned ^ (kmSigned >> 31)) - 1;
-                int branch = (short) eShift <= normKm ? kmShifted : sat;
-                int km = kmSigned != 0 ? branch : kmShifted;
+                var numPre = ((rHi[m] & 0xFFFF) << 16) + (acc << 4) + (rLo[m] << 1);
+                var absNum = (numPre ^ (numPre >> 31)) - (numPre >> 31);
+                var divResult = divW32W16(absNum, (short) eHi, eLo);
+                var kmSigned = numPre > 0 ? -divResult : divResult;
+                var kmShifted = kmSigned << eShift;
+                var sat = kmSigned > 0 ? 0x7FFFFFFF : 0x80000000;
+                var normKm = kmSigned == 0 ? 0 : Integer.numberOfLeadingZeros(kmSigned ^ (kmSigned >> 31)) - 1;
+                var branch = (short) eShift <= normKm ? kmShifted : sat;
+                var km = kmSigned != 0 ? branch : kmShifted;
                 k[m - 1] = (short) (km >>> 16);
 
-                int kmHiCheck = km >> 16;
+                var kmHiCheck = km >> 16;
                 if (((kmHiCheck ^ (kmHiCheck >> 31)) - (kmHiCheck >> 31)) > 32750) {
                     if (Log.WARNING) {
                         LOGGER.log(Level.WARNING, "levinson-durbin unstable at order {0} of {1}", m, order);
@@ -962,32 +962,32 @@ public final class NetEqSignalProcessing {
                     return 0;
                 }
 
-                int kmHi = km >> 16;
-                int kmLo = (km >>> 1) & 0x7FFF;
-                for (int p = 1; p != m; p++) {
-                    int back = m - p;
-                    int aLoBack = aLoPrev[back];
-                    int newAHi = aHiPrev[p] + kmHi * aLoBack
-                            + ((kmLo * aLoBack) >> 15)
-                            + ((kmHi * aHiPrev[back]) >> 15);
+                var kmHi = km >> 16;
+                var kmLo = (km >>> 1) & 0x7FFF;
+                for (var p = 1; p != m; p++) {
+                    var back = m - p;
+                    var aLoBack = aLoPrev[back];
+                    var newAHi = aHiPrev[p] + kmHi * aLoBack
+                                 + ((kmLo * aLoBack) >> 15)
+                                 + ((kmHi * aHiPrev[back]) >> 15);
                     aHi[p] = (short) (newAHi & 0x7FFF);
                     aLo[p] = (short) ((aLoPrev[p] & 0xFFFF) + (newAHi >>> 15));
                 }
                 aLo[m] = (short) (km >> 20);
                 aHi[m] = (short) (((km >>> 4) - ((km >> 20) << 16)) >>> 1);
 
-                int copyElems = iteration + 2;
+                var copyElems = iteration + 2;
                 System.arraycopy(aLo, 1, aLoPrev, 1, copyElems);
                 System.arraycopy(aHi, 1, aHiPrev, 1, copyElems);
 
-                int kTerm = (kmHi * kmHi + ((kmHi * kmLo) >> 14)) << 1;
-                int kAbs = (kTerm ^ (kTerm >> 31)) - (kTerm >> 31);
-                int eCompNew = 0x7FFFFFFF ^ kAbs;
-                int eCompNewHi = eCompNew >>> 16;
-                int eNew = ((eCompNewHi * eLo) >>> 15)
-                        + eCompNewHi * eHi
-                        + (((eCompNew >>> 1) & 0x7FFF) * eHi >> 15);
-                int renorm = eNew == 0 ? 0 : Integer.numberOfLeadingZeros((eNew << 1) ^ (eNew >> 30)) - 1;
+                var kTerm = (kmHi * kmHi + ((kmHi * kmLo) >> 14)) << 1;
+                var kAbs = (kTerm ^ (kTerm >> 31)) - (kTerm >> 31);
+                var eCompNew = 0x7FFFFFFF ^ kAbs;
+                var eCompNewHi = eCompNew >>> 16;
+                var eNew = ((eCompNewHi * eLo) >>> 15)
+                           + eCompNewHi * eHi
+                           + (((eCompNew >>> 1) & 0x7FFF) * eHi >> 15);
+                var renorm = eNew == 0 ? 0 : Integer.numberOfLeadingZeros((eNew << 1) ^ (eNew >> 30)) - 1;
                 eShift = eShift + renorm;
                 eRun = (eNew << 1) << renorm;
 
@@ -1001,8 +1001,8 @@ public final class NetEqSignalProcessing {
 
         a[0] = 4096;
         if (order + 1 >= 2) {
-            for (int i = 1; i <= order; i++) {
-                int v = ((aHiPrev[i] << 2) + ((aLoPrev[i] & 0xFFFF) << 17) + 32768) >>> 16;
+            for (var i = 1; i <= order; i++) {
+                var v = ((aHiPrev[i] << 2) + ((aLoPrev[i] & 0xFFFF) << 17) + 32768) >>> 16;
                 a[i] = (short) v;
             }
         }
@@ -1033,13 +1033,13 @@ public final class NetEqSignalProcessing {
      */
     static void crossFade(short[] out, int outPos, short[] oldData, int oldPos,
                           short[] newData, int newPos, int overlap) {
-        int step = 16384 / (overlap + 1);
-        int weight = 16384;
-        for (int i = 0; i < overlap; i++) {
+        var step = 16384 / (overlap + 1);
+        var weight = 16384;
+        for (var i = 0; i < overlap; i++) {
             weight -= step;
             int oldSample = oldData[oldPos + i];
             int newSample = newData[newPos + i];
-            int blended = (weight * oldSample + (16384 - weight) * newSample + 8192) >> 14;
+            var blended = (weight * oldSample + (16384 - weight) * newSample + 8192) >> 14;
             out[outPos + i] = (short) blended;
         }
     }

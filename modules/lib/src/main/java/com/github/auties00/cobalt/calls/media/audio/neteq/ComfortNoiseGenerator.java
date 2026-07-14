@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import java.util.Arrays;
 import java.util.Random;
 import com.github.auties00.cobalt.calls.media.audio.neteq.decoder.ComfortNoiseDecoder;
 import com.github.auties00.cobalt.log.Log;
@@ -263,8 +264,8 @@ public final class ComfortNoiseGenerator {
      * the first frame after a reset uses the faster interpolation weights.
      */
     public void reset() {
-        java.util.Arrays.fill(filterMemory, 0.0);
-        java.util.Arrays.fill(usedReflectionQ15, 0);
+        Arrays.fill(filterMemory, 0.0);
+        Arrays.fill(usedReflectionQ15, 0);
         usedEnergy = 0;
         firstFrame = true;
         if (Log.DEBUG) LOGGER.log(Level.DEBUG, "calls cng reset");

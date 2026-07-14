@@ -2,6 +2,8 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.celp;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables;
 
+import java.util.Arrays;
+
 /**
  * Builds the per subframe code excited linear prediction (CELP) excitation of an MLow voiced or unvoiced
  * low band frame.
@@ -163,7 +165,7 @@ public final class CelpSynthesizer {
      * continuous stream, which must thread the pitch history.
      */
     public void reset() {
-        java.util.Arrays.fill(acbState, 0.0f);
+        Arrays.fill(acbState, 0.0f);
     }
 
     /**
@@ -189,15 +191,15 @@ public final class CelpSynthesizer {
      */
     public void genExcitation(int[] fcbgIdx, boolean voiced, int numSubfr, int subfrLen,
                               int nPositions, short[] positions, short[] posPulses, float[] exc) {
-        float[] gainTab = voiced ? fcbgainsV : fcbgainsUv;
-        float[] fcbGains = new float[numSubfr];
-        for (int sf = 0; sf < numSubfr; sf++) {
+        var gainTab = voiced ? fcbgainsV : fcbgainsUv;
+        var fcbGains = new float[numSubfr];
+        for (var sf = 0; sf < numSubfr; sf++) {
             fcbGains[sf] = gainTab[fcbgIdx[sf]];
         }
-        int shift = subfrLen == 80 ? 4 : 5;
-        int len = numSubfr * subfrLen;
-        java.util.Arrays.fill(exc, 0, len, 0.0f);
-        for (int n = 0; n < nPositions; n++) {
+        var shift = subfrLen == 80 ? 4 : 5;
+        var len = numSubfr * subfrLen;
+        Arrays.fill(exc, 0, len, 0.0f);
+        for (var n = 0; n < nPositions; n++) {
             int pos = positions[n];
             exc[pos] = posPulses[n] * fcbGains[POS2IDX[pos >> shift]];
         }
@@ -214,9 +216,9 @@ public final class CelpSynthesizer {
      * @return a freshly allocated {@link #ACBG_M} entry array of real valued tap gains
      */
     public static float[] acbDequant(boolean lowRate, int acbIdx) {
-        short[] cb = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
-        float[] acbG = new float[ACBG_M];
-        for (int m = 0; m < ACBG_M; m++) {
+        var cb = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
+        var acbG = new float[ACBG_M];
+        for (var m = 0; m < ACBG_M; m++) {
             acbG[m] = cb[acbIdx * ACBG_M + m] * Q14_SCALE;
         }
         return acbG;
@@ -249,18 +251,18 @@ public final class CelpSynthesizer {
      */
     public void celpDecode(boolean voiced, float[] acbGain, float[] lags, int numLags, int subfrLen,
                            boolean lowRate, float normalizedBitrate, float[] excSubframe) {
-        int acbStateLen = subfrLen + 2 * MAX_PITCH_LAG + LTP_INTERPOL_DELAY;
+        var acbStateLen = subfrLen + 2 * MAX_PITCH_LAG + LTP_INTERPOL_DELAY;
         if (voiced) {
-            float highBoost = DEC_ACB_HIGH_BOOST[0]
-                    + (DEC_ACB_HIGH_BOOST[1] - DEC_ACB_HIGH_BOOST[0]) * normalizedBitrate;
-            int iLag = (int) lags[numLags - 1];
+            var highBoost = DEC_ACB_HIGH_BOOST[0]
+                            + (DEC_ACB_HIGH_BOOST[1] - DEC_ACB_HIGH_BOOST[0]) * normalizedBitrate;
+            var iLag = (int) lags[numLags - 1];
             if (lowRate) {
                 pitchSharp(excSubframe, iLag, subfrLen);
             }
-            float[] acbBasis = acbBasisScratch;
+            var acbBasis = acbBasisScratch;
             synLtpBasis(lags, numLags, acbStateLen, acbBasis);
             adjustAcbGains(acbGain, highBoost);
-            for (int i = 0; i < subfrLen; i++) {
+            for (var i = 0; i < subfrLen; i++) {
                 excSubframe[i] += acbBasis[i] * acbGain[0] + acbBasis[subfrLen + i] * acbGain[1];
             }
         }
@@ -279,7 +281,7 @@ public final class CelpSynthesizer {
      * @param len the number of samples to process
      */
     private static void pitchSharp(float[] x, int lag, int len) {
-        for (int i = lag; i < len; i++) {
+        for (var i = lag; i < len; i++) {
             x[i] += x[i - lag] * PITCH_SHARPENING_COEF;
         }
     }
@@ -301,33 +303,33 @@ public final class CelpSynthesizer {
      * @param acbBasis    the basis output, {@code 2 * numLags * LAG_SUBFRLEN} entries written
      */
     private void synLtpBasis(float[] lags, int numLags, int acbStateLen, float[] acbBasis) {
-        int pEnd = acbStateLen - numLags * LAG_SUBFRLEN;
-        for (int subfr = 0; subfr < numLags; subfr++) {
-            int iLag = (int) Math.floor(lags[subfr]);
-            int centerOut = subfr * LAG_SUBFRLEN;
-            int sideOut = (numLags + subfr) * LAG_SUBFRLEN;
+        var pEnd = acbStateLen - numLags * LAG_SUBFRLEN;
+        for (var subfr = 0; subfr < numLags; subfr++) {
+            var iLag = (int) Math.floor(lags[subfr]);
+            var centerOut = subfr * LAG_SUBFRLEN;
+            var sideOut = (numLags + subfr) * LAG_SUBFRLEN;
             if (iLag == lags[subfr]) {
-                for (int i = 0; i < LAG_SUBFRLEN; i++) {
+                for (var i = 0; i < LAG_SUBFRLEN; i++) {
                     acbState[pEnd + i] = acbState[pEnd + i - iLag];
                 }
                 System.arraycopy(acbState, pEnd, acbBasis, centerOut, LAG_SUBFRLEN);
-                int a = pEnd - iLag - 1;
-                int b = pEnd - iLag + 1;
-                for (int i = 0; i < LAG_SUBFRLEN; i++) {
+                var a = pEnd - iLag - 1;
+                var b = pEnd - iLag + 1;
+                for (var i = 0; i < LAG_SUBFRLEN; i++) {
                     acbBasis[sideOut + i] = acbState[a + i] + acbState[b + i];
                 }
             } else {
                 // The first side sample reaches one position before the interpolated span and the last
                 // reaches one past it; both index the integer floor of the lag, since the symmetric kernel
                 // supplies the implicit half sample delay.
-                float first = dotProd(acbState, pEnd - 1 - iLag - LTP_INTERPOL_DELAY,
+                var first = dotProd(acbState, pEnd - 1 - iLag - LTP_INTERPOL_DELAY,
                         MiscTables.INTERPOL_KERNEL, 2 * LTP_INTERPOL_DELAY);
                 interpol(acbState, pEnd - iLag - LTP_INTERPOL_DELAY, acbState, pEnd, LAG_SUBFRLEN);
-                float last = dotProd(acbState, pEnd + LAG_SUBFRLEN - iLag - LTP_INTERPOL_DELAY,
+                var last = dotProd(acbState, pEnd + LAG_SUBFRLEN - iLag - LTP_INTERPOL_DELAY,
                         MiscTables.INTERPOL_KERNEL, 2 * LTP_INTERPOL_DELAY);
                 System.arraycopy(acbState, pEnd, acbBasis, centerOut, LAG_SUBFRLEN);
                 acbBasis[sideOut] = first + acbState[pEnd + 1];
-                for (int i = 0; i < LAG_SUBFRLEN - 2; i++) {
+                for (var i = 0; i < LAG_SUBFRLEN - 2; i++) {
                     acbBasis[sideOut + 1 + i] = acbState[pEnd + i] + acbState[pEnd + 2 + i];
                 }
                 acbBasis[sideOut + LAG_SUBFRLEN - 1] = acbState[pEnd + LAG_SUBFRLEN - 2] + last;
@@ -351,9 +353,9 @@ public final class CelpSynthesizer {
         if (highBoost == 0.0f) {
             return;
         }
-        float f0 = acbG[0] + 2.0f * acbG[1];
-        float f1 = acbG[0] - acbG[1];
-        float absF1New = Math.min(Math.abs(f1) + highBoost, Math.abs(f0));
+        var f0 = acbG[0] + 2.0f * acbG[1];
+        var f1 = acbG[0] - acbG[1];
+        var absF1New = Math.min(Math.abs(f1) + highBoost, Math.abs(f0));
         f1 *= absF1New / (Math.abs(f1) + 1e-12f);
         acbG[0] = (f0 + 2.0f * f1) / 3.0f;
         acbG[1] = (f0 - f1) / 3.0f;
@@ -374,10 +376,10 @@ public final class CelpSynthesizer {
      * @param n    the number of output samples
      */
     private static void interpol(float[] x, int xOff, float[] y, int yOff, int n) {
-        float[] kernel = MiscTables.INTERPOL_KERNEL;
-        for (int m = 0; m < n; m++) {
-            float ret = 0.0f;
-            for (int i = 0; i < 8; i++) {
+        var kernel = MiscTables.INTERPOL_KERNEL;
+        for (var m = 0; m < n; m++) {
+            var ret = 0.0f;
+            for (var i = 0; i < 8; i++) {
                 ret += (x[xOff + m + i] + x[xOff + m + 15 - i]) * kernel[i];
             }
             y[yOff + m] = ret;
@@ -394,8 +396,8 @@ public final class CelpSynthesizer {
      * @return the accumulated single precision dot product
      */
     private static float dotProd(float[] a, int aOff, float[] b, int len) {
-        float ret = 0.0f;
-        for (int i = 0; i < len; i++) {
+        var ret = 0.0f;
+        for (var i = 0; i < len; i++) {
             ret += a[aOff + i] * b[i];
         }
         return ret;
@@ -409,9 +411,9 @@ public final class CelpSynthesizer {
      * @return a freshly allocated {@link #FCBG_V_N} entry table
      */
     private static float[] buildVoicedGains() {
-        float[] tab = new float[FCBG_V_N];
-        for (int ix = 0; ix < FCBG_V_N; ix++) {
-            float db = ix * 3.0f + (-100.0f);
+        var tab = new float[FCBG_V_N];
+        for (var ix = 0; ix < FCBG_V_N; ix++) {
+            var db = ix * 3.0f + (-100.0f);
             tab[ix] = (float) Math.pow(10.0, 0.05 * db);
         }
         return tab;
@@ -426,9 +428,9 @@ public final class CelpSynthesizer {
      * @return a freshly allocated {@code UV_GAIN_IDX_LEN + 1} entry table
      */
     private static float[] buildUnvoicedGains() {
-        float[] tab = new float[UV_GAIN_IDX_LEN + 1];
-        for (int ix = 0; ix <= UV_GAIN_IDX_LEN; ix++) {
-            float db = ix * 1.0f + (-90.0f);
+        var tab = new float[UV_GAIN_IDX_LEN + 1];
+        for (var ix = 0; ix <= UV_GAIN_IDX_LEN; ix++) {
+            var db = ix * 1.0f + (-90.0f);
             tab[ix] = (float) Math.pow(10.0, 0.05 * db);
         }
         return tab;

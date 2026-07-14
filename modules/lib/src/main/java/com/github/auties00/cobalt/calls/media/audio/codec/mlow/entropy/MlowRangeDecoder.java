@@ -321,7 +321,7 @@ public final class MlowRangeDecoder {
         while (Long.compareUnsigned(rng, EC_CODE_BOT) <= 0) {
             nbitsTotal += EC_SYM_BITS;
             rng = (rng << EC_SYM_BITS) & U32;
-            int sym = rem;
+            var sym = rem;
             rem = readByte();
             sym = ((sym << EC_SYM_BITS) | rem) >> (EC_SYM_BITS - EC_CODE_EXTRA);
             val = (((val << EC_SYM_BITS) + (EC_SYM_MAX & ~sym)) & (EC_CODE_TOP - 1)) & U32;
@@ -345,7 +345,7 @@ public final class MlowRangeDecoder {
      */
     public long decode(long ft) {
         ext = celtUdiv(rng, ft);
-        long s = Long.divideUnsigned(val, ext);
+        var s = Long.divideUnsigned(val, ext);
         return ft - ecMini(s + 1, ft);
     }
 
@@ -361,8 +361,8 @@ public final class MlowRangeDecoder {
      */
     public long decodeBin(int bits) {
         ext = rng >>> bits;
-        long s = Long.divideUnsigned(val, ext);
-        long ft = 1L << bits;
+        var s = Long.divideUnsigned(val, ext);
+        var ft = 1L << bits;
         return ft - ecMini(s + 1, ft);
     }
 
@@ -380,7 +380,7 @@ public final class MlowRangeDecoder {
      * @param ft the total frequency, which must equal the value passed to the preceding {@code decode}
      */
     public void update(long fl, long fh, long ft) {
-        long s = imul32(ext, ft - fh);
+        var s = imul32(ext, ft - fh);
         val = (val - s) & U32;
         rng = (fl > 0 ? imul32(ext, fh - fl) : (rng - s) & U32);
         normalize();
@@ -397,10 +397,10 @@ public final class MlowRangeDecoder {
      * @return 1 if the decoded bit is one, 0 otherwise
      */
     public int decodeBitLogp(int logp) {
-        long r = rng;
-        long d = val;
-        long s = r >>> logp;
-        int ret = Long.compareUnsigned(d, s) < 0 ? 1 : 0;
+        var r = rng;
+        var d = val;
+        var s = r >>> logp;
+        var ret = Long.compareUnsigned(d, s) < 0 ? 1 : 0;
         if (ret == 0) {
             val = (d - s) & U32;
         }
@@ -423,10 +423,10 @@ public final class MlowRangeDecoder {
      * @return the decoded symbol index
      */
     public int decodeIcdf(int[] icdf, int ftb) {
-        long s = rng;
-        long d = val;
-        long r = s >>> ftb;
-        int ret = -1;
+        var s = rng;
+        var d = val;
+        var r = s >>> ftb;
+        var ret = -1;
         long t;
         do {
             t = s;
@@ -452,15 +452,15 @@ public final class MlowRangeDecoder {
      * @return the decoded unsigned integer in {@code [0, ft)}, as a value in {@code [0, 2^32)}
      */
     public long decodeUint(long ft) {
-        long ftMinus = ft - 1;
-        int ftb = ecIlog(ftMinus);
+        var ftMinus = ft - 1;
+        var ftb = ecIlog(ftMinus);
         if (ftb > EC_UINT_BITS) {
             ftb -= EC_UINT_BITS;
-            long ftHigh = (ftMinus >>> ftb) + 1;
-            long s = decode(ftHigh);
+            var ftHigh = (ftMinus >>> ftb) + 1;
+            var s = decode(ftHigh);
             update(s, s + 1, ftHigh);
-            long tail = decodeBits(ftb);
-            long result = ((s << ftb) | tail) & U32;
+            var tail = decodeBits(ftb);
+            var result = ((s << ftb) | tail) & U32;
             if (Long.compareUnsigned(result, ftMinus) <= 0) {
                 return result;
             }
@@ -470,8 +470,8 @@ public final class MlowRangeDecoder {
             error = 1;
             return ftMinus;
         }
-        long ftSmall = ftMinus + 1;
-        long s = decode(ftSmall);
+        var ftSmall = ftMinus + 1;
+        var s = decode(ftSmall);
         update(s, s + 1, ftSmall);
         return s;
     }
@@ -488,15 +488,15 @@ public final class MlowRangeDecoder {
      * @return the extracted bits, right aligned, in {@code [0, (1 << bits))}
      */
     public long decodeBits(int bits) {
-        long window = endWindow;
-        int available = nendBits;
+        var window = endWindow;
+        var available = nendBits;
         if (available < bits) {
             do {
                 window |= ((long) readByteFromEnd() << available) & U32;
                 available += EC_SYM_BITS;
             } while (available <= EC_WINDOW_SIZE - EC_SYM_BITS);
         }
-        long ret = window & (((1L << bits) - 1) & U32);
+        var ret = window & (((1L << bits) - 1) & U32);
         window = (window >>> bits) & U32;
         available -= bits;
         endWindow = window;
@@ -528,12 +528,12 @@ public final class MlowRangeDecoder {
      * @return the number of bits consumed, scaled by 8, as a 32 bit unsigned value
      */
     public long tellFrac() {
-        long nbits = ((long) nbitsTotal << BITRES) & U32;
-        int l = ecIlog(rng);
-        long r = (rng >>> (l - 16)) & U32;
-        long b = (r >>> 12) - 8;
+        var nbits = ((long) nbitsTotal << BITRES) & U32;
+        var l = ecIlog(rng);
+        var r = (rng >>> (l - 16)) & U32;
+        var b = (r >>> 12) - 8;
         b += (Long.compareUnsigned(r, TELL_FRAC_CORRECTION[(int) b]) > 0) ? 1 : 0;
-        long lScaled = ((long) l << BITRES) + b;
+        var lScaled = ((long) l << BITRES) + b;
         return (nbits - lScaled) & U32;
     }
 

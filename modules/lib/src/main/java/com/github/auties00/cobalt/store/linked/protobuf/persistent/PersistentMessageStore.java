@@ -786,7 +786,7 @@ final class PersistentMessageStore implements AutoCloseable {
      * @return a closeable stream of decoded entries
      */
     private static <T> Stream<T> streamRange(MVMap<byte[], byte[]> map, byte[] start, byte[] stop, Function<byte[], T> decoder) {
-        Cursor<byte[], byte[]> cursor = start == null ? map.cursor(null) : map.cursor(start, stop, false);
+        var cursor = start == null ? map.cursor(null) : map.cursor(start, stop, false);
         var iterator = new Iterator<T>() {
             @Override
             public boolean hasNext() {

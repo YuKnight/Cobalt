@@ -353,10 +353,10 @@ public final class Vad {
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "vad reset");
         }
-        for (int b = 0; b < N_BANDS; b++) {
+        for (var b = 0; b < N_BANDS; b++) {
             noiseLevelBias[b] = Math.max(NOISE_LEVELS_BIAS / (b + 1), 1);
         }
-        for (int b = 0; b < N_BANDS; b++) {
+        for (var b = 0; b < N_BANDS; b++) {
             noiseLevel[b] = 100 * noiseLevelBias[b];
             inverseNoiseLevel[b] = INT32_MAX / noiseLevel[b];
         }
@@ -364,7 +364,7 @@ public final class Vad {
         anaState[0] = anaState[1] = 0;
         anaState1[0] = anaState1[1] = 0;
         anaState2[0] = anaState2[1] = 0;
-        for (int b = 0; b < N_BANDS; b++) {
+        for (var b = 0; b < N_BANDS; b++) {
             subFrameEnergy[b] = 0;
         }
         highPassState[0] = 0;
@@ -391,17 +391,17 @@ public final class Vad {
      * @return the per packet voice activity decision
      */
     public VadDecision processPacket(short[] pcm, int frameLen, int framesPerPacket, int activity, boolean useDtx) {
-        int fs = 16000;
-        int packetMs = (frameLen * framesPerPacket * 1000) / fs;
-        boolean vad = false;
-        boolean codedAsActiveVoice = false;
+        var fs = 16000;
+        var packetMs = (frameLen * framesPerPacket * 1000) / fs;
+        var vad = false;
+        var codedAsActiveVoice = false;
         var types = new FrameActivity[framesPerPacket];
         var saQ8 = new int[framesPerPacket];
         var tiltQ15 = new int[framesPerPacket];
         var results = new float[framesPerPacket];
 
-        for (int i = 0; i < framesPerPacket; i++) {
-            int speechActivityQ8 = speechActivity(pcm, i * frameLen, frameLen);
+        for (var i = 0; i < framesPerPacket; i++) {
+            var speechActivityQ8 = speechActivity(pcm, i * frameLen, frameLen);
             tiltQ15[i] = lastInputTiltQ15;
             results[i] = speechActivityQ8 / 256.0f;
             if (activity == ACTIVITY_NO_DECISION) {
@@ -416,7 +416,7 @@ public final class Vad {
             saQ8[i] = speechActivityQ8;
         }
 
-        for (int i = 0; i < framesPerPacket; i++) {
+        for (var i = 0; i < framesPerPacket; i++) {
             if (types[i] == FrameActivity.ACTIVE) {
                 remainingHangoverMs = hangoverMs;
             } else {
@@ -433,7 +433,7 @@ public final class Vad {
             }
         }
 
-        boolean sidFrame = useDtx && !codedAsActiveVoice;
+        var sidFrame = useDtx && !codedAsActiveVoice;
         if (sidFrame) {
             sendSidFrame = true;
             if (sidIntervalMs > packetMs) {
@@ -477,16 +477,16 @@ public final class Vad {
      * @return the speech activity level in Q8, clamped to {@code [0, 255]}
      */
     private int speechActivity(short[] pcm, int offset, int frameLen) {
-        int decimatedFrameLen1 = frameLen >> 1;
-        int decimatedFrameLen2 = frameLen >> 2;
-        int decimatedFrameLen = frameLen >> 3;
+        var decimatedFrameLen1 = frameLen >> 1;
+        var decimatedFrameLen2 = frameLen >> 2;
+        var decimatedFrameLen = frameLen >> 3;
 
-        int[] xOffset = xOffsetScratch;
+        var xOffset = xOffsetScratch;
         xOffset[0] = 0;
         xOffset[1] = decimatedFrameLen + decimatedFrameLen2;
         xOffset[2] = xOffset[1] + decimatedFrameLen;
         xOffset[3] = xOffset[2] + decimatedFrameLen2;
-        short[] x = new short[xOffset[3] + decimatedFrameLen1];
+        var x = new short[xOffset[3] + decimatedFrameLen1];
 
         // Split 0 to 8 kHz into 0 to 4 kHz and 4 to 8 kHz, reading directly from the caller's PCM frame.
         analysisFilterBankIn(pcm, offset, anaState, x, 0, x, xOffset[3], frameLen);
@@ -496,23 +496,23 @@ public final class Vad {
         analysisFilterBank(x, 0, anaState2, x, 0, x, xOffset[1], decimatedFrameLen2);
 
         // High pass filter on lowest band, -3 dB at 66 Hz. highpass_sharpness is fixed at 0, so the scaling is unity.
-        int aNegQ16 = 53084;
+        var aNegQ16 = 53084;
         aNegQ16 = (aNegQ16 * 100) / 100;
-        int bQ16 = (65536 + aNegQ16) / 2;
+        var bQ16 = (65536 + aNegQ16) / 2;
         highPassFilter(x, bQ16, aNegQ16, highPassState, x, decimatedFrameLen);
 
-        int[] xnrg = xnrgScratch;
+        var xnrg = xnrgScratch;
         int sumSquared;
-        for (int b = 0; b < N_BANDS; b++) {
+        for (var b = 0; b < N_BANDS; b++) {
             decimatedFrameLen = frameLen >> Math.min(N_BANDS - b, N_BANDS - 1);
-            int decSubFrameLen = decimatedFrameLen >> INTERNAL_SUBFRAMES_LOG2;
-            int decSubFrameOffset = 0;
+            var decSubFrameLen = decimatedFrameLen >> INTERNAL_SUBFRAMES_LOG2;
+            var decSubFrameOffset = 0;
             xnrg[b] = subFrameEnergy[b];
             sumSquared = 0;
-            for (int s = 0; s < INTERNAL_SUBFRAMES; s++) {
+            for (var s = 0; s < INTERNAL_SUBFRAMES; s++) {
                 sumSquared = 0;
-                for (int i = 0; i < decSubFrameLen; i++) {
-                    int xTmp = x[xOffset[b] + i + decSubFrameOffset] >> 3;
+                for (var i = 0; i < decSubFrameLen; i++) {
+                    var xTmp = x[xOffset[b] + i + decSubFrameOffset] >> 3;
                     sumSquared = sumSquared + xTmp * xTmp;
                 }
                 if (s < INTERNAL_SUBFRAMES - 1) {
@@ -527,10 +527,10 @@ public final class Vad {
 
         updateNoiseLevels(xnrg);
 
-        int sumSq = 0;
-        int inputTilt = 0;
-        for (int b = 0; b < N_BANDS; b++) {
-            int speechNrg = xnrg[b] - noiseLevel[b];
+        var sumSq = 0;
+        var inputTilt = 0;
+        for (var b = 0; b < N_BANDS; b++) {
+            var speechNrg = xnrg[b] - noiseLevel[b];
             if (speechNrg > 0) {
                 int nrgToNoiseRatioQ8;
                 if ((xnrg[b] & 0xFF800000) == 0) {
@@ -538,7 +538,7 @@ public final class Vad {
                 } else {
                     nrgToNoiseRatioQ8 = xnrg[b] / ((noiseLevel[b] >> 8) + 1);
                 }
-                int snrQ7 = lin2log(nrgToNoiseRatioQ8) - 8 * 128;
+                var snrQ7 = lin2log(nrgToNoiseRatioQ8) - 8 * 128;
                 sumSq = sumSq + snrQ7 * snrQ7;
                 if (speechNrg < (1 << 20)) {
                     snrQ7 = smulwb(sqrtApprox(speechNrg) << 6, snrQ7);
@@ -551,8 +551,8 @@ public final class Vad {
         int snrDbQ7 = (short) (3 * sqrtApprox(sumSq));
 
         // vad_non_binariness is fixed at 0, so the SNR scaling factor is the stock SILK constant.
-        int vadSnrFactorQ16 = (SNR_FACTOR_Q16 * 150) / 150;
-        int saQ15 = sigmQ15(smulwb(vadSnrFactorQ16, snrDbQ7) - NEGATIVE_OFFSET_Q5);
+        var vadSnrFactorQ16 = (SNR_FACTOR_Q16 * 150) / 150;
+        var saQ15 = sigmQ15(smulwb(vadSnrFactorQ16, snrDbQ7) - NEGATIVE_OFFSET_Q5);
 
         lastInputTiltQ15 = (sigmQ15(inputTilt) - 16384) << 1;
 
@@ -579,10 +579,10 @@ public final class Vad {
             minCoef = 0;
         }
 
-        for (int k = 0; k < N_BANDS; k++) {
-            int nl = noiseLevel[k];
-            int nrg = addPosSat32(px[k], noiseLevelBias[k]);
-            int invNrg = INT32_MAX / nrg;
+        for (var k = 0; k < N_BANDS; k++) {
+            var nl = noiseLevel[k];
+            var nrg = addPosSat32(px[k], noiseLevelBias[k]);
+            var invNrg = INT32_MAX / nrg;
 
             int coef;
             if (nrg > (nl << 3)) {
@@ -621,18 +621,18 @@ public final class Vad {
      */
     private static void analysisFilterBankIn(short[] in, int inOffset, int[] state,
                                              short[] outL, int outLOff, short[] outH, int outHOff, int n) {
-        int n2 = n >> 1;
-        for (int k = 0; k < n2; k++) {
-            int in32 = ((int) in[inOffset + 2 * k]) << 10;
-            int y = in32 - state[0];
-            int xx = smlawb(y, y, A_FB1_21);
-            int out1 = state[0] + xx;
+        var n2 = n >> 1;
+        for (var k = 0; k < n2; k++) {
+            var in32 = ((int) in[inOffset + 2 * k]) << 10;
+            var y = in32 - state[0];
+            var xx = smlawb(y, y, A_FB1_21);
+            var out1 = state[0] + xx;
             state[0] = in32 + xx;
 
             in32 = ((int) in[inOffset + 2 * k + 1]) << 10;
             y = in32 - state[1];
             xx = smulwb(y, A_FB1_20);
-            int out2 = state[1] + xx;
+            var out2 = state[1] + xx;
             state[1] = in32 + xx;
 
             outL[outLOff + k] = (short) sat16(rshiftRound(out2 + out1, 11));
@@ -658,18 +658,18 @@ public final class Vad {
      */
     private static void analysisFilterBank(short[] in, int inOffset, int[] state,
                                            short[] outL, int outLOff, short[] outH, int outHOff, int n) {
-        int n2 = n >> 1;
-        for (int k = 0; k < n2; k++) {
-            int in32 = ((int) in[inOffset + 2 * k]) << 10;
-            int y = in32 - state[0];
-            int xx = smlawb(y, y, A_FB1_21);
-            int out1 = state[0] + xx;
+        var n2 = n >> 1;
+        for (var k = 0; k < n2; k++) {
+            var in32 = ((int) in[inOffset + 2 * k]) << 10;
+            var y = in32 - state[0];
+            var xx = smlawb(y, y, A_FB1_21);
+            var out1 = state[0] + xx;
             state[0] = in32 + xx;
 
             in32 = ((int) in[inOffset + 2 * k + 1]) << 10;
             y = in32 - state[1];
             xx = smulwb(y, A_FB1_20);
-            int out2 = state[1] + xx;
+            var out2 = state[1] + xx;
             state[1] = in32 + xx;
 
             outL[outLOff + k] = (short) sat16(rshiftRound(out2 + out1, 11));
@@ -692,9 +692,9 @@ public final class Vad {
      * @param len   the signal length (must be even)
      */
     private static void highPassFilter(short[] in, int bQ16, int aNegQ16, int[] state, short[] out, int len) {
-        for (int k = 0; k < len; k++) {
-            int inVal = smulwb(bQ16, in[k]);
-            short outVal = (short) sat16(state[0] - inVal);
+        for (var k = 0; k < len; k++) {
+            var inVal = smulwb(bQ16, in[k]);
+            var outVal = (short) sat16(state[0] - inVal);
             state[0] = smlawb(inVal, aNegQ16, outVal);
             out[k] = outVal;
         }
@@ -764,7 +764,7 @@ public final class Vad {
      * @return {@code a + b}, or {@link #INT32_MAX} when the sum sets the sign bit
      */
     private static int addPosSat32(int a, int b) {
-        int sum = a + b;
+        var sum = a + b;
         return (sum & 0x80000000) != 0 ? INT32_MAX : sum;
     }
 
@@ -778,8 +778,8 @@ public final class Vad {
      * @return the approximate base two logarithm scaled by 128
      */
     private static int lin2log(int inLin) {
-        int lz = inLin != 0 ? Integer.numberOfLeadingZeros(inLin) : 32;
-        int fracQ7 = ror32(inLin, 24 - lz) & 0x7F;
+        var lz = inLin != 0 ? Integer.numberOfLeadingZeros(inLin) : 32;
+        var fracQ7 = ror32(inLin, 24 - lz) & 0x7F;
         return (smlawb(fracQ7, fracQ7 * (128 - fracQ7), 179)) + ((31 - lz) << 7);
     }
 
@@ -795,8 +795,8 @@ public final class Vad {
         if (x <= 0) {
             return 0;
         }
-        int lz = Integer.numberOfLeadingZeros(x);
-        int fracQ7 = ror32(x, 24 - lz) & 0x7F;
+        var lz = Integer.numberOfLeadingZeros(x);
+        var fracQ7 = ror32(x, 24 - lz) & 0x7F;
         int y;
         if ((lz & 1) != 0) {
             y = 32768;
@@ -818,21 +818,21 @@ public final class Vad {
      * @return the sigmoid value in Q15, in {@code [0, 32767]}
      */
     private static int sigmQ15(int inQ5) {
-        int[] slopeQ10 = {237, 153, 73, 30, 12, 7};
-        int[] posQ15 = {16384, 23955, 28861, 31213, 32178, 32548};
-        int[] negQ15 = {16384, 8812, 3906, 1554, 589, 219};
+        var slopeQ10 = new int[]{237, 153, 73, 30, 12, 7};
+        var posQ15 = new int[]{16384, 23955, 28861, 31213, 32178, 32548};
+        var negQ15 = new int[]{16384, 8812, 3906, 1554, 589, 219};
         if (inQ5 < 0) {
             inQ5 = -inQ5;
             if (inQ5 >= 6 * 32) {
                 return 0;
             }
-            int ind = inQ5 >> 5;
+            var ind = inQ5 >> 5;
             return negQ15[ind] - slopeQ10[ind] * (inQ5 & 0x1F);
         } else {
             if (inQ5 >= 6 * 32) {
                 return 32767;
             }
-            int ind = inQ5 >> 5;
+            var ind = inQ5 >> 5;
             return posQ15[ind] + slopeQ10[ind] * (inQ5 & 0x1F);
         }
     }
@@ -848,7 +848,7 @@ public final class Vad {
         if (rot == 0) {
             return a32;
         } else if (rot < 0) {
-            int m = -rot;
+            var m = -rot;
             return (a32 << m) | (a32 >>> (32 - m));
         } else {
             return (a32 << (32 - rot)) | (a32 >>> rot);

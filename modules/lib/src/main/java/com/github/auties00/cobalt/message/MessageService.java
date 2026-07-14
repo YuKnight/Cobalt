@@ -12,6 +12,8 @@ import com.github.auties00.cobalt.model.message.MessageInfo;
 import com.github.auties00.cobalt.model.newsletter.NewsletterMessageInfo;
 import com.github.auties00.cobalt.stanza.Stanza;
 
+import java.util.List;
+
 /**
  * Facade that fans message traffic between the outbound send pipeline and the inbound receive
  * pipeline.
@@ -178,5 +180,5 @@ public interface MessageService {
      * @param peer        the peer's LID user JID; never {@code null}
      * @param peerDevices the peer's per-device LID JIDs; never {@code null}, never empty
      */
-    record CallPeerAddressing(Jid peer, java.util.List<Jid> peerDevices) {}
+    record CallPeerAddressing(Jid peer, List<Jid> peerDevices) {}
 }

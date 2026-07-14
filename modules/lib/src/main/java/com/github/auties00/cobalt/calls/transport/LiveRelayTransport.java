@@ -12,6 +12,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -119,7 +120,7 @@ public final class LiveRelayTransport implements MediaTransport {
          * bringup thread until the channel is ready or the bringup fails. It is called once, after ICE has
          * selected the relay path; a second call after the channel is ready is a no op.
          *
-         * @throws com.github.auties00.cobalt.exception.linked.WhatsAppCallException.DataChannel if the handshake,
+         * @throws WhatsAppCallException.DataChannel if the handshake,
          *                                                                                the SCTP connect, or
          *                                                                                the channel open
          *                                                                                fails
@@ -2019,12 +2020,12 @@ public final class LiveRelayTransport implements MediaTransport {
         @Override
         public boolean equals(Object obj) {
             return obj == this
-                    || (obj instanceof TransactionKey that && java.util.Arrays.equals(transactionId, that.transactionId));
+                    || (obj instanceof TransactionKey that && Arrays.equals(transactionId, that.transactionId));
         }
 
         @Override
         public int hashCode() {
-            return java.util.Arrays.hashCode(transactionId);
+            return Arrays.hashCode(transactionId);
         }
     }
 }

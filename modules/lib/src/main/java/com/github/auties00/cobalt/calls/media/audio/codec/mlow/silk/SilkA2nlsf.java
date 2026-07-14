@@ -150,8 +150,8 @@ public final class SilkA2nlsf {
      * @param dd the polynomial order, half the filter order
      */
     private static void transPoly(int[] p, int dd) {
-        for (int k = 2; k <= dd; k++) {
-            for (int n = dd; n > k; n--) {
+        for (var k = 2; k <= dd; k++) {
+            for (var n = dd; n > k; n--) {
                 p[n - 2] -= p[n];
             }
             p[k - 2] -= p[k] << 1;
@@ -172,9 +172,9 @@ public final class SilkA2nlsf {
     private static int evalPoly(int[] p, int x, int dd) {
         // A single rolled loop runs the same multiply accumulate sequence as the order 8 unrolled form and
         // produces identical integer results.
-        int y32 = p[dd];
-        int xQ16 = x << 4;
-        for (int n = dd - 1; n >= 0; n--) {
+        var y32 = p[dd];
+        var xQ16 = x << 4;
+        for (var n = dd - 1; n >= 0; n--) {
             y32 = smlaww(p[n], y32, xQ16);
         }
         return y32;
@@ -197,12 +197,12 @@ public final class SilkA2nlsf {
     private static void init(int[] aQ16, int[] p, int[] q, int dd) {
         p[dd] = 1 << 16;
         q[dd] = 1 << 16;
-        for (int k = 0; k < dd; k++) {
+        for (var k = 0; k < dd; k++) {
             p[k] = -aQ16[dd - k - 1] - aQ16[dd + k];
             q[k] = -aQ16[dd - k - 1] + aQ16[dd + k];
         }
 
-        for (int k = dd; k > 0; k--) {
+        for (var k = dd; k > 0; k--) {
             p[k - 1] -= p[k];
             q[k - 1] += q[k];
         }
@@ -229,18 +229,18 @@ public final class SilkA2nlsf {
      * @param d    the filter order; must be even
      */
     public static void a2nlsf(short[] nlsf, int[] aQ16, int d) {
-        int dd = d >> 1;
+        var dd = d >> 1;
 
-        int[] p = new int[MAX_ORDER_LPC / 2 + 1];
-        int[] q = new int[MAX_ORDER_LPC / 2 + 1];
-        int[][] pq = {p, q};
+        var p = new int[MAX_ORDER_LPC / 2 + 1];
+        var q = new int[MAX_ORDER_LPC / 2 + 1];
+        var pq = new int[][]{p, q};
 
         init(aQ16, p, q, dd);
 
-        int[] poly = p;
+        var poly = p;
 
-        int xlo = LSF_COS_TAB_Q12[0];
-        int ylo = evalPoly(poly, xlo, dd);
+        var xlo = LSF_COS_TAB_Q12[0];
+        var ylo = evalPoly(poly, xlo, dd);
 
         int rootIx;
         if (ylo < 0) {
@@ -251,20 +251,20 @@ public final class SilkA2nlsf {
         } else {
             rootIx = 0;
         }
-        int k = 1;
-        int i = 0;
-        int thr = 0;
+        var k = 1;
+        var i = 0;
+        var thr = 0;
         while (true) {
-            int xhi = LSF_COS_TAB_Q12[k];
-            int yhi = evalPoly(poly, xhi, dd);
+            var xhi = LSF_COS_TAB_Q12[k];
+            var yhi = evalPoly(poly, xhi, dd);
 
             if ((ylo <= 0 && yhi >= thr) || (ylo >= 0 && yhi <= -thr)) {
                 thr = yhi == 0 ? 1 : 0;
 
-                int ffrac = -256;
-                for (int m = 0; m < BIN_DIV_STEPS; m++) {
-                    int xmid = rshiftRound(xlo + xhi, 1);
-                    int ymid = evalPoly(poly, xmid, dd);
+                var ffrac = -256;
+                for (var m = 0; m < BIN_DIV_STEPS; m++) {
+                    var xmid = rshiftRound(xlo + xhi, 1);
+                    var ymid = evalPoly(poly, xmid, dd);
 
                     if ((ylo <= 0 && ymid >= 0) || (ylo >= 0 && ymid <= 0)) {
                         xhi = xmid;
@@ -277,8 +277,8 @@ public final class SilkA2nlsf {
                 }
 
                 if (Math.abs(ylo) < 65536) {
-                    int den = ylo - yhi;
-                    int nom = (ylo << (8 - BIN_DIV_STEPS)) + (den >> 1);
+                    var den = ylo - yhi;
+                    var nom = (ylo << (8 - BIN_DIV_STEPS)) + (den >> 1);
                     if (den != 0) {
                         ffrac += nom / den;
                     }
@@ -349,8 +349,8 @@ public final class SilkA2nlsf {
      * @param chirpQ16 the initial chirp factor in Q16
      */
     private static void bwExpander32(int[] ar, int d, int chirpQ16) {
-        int chirpMinusOneQ16 = chirpQ16 - 65536;
-        for (int i = 0; i < d - 1; i++) {
+        var chirpMinusOneQ16 = chirpQ16 - 65536;
+        for (var i = 0; i < d - 1; i++) {
             ar[i] = smulww(chirpQ16, ar[i]);
             chirpQ16 += rshiftRound(chirpQ16 * chirpMinusOneQ16, 16);
         }

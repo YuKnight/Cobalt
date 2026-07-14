@@ -182,70 +182,70 @@ public final class GainQuantizer {
     public VoicedGains quantizeVoiced(AcbSearch.AcbParams acbg, float fcbWnrg, float gainFromSearch,
                                       float[] excFcb, float[] dLpc, int fcbSubfrlen, boolean lowRate,
                                       int prevAcbIdx, int prevFcbIdx) {
-        float fcbgain = Math.max(gainFromSearch, 0.0f);
-        float gainDb = 20.0f * log10f(fcbgain + 1.0e-16f);
+        var fcbgain = Math.max(gainFromSearch, 0.0f);
+        var gainDb = 20.0f * log10f(fcbgain + 1.0e-16f);
         gainDb = Math.min(Math.max(gainDb, V_GAIN_MIN_DB), V_GAIN_MAX_DB);
-        int maxGainIdx = Math.round((V_GAIN_MAX_DB - V_GAIN_MIN_DB) / V_GAIN_STEP_DB);
+        var maxGainIdx = Math.round((V_GAIN_MAX_DB - V_GAIN_MIN_DB) / V_GAIN_STEP_DB);
 
-        float[] acbBasisPhi = acbg.acbBasisPhi();
-        float[] acbFcb = new float[ACBG_M];
-        for (int i = 0; i < ACBG_M; i++) {
+        var acbBasisPhi = acbg.acbBasisPhi();
+        var acbFcb = new float[ACBG_M];
+        for (var i = 0; i < ACBG_M; i++) {
             acbFcb[i] = dotProd(acbBasisPhi, i * fcbSubfrlen, excFcb, 0, fcbSubfrlen);
         }
         // phiAll is the symmetric (ACBG_M + 1) system: the top left block is phiAcb, the border is acbFcb, and
         // the bottom right corner is fcbWnrg, stored row major.
-        float[] phiAll = new float[(ACBG_M + 1) * (ACBG_M + 1)];
-        float[] phiAcb = acbg.phiAcb();
-        for (int i = 0; i < ACBG_M; i++) {
-            for (int j = 0; j < ACBG_M; j++) {
+        var phiAll = new float[(ACBG_M + 1) * (ACBG_M + 1)];
+        var phiAcb = acbg.phiAcb();
+        for (var i = 0; i < ACBG_M; i++) {
+            for (var j = 0; j < ACBG_M; j++) {
                 phiAll[i * (ACBG_M + 1) + j] = phiAcb[i * ACBG_M + j];
             }
         }
-        for (int i = 0; i < ACBG_M; i++) {
+        for (var i = 0; i < ACBG_M; i++) {
             phiAll[i * (ACBG_M + 1) + ACBG_M] = acbFcb[i];
             phiAll[ACBG_M * (ACBG_M + 1) + i] = acbFcb[i];
         }
         phiAll[ACBG_M * (ACBG_M + 1) + ACBG_M] = fcbWnrg;
-        float[] dAll = new float[ACBG_M + 1];
-        float[] dAcbLpc = acbg.dAcbLpc();
+        var dAll = new float[ACBG_M + 1];
+        var dAcbLpc = acbg.dAcbLpc();
         dAll[0] = dAcbLpc[0];
         dAll[1] = dAcbLpc[1];
         dAll[ACBG_M] = dotProd(dLpc, 0, excFcb, 0, fcbSubfrlen);
 
-        int[] gainIdxs = new int[N_GAIN_STEPS];
-        float[] fcbgains = new float[N_GAIN_STEPS];
-        float[] fcbgInvProb = new float[N_GAIN_STEPS];
-        int firstGainIdx = Math.max((int) Math.floor((gainDb - V_GAIN_MIN_DB) / V_GAIN_STEP_DB) - (N_GAIN_STEPS - 1) / 2, 0);
+        var gainIdxs = new int[N_GAIN_STEPS];
+        var fcbgains = new float[N_GAIN_STEPS];
+        var fcbgInvProb = new float[N_GAIN_STEPS];
+        var firstGainIdx = Math.max((int) Math.floor((gainDb - V_GAIN_MIN_DB) / V_GAIN_STEP_DB) - (N_GAIN_STEPS - 1) / 2, 0);
         firstGainIdx = Math.min(firstGainIdx, maxGainIdx - 1);
-        int offset = (int) Math.floor((V_GAIN_MIN_DB - V_GAIN_MAX_DB) / V_GAIN_STEP_DB);
-        for (int i = 0; i < N_GAIN_STEPS; i++) {
+        var offset = (int) Math.floor((V_GAIN_MIN_DB - V_GAIN_MAX_DB) / V_GAIN_STEP_DB);
+        for (var i = 0; i < N_GAIN_STEPS; i++) {
             gainIdxs[i] = firstGainIdx + i;
             fcbgains[i] = fcbgainsV[gainIdxs[i]];
             if (prevFcbIdx == -1) {
                 fcbgInvProb[i] = gainCosts.fcbgVInvProb()[gainIdxs[i]];
             } else {
-                int delta = prevFcbIdx - gainIdxs[i];
-                int cmfIdx = delta - offset;
+                var delta = prevFcbIdx - gainIdxs[i];
+                var cmfIdx = delta - offset;
                 fcbgInvProb[i] = gainCosts.fcbgVDeltaInvProb()[cmfIdx];
             }
         }
 
-        float bestRd = 1e30f;
-        int bestAcbgIdx = 0;
-        int bestFcbgIdx = 0;
-        int transitionIdx = prevAcbIdx == -1 ? 0 : (prevAcbIdx + 1);
-        short[] cbAcbgains = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
-        float[] acbgInvProb = lowRate ? gainCosts.acbgInvProbLr()[transitionIdx] : gainCosts.acbgInvProbHr()[transitionIdx];
-        float[] gains = new float[ACBG_M + 1];
-        for (int n = 0; n < ACBG_N; n++) {
-            for (int m = 0; m < ACBG_M; m++) {
+        var bestRd = 1e30f;
+        var bestAcbgIdx = 0;
+        var bestFcbgIdx = 0;
+        var transitionIdx = prevAcbIdx == -1 ? 0 : (prevAcbIdx + 1);
+        var cbAcbgains = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
+        var acbgInvProb = lowRate ? gainCosts.acbgInvProbLr()[transitionIdx] : gainCosts.acbgInvProbHr()[transitionIdx];
+        var gains = new float[ACBG_M + 1];
+        for (var n = 0; n < ACBG_N; n++) {
+            for (var m = 0; m < ACBG_M; m++) {
                 gains[m] = cbAcbgains[n * ACBG_M + m] * Q14_SCALE;
             }
-            for (int i = 0; i < N_GAIN_STEPS; i++) {
+            for (var i = 0; i < N_GAIN_STEPS; i++) {
                 gains[ACBG_M] = fcbgains[i];
-                float werrOut = acbg.werrIn() + wnrg3(phiAll, gains)
-                        - 2.0f * (dAll[0] * gains[0] + dAll[1] * gains[1] + dAll[2] * gains[2]);
-                float rd = werrOut * fcbgInvProb[i] * acbgInvProb[n];
+                var werrOut = acbg.werrIn() + wnrg3(phiAll, gains)
+                              - 2.0f * (dAll[0] * gains[0] + dAll[1] * gains[1] + dAll[2] * gains[2]);
+                var rd = werrOut * fcbgInvProb[i] * acbgInvProb[n];
                 if (rd < bestRd) {
                     bestRd = rd;
                     bestAcbgIdx = n;
@@ -254,7 +254,7 @@ public final class GainQuantizer {
             }
         }
 
-        int fcbIdx = Math.min(Math.max(bestFcbgIdx, 0), maxGainIdx);
+        var fcbIdx = Math.min(Math.max(bestFcbgIdx, 0), maxGainIdx);
         if (Log.TRACE) {
             LOGGER.log(Level.TRACE, "voiced gain quantize: subfrlen={0} lowRate={1} acbIdx={2} fcbIdx={3}",
                     fcbSubfrlen, lowRate, bestAcbgIdx, fcbIdx);
@@ -272,9 +272,9 @@ public final class GainQuantizer {
      * @return the unvoiced fixed codebook gain index in {@code [0, UV_GAIN_IDX_LEN]}
      */
     public static int quantizeUnvoiced(float gainFromSearch) {
-        float gainDb = 20.0f * log10f(gainFromSearch + 1.0e-16f);
+        var gainDb = 20.0f * log10f(gainFromSearch + 1.0e-16f);
         gainDb = Math.min(Math.max(gainDb, UV_GAIN_MIN_DB), UV_GAIN_MAX_DB);
-        int fcbIdx = Math.round((gainDb - UV_GAIN_MIN_DB) / UV_GAIN_STEP_DB);
+        var fcbIdx = Math.round((gainDb - UV_GAIN_MIN_DB) / UV_GAIN_STEP_DB);
         if (Log.TRACE) {
             LOGGER.log(Level.TRACE, "unvoiced gain quantize: fcbIdx={0}", fcbIdx);
         }
@@ -323,19 +323,19 @@ public final class GainQuantizer {
      * @return the accumulated single precision dot product
      */
     private static float dotProd(float[] a, int aOff, float[] b, int bOff, int len) {
-        float s0 = 0.0f;
-        float s1 = 0.0f;
-        float s2 = 0.0f;
-        float s3 = 0.0f;
-        int m = len & ~3;
-        int i = 0;
+        var s0 = 0.0f;
+        var s1 = 0.0f;
+        var s2 = 0.0f;
+        var s3 = 0.0f;
+        var m = len & ~3;
+        var i = 0;
         for (; i < m; i += 4) {
             s0 += a[aOff + i] * b[bOff + i];
             s1 += a[aOff + i + 1] * b[bOff + i + 1];
             s2 += a[aOff + i + 2] * b[bOff + i + 2];
             s3 += a[aOff + i + 3] * b[bOff + i + 3];
         }
-        float acc = (s0 + s2) + (s1 + s3);
+        var acc = (s0 + s2) + (s1 + s3);
         for (; i < len; i++) {
             acc += a[aOff + i] * b[bOff + i];
         }
@@ -365,9 +365,9 @@ public final class GainQuantizer {
      * @return a freshly allocated {@code FCBG_V_N}-entry table
      */
     private static float[] buildVoicedGains() {
-        float[] tab = new float[FCBG_V_N];
-        for (int ix = 0; ix < FCBG_V_N; ix++) {
-            float db = ix * V_GAIN_STEP_DB + V_GAIN_MIN_DB;
+        var tab = new float[FCBG_V_N];
+        for (var ix = 0; ix < FCBG_V_N; ix++) {
+            var db = ix * V_GAIN_STEP_DB + V_GAIN_MIN_DB;
             tab[ix] = (float) Math.pow(10.0, 0.05f * db);
         }
         return tab;
@@ -383,9 +383,9 @@ public final class GainQuantizer {
      * @return a freshly allocated {@code UV_GAIN_IDX_LEN + 1}-entry table
      */
     private static float[] buildUnvoicedGains() {
-        float[] tab = new float[UV_GAIN_IDX_LEN + 1];
-        for (int ix = 0; ix <= UV_GAIN_IDX_LEN; ix++) {
-            float db = ix * UV_GAIN_STEP_DB + UV_GAIN_MIN_DB;
+        var tab = new float[UV_GAIN_IDX_LEN + 1];
+        for (var ix = 0; ix <= UV_GAIN_IDX_LEN; ix++) {
+            var db = ix * UV_GAIN_STEP_DB + UV_GAIN_MIN_DB;
             tab[ix] = (float) Math.pow(10.0, 0.05f * db);
         }
         return tab;

@@ -34,6 +34,7 @@ import com.github.auties00.cobalt.stanza.StanzaBuilder;
 import com.github.auties00.cobalt.util.DataUtils;
 
 import java.lang.System.Logger.Level;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -1858,7 +1859,7 @@ public final class LifecycleController {
             // hold for contacts; the internal Call keeps the LID creator for reply addressing.
             var callerForApp = offer.callerPnValue().map(Jid::toUserJid).orElse(creator.toUserJid());
             var chatForApp = group ? chatJid : callerForApp;
-            var incoming = new IncomingCall(callId, callerForApp, chatForApp, java.time.Instant.now(),
+            var incoming = new IncomingCall(callId, callerForApp, chatForApp, Instant.now(),
                     offer.isVideo(), group, offer.groupJidValue().orElse(null), false);
             return Optional.of(incoming);
         } finally {
@@ -2339,7 +2340,7 @@ public final class LifecycleController {
      * always active on connect. The connected peer test reads the call's
      * {@link CallMembership#participantProvider() participant provider}
      * ({@link com.github.auties00.cobalt.calls.engine.participant.ParticipantProvider#firstConnectedPeer()}),
-     * whose per slot {@link com.github.auties00.cobalt.calls.engine.participant.CallParticipant} aggregates
+     * whose per slot {@link CallParticipant} aggregates
      * carry the membership state projected from each roster entry's {@code "connected"} literal.
      *
      * @param orchestrated the call whose media plane connected
@@ -2877,7 +2878,7 @@ public final class LifecycleController {
      * Handles an inbound {@code mute_v2}: a peer reported its own mute state or asked the local user to mute.
      *
      * <p>Routes a peer mute request to the call's {@link MuteController#onPeerMuteRequest(Jid)}, which
-     * surfaces a {@link com.github.auties00.cobalt.calls.engine.control.event.MuteByAnotherParticipant} unless the
+     * surfaces a {@link MuteByAnotherParticipant} unless the
      * recent unmute lockout is active, and a peer self state report to
      * {@link MuteController#onPeerMuted(Jid)}, which satisfies a pending outbound peer mute request without
      * re emitting. A {@code mute_v2} for an untracked call, or one whose control units are not built, is
@@ -2912,7 +2913,7 @@ public final class LifecycleController {
      *
      * @implNote This implementation mirrors the participant plane writes made alongside the host event: it
      * sets the participant's video state code (the value
-     * {@link com.github.auties00.cobalt.calls.engine.participant.CallParticipant#videoState(int)} reads back)
+     * {@link CallParticipant#videoState(int)} reads back)
      * and toggles the reporting device's per device video enabled flag. The subscribed encoded stream id the
      * view also carries is driven by the video subscription manager in the media plane, not by this signaling
      * path, so it is not set here.
@@ -2934,9 +2935,9 @@ public final class LifecycleController {
      * Handles an inbound {@code screen_share}: a peer reported a change in its screen share stream.
      *
      * <p>Routes the report to the call's
-     * {@link ScreenShareController#onPeerScreenShare(Jid, com.github.auties00.cobalt.calls.engine.control.ScreenShareState, int)
+     * {@link ScreenShareController#onPeerScreenShare(Jid, ScreenShareState, int)
      * onPeerScreenShare}, resolving the numeric wire state through
-     * {@link com.github.auties00.cobalt.calls.engine.control.ScreenShareState#ofCode(int)}; an unrecognized
+     * {@link ScreenShareState#ofCode(int)}; an unrecognized
      * state code is dropped. A {@code screen_share} for an untracked call, or one whose control units are not
      * built, is ignored.
      *
@@ -2971,7 +2972,7 @@ public final class LifecycleController {
      * @param senderJid the reporting device JID whose owning participant is mutated
      * @param mutation  the mutation to apply to the resolved participant aggregate
      */
-    private void projectPeerMediaState(String callId, Jid senderJid, java.util.function.Consumer<CallParticipant> mutation) {
+    private void projectPeerMediaState(String callId, Jid senderJid, Consumer<CallParticipant> mutation) {
         var orchestrated = calls.get(callId);
         if (orchestrated == null) {
             return;
@@ -3043,7 +3044,7 @@ public final class LifecycleController {
      * @param callId the identifier of the call whose control units the action targets
      * @param action the action to run against the call's control units
      */
-    private void withControls(String callId, java.util.function.Consumer<CallControls> action) {
+    private void withControls(String callId, Consumer<CallControls> action) {
         var orchestrated = calls.get(callId);
         if (orchestrated == null) {
             return;
@@ -3072,9 +3073,9 @@ public final class LifecycleController {
      * are also constructed over the media session's {@link AppDataController} and wired onto the same
      * {@link ControlEventBridge}: the {@link ReactionController} attaches its outbound send seam to
      * {@link AppDataController#sendReaction(String)} and registers itself as the controller's inbound
-     * reaction observer ({@link AppDataController#attachReactionObserver(java.util.function.BiConsumer)} plus
+     * reaction observer ({@link AppDataController#attachReactionObserver(BiConsumer)} plus
      * the reaction clear sweep), the {@link TranscriptionController} registers as the inbound transcription
-     * observer ({@link AppDataController#attachTranscriptionObserver(java.util.function.BiConsumer)}), and the
+     * observer ({@link AppDataController#attachTranscriptionObserver(BiConsumer)}), and the
      * {@link ImuDataController} is built over the call's outbound IMU app data send. A call whose transport
      * carries no app data plane skips the three app data units, which are then left unset on the holder. The
      * units are stored on the orchestration handle and closed on teardown. This is idempotent: a call whose
@@ -3436,7 +3437,7 @@ public final class LifecycleController {
      * crypto facade's rekey fanout, which skips a device whose encryption fails rather than aborting the
      * whole rotation. A rekey carries the local device JID as its call creator and an omitted transaction id,
      * since the placement and membership change rounds do not stamp the self rekey transaction counter bounded
-     * below {@link com.github.auties00.cobalt.calls.signaling.incall.RekeyStanza#MAX_TRANSACTION_ID}.
+     * below {@link RekeyStanza#MAX_TRANSACTION_ID}.
      *
      * @implNote This implementation sends each connected participant device its own
      * {@code <call to="<deviceLid>"><enc_rekey>} carrying one {@code <enc>} (a single 32 byte key, the same
@@ -3455,7 +3456,7 @@ public final class LifecycleController {
             return;
         }
         var plaintext = crypto.wrapCallKey(callKey);
-        List<CallRekeyEnvelope> envelopes = crypto.encryptRekeyFanout(recipients, plaintext);
+        var envelopes = crypto.encryptRekeyFanout(recipients, plaintext);
         var callId = orchestrated.callId();
         for (var envelope : envelopes) {
             var rekey = envelope.toNode(callId, self, -1);

@@ -32,7 +32,7 @@ final class EmojiResources {
      * @throws UncheckedIOException if the resource is absent
      */
     static DataInputStream open(String name) {
-        InputStream stream = EmojiResources.class.getResourceAsStream(name);
+        var stream = EmojiResources.class.getResourceAsStream(name);
         if (stream == null) {
             throw new UncheckedIOException(new IOException("Missing emoji resource: " + name));
         }
@@ -47,7 +47,7 @@ final class EmojiResources {
      * @return a buffered {@link DataInputStream} over the resource, or {@code null} when absent
      */
     static DataInputStream openOptional(String name) {
-        InputStream stream = EmojiResources.class.getResourceAsStream(name);
+        var stream = EmojiResources.class.getResourceAsStream(name);
         return stream == null ? null : new DataInputStream(new BufferedInputStream(stream));
     }
 
@@ -59,8 +59,8 @@ final class EmojiResources {
      * @throws IOException if the stream ends before the declared number of bytes is read
      */
     static String readString(DataInputStream in) throws IOException {
-        int length = in.readInt();
-        byte[] bytes = in.readNBytes(length);
+        var length = in.readInt();
+        var bytes = in.readNBytes(length);
         if (bytes.length != length) {
             throw new IOException("Truncated emoji resource string: expected " + length + ", got " + bytes.length);
         }

@@ -1651,7 +1651,7 @@ public final class LiveLidMigrationService implements LidMigrationService {
      * ({@code numberOfUserChatsWithoutAccountLid}, only when
      * {@link #isLidMigrated()} is {@code true}), regular phone-number chats
      * ({@code numberOfRegularPnChats}), groups partitioned by whether their
-     * {@link com.github.auties00.cobalt.model.chat.group.GroupMetadata#isLidAddressingMode()}
+     * {@link GroupMetadata#isLidAddressingMode()}
      * is set ({@code numberOfLidGroups} vs {@code numberOfPnGroups}), and the
      * click-to-WhatsApp phone-number-hiding threads partitioned by whether
      * {@link #toPn(Jid)} can resolve their phone number

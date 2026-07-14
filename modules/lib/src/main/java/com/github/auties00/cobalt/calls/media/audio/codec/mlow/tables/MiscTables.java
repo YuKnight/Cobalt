@@ -457,9 +457,9 @@ public final class MiscTables {
      * @return a freshly allocated {@code int[rows][]} of built CMFs, one per row
      */
     private static int[][] buildRowCmfs(byte[] flat, int rowLen) {
-        int rows = flat.length / rowLen;
-        int[][] out = new int[rows][];
-        for (int r = 0; r < rows; r++) {
+        var rows = flat.length / rowLen;
+        var out = new int[rows][];
+        for (var r = 0; r < rows; r++) {
             out[r] = CmfBuilder.dcmfToCmf(flat, r * rowLen, rowLen);
         }
         return out;
@@ -474,8 +474,8 @@ public final class MiscTables {
      * @return a freshly allocated {@code byte[]} of the same length, each entry the narrowed input
      */
     private static byte[] unsignedBytes(int... values) {
-        byte[] out = new byte[values.length];
-        for (int i = 0; i < values.length; i++) {
+        var out = new byte[values.length];
+        for (var i = 0; i < values.length; i++) {
             out[i] = (byte) values[i];
         }
         return out;

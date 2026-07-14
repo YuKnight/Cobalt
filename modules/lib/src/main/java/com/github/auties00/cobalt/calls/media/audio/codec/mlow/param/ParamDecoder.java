@@ -12,6 +12,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PulseTable
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Decodes the low band parameter set of every internal frame in an MLow speech codec packet.
@@ -183,7 +184,7 @@ public final class ParamDecoder {
         this.prevNrgresIdx = -1;
         this.prevVoiced = 0;
         this.pitchLagDecoder.reset();
-        java.util.Arrays.fill(previousLsf, 0.0f);
+        Arrays.fill(previousLsf, 0.0f);
     }
 
     /**
@@ -306,16 +307,16 @@ public final class ParamDecoder {
         } else {
             rangeDecoder.reset(packet, offset + 1, length - 1);
         }
-        MlowRangeDecoder decoder = rangeDecoder;
-        int numFrames = toc.numFrames();
+        var decoder = rangeDecoder;
+        var numFrames = toc.numFrames();
         if (toc.fec() && !fecRecovery) {
             if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mlow param decode: skipping fec leading frames={0}", numFrames);
             skipLeadingFec(decoder, toc, numFrames);
         }
-        int decodedFrames = toc.sid() ? 1 : numFrames;
-        DecodedFrame[] out = new DecodedFrame[decodedFrames];
-        boolean condCoding = false;
-        for (int frame = 0; frame < decodedFrames; frame++) {
+        var decodedFrames = toc.sid() ? 1 : numFrames;
+        var out = new DecodedFrame[decodedFrames];
+        var condCoding = false;
+        for (var frame = 0; frame < decodedFrames; frame++) {
             out[frame] = decodeFrame(decoder, toc, frame, condCoding);
             condCoding = true;
         }
@@ -346,8 +347,8 @@ public final class ParamDecoder {
      * @param numFrames the number of leading LBRR frames to skip, the packet's internal frame count
      */
     private void skipLeadingFec(MlowRangeDecoder decoder, MlowTocByte toc, int numFrames) {
-        boolean condCoding = false;
-        for (int frame = 0; frame < numFrames; frame++) {
+        var condCoding = false;
+        for (var frame = 0; frame < numFrames; frame++) {
             decodeFrame(decoder, toc, frame, condCoding);
             condCoding = true;
         }
@@ -370,21 +371,21 @@ public final class ParamDecoder {
      * @return the decoded parameters of the frame
      */
     public DecodedFrame decodeFrame(MlowRangeDecoder decoder, MlowTocByte toc, int frameNum, boolean condCoding) {
-        int framelen = toc.frameLength16();
-        int numSubfr = toc.numSubframes();
-        boolean codedAsActiveVoice = toc.codedAsActiveVoice();
-        boolean lowRate = toc.lowRate();
-        boolean sid = toc.sid();
+        var framelen = toc.frameLength16();
+        var numSubfr = toc.numSubframes();
+        var codedAsActiveVoice = toc.codedAsActiveVoice();
+        var lowRate = toc.lowRate();
+        var sid = toc.sid();
 
         int voiced;
         if (codedAsActiveVoice) {
-            int[] cmf = MiscTables.VUV_CMFS[frameNum == 0 ? 0 : prevVoiced == 0 ? 1 : 2];
+            var cmf = MiscTables.VUV_CMFS[frameNum == 0 ? 0 : prevVoiced == 0 ? 1 : 2];
             voiced = MlowEntropyWrapper.decodeUpdate(decoder, cmf);
         } else {
             voiced = 0;
         }
 
-        boolean cond = condCoding && (voiced == prevVoiced);
+        var cond = condCoding && (voiced == prevVoiced);
         if (!cond) {
             if (Log.TRACE) {
                 LOGGER.log(Level.TRACE, "mlow param decode: resetting predictors frame={0} voiced={1}",
@@ -397,11 +398,11 @@ public final class ParamDecoder {
         }
         prevVoiced = voiced;
 
-        LsfDequantizer.DecodedLsf lsf =
+        var lsf =
                 lsfDequantizer.decode(decoder, voiced, lowRate ? 1 : 0, cond, previousLsf);
         System.arraycopy(lsf.lsf(), 0, previousLsf, 0, LPC_ORDER);
 
-        int lsfInterpolIdx = 0;
+        var lsfInterpolIdx = 0;
         if (codedAsActiveVoice && numSubfr > 1) {
             lsfInterpolIdx = MlowEntropyWrapper.decodeUpdate(decoder, MiscTables.LSF_INTERP_CMF);
         }
@@ -414,21 +415,21 @@ public final class ParamDecoder {
             pulses = new PulseDecoder.Result(0, 0, new short[framelen], new short[framelen], new short[numSubfr]);
         }
 
-        int[] acbgIdx = new int[numSubfr];
-        int[] fcbgIdx = new int[numSubfr];
+        var acbgIdx = new int[numSubfr];
+        var fcbgIdx = new int[numSubfr];
         int[] laginds;
-        int blocksegsIx = -1;
-        int nrgresFrameQi = 0;
-        int nrgresShapeQi = 0;
+        var blocksegsIx = -1;
+        var nrgresFrameQi = 0;
+        var nrgresShapeQi = 0;
         int[] nrgresDbqQ14;
 
         if (codedAsActiveVoice && voiced != 0) {
-            int meanAcbgQ14 = decodeVoicedGains(decoder, pulses.sfPulses(), numSubfr, lowRate, acbgIdx, fcbgIdx);
+            var meanAcbgQ14 = decodeVoicedGains(decoder, pulses.sfPulses(), numSubfr, lowRate, acbgIdx, fcbgIdx);
             laginds = pitchLagDecoder.decodeLags(decoder, meanAcbgQ14);
             blocksegsIx = pitchLagDecoder.lastBlocksegsIx();
             nrgresDbqQ14 = new int[numSubfr];
         } else {
-            ResNrgDequantizer.DecodeResult res =
+            var res =
                     resNrgDequantizer.decode(decoder, numSubfr, toShortlessIntArray(pulses.sfPulses()));
             nrgresFrameQi = res.nrgresFrameQi();
             nrgresShapeQi = res.nrgresShapeQi();
@@ -480,9 +481,9 @@ public final class ParamDecoder {
     private int decodeVoicedGains(MlowRangeDecoder decoder, short[] sfPulses, int numSubfr, boolean lowRate,
                                   int[] acbgIdx, int[] fcbgIdx) {
         long meanAcbgQ14 = 0;
-        short[] acbgCbk = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
-        for (int sf = 0; sf < numSubfr; sf++) {
-            int[] cmf = lowRate ? MiscTables.acbGainsCmfLr(prevAcbIdx + 1) : MiscTables.acbGainsCmfHr(prevAcbIdx + 1);
+        var acbgCbk = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
+        for (var sf = 0; sf < numSubfr; sf++) {
+            var cmf = lowRate ? MiscTables.acbGainsCmfLr(prevAcbIdx + 1) : MiscTables.acbGainsCmfHr(prevAcbIdx + 1);
             acbgIdx[sf] = MlowEntropyWrapper.decodeUpdate(decoder, cmf);
             prevAcbIdx = acbgIdx[sf];
             meanAcbgQ14 += acbgCbk[prevAcbIdx * ACBG_M] + 2 * acbgCbk[prevAcbIdx * ACBG_M + 1];
@@ -490,9 +491,9 @@ public final class ParamDecoder {
                 if (prevFcbIdx == -1) {
                     fcbgIdx[sf] = MlowEntropyWrapper.decodeUpdate(decoder, MiscTables.fcbgVCmf());
                 } else {
-                    int minDelta = -prevFcbIdx;
-                    int maxDelta = (FCBG_V_N - 1) - prevFcbIdx;
-                    int delta = MlowEntropyWrapper.decodeUpdate(decoder, MiscTables.fcbgVDeltaCmf(),
+                    var minDelta = -prevFcbIdx;
+                    var maxDelta = (FCBG_V_N - 1) - prevFcbIdx;
+                    var delta = MlowEntropyWrapper.decodeUpdate(decoder, MiscTables.fcbgVDeltaCmf(),
                             (FCBG_V_N - 1) + minDelta, maxDelta - minDelta + 2) + minDelta;
                     fcbgIdx[sf] = prevFcbIdx + delta;
                 }
@@ -510,8 +511,8 @@ public final class ParamDecoder {
      * @return a freshly allocated {@code int} copy of {@code sfPulses}
      */
     private static int[] toShortlessIntArray(short[] sfPulses) {
-        int[] out = new int[sfPulses.length];
-        for (int i = 0; i < sfPulses.length; i++) {
+        var out = new int[sfPulses.length];
+        for (var i = 0; i < sfPulses.length; i++) {
             out[i] = sfPulses[i];
         }
         return out;

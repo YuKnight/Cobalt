@@ -356,14 +356,14 @@ public final class NetEqExpand {
      * @param history the decoded PCM history to analyze; never {@code null}
      */
     void analyzeSignal(NetEqSyncBuffer history) {
-        int capacity = history.capacity();
-        int needed = fsMult * 256;
+        var capacity = history.capacity();
+        var needed = fsMult * 256;
         var full = new short[Math.max(needed, DOWNSAMPLE_LENGTH * fsMult * 4)];
-        int copy = Math.min(full.length, capacity);
+        var copy = Math.min(full.length, capacity);
         history.copyRange(capacity - copy, full, full.length - copy, copy);
 
         var decimated = new short[DOWNSAMPLE_LENGTH];
-        int produced = NetEqSignalProcessing.downsampleTo4kHz(decimated, full, full.length, DOWNSAMPLE_LENGTH,
+        var produced = NetEqSignalProcessing.downsampleTo4kHz(decimated, full, full.length, DOWNSAMPLE_LENGTH,
                 fsHz, false);
         if (produced < DOWNSAMPLE_LENGTH) {
             maxLag = 0;
@@ -378,17 +378,17 @@ public final class NetEqExpand {
         }
 
         var correlation = new int[CORRELATION_LAGS];
-        int anchorPos = DOWNSAMPLE_LENGTH - CORRELATION_SPAN;
-        int slidePos = anchorPos - 4;
-        int corrShift = NetEqSignalProcessing.crossCorrelationScaled(correlation, decimated, anchorPos,
+        var anchorPos = DOWNSAMPLE_LENGTH - CORRELATION_SPAN;
+        var slidePos = anchorPos - 4;
+        var corrShift = NetEqSignalProcessing.crossCorrelationScaled(correlation, decimated, anchorPos,
                 decimated, slidePos, CORRELATION_SPAN, CORRELATION_LAGS, -1);
 
-        int dominant = bestRegionLag(correlation);
+        var dominant = bestRegionLag(correlation);
         maxLag = dominant * fsMult;
 
         fitModel(decimated, produced);
 
-        int dominantCorrelation = normalizedDominantCorrelation(correlation, corrShift);
+        var dominantCorrelation = normalizedDominantCorrelation(correlation, corrShift);
         voiceMixFactor = voiceMixCubic(dominantCorrelation);
         currentVoiceMixFactor = voiceMixFactor;
 
@@ -414,17 +414,17 @@ public final class NetEqExpand {
      * @return the four kilohertz lag of the best region
      */
     private int bestRegionLag(int[] correlation) {
-        int peakLag = 0;
-        int peakValue = Integer.MIN_VALUE;
-        for (int i = 0; i < CORRELATION_LAGS; i++) {
+        var peakLag = 0;
+        var peakValue = Integer.MIN_VALUE;
+        for (var i = 0; i < CORRELATION_LAGS; i++) {
             if (correlation[i] > peakValue) {
                 peakValue = correlation[i];
                 peakLag = i;
             }
         }
-        int clampHigh = fsMult * 120 - 1;
-        int base = fsMult * 20;
-        int lag4k = base + peakLag;
+        var clampHigh = fsMult * 120 - 1;
+        var base = fsMult * 20;
+        var lag4k = base + peakLag;
         if (lag4k > clampHigh) {
             lag4k = clampHigh;
         }
@@ -442,8 +442,8 @@ public final class NetEqExpand {
      * @return the normalized dominant correlation, in {@code [0, 16384]}
      */
     private int normalizedDominantCorrelation(int[] correlation, int corrShift) {
-        int peak = 0;
-        for (int v : correlation) {
+        var peak = 0;
+        for (var v : correlation) {
             if (v > peak) {
                 peak = v;
             }
@@ -451,8 +451,8 @@ public final class NetEqExpand {
         if (peak <= 0) {
             return 0;
         }
-        int zero = correlation[0] > 0 ? correlation[0] : peak;
-        long scaled = ((long) peak << 14) / zero;
+        var zero = correlation[0] > 0 ? correlation[0] : peak;
+        var scaled = ((long) peak << 14) / zero;
         if (scaled > Q14_ONE) {
             scaled = Q14_ONE;
         }
@@ -477,9 +477,9 @@ public final class NetEqExpand {
      */
     private void fitModel(short[] decimated, int length) {
         var r = new int[LPC_TAPS];
-        for (int k = 0; k < LPC_TAPS; k++) {
+        for (var k = 0; k < LPC_TAPS; k++) {
             long sum = 0;
-            for (int i = 0; i + k < length; i++) {
+            for (var i = 0; i + k < length; i++) {
                 sum += (long) decimated[i] * decimated[i + k];
             }
             r[k] = (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, sum >> 6));
@@ -508,29 +508,29 @@ public final class NetEqExpand {
      * @param full the full rate history the excitation is synthesized from
      */
     private void deriveExcitationGain(short[] full) {
-        int srcLen = full.length;
+        var srcLen = full.length;
         var excitation = new short[AR_FILTER_ORDER + EXCITATION_LENGTH];
-        for (int j = 0; j < AR_FILTER_ORDER; j++) {
-            int idx = srcLen - EXCITATION_LENGTH - AR_FILTER_ORDER + j;
+        for (var j = 0; j < AR_FILTER_ORDER; j++) {
+            var idx = srcLen - EXCITATION_LENGTH - AR_FILTER_ORDER + j;
             excitation[j] = idx >= 0 ? full[idx] : 0;
         }
-        for (int i = 0; i < EXCITATION_LENGTH; i++) {
-            int idx = srcLen - EXCITATION_LENGTH + i;
+        for (var i = 0; i < EXCITATION_LENGTH; i++) {
+            var idx = srcLen - EXCITATION_LENGTH + i;
             excitation[AR_FILTER_ORDER + i] = idx >= 0 ? full[idx] : 0;
         }
         NetEqSignalProcessing.filterAr(excitation, AR_FILTER_ORDER, arCoefficients, AR_FILTER_ORDER,
                 EXCITATION_LENGTH);
 
-        int maxAbs = NetEqSignalProcessing.maxAbs16(excitation, AR_FILTER_ORDER, EXCITATION_LENGTH);
+        var maxAbs = NetEqSignalProcessing.maxAbs16(excitation, AR_FILTER_ORDER, EXCITATION_LENGTH);
         long energy = 0;
-        for (int i = 0; i < EXCITATION_LENGTH; i++) {
+        for (var i = 0; i < EXCITATION_LENGTH; i++) {
             int v = excitation[AR_FILTER_ORDER + i];
             energy += (long) v * v;
         }
-        int root = NetEqSignalProcessing.sqrtFloor((int) Math.min(Integer.MAX_VALUE, energy >> 7));
+        var root = NetEqSignalProcessing.sqrtFloor((int) Math.min(Integer.MAX_VALUE, energy >> 7));
         backgroundNoiseLevel = root;
 
-        int shift = maxAbs == 0 ? 0 : Math.max(0, 16 - Integer.numberOfLeadingZeros(maxAbs));
+        var shift = maxAbs == 0 ? 0 : Math.max(0, 16 - Integer.numberOfLeadingZeros(maxAbs));
         excitationGain = Math.max(1, root == 0 ? Q14_ONE : Math.min(Q14_ONE, (root << 1)));
         excitationGainShift = shift;
     }
@@ -555,10 +555,10 @@ public final class NetEqExpand {
         if (correlation < VOICED_THRESHOLD) {
             return 0;
         }
-        int c = correlation;
-        int c2 = (int) (((long) c * c >> 14) & 0xFFFF);
-        int term = 19_931 * c + c2 * -16_422 + (((c2 * c) >> 14) * 5_776) - 84_852_736;
-        int mix = term / 4_096;
+        var c = correlation;
+        var c2 = (int) (((long) c * c >> 14) & 0xFFFF);
+        var term = 19_931 * c + c2 * -16_422 + (((c2 * c) >> 14) * 5_776) - 84_852_736;
+        var mix = term / 4_096;
         if (mix >= Q14_ONE) {
             mix = Q14_ONE;
         }
@@ -588,8 +588,8 @@ public final class NetEqExpand {
             case 32_000 -> { muteSlope = 1_560; muteStart = 31_208; }
             default -> { muteSlope = 1_057; muteStart = 31_711; }
         }
-        int numerator = consecutiveExpands == 3 ? MUTE_PERIOD_FAST : MUTE_PERIOD_SLOW;
-        int fade = numerator / Math.max(1, fsMult);
+        var numerator = consecutiveExpands == 3 ? MUTE_PERIOD_FAST : MUTE_PERIOD_SLOW;
+        var fade = numerator / Math.max(1, fsMult);
         bgnFade = bgnFade == 0 ? fade : Math.min(bgnFade, fade);
     }
 
@@ -627,8 +627,8 @@ public final class NetEqExpand {
      * @return the synthesized frame, {@code frameSamples} long
      */
     private short[] synthesize(NetEqSyncBuffer history, int frameSamples) {
-        int capacity = history.capacity();
-        int period = maxLag > 0 ? maxLag : Math.min(frameSamples, capacity);
+        var capacity = history.capacity();
+        var period = maxLag > 0 ? maxLag : Math.min(frameSamples, capacity);
         if (period <= 0) {
             return new short[frameSamples];
         }
@@ -637,17 +637,17 @@ public final class NetEqExpand {
         var unvoiced = noiseExcitation(history, frameSamples, period);
 
         var out = new short[frameSamples];
-        int rampV = Math.min(muteStart, muteFactor << 1);
-        int rampU = Math.max(muteSlope, Q14_ONE - muteFactor);
-        int gain = Math.max(0, BGN_GAIN_SEED - (consecutiveExpands * bgnFade * frameSamples));
-        int vmf = currentVoiceMixFactor;
-        for (int i = 0; i < frameSamples; i++) {
+        var rampV = Math.min(muteStart, muteFactor << 1);
+        var rampU = Math.max(muteSlope, Q14_ONE - muteFactor);
+        var gain = Math.max(0, BGN_GAIN_SEED - (consecutiveExpands * bgnFade * frameSamples));
+        var vmf = currentVoiceMixFactor;
+        for (var i = 0; i < frameSamples; i++) {
             int v = voiced[i];
             int u = unvoiced[i];
-            int mixed = ((u * vmf) >> 14) * (short) rampU;
-            int blended = (v * (short) rampV + mixed + 16_384) >> 15;
-            int bgn = ((backgroundNoiseSample(unvoiced, i) * (gain >> 6)) - 8_192) >> 14;
-            int sample = blended + ((bgn * (Q14_ONE - vmf)) >> 14);
+            var mixed = ((u * vmf) >> 14) * (short) rampU;
+            var blended = (v * (short) rampV + mixed + 16_384) >> 15;
+            var bgn = ((backgroundNoiseSample(unvoiced, i) * (gain >> 6)) - 8_192) >> 14;
+            var sample = blended + ((bgn * (Q14_ONE - vmf)) >> 14);
             out[i] = (short) sample;
             rampV = rampV - muteSlope;
             rampU = rampU + muteSlope;
@@ -679,14 +679,14 @@ public final class NetEqExpand {
      * @return the periodic voiced excitation, {@code frameSamples} long
      */
     private short[] periodicExcitation(NetEqSyncBuffer history, int frameSamples, int period) {
-        int capacity = history.capacity();
+        var capacity = history.capacity();
         var buffer = new short[AR_FILTER_ORDER + frameSamples];
-        for (int j = 0; j < AR_FILTER_ORDER; j++) {
-            int idx = capacity - AR_FILTER_ORDER + j;
+        for (var j = 0; j < AR_FILTER_ORDER; j++) {
+            var idx = capacity - AR_FILTER_ORDER + j;
             buffer[j] = idx >= 0 ? perturb(history.at(idx)) : 0;
         }
         for (int i = 0, phase = 0; i < frameSamples; i++) {
-            int idx = capacity - period + phase;
+            var idx = capacity - period + phase;
             buffer[AR_FILTER_ORDER + i] = idx >= 0 && idx < capacity ? history.at(idx) : 0;
             if (++phase == period) {
                 phase = 0;
@@ -715,23 +715,23 @@ public final class NetEqExpand {
      * @return the unvoiced noise excitation, {@code frameSamples} long
      */
     private short[] noiseExcitation(NetEqSyncBuffer history, int frameSamples, int period) {
-        int capacity = history.capacity();
+        var capacity = history.capacity();
         var raw = new short[frameSamples];
         for (int i = 0, phase = 0; i < frameSamples; i++) {
-            int idx = capacity - period + phase;
+            var idx = capacity - period + phase;
             raw[i] = idx >= 0 && idx < capacity ? perturb(history.at(idx)) : 0;
             if (++phase == period) {
                 phase = 0;
             }
         }
         var scaled = new short[frameSamples];
-        int round = excitationGainShift > 0 ? 1 << (excitationGainShift - 1) : 0;
+        var round = excitationGainShift > 0 ? 1 << (excitationGainShift - 1) : 0;
         NetEqSignalProcessing.scaleVector(scaled, 0, raw, 0, excitationGain, round, excitationGainShift,
                 frameSamples);
 
         var buffer = new short[AR_FILTER_ORDER + frameSamples];
-        for (int j = 0; j < AR_FILTER_ORDER; j++) {
-            int idx = capacity - AR_FILTER_ORDER + j;
+        for (var j = 0; j < AR_FILTER_ORDER; j++) {
+            var idx = capacity - AR_FILTER_ORDER + j;
             buffer[j] = idx >= 0 ? perturb(history.at(idx)) : 0;
         }
         NetEqSignalProcessing.filterArInput(scaled, 0, buffer, AR_FILTER_ORDER, arCoefficients, AR_FILTER_ORDER,
@@ -756,7 +756,7 @@ public final class NetEqExpand {
     private int backgroundNoiseSample(short[] unvoiced, int i) {
         // TODO: WhatsApp shapes the floor from a fixed background noise template; this approximates it with
         //  the unvoiced excitation bounded by the analyzed energy root.
-        int floor = backgroundNoiseLevel;
+        var floor = backgroundNoiseLevel;
         if (floor <= 0) {
             return unvoiced[i];
         }

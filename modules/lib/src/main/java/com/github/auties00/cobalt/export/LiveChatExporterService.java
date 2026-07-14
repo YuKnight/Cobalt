@@ -211,7 +211,7 @@ public final class LiveChatExporterService implements ChatExporterService {
 
             var limit = Math.max(0, options.messageLimit());
             var hasMoreHistory = filtered.size() > limit;
-            List<ChatMessageInfo> messages = hasMoreHistory
+            var messages = hasMoreHistory
                     ? filtered.subList(filtered.size() - limit, filtered.size())
                     : filtered;
             if (Log.DEBUG) {

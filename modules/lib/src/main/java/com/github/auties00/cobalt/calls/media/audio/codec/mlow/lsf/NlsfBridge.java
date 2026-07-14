@@ -111,19 +111,19 @@ public final class NlsfBridge {
      *         when {@code d} exceeds {@value #LPC_ORDER}
      */
     public static float[] nlsf2a(float[] nlsf, int d) {
-        float[] a = new float[d + 1];
+        var a = new float[d + 1];
         if (d > LPC_ORDER) {
             return a;
         }
-        short[] nlsf16 = new short[d];
-        for (int i = 0; i < d; i++) {
+        var nlsf16 = new short[d];
+        for (var i = 0; i < d; i++) {
             nlsf16[i] = (short) Math.round(nlsf[i] * SCALE1_NUM / SMPL_PI);
         }
-        int[] a32QA1 = new int[LPC_ORDER + 1];
+        var a32QA1 = new int[LPC_ORDER + 1];
         SilkNlsf2a.nlsf2a32(a32QA1, nlsf16, d);
 
         a[0] = 1.0f;
-        for (int i = 0; i < d; i++) {
+        for (var i = 0; i < d; i++) {
             a[i + 1] = -a32QA1[i] * SCALE2;
         }
         return a;

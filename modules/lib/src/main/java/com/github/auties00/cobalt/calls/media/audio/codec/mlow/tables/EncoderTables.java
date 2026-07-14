@@ -359,7 +359,7 @@ public final class EncoderTables {
      * @return the shared encoder LSF search tables
      */
     public static LsfSearch lsfSearch() {
-        LsfSearch local = cachedLsf;
+        var local = cachedLsf;
         if (local == null) {
             synchronized (EncoderTables.class) {
                 local = cachedLsf;
@@ -383,7 +383,7 @@ public final class EncoderTables {
      * @return the shared gain inverse-probability cost tables
      */
     public static GainCosts gainCosts() {
-        GainCosts local = cachedGains;
+        var local = cachedGains;
         if (local == null) {
             synchronized (EncoderTables.class) {
                 local = cachedGains;
@@ -412,8 +412,8 @@ public final class EncoderTables {
      * @return the normalized bitrate in {@code [0, 1]}
      */
     public static float getNormalizedBitrate(int numPulses, int frameLength16) {
-        float pulsesPer20ms = (numPulses * frameLength16) / (20.0f * 16.0f);
-        float x = PULSES2NORMALIZED_BITRATE[0] * log2f(pulsesPer20ms + 1.0f) - PULSES2NORMALIZED_BITRATE[1];
+        var pulsesPer20ms = (numPulses * frameLength16) / (20.0f * 16.0f);
+        var x = PULSES2NORMALIZED_BITRATE[0] * log2f(pulsesPer20ms + 1.0f) - PULSES2NORMALIZED_BITRATE[1];
         return sigmoid(x);
     }
 
@@ -430,24 +430,24 @@ public final class EncoderTables {
      * @return the freshly built encoder LSF search tables
      */
     private static LsfSearch buildLsfSearch() {
-        LsfStage1[] stage1 = new LsfStage1[2];
-        for (int voiced = 0; voiced <= 1; voiced++) {
+        var stage1 = new LsfStage1[2];
+        for (var voiced = 0; voiced <= 1; voiced++) {
             stage1[voiced] = buildLsfStage1(voiced);
         }
 
-        int order = LsfTables.SMPL_LPC_ORDER;
-        int centroids = LsfTables.LSF_CB_CENTROIDS;
-        float[][][][][] stage2NumBits = new float[2][2][centroids + 1][order][];
-        byte[] dcmf = packDcmf();
-        int dcmfOffset = 0;
-        for (int voiced = 0; voiced <= 1; voiced++) {
-            for (int lowRate = 0; lowRate <= 1; lowRate++) {
-                for (int c = 0; c <= centroids; c++) {
-                    for (int i = 0; i < order; i++) {
-                        int minQi = LsfTables.MIN_QI[voiced][lowRate][c][i];
-                        int maxQi = LsfTables.MAX_QI[voiced][lowRate][c][i];
-                        int count = maxQi - minQi + 1;
-                        int[] cmf = CmfBuilder.dcmfToCmf(dcmf, dcmfOffset, count);
+        var order = LsfTables.SMPL_LPC_ORDER;
+        var centroids = LsfTables.LSF_CB_CENTROIDS;
+        var stage2NumBits = new float[2][2][centroids + 1][order][];
+        var dcmf = packDcmf();
+        var dcmfOffset = 0;
+        for (var voiced = 0; voiced <= 1; voiced++) {
+            for (var lowRate = 0; lowRate <= 1; lowRate++) {
+                for (var c = 0; c <= centroids; c++) {
+                    for (var i = 0; i < order; i++) {
+                        var minQi = LsfTables.MIN_QI[voiced][lowRate][c][i];
+                        var maxQi = LsfTables.MAX_QI[voiced][lowRate][c][i];
+                        var count = maxQi - minQi + 1;
+                        var cmf = CmfBuilder.dcmfToCmf(dcmf, dcmfOffset, count);
                         stage2NumBits[voiced][lowRate][c][i] = CmfBuilder.cmfToBits(cmf);
                         dcmfOffset += count;
                     }
@@ -471,51 +471,51 @@ public final class EncoderTables {
      * @return the stage-1 search products for the class
      */
     private static LsfStage1 buildLsfStage1(int voiced) {
-        int order = LsfTables.SMPL_LPC_ORDER;
-        int centroids = LsfTables.LSF_CB_CENTROIDS;
+        var order = LsfTables.SMPL_LPC_ORDER;
+        var centroids = LsfTables.LSF_CB_CENTROIDS;
 
-        int[] cinvPacked = voiced == 0 ? LsfTables.CINV_UV : LsfTables.CINV_V;
-        float cinvMin = voiced == 0 ? LsfTables.LSF_CINV_UV_MIN : LsfTables.LSF_CINV_V_MIN;
-        float cinvScale = voiced == 0 ? LsfTables.LSF_CINV_UV_SCALE : LsfTables.LSF_CINV_V_SCALE;
-        float[][] cInv = new float[order][order];
-        int p = 0;
-        for (int i = 0; i < order; i++) {
-            for (int j = 0; j <= i; j++) {
-                float value = cinvMin + cinvScale * cinvPacked[p++];
+        var cinvPacked = voiced == 0 ? LsfTables.CINV_UV : LsfTables.CINV_V;
+        var cinvMin = voiced == 0 ? LsfTables.LSF_CINV_UV_MIN : LsfTables.LSF_CINV_V_MIN;
+        var cinvScale = voiced == 0 ? LsfTables.LSF_CINV_UV_SCALE : LsfTables.LSF_CINV_V_SCALE;
+        var cInv = new float[order][order];
+        var p = 0;
+        for (var i = 0; i < order; i++) {
+            for (var j = 0; j <= i; j++) {
+                var value = cinvMin + cinvScale * cinvPacked[p++];
                 cInv[i][j] = value;
                 cInv[j][i] = value;
             }
         }
 
-        int[][] cb16 = voiced == 0 ? LsfTables.CB_UV : LsfTables.CB_V;
-        float cbMin = voiced == 0 ? LsfTables.LSF_CB_UV_MIN : LsfTables.LSF_CB_V_MIN;
-        float cbScale = voiced == 0 ? LsfTables.LSF_CB_UV_SCALE : LsfTables.LSF_CB_V_SCALE;
-        float[] mean = voiced == 0 ? LsfTables.MEAN_UV : LsfTables.MEAN_V;
-        int[][][] rot8 = voiced == 0 ? LsfTables.ROT_UV : LsfTables.ROT_V;
-        float rotMin = voiced == 0 ? LsfTables.LSF_ROT_UV_MIN : LsfTables.LSF_ROT_V_MIN;
-        float rotScale = voiced == 0 ? LsfTables.LSF_ROT_UV_SCALE : LsfTables.LSF_ROT_V_SCALE;
+        var cb16 = voiced == 0 ? LsfTables.CB_UV : LsfTables.CB_V;
+        var cbMin = voiced == 0 ? LsfTables.LSF_CB_UV_MIN : LsfTables.LSF_CB_V_MIN;
+        var cbScale = voiced == 0 ? LsfTables.LSF_CB_UV_SCALE : LsfTables.LSF_CB_V_SCALE;
+        var mean = voiced == 0 ? LsfTables.MEAN_UV : LsfTables.MEAN_V;
+        var rot8 = voiced == 0 ? LsfTables.ROT_UV : LsfTables.ROT_V;
+        var rotMin = voiced == 0 ? LsfTables.LSF_ROT_UV_MIN : LsfTables.LSF_ROT_V_MIN;
+        var rotScale = voiced == 0 ? LsfTables.LSF_ROT_UV_SCALE : LsfTables.LSF_ROT_V_SCALE;
 
-        float[][] cbCinv = new float[centroids][order];
-        float[][][] wie = new float[centroids][order][order];
-        for (int c = 0; c < centroids; c++) {
-            float[] lsfCb = new float[order];
-            for (int i = 0; i < order; i++) {
+        var cbCinv = new float[centroids][order];
+        var wie = new float[centroids][order][order];
+        for (var c = 0; c < centroids; c++) {
+            var lsfCb = new float[order];
+            for (var i = 0; i < order; i++) {
                 lsfCb[i] = cbMin + cb16[c][i] * cbScale + mean[i];
             }
             cbCinv[c] = symMatrixMult(cInv, lsfCb);
-            float[][] rot = new float[order][order];
-            for (int i = 0; i < order; i++) {
-                for (int j = 0; j < order; j++) {
+            var rot = new float[order][order];
+            for (var i = 0; i < order; i++) {
+                for (var j = 0; j < order; j++) {
                     rot[i][j] = rotMin + rot8[c][i][j] * rotScale;
                 }
             }
             inverseRotWeight(rot, lsfCb, wie[c]);
         }
 
-        int[] stage1Cmf = voiced == 0 ? LsfTables.CMF_UV : LsfTables.CMF_V;
-        int[] stage1CmfCond = voiced == 0 ? LsfTables.CMF_COND_UV : LsfTables.CMF_COND_V;
-        float[] bits = CmfBuilder.cmfToBits(stage1Cmf);
-        float[] bitsCond = CmfBuilder.cmfToBits(stage1CmfCond);
+        var stage1Cmf = voiced == 0 ? LsfTables.CMF_UV : LsfTables.CMF_V;
+        var stage1CmfCond = voiced == 0 ? LsfTables.CMF_COND_UV : LsfTables.CMF_COND_V;
+        var bits = CmfBuilder.cmfToBits(stage1Cmf);
+        var bitsCond = CmfBuilder.cmfToBits(stage1CmfCond);
         return new LsfStage1(cInv, cbCinv, wie, bits, bitsCond);
     }
 
@@ -529,14 +529,14 @@ public final class EncoderTables {
      * @return the freshly built gain inverse-probability cost tables
      */
     private static GainCosts buildGainCosts() {
-        float[][] acbgLr = new float[ACBG_N + 1][];
-        float[][] acbgHr = new float[ACBG_N + 1][];
-        for (int context = 0; context <= ACBG_N; context++) {
+        var acbgLr = new float[ACBG_N + 1][];
+        var acbgHr = new float[ACBG_N + 1][];
+        for (var context = 0; context <= ACBG_N; context++) {
             acbgLr[context] = invProb(CmfBuilder.cmfToBits(MiscTables.acbGainsCmfLr(context)));
             acbgHr[context] = invProb(CmfBuilder.cmfToBits(MiscTables.acbGainsCmfHr(context)));
         }
-        float[] fcbgV = invProb(CmfBuilder.cmfToBits(MiscTables.fcbgVCmf()));
-        float[] fcbgVDelta = invProb(CmfBuilder.cmfToBits(MiscTables.fcbgVDeltaCmf()));
+        var fcbgV = invProb(CmfBuilder.cmfToBits(MiscTables.fcbgVCmf()));
+        var fcbgVDelta = invProb(CmfBuilder.cmfToBits(MiscTables.fcbgVDeltaCmf()));
         return new GainCosts(acbgLr, acbgHr, fcbgV, fcbgVDelta);
     }
 
@@ -551,8 +551,8 @@ public final class EncoderTables {
      * @return a freshly allocated array of the exponentiated multiplicative penalties
      */
     private static float[] invProb(float[] bits) {
-        float[] out = new float[bits.length];
-        for (int i = 0; i < bits.length; i++) {
+        var out = new float[bits.length];
+        for (var i = 0; i < bits.length; i++) {
             out[i] = (float) Math.pow(2.0, bits[i] * (double) SMPL_G_ACB_RD_MU);
         }
         return out;
@@ -570,11 +570,11 @@ public final class EncoderTables {
      * @return a freshly allocated {@value LsfTables#SMPL_LPC_ORDER}-entry product vector
      */
     private static float[] symMatrixMult(float[][] matrix, float[] vector) {
-        int order = LsfTables.SMPL_LPC_ORDER;
-        float[] out = new float[order];
-        for (int i = 0; i < order; i++) {
-            float sum = 0.0f;
-            for (int j = 0; j < order; j++) {
+        var order = LsfTables.SMPL_LPC_ORDER;
+        var out = new float[order];
+        for (var i = 0; i < order; i++) {
+            var sum = 0.0f;
+            for (var j = 0; j < order; j++) {
                 sum += matrix[i][j] * vector[j];
             }
             out[i] = sum;
@@ -596,14 +596,14 @@ public final class EncoderTables {
      * @param wie the destination inverse weighting matrix, {@value LsfTables#SMPL_LPC_ORDER} square
      */
     private static void inverseRotWeight(float[][] rot, float[] lsf, float[][] wie) {
-        int order = LsfTables.SMPL_LPC_ORDER;
-        float[] weight = laroiaWeights(lsf);
-        float[] sqrtWeight = new float[order];
-        for (int i = 0; i < order; i++) {
+        var order = LsfTables.SMPL_LPC_ORDER;
+        var weight = laroiaWeights(lsf);
+        var sqrtWeight = new float[order];
+        for (var i = 0; i < order; i++) {
             sqrtWeight[i] = FastSqrt.sqrt(weight[i]);
         }
-        for (int i = 0; i < order; i++) {
-            for (int j = 0; j < order; j++) {
+        for (var i = 0; i < order; i++) {
+            for (var j = 0; j < order; j++) {
                 wie[j][i] = rot[i][j] * sqrtWeight[j];
             }
         }
@@ -622,15 +622,15 @@ public final class EncoderTables {
      * @return a freshly allocated weight vector of {@value LsfTables#SMPL_LPC_ORDER} entries
      */
     private static float[] laroiaWeights(float[] lsf) {
-        int order = LsfTables.SMPL_LPC_ORDER;
-        float[] invDelta = new float[order + 1];
+        var order = LsfTables.SMPL_LPC_ORDER;
+        var invDelta = new float[order + 1];
         invDelta[0] = 1.0f / Math.max(lsf[0], LAROIA_MIN_DIST);
-        for (int i = 1; i < order; i++) {
+        for (var i = 1; i < order; i++) {
             invDelta[i] = 1.0f / Math.max(lsf[i] - lsf[i - 1], LAROIA_MIN_DIST);
         }
         invDelta[order] = 1.0f / Math.max(SMPL_PI - lsf[order - 1], LAROIA_MIN_DIST);
-        float[] weight = new float[order];
-        for (int i = 0; i < order; i++) {
+        var weight = new float[order];
+        for (var i = 0; i < order; i++) {
             weight[i] = invDelta[i] + invDelta[i + 1];
         }
         return weight;
@@ -679,8 +679,8 @@ public final class EncoderTables {
      * @return a freshly allocated byte array of {@value LsfTables#ST2_ALL_QLVLS_LEN} entries
      */
     private static byte[] packDcmf() {
-        byte[] out = new byte[LsfTables.ST2_ALL_QLVL_DCMFS.length];
-        for (int i = 0; i < out.length; i++) {
+        var out = new byte[LsfTables.ST2_ALL_QLVL_DCMFS.length];
+        for (var i = 0; i < out.length; i++) {
             out[i] = (byte) LsfTables.ST2_ALL_QLVL_DCMFS[i];
         }
         return out;

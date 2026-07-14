@@ -202,11 +202,11 @@ public final class ParamEncoder {
                     "param encode frame {0}: numSubfr={1} activeVoice={2} condCoding={3} lowRate={4} sid={5}",
                     frameNum, numSubfr, codedAsActiveVoice, condCoding, lowRate, sid);
         }
-        int voiced = params.voiced() ? 1 : 0;
-        int lowRateIx = lowRate ? 1 : 0;
+        var voiced = params.voiced() ? 1 : 0;
+        var lowRateIx = lowRate ? 1 : 0;
 
         if (codedAsActiveVoice) {
-            int[] cmf = MiscTables.VUV_CMFS[frameNum == 0 ? 0 : prevVoiced == 0 ? 1 : 2];
+            var cmf = MiscTables.VUV_CMFS[frameNum == 0 ? 0 : prevVoiced == 0 ? 1 : 2];
             MlowEntropyWrapper.encodeUpdate(encoder, cmf, voiced);
         }
 
@@ -218,12 +218,12 @@ public final class ParamEncoder {
             prevLagidx = -1;
         }
 
-        int[] lsfIdx = params.lsfIdx();
-        Stage1 st1 = lsfCodebook.stage1(voiced);
-        int[] stage1Cmf = condCoding ? st1.cmfCond() : st1.cmf();
+        var lsfIdx = params.lsfIdx();
+        var st1 = lsfCodebook.stage1(voiced);
+        var stage1Cmf = condCoding ? st1.cmfCond() : st1.cmf();
         MlowEntropyWrapper.encodeUpdate(encoder, stage1Cmf, lsfIdx[0]);
-        Stage2 st2 = lsfCodebook.stage2(voiced, lowRateIx, lsfIdx[0]);
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var st2 = lsfCodebook.stage2(voiced, lowRateIx, lsfIdx[0]);
+        for (var i = 0; i < LPC_ORDER; i++) {
             MlowEntropyWrapper.encodeUpdate(encoder, st2.cmf()[i], lsfIdx[i + 1]);
         }
 
@@ -231,7 +231,7 @@ public final class ParamEncoder {
             MlowEntropyWrapper.encodeUpdate(encoder, MiscTables.LSF_INTERP_CMF, params.lsfInterpolIdx());
         }
 
-        int[] sfPulses = new int[numSubfr];
+        var sfPulses = new int[numSubfr];
         if (!sid) {
             PulseEncoder.encode(encoder, pulseTables, params.pulses(), framelen, numSubfr, lowRate,
                     params.voiced(), codedAsActiveVoice, sfPulses);
@@ -265,11 +265,11 @@ public final class ParamEncoder {
     private void encodeVoiced(MlowRangeEncoder encoder, LbQuantParams params, int[] sfPulses, int numSubfr,
                               int pitchNumSubfr, boolean lowRate) {
         long meanAcbgQ14 = 0;
-        short[] acbgCbk = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
-        int[] acbgIdx = params.acbgIdx();
-        int[] fcbgIdx = params.fcbgIdx();
-        for (int sf = 0; sf < numSubfr; sf++) {
-            int[] cmf = lowRate ? MiscTables.acbGainsCmfLr(prevAcbIdx + 1) : MiscTables.acbGainsCmfHr(prevAcbIdx + 1);
+        var acbgCbk = lowRate ? MiscTables.ACB_GAINS_LR_Q14 : MiscTables.ACB_GAINS_HR_Q14;
+        var acbgIdx = params.acbgIdx();
+        var fcbgIdx = params.fcbgIdx();
+        for (var sf = 0; sf < numSubfr; sf++) {
+            var cmf = lowRate ? MiscTables.acbGainsCmfLr(prevAcbIdx + 1) : MiscTables.acbGainsCmfHr(prevAcbIdx + 1);
             MlowEntropyWrapper.encodeUpdate(encoder, cmf, acbgIdx[sf]);
             prevAcbIdx = acbgIdx[sf];
             meanAcbgQ14 += acbgCbk[prevAcbIdx * ACBG_M] + 2 * acbgCbk[prevAcbIdx * ACBG_M + 1];
@@ -277,12 +277,12 @@ public final class ParamEncoder {
                 if (prevFcbIdx == -1) {
                     MlowEntropyWrapper.encodeUpdate(encoder, MiscTables.fcbgVCmf(), fcbgIdx[sf]);
                 } else {
-                    int delta = fcbgIdx[sf] - prevFcbIdx;
-                    int minDelta = -prevFcbIdx;
-                    int maxDelta = (FCBG_V_N - 1) - prevFcbIdx;
-                    int[] dcmf = MiscTables.fcbgVDeltaCmf();
-                    int base = FCBG_V_N - 1;
-                    long sub = dcmf[base + minDelta] & 0xFFFFFFFFL;
+                    var delta = fcbgIdx[sf] - prevFcbIdx;
+                    var minDelta = -prevFcbIdx;
+                    var maxDelta = (FCBG_V_N - 1) - prevFcbIdx;
+                    var dcmf = MiscTables.fcbgVDeltaCmf();
+                    var base = FCBG_V_N - 1;
+                    var sub = dcmf[base + minDelta] & 0xFFFFFFFFL;
                     encoder.encode((dcmf[base + delta] & 0xFFFFFFFFL) - sub,
                             (dcmf[base + delta + 1] & 0xFFFFFFFFL) - sub,
                             (dcmf[base + maxDelta + 1] & 0xFFFFFFFFL) - sub);
@@ -290,10 +290,10 @@ public final class ParamEncoder {
                 prevFcbIdx = fcbgIdx[sf];
             }
         }
-        int meanInt = (int) (meanAcbgQ14 / numSubfr);
+        var meanInt = (int) (meanAcbgQ14 / numSubfr);
 
-        int mode = 2;
-        int[] thr = PitchTables.acbgainThr20Q14();
+        var mode = 2;
+        var thr = PitchTables.acbgainThr20Q14();
         if (meanInt < thr[0]) {
             mode = 0;
         } else if (meanInt < thr[1]) {
@@ -304,7 +304,7 @@ public final class ParamEncoder {
                     mode, params.blocksegsIx());
         }
         encodeLags(encoder, params.blocksegsIx(), params.laginds(), mode);
-        Blockseg seg = pitchData.blocksegs()[params.blocksegsIx()];
+        var seg = pitchData.blocksegs()[params.blocksegsIx()];
         prevLagblk = seg.blocks()[seg.nblocks() - 1];
         prevLagidx = params.laginds()[pitchNumSubfr - 1];
     }
@@ -324,43 +324,43 @@ public final class ParamEncoder {
      * @param mode        the within block delta lag CMF class selected by the mean quantized gain
      */
     private void encodeLags(MlowRangeEncoder encoder, int blocksegsIx, int[] laginds, int mode) {
-        int ixJulia = pitchData.blocksegs2idx()[blocksegsIx] & 0xFF;
-        Blockseg seg = pitchData.blocksegs()[blocksegsIx];
-        int numBlocksegs = pitchData.numBlocksegs();
+        var ixJulia = pitchData.blocksegs2idx()[blocksegsIx] & 0xFF;
+        var seg = pitchData.blocksegs()[blocksegsIx];
+        var numBlocksegs = pitchData.numBlocksegs();
 
         if (prevLagblk < 0) {
             if (Log.TRACE) {
                 LOGGER.log(Level.TRACE, "param encode lags: first frame of packet, uniform blockseg index");
             }
-            int[] cmf = pitchData.blocksegIdxCmf();
+            var cmf = pitchData.blocksegIdxCmf();
             encoder.encode(cmf[ixJulia - 1] & 0xFFFFFFFFL, cmf[ixJulia] & 0xFFFFFFFFL,
                     cmf[numBlocksegs] & 0xFFFFFFFFL);
         } else {
             if (Log.TRACE) {
                 LOGGER.log(Level.TRACE, "param encode lags: block transition from prevLagblk={0}", prevLagblk);
             }
-            int[] transCmf = pitchData.blockTransitionCmf()[prevLagblk];
-            int block0 = seg.blocks()[0];
+            var transCmf = pitchData.blockTransitionCmf()[prevLagblk];
+            var block0 = seg.blocks()[0];
             encoder.encode(transCmf[block0] & 0xFFFFFFFFL, transCmf[block0 + 1] & 0xFFFFFFFFL,
                     transCmf[PITCH_NUM_BLOCKS] & 0xFFFFFFFFL);
-            byte[] range = pitchData.firstBlockRange();
-            int startIx = range[block0 * 2] & 0xFF;
-            int rangeEnd = range[block0 * 2 + 1] & 0xFF;
-            int cmfLen = rangeEnd - startIx + 1;
-            int[] cmf = pitchData.blocksegIdxCmf();
-            long sub = cmf[startIx] & 0xFFFFFFFFL;
-            int rel = ixJulia - startIx - 1;
+            var range = pitchData.firstBlockRange();
+            var startIx = range[block0 * 2] & 0xFF;
+            var rangeEnd = range[block0 * 2 + 1] & 0xFF;
+            var cmfLen = rangeEnd - startIx + 1;
+            var cmf = pitchData.blocksegIdxCmf();
+            var sub = cmf[startIx] & 0xFFFFFFFFL;
+            var rel = ixJulia - startIx - 1;
             encoder.encode((cmf[startIx + rel] & 0xFFFFFFFFL) - sub,
                     (cmf[startIx + rel + 1] & 0xFFFFFFFFL) - sub,
                     (cmf[startIx + cmfLen] & 0xFFFFFFFFL) - sub);
         }
 
-        int blk = seg.blocks()[0];
-        int deltaBlk = blk - prevLagblk;
-        int startSeg = 0;
-        int lagindsIx = 0;
+        var blk = seg.blocks()[0];
+        var deltaBlk = blk - prevLagblk;
+        var startSeg = 0;
+        var lagindsIx = 0;
         if (!(prevLagblk > -1 && deltaBlk >= -1 && deltaBlk <= 2)) {
-            int idxMod = laginds[lagindsIx] - blk * BLOCKSIZE;
+            var idxMod = laginds[lagindsIx] - blk * BLOCKSIZE;
             encoder.encode(idxMod, idxMod + 1, BLOCKSIZE);
             prevLagblk = blk;
             prevLagidx = laginds[lagindsIx];
@@ -368,20 +368,20 @@ public final class ParamEncoder {
             startSeg = 1;
         }
 
-        int[] deltaLagCmf = pitchData.deltaLagCmfs()[mode];
-        int[] blocks = seg.blocks();
-        int[] seglens = seg.seglens();
-        for (int k = startSeg; k < seg.nblocks(); k++) {
+        var deltaLagCmf = pitchData.deltaLagCmfs()[mode];
+        var blocks = seg.blocks();
+        var seglens = seg.seglens();
+        for (var k = startSeg; k < seg.nblocks(); k++) {
             blk = blocks[k];
-            int idx = laginds[lagindsIx];
+            var idx = laginds[lagindsIx];
             lagindsIx += seglens[k];
             deltaBlk = blk - prevLagblk;
-            int deltaIdx = idx - prevLagidx;
-            int prevLagidxMod = prevLagidx - prevLagblk * BLOCKSIZE;
-            int deltaRangeStart = -prevLagidxMod + deltaBlk * BLOCKSIZE;
-            int windowStart = deltaRangeStart + 2 * BLOCKSIZE - 1;
-            int ix = deltaIdx - deltaRangeStart;
-            long sub = deltaLagCmf[windowStart] & 0xFFFFFFFFL;
+            var deltaIdx = idx - prevLagidx;
+            var prevLagidxMod = prevLagidx - prevLagblk * BLOCKSIZE;
+            var deltaRangeStart = -prevLagidxMod + deltaBlk * BLOCKSIZE;
+            var windowStart = deltaRangeStart + 2 * BLOCKSIZE - 1;
+            var ix = deltaIdx - deltaRangeStart;
+            var sub = deltaLagCmf[windowStart] & 0xFFFFFFFFL;
             encoder.encode((deltaLagCmf[windowStart + ix] & 0xFFFFFFFFL) - sub,
                     (deltaLagCmf[windowStart + ix + 1] & 0xFFFFFFFFL) - sub,
                     (deltaLagCmf[windowStart + BLOCKSIZE] & 0xFFFFFFFFL) - sub);
@@ -405,7 +405,7 @@ public final class ParamEncoder {
      * @param numSubfr the number of subframes in the frame
      */
     private void encodeUnvoiced(MlowRangeEncoder encoder, LbQuantParams params, int[] sfPulses, int numSubfr) {
-        int tableIx = numSubfrToIdx(numSubfr);
+        var tableIx = numSubfrToIdx(numSubfr);
         if (numSubfr == 1) {
             MlowEntropyWrapper.encodeUpdate(encoder, NrgResTables.gain1Cmf(), params.nrgresFrameQi());
         } else if (numSubfr == 2) {
@@ -416,19 +416,19 @@ public final class ParamEncoder {
             MlowEntropyWrapper.encodeUpdate(encoder, NrgResTables.shapeCb4Cmf(), params.nrgresShapeQi());
         }
 
-        int[] dbqQ14 = params.nrgresDbqQ14();
-        int[] fcbgIdx = params.fcbgIdx();
-        for (int i = 0; i < numSubfr; i++) {
+        var dbqQ14 = params.nrgresDbqQ14();
+        var fcbgIdx = params.fcbgIdx();
+        for (var i = 0; i < numSubfr; i++) {
             if (sfPulses[i] > 0) {
-                int nrgresDbq = (dbqQ14[i] + (1 << 13)) >> 14;
+                var nrgresDbq = (dbqQ14[i] + (1 << 13)) >> 14;
                 nrgresDbq = Math.min(Math.max(nrgresDbq, NrgResTables.RES_NRG_MIN_DB), NrgResTables.RES_NRG_MAX_DB);
-                int minOffset = -nrgresDbq;
-                int maxOffset = UV_GAIN_IDX_LEN - nrgresDbq;
-                int cmfLen = maxOffset - minOffset + 2;
-                int cmfIx = Math.min(sfPulses[i] / N_PULSES_STEP, FCB_G_OFFSET_CMFS - 1);
-                int[] cmf = NrgResTables.fcbgOffsetCmf(tableIx, cmfIx);
-                long sub = cmf[minOffset] & 0xFFFFFFFFL;
-                int idx = fcbgIdx[i];
+                var minOffset = -nrgresDbq;
+                var maxOffset = UV_GAIN_IDX_LEN - nrgresDbq;
+                var cmfLen = maxOffset - minOffset + 2;
+                var cmfIx = Math.min(sfPulses[i] / N_PULSES_STEP, FCB_G_OFFSET_CMFS - 1);
+                var cmf = NrgResTables.fcbgOffsetCmf(tableIx, cmfIx);
+                var sub = cmf[minOffset] & 0xFFFFFFFFL;
+                var idx = fcbgIdx[i];
                 encoder.encode((cmf[minOffset + idx] & 0xFFFFFFFFL) - sub,
                         (cmf[minOffset + idx + 1] & 0xFFFFFFFFL) - sub,
                         (cmf[minOffset + cmfLen - 1] & 0xFFFFFFFFL) - sub);

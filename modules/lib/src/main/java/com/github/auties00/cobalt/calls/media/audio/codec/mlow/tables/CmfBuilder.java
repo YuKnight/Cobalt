@@ -92,14 +92,14 @@ public final class CmfBuilder {
      * @throws IllegalArgumentException if {@code dcmf} is empty
      */
     public static int[] dcmfToCmf(byte[] dcmf) {
-        int dcmfLen = dcmf.length;
+        var dcmfLen = dcmf.length;
         if (dcmfLen == 0) {
             throw new IllegalArgumentException("dcmf must be non-empty");
         }
-        int[] cmf = new int[dcmfLen + 1];
-        int sum = 0;
-        for (int n = 0; n < dcmfLen; n++) {
-            int tmp = dcmf[n] & 0xFF;
+        var cmf = new int[dcmfLen + 1];
+        var sum = 0;
+        for (var n = 0; n < dcmfLen; n++) {
+            var tmp = dcmf[n] & 0xFF;
             tmp += 1;
             tmp *= tmp;
             if (tmp > MASS_CLAMP) {
@@ -109,7 +109,7 @@ public final class CmfBuilder {
             sum += tmp;
         }
         cmf[0] = 0;
-        for (int n = 1; n < dcmfLen + 1; n++) {
+        for (var n = 1; n < dcmfLen + 1; n++) {
             cmf[n] = cmf[n - 1] + cmf[n] * (SCALE_BASE - dcmfLen) / sum + 1;
         }
         return cmf;
@@ -139,10 +139,10 @@ public final class CmfBuilder {
         if (offset < 0 || offset + rowLen > dcmf.length) {
             throw new IndexOutOfBoundsException("row [" + offset + ", " + (offset + rowLen) + ") out of bounds for length " + dcmf.length);
         }
-        int[] cmf = new int[rowLen + 1];
-        int sum = 0;
-        for (int n = 0; n < rowLen; n++) {
-            int tmp = dcmf[offset + n] & 0xFF;
+        var cmf = new int[rowLen + 1];
+        var sum = 0;
+        for (var n = 0; n < rowLen; n++) {
+            var tmp = dcmf[offset + n] & 0xFF;
             tmp += 1;
             tmp *= tmp;
             if (tmp > MASS_CLAMP) {
@@ -152,7 +152,7 @@ public final class CmfBuilder {
             sum += tmp;
         }
         cmf[0] = 0;
-        for (int n = 1; n < rowLen + 1; n++) {
+        for (var n = 1; n < rowLen + 1; n++) {
             cmf[n] = cmf[n - 1] + cmf[n] * (SCALE_BASE - rowLen) / sum + 1;
         }
         return cmf;
@@ -173,14 +173,14 @@ public final class CmfBuilder {
      * @throws IllegalArgumentException if {@code cmf} has fewer than two entries
      */
     public static float[] cmfToBits(int[] cmf) {
-        int cmfLen = cmf.length;
+        var cmfLen = cmf.length;
         if (cmfLen < 2) {
             throw new IllegalArgumentException("cmf must have at least two entries");
         }
         float total = cmf[cmfLen - 1];
-        float[] bits = new float[cmfLen - 1];
-        for (int i = 0; i < cmfLen - 1; i++) {
-            float p = (cmf[i + 1] - cmf[i]) / total;
+        var bits = new float[cmfLen - 1];
+        for (var i = 0; i < cmfLen - 1; i++) {
+            var p = (cmf[i + 1] - cmf[i]) / total;
             bits[i] = (float) (-(Math.log(p) / Math.log(2.0)));
         }
         return bits;
@@ -199,8 +199,8 @@ public final class CmfBuilder {
      * @return a freshly allocated array of {@code in.length} unpacked floats
      */
     public static float[] unpack8(byte[] in, float scale, float min) {
-        float[] out = new float[in.length];
-        for (int i = 0; i < in.length; i++) {
+        var out = new float[in.length];
+        for (var i = 0; i < in.length; i++) {
             out[i] = min + (in[i] & 0xFF) * scale;
         }
         return out;
@@ -221,8 +221,8 @@ public final class CmfBuilder {
      * @return a freshly allocated array of {@code in.length} unpacked floats
      */
     public static float[] unpack16(int[] in, float scale, float min) {
-        float[] out = new float[in.length];
-        for (int i = 0; i < in.length; i++) {
+        var out = new float[in.length];
+        for (var i = 0; i < in.length; i++) {
             out[i] = min + (in[i] & 0xFFFF) * scale;
         }
         return out;

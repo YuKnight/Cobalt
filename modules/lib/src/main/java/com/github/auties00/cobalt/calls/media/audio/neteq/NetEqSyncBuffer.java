@@ -205,7 +205,7 @@ public final class NetEqSyncBuffer {
      * @param frame the samples to write into the tail; never {@code null} and no longer than the capacity
      */
     void replaceTail(short[] frame) {
-        int length = frame.length;
+        var length = frame.length;
         System.arraycopy(frame, 0, samples, capacity - length, length);
     }
 
@@ -224,8 +224,8 @@ public final class NetEqSyncBuffer {
      * @return the number of samples copied, in {@code [0, requested]}
      */
     int getNextAudioInterleaved(short[] out, int requested) {
-        int available = capacity - nextIndex;
-        int count = Math.min(requested, available);
+        var available = capacity - nextIndex;
+        var count = Math.min(requested, available);
         System.arraycopy(samples, nextIndex, out, 0, count);
         nextIndex += count;
         return count;

@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.log.Log;
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -122,7 +123,7 @@ public final class NackTracker {
      * @throws NullPointerException if {@code config} is {@code null}
      */
     public NackTracker(NetEqConfig config) {
-        this.config = java.util.Objects.requireNonNull(config, "config cannot be null");
+        this.config = Objects.requireNonNull(config, "config cannot be null");
         this.missing = new TreeMap<>();
         this.lastReceivedSequence = -1;
         this.lastDecodedSequence = -1;

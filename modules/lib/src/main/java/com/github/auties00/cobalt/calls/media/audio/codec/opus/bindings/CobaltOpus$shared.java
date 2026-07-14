@@ -26,14 +26,14 @@ public class CobaltOpus$shared {
     public static final ValueLayout.OfFloat C_FLOAT = (ValueLayout.OfFloat) Linker.nativeLinker().canonicalLayouts().get("float");
     public static final ValueLayout.OfDouble C_DOUBLE = (ValueLayout.OfDouble) Linker.nativeLinker().canonicalLayouts().get("double");
     public static final AddressLayout C_POINTER = ((AddressLayout) Linker.nativeLinker().canonicalLayouts().get("void*"))
-            .withTargetLayout(MemoryLayout.sequenceLayout(java.lang.Long.MAX_VALUE, C_CHAR));
+            .withTargetLayout(MemoryLayout.sequenceLayout(Long.MAX_VALUE, C_CHAR));
     public static final ValueLayout.OfInt C_LONG = (ValueLayout.OfInt) Linker.nativeLinker().canonicalLayouts().get("long");
     public static final ValueLayout.OfDouble C_LONG_DOUBLE = (ValueLayout.OfDouble) Linker.nativeLinker().canonicalLayouts().get("double");
 
     static final boolean TRACE_DOWNCALLS = Boolean.getBoolean("jextract.trace.downcalls");
 
     static void traceDowncall(String name, Object... args) {
-         String traceArgs = Arrays.stream(args)
+        var traceArgs = Arrays.stream(args)
                        .map(Object::toString)
                        .collect(Collectors.joining(", "));
          System.out.printf("%s(%s)\n", name, traceArgs);
@@ -52,7 +52,7 @@ public class CobaltOpus$shared {
             case PaddingLayout p -> p;
             case ValueLayout v -> v.withByteAlignment(align);
             case GroupLayout g -> {
-                MemoryLayout[] alignedMembers = g.memberLayouts().stream()
+                var alignedMembers = g.memberLayouts().stream()
                         .map(m -> align(m, align)).toArray(MemoryLayout[]::new);
                 yield g instanceof StructLayout ?
                         MemoryLayout.structLayout(alignedMembers) : MemoryLayout.unionLayout(alignedMembers);

@@ -5,9 +5,9 @@ import com.github.auties00.cobalt.log.Log;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.System.Logger.Level;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -249,40 +249,40 @@ final class MlowHbTables {
      * @throws UncheckedIOException if the resource is missing, truncated, or has the wrong magic
      */
     private static void load() {
-        try (InputStream in = MlowHbTables.class.getResourceAsStream(RESOURCE)) {
+        try (var in = MlowHbTables.class.getResourceAsStream(RESOURCE)) {
             if (in == null) {
                 throw new IOException("missing high-band table resource " + RESOURCE);
             }
-            DataInputStream data = new DataInputStream(in);
+            var data = new DataInputStream(in);
             if (data.read() != 'M' || data.read() != 'H' || data.read() != 'B' || data.read() != '1') {
                 throw new IOException("bad high-band table magic");
             }
             Map<String, float[]> floats = new HashMap<>();
             Map<String, int[]> ints = new HashMap<>();
             while (true) {
-                int type = data.read();
+                var type = data.read();
                 if (type < 0) {
                     break;
                 }
-                String name = readName(data);
-                int count = readLeInt(data);
+                var name = readName(data);
+                var count = readLeInt(data);
                 if (type == 0) {
-                    float[] arr = new float[count];
-                    for (int i = 0; i < count; i++) {
+                    var arr = new float[count];
+                    for (var i = 0; i < count; i++) {
                         arr[i] = Float.intBitsToFloat(readLeInt(data));
                     }
                     floats.put(name, arr);
                 } else {
-                    int[] arr = new int[count];
-                    for (int i = 0; i < count; i++) {
+                    var arr = new int[count];
+                    for (var i = 0; i < count; i++) {
                         arr[i] = readLeInt(data);
                     }
                     ints.put(name, arr);
                 }
             }
-            int[] lsfSizes = ints.get("LSF_SIZES");
-            for (int v = 0; v < 2; v++) {
-                for (int lr = 0; lr < 2; lr++) {
+            var lsfSizes = ints.get("LSF_SIZES");
+            for (var v = 0; v < 2; v++) {
+                for (var lr = 0; lr < 2; lr++) {
                     LSF_SIZES[v][lr] = lsfSizes[v * 2 + lr];
                     LSF_CB[v][lr] = floats.get("LSF_CB_" + v + "_" + lr);
                     LSF_CMF[v][lr] = ints.get("LSF_CMF_" + v + "_" + lr);
@@ -290,10 +290,10 @@ final class MlowHbTables {
                 LSF_CMF_COND[v] = ints.get("LSF_CMF_COND_" + v);
                 SEL_COND[v] = ints.get("SEL_COND_" + v);
             }
-            int[] gainSizes = ints.get("GAIN_SIZES");
-            for (int fl = 0; fl < 2; fl++) {
-                for (int v = 0; v < 2; v++) {
-                    for (int lr = 0; lr < 2; lr++) {
+            var gainSizes = ints.get("GAIN_SIZES");
+            for (var fl = 0; fl < 2; fl++) {
+                for (var v = 0; v < 2; v++) {
+                    for (var lr = 0; lr < 2; lr++) {
                         GAIN_SIZES[fl][v][lr] = gainSizes[(fl * 2 + v) * 2 + lr];
                         GAIN_CB[fl][v][lr] = floats.get("GAIN_CB_" + fl + "_" + v + "_" + lr);
                         GAIN_CMF[fl][v][lr] = ints.get("GAIN_CMF_" + fl + "_" + v + "_" + lr);
@@ -317,10 +317,10 @@ final class MlowHbTables {
      * @throws IOException if the stream ends before the name is complete
      */
     private static String readName(DataInputStream data) throws IOException {
-        int len = readLeInt(data);
-        byte[] bytes = new byte[len];
+        var len = readLeInt(data);
+        var bytes = new byte[len];
         data.readFully(bytes);
-        return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 
     /**
@@ -332,10 +332,10 @@ final class MlowHbTables {
      * @throws EOFException if the stream ends before a full value is read
      */
     private static int readLeInt(DataInputStream data) throws IOException {
-        int b0 = data.read();
-        int b1 = data.read();
-        int b2 = data.read();
-        int b3 = data.read();
+        var b0 = data.read();
+        var b1 = data.read();
+        var b2 = data.read();
+        var b3 = data.read();
         if ((b0 | b1 | b2 | b3) < 0) {
             throw new EOFException("truncated high-band table resource");
         }

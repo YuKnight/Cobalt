@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -276,9 +277,9 @@ public final class MlowDecoder {
         celpSynthesizer.reset();
         noiseGenerator.reset();
         plc.resetStream();
-        java.util.Arrays.fill(lpcSynthMem, 0.0f);
-        java.util.Arrays.fill(uvPulseShapingState, 0.0f);
-        java.util.Arrays.fill(hpArma2State, 0.0f);
+        Arrays.fill(lpcSynthMem, 0.0f);
+        Arrays.fill(uvPulseShapingState, 0.0f);
+        Arrays.fill(hpArma2State, 0.0f);
         prevNrgres = 0.0f;
         tiltState[0] = 0.0f;
         lastToc = null;
@@ -297,7 +298,7 @@ public final class MlowDecoder {
      * @param lost      whether this packet was concealed rather than decoded
      */
     public void applyComfortNoiseAndLossInfo(float[] synthesis, boolean lost) {
-        int lostFlag = lost ? MlowPlc.FLAG_PACKET_LOST : 0;
+        var lostFlag = lost ? MlowPlc.FLAG_PACKET_LOST : 0;
         plc.addComfortNoise(synthesis, 0, synthesis.length, lostFlag);
         plc.updateLossInfo(lostFlag, synthesis.length / CELP_FS_KHZ);
     }
@@ -316,9 +317,9 @@ public final class MlowDecoder {
      *                                  above 16 kHz
      */
     public short[] decode(byte[] packet) {
-        float[] pcm = decodeFloat(packet);
-        short[] out = new short[pcm.length];
-        for (int i = 0; i < pcm.length; i++) {
+        var pcm = decodeFloat(packet);
+        var out = new short[pcm.length];
+        for (var i = 0; i < pcm.length; i++) {
             out[i] = toInt16(pcm[i]);
         }
         return out;
@@ -343,7 +344,7 @@ public final class MlowDecoder {
             if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow decode: empty packet");
             throw new IllegalArgumentException("empty MLow packet");
         }
-        int toc = packet[0] & 0xFF;
+        var toc = packet[0] & 0xFF;
         if (isMultiframe(toc)) {
             return decodeMultiframe(packet);
         }
@@ -407,7 +408,7 @@ public final class MlowDecoder {
             throw new IllegalArgumentException("empty MLow packet");
         }
         List<PacketSynthesis> packets = new ArrayList<>();
-        int toc = packet[0] & 0xFF;
+        var toc = packet[0] & 0xFF;
         if (isMultiframe(toc)) {
             decodeMultiframeWithSynthesis(packet, packets, lpcPostfilterEnabled);
         } else {
@@ -435,14 +436,14 @@ public final class MlowDecoder {
             if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow decode: truncated multiframe packet");
             throw new IllegalArgumentException("truncated multiframe MLow packet");
         }
-        int numFrames = packet[1] & 0xFF;
+        var numFrames = packet[1] & 0xFF;
         if (numFrames < 2) {
             throw new IllegalArgumentException("multiframe MLow packet with fewer than two frames");
         }
-        int[] sizes = new int[numFrames];
-        int pos = 2;
-        for (int i = 0; i < numFrames - 1; i++) {
-            int first = packet[pos] & 0xFF;
+        var sizes = new int[numFrames];
+        var pos = 2;
+        for (var i = 0; i < numFrames - 1; i++) {
+            var first = packet[pos] & 0xFF;
             if (first < 252) {
                 sizes[i] = first;
                 pos += 1;
@@ -457,15 +458,15 @@ public final class MlowDecoder {
                 throw new IllegalArgumentException("malformed multiframe MLow frame size");
             }
         }
-        int consumed = 0;
-        for (int i = 0; i < numFrames - 1; i++) {
+        var consumed = 0;
+        for (var i = 0; i < numFrames - 1; i++) {
             consumed += sizes[i];
         }
         sizes[numFrames - 1] = packet.length - pos - consumed;
         if (sizes[numFrames - 1] <= 0) {
             throw new IllegalArgumentException("malformed multiframe MLow last-frame size");
         }
-        for (int i = 0; i < numFrames; i++) {
+        for (var i = 0; i < numFrames; i++) {
             out.add(decodeFrameWithSynthesis(packet, pos, sizes[i], lpcPostfilterEnabled, false));
             pos += sizes[i];
         }
@@ -494,32 +495,32 @@ public final class MlowDecoder {
      */
     private PacketSynthesis decodeFrameWithSynthesis(byte[] packet, int offset, int length,
                                                      boolean lpcPostfilterEnabled, boolean fecRecovery) {
-        MlowTocByte tocByte = MlowTocByte.decode(packet[offset] & 0xFF);
+        var tocByte = MlowTocByte.decode(packet[offset] & 0xFF);
         if (fecRecovery && Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "calls mlow decode: fec recovery, bytes={0}", length);
         }
         plc.reset(tocByte.sid());
         lastToc = tocByte;
-        ParamDecoder.DecodedFrame[] decodedFrames =
+        var decodedFrames =
                 paramDecoder.decodePacket(tocByte, packet, offset, length, fecRecovery);
 
-        int frameLength = tocByte.frameLength16();
-        int numSubframes = tocByte.numSubframes();
-        int subframeLength = frameLength / numSubframes;
-        boolean lowRate = tocByte.lowRate();
-        int lagsPerSubframe = subframeLength / LAG_SUBFRLEN;
-        int lagsPerFrame = frameLength / LAG_SUBFRLEN;
-        int numFrames = decodedFrames.length;
+        var frameLength = tocByte.frameLength16();
+        var numSubframes = tocByte.numSubframes();
+        var subframeLength = frameLength / numSubframes;
+        var lowRate = tocByte.lowRate();
+        var lagsPerSubframe = subframeLength / LAG_SUBFRLEN;
+        var lagsPerFrame = frameLength / LAG_SUBFRLEN;
+        var numFrames = decodedFrames.length;
 
-        float[] synthesis = new float[numFrames * frameLength];
-        float[][][] lpc = new float[numFrames][][];
-        float[] lagsPerPacket = new float[numFrames * lagsPerFrame];
-        float[] normalizedBitratePerFrame = new float[numFrames];
-        for (int frame = 0; frame < numFrames; frame++) {
-            float[][] frameLpc = new float[numSubframes][];
-            float[] frameLags = new float[lagsPerFrame];
-            float[] frameNormalizedBitrate = new float[1];
-            float[] frameOut = synthesizeFrameWithCapture(decodedFrames[frame], tocByte, frame, frameLength,
+        var synthesis = new float[numFrames * frameLength];
+        var lpc = new float[numFrames][][];
+        var lagsPerPacket = new float[numFrames * lagsPerFrame];
+        var normalizedBitratePerFrame = new float[numFrames];
+        for (var frame = 0; frame < numFrames; frame++) {
+            var frameLpc = new float[numSubframes][];
+            var frameLags = new float[lagsPerFrame];
+            var frameNormalizedBitrate = new float[1];
+            var frameOut = synthesizeFrameWithCapture(decodedFrames[frame], tocByte, frame, frameLength,
                     numSubframes, subframeLength, lowRate, lagsPerSubframe, lagsPerFrame, lpcPostfilterEnabled,
                     frameLpc, frameLags, frameNormalizedBitrate);
             System.arraycopy(frameOut, 0, synthesis, frame * frameLength, frameLength);
@@ -528,7 +529,7 @@ public final class MlowDecoder {
             normalizedBitratePerFrame[frame] = frameNormalizedBitrate[0];
         }
 
-        boolean voiced = numFrames > 0 && decodedFrames[0].voiced();
+        var voiced = numFrames > 0 && decodedFrames[0].voiced();
         return new PacketSynthesis(synthesis, numFrames, lpc, numSubframes, subframeLength, lagsPerPacket,
                 normalizedBitratePerFrame, voiced, lowRate);
     }
@@ -551,24 +552,24 @@ public final class MlowDecoder {
      */
     public DecodeResult concealWithSynthesis(int packetSamples, boolean lpcPostfilterEnabled) {
         if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow packet loss concealment: samples={0}", packetSamples);
-        boolean lowRate = lastToc != null && lastToc.lowRate();
-        int frameLength = 20 * CELP_FS_KHZ;
-        int numFrames = packetSamples / frameLength;
-        int numSubframes = 1 << (2 - (lowRate ? 1 : 0));
-        int subframeLength = frameLength / numSubframes;
-        int lagsPerSubframe = subframeLength / LAG_SUBFRLEN;
-        int lagsPerFrame = frameLength / LAG_SUBFRLEN;
-        boolean voiced = plc.voiced();
+        var lowRate = lastToc != null && lastToc.lowRate();
+        var frameLength = 20 * CELP_FS_KHZ;
+        var numFrames = packetSamples / frameLength;
+        var numSubframes = 1 << (2 - (lowRate ? 1 : 0));
+        var subframeLength = frameLength / numSubframes;
+        var lagsPerSubframe = subframeLength / LAG_SUBFRLEN;
+        var lagsPerFrame = frameLength / LAG_SUBFRLEN;
+        var voiced = plc.voiced();
 
-        float[] synthesis = new float[numFrames * frameLength];
-        float[][][] lpc = new float[numFrames][][];
-        float[] lagsPerPacket = new float[numFrames * lagsPerFrame];
-        float[] normalizedBitratePerFrame = new float[numFrames];
-        for (int frame = 0; frame < numFrames; frame++) {
-            float[][] frameLpc = new float[numSubframes][];
-            float[] frameLags = new float[lagsPerFrame];
-            float[] frameNormalizedBitrate = new float[1];
-            float[] frameOut = concealFrameSynthesis(frameLength, numSubframes, subframeLength, lowRate,
+        var synthesis = new float[numFrames * frameLength];
+        var lpc = new float[numFrames][][];
+        var lagsPerPacket = new float[numFrames * lagsPerFrame];
+        var normalizedBitratePerFrame = new float[numFrames];
+        for (var frame = 0; frame < numFrames; frame++) {
+            var frameLpc = new float[numSubframes][];
+            var frameLags = new float[lagsPerFrame];
+            var frameNormalizedBitrate = new float[1];
+            var frameOut = concealFrameSynthesis(frameLength, numSubframes, subframeLength, lowRate,
                     lagsPerSubframe, lagsPerFrame, lpcPostfilterEnabled, frameLpc, frameLags,
                     frameNormalizedBitrate);
             System.arraycopy(frameOut, 0, synthesis, frame * frameLength, frameLength);
@@ -577,7 +578,7 @@ public final class MlowDecoder {
             normalizedBitratePerFrame[frame] = frameNormalizedBitrate[0];
         }
 
-        PacketSynthesis packet = new PacketSynthesis(synthesis, numFrames, lpc, numSubframes, subframeLength,
+        var packet = new PacketSynthesis(synthesis, numFrames, lpc, numSubframes, subframeLength,
                 lagsPerPacket, normalizedBitratePerFrame, voiced, lowRate);
         return new DecodeResult(List.of(packet));
     }
@@ -609,35 +610,35 @@ public final class MlowDecoder {
     private float[] concealFrameSynthesis(int frameLength, int numSubframes, int subframeLength, boolean lowRate,
                                           int lagsPerSubframe, int lagsPerFrame, boolean lpcPostfilterEnabled,
                                           float[][] lpcOut, float[] lagsOut, float[] normalizedBitrateOut) {
-        float[] aFlat = new float[numSubframes * (LPC_ORDER + 1)];
-        float[] lsfsFlat = new float[numSubframes * LPC_ORDER];
-        float[] acbGainsFlat = new float[numSubframes * PLC_ACBG_M];
-        float[] lags = new float[lagsPerFrame];
-        MlowPlc.ConcealedParams cp = plc.concealCelp(aFlat, lsfsFlat, acbGainsFlat, lags, numSubframes,
+        var aFlat = new float[numSubframes * (LPC_ORDER + 1)];
+        var lsfsFlat = new float[numSubframes * LPC_ORDER];
+        var acbGainsFlat = new float[numSubframes * PLC_ACBG_M];
+        var lags = new float[lagsPerFrame];
+        var cp = plc.concealCelp(aFlat, lsfsFlat, acbGainsFlat, lags, numSubframes,
                 subframeLength);
-        boolean voiced = cp.voiced();
+        var voiced = cp.voiced();
 
         plc.blendLtp(celpSynthesizer.acbState(), lags[0]);
         plc.updateRecoveryInfo(voiced);
 
-        float normalizedBitrate = normalizedBitrate(cp.nPulses(), frameLength);
-        float[] lpcRes = new float[frameLength];
+        var normalizedBitrate = normalizedBitrate(cp.nPulses(), frameLength);
+        var lpcRes = new float[frameLength];
 
-        float[] y = new float[LPC_ORDER + frameLength];
+        var y = new float[LPC_ORDER + frameLength];
         System.arraycopy(lpcSynthMem, 0, y, 0, LPC_ORDER);
 
-        for (int sf = 0; sf < numSubframes; sf++) {
-            float[] acbGain = {acbGainsFlat[sf * PLC_ACBG_M], acbGainsFlat[sf * PLC_ACBG_M + 1]};
-            float[] lsfSf = new float[LPC_ORDER];
+        for (var sf = 0; sf < numSubframes; sf++) {
+            var acbGain = new float[]{acbGainsFlat[sf * PLC_ACBG_M], acbGainsFlat[sf * PLC_ACBG_M + 1]};
+            var lsfSf = new float[LPC_ORDER];
             System.arraycopy(lsfsFlat, sf * LPC_ORDER, lsfSf, 0, LPC_ORDER);
-            float[] aSf = new float[LPC_ORDER + 1];
+            var aSf = new float[LPC_ORDER + 1];
             System.arraycopy(aFlat, sf * (LPC_ORDER + 1), aSf, 0, LPC_ORDER + 1);
 
             System.arraycopy(lpcRes, sf * subframeLength, excSubframe, 0, subframeLength);
             celpSynthesizer.celpDecode(voiced, acbGain, sliceLags(lags, sf * lagsPerSubframe, lagsPerSubframe),
                     lagsPerSubframe, subframeLength, lowRate, normalizedBitrate, excSubframe);
 
-            float nrgres = ResNrgDequantizer.dequantizeResnrg(cp.nrgresDbqQ14(), subframeLength);
+            var nrgres = ResNrgDequantizer.dequantizeResnrg(cp.nrgresDbqQ14(), subframeLength);
             if (!voiced) {
                 prevNrgres = nrgres;
             }
@@ -645,7 +646,7 @@ public final class MlowDecoder {
             noiseGenerator.genNoise(excSubframe, subframeLength, voiced, cp.sfPulses(), nrgres,
                     cp.fcbgIdx(), lsfSf, normalizedBitrate, noise);
 
-            int lowRateIx = lowRate ? 1 : 0;
+            var lowRateIx = lowRate ? 1 : 0;
             if (!voiced && cp.sfPulses() > 0 && UV_PULSE_SHAPING_COEFS[lowRateIx][0][0] < 1.0f) {
                 Filters.arma1(excSubframe, 0, subframeLength, UV_PULSE_SHAPING_COEFS[lowRateIx][0],
                         UV_PULSE_SHAPING_COEFS[lowRateIx][1], uvPulseShapingState, 0);
@@ -654,14 +655,14 @@ public final class MlowDecoder {
                 uvPulseShapingState[1] = 0.0f;
             }
 
-            for (int i = 0; i < subframeLength; i++) {
+            for (var i = 0; i < subframeLength; i++) {
                 excSubframe[i] += noise[i];
             }
 
-            int voicedIx = voiced ? 1 : 0;
+            var voicedIx = voiced ? 1 : 0;
             if (!lpcPostfilterEnabled) {
                 if (lowRate && POST_TILT_COEFS[voicedIx][0] < 1.0f) {
-                    float[] tilted = new float[subframeLength];
+                    var tilted = new float[subframeLength];
                     Filters.ma1(excSubframe, 0, subframeLength, POST_TILT_COEFS[voicedIx], tiltState, 0,
                             tilted, 0);
                     System.arraycopy(tilted, 0, excSubframe, 0, subframeLength);
@@ -671,8 +672,8 @@ public final class MlowDecoder {
             }
 
             plc.decayExc(excSubframe, 0, subframeLength, false, voiced);
-            float excNrg = 0.0f;
-            for (int i = 0; i < subframeLength; i++) {
+            var excNrg = 0.0f;
+            for (var i = 0; i < subframeLength; i++) {
                 excNrg += excSubframe[i] * excSubframe[i];
             }
             plc.updateNrg(excNrg, subframeLength);
@@ -682,7 +683,7 @@ public final class MlowDecoder {
         }
 
         System.arraycopy(y, frameLength, lpcSynthMem, 0, LPC_ORDER);
-        float[] frameOut = new float[frameLength];
+        var frameOut = new float[frameLength];
         System.arraycopy(y, LPC_ORDER, frameOut, 0, frameLength);
         plc.carryConcealStateEmph(frameOut[frameLength - 1]);
         System.arraycopy(lags, 0, lagsOut, 0, lagsPerFrame);
@@ -724,29 +725,29 @@ public final class MlowDecoder {
                                                boolean lowRate, int lagsPerSubframe, int lagsPerFrame,
                                                boolean lpcPostfilterEnabled, float[][] lpcOut, float[] lagsOut,
                                                float[] normalizedBitrateOut) {
-        boolean voiced = df.voiced();
+        var voiced = df.voiced();
         // On the first frame after a loss the previous frame LSF vector is adapted toward the concealment or
         // comfort noise spectrum before interpolation; on a clean stream this does nothing.
         if (frameNum == 0) {
             plc.adaptLsf(subframeLpc.previousLsf(), LPC_ORDER);
         }
-        LpcInterpolator.InterpolatedFrame interpolated = subframeLpc.process(df, toc);
-        float[][] a = interpolated.lpc();
-        float[][] lsfs = interpolated.lsf();
+        var interpolated = subframeLpc.process(df, toc);
+        var a = interpolated.lpc();
+        var lsfs = interpolated.lsf();
         // Bandwidth expand the recovered filters on the first good voiced frames after a voiced loss; does
         // nothing on a clean stream.
         plc.bweRecover(voiced, a, numSubframes, frameLength / CELP_FS_KHZ);
 
-        float[] lags = new float[lagsPerFrame];
-        for (int i = 0; i < lagsPerFrame; i++) {
+        var lags = new float[lagsPerFrame];
+        for (var i = 0; i < lagsPerFrame; i++) {
             lags[i] = voiced ? df.laginds()[i] * 0.5f + MIN_PITCH_LAG : 0.0f;
         }
 
         // Dequantize every subframe's adaptive codebook gains up front so the concealment state maintenance
         // sees the whole frame's gains before the synthesis loop runs.
-        float[][] acbGainsPerSf = new float[numSubframes][];
-        float[] acbGainsFlat = new float[numSubframes * PLC_ACBG_M];
-        for (int sf = 0; sf < numSubframes; sf++) {
+        var acbGainsPerSf = new float[numSubframes][];
+        var acbGainsFlat = new float[numSubframes * PLC_ACBG_M];
+        for (var sf = 0; sf < numSubframes; sf++) {
             acbGainsPerSf[sf] = CelpSynthesizer.acbDequant(lowRate, df.acbgIdx()[sf]);
             acbGainsFlat[sf * PLC_ACBG_M] = acbGainsPerSf[sf][0];
             acbGainsFlat[sf * PLC_ACBG_M + 1] = acbGainsPerSf[sf][1];
@@ -755,24 +756,24 @@ public final class MlowDecoder {
                 df.fcbgIdx()[numSubframes - 1], acbGainsFlat, a[numSubframes - 1], lsfs[numSubframes - 1],
                 lags, lagsPerFrame, numSubframes, subframeLength);
 
-        float normalizedBitrate = normalizedBitrate(df.nPulses(), frameLength);
+        var normalizedBitrate = normalizedBitrate(df.nPulses(), frameLength);
 
-        float[] lpcRes = new float[frameLength];
+        var lpcRes = new float[frameLength];
         celpSynthesizer.genExcitation(df.fcbgIdx(), voiced, numSubframes, subframeLength,
                 df.nPositions(), df.positions(), df.posPulses(), lpcRes);
 
         // y holds LPC_ORDER history samples then the frame's frameLength output samples.
-        float[] y = new float[LPC_ORDER + frameLength];
+        var y = new float[LPC_ORDER + frameLength];
         System.arraycopy(lpcSynthMem, 0, y, 0, LPC_ORDER);
 
-        float[] nrgresLinear = new float[numSubframes];
-        for (int sf = 0; sf < numSubframes; sf++) {
-            float[] acbGain = acbGainsPerSf[sf];
+        var nrgresLinear = new float[numSubframes];
+        for (var sf = 0; sf < numSubframes; sf++) {
+            var acbGain = acbGainsPerSf[sf];
             System.arraycopy(lpcRes, sf * subframeLength, excSubframe, 0, subframeLength);
             celpSynthesizer.celpDecode(voiced, acbGain, sliceLags(lags, sf * lagsPerSubframe, lagsPerSubframe),
                     lagsPerSubframe, subframeLength, lowRate, normalizedBitrate, excSubframe);
 
-            float nrgres = ResNrgDequantizer.dequantizeResnrg(df.nrgresDbqQ14()[sf], subframeLength);
+            var nrgres = ResNrgDequantizer.dequantizeResnrg(df.nrgresDbqQ14()[sf], subframeLength);
             nrgresLinear[sf] = nrgres;
             if (!voiced) {
                 prevNrgres = nrgres;
@@ -781,7 +782,7 @@ public final class MlowDecoder {
             noiseGenerator.genNoise(excSubframe, subframeLength, voiced, df.sfPulses()[sf], nrgres,
                     df.fcbgIdx()[sf], lsfs[sf], normalizedBitrate, noise);
 
-            int lowRateIx = lowRate ? 1 : 0;
+            var lowRateIx = lowRate ? 1 : 0;
             if (!voiced && df.sfPulses()[sf] > 0 && UV_PULSE_SHAPING_COEFS[lowRateIx][0][0] < 1.0f) {
                 Filters.arma1(excSubframe, 0, subframeLength, UV_PULSE_SHAPING_COEFS[lowRateIx][0],
                         UV_PULSE_SHAPING_COEFS[lowRateIx][1], uvPulseShapingState, 0);
@@ -790,14 +791,14 @@ public final class MlowDecoder {
                 uvPulseShapingState[1] = 0.0f;
             }
 
-            for (int i = 0; i < subframeLength; i++) {
+            for (var i = 0; i < subframeLength; i++) {
                 excSubframe[i] += noise[i];
             }
 
-            int voicedIx = voiced ? 1 : 0;
+            var voicedIx = voiced ? 1 : 0;
             if (!lpcPostfilterEnabled) {
                 if (lowRate && POST_TILT_COEFS[voicedIx][0] < 1.0f) {
-                    float[] tilted = new float[subframeLength];
+                    var tilted = new float[subframeLength];
                     Filters.ma1(excSubframe, 0, subframeLength, POST_TILT_COEFS[voicedIx], tiltState, 0,
                             tilted, 0);
                     System.arraycopy(tilted, 0, excSubframe, 0, subframeLength);
@@ -810,8 +811,8 @@ public final class MlowDecoder {
             // accumulator without touching the excitation, and the energy is recorded for a future lost
             // frame's pitch candidate search; neither alters the good decode output.
             plc.decayExc(excSubframe, 0, subframeLength, true, voiced);
-            float excNrg = 0.0f;
-            for (int i = 0; i < subframeLength; i++) {
+            var excNrg = 0.0f;
+            for (var i = 0; i < subframeLength; i++) {
                 excNrg += excSubframe[i] * excSubframe[i];
             }
             plc.updateNrg(excNrg, subframeLength);
@@ -822,14 +823,14 @@ public final class MlowDecoder {
 
         System.arraycopy(y, frameLength, lpcSynthMem, 0, LPC_ORDER);
 
-        float[] frameOut = new float[frameLength];
+        var frameOut = new float[frameLength];
         System.arraycopy(y, LPC_ORDER, frameOut, 0, frameLength);
 
         // Maintain the comfort noise background candidate model from this frame's synthesis; on an inactive
         // (non voice) frame the lowest energy subframe is recorded as a candidate a later concealment draws
         // its noise floor from.
-        float[] lsfsFlat = new float[numSubframes * LPC_ORDER];
-        for (int sf = 0; sf < numSubframes; sf++) {
+        var lsfsFlat = new float[numSubframes * LPC_ORDER];
+        for (var sf = 0; sf < numSubframes; sf++) {
             System.arraycopy(lsfs[sf], 0, lsfsFlat, sf * LPC_ORDER, LPC_ORDER);
         }
         plc.updateCng(frameOut, 0, voiced, toc.vad(), numSubframes, subframeLength, nrgresLinear, lsfsFlat);
@@ -899,14 +900,14 @@ public final class MlowDecoder {
             if (Log.WARNING) LOGGER.log(Level.WARNING, "calls mlow decode: truncated multiframe packet");
             throw new IllegalArgumentException("truncated multiframe MLow packet");
         }
-        int numFrames = packet[1] & 0xFF;
+        var numFrames = packet[1] & 0xFF;
         if (numFrames < 2) {
             throw new IllegalArgumentException("multiframe MLow packet with fewer than two frames");
         }
-        int[] sizes = new int[numFrames];
-        int pos = 2;
-        for (int i = 0; i < numFrames - 1; i++) {
-            int first = packet[pos] & 0xFF;
+        var sizes = new int[numFrames];
+        var pos = 2;
+        for (var i = 0; i < numFrames - 1; i++) {
+            var first = packet[pos] & 0xFF;
             if (first < 252) {
                 sizes[i] = first;
                 pos += 1;
@@ -921,24 +922,24 @@ public final class MlowDecoder {
                 throw new IllegalArgumentException("malformed multiframe MLow frame size");
             }
         }
-        int consumed = 0;
-        for (int i = 0; i < numFrames - 1; i++) {
+        var consumed = 0;
+        for (var i = 0; i < numFrames - 1; i++) {
             consumed += sizes[i];
         }
         sizes[numFrames - 1] = packet.length - pos - consumed;
         if (sizes[numFrames - 1] <= 0) {
             throw new IllegalArgumentException("malformed multiframe MLow last-frame size");
         }
-        float[][] frames = new float[numFrames][];
-        int total = 0;
-        for (int i = 0; i < numFrames; i++) {
+        var frames = new float[numFrames][];
+        var total = 0;
+        for (var i = 0; i < numFrames; i++) {
             frames[i] = decodeFrameFloat(packet, pos, sizes[i]);
             total += frames[i].length;
             pos += sizes[i];
         }
-        float[] out = new float[total];
-        int off = 0;
-        for (float[] frame : frames) {
+        var out = new float[total];
+        var off = 0;
+        for (var frame : frames) {
             System.arraycopy(frame, 0, out, off, frame.length);
             off += frame.length;
         }
@@ -961,21 +962,21 @@ public final class MlowDecoder {
      * @throws IllegalArgumentException if the packet announces a sample rate above 16 kHz
      */
     private float[] decodeFrameFloat(byte[] packet, int offset, int length) {
-        MlowTocByte tocByte = MlowTocByte.decode(packet[offset] & 0xFF);
+        var tocByte = MlowTocByte.decode(packet[offset] & 0xFF);
         // TODO: wire MlowBandwidthExtension: on the above 16 kHz (SWB/FB) branch ParamDecoder currently rejects, instantiate MlowBandwidthExtension and call decodeWideband(low band, LPC residual, nyquist gains, MlowHbParamDecoder HbFrameInput) to synthesize 32/48 kHz PCM, gated on the packet announced sample rate from tocByte
         // TODO: wire MlowLsfInterpolTables: reachable via decodeWideband, then hbLsfInterpolate, then MlowLsfInterpolTables.factors once the SWB bandwidth extension path is wired here and in MLowAudioDecoder.decode
-        ParamDecoder.DecodedFrame[] decodedFrames = paramDecoder.decodePacket(tocByte, packet, offset, length);
+        var decodedFrames = paramDecoder.decodePacket(tocByte, packet, offset, length);
 
-        int frameLength = tocByte.frameLength16();
-        int numSubframes = tocByte.numSubframes();
-        int subframeLength = frameLength / numSubframes;
-        boolean lowRate = tocByte.lowRate();
-        int lagsPerSubframe = subframeLength / LAG_SUBFRLEN;
-        int lagsPerFrame = frameLength / LAG_SUBFRLEN;
+        var frameLength = tocByte.frameLength16();
+        var numSubframes = tocByte.numSubframes();
+        var subframeLength = frameLength / numSubframes;
+        var lowRate = tocByte.lowRate();
+        var lagsPerSubframe = subframeLength / LAG_SUBFRLEN;
+        var lagsPerFrame = frameLength / LAG_SUBFRLEN;
 
-        float[] out = new float[decodedFrames.length * frameLength];
-        for (int frame = 0; frame < decodedFrames.length; frame++) {
-            float[] frameOut = synthesizeFrame(decodedFrames[frame], tocByte, frameLength, numSubframes,
+        var out = new float[decodedFrames.length * frameLength];
+        for (var frame = 0; frame < decodedFrames.length; frame++) {
+            var frameOut = synthesizeFrame(decodedFrames[frame], tocByte, frameLength, numSubframes,
                     subframeLength, lowRate, lagsPerSubframe, lagsPerFrame);
             System.arraycopy(frameOut, 0, out, frame * frameLength, frameLength);
         }
@@ -1005,33 +1006,33 @@ public final class MlowDecoder {
     private float[] synthesizeFrame(ParamDecoder.DecodedFrame df, MlowTocByte toc, int frameLength,
                                     int numSubframes, int subframeLength, boolean lowRate,
                                     int lagsPerSubframe, int lagsPerFrame) {
-        boolean voiced = df.voiced();
-        LpcInterpolator.InterpolatedFrame interpolated = subframeLpc.process(df, toc);
-        float[][] a = interpolated.lpc();
-        float[][] lsfs = interpolated.lsf();
+        var voiced = df.voiced();
+        var interpolated = subframeLpc.process(df, toc);
+        var a = interpolated.lpc();
+        var lsfs = interpolated.lsf();
 
-        float[] lags = new float[lagsPerFrame];
-        for (int i = 0; i < lagsPerFrame; i++) {
+        var lags = new float[lagsPerFrame];
+        for (var i = 0; i < lagsPerFrame; i++) {
             lags[i] = voiced ? df.laginds()[i] * 0.5f + MIN_PITCH_LAG : 0.0f;
         }
 
-        float normalizedBitrate = normalizedBitrate(df.nPulses(), frameLength);
+        var normalizedBitrate = normalizedBitrate(df.nPulses(), frameLength);
 
-        float[] lpcRes = new float[frameLength];
+        var lpcRes = new float[frameLength];
         celpSynthesizer.genExcitation(df.fcbgIdx(), voiced, numSubframes, subframeLength,
                 df.nPositions(), df.positions(), df.posPulses(), lpcRes);
 
         // y holds LPC_ORDER history samples then the frame's frameLength output samples.
-        float[] y = new float[LPC_ORDER + frameLength];
+        var y = new float[LPC_ORDER + frameLength];
         System.arraycopy(lpcSynthMem, 0, y, 0, LPC_ORDER);
 
-        for (int sf = 0; sf < numSubframes; sf++) {
-            float[] acbGain = CelpSynthesizer.acbDequant(lowRate, df.acbgIdx()[sf]);
+        for (var sf = 0; sf < numSubframes; sf++) {
+            var acbGain = CelpSynthesizer.acbDequant(lowRate, df.acbgIdx()[sf]);
             System.arraycopy(lpcRes, sf * subframeLength, excSubframe, 0, subframeLength);
             celpSynthesizer.celpDecode(voiced, acbGain, sliceLags(lags, sf * lagsPerSubframe, lagsPerSubframe),
                     lagsPerSubframe, subframeLength, lowRate, normalizedBitrate, excSubframe);
 
-            float nrgres = ResNrgDequantizer.dequantizeResnrg(df.nrgresDbqQ14()[sf], subframeLength);
+            var nrgres = ResNrgDequantizer.dequantizeResnrg(df.nrgresDbqQ14()[sf], subframeLength);
             if (!voiced) {
                 prevNrgres = nrgres;
             }
@@ -1039,7 +1040,7 @@ public final class MlowDecoder {
             noiseGenerator.genNoise(excSubframe, subframeLength, voiced, df.sfPulses()[sf], nrgres,
                     df.fcbgIdx()[sf], lsfs[sf], normalizedBitrate, noise);
 
-            int lowRateIx = lowRate ? 1 : 0;
+            var lowRateIx = lowRate ? 1 : 0;
             if (!voiced && df.sfPulses()[sf] > 0 && UV_PULSE_SHAPING_COEFS[lowRateIx][0][0] < 1.0f) {
                 Filters.arma1(excSubframe, 0, subframeLength, UV_PULSE_SHAPING_COEFS[lowRateIx][0],
                         UV_PULSE_SHAPING_COEFS[lowRateIx][1], uvPulseShapingState, 0);
@@ -1048,7 +1049,7 @@ public final class MlowDecoder {
                 uvPulseShapingState[1] = 0.0f;
             }
 
-            for (int i = 0; i < subframeLength; i++) {
+            for (var i = 0; i < subframeLength; i++) {
                 excSubframe[i] += noise[i];
             }
 
@@ -1057,7 +1058,7 @@ public final class MlowDecoder {
 
         System.arraycopy(y, frameLength, lpcSynthMem, 0, LPC_ORDER);
 
-        float[] frameOut = new float[frameLength];
+        var frameOut = new float[frameLength];
         System.arraycopy(y, LPC_ORDER, frameOut, 0, frameLength);
         Filters.arma2(frameOut, 0, frameLength, HP_B2, HP_A2, hpArma2State, 0);
         return frameOut;
@@ -1072,7 +1073,7 @@ public final class MlowDecoder {
      * @return a freshly allocated copy of the subframe's lags
      */
     private static float[] sliceLags(float[] lags, int offset, int length) {
-        float[] out = new float[length];
+        var out = new float[length];
         System.arraycopy(lags, offset, out, 0, length);
         return out;
     }
@@ -1089,8 +1090,8 @@ public final class MlowDecoder {
      * @return the normalized bitrate in {@code [0, 1]}
      */
     private static float normalizedBitrate(int numPulses, int frameLength) {
-        float pulsesPer20ms = (numPulses * frameLength) / (20.0f * 16.0f);
-        float x = 1.4f * (float) (Math.log(pulsesPer20ms + 1.0f) / Math.log(2.0)) - 6.5f;
+        var pulsesPer20ms = (numPulses * frameLength) / (20.0f * 16.0f);
+        var x = 1.4f * (float) (Math.log(pulsesPer20ms + 1.0f) / Math.log(2.0)) - 6.5f;
         return sigmoid(x);
     }
 
@@ -1148,7 +1149,7 @@ public final class MlowDecoder {
      * @return the rounded and clamped {@code int16} sample
      */
     private static short toInt16(float sample) {
-        int v = Math.round(sample * PCM_SCALE);
+        var v = Math.round(sample * PCM_SCALE);
         if (v > 32767) {
             v = 32767;
         } else if (v < -32768) {

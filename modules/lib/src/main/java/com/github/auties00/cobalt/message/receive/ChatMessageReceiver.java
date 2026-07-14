@@ -74,6 +74,7 @@ import com.github.auties00.cobalt.wam.type.StructuredMessageClass;
 
 import java.lang.System.Logger.Level;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -1287,7 +1288,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
      * @param receivedToken the token bytes the server attached
      * @param version       the reporting-token version
      * @return {@code true} when a candidate pair reproduces the received token
-     * @throws java.security.GeneralSecurityException if a cryptographic primitive
+     * @throws GeneralSecurityException if a cryptographic primitive
      *         is unavailable
      */
     private boolean reportingTokenMatches(
@@ -1296,7 +1297,7 @@ final class ChatMessageReceiver extends MessageReceiver<ChatMessageInfo> {
             byte[] content,
             byte[] receivedToken,
             int version
-    ) throws java.security.GeneralSecurityException {
+    ) throws GeneralSecurityException {
         var senders = new LinkedHashSet<Jid>();
         addUserJid(senders, stanza.senderJid());
         stanza.senderPn().ifPresent(pn -> addUserJid(senders, pn));

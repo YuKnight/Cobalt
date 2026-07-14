@@ -71,16 +71,16 @@ public final class A2nlsfBridge {
      *         {@code (0, SMPL_PI)}
      */
     public static float[] a2nlsf(float[] a) {
-        int[] aQ16 = new int[LPC_ORDER];
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var aQ16 = new int[LPC_ORDER];
+        for (var i = 0; i < LPC_ORDER; i++) {
             aQ16[i] = roundf(-a[i + 1] * 65536.0f);
         }
 
-        short[] lsfQ15 = new short[LPC_ORDER];
+        var lsfQ15 = new short[LPC_ORDER];
         SilkA2nlsf.a2nlsf(lsfQ15, aQ16, LPC_ORDER);
 
-        float[] nlsf = new float[LPC_ORDER];
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var nlsf = new float[LPC_ORDER];
+        for (var i = 0; i < LPC_ORDER; i++) {
             nlsf[i] = lsfQ15[i] / 32768.0f * SMPL_PI;
         }
         return nlsf;

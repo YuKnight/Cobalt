@@ -36,17 +36,23 @@ import com.github.auties00.cobalt.model.message.MessageKey;
 import com.github.auties00.cobalt.model.message.MessageKeyBuilder;
 import com.github.auties00.cobalt.store.cloud.CloudWhatsAppStore;
 
+import java.io.IOException;
 import java.lang.System.Logger.Level;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Production implementation of {@link CloudWhatsAppClient}.
@@ -444,7 +450,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         try {
             var data = Files.readAllBytes(file);
             return uploadMedia(data, mimeType, file.getFileName().toString());
-        } catch (java.io.IOException exception) {
+        } catch (IOException exception) {
             if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to read media file", exception);
             throw new IllegalArgumentException("failed to read media file: " + file, exception);
         }
@@ -458,7 +464,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         String mimeType;
         try {
             mimeType = Files.probeContentType(file);
-        } catch (java.io.IOException exception) {
+        } catch (IOException exception) {
             if (Log.WARNING) LOGGER.log(Level.WARNING, "failed to probe media MIME type", exception);
             throw new IllegalArgumentException("failed to probe the MIME type of " + file, exception);
         }
@@ -723,7 +729,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         String after = null;
         var restarted = false;
         while (true) {
-            var parameters = new java.util.HashMap<String, String>();
+            var parameters = new HashMap<String, String>();
             parameters.put("limit", "100");
             if (after != null) {
                 parameters.put("after", after);
@@ -1050,7 +1056,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      * @return the phone numbers
      */
     private List<CloudPhoneNumber> queryPhoneNumbers(Map<String, String> parameters) {
-        var merged = new java.util.HashMap<>(parameters);
+        var merged = new HashMap<>(parameters);
         merged.putIfAbsent("fields", PHONE_NUMBER_FIELDS);
         var response = api.get(requireWaba() + "/phone_numbers", merged);
         var data = response.getJSONArray("data");
@@ -1461,7 +1467,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
         String after = null;
         var restarted = false;
         while (true) {
-            var parameters = new java.util.HashMap<String, String>();
+            var parameters = new HashMap<String, String>();
             parameters.put("limit", "100");
             if (after != null) {
                 parameters.put("after", after);
@@ -2002,7 +2008,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     @Override
     public void editCommerceSettings(CloudCommerceSettings settings) {
         Objects.requireNonNull(settings, "settings must not be null");
-        var parameters = new java.util.HashMap<String, String>();
+        var parameters = new HashMap<String, String>();
         settings.cartEnabled().ifPresent(value -> parameters.put("is_cart_enabled", String.valueOf(value)));
         settings.catalogVisible().ifPresent(value -> parameters.put("is_catalog_visible", String.valueOf(value)));
         if (parameters.isEmpty()) {
@@ -2963,7 +2969,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      * @param order the order to serialize
      * @return the JSON order object
      */
-    private static JSONObject orderJson(com.github.auties00.cobalt.model.cloud.commerce.CloudOrder order) {
+    private static JSONObject orderJson(CloudOrder order) {
         var json = new JSONObject();
         json.put("status", order.status().token());
         order.catalogId().ifPresent(value -> json.put("catalog_id", value));
@@ -3043,7 +3049,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      */
     private static CloudOAuthToken parseOAuthToken(JSONObject response) {
         var expiresIn = response.containsKey("expires_in")
-                ? java.time.Duration.ofSeconds(response.getLongValue("expires_in")) : null;
+                ? Duration.ofSeconds(response.getLongValue("expires_in")) : null;
         return new CloudOAuthToken(
                 response.getString("access_token"),
                 response.getString("token_type"),
@@ -3381,7 +3387,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             server.hostname().ifPresent(value -> serverJson.put("hostname", value));
             server.port().ifPresent(value -> serverJson.put("port", value));
             if (!server.requestUriUserParams().isEmpty()) {
-                serverJson.put("request_uri_user_params", new JSONObject(new java.util.LinkedHashMap<>(server.requestUriUserParams())));
+                serverJson.put("request_uri_user_params", new JSONObject(new LinkedHashMap<>(server.requestUriUserParams())));
             }
             servers.add(serverJson);
         }
@@ -3469,7 +3475,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 var server = serverArray.getJSONObject(index);
                 var port = server.containsKey("port") ? server.getInteger("port") : null;
                 var appId = server.containsKey("app_id") ? server.getInteger("app_id") : null;
-                var params = new java.util.LinkedHashMap<String, String>();
+                var params = new LinkedHashMap<String, String>();
                 var paramsNode = server.getJSONObject("request_uri_user_params");
                 if (paramsNode != null) {
                     for (var key : paramsNode.keySet()) {
@@ -3524,7 +3530,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
     private CloudPhoneNumber parsePhoneNumber(JSONObject node) {
         var throughput = node.getJSONObject("throughput");
         var throughputLevel = throughput != null ? throughput.getString("level") : null;
-        Boolean official = node.containsKey("is_official_business_account")
+        var official = node.containsKey("is_official_business_account")
                 ? node.getBooleanValue("is_official_business_account") : null;
         return new CloudPhoneNumber(
                 node.getString("id") != null ? node.getString("id") : store.phoneNumberId(),
@@ -3553,7 +3559,7 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      * @param <E>     the enum type
      * @return the resolved enum constant, or {@code null} when {@code token} is {@code null}
      */
-    private static <E> E enumOrNull(String token, java.util.function.Function<String, E> factory) {
+    private static <E> E enumOrNull(String token, Function<String, E> factory) {
         return token == null ? null : factory.apply(token);
     }
 
@@ -3648,8 +3654,8 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
      */
     private static CloudTemplateComparison parseTemplateComparison(JSONObject response) {
         var blockRateOrder = new ArrayList<String>();
-        var timesSent = new java.util.LinkedHashMap<String, Long>();
-        var topBlockReason = new java.util.LinkedHashMap<String, CloudTemplateBlockReason>();
+        var timesSent = new LinkedHashMap<String, Long>();
+        var topBlockReason = new LinkedHashMap<String, CloudTemplateBlockReason>();
         var data = response.getJSONArray("data");
         if (data != null) {
             for (var index = 0; index < data.size(); index++) {
@@ -3687,8 +3693,8 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
                 }
             }
         }
-        var perTemplate = new java.util.LinkedHashMap<String, CloudTemplateComparison.Metrics>();
-        var keys = new java.util.LinkedHashSet<String>();
+        var perTemplate = new LinkedHashMap<String, CloudTemplateComparison.Metrics>();
+        var keys = new LinkedHashSet<String>();
         keys.addAll(timesSent.keySet());
         keys.addAll(topBlockReason.keySet());
         for (var key : keys) {
@@ -3816,19 +3822,19 @@ public final class LiveCloudWhatsAppClient implements CloudWhatsAppClient {
             return null;
         }
         try {
-            return java.time.OffsetDateTime.parse(value).toInstant();
-        } catch (java.time.format.DateTimeParseException ignored) {
+            return OffsetDateTime.parse(value).toInstant();
+        } catch (DateTimeParseException ignored) {
             // not an extended-offset ISO string; try the basic-offset and zulu forms below
         }
         try {
-            return java.time.OffsetDateTime.parse(value,
-                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss[.SSS]Z")).toInstant();
-        } catch (java.time.format.DateTimeParseException ignored) {
+            return OffsetDateTime.parse(value,
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss[.SSS]Z")).toInstant();
+        } catch (DateTimeParseException ignored) {
             // not a basic-offset string; try the zulu form below
         }
         try {
             return Instant.parse(value);
-        } catch (java.time.format.DateTimeParseException ignored) {
+        } catch (DateTimeParseException ignored) {
             return null;
         }
     }

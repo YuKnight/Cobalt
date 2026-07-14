@@ -61,15 +61,15 @@ final class EmojiSkinTones {
          * @throws UncheckedIOException if the resource cannot be read
          */
         private static Map<String, Map<String, String>> load() {
-            try (DataInputStream in = EmojiResources.open("emoji_skintones.bin")) {
-                int bases = in.readInt();
+            try (var in = EmojiResources.open("emoji_skintones.bin")) {
+                var bases = in.readInt();
                 Map<String, Map<String, String>> table = HashMap.newHashMap(bases);
-                for (int i = 0; i < bases; i++) {
-                    String base = EmojiResources.readString(in);
-                    int variants = in.readInt();
+                for (var i = 0; i < bases; i++) {
+                    var base = EmojiResources.readString(in);
+                    var variants = in.readInt();
                     Map<String, String> tones = HashMap.newHashMap(variants);
-                    for (int j = 0; j < variants; j++) {
-                        String key = EmojiResources.readString(in);
+                    for (var j = 0; j < variants; j++) {
+                        var key = EmojiResources.readString(in);
                         tones.put(key, EmojiResources.readString(in));
                     }
                     table.put(base, tones);
@@ -112,8 +112,8 @@ final class EmojiSkinTones {
         if (!base.skinToneable()) {
             return Optional.empty();
         }
-        String a = first.modifier();
-        String b = second.modifier();
+        var a = first.modifier();
+        var b = second.modifier();
         if (a.isEmpty() && b.isEmpty()) {
             return Optional.of(base.value());
         }
@@ -131,8 +131,8 @@ final class EmojiSkinTones {
         if (value == null) {
             return EmojiSkinTone.NONE;
         }
-        for (int i = 0; i < value.length(); ) {
-            int codePoint = value.codePointAt(i);
+        for (var i = 0; i < value.length(); ) {
+            var codePoint = value.codePointAt(i);
             if (isToneModifier(codePoint)) {
                 return forModifier(new String(Character.toChars(codePoint)));
             }
@@ -152,8 +152,8 @@ final class EmojiSkinTones {
      */
     static Optional<String> variantFor(WhatsAppEmoji base, String tonedInput) {
         List<String> modifiers = new ArrayList<>(2);
-        for (int i = 0; i < tonedInput.length(); ) {
-            int codePoint = tonedInput.codePointAt(i);
+        for (var i = 0; i < tonedInput.length(); ) {
+            var codePoint = tonedInput.codePointAt(i);
             if (isToneModifier(codePoint)) {
                 modifiers.add(new String(Character.toChars(codePoint)));
             }
@@ -162,8 +162,8 @@ final class EmojiSkinTones {
         if (modifiers.isEmpty()) {
             return Optional.of(base.value());
         }
-        String first = modifiers.get(0);
-        boolean uniform = modifiers.stream().allMatch(first::equals);
+        var first = modifiers.get(0);
+        var uniform = modifiers.stream().allMatch(first::equals);
         return lookup(base.value(), uniform ? first : String.join("", modifiers));
     }
 
@@ -175,9 +175,9 @@ final class EmojiSkinTones {
      *         when it carries none
      */
     static String stripModifiers(String value) {
-        boolean toned = false;
-        for (int i = 0; i < value.length(); ) {
-            int codePoint = value.codePointAt(i);
+        var toned = false;
+        for (var i = 0; i < value.length(); ) {
+            var codePoint = value.codePointAt(i);
             if (isToneModifier(codePoint)) {
                 toned = true;
                 break;
@@ -187,9 +187,9 @@ final class EmojiSkinTones {
         if (!toned) {
             return value;
         }
-        StringBuilder stripped = new StringBuilder(value.length());
-        for (int i = 0; i < value.length(); ) {
-            int codePoint = value.codePointAt(i);
+        var stripped = new StringBuilder(value.length());
+        for (var i = 0; i < value.length(); ) {
+            var codePoint = value.codePointAt(i);
             if (!isToneModifier(codePoint)) {
                 stripped.appendCodePoint(codePoint);
             }
@@ -206,7 +206,7 @@ final class EmojiSkinTones {
      * @return the variant string, or empty when there is no such base or key
      */
     private static Optional<String> lookup(String baseValue, String toneKey) {
-        Map<String, String> tones = Table.BY_BASE.get(baseValue);
+        var tones = Table.BY_BASE.get(baseValue);
         if (tones == null) {
             return Optional.empty();
         }
@@ -220,7 +220,7 @@ final class EmojiSkinTones {
      * @return the matching tone, or {@link EmojiSkinTone#NONE} when none matches
      */
     private static EmojiSkinTone forModifier(String modifier) {
-        for (EmojiSkinTone tone : EmojiSkinTone.values()) {
+        for (var tone : EmojiSkinTone.values()) {
             if (tone.modifier().equals(modifier)) {
                 return tone;
             }

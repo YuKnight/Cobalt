@@ -9,6 +9,7 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.foreign.ValueLayout.JAVA_BYTE;
@@ -127,7 +128,7 @@ public class DataUtilsSegmentAccessBenchmark {
 
     @Setup(Level.Trial)
     public void setup() {
-        var random = new java.util.Random(0xC0BA17L);
+        var random = new Random(0xC0BA17L);
         random.nextBytes(refBytes);
         kind = Type.valueOf(type);
         get = "GET".equals(op);
@@ -239,31 +240,38 @@ public class DataUtilsSegmentAccessBenchmark {
 
     // Strategy C: single native-order VarHandle plus reverseBytes / raw-bits reinterpretation when order != native.
 
-    private static short cGetShort(MemorySegment s, int o, ByteOrder ord) { short v = (short) NH_S.get(s, (long) o); return ord == NATIVE ? v : Short.reverseBytes(v); }
-    private static int cGetInt(MemorySegment s, int o, ByteOrder ord) { int v = (int) NH_I.get(s, (long) o); return ord == NATIVE ? v : Integer.reverseBytes(v); }
-    private static long cGetLong(MemorySegment s, int o, ByteOrder ord) { long v = (long) NH_L.get(s, (long) o); return ord == NATIVE ? v : Long.reverseBytes(v); }
-    private static float cGetFloat(MemorySegment s, int o, ByteOrder ord) { int r = (int) NH_I.get(s, (long) o); if (ord != NATIVE) r = Integer.reverseBytes(r); return Float.intBitsToFloat(r); }
-    private static double cGetDouble(MemorySegment s, int o, ByteOrder ord) { long r = (long) NH_L.get(s, (long) o); if (ord != NATIVE) r = Long.reverseBytes(r); return Double.longBitsToDouble(r); }
+    private static short cGetShort(MemorySegment s, int o, ByteOrder ord) {
+        var v = (short) NH_S.get(s, (long) o); return ord == NATIVE ? v : Short.reverseBytes(v); }
+    private static int cGetInt(MemorySegment s, int o, ByteOrder ord) {
+        var v = (int) NH_I.get(s, (long) o); return ord == NATIVE ? v : Integer.reverseBytes(v); }
+    private static long cGetLong(MemorySegment s, int o, ByteOrder ord) {
+        var v = (long) NH_L.get(s, (long) o); return ord == NATIVE ? v : Long.reverseBytes(v); }
+    private static float cGetFloat(MemorySegment s, int o, ByteOrder ord) {
+        var r = (int) NH_I.get(s, (long) o); if (ord != NATIVE) r = Integer.reverseBytes(r); return Float.intBitsToFloat(r); }
+    private static double cGetDouble(MemorySegment s, int o, ByteOrder ord) {
+        var r = (long) NH_L.get(s, (long) o); if (ord != NATIVE) r = Long.reverseBytes(r); return Double.longBitsToDouble(r); }
 
     private static void cPutShort(MemorySegment s, int o, short v, ByteOrder ord) { NH_S.set(s, (long) o, ord == NATIVE ? v : Short.reverseBytes(v)); }
     private static void cPutInt(MemorySegment s, int o, int v, ByteOrder ord) { NH_I.set(s, (long) o, ord == NATIVE ? v : Integer.reverseBytes(v)); }
     private static void cPutLong(MemorySegment s, int o, long v, ByteOrder ord) { NH_L.set(s, (long) o, ord == NATIVE ? v : Long.reverseBytes(v)); }
-    private static void cPutFloat(MemorySegment s, int o, float v, ByteOrder ord) { int r = Float.floatToRawIntBits(v); if (ord != NATIVE) r = Integer.reverseBytes(r); NH_I.set(s, (long) o, r); }
-    private static void cPutDouble(MemorySegment s, int o, double v, ByteOrder ord) { long r = Double.doubleToRawLongBits(v); if (ord != NATIVE) r = Long.reverseBytes(r); NH_L.set(s, (long) o, r); }
+    private static void cPutFloat(MemorySegment s, int o, float v, ByteOrder ord) {
+        var r = Float.floatToRawIntBits(v); if (ord != NATIVE) r = Integer.reverseBytes(r); NH_I.set(s, (long) o, r); }
+    private static void cPutDouble(MemorySegment s, int o, double v, ByteOrder ord) {
+        var r = Double.doubleToRawLongBits(v); if (ord != NATIVE) r = Long.reverseBytes(r); NH_L.set(s, (long) o, r); }
 
     // Strategy D: byte-by-byte get(JAVA_BYTE, ...) with manual shift/combine.
 
     private static short dGetShort(MemorySegment s, int o, ByteOrder ord) {
-        int b0 = s.get(JAVA_BYTE, o) & 0xFF;
-        int b1 = s.get(JAVA_BYTE, o + 1) & 0xFF;
+        var b0 = s.get(JAVA_BYTE, o) & 0xFF;
+        var b1 = s.get(JAVA_BYTE, o + 1) & 0xFF;
         return ord == ByteOrder.BIG_ENDIAN ? (short) ((b0 << 8) | b1) : (short) ((b1 << 8) | b0);
     }
 
     private static int dGetInt(MemorySegment s, int o, ByteOrder ord) {
-        int b0 = s.get(JAVA_BYTE, o) & 0xFF;
-        int b1 = s.get(JAVA_BYTE, o + 1) & 0xFF;
-        int b2 = s.get(JAVA_BYTE, o + 2) & 0xFF;
-        int b3 = s.get(JAVA_BYTE, o + 3) & 0xFF;
+        var b0 = s.get(JAVA_BYTE, o) & 0xFF;
+        var b1 = s.get(JAVA_BYTE, o + 1) & 0xFF;
+        var b2 = s.get(JAVA_BYTE, o + 2) & 0xFF;
+        var b3 = s.get(JAVA_BYTE, o + 3) & 0xFF;
         return ord == ByteOrder.BIG_ENDIAN
                 ? (b0 << 24) | (b1 << 16) | (b2 << 8) | b3
                 : (b3 << 24) | (b2 << 16) | (b1 << 8) | b0;
@@ -272,11 +280,11 @@ public class DataUtilsSegmentAccessBenchmark {
     private static long dGetLong(MemorySegment s, int o, ByteOrder ord) {
         long result = 0;
         if (ord == ByteOrder.BIG_ENDIAN) {
-            for (int i = 0; i < 8; i++) {
+            for (var i = 0; i < 8; i++) {
                 result = (result << 8) | (s.get(JAVA_BYTE, o + i) & 0xFFL);
             }
         } else {
-            for (int i = 7; i >= 0; i--) {
+            for (var i = 7; i >= 0; i--) {
                 result = (result << 8) | (s.get(JAVA_BYTE, o + i) & 0xFFL);
             }
         }
@@ -287,7 +295,7 @@ public class DataUtilsSegmentAccessBenchmark {
     private static double dGetDouble(MemorySegment s, int o, ByteOrder ord) { return Double.longBitsToDouble(dGetLong(s, o, ord)); }
 
     private static void dPutShort(MemorySegment s, int o, short v, ByteOrder ord) {
-        int iv = v & 0xFFFF;
+        var iv = v & 0xFFFF;
         if (ord == ByteOrder.BIG_ENDIAN) {
             s.set(JAVA_BYTE, o, (byte) (iv >>> 8));
             s.set(JAVA_BYTE, o + 1, (byte) iv);
@@ -299,11 +307,11 @@ public class DataUtilsSegmentAccessBenchmark {
 
     private static void dPutInt(MemorySegment s, int o, int v, ByteOrder ord) {
         if (ord == ByteOrder.BIG_ENDIAN) {
-            for (int i = 0; i < 4; i++) {
+            for (var i = 0; i < 4; i++) {
                 s.set(JAVA_BYTE, o + i, (byte) (v >>> (24 - 8 * i)));
             }
         } else {
-            for (int i = 0; i < 4; i++) {
+            for (var i = 0; i < 4; i++) {
                 s.set(JAVA_BYTE, o + i, (byte) (v >>> (8 * i)));
             }
         }
@@ -311,11 +319,11 @@ public class DataUtilsSegmentAccessBenchmark {
 
     private static void dPutLong(MemorySegment s, int o, long v, ByteOrder ord) {
         if (ord == ByteOrder.BIG_ENDIAN) {
-            for (int i = 0; i < 8; i++) {
+            for (var i = 0; i < 8; i++) {
                 s.set(JAVA_BYTE, o + i, (byte) (v >>> (56 - 8 * i)));
             }
         } else {
-            for (int i = 0; i < 8; i++) {
+            for (var i = 0; i < 8; i++) {
                 s.set(JAVA_BYTE, o + i, (byte) (v >>> (8 * i)));
             }
         }
@@ -346,7 +354,7 @@ public class DataUtilsSegmentAccessBenchmark {
         var vs = MemorySegment.ofArray(refBytes.clone());
         switch (kind) {
             case SHORT -> {
-                short exp = DataUtils.getShort(refBytes, offset, byteOrder);
+                var exp = DataUtils.getShort(refBytes, offset, byteOrder);
                 check(aGetShort(vs, offset, byteOrder) == exp, "A get short");
                 check(bGetShort(vs, offset, byteOrder) == exp, "B get short");
                 check(cGetShort(vs, offset, byteOrder) == exp, "C get short");
@@ -361,7 +369,7 @@ public class DataUtilsSegmentAccessBenchmark {
                 checkPut(s -> ePutShort(s, offset, sVal, byteOrder), pe, "E put short");
             }
             case INT -> {
-                int exp = DataUtils.getInt(refBytes, offset, byteOrder);
+                var exp = DataUtils.getInt(refBytes, offset, byteOrder);
                 check(aGetInt(vs, offset, byteOrder) == exp, "A get int");
                 check(bGetInt(vs, offset, byteOrder) == exp, "B get int");
                 check(cGetInt(vs, offset, byteOrder) == exp, "C get int");
@@ -376,7 +384,7 @@ public class DataUtilsSegmentAccessBenchmark {
                 checkPut(s -> ePutInt(s, offset, iVal, byteOrder), pe, "E put int");
             }
             case LONG -> {
-                long exp = DataUtils.getLong(refBytes, offset, byteOrder);
+                var exp = DataUtils.getLong(refBytes, offset, byteOrder);
                 check(aGetLong(vs, offset, byteOrder) == exp, "A get long");
                 check(bGetLong(vs, offset, byteOrder) == exp, "B get long");
                 check(cGetLong(vs, offset, byteOrder) == exp, "C get long");
@@ -391,7 +399,7 @@ public class DataUtilsSegmentAccessBenchmark {
                 checkPut(s -> ePutLong(s, offset, lVal, byteOrder), pe, "E put long");
             }
             case FLOAT -> {
-                int expBits = Float.floatToRawIntBits(DataUtils.getFloat(refBytes, offset, byteOrder));
+                var expBits = Float.floatToRawIntBits(DataUtils.getFloat(refBytes, offset, byteOrder));
                 check(Float.floatToRawIntBits(aGetFloat(vs, offset, byteOrder)) == expBits, "A get float");
                 check(Float.floatToRawIntBits(bGetFloat(vs, offset, byteOrder)) == expBits, "B get float");
                 check(Float.floatToRawIntBits(cGetFloat(vs, offset, byteOrder)) == expBits, "C get float");
@@ -406,7 +414,7 @@ public class DataUtilsSegmentAccessBenchmark {
                 checkPut(s -> ePutFloat(s, offset, fVal, byteOrder), pe, "E put float");
             }
             case DOUBLE -> {
-                long expBits = Double.doubleToRawLongBits(DataUtils.getDouble(refBytes, offset, byteOrder));
+                var expBits = Double.doubleToRawLongBits(DataUtils.getDouble(refBytes, offset, byteOrder));
                 check(Double.doubleToRawLongBits(aGetDouble(vs, offset, byteOrder)) == expBits, "A get double");
                 check(Double.doubleToRawLongBits(bGetDouble(vs, offset, byteOrder)) == expBits, "B get double");
                 check(Double.doubleToRawLongBits(cGetDouble(vs, offset, byteOrder)) == expBits, "C get double");

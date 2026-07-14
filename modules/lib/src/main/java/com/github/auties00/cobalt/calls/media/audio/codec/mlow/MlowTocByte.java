@@ -73,22 +73,22 @@ public record MlowTocByte(
      *                                  which the two bit field cannot produce but is guarded defensively
      */
     public static MlowTocByte decode(int tocByte) {
-        int b = tocByte & 0xFF;
-        boolean sid = ((b >> 7) & 1) != 0;
-        boolean vad = ((b >> 6) & 1) != 0;
-        int sampleRateHz = (((b >> 5) & 1) + 1) * 16000;
-        int packetLenMs = switch ((b >> 3) & 3) {
+        var b = tocByte & 0xFF;
+        var sid = ((b >> 7) & 1) != 0;
+        var vad = ((b >> 6) & 1) != 0;
+        var sampleRateHz = (((b >> 5) & 1) + 1) * 16000;
+        var packetLenMs = switch ((b >> 3) & 3) {
             case 0 -> 10;
             case 1 -> 20;
             case 2 -> 60;
             case 3 -> 120;
             default -> throw new IllegalArgumentException("invalid frame-size selector in TOC byte " + b);
         };
-        boolean lowRate = ((b >> 2) & 1) != 0;
-        int rawBit1 = (b >> 1) & 1;
-        boolean fec = vad && rawBit1 != 0;
-        boolean codedAsActiveVoice = vad || rawBit1 != 0;
-        boolean stereo = (b & 1) != 0;
+        var lowRate = ((b >> 2) & 1) != 0;
+        var rawBit1 = (b >> 1) & 1;
+        var fec = vad && rawBit1 != 0;
+        var codedAsActiveVoice = vad || rawBit1 != 0;
+        var stereo = (b & 1) != 0;
         return new MlowTocByte(sid, vad, sampleRateHz, packetLenMs, lowRate, fec, codedAsActiveVoice, stereo);
     }
 

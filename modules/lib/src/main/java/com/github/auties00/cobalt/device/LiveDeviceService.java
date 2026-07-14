@@ -367,7 +367,7 @@ public final class LiveDeviceService implements DeviceService {
      *
      * @param userJids              the user JIDs to resolve
      * @param context               the USync context wire literal, one of the
-     *                              {@link com.github.auties00.cobalt.stanza.usync.UsyncContext} values
+     *                              {@link UsyncContext} values
      *                              (for example {@code "message"}, {@code "interactive"},
      *                              {@code "notification"})
      * @param expectedPhash         the phash to compare against the local device list, or
@@ -1809,7 +1809,7 @@ public final class LiveDeviceService implements DeviceService {
      *
      * <p>A no-op unless the sync was queued by the account-sync devices handler during
      * resume-from-restart with a deferred ack (see
-     * {@link PendingDeviceSync#ofDeferredAck(java.util.Collection, String, String, Jid)}). It is
+     * {@link PendingDeviceSync#ofDeferredAck(Collection, String, String, Jid)}). It is
      * called from every terminal branch of {@link #retryPendingSyncs()}, whether the device fetch
      * succeeded or the entry was finally abandoned, so the server stops replaying the notification
      * once Cobalt is done with it; only the transient-retry path leaves the ack pending, carried
@@ -2905,7 +2905,7 @@ public final class LiveDeviceService implements DeviceService {
      *
      * <p>The entry point is the no-cached-record branch of
      * {@link #handleDeviceAddNotification(Jid, Stanza, Stanza, long)}. The follow-up USync carries the
-     * {@link com.github.auties00.cobalt.stanza.usync.UsyncContext#NOTIFICATION} context since it is
+     * {@link UsyncContext#NOTIFICATION} context since it is
      * driven by an inbound device notification.
      *
      * @implNote

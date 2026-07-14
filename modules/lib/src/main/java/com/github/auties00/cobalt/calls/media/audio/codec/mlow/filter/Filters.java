@@ -93,14 +93,14 @@ public final class Filters {
      */
     public static void ma1(float[] x, int xOff, int n, float[] coef, float[] state, int stateOff, float[] y, int yOff) {
         if (coef[0] == 1.0f) {
-            for (int i = 0; i < n - 1; i++) {
+            for (var i = 0; i < n - 1; i++) {
                 y[yOff + 1 + i] = x[xOff + 1 + i] + coef[1] * x[xOff + i];
             }
         } else {
-            for (int i = 0; i < n; i++) {
+            for (var i = 0; i < n; i++) {
                 y[yOff + i] = x[xOff + i] * coef[0];
             }
-            for (int i = 0; i < n - 1; i++) {
+            for (var i = 0; i < n - 1; i++) {
                 y[yOff + 1 + i] += coef[1] * x[xOff + i];
             }
         }
@@ -130,18 +130,18 @@ public final class Filters {
      */
     public static void ma2(float[] x, int xOff, int n, float[] coef, float[] state, int stateOff, float[] y, int yOff) {
         if (coef[0] == 1.0f) {
-            for (int i = 0; i < n - 1; i++) {
+            for (var i = 0; i < n - 1; i++) {
                 y[yOff + 1 + i] = x[xOff + 1 + i] + coef[1] * x[xOff + i];
             }
         } else {
-            for (int i = 0; i < n; i++) {
+            for (var i = 0; i < n; i++) {
                 y[yOff + i] = x[xOff + i] * coef[0];
             }
-            for (int i = 0; i < n - 1; i++) {
+            for (var i = 0; i < n - 1; i++) {
                 y[yOff + 1 + i] += coef[1] * x[xOff + i];
             }
         }
-        for (int i = 0; i < n - 2; i++) {
+        for (var i = 0; i < n - 2; i++) {
             y[yOff + 2 + i] += coef[2] * x[xOff + i];
         }
         y[yOff] = coef[0] * x[xOff] + coef[1] * state[stateOff] + coef[2] * state[stateOff + 1];
@@ -166,9 +166,9 @@ public final class Filters {
      * @param yOff the offset of the first output sample in {@code y}
      */
     public static void ma3(float[] x, int xOff, int n, float[] coef, float[] y, int yOff) {
-        for (int sample = 0; sample < n; sample++) {
+        for (var sample = 0; sample < n; sample++) {
             float res = 0;
-            for (int i = 0; i < 4; i++) {
+            for (var i = 0; i < 4; i++) {
                 res += coef[i] * x[xOff + sample - i];
             }
             y[yOff + sample] = res;
@@ -190,9 +190,9 @@ public final class Filters {
      * @param yOff the offset of the first output sample in {@code y}
      */
     public static void ma9(float[] x, int xOff, int n, float[] coef, float[] y, int yOff) {
-        for (int sample = 0; sample < n; sample++) {
+        for (var sample = 0; sample < n; sample++) {
             float res = 0;
-            for (int i = 0; i < 10; i++) {
+            for (var i = 0; i < 10; i++) {
                 res += coef[i] * x[xOff + sample - i];
             }
             y[yOff + sample] = res;
@@ -215,9 +215,9 @@ public final class Filters {
      * @param yOff the offset of the first output sample in {@code y}
      */
     public static void ma16Monic(float[] x, int xOff, int n, float[] coef, float[] y, int yOff) {
-        for (int sample = 0; sample < n; sample++) {
-            float res = x[xOff + sample];
-            for (int i = 1; i < 17; i++) {
+        for (var sample = 0; sample < n; sample++) {
+            var res = x[xOff + sample];
+            for (var i = 1; i < 17; i++) {
                 res += coef[i] * x[xOff + sample - i];
             }
             y[yOff + sample] = res;
@@ -241,9 +241,9 @@ public final class Filters {
      * @param yOff the offset of the first output sample in {@code y}
      */
     public static void ma16Sym(float[] x, int xOff, int n, float[] coef, float[] y, int yOff) {
-        for (int sample = 0; sample < n; sample++) {
-            float res = x[xOff + sample - 8] * coef[8];
-            for (int i = 0; i < 8; i++) {
+        for (var sample = 0; sample < n; sample++) {
+            var res = x[xOff + sample - 8] * coef[8];
+            for (var i = 0; i < 8; i++) {
                 res += coef[i] * (x[xOff + sample - i] + x[xOff + sample - 16 + i]);
             }
             y[yOff + sample] = res;
@@ -270,19 +270,19 @@ public final class Filters {
     public static void ma(float[] x, int xOff, int n, float[] coef, int coefLen, float[] y, int yOff) {
         int i;
         if (coef[0] == 1.0f) {
-            for (int sample = 0; sample < n; sample++) {
+            for (var sample = 0; sample < n; sample++) {
                 y[yOff + sample] = x[xOff + sample] + coef[1] * x[xOff + sample - 1];
             }
             i = 2;
         } else {
-            for (int sample = 0; sample < n; sample++) {
+            for (var sample = 0; sample < n; sample++) {
                 y[yOff + sample] = x[xOff + sample] * coef[0];
             }
             i = 1;
         }
         for (; i < coefLen; i++) {
-            float c = coef[i];
-            for (int sample = 0; sample < n; sample++) {
+            var c = coef[i];
+            for (var sample = 0; sample < n; sample++) {
                 y[yOff + sample] += c * x[xOff + sample - i];
             }
         }
@@ -309,19 +309,19 @@ public final class Filters {
      * @param yOff     the offset of the first output sample in {@code y}
      */
     public static void ar1(float[] x, int xOff, int n, float[] coef, float[] state, int stateOff, float[] y, int yOff) {
-        final float ar1 = -coef[1];
-        final float ar1_2 = ar1 * ar1;
-        final float ar1_3 = ar1 * ar1_2;
-        final float ar1_4 = ar1 * ar1_3;
-        final float ar1_5 = ar1 * ar1_4;
-        float ytmp = state[stateOff];
-        int sample = 0;
+        final var ar1 = -coef[1];
+        final var ar1_2 = ar1 * ar1;
+        final var ar1_3 = ar1 * ar1_2;
+        final var ar1_4 = ar1 * ar1_3;
+        final var ar1_5 = ar1 * ar1_4;
+        var ytmp = state[stateOff];
+        var sample = 0;
         for (; sample < n - 4; sample += 5) {
-            float xtmp0 = x[xOff + sample];
-            float xtmp1 = x[xOff + sample + 1];
-            float xtmp2 = x[xOff + sample + 2];
-            float xtmp3 = x[xOff + sample + 3];
-            float xtmp4 = x[xOff + sample + 4];
+            var xtmp0 = x[xOff + sample];
+            var xtmp1 = x[xOff + sample + 1];
+            var xtmp2 = x[xOff + sample + 2];
+            var xtmp3 = x[xOff + sample + 3];
+            var xtmp4 = x[xOff + sample + 4];
             y[yOff + sample + 4] = xtmp4 + ar1 * xtmp3 + ar1_2 * xtmp2 + ar1_3 * xtmp1 + ar1_4 * xtmp0 + ar1_5 * ytmp;
             y[yOff + sample] = xtmp0 + ar1 * ytmp;
             y[yOff + sample + 1] = xtmp1 + ar1 * xtmp0 + ar1_2 * ytmp;
@@ -358,28 +358,28 @@ public final class Filters {
      * @param yOff     the offset of the first output sample in {@code y}
      */
     public static void ar2(float[] x, int xOff, int n, float[] coef, float[] state, int stateOff, float[] y, int yOff) {
-        float ytmp0 = state[stateOff + 1];
-        float ytmp1 = state[stateOff];
-        final float ar1 = -coef[1];
-        final float ar2 = -coef[2];
-        final float ar1_2 = ar1 * ar1;
-        final float ar1_3 = ar1 * ar1_2;
-        final float ar1_4 = ar1 * ar1_3;
-        final float imp1 = ar1;
-        final float imp2 = ar1_2 + ar2;
-        final float imp3 = ar1_3 + 2 * ar1 * ar2;
-        final float imp4 = ar1_4 + ar2 * ar2 + 3 * ar1_2 * ar2;
-        final float ymp1 = ar2;
-        final float ymp2 = ar2 * imp1;
-        final float ymp3 = ar2 * imp2;
-        final float ymp4 = ar2 * imp3;
-        int sample = 0;
+        var ytmp0 = state[stateOff + 1];
+        var ytmp1 = state[stateOff];
+        final var ar1 = -coef[1];
+        final var ar2 = -coef[2];
+        final var ar1_2 = ar1 * ar1;
+        final var ar1_3 = ar1 * ar1_2;
+        final var ar1_4 = ar1 * ar1_3;
+        final var imp1 = ar1;
+        final var imp2 = ar1_2 + ar2;
+        final var imp3 = ar1_3 + 2 * ar1 * ar2;
+        final var imp4 = ar1_4 + ar2 * ar2 + 3 * ar1_2 * ar2;
+        final var ymp1 = ar2;
+        final var ymp2 = ar2 * imp1;
+        final var ymp3 = ar2 * imp2;
+        final var ymp4 = ar2 * imp3;
+        var sample = 0;
         for (; sample < n - 3; sample += 4) {
-            float xtmp0 = x[xOff + sample];
-            float xtmp1 = x[xOff + sample + 1];
-            float xtmp2 = x[xOff + sample + 2];
+            var xtmp0 = x[xOff + sample];
+            var xtmp1 = x[xOff + sample + 1];
+            var xtmp2 = x[xOff + sample + 2];
             y[yOff + sample + 2] = xtmp2 + imp1 * xtmp1 + imp2 * xtmp0 + imp3 * ytmp1 + ymp3 * ytmp0;
-            float xtmp3 = x[xOff + sample + 3];
+            var xtmp3 = x[xOff + sample + 3];
             y[yOff + sample + 3] = xtmp3 + imp1 * xtmp2 + imp2 * xtmp1 + imp3 * xtmp0 + imp4 * ytmp1 + ymp4 * ytmp0;
             y[yOff + sample] = xtmp0 + imp1 * ytmp1 + ymp1 * ytmp0;
             y[yOff + sample + 1] = xtmp1 + imp1 * xtmp0 + imp2 * ytmp1 + ymp2 * ytmp0;
@@ -413,24 +413,24 @@ public final class Filters {
      * @param yOff the offset of the first output sample in {@code y}; at least four
      */
     public static void ar4(float[] x, int xOff, int n, float[] coef, float[] y, int yOff) {
-        float[] coef2 = new float[4];
+        var coef2 = new float[4];
         coef2[0] = coef[2] - coef[1] * coef[1];
         coef2[1] = coef[3] - coef[1] * coef[2];
         coef2[2] = coef[4] - coef[1] * coef[3];
         coef2[3] = -coef[1] * coef[4];
-        float res0 = y[yOff - 2];
-        float res1 = y[yOff - 1];
-        int sample = 0;
+        var res0 = y[yOff - 2];
+        var res1 = y[yOff - 1];
+        var sample = 0;
         for (; sample < n - 1; sample += 2) {
-            float tmp0 = x[xOff + sample] - coef[4] * y[yOff + sample - 4] - coef[3] * y[yOff + sample - 3] - coef[2] * res0 - coef[1] * res1;
+            var tmp0 = x[xOff + sample] - coef[4] * y[yOff + sample - 4] - coef[3] * y[yOff + sample - 3] - coef[2] * res0 - coef[1] * res1;
             res1 = x[xOff + sample + 1] - coef[1] * x[xOff + sample] - coef2[3] * y[yOff + sample - 4] - coef2[2] * y[yOff + sample - 3] - coef2[1] * res0 - coef2[0] * res1;
             res0 = tmp0;
             y[yOff + sample] = res0;
             y[yOff + sample + 1] = res1;
         }
         for (; sample < n; sample++) {
-            float res = x[xOff + sample];
-            for (int i = 0; i < 4; i++) {
+            var res = x[xOff + sample];
+            for (var i = 0; i < 4; i++) {
                 res -= coef[4 - i] * y[yOff + sample - 4 + i];
             }
             y[yOff + sample] = res;
@@ -458,9 +458,9 @@ public final class Filters {
      * @param yOff the offset of the first output sample in {@code y}; at least 16
      */
     public static void ar16(float[] x, int xOff, int n, float[] coef, float[] y, int yOff) {
-        for (int sample = 0; sample < n; sample++) {
-            float res = x[xOff + sample];
-            for (int i = 0; i < 16; i++) {
+        for (var sample = 0; sample < n; sample++) {
+            var res = x[xOff + sample];
+            for (var i = 0; i < 16; i++) {
                 res -= coef[16 - i] * y[yOff + sample - 16 + i];
             }
             y[yOff + sample] = res;
@@ -602,7 +602,7 @@ public final class Filters {
      * @param yOff     the offset of the first output sample in {@code y}
      */
     public static void allpass2(float[] x, int xOff, int n, float[] coef, float[] state, int stateOff, float[] y, int yOff) {
-        float[] coefMa = {coef[2], coef[1], 1.0f};
+        var coefMa = new float[]{coef[2], coef[1], 1.0f};
         ma2(x, xOff, n, coefMa, state, stateOff, y, yOff);
         ar2(y, yOff, n, coef, state, stateOff + 2, y, yOff);
     }
@@ -624,9 +624,9 @@ public final class Filters {
      * @param kernel the 16 tap symmetric interpolation kernel
      */
     public static void interpol(float[] x, int xOff, float[] y, int yOff, int n, float[] kernel) {
-        for (int sample = 0; sample < n; sample++) {
-            float ret = 0.0f;
-            for (int i = 0; i < 8; i++) {
+        for (var sample = 0; sample < n; sample++) {
+            var ret = 0.0f;
+            for (var i = 0; i < 8; i++) {
                 ret += (x[xOff + sample + i] + x[xOff + sample + 15 - i]) * kernel[i];
             }
             y[yOff + sample] = ret;

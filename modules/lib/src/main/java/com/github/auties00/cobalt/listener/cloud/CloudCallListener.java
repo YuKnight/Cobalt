@@ -13,9 +13,9 @@ import com.github.auties00.cobalt.model.cloud.CloudCallEvent;
  * each inbound signaling event delivered through the {@code calls} webhook change field, either a
  * {@link CloudCallEvent.Connect} carrying an SDP offer or a {@link CloudCallEvent.Terminate} carrying
  * the final disposition. Business-initiated call status transitions reach
- * {@link com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient#addCallStatusListener
+ * {@link CloudWhatsAppClient#addCallStatusListener
  * CloudCallStatusListener} and consumer permission replies reach
- * {@link com.github.auties00.cobalt.client.cloud.CloudWhatsAppClient#addCallPermissionListener
+ * {@link CloudWhatsAppClient#addCallPermissionListener
  * CloudCallPermissionListener} instead.
  *
  * @see CloudWhatsAppClientListener

@@ -69,18 +69,18 @@ public final class MlowHbParamDecoder {
      */
     public MlowBandwidthExtension.HbFrameParams decode(MlowRangeDecoder decoder, int frameLength16, boolean voiced,
                                                        boolean condCoding, boolean lowRate) {
-        int v = voiced ? 1 : 0;
-        int lr = lowRate ? 1 : 0;
-        int framelen20 = frameLength16 == 320 ? 1 : 0;
+        var v = voiced ? 1 : 0;
+        var lr = lowRate ? 1 : 0;
+        var framelen20 = frameLength16 == 320 ? 1 : 0;
 
-        int[] gainCmf = MlowHbTables.gainCmf(framelen20, v, lr);
-        int gainQi = MlowEntropyWrapper.decodeUpdate(decoder, gainCmf);
+        var gainCmf = MlowHbTables.gainCmf(framelen20, v, lr);
+        var gainQi = MlowEntropyWrapper.decodeUpdate(decoder, gainCmf);
 
         int lsfIdx;
         if (condCoding && lowRate) {
-            int cmfLen = MlowHbTables.lsfSize(v, lr) + 1;
-            int row = MlowHbTables.selCond(v)[prevHbLpcIx];
-            int[] condBlock = MlowHbTables.lsfCmfCond(v);
+            var cmfLen = MlowHbTables.lsfSize(v, lr) + 1;
+            var row = MlowHbTables.selCond(v)[prevHbLpcIx];
+            var condBlock = MlowHbTables.lsfCmfCond(v);
             lsfIdx = MlowEntropyWrapper.decodeUpdate(decoder, condBlock, row * cmfLen, cmfLen);
         } else {
             lsfIdx = MlowEntropyWrapper.decodeUpdate(decoder, MlowHbTables.lsfCmf(v, lr));

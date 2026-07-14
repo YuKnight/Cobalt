@@ -176,14 +176,14 @@ public final class FastSqrt {
      * @return the {@code rsqrtps} approximation of {@code 1 / sqrt(a)}
      */
     private static float rsqrtps(float a) {
-        int bits = Float.floatToRawIntBits(a);
-        int biasedExp = (bits >>> 23) & 0xff;
-        int index = (bits & 0x7fffff) >>> 13;
-        int exp = biasedExp - 127;
-        int parity = (exp & 1) != 0 ? 1 : 0;
-        int seedMantissa = (RSQRT_SEED[parity * INDEX_SIZE + index] & 0xffff) << 11;
-        int seedBits = 0x3f000000 | seedMantissa;
-        int resultExp = ((seedBits >>> 23) & 0xff) - (exp - parity) / 2;
+        var bits = Float.floatToRawIntBits(a);
+        var biasedExp = (bits >>> 23) & 0xff;
+        var index = (bits & 0x7fffff) >>> 13;
+        var exp = biasedExp - 127;
+        var parity = (exp & 1) != 0 ? 1 : 0;
+        var seedMantissa = (RSQRT_SEED[parity * INDEX_SIZE + index] & 0xffff) << 11;
+        var seedBits = 0x3f000000 | seedMantissa;
+        var resultExp = ((seedBits >>> 23) & 0xff) - (exp - parity) / 2;
         return Float.intBitsToFloat((seedBits & 0x807fffff) | (resultExp << 23));
     }
 
@@ -201,10 +201,10 @@ public final class FastSqrt {
         if (a == 0.0f) {
             return 0.0f;
         }
-        float x0 = rsqrtps(a);
-        float ax0 = a * x0;
-        float refined = ax0 * x0;
-        float halfAx0 = ax0 * -0.5f;
+        var x0 = rsqrtps(a);
+        var ax0 = a * x0;
+        var refined = ax0 * x0;
+        var halfAx0 = ax0 * -0.5f;
         return halfAx0 * (refined - 3.0f);
     }
 

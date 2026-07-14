@@ -63,6 +63,7 @@ import java.lang.System.Logger.Level;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -690,7 +691,7 @@ public final class CloudWebhookDecoder {
                 var server = serverArray.getJSONObject(index);
                 var port = server.containsKey("port") ? server.getInteger("port") : null;
                 var appId = server.containsKey("app_id") ? server.getInteger("app_id") : null;
-                var params = new java.util.LinkedHashMap<String, String>();
+                var params = new LinkedHashMap<String, String>();
                 var paramsNode = server.getJSONObject("request_uri_user_params");
                 if (paramsNode != null) {
                     for (var key : paramsNode.keySet()) {

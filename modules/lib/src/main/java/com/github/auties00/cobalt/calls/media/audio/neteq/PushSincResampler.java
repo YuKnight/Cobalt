@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * Resamples a fixed size block of PCM from one sample rate to another with a windowed sinc filter, the
  * shared kernel the audio path uses ahead of and behind the codec when the device rate differs from the
@@ -135,8 +138,8 @@ public final class PushSincResampler {
      *                                  {@code destination} is too short
      */
     public int resample(float[] source, float[] destination) {
-        java.util.Objects.requireNonNull(source, "source cannot be null");
-        java.util.Objects.requireNonNull(destination, "destination cannot be null");
+        Objects.requireNonNull(source, "source cannot be null");
+        Objects.requireNonNull(destination, "destination cannot be null");
         if (source.length != sourceBlockLength) {
             throw new IllegalArgumentException("source length " + source.length
                     + " does not match configured block length " + sourceBlockLength);
@@ -170,7 +173,7 @@ public final class PushSincResampler {
      * tail into the new block.
      */
     public void reset() {
-        java.util.Arrays.fill(history, 0.0f);
+        Arrays.fill(history, 0.0f);
     }
 
     /**

@@ -33,9 +33,12 @@ import com.github.auties00.cobalt.model.message.media.StickerMessage;
 import com.github.auties00.cobalt.model.message.media.VideoMessage;
 import com.github.auties00.cobalt.model.message.text.ExtendedTextMessage;
 import com.github.auties00.cobalt.model.message.text.HighlyStructuredMessage;
+import com.github.auties00.cobalt.model.message.text.ReactionMessage;
 
 import java.lang.System.Logger.Level;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Translates Cobalt's universal {@link MessageContainer} model into the Cloud API {@code /messages}
@@ -126,7 +129,7 @@ public final class CloudMessageEncoder {
                 }
                 root.put("contacts", array);
             }
-            case com.github.auties00.cobalt.model.message.text.ReactionMessage reaction -> {
+            case ReactionMessage reaction -> {
                 root.put("type", "reaction");
                 var node = new JSONObject();
                 reaction.key().flatMap(key -> key.id()).ifPresent(id -> node.put("message_id", id));
@@ -855,7 +858,7 @@ public final class CloudMessageEncoder {
         if (components == null) {
             return List.of();
         }
-        var result = new java.util.ArrayList<CloudTemplateComponent>();
+        var result = new ArrayList<CloudTemplateComponent>();
         for (var index = 0; index < components.size(); index++) {
             var component = decodeTemplateComponent(components.getJSONObject(index));
             if (component != null) {
@@ -876,7 +879,7 @@ public final class CloudMessageEncoder {
         if (type == null) {
             return null;
         }
-        return switch (type.toUpperCase(java.util.Locale.ROOT)) {
+        return switch (type.toUpperCase(Locale.ROOT)) {
             case "HEADER" -> new CloudTemplateComponentHeaderBuilder()
                     .format(CloudTemplateHeaderFormat.of(node.getString("format")))
                     .text(node.getString("text"))
@@ -890,7 +893,7 @@ public final class CloudMessageEncoder {
                     .text(node.getString("text"))
                     .build();
             case "BUTTONS" -> {
-                var buttons = new java.util.ArrayList<CloudTemplateButton>();
+                var buttons = new ArrayList<CloudTemplateButton>();
                 var array = node.getJSONArray("buttons");
                 if (array != null) {
                     for (var index = 0; index < array.size(); index++) {
@@ -903,7 +906,7 @@ public final class CloudMessageEncoder {
                 yield new CloudTemplateComponent.Buttons(buttons);
             }
             case "CAROUSEL" -> {
-                var cards = new java.util.ArrayList<CloudTemplateComponent.Carousel.Card>();
+                var cards = new ArrayList<CloudTemplateComponent.Carousel.Card>();
                 var array = node.getJSONArray("cards");
                 if (array != null) {
                     for (var index = 0; index < array.size(); index++) {
@@ -931,7 +934,7 @@ public final class CloudMessageEncoder {
         if (type == null) {
             return null;
         }
-        return switch (type.toUpperCase(java.util.Locale.ROOT)) {
+        return switch (type.toUpperCase(Locale.ROOT)) {
             case "QUICK_REPLY" -> new CloudTemplateButtonQuickReplyBuilder()
                     .text(node.getString("text"))
                     .build();

@@ -191,34 +191,34 @@ public final class SilkNlsf2a {
      * @param d      the filter order; must be {@code 4}, {@code 10}, or {@code 16}
      */
     public static void nlsf2a32(int[] a32QA1, short[] nlsf, int d) {
-        int[] ordering = d == 16 ? ORDERING16 : d == 10 ? ORDERING10 : ORDERING4;
-        int[] cosLsfQA = new int[MAX_ORDER_LPC];
-        for (int k = 0; k < d; k++) {
-            int nlsfK = nlsf[k] & 0xFFFF;
+        var ordering = d == 16 ? ORDERING16 : d == 10 ? ORDERING10 : ORDERING4;
+        var cosLsfQA = new int[MAX_ORDER_LPC];
+        for (var k = 0; k < d; k++) {
+            var nlsfK = nlsf[k] & 0xFFFF;
 
             // integer table index, 0 to 127
-            int fInt = nlsfK >> (15 - 7);
+            var fInt = nlsfK >> (15 - 7);
 
             // fractional part, 0 to 255
-            int fFrac = nlsfK - (fInt << (15 - 7));
+            var fFrac = nlsfK - (fInt << (15 - 7));
 
             int cosVal = LSF_COS_TAB_Q12[fInt];
-            int delta = LSF_COS_TAB_Q12[fInt + 1] - cosVal;
+            var delta = LSF_COS_TAB_Q12[fInt + 1] - cosVal;
 
             // linear interpolation, result in QA
             cosLsfQA[ordering[k]] = rshiftRound((cosVal << 8) + delta * fFrac, 20 - QA);
         }
 
-        int dd = d >> 1;
+        var dd = d >> 1;
 
-        int[] p = new int[MAX_ORDER_LPC / 2 + 1];
-        int[] q = new int[MAX_ORDER_LPC / 2 + 1];
+        var p = new int[MAX_ORDER_LPC / 2 + 1];
+        var q = new int[MAX_ORDER_LPC / 2 + 1];
         findPoly(p, cosLsfQA, 0, dd);
         findPoly(q, cosLsfQA, 1, dd);
 
-        for (int k = 0; k < dd; k++) {
-            int pTmp = p[k + 1] + p[k];
-            int qTmp = q[k + 1] - q[k];
+        for (var k = 0; k < dd; k++) {
+            var pTmp = p[k + 1] + p[k];
+            var qTmp = q[k + 1] - q[k];
             a32QA1[k] = -qTmp - pTmp;
             a32QA1[d - k - 1] = qTmp - pTmp;
         }
@@ -242,10 +242,10 @@ public final class SilkNlsf2a {
     private static void findPoly(int[] out, int[] cLSF, int offset, int dd) {
         out[0] = 1 << QA;
         out[1] = -cLSF[offset];
-        for (int k = 1; k < dd; k++) {
-            int ftmp = cLSF[offset + 2 * k];
+        for (var k = 1; k < dd; k++) {
+            var ftmp = cLSF[offset + 2 * k];
             out[k + 1] = (out[k - 1] << 1) - (int) rshiftRound64(smull(ftmp, out[k]), QA);
-            for (int n = k; n > 1; n--) {
+            for (var n = k; n > 1; n--) {
                 out[n] += out[n - 2] - (int) rshiftRound64(smull(ftmp, out[n - 1]), QA);
             }
             out[1] -= ftmp;
@@ -268,14 +268,14 @@ public final class SilkNlsf2a {
      * @param d    the filter order; must be {@code 4}, {@code 10}, or {@code 16}
      */
     public static void nlsf2a(short[] aQ12, short[] nlsf, int d) {
-        int[] a32QA1 = new int[MAX_ORDER_LPC];
+        var a32QA1 = new int[MAX_ORDER_LPC];
         nlsf2a32(a32QA1, nlsf, d);
 
         lpcFit(aQ12, a32QA1, 12, QA + 1, d);
 
-        for (int i = 0; lpcInversePredGain(aQ12, d) == 0 && i < MAX_LPC_STABILIZE_ITERATIONS; i++) {
+        for (var i = 0; lpcInversePredGain(aQ12, d) == 0 && i < MAX_LPC_STABILIZE_ITERATIONS; i++) {
             bwExpander32(a32QA1, d, 65536 - (2 << i));
-            for (int k = 0; k < d; k++) {
+            for (var k = 0; k < d; k++) {
                 aQ12[k] = (short) rshiftRound(a32QA1[k], QA + 1 - 12);
             }
         }
@@ -298,12 +298,12 @@ public final class SilkNlsf2a {
      * @param d     the filter order
      */
     private static void lpcFit(short[] aQOut, int[] aQIn, int qOut, int qIn, int d) {
-        int idx = 0;
+        var idx = 0;
         int i;
         for (i = 0; i < 10; i++) {
-            int maxabs = 0;
-            for (int k = 0; k < d; k++) {
-                int absval = Math.abs(aQIn[k]);
+            var maxabs = 0;
+            for (var k = 0; k < d; k++) {
+                var absval = Math.abs(aQIn[k]);
                 if (absval > maxabs) {
                     maxabs = absval;
                     idx = k;
@@ -313,7 +313,7 @@ public final class SilkNlsf2a {
 
             if (maxabs > INT16_MAX) {
                 maxabs = Math.min(maxabs, 163838);
-                int chirpQ16 = fixConst(0.999, 16) - div32(((maxabs - INT16_MAX) << 14),
+                var chirpQ16 = fixConst(0.999, 16) - div32(((maxabs - INT16_MAX) << 14),
                         (maxabs * (idx + 1)) >> 2);
                 bwExpander32(aQIn, d, chirpQ16);
             } else {
@@ -326,12 +326,12 @@ public final class SilkNlsf2a {
                 LOGGER.log(Level.WARNING,
                         "lpc fit exhausted 10 chirp retries, saturating coefficients to int16, order={0}", d);
             }
-            for (int k = 0; k < d; k++) {
+            for (var k = 0; k < d; k++) {
                 aQOut[k] = (short) sat16(rshiftRound(aQIn[k], qIn - qOut));
                 aQIn[k] = aQOut[k] << (qIn - qOut);
             }
         } else {
-            for (int k = 0; k < d; k++) {
+            for (var k = 0; k < d; k++) {
                 aQOut[k] = (short) rshiftRound(aQIn[k], qIn - qOut);
             }
         }
@@ -349,8 +349,8 @@ public final class SilkNlsf2a {
      * @param chirpQ16 the initial chirp factor in Q16
      */
     private static void bwExpander32(int[] ar, int d, int chirpQ16) {
-        int chirpMinusOneQ16 = chirpQ16 - 65536;
-        for (int i = 0; i < d - 1; i++) {
+        var chirpMinusOneQ16 = chirpQ16 - 65536;
+        for (var i = 0; i < d - 1; i++) {
             ar[i] = smulww(chirpQ16, ar[i]);
             chirpQ16 += rshiftRound(chirpQ16 * chirpMinusOneQ16, 16);
         }
@@ -372,10 +372,10 @@ public final class SilkNlsf2a {
      * @return the inverse prediction gain in Q30, or {@code 0} if the filter is unstable
      */
     private static int lpcInversePredGain(short[] aQ12, int order) {
-        final int qaGain = 24;
-        int[] atmpQA = new int[MAX_ORDER_LPC];
-        int dcResp = 0;
-        for (int k = 0; k < order; k++) {
+        final var qaGain = 24;
+        var atmpQA = new int[MAX_ORDER_LPC];
+        var dcResp = 0;
+        for (var k = 0; k < order; k++) {
             dcResp += aQ12[k];
             atmpQA[k] = aQ12[k] << (qaGain - 12);
         }
@@ -401,30 +401,30 @@ public final class SilkNlsf2a {
      * @return the inverse prediction gain in Q30, or {@code 0} if the filter is unstable
      */
     private static int inversePredGainQA(int[] aQA, int order, int qaGain) {
-        int aLimit = fixConst(0.99975, qaGain);
-        int invGainQ30 = fixConst(1, 30);
+        var aLimit = fixConst(0.99975, qaGain);
+        var invGainQ30 = fixConst(1, 30);
         int k;
         for (k = order - 1; k > 0; k--) {
             if (aQA[k] > aLimit || aQA[k] < -aLimit) {
                 return 0;
             }
 
-            int rcQ31 = -(aQA[k] << (31 - qaGain));
+            var rcQ31 = -(aQA[k] << (31 - qaGain));
 
-            int rcMult1Q30 = fixConst(1, 30) - smmul(rcQ31, rcQ31);
+            var rcMult1Q30 = fixConst(1, 30) - smmul(rcQ31, rcQ31);
 
             invGainQ30 = smmul(invGainQ30, rcMult1Q30) << 2;
             if (invGainQ30 < (int) (1.0f / MAX_PREDICTION_POWER_GAIN * (1L << 30) + 0.5)) {
                 return 0;
             }
 
-            int mult2Q = 32 - clz32(Math.abs(rcMult1Q30));
-            int rcMult2 = inverse32VarQ(rcMult1Q30, mult2Q + 30);
+            var mult2Q = 32 - clz32(Math.abs(rcMult1Q30));
+            var rcMult2 = inverse32VarQ(rcMult1Q30, mult2Q + 30);
 
-            for (int n = 0; n < (k + 1) >> 1; n++) {
-                int tmp1 = aQA[n];
-                int tmp2 = aQA[k - n - 1];
-                long tmp64 = rshiftRound64(smull(subSat32(tmp1, mul32FracQ(tmp2, rcQ31, 31)), rcMult2), mult2Q);
+            for (var n = 0; n < (k + 1) >> 1; n++) {
+                var tmp1 = aQA[n];
+                var tmp2 = aQA[k - n - 1];
+                var tmp64 = rshiftRound64(smull(subSat32(tmp1, mul32FracQ(tmp2, rcQ31, 31)), rcMult2), mult2Q);
                 if (tmp64 > Integer.MAX_VALUE || tmp64 < Integer.MIN_VALUE) {
                     return 0;
                 }
@@ -441,8 +441,8 @@ public final class SilkNlsf2a {
             return 0;
         }
 
-        int rcQ31 = -(aQA[0] << (31 - qaGain));
-        int rcMult1Q30 = fixConst(1, 30) - smmul(rcQ31, rcQ31);
+        var rcQ31 = -(aQA[0] << (31 - qaGain));
+        var rcMult1Q30 = fixConst(1, 30) - smmul(rcQ31, rcQ31);
 
         invGainQ30 = smmul(invGainQ30, rcMult1Q30) << 2;
         if (invGainQ30 < (int) (1.0f / MAX_PREDICTION_POWER_GAIN * (1L << 30) + 0.5)) {
@@ -543,7 +543,7 @@ public final class SilkNlsf2a {
      * @return the saturated difference
      */
     private static int subSat32(int a, int b) {
-        long r = (long) a - b;
+        var r = (long) a - b;
         if (r > Integer.MAX_VALUE) {
             return Integer.MAX_VALUE;
         }
@@ -615,18 +615,18 @@ public final class SilkNlsf2a {
      * @return an approximation of {@code (1 << qres) / b32}
      */
     private static int inverse32VarQ(int b32, int qres) {
-        int bHeadrm = clz32(Math.abs(b32)) - 1;
-        int b32Nrm = b32 << bHeadrm;
+        var bHeadrm = clz32(Math.abs(b32)) - 1;
+        var b32Nrm = b32 << bHeadrm;
 
-        int b32Inv = (Integer.MAX_VALUE >> 2) / (b32Nrm >> 16);
+        var b32Inv = (Integer.MAX_VALUE >> 2) / (b32Nrm >> 16);
 
-        int result = b32Inv << 16;
+        var result = b32Inv << 16;
 
-        int errQ32 = (((1 << 29) - smulwb(b32Nrm, b32Inv)) << 3);
+        var errQ32 = (((1 << 29) - smulwb(b32Nrm, b32Inv)) << 3);
 
         result = smlaww(result, errQ32, b32Inv);
 
-        int lshift = 61 - bHeadrm - qres;
+        var lshift = 61 - bHeadrm - qres;
         if (lshift <= 0) {
             return lshiftSat32(result, -lshift);
         }
@@ -673,9 +673,9 @@ public final class SilkNlsf2a {
      * @return the clamped left shifted value
      */
     private static int lshiftSat32(int a, int shift) {
-        int lo = Integer.MIN_VALUE >> shift;
-        int hi = Integer.MAX_VALUE >> shift;
-        int limited = a > hi ? hi : Math.max(a, lo);
+        var lo = Integer.MIN_VALUE >> shift;
+        var hi = Integer.MAX_VALUE >> shift;
+        var limited = a > hi ? hi : Math.max(a, lo);
         return limited << shift;
     }
 }

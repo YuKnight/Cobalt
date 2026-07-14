@@ -3,6 +3,7 @@ package com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf;
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Interpolates one line spectral frequency (LSF) vector per frame into per subframe LSF vectors and
@@ -102,7 +103,7 @@ public final class LpcInterpolator {
      * which must thread the previous frame vector.
      */
     public void reset() {
-        java.util.Arrays.fill(previousLsf, 0.0f);
+        Arrays.fill(previousLsf, 0.0f);
         if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mlow lpc interpolator: reset");
     }
 
@@ -156,13 +157,13 @@ public final class LpcInterpolator {
         if (previousLsf[LPC_ORDER - 1] == 0.0f) {
             System.arraycopy(lsf, 0, previousLsf, 0, LPC_ORDER);
         }
-        int numSubfr = interpol.length;
-        float[][] a = new float[numSubfr][];
-        float[][] lsfs = new float[numSubfr][];
-        float[] ilsf = new float[LPC_ORDER];
-        float prevFactor = -1.0f;
-        for (int j = 0; j < numSubfr; j++) {
-            float factor = interpol[j];
+        var numSubfr = interpol.length;
+        var a = new float[numSubfr][];
+        var lsfs = new float[numSubfr][];
+        var ilsf = new float[LPC_ORDER];
+        var prevFactor = -1.0f;
+        for (var j = 0; j < numSubfr; j++) {
+            var factor = interpol[j];
             if (factor == prevFactor) {
                 // A repeated factor reuses the prior subframe's filter and interpolated vector verbatim. Both
                 // rows are only read downstream and are never mutated or pooled as scratch, so aliasing the
@@ -173,11 +174,11 @@ public final class LpcInterpolator {
                 if (factor == 1.0f) {
                     System.arraycopy(lsf, 0, ilsf, 0, LPC_ORDER);
                 } else {
-                    float oneMinus = 1.0f - factor;
-                    for (int i = 0; i < LPC_ORDER; i++) {
+                    var oneMinus = 1.0f - factor;
+                    for (var i = 0; i < LPC_ORDER; i++) {
                         ilsf[i] = previousLsf[i] * oneMinus;
                     }
-                    for (int i = 0; i < LPC_ORDER; i++) {
+                    for (var i = 0; i < LPC_ORDER; i++) {
                         ilsf[i] += factor * lsf[i];
                     }
                 }
@@ -201,7 +202,7 @@ public final class LpcInterpolator {
      *         unity coefficient
      */
     public static float[] nlsf2aStabilize(float[] ilsf) {
-        float[] a = NlsfBridge.nlsf2a(ilsf);
+        var a = NlsfBridge.nlsf2a(ilsf);
         stabilize(a);
         return a;
     }
@@ -221,7 +222,7 @@ public final class LpcInterpolator {
         if (isStable(a)) {
             return;
         }
-        int iter = 0;
+        var iter = 0;
         do {
             iter++;
             bweExpand(a, 1.0f - iter * 0.001f);
@@ -245,13 +246,13 @@ public final class LpcInterpolator {
      */
     private static void bweExpand(float[] a, float bwe) {
         if (bwe <= 0.0f) {
-            for (int i = 1; i < LPC_ORDER + 1; i++) {
+            for (var i = 1; i < LPC_ORDER + 1; i++) {
                 a[i] = 0.0f;
             }
             return;
         }
-        float c = bwe;
-        for (int i = 1; i < LPC_ORDER + 1; i++) {
+        var c = bwe;
+        for (var i = 1; i < LPC_ORDER + 1; i++) {
             a[i] *= c;
             c *= bwe;
         }
@@ -275,19 +276,19 @@ public final class LpcInterpolator {
         if (a[LPC_ORDER] * a[LPC_ORDER] > MAX_RC_STABLE) {
             return false;
         }
-        double[] a0 = new double[LPC_ORDER];
-        double[] a1 = new double[LPC_ORDER];
-        for (int i = 0; i < LPC_ORDER; i++) {
+        var a0 = new double[LPC_ORDER];
+        var a1 = new double[LPC_ORDER];
+        for (var i = 0; i < LPC_ORDER; i++) {
             a0[i] = a[i + 1];
         }
-        int m = LPC_ORDER - 1;
+        var m = LPC_ORDER - 1;
         while (true) {
-            double den = 1.0 - a0[m] * a0[m];
+            var den = 1.0 - a0[m] * a0[m];
             if (den == 0.0) {
                 return false;
             }
-            double invDen = 1.0 / den;
-            for (int k = 0; k < m; k++) {
+            var invDen = 1.0 / den;
+            for (var k = 0; k < m; k++) {
                 a1[k] = (a0[k] - a0[m] * a0[m - k - 1]) * invDen;
             }
             if (a1[m - 1] * a1[m - 1] > MAX_RC_STABLE) {
@@ -301,7 +302,7 @@ public final class LpcInterpolator {
                 return false;
             }
             invDen = 1.0 / den;
-            for (int k = 0; k < m; k++) {
+            for (var k = 0; k < m; k++) {
                 a0[k] = (a1[k] - a1[m] * a1[m - k - 1]) * invDen;
             }
             if (a0[m - 1] * a0[m - 1] > MAX_RC_STABLE) {

@@ -437,8 +437,8 @@ public final class PitchTables {
      * @return a freshly allocated {@code int[N_DELTALAG_CMFS][]} of delta-lag CMFs
      */
     static int[][] loadDeltaLagCmfs() {
-        int[][] cmfs = new int[N_DELTALAG_CMFS][];
-        for (int i = 0; i < N_DELTALAG_CMFS; i++) {
+        var cmfs = new int[N_DELTALAG_CMFS][];
+        for (var i = 0; i < N_DELTALAG_CMFS; i++) {
             cmfs[i] = CmfBuilder.dcmfToCmf(DELTA_LAG_DCMFS, i * DELTALAG_DCMF_LEN, DELTALAG_DCMF_LEN);
         }
         return cmfs;
@@ -455,8 +455,8 @@ public final class PitchTables {
      * @return a freshly allocated {@code int[PITCH_NUM_BLOCKS][]} of block-transition CMFs
      */
     static int[][] loadBlockTransitionCmfs20() {
-        int[][] cmfs = new int[PITCH_NUM_BLOCKS][];
-        for (int i = 0; i < PITCH_NUM_BLOCKS; i++) {
+        var cmfs = new int[PITCH_NUM_BLOCKS][];
+        for (var i = 0; i < PITCH_NUM_BLOCKS; i++) {
             cmfs[i] = CmfBuilder.dcmfToCmf(BLOCK_TRANSITION_DCMF_20, i * PITCH_NUM_BLOCKS, PITCH_NUM_BLOCKS);
         }
         return cmfs;
@@ -589,7 +589,7 @@ public final class PitchTables {
      * @return a freshly built {@link PitchData} for 20 ms frames
      */
     private static PitchData buildData20() {
-        Blockseg[] segs = decodeBlocksegs(BLOCKSEGS, BLOCKSEGS_BYTES, NUM_BLOCKSEGS);
+        var segs = decodeBlocksegs(BLOCKSEGS, BLOCKSEGS_BYTES, NUM_BLOCKSEGS);
         return new PitchData(
                 segs,
                 BLOCKSEGS2IDX,
@@ -615,13 +615,13 @@ public final class PitchTables {
      * @return a freshly allocated array of {@code count} reconstructed segmentations
      */
     private static Blockseg[] decodeBlocksegs(byte[] stream, int length, int count) {
-        MlowRangeDecoder decoder = new MlowRangeDecoder(stream, 0, length);
-        Blockseg[] out = new Blockseg[count];
-        for (int i = 0; i < count; i++) {
-            int len = decodeUniform(decoder, BLOCKSEGS_N_LEN) + 1;
-            int[] blocks = new int[len];
-            int[] seglens = new int[len];
-            for (int j = 0; j < len; j++) {
+        var decoder = new MlowRangeDecoder(stream, 0, length);
+        var out = new Blockseg[count];
+        for (var i = 0; i < count; i++) {
+            var len = decodeUniform(decoder, BLOCKSEGS_N_LEN) + 1;
+            var blocks = new int[len];
+            var seglens = new int[len];
+            for (var j = 0; j < len; j++) {
                 blocks[j] = decodeUniform(decoder, BLOCKSEGS_N_BLOCK);
                 seglens[j] = decodeUniform(decoder, BLOCKSEGS_N_SEGLEN) + 1;
             }
@@ -644,7 +644,7 @@ public final class PitchTables {
      * @return the decoded value in {@code [0, n)}
      */
     private static int decodeUniform(MlowRangeDecoder decoder, int n) {
-        long cmfLow = decoder.decode(n);
+        var cmfLow = decoder.decode(n);
         decoder.update(cmfLow, cmfLow + 1, n);
         return (int) cmfLow;
     }

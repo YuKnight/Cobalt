@@ -419,7 +419,7 @@ public final class UnifiedAudioQualityControl {
      */
     private double updateRttSlope(double elapsedS) {
         var currentRtt = (double) rttEstimator.estimate();
-        double slope = 0.0;
+        var slope = 0.0;
         if (elapsedS > 0.0) {
             slope = (currentRtt - lastRttMs) / elapsedS;
         }

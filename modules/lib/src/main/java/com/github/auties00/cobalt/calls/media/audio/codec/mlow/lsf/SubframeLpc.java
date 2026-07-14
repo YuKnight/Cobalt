@@ -162,8 +162,8 @@ public final class SubframeLpc {
      * @return the per subframe stabilized LPC filters and interpolated LSF vectors
      */
     public LpcInterpolator.InterpolatedFrame process(ParamDecoder.DecodedFrame frame, MlowTocByte toc) {
-        int numSubframes = toc.numSubframes();
-        float[] interpol = interpolRow(numSubframes, frame.lsfInterpolIdx(), toc.sid());
+        var numSubframes = toc.numSubframes();
+        var interpol = interpolRow(numSubframes, frame.lsfInterpolIdx(), toc.sid());
         return interpolator.interpolate(frame.lsf(), interpol);
     }
 

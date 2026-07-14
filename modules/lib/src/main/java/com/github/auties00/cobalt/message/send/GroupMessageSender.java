@@ -987,7 +987,7 @@ final class GroupMessageSender extends MessageSender<ChatMessageInfo> {
      * Commits one
      * {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
      * depleted one-time pre-key reported by the last
-     * {@link DeviceService#ensureSessions(java.util.Collection)} call.
+     * {@link DeviceService#ensureSessions(Collection)} call.
      *
      * <p>No-op when {@code depletedPrekeyCount} is not positive. Mirrors WA Web's
      * {@code maybePostPrekeysDepletionMetric}.

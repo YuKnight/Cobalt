@@ -1,5 +1,7 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow.celp;
 
+import java.util.Arrays;
+
 /**
  * Generates the noise excitation that MLow adds to the deterministic pulse and pitch excitation.
  *
@@ -191,10 +193,10 @@ public final class NoiseGenerator {
     public void reset() {
         this.envSmth = 0.0f;
         this.envLast = 0.0f;
-        java.util.Arrays.fill(outStateUv, 0.0f);
-        java.util.Arrays.fill(outStateV, 0.0f);
-        java.util.Arrays.fill(corrSmth, 0.0f);
-        java.util.Arrays.fill(shapeState, 0.0f);
+        Arrays.fill(outStateUv, 0.0f);
+        Arrays.fill(outStateV, 0.0f);
+        Arrays.fill(corrSmth, 0.0f);
+        Arrays.fill(shapeState, 0.0f);
         this.prevVoiced = 0;
         this.sinceUnvoiced = 0;
         this.randSeed = 0;
@@ -225,79 +227,79 @@ public final class NoiseGenerator {
      */
     public void genNoise(float[] excLpc, int l, boolean voiced, int numPulses, float nrgres,
                          int fcbgIdx, float[] lsf, float normalizedBitrate, float[] noise) {
-        boolean v = voiced;
-        float nrgRatio = 1.0f;
-        float[] noiseUv = new float[l];
-        float[] noiseV2 = new float[l];
-        float[] env = new float[l];
+        var v = voiced;
+        var nrgRatio = 1.0f;
+        var noiseUv = new float[l];
+        var noiseV2 = new float[l];
+        var env = new float[l];
 
         if (v) {
-            float[] corrs = new float[NOISE_CORR_ORDER + 1];
-            for (int i = 0; i < NOISE_CORR_ORDER + 1; i++) {
+            var corrs = new float[NOISE_CORR_ORDER + 1];
+            for (var i = 0; i < NOISE_CORR_ORDER + 1; i++) {
                 corrs[i] = dotProd(excLpc, 0, excLpc, i, l - i);
             }
             corrs[0] += 1e-12f;
-            float corrSmthCoef = l == 160 ? 0.4f : 0.16f;
-            for (int i = 0; i < NOISE_CORR_ORDER + 1; i++) {
+            var corrSmthCoef = l == 160 ? 0.4f : 0.16f;
+            for (var i = 0; i < NOISE_CORR_ORDER + 1; i++) {
                 corrSmth[i] += corrSmthCoef * (corrs[i] - corrSmth[i]);
             }
-            float scale = DEC_NOISE_V_NOISE_GAIN * DEC_NOISE_V_NOISE_GAIN * corrs[0] / corrSmth[0];
-            float[] c = new float[NOISE_CORR_ORDER + 1];
-            for (int i = 0; i < NOISE_CORR_ORDER + 1; i++) {
+            var scale = DEC_NOISE_V_NOISE_GAIN * DEC_NOISE_V_NOISE_GAIN * corrs[0] / corrSmth[0];
+            var c = new float[NOISE_CORR_ORDER + 1];
+            for (var i = 0; i < NOISE_CORR_ORDER + 1; i++) {
                 c[i] = corrSmth[i] * scale;
             }
             c[1] *= 2.0f;
             c[2] *= 2.0f;
 
-            float[] f2 = new float[NOISE_DCT_ORDER];
+            var f2 = new float[NOISE_DCT_ORDER];
             matrixMultTransp16(dctMatT, c, f2, NOISE_CORR_ORDER + 1);
-            float m = maximum(f2, NOISE_DCT_ORDER) * 1.5f;
-            float[] f2Tgt = new float[NOISE_DCT_ORDER];
-            for (int i = 0; i < NOISE_DCT_ORDER; i++) {
+            var m = maximum(f2, NOISE_DCT_ORDER) * 1.5f;
+            var f2Tgt = new float[NOISE_DCT_ORDER];
+            for (var i = 0; i < NOISE_DCT_ORDER; i++) {
                 f2Tgt[i] = m - f2[i];
             }
-            float[] ctgt = new float[NOISE_CORR_ORDER + 1];
+            var ctgt = new float[NOISE_CORR_ORDER + 1];
             matrixMult(dctMatT, f2Tgt, ctgt, NOISE_CORR_ORDER + 1, NOISE_DCT_ORDER);
-            float[] noiseV = new float[l];
+            var noiseV = new float[l];
             genRandPulses(noiseV, l);
             if (prevVoiced == 0) {
                 envSmth = envLast;
             }
             getEnv(excLpc, l, ENV_SMTH_COEF_V, env);
-            for (int i = 0; i < l; i++) {
+            for (var i = 0; i < l; i++) {
                 noiseV[i] *= env[i];
             }
-            float nrgNoise = nrg(noiseV, l);
-            float inv = 1.0f / (nrgNoise + 1e-12f);
-            for (int i = 0; i < NOISE_CORR_ORDER + 1; i++) {
+            var nrgNoise = nrg(noiseV, l);
+            var inv = 1.0f / (nrgNoise + 1e-12f);
+            for (var i = 0; i < NOISE_CORR_ORDER + 1; i++) {
                 ctgt[i] *= inv;
             }
-            float[] coefMa = new float[NOISE_CORR_ORDER + 1];
+            var coefMa = new float[NOISE_CORR_ORDER + 1];
             specFact2(ctgt, coefMa);
 
             filtMa2(noiseV, l, coefMa, shapeState, noiseV2);
 
             if (prevVoiced == 0) {
                 genRandPulses(noiseUv, l);
-                float envVal = envLast * ENV_SMTH_COEF_UV_V;
-                for (int i = 0; i < l; i += 2) {
+                var envVal = envLast * ENV_SMTH_COEF_UV_V;
+                for (var i = 0; i < l; i += 2) {
                     noiseUv[i] *= envVal;
                     noiseUv[i + 1] *= envVal * ENV_SMTH_COEF_UV_V;
                     envVal *= ENV_SMTH_COEF_UV_V * ENV_SMTH_COEF_UV_V;
                 }
             } else if (sinceUnvoiced < 2) {
-                java.util.Arrays.fill(noiseUv, 0, l, 0.0f);
+                Arrays.fill(noiseUv, 0, l, 0.0f);
             }
             envLast = env[l - 1];
         } else {
-            java.util.Arrays.fill(corrSmth, 0.0f);
-            java.util.Arrays.fill(shapeState, 0.0f);
-            java.util.Arrays.fill(noiseV2, 0, l, 0.0f);
+            Arrays.fill(corrSmth, 0.0f);
+            Arrays.fill(shapeState, 0.0f);
+            Arrays.fill(noiseV2, 0, l, 0.0f);
 
             float nrgTgt;
             if (numPulses > 0) {
                 nrgRatio = nrg(excLpc, l) / (nrgres + 1e-20f);
-                float hardness = 10.0f + 20.0f * normalizedBitrate;
+                var hardness = 10.0f + 20.0f * normalizedBitrate;
                 nrgTgt = nrgres * (float) (Math.log(Math.exp(hardness * (1.0f - nrgRatio)) + 1) / hardness);
                 getEnv(excLpc, l, ENV_SMTH_COEF_UV, env);
             } else {
@@ -306,13 +308,13 @@ public final class NoiseGenerator {
                 getEnv0(l, ENV_SMTH_COEF_UV, env);
             }
 
-            float scale = 1.0f / l;
+            var scale = 1.0f / l;
             nrgTgt = nrgTgt * scale + 1e-30f;
-            float nrgEnv = nrg(env, l) * scale;
-            float f = (float) Math.sqrt(nrgTgt);
-            float g = (float) Math.sqrt(nrgTgt / nrgEnv);
-            float ge = g * env[0];
-            float envLastLocal = envLast;
+            var nrgEnv = nrg(env, l) * scale;
+            var f = (float) Math.sqrt(nrgTgt);
+            var g = (float) Math.sqrt(nrgTgt / nrgEnv);
+            var ge = g * env[0];
+            var envLastLocal = envLast;
             if (envLastLocal < Math.min(f, ge)) {
                 if (f < ge) {
                     g = 0.0f;
@@ -326,11 +328,11 @@ public final class NoiseGenerator {
                     f = 0.0f;
                 }
             } else {
-                float sumEnv = sum(env, l) * scale;
-                float a = nrgEnv + env[0] * env[0] - 2.0f * sumEnv * env[0];
-                float b = 2.0f * envLastLocal * (sumEnv - env[0]);
-                float cc = envLastLocal * envLastLocal - nrgTgt;
-                float tmp = b * b - 4.0f * a * cc;
+                var sumEnv = sum(env, l) * scale;
+                var a = nrgEnv + env[0] * env[0] - 2.0f * sumEnv * env[0];
+                var b = 2.0f * envLastLocal * (sumEnv - env[0]);
+                var cc = envLastLocal * envLastLocal - nrgTgt;
+                var tmp = b * b - 4.0f * a * cc;
                 if ((tmp < 1e-35f) || (a < 1e-25f)) {
                     f = 0.0f;
                     g = 0.0f;
@@ -348,8 +350,8 @@ public final class NoiseGenerator {
 
             genRandPulses(noiseUv, l);
             if (numPulses > 0) {
-                float maxVal = fcbgainsUvCap(fcbgIdx);
-                for (int i = 0; i < l; i++) {
+                var maxVal = fcbgainsUvCap(fcbgIdx);
+                for (var i = 0; i < l; i++) {
                     if (excLpc[i] == 0.0f) {
                         noiseUv[i] *= Math.min(f + g * env[i], maxVal);
                     } else {
@@ -358,7 +360,7 @@ public final class NoiseGenerator {
                 }
                 envLast = Math.min(f + g * env[l - 1], maxVal);
             } else {
-                for (int i = 0; i < l; i++) {
+                for (var i = 0; i < l; i++) {
                     noiseUv[i] *= f + g * env[i];
                 }
                 envLast = f + g * env[l - 1];
@@ -368,7 +370,7 @@ public final class NoiseGenerator {
         if (prevVoiced != 0 || v) {
             filtMa2(noiseV2, l, COEF_MA_V, outStateV, noise);
         } else {
-            java.util.Arrays.fill(noise, 0, l, 0.0f);
+            Arrays.fill(noise, 0, l, 0.0f);
         }
         if (sinceUnvoiced < 2 || !v) {
             addNoiseUv(noiseUv, l, lsf, nrgRatio, noise);
@@ -398,20 +400,20 @@ public final class NoiseGenerator {
      * @param noise      the output the filtered burst is added into, {@code l} entries
      */
     private void addNoiseUv(float[] excNoiseUv, int l, float[] lsf, float nrgRatio, float[] noise) {
-        float lsfHz = 16000.0f * (lsf[0] + lsf[1]) / (4.0f * PI);
-        float minUvFcornerHz = lsfHz * 3.0f * sigmoid(0.2f / (lsf[1] - lsf[0] + 1e-30f) - 3.0f);
-        float uvFcornerHz = DEC_NOISE_UV_FCORNER_HZ * Math.min(1.0f, 0.6f + 0.4f * nrgRatio);
+        var lsfHz = 16000.0f * (lsf[0] + lsf[1]) / (4.0f * PI);
+        var minUvFcornerHz = lsfHz * 3.0f * sigmoid(0.2f / (lsf[1] - lsf[0] + 1e-30f) - 3.0f);
+        var uvFcornerHz = DEC_NOISE_UV_FCORNER_HZ * Math.min(1.0f, 0.6f + 0.4f * nrgRatio);
         uvFcornerHz = Math.max(uvFcornerHz, minUvFcornerHz);
         uvFcornerHz = Math.min(uvFcornerHz, 1500.0f);
-        float coefTmp = 6.0f * uvFcornerHz / 16000.0f;
-        float[] coefMaUv = new float[2];
-        float[] coefArUv = new float[2];
+        var coefTmp = 6.0f * uvFcornerHz / 16000.0f;
+        var coefMaUv = new float[2];
+        var coefArUv = new float[2];
         coefMaUv[0] = (1.0f - 0.5f * coefTmp) * DEC_NOISE_UV_NOISE_GAIN;
         coefMaUv[1] = -coefMaUv[0];
         coefArUv[0] = 1.0f;
         coefArUv[1] = -1.0f + coefTmp;
         filtArma1(excNoiseUv, l, coefMaUv, coefArUv, outStateUv, excNoiseUv);
-        for (int i = 0; i < l; i++) {
+        for (var i = 0; i < l; i++) {
             noise[i] += excNoiseUv[i];
         }
     }
@@ -429,7 +431,7 @@ public final class NoiseGenerator {
      * @param l     the number of samples to generate
      */
     private void genRandPulses(float[] noise, int l) {
-        int i = 0;
+        var i = 0;
         for (; i < l - 3; i += 4) {
             randSeed = RAND_INCREMENT + randSeed * RAND_MULTIPLIER;
             noise[i] = RAND_SCALE * randSeed;
@@ -456,17 +458,17 @@ public final class NoiseGenerator {
      * @param env the envelope output, {@code len} entries written
      */
     private void getEnv(float[] exc, int len, float smthCoefIn, float[] env) {
-        float smthCoef = smthCoefIn * smthCoefIn;
-        float state = envSmth + 1e-8f;
+        var smthCoef = smthCoefIn * smthCoefIn;
+        var state = envSmth + 1e-8f;
         state *= state;
-        float gainCoef = 1.0f - smthCoef;
-        float smthCoef2 = smthCoef * smthCoef;
-        float gainSmthCoef = gainCoef * smthCoef;
-        for (int i = 0; i < len - 3; i += 4) {
-            float tmp0 = exc[i] * exc[i] + exc[i + 1] * exc[i + 1];
-            float tmp1 = exc[i + 2] * exc[i + 2] + exc[i + 3] * exc[i + 3];
-            float y1 = gainCoef * tmp1 + gainSmthCoef * tmp0 + smthCoef2 * state;
-            float y0 = gainCoef * tmp0 + smthCoef * state;
+        var gainCoef = 1.0f - smthCoef;
+        var smthCoef2 = smthCoef * smthCoef;
+        var gainSmthCoef = gainCoef * smthCoef;
+        for (var i = 0; i < len - 3; i += 4) {
+            var tmp0 = exc[i] * exc[i] + exc[i + 1] * exc[i + 1];
+            var tmp1 = exc[i + 2] * exc[i + 2] + exc[i + 3] * exc[i + 3];
+            var y1 = gainCoef * tmp1 + gainSmthCoef * tmp0 + smthCoef2 * state;
+            var y0 = gainCoef * tmp0 + smthCoef * state;
             env[i] = env[i + 1] = (float) Math.sqrt(y0);
             env[i + 2] = env[i + 3] = (float) Math.sqrt(y1);
             state = y1;
@@ -485,9 +487,9 @@ public final class NoiseGenerator {
      * @param env      the envelope output, {@code len} entries written
      */
     private void getEnv0(int len, float smthCoef, float[] env) {
-        float smthCoef2 = smthCoef * smthCoef;
+        var smthCoef2 = smthCoef * smthCoef;
         env[0] = env[1] = (envSmth + 1e-8f) * smthCoef;
-        for (int i = 2; i < len - 2; i += 4) {
+        for (var i = 2; i < len - 2; i += 4) {
             env[i + 2] = env[i + 3] = env[i - 1] * smthCoef2;
             env[i] = env[i + 1] = env[i - 1] * smthCoef;
         }
@@ -511,18 +513,18 @@ public final class NoiseGenerator {
     private static void filtMa2(float[] x, int n, float[] coef, float[] state, float[] y) {
         if (coef[0] == 1.0f) {
             y[0] = x[0];
-            for (int i = 1; i < n; i++) {
+            for (var i = 1; i < n; i++) {
                 y[i] = x[i] + coef[1] * x[i - 1];
             }
         } else {
-            for (int i = 0; i < n; i++) {
+            for (var i = 0; i < n; i++) {
                 y[i] = coef[0] * x[i];
             }
-            for (int i = 1; i < n; i++) {
+            for (var i = 1; i < n; i++) {
                 y[i] += coef[1] * x[i - 1];
             }
         }
-        for (int i = 2; i < n; i++) {
+        for (var i = 2; i < n; i++) {
             y[i] += coef[2] * x[i - 2];
         }
         y[0] = coef[0] * x[0] + coef[1] * state[0] + coef[2] * state[1];
@@ -548,27 +550,27 @@ public final class NoiseGenerator {
      * @param y      the output signal, {@code n} entries written; may alias {@code x}
      */
     private static void filtArma1(float[] x, int n, float[] coefMa, float[] coefAr, float[] state, float[] y) {
-        float[] ma = new float[n];
+        var ma = new float[n];
         // First order moving average stage.
         if (coefMa[0] == 1.0f) {
             ma[0] = x[0];
-            for (int i = 1; i < n; i++) {
+            for (var i = 1; i < n; i++) {
                 ma[i] = x[i] + coefMa[1] * x[i - 1];
             }
         } else {
-            for (int i = 0; i < n; i++) {
+            for (var i = 0; i < n; i++) {
                 ma[i] = coefMa[0] * x[i];
             }
-            for (int i = 1; i < n; i++) {
+            for (var i = 1; i < n; i++) {
                 ma[i] += coefMa[1] * x[i - 1];
             }
         }
         ma[0] = coefMa[0] * x[0] + coefMa[1] * state[0];
         state[0] = x[n - 1];
         // First order auto regressive stage: y[n] = x[n] - coefAr[1] * y[n-1].
-        float ar1 = -coefAr[1];
-        float ytmp = state[1];
-        for (int i = 0; i < n; i++) {
+        var ar1 = -coefAr[1];
+        var ytmp = state[1];
+        for (var i = 0; i < n; i++) {
             ytmp = ma[i] + ytmp * ar1;
             y[i] = ytmp;
         }
@@ -587,32 +589,32 @@ public final class NoiseGenerator {
      */
     private static void specFact2(float[] c, float[] a) {
         c[0] += 1e-30f;
-        float invC0 = 1.0f / c[0];
-        float r2 = c[2] * invC0;
-        float r1 = c[1] / (c[0] * (1 + r2));
-        for (int iter = 0; iter < 2; iter++) {
-            float v0 = 1.0f + r1 * r1 + r2 * r2;
-            float v1 = r1 + r1 * r2;
-            float s = -2.0f / v0;
-            float da0 = s * r1;
-            float da1 = s * r2;
+        var invC0 = 1.0f / c[0];
+        var r2 = c[2] * invC0;
+        var r1 = c[1] / (c[0] * (1 + r2));
+        for (var iter = 0; iter < 2; iter++) {
+            var v0 = 1.0f + r1 * r1 + r2 * r2;
+            var v1 = r1 + r1 * r2;
+            var s = -2.0f / v0;
+            var da0 = s * r1;
+            var da1 = s * r2;
             s = v0 * invC0;
-            float e1 = s * c[1] - v1;
-            float e2 = s * c[2] - r2;
-            float r0 = 2.0f * r1 + v0 * da0;
-            float r3 = 2.0f * r2 + v0 * da1;
-            float rr00 = r0 * r0;
-            float rr01 = r0 * r3;
-            float rr11 = r3 * r3;
-            float rA = 1.0f + r2 + v1 * da0;
-            float rB = r1 + v1 * da1;
+            var e1 = s * c[1] - v1;
+            var e2 = s * c[2] - r2;
+            var r0 = 2.0f * r1 + v0 * da0;
+            var r3 = 2.0f * r2 + v0 * da1;
+            var rr00 = r0 * r0;
+            var rr01 = r0 * r3;
+            var rr11 = r3 * r3;
+            var rA = 1.0f + r2 + v1 * da0;
+            var rB = r1 + v1 * da1;
             rr00 += rA * rA;
             rr01 += rA * rB;
             rr11 += rB * rB;
-            float re0 = rA * e1;
-            float re1 = rB * e1;
-            float rC = r2 * da0;
-            float rD = 1.0f + r2 * da1;
+            var re0 = rA * e1;
+            var re1 = rB * e1;
+            var rC = r2 * da0;
+            var rD = 1.0f + r2 * da1;
             rr00 += rC * rC;
             rr01 += rC * rD;
             rr11 += rD * rD;
@@ -626,7 +628,7 @@ public final class NoiseGenerator {
             r1 += (rr11 * re0 - rr01 * re1) * s;
             r2 += (-rr01 * re0 + rr00 * re1) * s;
         }
-        float sc = (float) Math.sqrt(c[0] / (1.0f + r1 * r1 + r2 * r2));
+        var sc = (float) Math.sqrt(c[0] / (1.0f + r1 * r1 + r2 * r2));
         a[0] = sc;
         a[1] = sc * r1;
         a[2] = sc * r2;
@@ -644,14 +646,14 @@ public final class NoiseGenerator {
      * @param lenX the input length
      */
     private static void matrixMultTransp16(float[][] c, float[] x, float[] y, int lenX) {
-        float[] tmp = new float[16];
-        float xt = x[0];
-        for (int i = 0; i < 16; i++) {
+        var tmp = new float[16];
+        var xt = x[0];
+        for (var i = 0; i < 16; i++) {
             tmp[i] = c[0][i] * xt;
         }
-        for (int j = 1; j < lenX; j++) {
+        for (var j = 1; j < lenX; j++) {
             xt = x[j];
-            for (int i = 0; i < 16; i++) {
+            for (var i = 0; i < 16; i++) {
                 tmp[i] += c[j][i] * xt;
             }
         }
@@ -670,7 +672,7 @@ public final class NoiseGenerator {
      * @param lenX the input length
      */
     private static void matrixMult(float[][] c, float[] x, float[] y, int lenY, int lenX) {
-        for (int i = 0; i < lenY; i++) {
+        for (var i = 0; i < lenY; i++) {
             y[i] = dotProd(c[i], 0, x, 0, lenX);
         }
     }
@@ -686,8 +688,8 @@ public final class NoiseGenerator {
      * @return the accumulated single precision dot product
      */
     private static float dotProd(float[] a, int aOff, float[] b, int bOff, int len) {
-        float ret = 0.0f;
-        for (int i = 0; i < len; i++) {
+        var ret = 0.0f;
+        for (var i = 0; i < len; i++) {
             ret += a[aOff + i] * b[bOff + i];
         }
         return ret;
@@ -701,8 +703,8 @@ public final class NoiseGenerator {
      * @return the single precision sum of squares
      */
     private static float nrg(float[] x, int n) {
-        float r = 0.0f;
-        for (int i = 0; i < n; i++) {
+        var r = 0.0f;
+        for (var i = 0; i < n; i++) {
             r += x[i] * x[i];
         }
         return r;
@@ -716,8 +718,8 @@ public final class NoiseGenerator {
      * @return the single precision sum
      */
     private static float sum(float[] x, int n) {
-        float r = 0.0f;
-        for (int i = 0; i < n; i++) {
+        var r = 0.0f;
+        for (var i = 0; i < n; i++) {
             r += x[i];
         }
         return r;
@@ -731,8 +733,8 @@ public final class NoiseGenerator {
      * @return the largest entry
      */
     private static float maximum(float[] x, int len) {
-        float max = x[0];
-        for (int i = 1; i < len; i++) {
+        var max = x[0];
+        for (var i = 1; i < len; i++) {
             if (x[i] > max) {
                 max = x[i];
             }
@@ -768,7 +770,7 @@ public final class NoiseGenerator {
      * @return half the table entry, the unvoiced noise cap
      */
     private static float fcbgainsUvCap(int fcbgIdx) {
-        float db = fcbgIdx * 1.0f + (-90.0f);
+        var db = fcbgIdx * 1.0f + (-90.0f);
         return (float) Math.pow(10.0, 0.05 * db) * 0.5f;
     }
 
@@ -782,12 +784,12 @@ public final class NoiseGenerator {
      * @return a freshly allocated {@code [NOISE_CORR_ORDER + 1][NOISE_DCT_ORDER]} matrix
      */
     private static float[][] buildDctMatrix() {
-        float[][] mat = new float[NOISE_CORR_ORDER + 1][NOISE_DCT_ORDER];
-        float sc = (float) (1.0 / Math.sqrt(NOISE_DCT_ORDER));
-        for (int i = 0; i < NOISE_DCT_ORDER; i++) {
-            float dOmega = ((0.5f + i) * PI) / NOISE_DCT_ORDER;
-            float omega = 0.0f;
-            for (int j = 0; j < NOISE_CORR_ORDER + 1; j++) {
+        var mat = new float[NOISE_CORR_ORDER + 1][NOISE_DCT_ORDER];
+        var sc = (float) (1.0 / Math.sqrt(NOISE_DCT_ORDER));
+        for (var i = 0; i < NOISE_DCT_ORDER; i++) {
+            var dOmega = ((0.5f + i) * PI) / NOISE_DCT_ORDER;
+            var omega = 0.0f;
+            for (var j = 0; j < NOISE_CORR_ORDER + 1; j++) {
                 mat[j][i] = (float) Math.cos(omega) * sc;
                 omega += dOmega;
             }

@@ -238,8 +238,8 @@ public final class FcbSearch {
      * @return a freshly allocated survivor state buffer
      */
     private static FcbState[] newStates() {
-        FcbState[] s = new FcbState[MAX_NUMSURV];
-        for (int i = 0; i < s.length; i++) {
+        var s = new FcbState[MAX_NUMSURV];
+        for (var i = 0; i < s.length; i++) {
             s[i] = new FcbState();
         }
         return s;
@@ -252,8 +252,8 @@ public final class FcbSearch {
      * @return a freshly allocated survivor pool
      */
     private static Fcb[] newFcbs(int size) {
-        Fcb[] f = new Fcb[size];
-        for (int i = 0; i < f.length; i++) {
+        var f = new Fcb[size];
+        for (var i = 0; i < f.length; i++) {
             f[i] = new Fcb();
         }
         return f;
@@ -278,26 +278,26 @@ public final class FcbSearch {
      */
     public Result search(float[] d, float[] wnrgPerPulse, int[] fcbPulsesMax, float[] phi, float[] phiFlip,
                          int lResp, int fcbSubfrlen) {
-        short[][] pulses = new short[MAX_RATES][MAX_PULSES_PER_SF];
-        int[] nPulses = new int[MAX_RATES];
-        float[] wnrg = new float[MAX_RATES];
-        float[] gainFromSearch = new float[MAX_RATES];
-        float[] fcbWnrg = new float[MAX_RATES];
+        var pulses = new short[MAX_RATES][MAX_PULSES_PER_SF];
+        var nPulses = new int[MAX_RATES];
+        var wnrg = new float[MAX_RATES];
+        var gainFromSearch = new float[MAX_RATES];
+        var fcbWnrg = new float[MAX_RATES];
 
-        int[] positions = positionsScratch;
-        float[] dAbs = new float[fcbSubfrlen];
-        float[] dSign = new float[fcbSubfrlen];
-        float[] num = new float[fcbSubfrlen];
-        float[] den = new float[fcbSubfrlen];
+        var positions = positionsScratch;
+        var dAbs = new float[fcbSubfrlen];
+        var dSign = new float[fcbSubfrlen];
+        var num = new float[fcbSubfrlen];
+        var den = new float[fcbSubfrlen];
         calcDAbsAndSign(d, fcbSubfrlen, dAbs, dSign);
-        for (int i = 0; i < fcbSubfrlen; i++) {
+        for (var i = 0; i < fcbSubfrlen; i++) {
             den[i] = phi[0] + 1e-16f;
         }
         System.arraycopy(dAbs, 0, num, 0, fcbSubfrlen);
         positions[0] = getMaxi(num, fcbSubfrlen);
-        float[] nrgThr = new float[MAX_RATES];
-        float ratio = num[positions[0]] / den[positions[0]];
-        float wnrg0 = num[positions[0]] * ratio;
+        var nrgThr = new float[MAX_RATES];
+        var ratio = num[positions[0]] / den[positions[0]];
+        var wnrg0 = num[positions[0]] * ratio;
         if (checkIfBetter(wnrg0, nrgThr, IDX_MAIN, wnrgPerPulse[IDX_MAIN])) {
             nPulses[IDX_MAIN] = 1;
             wnrg[IDX_MAIN] = wnrg[IDX_FEC] = wnrg0;
@@ -311,26 +311,26 @@ public final class FcbSearch {
             }
         }
 
-        float[] q = new float[fcbSubfrlen];
-        for (int pulseNr = 1; pulseNr < fcbPulsesMax[IDX_MAIN]; pulseNr++) {
-            int position = positions[pulseNr - 1];
-            float sgn = dSign[position];
-            for (int i = 0; i < fcbSubfrlen; i++) {
+        var q = new float[fcbSubfrlen];
+        for (var pulseNr = 1; pulseNr < fcbPulsesMax[IDX_MAIN]; pulseNr++) {
+            var position = positions[pulseNr - 1];
+            var sgn = dSign[position];
+            for (var i = 0; i < fcbSubfrlen; i++) {
                 num[i] += dAbs[position];
             }
-            int[] nzr = new int[2];
-            int phiCol = getPhiCol(position, lResp, fcbSubfrlen, nzr);
-            float dDen = 0.0f;
-            for (int i = 0; i < pulseNr - 1; i++) {
+            var nzr = new int[2];
+            var phiCol = getPhiCol(position, lResp, fcbSubfrlen, nzr);
+            var dDen = 0.0f;
+            for (var i = 0; i < pulseNr - 1; i++) {
                 dDen += phiFlip[phiCol + positions[i]] * dSign[positions[i]];
             }
             dDen *= 2.0f * sgn;
             dDen += phiFlip[phiCol + position];
-            for (int i = 0; i < fcbSubfrlen; i++) {
+            for (var i = 0; i < fcbSubfrlen; i++) {
                 den[i] += dDen;
             }
-            float twoSign = 2.0f * sgn;
-            for (int i = nzr[0]; i < nzr[1]; i++) {
+            var twoSign = 2.0f * sgn;
+            for (var i = nzr[0]; i < nzr[1]; i++) {
                 den[i] += bandTerm(dSign[i], phiFlip[phiCol + i], twoSign);
             }
             celpQ(num, den, fcbSubfrlen, q);
@@ -349,10 +349,10 @@ public final class FcbSearch {
                 fcbWnrg[IDX_FEC] = den[positions[pulseNr]];
             }
         }
-        for (int r = IDX_FEC; r <= IDX_MAIN; r++) {
+        for (var r = IDX_FEC; r <= IDX_MAIN; r++) {
             if (nrgThr[r] > 0.0f) {
-                for (int i = 0; i < nPulses[r]; i++) {
-                    int position = positions[i];
+                for (var i = 0; i < nPulses[r]; i++) {
+                    var position = positions[i];
                     pulses[r][i] = (short) (dSign[position] > 0 ? (1 + position) : -(1 + position));
                 }
             } else {
@@ -394,20 +394,20 @@ public final class FcbSearch {
     public Result searchDeldec(float[] d, float pitchSharp, int lag, float[] wnrgPerPulse, int[] fcbPulsesMax,
                                short[] surv, float[] phi, float[] phiFlip, int lResp, int fcbSubfrlen,
                                long[] sgntrs) {
-        short[][] pulses = new short[MAX_RATES][MAX_PULSES_PER_SF];
-        int[] nPulses = new int[MAX_RATES];
-        float[] wnrg = new float[MAX_RATES];
-        float[] gainFromSearch = new float[MAX_RATES];
-        float[] fcbWnrg = new float[MAX_RATES];
+        var pulses = new short[MAX_RATES][MAX_PULSES_PER_SF];
+        var nPulses = new int[MAX_RATES];
+        var wnrg = new float[MAX_RATES];
+        var gainFromSearch = new float[MAX_RATES];
+        var fcbWnrg = new float[MAX_RATES];
 
-        float[] dAbs = new float[fcbSubfrlen];
-        float[] dSign = new float[fcbSubfrlen];
+        var dAbs = new float[fcbSubfrlen];
+        var dSign = new float[fcbSubfrlen];
         if (pitchSharp != 0.0f && lag > 0 && lag < fcbSubfrlen) {
-            float[] dNew = new float[fcbSubfrlen];
+            var dNew = new float[fcbSubfrlen];
             System.arraycopy(d, 0, dNew, 0, fcbSubfrlen);
-            for (int j = 0; j < fcbSubfrlen; j++) {
-                float g = pitchSharp;
-                for (int i = lag + j; i < fcbSubfrlen; i += lag) {
+            for (var j = 0; j < fcbSubfrlen; j++) {
+                var g = pitchSharp;
+                for (var i = lag + j; i < fcbSubfrlen; i += lag) {
                     dNew[j] += g * d[i];
                     g *= pitchSharp;
                 }
@@ -419,58 +419,58 @@ public final class FcbSearch {
         }
 
         // Double buffered survivor state: read from statesA, write into statesB, swap after each stage.
-        FcbState[] readBuf = statesA;
-        FcbState[] writeBuf = statesB;
-        Fcb[] bestFcb = {new Fcb(), new Fcb()};
-        FcbState[] bestFcbState = {new FcbState(), new FcbState()};
-        float[] nrgThr = new float[MAX_RATES];
+        var readBuf = statesA;
+        var writeBuf = statesB;
+        var bestFcb = new Fcb[]{new Fcb(), new Fcb()};
+        var bestFcbState = new FcbState[]{new FcbState(), new FcbState()};
+        var nrgThr = new float[MAX_RATES];
 
-        FcbState fcbState = writeBuf[0];
+        var fcbState = writeBuf[0];
         System.arraycopy(dAbs, 0, fcbState.num, 0, fcbSubfrlen);
         if (pitchSharp == 0.0f) {
-            for (int i = 0; i < fcbSubfrlen; i++) {
+            for (var i = 0; i < fcbSubfrlen; i++) {
                 fcbState.den[i] = phi[0] + 1e-16f;
             }
         } else {
-            int[] nzr = new int[2];
-            int off = fcbSubfrlen - 1;
-            for (int i = fcbSubfrlen - 1; i >= 0; i -= lag) {
-                float res = 1e-16f;
-                float g1 = 1.0f;
-                for (int j = i; j < fcbSubfrlen; j += lag) {
-                    int phiCol = getPhiCol(j, lResp, fcbSubfrlen, nzr);
-                    float g2 = 1.0f;
-                    for (int k = i; k < fcbSubfrlen; k += lag) {
+            var nzr = new int[2];
+            var off = fcbSubfrlen - 1;
+            for (var i = fcbSubfrlen - 1; i >= 0; i -= lag) {
+                var res = 1e-16f;
+                var g1 = 1.0f;
+                for (var j = i; j < fcbSubfrlen; j += lag) {
+                    var phiCol = getPhiCol(j, lResp, fcbSubfrlen, nzr);
+                    var g2 = 1.0f;
+                    for (var k = i; k < fcbSubfrlen; k += lag) {
                         res += g1 * g2 * phiFlip[phiCol + k];
                         g2 *= pitchSharp;
                     }
                     g1 *= pitchSharp;
                 }
-                int len = Math.min(lag, off + 1);
-                for (int j = 0; j < len; j++) {
+                var len = Math.min(lag, off + 1);
+                for (var j = 0; j < len; j++) {
                     fcbState.den[off - j] = res;
                 }
                 off -= len;
             }
         }
         // After the swap, readBuf == statesB (holds the seed state), writeBuf == statesA.
-        FcbState[] tmpSwap = readBuf;
+        var tmpSwap = readBuf;
         readBuf = writeBuf;
         writeBuf = tmpSwap;
 
-        float[] q = new float[Math.max(fcbSubfrlen, MAX_NUMSURV * MAX_NUMSURV)];
+        var q = new float[Math.max(fcbSubfrlen, MAX_NUMSURV * MAX_NUMSURV)];
         if (pitchSharp == 0.0f) {
             System.arraycopy(fcbState.num, 0, q, 0, fcbSubfrlen);
         } else {
             celpQ(fcbState.num, fcbState.den, fcbSubfrlen, q);
         }
 
-        int[] sortIx = new int[MAX_NUMSURV];
-        int fcbsSize = 0;
+        var sortIx = new int[MAX_NUMSURV];
+        var fcbsSize = 0;
         getMaxiK(q, sortIx, fcbSubfrlen, surv[0]);
-        for (int i = 0; i < surv[0]; i++) {
-            int pos = sortIx[i];
-            Fcb f = fcbs[fcbsSize++];
+        for (var i = 0; i < surv[0]; i++) {
+            var pos = sortIx[i];
+            var f = fcbs[fcbsSize++];
             f.sgntr = sgntrs[pos];
             f.posNew = pos;
             f.signNew = dSign[pos];
@@ -485,26 +485,26 @@ public final class FcbSearch {
         }
 
         if (fcbPulsesMax[IDX_MAIN] > 1) {
-            for (int pulseNr = 2; pulseNr < fcbPulsesMax[IDX_MAIN]; pulseNr++) {
-                int candidatesSize = 0;
-                int uniqueSize = 0;
-                int idx = 0;
-                for (int i = 0; i < fcbsSize; i++) {
-                    int[] sizes = addPulse(fcbs[i], readBuf, writeBuf, dAbs, dSign, surv[pulseNr - 1], idx,
+            for (var pulseNr = 2; pulseNr < fcbPulsesMax[IDX_MAIN]; pulseNr++) {
+                var candidatesSize = 0;
+                var uniqueSize = 0;
+                var idx = 0;
+                for (var i = 0; i < fcbsSize; i++) {
+                    var sizes = addPulse(fcbs[i], readBuf, writeBuf, dAbs, dSign, surv[pulseNr - 1], idx,
                             lag, pitchSharp, phiFlip, sgntrs, lResp, fcbSubfrlen, candidatesSize, uniqueSize);
                     candidatesSize = sizes[0];
                     uniqueSize = sizes[1];
                     idx++;
                 }
-                FcbState[] s2 = readBuf;
+                var s2 = readBuf;
                 readBuf = writeBuf;
                 writeBuf = s2;
-                for (int i = 0; i < candidatesSize; i++) {
+                for (var i = 0; i < candidatesSize; i++) {
                     q[i] = fcbCandidates[i].wnrg;
                 }
                 getMaxiK(q, sortIx, candidatesSize, surv[pulseNr - 1]);
                 fcbsSize = 0;
-                for (int i = 0; i < surv[pulseNr - 1]; i++) {
+                for (var i = 0; i < surv[pulseNr - 1]; i++) {
                     fcbs[fcbsSize++].copyFrom(fcbCandidates[sortIx[i]]);
                 }
                 checkIfBetterDeldec(readBuf, fcbs[0], bestFcb[IDX_MAIN], bestFcbState[IDX_MAIN], nrgThr, IDX_MAIN, wnrgPerPulse[IDX_MAIN]);
@@ -513,20 +513,20 @@ public final class FcbSearch {
                 }
             }
             // last pulse
-            int candidatesSize = 0;
-            int uniqueSize = 0;
-            for (int i = 0; i < fcbsSize; i++) {
-                int[] sizes = addPulse(fcbs[i], readBuf, writeBuf, dAbs, dSign, 1, i, lag, pitchSharp,
+            var candidatesSize = 0;
+            var uniqueSize = 0;
+            for (var i = 0; i < fcbsSize; i++) {
+                var sizes = addPulse(fcbs[i], readBuf, writeBuf, dAbs, dSign, 1, i, lag, pitchSharp,
                         phiFlip, sgntrs, lResp, fcbSubfrlen, candidatesSize, uniqueSize);
                 candidatesSize = sizes[0];
                 uniqueSize = sizes[1];
             }
-            FcbState[] s2 = readBuf;
+            var s2 = readBuf;
             readBuf = writeBuf;
             writeBuf = s2;
-            int bestIdx = 0;
-            float maxWnrg = fcbCandidates[0].wnrg;
-            for (int i = 1; i < candidatesSize; i++) {
+            var bestIdx = 0;
+            var maxWnrg = fcbCandidates[0].wnrg;
+            for (var i = 1; i < candidatesSize; i++) {
                 if (fcbCandidates[i].wnrg > maxWnrg) {
                     maxWnrg = fcbCandidates[i].wnrg;
                     bestIdx = i;
@@ -535,8 +535,8 @@ public final class FcbSearch {
             checkIfBetterDeldec(readBuf, fcbCandidates[bestIdx], bestFcb[IDX_MAIN], bestFcbState[IDX_MAIN], nrgThr, IDX_MAIN, wnrgPerPulse[IDX_MAIN]);
         }
 
-        for (int r = IDX_FEC; r <= IDX_MAIN; r++) {
-            for (int i = 0; i < bestFcb[r].nPulses; i++) {
+        for (var r = IDX_FEC; r <= IDX_MAIN; r++) {
+            for (var i = 0; i < bestFcb[r].nPulses; i++) {
                 pulses[r][i] = (short) (bestFcbState[r].pulseSigns[i] > 0
                         ? (1 + bestFcbState[r].pulsePositions[i])
                         : -(1 + bestFcbState[r].pulsePositions[i]));
@@ -592,38 +592,38 @@ public final class FcbSearch {
     private int[] addPulse(Fcb fcb, FcbState[] readBuf, FcbState[] writeBuf, float[] dAbs, float[] dSign,
                            int numsurv, int idx, int lag, float pitchSharp, float[] phiFlip, long[] sgntrs,
                            int lResp, int fcbSubfrlen, int candidatesSize, int uniqueSize) {
-        FcbState stateW = writeBuf[idx];
-        FcbState stateR = readBuf[fcb.fcbStateIdx];
+        var stateW = writeBuf[idx];
+        var stateR = readBuf[fcb.fcbStateIdx];
 
-        for (int i = 0; i < fcbSubfrlen; i++) {
+        for (var i = 0; i < fcbSubfrlen; i++) {
             stateW.num[i] = stateR.num[i] + dAbs[fcb.posNew];
         }
         System.arraycopy(stateR.den, 0, stateW.den, 0, fcbSubfrlen);
         if (pitchSharp == 0.0f) {
-            int[] nzr = new int[2];
-            int phiCol = getPhiCol(fcb.posNew, lResp, fcbSubfrlen, nzr);
-            float dDen = 0.0f;
-            for (int i = 0; i < fcb.nPulses; i++) {
+            var nzr = new int[2];
+            var phiCol = getPhiCol(fcb.posNew, lResp, fcbSubfrlen, nzr);
+            var dDen = 0.0f;
+            for (var i = 0; i < fcb.nPulses; i++) {
                 dDen += phiFlip[phiCol + stateR.pulsePositions[i]] * stateR.pulseSigns[i];
             }
             dDen *= 2.0f * fcb.signNew;
             dDen += phiFlip[phiCol + fcb.posNew];
-            for (int i = 0; i < fcbSubfrlen; i++) {
+            for (var i = 0; i < fcbSubfrlen; i++) {
                 stateW.den[i] += dDen;
             }
-            float twoSign = 2.0f * fcb.signNew;
-            for (int i = nzr[0]; i < nzr[1]; i++) {
+            var twoSign = 2.0f * fcb.signNew;
+            for (var i = nzr[0]; i < nzr[1]; i++) {
                 stateW.den[i] += bandTerm(dSign[i], phiFlip[phiCol + i], twoSign);
             }
         } else {
-            int[] nzr = new int[2];
-            float g1 = 1.0f;
-            float dDen = 0.0f;
-            for (int pos = fcb.posNew; pos < fcbSubfrlen; pos += lag) {
-                int phiCol = getPhiCol(pos, lResp, fcbSubfrlen, nzr);
-                for (int i = 0; i < fcb.nPulses; i++) {
-                    float g2 = g1;
-                    for (int posPrev = stateR.pulsePositions[i]; posPrev < fcbSubfrlen; posPrev += lag) {
+            var nzr = new int[2];
+            var g1 = 1.0f;
+            var dDen = 0.0f;
+            for (var pos = fcb.posNew; pos < fcbSubfrlen; pos += lag) {
+                var phiCol = getPhiCol(pos, lResp, fcbSubfrlen, nzr);
+                for (var i = 0; i < fcb.nPulses; i++) {
+                    var g2 = g1;
+                    for (var posPrev = stateR.pulsePositions[i]; posPrev < fcbSubfrlen; posPrev += lag) {
                         dDen += g2 * phiFlip[phiCol + posPrev] * stateR.pulseSigns[i];
                         g2 *= pitchSharp;
                     }
@@ -632,34 +632,34 @@ public final class FcbSearch {
             }
             dDen *= 2.0f * fcb.signNew;
             g1 = 1.0f;
-            for (int pos1 = fcb.posNew; pos1 < fcbSubfrlen; pos1 += lag) {
-                int phiCol = getPhiCol(pos1, lResp, fcbSubfrlen, nzr);
-                float g2 = g1;
-                for (int pos2 = fcb.posNew; pos2 < fcbSubfrlen; pos2 += lag) {
+            for (var pos1 = fcb.posNew; pos1 < fcbSubfrlen; pos1 += lag) {
+                var phiCol = getPhiCol(pos1, lResp, fcbSubfrlen, nzr);
+                var g2 = g1;
+                for (var pos2 = fcb.posNew; pos2 < fcbSubfrlen; pos2 += lag) {
                     dDen += g2 * phiFlip[phiCol + pos2];
                     g2 *= pitchSharp;
                 }
                 g1 *= pitchSharp;
             }
-            for (int i = 0; i < fcbSubfrlen; i++) {
+            for (var i = 0; i < fcbSubfrlen; i++) {
                 stateW.den[i] += dDen;
             }
-            float[] ddDen = new float[fcbSubfrlen];
+            var ddDen = new float[fcbSubfrlen];
             g1 = 1.0f;
-            for (int pos = fcb.posNew; pos < fcbSubfrlen; pos += lag) {
-                int phiCol = getPhiCol(pos, lResp, fcbSubfrlen, nzr);
-                float g2 = g1;
-                for (int k = 0; k < fcbSubfrlen; k += lag) {
-                    int startI = Math.max(0, nzr[0] - k);
-                    int endI = Math.min(fcbSubfrlen - k, nzr[1] - k);
-                    for (int i = startI; i < endI; i++) {
+            for (var pos = fcb.posNew; pos < fcbSubfrlen; pos += lag) {
+                var phiCol = getPhiCol(pos, lResp, fcbSubfrlen, nzr);
+                var g2 = g1;
+                for (var k = 0; k < fcbSubfrlen; k += lag) {
+                    var startI = Math.max(0, nzr[0] - k);
+                    var endI = Math.min(fcbSubfrlen - k, nzr[1] - k);
+                    for (var i = startI; i < endI; i++) {
                         ddDen[i] += g2 * phiFlip[phiCol + i + k];
                     }
                     g2 *= pitchSharp;
                 }
                 g1 *= pitchSharp;
             }
-            for (int i = 0; i < fcbSubfrlen; i++) {
+            for (var i = 0; i < fcbSubfrlen; i++) {
                 stateW.den[i] += 2.0f * fcb.signNew * dSign[i] * ddDen[i];
             }
         }
@@ -671,13 +671,13 @@ public final class FcbSearch {
         fcb.nPulses++;
         fcb.fcbStateIdx = idx;
 
-        float[] qLocal = new float[fcbSubfrlen];
+        var qLocal = new float[fcbSubfrlen];
         celpQ(stateW.num, stateW.den, fcbSubfrlen, qLocal);
-        int[] sortIx = new int[MAX_NUMSURV];
+        var sortIx = new int[MAX_NUMSURV];
         getMaxiK(qLocal, sortIx, fcbSubfrlen, numsurv);
 
-        long fcbSgntr = fcb.sgntr;
-        for (int i = 0; i < numsurv; i++) {
+        var fcbSgntr = fcb.sgntr;
+        for (var i = 0; i < numsurv; i++) {
             fcb.sgntr = fcbSgntr + sgntrs[sortIx[i]];
             if (isUnique(uniqueSize, fcb.sgntr)) {
                 fcb.posNew = sortIx[i];
@@ -743,7 +743,7 @@ public final class FcbSearch {
      * @return {@code true} when the signature is not yet present
      */
     private boolean isUnique(int uniqueSize, long sgntr) {
-        for (int i = 0; i < uniqueSize; i++) {
+        for (var i = 0; i < uniqueSize; i++) {
             if (uniqueSgntr[i] == sgntr) {
                 return false;
             }
@@ -800,7 +800,7 @@ public final class FcbSearch {
      * @param q   the destination criterion array
      */
     private static void celpQ(float[] num, float[] den, int l, float[] q) {
-        for (int i = 0; i < l; i++) {
+        for (var i = 0; i < l; i++) {
             q[i] = (num[i] * num[i]) / den[i];
         }
     }
@@ -817,7 +817,7 @@ public final class FcbSearch {
      * @param dSign the destination signs
      */
     private static void calcDAbsAndSign(float[] d, int l, float[] dAbs, float[] dSign) {
-        for (int i = 0; i < l; i++) {
+        for (var i = 0; i < l; i++) {
             if (d[i] > 0.0f) {
                 dAbs[i] = d[i];
                 dSign[i] = 1.0f;
@@ -840,32 +840,32 @@ public final class FcbSearch {
      * @return the index of the maximum element
      */
     private static int getMaxi(float[] x, int xLen) {
-        float[] buf = new float[MAX_SF_LEN];
-        int numHalves = 0;
-        int len = (xLen + 1) >> 1;
-        for (int i = 0; i < xLen - len; i++) {
+        var buf = new float[MAX_SF_LEN];
+        var numHalves = 0;
+        var len = (xLen + 1) >> 1;
+        for (var i = 0; i < xLen - len; i++) {
             buf[i] = Math.max(x[i], x[i + len]);
         }
         buf[xLen - len] = x[xLen - len];
-        int bufPtr = 0;
+        var bufPtr = 0;
         while ((len & 1) == 0) {
             bufPtr += len;
             len >>= 1;
-            for (int i = 0; i < len; i++) {
+            for (var i = 0; i < len; i++) {
                 buf[bufPtr + i] = Math.max(buf[bufPtr - 2 * len + i], buf[bufPtr - len + i]);
             }
             numHalves++;
         }
-        int idx = 0;
-        float maxtmp = buf[bufPtr];
-        for (int nn = 1; nn < len; nn++) {
-            float xtmp = buf[bufPtr + nn];
+        var idx = 0;
+        var maxtmp = buf[bufPtr];
+        for (var nn = 1; nn < len; nn++) {
+            var xtmp = buf[bufPtr + nn];
             if (xtmp > maxtmp) {
                 maxtmp = xtmp;
                 idx = nn;
             }
         }
-        for (int nn = 0; nn < numHalves; nn++) {
+        for (var nn = 0; nn < numHalves; nn++) {
             bufPtr -= 2 * len;
             if (buf[bufPtr + idx] < buf[bufPtr + idx + len]) {
                 idx += len;
@@ -893,35 +893,35 @@ public final class FcbSearch {
      * @param k    the number of indices to return
      */
     private static void getMaxiK(float[] x, int[] idx, int xLen, int k) {
-        float[] buf = new float[MAX_SORT_LEN];
-        byte[] flags = new byte[MAX_SORT_LEN / 2];
-        int[] is = new int[7];
-        int numHalves = 0;
-        int len = (xLen + 1) >> 1;
-        for (int i = 0; i < xLen - len; i++) {
+        var buf = new float[MAX_SORT_LEN];
+        var flags = new byte[MAX_SORT_LEN / 2];
+        var is = new int[7];
+        var numHalves = 0;
+        var len = (xLen + 1) >> 1;
+        for (var i = 0; i < xLen - len; i++) {
             buf[i] = Math.max(x[i], x[i + len]);
         }
         buf[xLen - len] = x[xLen - len];
-        int bufPtr = 0;
+        var bufPtr = 0;
         while ((len & 1) == 0) {
             bufPtr += len;
             len >>= 1;
-            for (int i = 0; i < len; i++) {
+            for (var i = 0; i < len; i++) {
                 buf[bufPtr + i] = Math.max(buf[bufPtr - 2 * len + i], buf[bufPtr - len + i]);
             }
             numHalves++;
         }
-        for (int kk = 0; kk < k; kk++) {
-            int i = 0;
-            float maxtmp = buf[bufPtr];
-            for (int nn = 1; nn < len; nn++) {
-                float xtmp = buf[bufPtr + nn];
+        for (var kk = 0; kk < k; kk++) {
+            var i = 0;
+            var maxtmp = buf[bufPtr];
+            for (var nn = 1; nn < len; nn++) {
+                var xtmp = buf[bufPtr + nn];
                 if (xtmp > maxtmp) {
                     maxtmp = xtmp;
                     i = nn;
                 }
             }
-            for (int nn = 0; nn < numHalves; nn++) {
+            for (var nn = 0; nn < numHalves; nn++) {
                 is[nn] = i;
                 bufPtr -= 2 * len;
                 if (buf[bufPtr + i] < buf[bufPtr + i + len]) {
@@ -929,8 +929,8 @@ public final class FcbSearch {
                 }
                 len <<= 1;
             }
-            float xtmp = -FLT_MAX;
-            int iFinal = i;
+            var xtmp = -FLT_MAX;
+            var iFinal = i;
             if (i + len < xLen) {
                 if (flags[i]++ == 0) {
                     if (x[i] < x[i + len]) {
@@ -950,7 +950,7 @@ public final class FcbSearch {
                 return;
             }
             buf[bufPtr + i] = xtmp;
-            for (int nn = numHalves - 1; nn >= 0; nn--) {
+            for (var nn = numHalves - 1; nn >= 0; nn--) {
                 i = is[nn];
                 len >>= 1;
                 buf[bufPtr + i + 2 * len] = Math.max(buf[bufPtr + i], buf[bufPtr + i + len]);

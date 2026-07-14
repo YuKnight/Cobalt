@@ -257,7 +257,7 @@ public final class LiveCallEventBus {
      *
      * <p>A self initiated change reaches only {@link LinkedCallMuteChangedListener}. An admin forced mute
      * reaches that callback too, because the participant's mic state did change, and additionally surfaces
-     * as a {@link com.github.auties00.cobalt.model.call.CallInteraction.PeerMuteRequest} on
+     * as a {@link CallInteraction.PeerMuteRequest} on
      * {@link LinkedCallInteractionListener}, the facade through which a forced mute is exposed.
      *
      * @param event the mute change to fan out

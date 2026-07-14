@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.PitchTable
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Open loop pitch lag estimator of the MLow speech encoder.
@@ -556,13 +557,13 @@ public final class OpenLoopPitch {
      */
     public Result estimate(float[] ltpBuf, int l, int lookAhead, float[] f2,
                            boolean codedAsActiveVoice, int numsubfrs) {
-        float[] lags = new float[numsubfrs];
-        int[] laginds = new int[numsubfrs];
+        var lags = new float[numsubfrs];
+        var laginds = new int[numsubfrs];
         if (!codedAsActiveVoice) {
             if (Log.TRACE) {
                 LOGGER.log(Level.TRACE, "open loop pitch estimate: inactive voice, using minimum pitch");
             }
-            for (int i = 0; i < numsubfrs; i++) {
+            for (var i = 0; i < numsubfrs; i++) {
                 lags[i] = MINPITCH_LEN;
             }
             prevLag = 0.0f;
@@ -571,7 +572,7 @@ public final class OpenLoopPitch {
             prevLagidx = -1;
             return new Result(lags, laginds, 0.0f, 0, (float) MINPITCH_LEN, 0.0f);
         }
-        Result result = search(ltpBuf, l, lookAhead, f2, numsubfrs, lags, laginds);
+        var result = search(ltpBuf, l, lookAhead, f2, numsubfrs, lags, laginds);
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "open loop pitch estimate: corr={0} blockseg={1} avgLag={2}",
                     result.pitchCorr(), result.blocksegIdx(), result.avgLag());
@@ -593,61 +594,61 @@ public final class OpenLoopPitch {
      */
     private Result search(float[] ltpBuf, int l, int lookAhead, float[] f2, int numsubfrs,
                           float[] lags, int[] laginds) {
-        int cBuf = (2 * FS_KHZ / STAGE1_FS_KHZ) * NUMLAGS_STAGE1 * PITCH_NUM_SUBFRAMES;
-        float[] cArr = new float[cBuf];
-        float[] hArr = new float[cBuf];
-        float[] e1Arr = new float[cBuf];
-        float[] eArr = new float[cBuf];
-        float[] e2Arr = e2Scratch;
-        float[] cCoarse = new float[NUMLAGS_COARSE * PITCH_NUM_SUBFRAMES];
-        float[] hCoarse = new float[NUMLAGS_COARSE * PITCH_NUM_SUBFRAMES];
-        float[] eCoarse = new float[NUMLAGS_COARSE * PITCH_NUM_SUBFRAMES];
+        var cBuf = (2 * FS_KHZ / STAGE1_FS_KHZ) * NUMLAGS_STAGE1 * PITCH_NUM_SUBFRAMES;
+        var cArr = new float[cBuf];
+        var hArr = new float[cBuf];
+        var e1Arr = new float[cBuf];
+        var eArr = new float[cBuf];
+        var e2Arr = e2Scratch;
+        var cCoarse = new float[NUMLAGS_COARSE * PITCH_NUM_SUBFRAMES];
+        var hCoarse = new float[NUMLAGS_COARSE * PITCH_NUM_SUBFRAMES];
+        var eCoarse = new float[NUMLAGS_COARSE * PITCH_NUM_SUBFRAMES];
 
-        int offset = DOWNSAMP_DELAY;
-        float[] stage1 = new float[(2 * FS_KHZ * 20) + MAXPITCH_LEN + 2 * DOWNSAMP_DELAY];
-        float[] ltpHp = new float[(2 * FS_KHZ * 20) + MAXPITCH_LEN];
+        var offset = DOWNSAMP_DELAY;
+        var stage1 = new float[(2 * FS_KHZ * 20) + MAXPITCH_LEN + 2 * DOWNSAMP_DELAY];
+        var ltpHp = new float[(2 * FS_KHZ * 20) + MAXPITCH_LEN];
 
-        float[] state = new float[2];
+        var state = new float[2];
         // HP: -3 dB @ 60 Hz, to remove low frequency noise.
         hpArma1(ltpBuf, l, state, stage1, offset);
         System.arraycopy(stage1, offset, ltpHp, 0, l - lookAhead);
 
-        int stage1Len = downsample(stage1, l + offset);
+        var stage1Len = downsample(stage1, l + offset);
 
         calcE1Multi(e1Arr, stage1, stage1Len, numsubfrs, MINPITCH_STAGE1, MAXPITCH_STAGE1, LAG_SUBFRLEN_STAGE1);
         calcCE2(cArr, e2Arr, stage1, stage1Len, numsubfrs);
 
-        int numlags = NUMLAGS_STAGE1;
-        float[] sqrtE1 = sqrtE1Scratch;
-        for (int sf = 0; sf < numsubfrs; sf++) {
-            for (int i = 0; i < numlags; i++) {
+        var numlags = NUMLAGS_STAGE1;
+        var sqrtE1 = sqrtE1Scratch;
+        for (var sf = 0; sf < numsubfrs; sf++) {
+            for (var i = 0; i < numlags; i++) {
                 sqrtE1[i] = e1Arr[sf * numlags + i] + 1e-30f;
             }
             sqrtVec(sqrtE1, numlags);
-            float sqrtE2 = (float) Math.sqrt(e2Arr[sf] + 1e-30f);
-            for (int i = 0; i < numlags; i++) {
-                float tmp = 0.5f * (sqrtE1[i] + sqrtE2);
+            var sqrtE2 = (float) Math.sqrt(e2Arr[sf] + 1e-30f);
+            for (var i = 0; i < numlags; i++) {
+                var tmp = 0.5f * (sqrtE1[i] + sqrtE2);
                 eArr[sf * numlags + i] = tmp * tmp;
             }
         }
 
-        int minpitchC = MINPITCH_STAGE1;
-        int numlagsC = numlags;
-        int minpitchE = MINPITCH_STAGE1;
-        int numlagsE = numlags;
-        int[] cUp = lowComplexity
+        var minpitchC = MINPITCH_STAGE1;
+        var numlagsC = numlags;
+        var minpitchE = MINPITCH_STAGE1;
+        var numlagsE = numlags;
+        var cUp = lowComplexity
                 ? upsampEFast(numsubfrs, minpitchC, numlagsC, cArr)
                 : upsampCFast(numsubfrs, minpitchC, numlagsC, cArr);
         minpitchC = cUp[0];
         numlagsC = cUp[1];
-        int[] eUp = upsampEFast(numsubfrs, minpitchE, numlagsE, eArr);
+        var eUp = upsampEFast(numsubfrs, minpitchE, numlagsE, eArr);
         minpitchE = eUp[0];
         numlagsE = eUp[1];
 
-        int offsetC = MINPITCH_COARSE - minpitchC;
-        int offsetE = MINPITCH_COARSE - minpitchE;
-        for (int sf = 0; sf < numsubfrs; sf++) {
-            for (int i = 0; i < NUMLAGS_COARSE; i++) {
+        var offsetC = MINPITCH_COARSE - minpitchC;
+        var offsetE = MINPITCH_COARSE - minpitchE;
+        for (var sf = 0; sf < numsubfrs; sf++) {
+            for (var i = 0; i < NUMLAGS_COARSE; i++) {
                 hArr[sf * NUMLAGS_COARSE + i] =
                         cArr[sf * numlagsC + offsetC + i] / eArr[sf * numlagsE + offsetE + i];
             }
@@ -656,70 +657,70 @@ public final class OpenLoopPitch {
             System.arraycopy(eArr, sf * numlagsE + offsetE, eCoarse, sf * NUMLAGS_COARSE, NUMLAGS_COARSE);
         }
 
-        float[][] hblk = new float[PITCH_NUM_SUBFRAMES][PITCH_NUM_BLOCKS];
-        for (int sf = 0; sf < numsubfrs; sf++) {
-            int blockPtr = sf * NUMLAGS_COARSE;
-            for (int block = 0; block < PITCH_NUM_BLOCKS; block++) {
+        var hblk = new float[PITCH_NUM_SUBFRAMES][PITCH_NUM_BLOCKS];
+        for (var sf = 0; sf < numsubfrs; sf++) {
+            var blockPtr = sf * NUMLAGS_COARSE;
+            for (var block = 0; block < PITCH_NUM_BLOCKS; block++) {
                 hblk[sf][block] = maximum(hArr, blockPtr, PITCHBLOCK_COARSE);
                 blockPtr += PITCHBLOCK_COARSE;
             }
         }
 
-        float[] sfWght = sfWghtScratch;
+        var sfWght = sfWghtScratch;
         calcSfWeights(e2Arr, numsubfrs, sfWght);
 
-        float[] utils = utilsScratch;
-        for (int i = 0; i < blocktracks.length; i++) {
-            float corr = 0.0f;
-            int[] track = blocktracks[i].track();
-            for (int sf = 0; sf < numsubfrs; sf++) {
+        var utils = utilsScratch;
+        for (var i = 0; i < blocktracks.length; i++) {
+            var corr = 0.0f;
+            var track = blocktracks[i].track();
+            for (var sf = 0; sf < numsubfrs; sf++) {
                 corr += hblk[sf][track[sf]] * sfWght[sf];
             }
-            float shortlagbias1 =
+            var shortlagbias1 =
                     (MAXPITCH_LEN / ((blocktracks[i].meanblock() + 1.5f) * PITCHBLOCK) - 1.0f) * SHORTWGHT1;
             utils[i] = 1.0f / (1.1f - corr)
                     - REDUCTION_FACTOR * PITCHBLOCK * PITCH_DELTAWGHT * blocktracks[i].trackdeltas()
                     + shortlagbias1;
         }
-        int[] trackIdx = getMaxiK(utils, blocktracks.length, numstates1);
+        var trackIdx = getMaxiK(utils, blocktracks.length, numstates1);
 
         // Recompute E1 at the input sampling rate over the full input rate lag range.
         calcE1Multi(e1Arr, ltpHp, l - lookAhead, numsubfrs, minpitchE, minpitchE + numlagsE - 1, LAG_SUBFRLEN);
 
-        int[] uniqueblocks = new int[PITCH_NUM_SUBFRAMES];
-        for (int i = 0; i < numstates1; i++) {
-            int[] track = blocktracks[trackIdx[i]].track();
-            for (int sf = 0; sf < numsubfrs; sf++) {
+        var uniqueblocks = new int[PITCH_NUM_SUBFRAMES];
+        for (var i = 0; i < numstates1; i++) {
+            var track = blocktracks[trackIdx[i]].track();
+            for (var sf = 0; sf < numsubfrs; sf++) {
                 uniqueblocks[sf] |= (1 << track[sf]);
             }
         }
 
-        float hThres = lowComplexity ? 0.0f : H_THRES_HQ;
+        var hThres = lowComplexity ? 0.0f : H_THRES_HQ;
         offsetC = MINPITCH_MS * FS_KHZ - minpitchC;
         offsetE = MINPITCH_MS * FS_KHZ - minpitchE;
-        float[] sqrtE1Blk = sqrtE1BlkScratch;
-        for (int sf = 0; sf < numsubfrs; sf++) {
-            int cPtr = offsetC + sf * numlagsC;
-            int ePtr = offsetE + sf * numlagsE;
-            int e1Ptr = offsetE + sf * numlagsE;
-            int hPtr = sf * NUMLAGS_FS;
-            int ltpPtr = l - lookAhead + (sf - numsubfrs) * LAG_SUBFRLEN;
+        var sqrtE1Blk = sqrtE1BlkScratch;
+        for (var sf = 0; sf < numsubfrs; sf++) {
+            var cPtr = offsetC + sf * numlagsC;
+            var ePtr = offsetE + sf * numlagsE;
+            var e1Ptr = offsetE + sf * numlagsE;
+            var hPtr = sf * NUMLAGS_FS;
+            var ltpPtr = l - lookAhead + (sf - numsubfrs) * LAG_SUBFRLEN;
             e2Arr[sf] = Math.max(dotProd40Self(ltpHp, ltpPtr), 1e-9f);
-            float sqrtE2 = (float) Math.sqrt(e2Arr[sf] + 1e-30f);
-            int mask = 1;
-            for (int block = 0; block < PITCH_NUM_BLOCKS; block++) {
+            var sqrtE2 = (float) Math.sqrt(e2Arr[sf] + 1e-30f);
+            var mask = 1;
+            for (var block = 0; block < PITCH_NUM_BLOCKS; block++) {
                 if ((uniqueblocks[sf] & mask) != 0) {
-                    for (int i = 0; i < PITCHBLOCK + 1; i++) {
+                    for (var i = 0; i < PITCHBLOCK + 1; i++) {
                         sqrtE1Blk[i] = e1Arr[e1Ptr + block * PITCHBLOCK + i] + 1e-30f;
                     }
                     sqrtVec(sqrtE1Blk, PITCHBLOCK + 1);
-                    for (int i = 0; i < PITCHBLOCK + 1; i++) {
-                        float tmp = 0.5f * (sqrtE1Blk[i] + sqrtE2);
+                    for (var i = 0; i < PITCHBLOCK + 1; i++) {
+                        var tmp = 0.5f * (sqrtE1Blk[i] + sqrtE2);
                         eArr[ePtr + block * PITCHBLOCK + i] = 0.5f * tmp * tmp;
                     }
-                    for (int i = 0; i < PITCHBLOCK; i++) {
+                    for (var i = 0; i < PITCHBLOCK; i++) {
                         if (hArr[hPtr + block * PITCHBLOCK + i] > hThres) {
-                            int lag = MINPITCH_LEN + block * PITCHBLOCK + i;
+                            var lag = MINPITCH_LEN + block * PITCHBLOCK + i;
                             cArr[cPtr + block * PITCHBLOCK + i] =
                                     0.5f * dotProd40(ltpHp, ltpPtr, ltpHp, ltpPtr - lag);
                         }
@@ -730,15 +731,15 @@ public final class OpenLoopPitch {
         }
 
         // Fractionally upsample C and E and recompute H, high subframe to low to avoid overwrite.
-        int fracStride = PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetC;
-        for (int sf = numsubfrs - 1; sf >= 0; sf--) {
-            int cPtr = offsetC + sf * numlagsC;
-            int cPtrFrac = offsetC + sf * (PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetC);
-            int ePtr = offsetE + sf * numlagsE;
-            int ePtrFrac = offsetE + sf * (PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetE);
-            int hPtr = sf * 2 * PITCHBLOCK * PITCH_NUM_BLOCKS;
-            int mask = 1 << (PITCH_NUM_BLOCKS - 1);
-            for (int block = PITCH_NUM_BLOCKS - 1; block >= 0; block--) {
+        var fracStride = PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetC;
+        for (var sf = numsubfrs - 1; sf >= 0; sf--) {
+            var cPtr = offsetC + sf * numlagsC;
+            var cPtrFrac = offsetC + sf * (PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetC);
+            var ePtr = offsetE + sf * numlagsE;
+            var ePtrFrac = offsetE + sf * (PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetE);
+            var hPtr = sf * 2 * PITCHBLOCK * PITCH_NUM_BLOCKS;
+            var mask = 1 << (PITCH_NUM_BLOCKS - 1);
+            for (var block = PITCH_NUM_BLOCKS - 1; block >= 0; block--) {
                 if ((uniqueblocks[sf] & mask) != 0) {
                     upsampECore(eArr, ePtr + block * PITCHBLOCK + PITCHBLOCK - 1,
                             eArr, ePtrFrac + block * 2 * PITCHBLOCK + 2 * PITCHBLOCK - 1, PITCHBLOCK);
@@ -749,9 +750,9 @@ public final class OpenLoopPitch {
                         upsampCCore(cArr, cPtr + block * PITCHBLOCK + PITCHBLOCK - 1,
                                 cArr, cPtrFrac + block * 2 * PITCHBLOCK + 2 * PITCHBLOCK - 1, PITCHBLOCK);
                     }
-                    int coutBase = cPtrFrac + block * 2 * PITCHBLOCK;
-                    int eoutBase = ePtrFrac + block * 2 * PITCHBLOCK;
-                    for (int i = 0; i < 2 * PITCHBLOCK; i++) {
+                    var coutBase = cPtrFrac + block * 2 * PITCHBLOCK;
+                    var eoutBase = ePtrFrac + block * 2 * PITCHBLOCK;
+                    for (var i = 0; i < 2 * PITCHBLOCK; i++) {
                         hArr[hPtr + block * 2 * PITCHBLOCK + i] = cArr[coutBase + i] / eArr[eoutBase + i];
                     }
                 }
@@ -760,37 +761,37 @@ public final class OpenLoopPitch {
         }
 
         // Fine search: per survivor segmentation, the energy weighted combined correlation peak.
-        float[] hComb = hCombScratch;
-        int nlaginds = 0;
-        int[] blocksegsIx = blocksegsIxScratch;
-        int[][] survLaginds = new int[NUM_BLOCKSEGS][PITCH_NUM_SUBFRAMES];
-        int[] lagindCache = lagindCacheScratch;
-        java.util.Arrays.fill(lagindCache, -1);
-        for (int surv = 0; surv < numstates1; surv++) {
-            int idx = trackIdx[surv];
-            int spanStart = BLOCKSEGS_IX[2 * idx];
-            int spanCount = BLOCKSEGS_IX[2 * idx + 1];
-            for (int j = 0; j < spanCount; j++) {
+        var hComb = hCombScratch;
+        var nlaginds = 0;
+        var blocksegsIx = blocksegsIxScratch;
+        var survLaginds = new int[NUM_BLOCKSEGS][PITCH_NUM_SUBFRAMES];
+        var lagindCache = lagindCacheScratch;
+        Arrays.fill(lagindCache, -1);
+        for (var surv = 0; surv < numstates1; surv++) {
+            var idx = trackIdx[surv];
+            var spanStart = BLOCKSEGS_IX[2 * idx];
+            var spanCount = BLOCKSEGS_IX[2 * idx + 1];
+            for (var j = 0; j < spanCount; j++) {
                 blocksegsIx[nlaginds] = spanStart + j;
-                PitchTables.Blockseg seg = data.blocksegs()[blocksegsIx[nlaginds]];
-                int[] blocks = seg.blocks();
-                int[] seglens = seg.seglens();
-                int startSf = 0;
-                for (int n = 0; n < seg.nblocks(); n++) {
-                    int lookupKey = (((startSf << CACHE_BITS_SEG_LEN) + seglens[n]) << CACHE_BITS_BLOCK) + blocks[n];
-                    int bestI = lagindCache[lookupKey];
+                var seg = data.blocksegs()[blocksegsIx[nlaginds]];
+                var blocks = seg.blocks();
+                var seglens = seg.seglens();
+                var startSf = 0;
+                for (var n = 0; n < seg.nblocks(); n++) {
+                    var lookupKey = (((startSf << CACHE_BITS_SEG_LEN) + seglens[n]) << CACHE_BITS_BLOCK) + blocks[n];
+                    var bestI = lagindCache[lookupKey];
                     if (bestI == -1) {
-                        java.util.Arrays.fill(hComb, 0.0f);
-                        for (int sf = startSf; sf < startSf + seglens[n]; sf++) {
-                            int hPtr = sf * 2 * PITCHBLOCK * PITCH_NUM_BLOCKS + blocks[n] * 2 * PITCHBLOCK;
-                            for (int i = 0; i < 2 * PITCHBLOCK; i++) {
+                        Arrays.fill(hComb, 0.0f);
+                        for (var sf = startSf; sf < startSf + seglens[n]; sf++) {
+                            var hPtr = sf * 2 * PITCHBLOCK * PITCH_NUM_BLOCKS + blocks[n] * 2 * PITCHBLOCK;
+                            for (var i = 0; i < 2 * PITCHBLOCK; i++) {
                                 hComb[i] += hArr[hPtr + i] * e2Arr[sf];
                             }
                         }
                         bestI = getMaxi(hComb, 2 * PITCHBLOCK);
                         lagindCache[lookupKey] = bestI;
                     }
-                    for (int sf = startSf; sf < startSf + seglens[n]; sf++) {
+                    for (var sf = startSf; sf < startSf + seglens[n]; sf++) {
                         survLaginds[nlaginds][sf] = bestI + blocks[n] * 2 * PITCHBLOCK;
                     }
                     startSf += seglens[n];
@@ -800,39 +801,39 @@ public final class OpenLoopPitch {
         }
 
         // Final search: utility per survivor, with the spectral harmonicity and previous lag bonuses.
-        float bestUtil = 0.0f;
-        float bestPitchcorr = 0.0f;
-        int bestSurv = 0;
-        float pitchRatewght = lowRate ? RATEWGHT_LR : RATEWGHT_HR;
+        var bestUtil = 0.0f;
+        var bestPitchcorr = 0.0f;
+        var bestSurv = 0;
+        var pitchRatewght = lowRate ? RATEWGHT_LR : RATEWGHT_HR;
 
-        float[] f2w = new float[F_LEN];
-        for (int i = 2; i < F_LEN; i++) {
+        var f2w = new float[F_LEN];
+        for (var i = 2; i < F_LEN; i++) {
             f2w[i] = f2[i] * (i + 3);
         }
-        int maxIx = getMaxi(sfWght, numsubfrs);
-        float[] harmCache = new float[HARM_CACHE_LEN];
-        for (int surv = 0; surv < nlaginds; surv++) {
-            float sumC = 0.0f;
-            float sumE = 0.0f;
-            for (int sf = 0; sf < numsubfrs; sf++) {
-                int cPtr = offsetC + sf * (PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetC);
-                int ePtr = offsetE + sf * (PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetE);
+        var maxIx = getMaxi(sfWght, numsubfrs);
+        var harmCache = new float[HARM_CACHE_LEN];
+        for (var surv = 0; surv < nlaginds; surv++) {
+            var sumC = 0.0f;
+            var sumE = 0.0f;
+            for (var sf = 0; sf < numsubfrs; sf++) {
+                var cPtr = offsetC + sf * (PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetC);
+                var ePtr = offsetE + sf * (PITCH_NUM_BLOCKS * 2 * PITCHBLOCK + offsetE);
                 sumC += cArr[cPtr + survLaginds[surv][sf]];
                 sumE += eArr[ePtr + survLaginds[surv][sf]];
             }
-            float rateBias = encodeLagsBits(blocksegsIx[surv], survLaginds[surv], prevLagblk, prevLagidx)
-                    * pitchRatewght;
+            var rateBias = encodeLagsBits(blocksegsIx[surv], survLaginds[surv], prevLagblk, prevLagidx)
+                           * pitchRatewght;
 
-            float meanLag = survLaginds[surv][maxIx] * 0.5f + MINPITCH_LEN;
-            float pitchcorr = sumC / sumE;
-            float firstLag = 0.5f * survLaginds[surv][0] + MINPITCH_LEN;
-            float prevLagBias = prevLagBias(firstLag);
-            float spectralHarmBias =
+            var meanLag = survLaginds[surv][maxIx] * 0.5f + MINPITCH_LEN;
+            var pitchcorr = sumC / sumE;
+            var firstLag = 0.5f * survLaginds[surv][0] + MINPITCH_LEN;
+            var prevLagBias = prevLagBias(firstLag);
+            var spectralHarmBias =
                     SPEC_HARM_BIAS * spectralHarmonicity(meanLag, f2w, harmCache, surv == 0);
 
-            float util = 1.0f / (1.1f - pitchcorr)
-                    - PITCH_DELTAWGHT * sumDeltas(survLaginds[surv], numsubfrs)
-                    + spectralHarmBias + prevLagBias - rateBias;
+            var util = 1.0f / (1.1f - pitchcorr)
+                       - PITCH_DELTAWGHT * sumDeltas(survLaginds[surv], numsubfrs)
+                       + spectralHarmBias + prevLagBias - rateBias;
             if (surv == 0 || util > bestUtil) {
                 bestUtil = util;
                 bestSurv = surv;
@@ -842,12 +843,12 @@ public final class OpenLoopPitch {
             }
         }
 
-        for (int sf = 0; sf < numsubfrs; sf++) {
+        for (var sf = 0; sf < numsubfrs; sf++) {
             lags[sf] = survLaginds[bestSurv][sf] * 0.5f + MINPITCH_LEN;
             laginds[sf] = survLaginds[bestSurv][sf];
         }
-        float avgLag = survLaginds[bestSurv][maxIx] * 0.5f + MINPITCH_LEN;
-        float harmStrength = spectralHarmonicity(avgLag, f2w, harmCache, false);
+        var avgLag = survLaginds[bestSurv][maxIx] * 0.5f + MINPITCH_LEN;
+        var harmStrength = spectralHarmonicity(avgLag, f2w, harmCache, false);
 
         prevLag = lags[numsubfrs - 1];
         prevPitchCorr = bestPitchcorr;
@@ -868,17 +869,17 @@ public final class OpenLoopPitch {
      * @return the {@value #NUM_BLOCKTRACKS} generated block tracks
      */
     private static Blocktrack[] genBlocktracks(PitchTables.Blockseg[] blocksegs) {
-        Blocktrack[] out = new Blocktrack[NUM_BLOCKTRACKS];
-        for (int t = 0; t < NUM_BLOCKTRACKS; t++) {
-            PitchTables.Blockseg seg = blocksegs[BLOCKSEGS_IX[2 * t]];
-            int[] blocks = seg.blocks();
-            int[] seglens = seg.seglens();
-            int[] track = new int[PITCH_NUM_SUBFRAMES];
-            float meanblock = 0.0f;
-            float trackdeltas = 0.0f;
-            int segIdx = 0;
-            for (int b = 0; b < seg.nblocks(); b++) {
-                for (int k = 0; k < seglens[b]; k++) {
+        var out = new Blocktrack[NUM_BLOCKTRACKS];
+        for (var t = 0; t < NUM_BLOCKTRACKS; t++) {
+            var seg = blocksegs[BLOCKSEGS_IX[2 * t]];
+            var blocks = seg.blocks();
+            var seglens = seg.seglens();
+            var track = new int[PITCH_NUM_SUBFRAMES];
+            var meanblock = 0.0f;
+            var trackdeltas = 0.0f;
+            var segIdx = 0;
+            for (var b = 0; b < seg.nblocks(); b++) {
+                for (var k = 0; k < seglens[b]; k++) {
                     track[segIdx++] = blocks[b];
                 }
                 meanblock += (float) blocks[b] * seglens[b];
@@ -905,10 +906,10 @@ public final class OpenLoopPitch {
      * @return the number of decimated output samples
      */
     private static int downsample(float[] buf, int len) {
-        int outLen = (len - 2 * DOWNSAMP_DELAY) / 2;
-        for (int j = 0; j < outLen; j++) {
-            float tmp = buf[2 * j + DOWNSAMP_DELAY] * DOWNSAMP_FILT[DOWNSAMP_DELAY];
-            for (int i = 0; i < DOWNSAMP_DELAY; i += 2) {
+        var outLen = (len - 2 * DOWNSAMP_DELAY) / 2;
+        for (var j = 0; j < outLen; j++) {
+            var tmp = buf[2 * j + DOWNSAMP_DELAY] * DOWNSAMP_FILT[DOWNSAMP_DELAY];
+            for (var i = 0; i < DOWNSAMP_DELAY; i += 2) {
                 tmp += (buf[2 * j + i] + buf[2 * j + 2 * DOWNSAMP_DELAY - i]) * DOWNSAMP_FILT[i];
             }
             buf[j] = tmp;
@@ -936,12 +937,12 @@ public final class OpenLoopPitch {
      * @param lagSubfrlen the energy window length
      */
     private static void calcE1(float[] e1, float[] ltpbuf, int t, int minpitch, int maxpitch, int lagSubfrlen) {
-        int numlags = maxpitch - minpitch + 1;
-        int reg = t - minpitch;
+        var numlags = maxpitch - minpitch + 1;
+        var reg = t - minpitch;
         e1[0] = Math.max(nrg(ltpbuf, reg, lagSubfrlen), 1e-9f);
-        for (int i = 1; i < numlags; i++) {
-            float add = ltpbuf[reg - i] * ltpbuf[reg - i];
-            float sub = ltpbuf[reg + lagSubfrlen - i] * ltpbuf[reg + lagSubfrlen - i];
+        for (var i = 1; i < numlags; i++) {
+            var add = ltpbuf[reg - i] * ltpbuf[reg - i];
+            var sub = ltpbuf[reg + lagSubfrlen - i] * ltpbuf[reg + lagSubfrlen - i];
             e1[i] = Math.max(e1[i - 1] + (add - sub), 1e-9f);
         }
     }
@@ -962,15 +963,15 @@ public final class OpenLoopPitch {
      */
     private static void calcE1Multi(float[] e1, float[] ltpbuf, int ltpbufLen, int numsubfrs,
                                     int minpitch, int maxpitch, int lagSubfrlen) {
-        int numlags = maxpitch - minpitch + 1;
-        int maxpitchExt = maxpitch + (numsubfrs - 1) * lagSubfrlen;
-        int numlagsExt = maxpitchExt - minpitch + 1;
-        int t = ltpbufLen - lagSubfrlen;
-        float[] e1Ext = new float[1024];
+        var numlags = maxpitch - minpitch + 1;
+        var maxpitchExt = maxpitch + (numsubfrs - 1) * lagSubfrlen;
+        var numlagsExt = maxpitchExt - minpitch + 1;
+        var t = ltpbufLen - lagSubfrlen;
+        var e1Ext = new float[1024];
         calcE1(e1Ext, ltpbuf, t, minpitch, maxpitchExt, lagSubfrlen);
-        int offset = numlagsExt - numlags;
-        for (int sf = 0; sf < numsubfrs; sf++) {
-            for (int i = 0; i < numlags; i++) {
+        var offset = numlagsExt - numlags;
+        for (var sf = 0; sf < numsubfrs; sf++) {
+            for (var i = 0; i < numlags; i++) {
                 e1[sf * numlags + i] = e1Ext[offset + i];
             }
             offset -= lagSubfrlen;
@@ -990,12 +991,12 @@ public final class OpenLoopPitch {
      * @param numsubfrs the number of pitch subframes
      */
     private static void calcCE2(float[] c, float[] e2, float[] ltpbuf, int ltpbufLen, int numsubfrs) {
-        int numLagsStage1 = NUMLAGS_STAGE1;
-        int t = ltpbufLen - LAG_SUBFRLEN_STAGE1 * numsubfrs;
-        for (int sf = 0; sf < numsubfrs; sf++) {
-            int tgt = t;
-            int reg = t - MINPITCH_STAGE1;
-            for (int i = 0; i < numLagsStage1; i++) {
+        var numLagsStage1 = NUMLAGS_STAGE1;
+        var t = ltpbufLen - LAG_SUBFRLEN_STAGE1 * numsubfrs;
+        for (var sf = 0; sf < numsubfrs; sf++) {
+            var tgt = t;
+            var reg = t - MINPITCH_STAGE1;
+            for (var i = 0; i < numLagsStage1; i++) {
                 c[sf * numLagsStage1 + i] = dotProd20(ltpbuf, tgt, ltpbuf, reg - i);
             }
             t += LAG_SUBFRLEN_STAGE1;
@@ -1017,11 +1018,11 @@ public final class OpenLoopPitch {
      * @return the updated {@code {minpitch, numlags}}
      */
     private static int[] upsampEFast(int numsubfrs, int minpitch, int numlags, float[] e) {
-        int nlagsIn = numlags;
-        int nlagsOut = (nlagsIn - 1) * 2;
-        for (int sf = numsubfrs - 1; sf >= 0; sf--) {
-            int x = sf * nlagsIn + nlagsIn - 2;
-            int y = sf * nlagsOut + nlagsOut - 1;
+        var nlagsIn = numlags;
+        var nlagsOut = (nlagsIn - 1) * 2;
+        for (var sf = numsubfrs - 1; sf >= 0; sf--) {
+            var x = sf * nlagsIn + nlagsIn - 2;
+            var y = sf * nlagsOut + nlagsOut - 1;
             upsampECore(e, x, e, y, nlagsIn - 1);
         }
         return new int[]{minpitch * 2, nlagsOut};
@@ -1041,11 +1042,11 @@ public final class OpenLoopPitch {
      * @return the updated {@code {minpitch, numlags}}
      */
     private static int[] upsampCFast(int numsubfrs, int minpitch, int numlags, float[] c) {
-        int nlagsIn = numlags;
-        int nlagsOut = (nlagsIn - INTERPOL_DELAY_C) * 2;
-        for (int sf = numsubfrs - 1; sf >= 0; sf--) {
-            int x = sf * nlagsIn + nlagsIn - 1 - INTERPOL_DELAY_C;
-            int y = sf * nlagsOut + nlagsOut - 1;
+        var nlagsIn = numlags;
+        var nlagsOut = (nlagsIn - INTERPOL_DELAY_C) * 2;
+        for (var sf = numsubfrs - 1; sf >= 0; sf--) {
+            var x = sf * nlagsIn + nlagsIn - 1 - INTERPOL_DELAY_C;
+            var y = sf * nlagsOut + nlagsOut - 1;
             upsampCCore(c, x, c, y, nlagsIn - (INTERPOL_DELAY_C * 2 - 1));
         }
         return new int[]{minpitch * 2, nlagsOut};
@@ -1064,7 +1065,7 @@ public final class OpenLoopPitch {
      * @param len  the number of input samples to expand
      */
     private static void upsampECore(float[] x, int xOff, float[] y, int yOff, int len) {
-        for (int i = 0; i < len; i++) {
+        for (var i = 0; i < len; i++) {
             y[yOff--] = (x[xOff] + x[xOff + 1]) * 0.5f;
             y[yOff--] = x[xOff--];
         }
@@ -1083,9 +1084,9 @@ public final class OpenLoopPitch {
      * @param len  the number of input samples to expand
      */
     private static void upsampCCore(float[] x, int xOff, float[] y, int yOff, int len) {
-        for (int i = 0; i < len; i++) {
-            float tmp = 0.0f;
-            for (int j = 0; j < INTERPOL_DELAY_C; j++) {
+        for (var i = 0; i < len; i++) {
+            var tmp = 0.0f;
+            for (var j = 0; j < INTERPOL_DELAY_C; j++) {
                 tmp += (x[xOff + j - (INTERPOL_DELAY_C - 1)] + x[xOff + INTERPOL_DELAY_C - j]) * INTERPOL_FILT_C[j];
             }
             y[yOff--] = tmp;
@@ -1103,11 +1104,11 @@ public final class OpenLoopPitch {
      * @param sfWght    the destination weight vector
      */
     private static void calcSfWeights(float[] e2, int numsubfrs, float[] sfWght) {
-        float sumE2 = 0.0f;
-        for (int sf = 0; sf < numsubfrs; sf++) {
+        var sumE2 = 0.0f;
+        for (var sf = 0; sf < numsubfrs; sf++) {
             sumE2 += e2[sf];
         }
-        for (int sf = 0; sf < numsubfrs; sf++) {
+        for (var sf = 0; sf < numsubfrs; sf++) {
             sfWght[sf] = e2[sf] / sumE2;
         }
     }
@@ -1120,8 +1121,8 @@ public final class OpenLoopPitch {
      * @return the sum of absolute adjacent subframe lag index differences
      */
     private static int sumDeltas(int[] laginds, int numsubfrs) {
-        int ret = 0;
-        for (int i = 1; i < numsubfrs; i++) {
+        var ret = 0;
+        for (var i = 1; i < numsubfrs; i++) {
             ret += Math.abs(laginds[i] - laginds[i - 1]);
         }
         return ret;
@@ -1137,8 +1138,8 @@ public final class OpenLoopPitch {
      * @return the continuity bonus
      */
     private float prevLagBias(float lag) {
-        float lagDiff = Math.abs(lag - prevLag);
-        float diffThres = PREVWGHT_SPAN * prevLag;
+        var lagDiff = Math.abs(lag - prevLag);
+        var diffThres = PREVWGHT_SPAN * prevLag;
         if (lagDiff < diffThres) {
             return prevPitchCorr * (1.0f - (lagDiff / diffThres)) * PREVWGHT;
         }
@@ -1161,34 +1162,34 @@ public final class OpenLoopPitch {
      * @return the estimated bit cost
      */
     private float encodeLagsBits(int blocksegsIx, int[] laginds, int prevBlk, int prevIdx) {
-        float nBits = 0.0f;
-        int ixJulia = data.blocksegs2idx()[blocksegsIx] & 0xFF;
-        int blocksize = BLOCKSIZE;
-        PitchTables.Blockseg seg = data.blocksegs()[blocksegsIx];
-        int[] blocks = seg.blocks();
-        int[] seglens = seg.seglens();
+        var nBits = 0.0f;
+        var ixJulia = data.blocksegs2idx()[blocksegsIx] & 0xFF;
+        var blocksize = BLOCKSIZE;
+        var seg = data.blocksegs()[blocksegsIx];
+        var blocks = seg.blocks();
+        var seglens = seg.seglens();
         if (prevBlk < 0) {
-            int[] cmf = data.blocksegIdxCmf();
+            var cmf = data.blocksegIdxCmf();
             nBits += encodeWrap(cmf[ixJulia - 1], cmf[ixJulia], cmf[data.numBlocksegs()]);
         } else {
-            int[] cmf = data.blockTransitionCmf()[prevBlk];
+            var cmf = data.blockTransitionCmf()[prevBlk];
             nBits += encodeWrap(cmf[blocks[0]], cmf[blocks[0] + 1], cmf[PITCH_NUM_BLOCKS]);
-            byte[] range = data.firstBlockRange();
-            int startIx = range[blocks[0] * 2] & 0xFF;
-            int cmfLen = (range[blocks[0] * 2 + 1] & 0xFF) - startIx + 1;
-            int[] idxCmf = data.blocksegIdxCmf();
-            int base = idxCmf[startIx];
+            var range = data.firstBlockRange();
+            var startIx = range[blocks[0] * 2] & 0xFF;
+            var cmfLen = (range[blocks[0] * 2 + 1] & 0xFF) - startIx + 1;
+            var idxCmf = data.blocksegIdxCmf();
+            var base = idxCmf[startIx];
             nBits += encodeWrap(
                     idxCmf[ixJulia - 1] - base,
                     idxCmf[ixJulia] - base,
                     idxCmf[startIx + cmfLen] - base);
         }
-        int blk = blocks[0];
-        int deltaBlk = blk - prevBlk;
-        int startSeg = 0;
-        int lagindsIx = 0;
-        int runPrevBlk = prevBlk;
-        int runPrevIdx = prevIdx;
+        var blk = blocks[0];
+        var deltaBlk = blk - prevBlk;
+        var startSeg = 0;
+        var lagindsIx = 0;
+        var runPrevBlk = prevBlk;
+        var runPrevIdx = prevIdx;
         if (!(prevBlk > -1 && deltaBlk >= -1 && deltaBlk <= 2)) {
             nBits += 6.0f;
             runPrevBlk = blk;
@@ -1196,18 +1197,18 @@ public final class OpenLoopPitch {
             lagindsIx += seglens[0];
             startSeg = 1;
         }
-        int[] deltaLagCmf = data.deltaLagCmfs()[1];
-        for (int k = startSeg; k < seg.nblocks(); k++) {
+        var deltaLagCmf = data.deltaLagCmfs()[1];
+        for (var k = startSeg; k < seg.nblocks(); k++) {
             blk = blocks[k];
-            int idx = laginds[lagindsIx];
+            var idx = laginds[lagindsIx];
             lagindsIx += seglens[k];
             deltaBlk = blk - runPrevBlk;
-            int deltaIdx = idx - runPrevIdx;
-            int prevLagidxMod = runPrevIdx - runPrevBlk * blocksize;
-            int deltaRangeStart = -prevLagidxMod + deltaBlk * blocksize;
-            int pCmf = deltaRangeStart + 2 * blocksize - 1;
-            int ix = deltaIdx - deltaRangeStart;
-            int base = deltaLagCmf[pCmf];
+            var deltaIdx = idx - runPrevIdx;
+            var prevLagidxMod = runPrevIdx - runPrevBlk * blocksize;
+            var deltaRangeStart = -prevLagidxMod + deltaBlk * blocksize;
+            var pCmf = deltaRangeStart + 2 * blocksize - 1;
+            var ix = deltaIdx - deltaRangeStart;
+            var base = deltaLagCmf[pCmf];
             nBits += encodeWrap(
                     deltaLagCmf[pCmf + ix] - base,
                     deltaLagCmf[pCmf + ix + 1] - base,
@@ -1230,8 +1231,8 @@ public final class OpenLoopPitch {
      * @return the estimated bit cost
      */
     private static float encodeWrap(int fl, int fh, int ft) {
-        float num = (float) (fh - fl);
-        float den = (float) ft;
+        var num = (float) (fh - fl);
+        var den = (float) ft;
         return -log2f(num / den);
     }
 
@@ -1269,44 +1270,44 @@ public final class OpenLoopPitch {
      */
     private static float spectralHarmonicity(float avgLag, float[] f2w, float[] cache, boolean resetCache) {
         if (resetCache) {
-            for (int i = 0; i < cache.length; i++) {
+            for (var i = 0; i < cache.length; i++) {
                 cache[i] = HARMONICITY_UNDEF;
             }
         }
-        float invF2StepHz = 2 * (F_LEN - 1) / 16000.0f;
-        float harmHz = 16000 / avgLag;
-        int harmIx = (int) rintf(harmHz * 2 * invF2StepHz);
+        var invF2StepHz = 2 * (F_LEN - 1) / 16000.0f;
+        var harmHz = 16000 / avgLag;
+        var harmIx = (int) rintf(harmHz * 2 * invF2StepHz);
         if (cache[harmIx] > HARMONICITY_UNDEF) {
             return cache[harmIx];
         }
-        float harmWidth = harmHz * invF2StepHz;
-        float harmStrength = 0.1f;
+        var harmWidth = harmHz * invF2StepHz;
+        var harmStrength = 0.1f;
         if (harmWidth > 1.97f) {
-            float[] peakValleyMags = new float[2 * NUM_HARMS + 1];
-            float[] weights = new float[20];
-            for (int numHarm = 0; numHarm <= NUM_HARMS * 2; numHarm++) {
-                float ixStart = 0.5f * numHarm * harmWidth;
-                float ixEnd = ixStart + harmWidth;
-                int idxStart = (int) Math.ceil(ixStart);
-                int idxEnd = (int) Math.floor(ixEnd);
-                int weightsLen = idxEnd - idxStart + 1;
-                float invHarmWidth = avgLag * ((1.0f / invF2StepHz) / 16000.0f);
-                for (int i = 0; i < weightsLen; i++) {
-                    float t = (idxStart - ixStart + i) * invHarmWidth;
-                    float tmp = t * (1.0f - t);
+            var peakValleyMags = new float[2 * NUM_HARMS + 1];
+            var weights = new float[20];
+            for (var numHarm = 0; numHarm <= NUM_HARMS * 2; numHarm++) {
+                var ixStart = 0.5f * numHarm * harmWidth;
+                var ixEnd = ixStart + harmWidth;
+                var idxStart = (int) Math.ceil(ixStart);
+                var idxEnd = (int) Math.floor(ixEnd);
+                var weightsLen = idxEnd - idxStart + 1;
+                var invHarmWidth = avgLag * ((1.0f / invF2StepHz) / 16000.0f);
+                for (var i = 0; i < weightsLen; i++) {
+                    var t = (idxStart - ixStart + i) * invHarmWidth;
+                    var tmp = t * (1.0f - t);
                     weights[i] = tmp * tmp;
                 }
-                float peakValleyNrg = dotProd(f2w, idxStart, weights, 0, weightsLen) / sumVec(weights, weightsLen);
+                var peakValleyNrg = dotProd(f2w, idxStart, weights, 0, weightsLen) / sumVec(weights, weightsLen);
                 peakValleyMags[numHarm] = (float) Math.sqrt(peakValleyNrg + 1e-30f);
             }
-            float[] magWeights = new float[NUM_HARMS];
-            float[] magRatiosLog = new float[NUM_HARMS];
-            for (int numHarm = 0; numHarm < NUM_HARMS; numHarm++) {
-                float p0 = peakValleyMags[2 * numHarm];
-                float p1 = peakValleyMags[2 * numHarm + 1];
-                float p2 = peakValleyMags[2 * numHarm + 2];
-                float magPeak = (p2 + p0) + MAG_PEAK_WEIGHTS[1] * p1;
-                float magValley = ((p1 + p1) + MAG_VALLEY_WEIGHTS[0] * p0) + MAG_VALLEY_WEIGHTS[2] * p2;
+            var magWeights = new float[NUM_HARMS];
+            var magRatiosLog = new float[NUM_HARMS];
+            for (var numHarm = 0; numHarm < NUM_HARMS; numHarm++) {
+                var p0 = peakValleyMags[2 * numHarm];
+                var p1 = peakValleyMags[2 * numHarm + 1];
+                var p2 = peakValleyMags[2 * numHarm + 2];
+                var magPeak = (p2 + p0) + MAG_PEAK_WEIGHTS[1] * p1;
+                var magValley = ((p1 + p1) + MAG_VALLEY_WEIGHTS[0] * p0) + MAG_VALLEY_WEIGHTS[2] * p2;
                 magRatiosLog[numHarm] = logf(magPeak / magValley);
                 magWeights[numHarm] = (float) Math.sqrt(magPeak + magValley + 1e-30f);
             }
@@ -1393,18 +1394,18 @@ public final class OpenLoopPitch {
      */
     private static void hpAr1(float[] x, int xOff, int n, float ar1, float[] state, int stateOff,
                               float[] y, int yOff) {
-        float ar12 = ar1 * ar1;
-        float ar13 = ar1 * ar12;
-        float ar14 = ar1 * ar13;
-        float ar15 = ar1 * ar14;
-        float yt = state[stateOff];
-        int k = 0;
+        var ar12 = ar1 * ar1;
+        var ar13 = ar1 * ar12;
+        var ar14 = ar1 * ar13;
+        var ar15 = ar1 * ar14;
+        var yt = state[stateOff];
+        var k = 0;
         for (; k < n - 4; k += 5) {
-            float x0 = x[xOff + k];
-            float x1 = x[xOff + k + 1];
-            float x2 = x[xOff + k + 2];
-            float x3 = x[xOff + k + 3];
-            float x4 = x[xOff + k + 4];
+            var x0 = x[xOff + k];
+            var x1 = x[xOff + k + 1];
+            var x2 = x[xOff + k + 2];
+            var x3 = x[xOff + k + 3];
+            var x4 = x[xOff + k + 4];
             y[yOff + k + 4] = ((x4 + ar15 * yt) + ar13 * x1) + ((ar1 * x3 + ar12 * x2) + ar14 * x0);
             y[yOff + k] = x0 + ar1 * yt;
             y[yOff + k + 1] = (x1 + ar12 * yt) + ar1 * x0;
@@ -1452,19 +1453,19 @@ public final class OpenLoopPitch {
      * @return the float inner product
      */
     private static float dotProd4Wide(float[] a, int aOff, float[] b, int bOff, int n) {
-        float l0 = 0.0f;
-        float l1 = 0.0f;
-        float l2 = 0.0f;
-        float l3 = 0.0f;
-        int n4 = n & ~3;
-        for (int i = 0; i < n4; i += 4) {
+        var l0 = 0.0f;
+        var l1 = 0.0f;
+        var l2 = 0.0f;
+        var l3 = 0.0f;
+        var n4 = n & ~3;
+        for (var i = 0; i < n4; i += 4) {
             l0 += a[aOff + i] * b[bOff + i];
             l1 += a[aOff + i + 1] * b[bOff + i + 1];
             l2 += a[aOff + i + 2] * b[bOff + i + 2];
             l3 += a[aOff + i + 3] * b[bOff + i + 3];
         }
-        float sum = (l0 + l2) + (l1 + l3);
-        for (int i = n4; i < n; i++) {
+        var sum = (l0 + l2) + (l1 + l3);
+        for (var i = n4; i < n; i++) {
             sum += a[aOff + i] * b[bOff + i];
         }
         return sum;
@@ -1486,12 +1487,12 @@ public final class OpenLoopPitch {
      * @return the float inner product over 20 taps
      */
     private static float dotProd20(float[] a, int aOff, float[] b, int bOff) {
-        float[] p0 = vmul(a, aOff, b, bOff);
-        float[] p1 = vmul(a, aOff + 4, b, bOff + 4);
-        float[] p2 = vmul(a, aOff + 8, b, bOff + 8);
-        float[] p3 = vmul(a, aOff + 12, b, bOff + 12);
-        float[] p4 = vmul(a, aOff + 16, b, bOff + 16);
-        float[] x = vadd(vadd(vadd(p0, p1), p4), vadd(p2, p3));
+        var p0 = vmul(a, aOff, b, bOff);
+        var p1 = vmul(a, aOff + 4, b, bOff + 4);
+        var p2 = vmul(a, aOff + 8, b, bOff + 8);
+        var p3 = vmul(a, aOff + 12, b, bOff + 12);
+        var p4 = vmul(a, aOff + 16, b, bOff + 16);
+        var x = vadd(vadd(vadd(p0, p1), p4), vadd(p2, p3));
         return (x[0] + x[2]) + (x[1] + x[3]);
     }
 
@@ -1513,19 +1514,19 @@ public final class OpenLoopPitch {
      * @return the float inner product over 40 taps
      */
     private static float dotProd40(float[] a, int aOff, float[] b, int bOff) {
-        float[] p0 = vmul(a, aOff, b, bOff);
-        float[] p1 = vmul(a, aOff + 4, b, bOff + 4);
-        float[] p2 = vmul(a, aOff + 8, b, bOff + 8);
-        float[] p3 = vmul(a, aOff + 12, b, bOff + 12);
-        float[] p4 = vmul(a, aOff + 16, b, bOff + 16);
-        float[] p5 = vmul(a, aOff + 20, b, bOff + 20);
-        float[] p6 = vmul(a, aOff + 24, b, bOff + 24);
-        float[] p7 = vmul(a, aOff + 28, b, bOff + 28);
-        float[] p8 = vmul(a, aOff + 32, b, bOff + 32);
-        float[] p9 = vmul(a, aOff + 36, b, bOff + 36);
-        float[] left = vadd(vadd(vadd(p3, p4), p7), vadd(vadd(p5, p6), p9));
-        float[] right = vadd(vadd(vadd(p1, p2), p8), p0);
-        float[] x = vadd(left, right);
+        var p0 = vmul(a, aOff, b, bOff);
+        var p1 = vmul(a, aOff + 4, b, bOff + 4);
+        var p2 = vmul(a, aOff + 8, b, bOff + 8);
+        var p3 = vmul(a, aOff + 12, b, bOff + 12);
+        var p4 = vmul(a, aOff + 16, b, bOff + 16);
+        var p5 = vmul(a, aOff + 20, b, bOff + 20);
+        var p6 = vmul(a, aOff + 24, b, bOff + 24);
+        var p7 = vmul(a, aOff + 28, b, bOff + 28);
+        var p8 = vmul(a, aOff + 32, b, bOff + 32);
+        var p9 = vmul(a, aOff + 36, b, bOff + 36);
+        var left = vadd(vadd(vadd(p3, p4), p7), vadd(vadd(p5, p6), p9));
+        var right = vadd(vadd(vadd(p1, p2), p8), p0);
+        var x = vadd(left, right);
         return (x[0] + x[2]) + (x[1] + x[3]);
     }
 
@@ -1545,19 +1546,19 @@ public final class OpenLoopPitch {
      * @return the float self energy over 40 taps
      */
     private static float dotProd40Self(float[] a, int off) {
-        float[] p0 = vmul(a, off, a, off);
-        float[] p1 = vmul(a, off + 4, a, off + 4);
-        float[] p2 = vmul(a, off + 8, a, off + 8);
-        float[] p3 = vmul(a, off + 12, a, off + 12);
-        float[] p4 = vmul(a, off + 16, a, off + 16);
-        float[] p5 = vmul(a, off + 20, a, off + 20);
-        float[] p6 = vmul(a, off + 24, a, off + 24);
-        float[] p7 = vmul(a, off + 28, a, off + 28);
-        float[] p8 = vmul(a, off + 32, a, off + 32);
-        float[] p9 = vmul(a, off + 36, a, off + 36);
-        float[] left = vadd(vadd(vadd(p0, p1), p6), p9);
-        float[] right = vadd(vadd(vadd(p2, p3), p7), vadd(vadd(p4, p5), p8));
-        float[] x = vadd(left, right);
+        var p0 = vmul(a, off, a, off);
+        var p1 = vmul(a, off + 4, a, off + 4);
+        var p2 = vmul(a, off + 8, a, off + 8);
+        var p3 = vmul(a, off + 12, a, off + 12);
+        var p4 = vmul(a, off + 16, a, off + 16);
+        var p5 = vmul(a, off + 20, a, off + 20);
+        var p6 = vmul(a, off + 24, a, off + 24);
+        var p7 = vmul(a, off + 28, a, off + 28);
+        var p8 = vmul(a, off + 32, a, off + 32);
+        var p9 = vmul(a, off + 36, a, off + 36);
+        var left = vadd(vadd(vadd(p0, p1), p6), p9);
+        var right = vadd(vadd(vadd(p2, p3), p7), vadd(vadd(p4, p5), p8));
+        var x = vadd(left, right);
         return (x[0] + x[2]) + (x[1] + x[3]);
     }
 
@@ -1602,21 +1603,21 @@ public final class OpenLoopPitch {
      * @return the float window sum
      */
     private static float sumVec(float[] x, int len) {
-        float seed = x[0];
-        int m = len - 1;
-        int m4 = m & ~3;
-        float l0 = 0.0f;
-        float l1 = 0.0f;
-        float l2 = 0.0f;
-        float l3 = 0.0f;
-        for (int i = 0; i < m4; i += 4) {
+        var seed = x[0];
+        var m = len - 1;
+        var m4 = m & ~3;
+        var l0 = 0.0f;
+        var l1 = 0.0f;
+        var l2 = 0.0f;
+        var l3 = 0.0f;
+        for (var i = 0; i < m4; i += 4) {
             l0 += x[1 + i];
             l1 += x[1 + i + 1];
             l2 += x[1 + i + 2];
             l3 += x[1 + i + 3];
         }
-        float sum = seed + ((l0 + l2) + (l1 + l3));
-        for (int i = 1 + m4; i < len; i++) {
+        var sum = seed + ((l0 + l2) + (l1 + l3));
+        for (var i = 1 + m4; i < len; i++) {
             sum += x[i];
         }
         return sum;
@@ -1629,7 +1630,7 @@ public final class OpenLoopPitch {
      * @param len the window length
      */
     private static void sqrtVec(float[] x, int len) {
-        for (int i = 0; i < len; i++) {
+        for (var i = 0; i < len; i++) {
             x[i] = (float) Math.sqrt(x[i]);
         }
     }
@@ -1643,8 +1644,8 @@ public final class OpenLoopPitch {
      * @return the float maximum
      */
     private static float maximum(float[] x, int off, int len) {
-        float xMax = x[off];
-        for (int i = 1; i < len; i++) {
+        var xMax = x[off];
+        for (var i = 1; i < len; i++) {
             if (x[off + i] > xMax) {
                 xMax = x[off + i];
             }
@@ -1664,32 +1665,32 @@ public final class OpenLoopPitch {
      * @return the index of the maximum
      */
     private static int getMaxi(float[] x, int xLen) {
-        float[] buf = new float[160];
-        int numHalves = 0;
-        int len = (xLen + 1) >> 1;
-        for (int n = 0; n < xLen - len; n++) {
+        var buf = new float[160];
+        var numHalves = 0;
+        var len = (xLen + 1) >> 1;
+        for (var n = 0; n < xLen - len; n++) {
             buf[n] = Math.max(x[n], x[n + len]);
         }
         buf[xLen - len] = x[xLen - len];
-        int bufPtr = 0;
+        var bufPtr = 0;
         while ((len & 1) == 0) {
             bufPtr += len;
             len >>= 1;
-            for (int n = 0; n < len; n++) {
+            for (var n = 0; n < len; n++) {
                 buf[bufPtr + n] = Math.max(buf[bufPtr - 2 * len + n], buf[bufPtr - len + n]);
             }
             numHalves++;
         }
-        int i = 0;
-        float maxtmp = buf[bufPtr];
-        for (int n = 1; n < len; n++) {
-            float xtmp = buf[bufPtr + n];
+        var i = 0;
+        var maxtmp = buf[bufPtr];
+        for (var n = 1; n < len; n++) {
+            var xtmp = buf[bufPtr + n];
             if (xtmp > maxtmp) {
                 maxtmp = xtmp;
                 i = n;
             }
         }
-        for (int n = 0; n < numHalves; n++) {
+        for (var n = 0; n < numHalves; n++) {
             bufPtr -= 2 * len;
             if (buf[bufPtr + i] < buf[bufPtr + i + len]) {
                 i += len;
@@ -1716,36 +1717,36 @@ public final class OpenLoopPitch {
      * @return the {@code k} indices of the highest values, in extraction order
      */
     private static int[] getMaxiK(float[] x, int xLen, int k) {
-        int[] idx = new int[k];
-        float[] buf = new float[2 * xLen + 2];
-        byte[] flags = new byte[xLen / 2 + 1];
-        int[] is = new int[16];
-        int numHalves = 0;
-        int len = (xLen + 1) >> 1;
-        int bufPtr = 0;
-        for (int n = 0; n < xLen - len; n++) {
+        var idx = new int[k];
+        var buf = new float[2 * xLen + 2];
+        var flags = new byte[xLen / 2 + 1];
+        var is = new int[16];
+        var numHalves = 0;
+        var len = (xLen + 1) >> 1;
+        var bufPtr = 0;
+        for (var n = 0; n < xLen - len; n++) {
             buf[n] = Math.max(x[n], x[n + len]);
         }
         buf[xLen - len] = x[xLen - len];
         while ((len & 1) == 0) {
             bufPtr += len;
             len >>= 1;
-            for (int n = 0; n < len; n++) {
+            for (var n = 0; n < len; n++) {
                 buf[bufPtr + n] = Math.max(buf[bufPtr - 2 * len + n], buf[bufPtr - len + n]);
             }
             numHalves++;
         }
-        for (int kk = 0; kk < k; kk++) {
-            int i = 0;
-            float maxtmp = buf[bufPtr];
-            for (int n = 1; n < len; n++) {
-                float xtmp = buf[bufPtr + n];
+        for (var kk = 0; kk < k; kk++) {
+            var i = 0;
+            var maxtmp = buf[bufPtr];
+            for (var n = 1; n < len; n++) {
+                var xtmp = buf[bufPtr + n];
                 if (xtmp > maxtmp) {
                     maxtmp = xtmp;
                     i = n;
                 }
             }
-            for (int n = 0; n < numHalves; n++) {
+            for (var n = 0; n < numHalves; n++) {
                 is[n] = i;
                 bufPtr -= 2 * len;
                 if (buf[bufPtr + i] < buf[bufPtr + i + len]) {
@@ -1753,8 +1754,8 @@ public final class OpenLoopPitch {
                 }
                 len <<= 1;
             }
-            float xtmp = -Float.MAX_VALUE;
-            int iFinal = i;
+            var xtmp = -Float.MAX_VALUE;
+            var iFinal = i;
             if (i + len < xLen) {
                 if (flags[i]++ == 0) {
                     if (x[i] < x[i + len]) {
@@ -1774,7 +1775,7 @@ public final class OpenLoopPitch {
                 return idx;
             }
             buf[bufPtr + i] = xtmp;
-            for (int n = numHalves - 1; n >= 0; n--) {
+            for (var n = numHalves - 1; n >= 0; n--) {
                 i = is[n];
                 len >>= 1;
                 buf[bufPtr + i + 2 * len] = Math.max(buf[bufPtr + i], buf[bufPtr + i + len]);
@@ -1899,39 +1900,39 @@ public final class OpenLoopPitch {
      * @return {@code logf(x)} in single precision
      */
     private static float logf(float x) {
-        int bits = Float.floatToRawIntBits(x);
+        var bits = Float.floatToRawIntBits(x);
         if ((bits & 0x7fffffff) >= 0x7f800000 || x <= 0.0f) {
             return (float) Math.log(x);
         }
-        float diff = x - 1.0f;
-        float absDiff = Float.intBitsToFloat(Float.floatToRawIntBits(diff) & 0x7fffffff);
+        var diff = x - 1.0f;
+        var absDiff = Float.intBitsToFloat(Float.floatToRawIntBits(diff) & 0x7fffffff);
         if (absDiff < 0.0625f) {
-            float s = diff / (2.0f + diff);
-            float diffTimesS = diff * s;
-            float twoS = s + s;
-            float twoSSquared = twoS * twoS;
-            float twoSCubed = twoS * twoSSquared;
-            float poly = twoSSquared * 0.012500000186264515f;
+            var s = diff / (2.0f + diff);
+            var diffTimesS = diff * s;
+            var twoS = s + s;
+            var twoSSquared = twoS * twoS;
+            var twoSCubed = twoS * twoSSquared;
+            var poly = twoSSquared * 0.012500000186264515f;
             poly = poly + 0.0833333358168602f;
             poly = poly * twoSCubed;
             poly = poly - diffTimesS;
             return diff + poly;
         }
-        float exponent = (float) ((bits >>> 23) - 0x7f);
-        int combined = (bits & 0x7f0000) + ((bits & 0x8000) << 1);
-        int idx = combined >>> 16;
-        float mantissa = Float.intBitsToFloat((bits & 0x7fffff) | 0x3f000000);
-        float reduced = Float.intBitsToFloat(combined | 0x3f000000) - mantissa;
+        var exponent = (float) ((bits >>> 23) - 0x7f);
+        var combined = (bits & 0x7f0000) + ((bits & 0x8000) << 1);
+        var idx = combined >>> 16;
+        var mantissa = Float.intBitsToFloat((bits & 0x7fffff) | 0x3f000000);
+        var reduced = Float.intBitsToFloat(combined | 0x3f000000) - mantissa;
         reduced = reduced * Float.intBitsToFloat(LOGF_RECIP[idx]);
-        float poly = reduced * 0.3333333432674408f;
-        float reducedSquared = reduced * reduced;
+        var poly = reduced * 0.3333333432674408f;
+        var reducedSquared = reduced * reduced;
         poly = poly + 0.5f;
         poly = poly * reducedSquared;
-        float mantissaLog = reduced + poly;
-        float low = 3.194618329871446e-05f * exponent;
+        var mantissaLog = reduced + poly;
+        var low = 3.194618329871446e-05f * exponent;
         low = low - mantissaLog;
         low = low + Float.intBitsToFloat(LOGF_LO[idx]);
-        float high = 0.693115234375f * exponent;
+        var high = 0.693115234375f * exponent;
         high = high + Float.intBitsToFloat(LOGF_HI[idx]);
         return high + low;
     }

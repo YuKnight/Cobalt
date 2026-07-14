@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.encode.LsfQuantiz
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Short term analysis front end of the MLow speech encoder, chaining the linear prediction analysis and the
@@ -122,7 +123,7 @@ public final class EncodeFrontEnd {
      * stream, which must thread the carry.
      */
     public void reset() {
-        java.util.Arrays.fill(previousLsf, 0.0f);
+        Arrays.fill(previousLsf, 0.0f);
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "encode front end reset");
         }
@@ -151,7 +152,7 @@ public final class EncodeFrontEnd {
     public FrameResult process(float[] lookback, int offset, boolean longWindow, boolean condCoding,
                                int surv, float rdwAdj, int voiced, int lowRate) {
         analysis.window(lookback, offset, longWindow, windowed);
-        LpcAnalysis.Result lpc = analysis.analyze(windowed);
+        var lpc = analysis.analyze(windowed);
 
         QuantizedLsf quant;
         if (condCoding) {

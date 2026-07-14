@@ -1,10 +1,12 @@
 package com.github.auties00.cobalt.calls.media.audio.codec.mlow;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
+import com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.LpcInterpolator;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.MiscTables;
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * The MLow packet loss concealment (PLC) and comfort noise generation (CNG) state machine for the low band
@@ -282,29 +284,29 @@ public final class MlowPlc {
         tocSid = false;
         randSeed = 0;
         smthState = 0.0f;
-        java.util.Arrays.fill(acbBuf, 0.0f);
-        java.util.Arrays.fill(excNrgBuf, 0.0f);
-        java.util.Arrays.fill(lagBuf, 0.0f);
+        Arrays.fill(acbBuf, 0.0f);
+        Arrays.fill(excNrgBuf, 0.0f);
+        Arrays.fill(lagBuf, 0.0f);
         lossLenMs = 0;
         comfSigRatio = 0.0f;
         recoveryLenMs = 0;
-        java.util.Arrays.fill(aLast, 0.0f);
+        Arrays.fill(aLast, 0.0f);
         voicedLast = false;
         nrgLast = 0.0f;
         voiced = false;
         lastSubfrPulses = 0;
         lastFcbIdx = 0;
-        java.util.Arrays.fill(lsf, 0.0f);
-        java.util.Arrays.fill(a, 0.0f);
+        Arrays.fill(lsf, 0.0f);
+        Arrays.fill(a, 0.0f);
         preciseLag = 0.0f;
         excAttenuation = 1.0f;
-        java.util.Arrays.fill(cngStateLb, 0.0f);
-        java.util.Arrays.fill(cngNrgLb, 0.0f);
-        java.util.Arrays.fill(cngFrameNrg, 0.0f);
-        for (float[] row : cngLsfsLb) {
-            java.util.Arrays.fill(row, 0.0f);
+        Arrays.fill(cngStateLb, 0.0f);
+        Arrays.fill(cngNrgLb, 0.0f);
+        Arrays.fill(cngFrameNrg, 0.0f);
+        for (var row : cngLsfsLb) {
+            Arrays.fill(row, 0.0f);
         }
-        java.util.Arrays.fill(cngLbDelayBuf, 0.0f);
+        Arrays.fill(cngLbDelayBuf, 0.0f);
         cngStateEmph[0] = 0.0f;
         cngRandSeed = 0;
         // prime the initial comfort noise candidate as a fresh construction does
@@ -355,20 +357,20 @@ public final class MlowPlc {
         preciseLag = lags[lagsPerFrame - 1];
 
         if (lossCountSubfr > 0 || tocSid) {
-            int numElems = MAX_PITCH_LAG / fcbSubfrlen;
-            java.util.Arrays.fill(acbBuf, 0, numElems, 0.0f);
-            java.util.Arrays.fill(excNrgBuf, 0, numElems, 0.0f);
-            java.util.Arrays.fill(lagBuf, 0, 2 * numElems, 0.0f);
+            var numElems = MAX_PITCH_LAG / fcbSubfrlen;
+            Arrays.fill(acbBuf, 0, numElems, 0.0f);
+            Arrays.fill(excNrgBuf, 0, numElems, 0.0f);
+            Arrays.fill(lagBuf, 0, 2 * numElems, 0.0f);
         }
 
-        int bufLeft = 2 * MAX_PITCH_LAG / LAG_SUBFRLEN - lagsPerFrame;
+        var bufLeft = 2 * MAX_PITCH_LAG / LAG_SUBFRLEN - lagsPerFrame;
         System.arraycopy(lagBuf, lagsPerFrame, lagBuf, 0, bufLeft);
         System.arraycopy(lags, 0, lagBuf, bufLeft, lagsPerFrame);
 
-        int toAdd = Math.min(numSubframes, MAX_PITCH_LAG / fcbSubfrlen);
+        var toAdd = Math.min(numSubframes, MAX_PITCH_LAG / fcbSubfrlen);
         bufLeft = MAX_PITCH_LAG / fcbSubfrlen - toAdd;
         System.arraycopy(acbBuf, toAdd, acbBuf, 0, bufLeft);
-        for (int i = 0; i < toAdd; i++) {
+        for (var i = 0; i < toAdd; i++) {
             acbBuf[bufLeft + i] = limitAcbgains(acbGains, i * ACBG_M, fcbSubfrlen);
         }
     }
@@ -381,7 +383,7 @@ public final class MlowPlc {
      * @param subfrlen the subframe length in samples
      */
     public void updateNrg(float resNrg, int subfrlen) {
-        int len = MAX_PITCH_LAG / subfrlen;
+        var len = MAX_PITCH_LAG / subfrlen;
         System.arraycopy(excNrgBuf, 1, excNrgBuf, 0, len - 1);
         excNrgBuf[len - 1] = resNrg;
     }
@@ -402,29 +404,29 @@ public final class MlowPlc {
             return;
         }
         if (subVoiced) {
-            float tgtNrg = nrg(resLpc, off, subfrlen);
-            float[] noise = new float[subfrlen];
+            var tgtNrg = nrg(resLpc, off, subfrlen);
+            var noise = new float[subfrlen];
             genRandPulses(noise, subfrlen);
 
             // modulate the random pulses by the excitation envelope: the envelope times noise product lands in
             // scratch, then the moving average high pass filters that product back into noise
-            float[] scratch = new float[subfrlen];
+            var scratch = new float[subfrlen];
             getEnv(resLpc, off, subfrlen, PLC_INJECT_SMTH, scratch);
-            for (int i = 0; i < subfrlen; i++) {
+            for (var i = 0; i < subfrlen; i++) {
                 scratch[i] *= noise[i];
             }
 
-            float[] tempState = {0.0f};
+            var tempState = new float[]{0.0f};
             Filters.ma1(scratch, 0, subfrlen, PLC_INJECT_COEF, tempState, 0, noise, 0);
-            float nrgRatio = (float) Math.sqrt(tgtNrg / (nrg(noise, 0, subfrlen) + 1.0e-30f));
-            float scale = nrgRatio * PLC_INJECT_GAIN;
-            for (int i = 0; i < subfrlen; i++) {
+            var nrgRatio = (float) Math.sqrt(tgtNrg / (nrg(noise, 0, subfrlen) + 1.0e-30f));
+            var scale = nrgRatio * PLC_INJECT_GAIN;
+            for (var i = 0; i < subfrlen; i++) {
                 noise[i] *= scale;
                 resLpc[off + i] += noise[i];
             }
         } else {
             excAttenuation *= subfrlen == MIN_SF_LEN ? PLC_EXC_ATTEN : PLC_EXC_ATTEN * PLC_EXC_ATTEN;
-            for (int i = 0; i < subfrlen; i++) {
+            for (var i = 0; i < subfrlen; i++) {
                 resLpc[off + i] *= excAttenuation;
             }
         }
@@ -449,12 +451,12 @@ public final class MlowPlc {
             LOGGER.log(Level.TRACE, "calls mlow plc: concealing frame, subframes={0} voiced={1} lossCount={2}",
                     numSubframes, voiced, lossCountSubfr);
         }
-        int lenBuffers = MAX_PITCH_LAG / subfrlen;
-        int nPulses = lastSubfrPulses * numSubframes;
-        float subfrlenComp = (float) subfrlen / MIN_SF_LEN;
-        int lagsPerSubframe = subfrlen / LAG_SUBFRLEN;
+        var lenBuffers = MAX_PITCH_LAG / subfrlen;
+        var nPulses = lastSubfrPulses * numSubframes;
+        var subfrlenComp = (float) subfrlen / MIN_SF_LEN;
+        var lagsPerSubframe = subfrlen / LAG_SUBFRLEN;
 
-        for (int i = 0; i < numSubframes; i++) {
+        for (var i = 0; i < numSubframes; i++) {
             lossCountSubfr += 1;
 
             bweExpand(a, 0, LPC_ORDER, (float) Math.pow(voiced ? PLC_BWE_V : PLC_BWE_UV, subfrlenComp));
@@ -463,33 +465,33 @@ public final class MlowPlc {
             System.arraycopy(lsf, 0, lsfsOut, i * LPC_ORDER, LPC_ORDER);
 
             preciseLag = Math.min(preciseLag * (float) Math.pow(PLC_LAG_DRIFT, subfrlenComp), MAX_PITCH_LAG);
-            float lagRounded = roundTo(preciseLag, 0.5f, 0.0f);
-            for (int j = 0; j < lagsPerSubframe; j++) {
+            var lagRounded = roundTo(preciseLag, 0.5f, 0.0f);
+            for (var j = 0; j < lagsPerSubframe; j++) {
                 lagsOut[i * lagsPerSubframe + j] = lagRounded;
             }
 
             if (voiced) {
-                int preciseLagSpan = (int) Math.ceil(preciseLag / (float) subfrlen);
-                int highestNrgIdx = 0;
-                float highestNrg = -1.0f;
-                for (int j = lenBuffers - preciseLagSpan; j < lenBuffers; j++) {
+                var preciseLagSpan = (int) Math.ceil(preciseLag / (float) subfrlen);
+                var highestNrgIdx = 0;
+                var highestNrg = -1.0f;
+                for (var j = lenBuffers - preciseLagSpan; j < lenBuffers; j++) {
                     if (excNrgBuf[j] > highestNrg) {
                         highestNrg = excNrgBuf[j];
                         highestNrgIdx = j;
                     }
                 }
-                float gain = acbBuf[highestNrgIdx];
-                float lateAtten = PLC_LATE_ATTEN_SCALE
-                        * sigmoid((-lossCountSubfr + PLC_LATE_ATTEN_OFFSET) * PLC_LATE_ATTEN_SHAPE)
-                        + (1.0f - PLC_LATE_ATTEN_SCALE);
+                var gain = acbBuf[highestNrgIdx];
+                var lateAtten = PLC_LATE_ATTEN_SCALE
+                                * sigmoid((-lossCountSubfr + PLC_LATE_ATTEN_OFFSET) * PLC_LATE_ATTEN_SHAPE)
+                                + (1.0f - PLC_LATE_ATTEN_SCALE);
                 gain *= (float) Math.pow(lateAtten, subfrlenComp);
                 if (lossCountSubfr <= PLC_EARLY_ATTEN_MS * 16 / subfrlen) {
-                    float alpha = (float) lossCountSubfr * subfrlen / (PLC_EARLY_ATTEN_MS * 16.0f);
+                    var alpha = (float) lossCountSubfr * subfrlen / (PLC_EARLY_ATTEN_MS * 16.0f);
                     alpha = (float) Math.pow(alpha, PLC_EARLY_ATTEN_POW);
                     gain = (float) Math.pow(PLC_EARLY_ATTEN_GAIN, subfrlenComp) * (1 - alpha) + gain * alpha;
                 }
                 acbGainsOut[i * ACBG_M] = gain;
-                for (int j = 1; j < ACBG_M; j++) {
+                for (var j = 1; j < ACBG_M; j++) {
                     acbGainsOut[i * ACBG_M + j] = 0.0f;
                 }
             }
@@ -508,13 +510,13 @@ public final class MlowPlc {
         if (!voiced) {
             return;
         }
-        int acbStateLen = 2 * MAX_PITCH_LAG + LTP_INTERPOL_DELAY;
-        int acbEnd = acbStateLen;
+        var acbStateLen = 2 * MAX_PITCH_LAG + LTP_INTERPOL_DELAY;
+        var acbEnd = acbStateLen;
 
-        int ceilLag = (int) Math.ceil(lag);
-        int pitchCycle1 = acbEnd - ceilLag;
-        float[] pitchCycle2 = new float[MAX_PITCH_LAG];
-        int doubleLag = (int) (2.0f * lag);
+        var ceilLag = (int) Math.ceil(lag);
+        var pitchCycle1 = acbEnd - ceilLag;
+        var pitchCycle2 = new float[MAX_PITCH_LAG];
+        var doubleLag = (int) (2.0f * lag);
         if ((float) Math.floor(lag) == lag) {
             System.arraycopy(acbState, acbEnd - doubleLag, pitchCycle2, 0, (int) lag);
         } else {
@@ -522,17 +524,17 @@ public final class MlowPlc {
                     INTERPOL_KERNEL);
         }
 
-        float lookback = 2.0f * lag / LAG_SUBFRLEN;
-        float lagInstability = 0.0f;
-        int lagBufLen = 2 * MAX_PITCH_LAG / LAG_SUBFRLEN;
-        for (int i = 0; i < (int) Math.floor(lookback); i++) {
+        var lookback = 2.0f * lag / LAG_SUBFRLEN;
+        var lagInstability = 0.0f;
+        var lagBufLen = 2 * MAX_PITCH_LAG / LAG_SUBFRLEN;
+        for (var i = 0; i < (int) Math.floor(lookback); i++) {
             lagInstability += Math.abs(lagBuf[lagBufLen - 1 - i] - lag);
         }
         lagInstability += Math.abs(lagBuf[lagBufLen - (int) Math.ceil(lookback)] - lag)
                 * (lookback - (float) Math.floor(lookback));
 
-        float ltpBlendCoef = sigmoid(PLC_BLEND_SHAPE * (lagInstability - PLC_BLEND_OFFSET)) / 2.0f;
-        for (int i = 0; i < ceilLag; i++) {
+        var ltpBlendCoef = sigmoid(PLC_BLEND_SHAPE * (lagInstability - PLC_BLEND_OFFSET)) / 2.0f;
+        for (var i = 0; i < ceilLag; i++) {
             acbState[acbStateLen - ceilLag + i] =
                     ltpBlendCoef * pitchCycle2[i] + (1.0f - ltpBlendCoef) * acbState[pitchCycle1 + i];
         }
@@ -594,23 +596,23 @@ public final class MlowPlc {
         if (!(frameVoiced && voicedLast)) {
             return;
         }
-        boolean lostPrevious = lossLenMs > 0;
-        boolean recoveryCont = recoveryLenMs > 0 && recoveryLenMs < RECOVER_LEN_MS;
+        var lostPrevious = lossLenMs > 0;
+        var recoveryCont = recoveryLenMs > 0 && recoveryLenMs < RECOVER_LEN_MS;
         if (lostPrevious) {
-            float[] impulse = new float[PLC_IMP_LEN + LPC_ORDER];
+            var impulse = new float[PLC_IMP_LEN + LPC_ORDER];
             impulse[LPC_ORDER] = 1.0f;
             Filters.ar16(impulse, LPC_ORDER, PLC_IMP_LEN, aLast, impulse, LPC_ORDER);
             nrgLast = nrg(impulse, LPC_ORDER, PLC_IMP_LEN);
         }
         if (lostPrevious || recoveryCont) {
-            float[] impulse = new float[PLC_IMP_LEN + LPC_ORDER];
+            var impulse = new float[PLC_IMP_LEN + LPC_ORDER];
             impulse[LPC_ORDER] = 1.0f;
             Filters.ar16(impulse, LPC_ORDER, PLC_IMP_LEN, a[numSubframes - 1], impulse, LPC_ORDER);
-            float postGain = nrg(impulse, LPC_ORDER, PLC_IMP_LEN);
+            var postGain = nrg(impulse, LPC_ORDER, PLC_IMP_LEN);
 
-            float logRatio = 0.5f * (float) Math.log10(postGain / (nrgLast + 1e-12f));
-            float bwe = 1.0f - (1.0f - RECOVER_MIN_BWE) * Math.max(Math.min(logRatio, 1.0f), 0.0f);
-            for (int s = 0; s < numSubframes; s++) {
+            var logRatio = 0.5f * (float) Math.log10(postGain / (nrgLast + 1e-12f));
+            var bwe = 1.0f - (1.0f - RECOVER_MIN_BWE) * Math.max(Math.min(logRatio, 1.0f), 0.0f);
+            for (var s = 0; s < numSubframes; s++) {
                 bweExpand(a[s], 0, LPC_ORDER, bwe);
             }
             recoveryLenMs += framelenMs;
@@ -640,13 +642,13 @@ public final class MlowPlc {
             return;
         }
 
-        int subfrIdx = 0;
-        float lowestNrgSubfr = 1e30f;
-        float nrgFrame = 0.0f;
-        float[] yEmph = new float[subfrlen];
-        for (int i = 0; i < numSubframes; i++) {
+        var subfrIdx = 0;
+        var lowestNrgSubfr = 1e30f;
+        var nrgFrame = 0.0f;
+        var yEmph = new float[subfrlen];
+        for (var i = 0; i < numSubframes; i++) {
             Filters.ma1(y, yOff + i * subfrlen, subfrlen, CNG_EMPH_COEF, cngStateEmph, 0, yEmph, 0);
-            float nrgSubfr = nrg(yEmph, 0, subfrlen);
+            var nrgSubfr = nrg(yEmph, 0, subfrlen);
             nrgFrame += nrgSubfr;
             if (nrgSubfr < lowestNrgSubfr) {
                 subfrIdx = i;
@@ -655,7 +657,7 @@ public final class MlowPlc {
         }
 
         if (!vad) {
-            int tail = cngCandidatesTail;
+            var tail = cngCandidatesTail;
             cngFrameNrg[tail] = nrgFrame;
             cngNrgLb[tail] = nrgres[subfrIdx] / (float) subfrlen;
             System.arraycopy(lsfs, LPC_ORDER * subfrIdx, cngLsfsLb[tail], 0, LPC_ORDER);
@@ -663,9 +665,9 @@ public final class MlowPlc {
             cngCandidatesTail = tail;
             cngNumCandidates = Math.min(cngNumCandidates + 1, CNG_NO_CANDIDATES);
 
-            float candidateLowestNrg = 1e30f;
-            int bestIdx = 0;
-            for (int i = 0; i < cngNumCandidates; i++) {
+            var candidateLowestNrg = 1e30f;
+            var bestIdx = 0;
+            for (var i = 0; i < cngNumCandidates; i++) {
                 if (cngFrameNrg[i] < candidateLowestNrg) {
                     candidateLowestNrg = cngFrameNrg[i];
                     bestIdx = i;
@@ -699,48 +701,48 @@ public final class MlowPlc {
      * @param lostFlag the loss flag of the packet
      */
     public void addComfortNoise(float[] y, int yOff, int yLen, int lostFlag) {
-        boolean isPlcFrame = lostFlag == FLAG_PACKET_LOST && !tocSid;
+        var isPlcFrame = lostFlag == FLAG_PACKET_LOST && !tocSid;
 
         if (isPlcFrame != isPlcFramePrev && Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "calls mlow plc: comfort noise {0} -> {1}", isPlcFramePrev, isPlcFrame);
         }
 
         if (isPlcFrame || isPlcFramePrev) {
-            float[] noiseBuf = new float[yLen + LPC_ORDER];
-            int noiseOff = LPC_ORDER;
+            var noiseBuf = new float[yLen + LPC_ORDER];
+            var noiseOff = LPC_ORDER;
             if (isPlcFrame) {
-                float[] filterA = new float[LPC_ORDER + 1];
+                var filterA = new float[LPC_ORDER + 1];
                 nlsf2aStabilize(cngLsfsLb[cngBestCandidateIdx], filterA);
-                float scale = (float) Math.sqrt(cngNrgLb[cngBestCandidateIdx] + 1e-30f);
+                var scale = (float) Math.sqrt(cngNrgLb[cngBestCandidateIdx] + 1e-30f);
                 genRandPulsesCng(noiseBuf, noiseOff, yLen);
-                for (int i = 0; i < yLen; i++) {
+                for (var i = 0; i < yLen; i++) {
                     noiseBuf[noiseOff + i] *= scale;
                 }
                 System.arraycopy(cngStateLb, 0, noiseBuf, noiseOff - LPC_ORDER, LPC_ORDER);
                 Filters.ar16(noiseBuf, noiseOff, yLen, filterA, noiseBuf, noiseOff);
                 System.arraycopy(noiseBuf, noiseOff + yLen - LPC_ORDER, cngStateLb, 0, LPC_ORDER);
             } else {
-                java.util.Arrays.fill(noiseBuf, noiseOff, noiseOff + yLen, 0.0f);
+                Arrays.fill(noiseBuf, noiseOff, noiseOff + yLen, 0.0f);
             }
 
-            float[] noiseOut = new float[yLen];
+            var noiseOut = new float[yLen];
             System.arraycopy(cngLbDelayBuf, 0, noiseOut, 0, TOT_POSTFILT_DELAY);
             System.arraycopy(noiseBuf, noiseOff, noiseOut, TOT_POSTFILT_DELAY, yLen - TOT_POSTFILT_DELAY);
             System.arraycopy(noiseBuf, noiseOff + yLen - TOT_POSTFILT_DELAY, cngLbDelayBuf, 0, TOT_POSTFILT_DELAY);
 
             if (lossLenMs == 0) {
-                for (int i = 0; i < TOT_POSTFILT_DELAY; i++) {
+                for (var i = 0; i < TOT_POSTFILT_DELAY; i++) {
                     noiseOut[TOT_POSTFILT_DELAY + i] *= (float) i * (1.0f / TOT_POSTFILT_DELAY);
                 }
             }
             if (lossLenMs > 0 && (lostFlag != FLAG_PACKET_LOST || tocSid)) {
-                for (int i = 0; i < TOT_POSTFILT_DELAY; i++) {
+                for (var i = 0; i < TOT_POSTFILT_DELAY; i++) {
                     noiseOut[i] *= 1.0f - (float) i * (1.0f / TOT_POSTFILT_DELAY);
                 }
             }
 
             comfSigRatio = nrg(noiseOut, 0, yLen) / (nrg(y, yOff, yLen) + 1e-12f);
-            for (int i = 0; i < yLen; i++) {
+            for (var i = 0; i < yLen; i++) {
                 y[yOff + i] += noiseOut[i];
             }
         } else {
@@ -770,9 +772,9 @@ public final class MlowPlc {
      * @return the clamped center tap gain
      */
     private float limitAcbgains(float[] acbGains, int off, int subfrlen) {
-        float ctrTap = 0.0f;
-        float subfrlenComp = (float) subfrlen / MIN_SF_LEN;
-        for (int i = 0; i < ACBG_M; i++) {
+        var ctrTap = 0.0f;
+        var subfrlenComp = (float) subfrlen / MIN_SF_LEN;
+        for (var i = 0; i < ACBG_M; i++) {
             ctrTap += acbGains[off + i] * ((i > 0 ? 1 : 0) + 1);
         }
         ctrTap = Math.abs(ctrTap);
@@ -790,8 +792,8 @@ public final class MlowPlc {
      * @return the energy
      */
     private static float nrg(float[] x, int off, int n) {
-        float sum = 0.0f;
-        for (int i = 0; i < n; i++) {
+        var sum = 0.0f;
+        for (var i = 0; i < n; i++) {
             sum += x[off + i] * x[off + i];
         }
         return sum;
@@ -808,16 +810,16 @@ public final class MlowPlc {
      */
     private void getEnv(float[] exc, int off, int len, float smthCoef, float[] env) {
         smthCoef *= smthCoef;
-        float state = smthState + 1e-8f;
+        var state = smthState + 1e-8f;
         state *= state;
-        float gainCoef = 1.0f - smthCoef;
-        float smthCoef2 = smthCoef * smthCoef;
-        float gainSmthCoef = gainCoef * smthCoef;
-        for (int i = 0; i < len - 3; i += 4) {
-            float tmp0 = exc[off + i] * exc[off + i] + exc[off + i + 1] * exc[off + i + 1];
-            float tmp1 = exc[off + i + 2] * exc[off + i + 2] + exc[off + i + 3] * exc[off + i + 3];
-            float y1 = gainCoef * tmp1 + gainSmthCoef * tmp0 + smthCoef2 * state;
-            float y0 = gainCoef * tmp0 + smthCoef * state;
+        var gainCoef = 1.0f - smthCoef;
+        var smthCoef2 = smthCoef * smthCoef;
+        var gainSmthCoef = gainCoef * smthCoef;
+        for (var i = 0; i < len - 3; i += 4) {
+            var tmp0 = exc[off + i] * exc[off + i] + exc[off + i + 1] * exc[off + i + 1];
+            var tmp1 = exc[off + i + 2] * exc[off + i + 2] + exc[off + i + 3] * exc[off + i + 3];
+            var y1 = gainCoef * tmp1 + gainSmthCoef * tmp0 + smthCoef2 * state;
+            var y0 = gainCoef * tmp0 + smthCoef * state;
             env[i] = env[i + 1] = (float) Math.sqrt(y0);
             env[i + 2] = env[i + 3] = (float) Math.sqrt(y1);
             state = y1;
@@ -857,7 +859,7 @@ public final class MlowPlc {
      * @return the LCG seed after generation
      */
     private static int genRandPulses(float[] out, int off, int len, int seed) {
-        int i = 0;
+        var i = 0;
         for (; i < len - 3; i += 4) {
             seed = RAND_INCREMENT + seed * RAND_MULTIPLIER;
             out[off + i] = RAND_SCALE * seed;
@@ -898,13 +900,13 @@ public final class MlowPlc {
      */
     private static void bweExpand(float[] filter, int off, int order, float bwe) {
         if (bwe <= 0.0f) {
-            for (int i = 1; i <= order; i++) {
+            for (var i = 1; i <= order; i++) {
                 filter[off + i] = 0.0f;
             }
             return;
         }
-        float c = bwe;
-        for (int i = 1; i <= order; i++) {
+        var c = bwe;
+        for (var i = 1; i <= order; i++) {
             filter[off + i] *= c;
             c *= bwe;
         }
@@ -940,7 +942,7 @@ public final class MlowPlc {
      * @param aOut  the LPC output, {@code LPC_ORDER + 1} entries with index zero the monic {@code 1.0f}
      */
     private static void nlsf2aStabilize(float[] lsfIn, float[] aOut) {
-        float[] result = com.github.auties00.cobalt.calls.media.audio.codec.mlow.lsf.LpcInterpolator.nlsf2aStabilize(lsfIn);
+        var result = LpcInterpolator.nlsf2aStabilize(lsfIn);
         System.arraycopy(result, 0, aOut, 0, LPC_ORDER + 1);
     }
 }

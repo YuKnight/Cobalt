@@ -649,7 +649,7 @@ final class StatusMessageSender extends MessageSender<ChatMessageInfo> {
      * Commits one
      * {@link com.github.auties00.cobalt.wam.event.PrekeysDepletionEvent} per
      * depleted one-time pre-key reported by the last
-     * {@link DeviceService#ensureSessions(java.util.Collection)} call.
+     * {@link DeviceService#ensureSessions(Collection)} call.
      *
      * <p>No-op when {@code depletedPrekeyCount} is not positive. The audience
      * size drives the {@code deviceSizeBucket} slot.

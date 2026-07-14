@@ -129,11 +129,11 @@ public final class PulseDecoder {
             boolean lowRate,
             boolean voiced,
             boolean codedAsActiveVoice) {
-        int subfrlen = framelen / nSubfr;
-        int voicedFlag = voiced ? 1 : 0;
-        int codedFlag = codedAsActiveVoice ? 1 : 0;
-        int maxPulses = MAX_PULSES_PER_FRAME[lowRate ? 1 : 0][codedFlag + voicedFlag] * framelen / MAX_PULSES_REF_FRAMELEN;
-        int maxSubfrPulses = maxPulses / nSubfr;
+        var subfrlen = framelen / nSubfr;
+        var voicedFlag = voiced ? 1 : 0;
+        var codedFlag = codedAsActiveVoice ? 1 : 0;
+        var maxPulses = MAX_PULSES_PER_FRAME[lowRate ? 1 : 0][codedFlag + voicedFlag] * framelen / MAX_PULSES_REF_FRAMELEN;
+        var maxSubfrPulses = maxPulses / nSubfr;
 
         int nPulses;
         if (lowRate) {
@@ -142,9 +142,9 @@ public final class PulseDecoder {
             nPulses = decodeNumPulsesClosedForm(decoder, maxPulses);
         }
 
-        short[] positions = new short[framelen];
-        short[] posPulses = new short[framelen];
-        short[] sfPulses = new short[nSubfr];
+        var positions = new short[framelen];
+        var posPulses = new short[framelen];
+        var sfPulses = new short[nSubfr];
         if (nPulses == 0) {
             return new Result(0, 0, positions, posPulses, sfPulses);
         }
@@ -154,7 +154,7 @@ public final class PulseDecoder {
             return new Result(0, 0, positions, posPulses, sfPulses);
         }
 
-        int nPositions = decodePulsePosSigns(decoder, tables, subfrlen, nSubfr, positions, posPulses, sfPulses);
+        var nPositions = decodePulsePosSigns(decoder, tables, subfrlen, nSubfr, positions, posPulses, sfPulses);
         return new Result(nPulses, nPositions, positions, posPulses, sfPulses);
     }
 
@@ -171,11 +171,11 @@ public final class PulseDecoder {
      * @return the decoded frame pulse count, in {@code [0, maxPulses]}
      */
     private static int decodeNumPulsesClosedForm(MlowRangeDecoder decoder, int maxPulses) {
-        long cmfMax = numPulsesCmf(maxPulses + 1, maxPulses + 1);
-        long cmfLow = decoder.decode(cmfMax);
+        var cmfMax = numPulsesCmf(maxPulses + 1, maxPulses + 1);
+        var cmfLow = decoder.decode(cmfMax);
         long cmf0 = 0;
-        for (int s = 0; s <= maxPulses; s++) {
-            long cmf1 = numPulsesCmf(maxPulses + 1, s + 1);
+        for (var s = 0; s <= maxPulses; s++) {
+            var cmf1 = numPulsesCmf(maxPulses + 1, s + 1);
             if (Long.compareUnsigned(cmfLow, cmf0) >= 0 && Long.compareUnsigned(cmfLow, cmf1) < 0) {
                 decoder.update(cmf0, cmf1, cmfMax);
                 return s;
@@ -228,20 +228,20 @@ public final class PulseDecoder {
             int maxSubfrPulses,
             int nPulses,
             short[] sfPulses) {
-        int maxPulsesPerSf = tables.maxPulsesPerSf();
+        var maxPulsesPerSf = tables.maxPulsesPerSf();
         if (nSubfr == 4) {
-            int minSplit = Math.max(nPulses - maxPulsesPerSf * 2, 0);
-            int maxSplit = nPulses - minSplit;
-            int minSplit2 = Math.max(nPulses - maxSubfrPulses * 2, 0);
-            int maxSplit2 = nPulses - minSplit;
+            var minSplit = Math.max(nPulses - maxPulsesPerSf * 2, 0);
+            var maxSplit = nPulses - minSplit;
+            var minSplit2 = Math.max(nPulses - maxSubfrPulses * 2, 0);
+            var maxSplit2 = nPulses - minSplit;
             if (minSplit2 < minSplit || maxSplit2 > maxSplit) {
                 return nPulses;
             }
             int nPulsesFirsthalf;
             if (maxSplit2 > minSplit2) {
-                int[] cmf = tables.splitCmfs()[nPulses - 1];
-                int cmfLen = maxSplit2 - minSplit2 + 2;
-                int base = minSplit2 - minSplit;
+                var cmf = tables.splitCmfs()[nPulses - 1];
+                var cmfLen = maxSplit2 - minSplit2 + 2;
+                var base = minSplit2 - minSplit;
                 nPulsesFirsthalf = MlowEntropyWrapper.decodeUpdate(decoder, cmf, base, cmfLen) + minSplit2;
             } else {
                 nPulsesFirsthalf = minSplit2;
@@ -296,16 +296,16 @@ public final class PulseDecoder {
             PulseTables.Tables tables,
             int nPulses,
             int maxSubfrPulses) {
-        int minSplit = Math.max(nPulses - maxSubfrPulses, 0);
-        int maxSplit = nPulses - minSplit;
+        var minSplit = Math.max(nPulses - maxSubfrPulses, 0);
+        var maxSplit = nPulses - minSplit;
         if (maxSplit < minSplit) {
             return -1;
         }
         if (maxSplit == minSplit) {
             return minSplit;
         }
-        int cmfLen = maxSplit - minSplit + 2;
-        int[] cmf = tables.splitCmfs()[nPulses - 1];
+        var cmfLen = maxSplit - minSplit + 2;
+        var cmf = tables.splitCmfs()[nPulses - 1];
         return MlowEntropyWrapper.decodeUpdate(decoder, cmf, minSplit, cmfLen) + minSplit;
     }
 
@@ -336,19 +336,19 @@ public final class PulseDecoder {
             short[] positions,
             short[] posPulses,
             short[] sfPulses) {
-        int runLengthStep = tables.runLengthStep();
-        int nPositions = -1;
-        for (int i = 0; i < nSubfr; i++) {
+        var runLengthStep = tables.runLengthStep();
+        var nPositions = -1;
+        for (var i = 0; i < nSubfr; i++) {
             int pulsesLeft = sfPulses[i];
-            int nSamplesLeft = subfrlen;
-            int pos = subfrlen * i;
-            for (int j = 0; j < sfPulses[i]; j++) {
+            var nSamplesLeft = subfrlen;
+            var pos = subfrlen * i;
+            for (var j = 0; j < sfPulses[i]; j++) {
                 pulsesLeft--;
-                int cmfInd = (nSamplesLeft + runLengthStep - 1) / runLengthStep - 1;
-                int[] cmfFull = tables.runLenCmfs()[cmfInd][pulsesLeft];
-                int maxSamples = tables.runLenMaxSamples(cmfInd);
-                int start = maxSamples - nSamplesLeft;
-                int ix = MlowEntropyWrapper.decodeUpdate(decoder, cmfFull, start, nSamplesLeft + 1);
+                var cmfInd = (nSamplesLeft + runLengthStep - 1) / runLengthStep - 1;
+                var cmfFull = tables.runLenCmfs()[cmfInd][pulsesLeft];
+                var maxSamples = tables.runLenMaxSamples(cmfInd);
+                var start = maxSamples - nSamplesLeft;
+                var ix = MlowEntropyWrapper.decodeUpdate(decoder, cmfFull, start, nSamplesLeft + 1);
                 if (j == 0 || ix > 0) {
                     pos += ix;
                     positions[++nPositions] = (short) pos;
@@ -361,13 +361,13 @@ public final class PulseDecoder {
         }
         nPositions++;
 
-        int signsDecoded = 0;
+        var signsDecoded = 0;
         while (signsDecoded < nPositions) {
-            int signsInSym = Math.min(nPositions - signsDecoded, MAX_SIGNS_PER_SYMBOL);
-            int sym = MlowEntropyWrapper.decodeUniform(decoder, 1 << signsInSym);
+            var signsInSym = Math.min(nPositions - signsDecoded, MAX_SIGNS_PER_SYMBOL);
+            var sym = MlowEntropyWrapper.decodeUniform(decoder, 1 << signsInSym);
             sym <<= (MAX_SIGNS_PER_SYMBOL + 1) - signsInSym;
-            for (int i = 0; i < signsInSym; i++) {
-                int sgn = (sym & 0x8000) >> (MAX_SIGNS_PER_SYMBOL - 1);
+            for (var i = 0; i < signsInSym; i++) {
+                var sgn = (sym & 0x8000) >> (MAX_SIGNS_PER_SYMBOL - 1);
                 sym <<= 1;
                 posPulses[signsDecoded++] *= (short) (sgn - 1);
             }

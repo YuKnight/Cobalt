@@ -185,7 +185,7 @@ public final class LsfCodebooks {
      * @return the shared two-stage LSF codebook
      */
     public static Codebook load() {
-        Codebook local = cached;
+        var local = cached;
         if (local == null) {
             synchronized (LsfCodebooks.class) {
                 local = cached;
@@ -213,33 +213,33 @@ public final class LsfCodebooks {
      * @return the freshly built codebook
      */
     private static Codebook build() {
-        Stage1[] stage1 = new Stage1[2];
-        for (int voiced = 0; voiced <= 1; voiced++) {
+        var stage1 = new Stage1[2];
+        for (var voiced = 0; voiced <= 1; voiced++) {
             stage1[voiced] = buildStage1(voiced);
         }
 
-        Stage2[][][] stage2 = new Stage2[2][2][LsfTables.LSF_CB_CENTROIDS + 1];
-        int qlvlsOffset = 0;
-        int dcmfOffset = 0;
-        for (int voiced = 0; voiced <= 1; voiced++) {
-            for (int lowRate = 0; lowRate <= 1; lowRate++) {
-                float qstep = LsfTables.QSTEP[voiced][lowRate];
-                for (int c = 0; c <= LsfTables.LSF_CB_CENTROIDS; c++) {
-                    float qs = qstep;
+        var stage2 = new Stage2[2][2][LsfTables.LSF_CB_CENTROIDS + 1];
+        var qlvlsOffset = 0;
+        var dcmfOffset = 0;
+        for (var voiced = 0; voiced <= 1; voiced++) {
+            for (var lowRate = 0; lowRate <= 1; lowRate++) {
+                var qstep = LsfTables.QSTEP[voiced][lowRate];
+                for (var c = 0; c <= LsfTables.LSF_CB_CENTROIDS; c++) {
+                    var qs = qstep;
                     if (c == LsfTables.LSF_CB_CENTROIDS) {
                         qs *= LsfTables.LSF_QSTEP_COND_MULT;
                     }
-                    int[] numQlvls = new int[LsfTables.SMPL_LPC_ORDER];
-                    float[][] qLvls = new float[LsfTables.SMPL_LPC_ORDER][];
-                    int[][] cmf = new int[LsfTables.SMPL_LPC_ORDER][];
-                    for (int i = 0; i < LsfTables.SMPL_LPC_ORDER; i++) {
-                        int minQi = LsfTables.MIN_QI[voiced][lowRate][c][i];
-                        int maxQi = LsfTables.MAX_QI[voiced][lowRate][c][i];
-                        int count = maxQi - minQi + 1;
+                    var numQlvls = new int[LsfTables.SMPL_LPC_ORDER];
+                    var qLvls = new float[LsfTables.SMPL_LPC_ORDER][];
+                    var cmf = new int[LsfTables.SMPL_LPC_ORDER][];
+                    for (var i = 0; i < LsfTables.SMPL_LPC_ORDER; i++) {
+                        var minQi = LsfTables.MIN_QI[voiced][lowRate][c][i];
+                        var maxQi = LsfTables.MAX_QI[voiced][lowRate][c][i];
+                        var count = maxQi - minQi + 1;
                         numQlvls[i] = count;
-                        float[] levels = new float[count];
-                        for (int lvl = 0; lvl < count; lvl++) {
-                            int packed = LsfTables.ST2_ALL_QLVLS_8[qlvlsOffset++];
+                        var levels = new float[count];
+                        for (var lvl = 0; lvl < count; lvl++) {
+                            var packed = LsfTables.ST2_ALL_QLVLS_8[qlvlsOffset++];
                             levels[lvl] = (LsfTables.ST2_ALL_QLVLS_MIN
                                     + LsfTables.ST2_ALL_QLVLS_SCALE * packed
                                     + lvl + minQi) * qs;
@@ -267,47 +267,47 @@ public final class LsfCodebooks {
      * @return the stage-1 products for the class
      */
     private static Stage1 buildStage1(int voiced) {
-        int[][] cb16 = voiced == 0 ? LsfTables.CB_UV : LsfTables.CB_V;
-        float cbMin = voiced == 0 ? LsfTables.LSF_CB_UV_MIN : LsfTables.LSF_CB_V_MIN;
-        float cbScale = voiced == 0 ? LsfTables.LSF_CB_UV_SCALE : LsfTables.LSF_CB_V_SCALE;
-        float[] mean = voiced == 0 ? LsfTables.MEAN_UV : LsfTables.MEAN_V;
-        int[][][] rot8 = voiced == 0 ? LsfTables.ROT_UV : LsfTables.ROT_V;
-        float rotMin = voiced == 0 ? LsfTables.LSF_ROT_UV_MIN : LsfTables.LSF_ROT_V_MIN;
-        float rotScale = voiced == 0 ? LsfTables.LSF_ROT_UV_SCALE : LsfTables.LSF_ROT_V_SCALE;
-        int[][][] rotCond8 = voiced == 0 ? LsfTables.ROT_COND_UV : LsfTables.ROT_COND_V;
-        float rotCondMin = voiced == 0 ? LsfTables.LSF_ROT_COND_UV_MIN : LsfTables.LSF_ROT_COND_V_MIN;
-        float rotCondScale = voiced == 0 ? LsfTables.LSF_ROT_COND_UV_SCALE : LsfTables.LSF_ROT_COND_V_SCALE;
+        var cb16 = voiced == 0 ? LsfTables.CB_UV : LsfTables.CB_V;
+        var cbMin = voiced == 0 ? LsfTables.LSF_CB_UV_MIN : LsfTables.LSF_CB_V_MIN;
+        var cbScale = voiced == 0 ? LsfTables.LSF_CB_UV_SCALE : LsfTables.LSF_CB_V_SCALE;
+        var mean = voiced == 0 ? LsfTables.MEAN_UV : LsfTables.MEAN_V;
+        var rot8 = voiced == 0 ? LsfTables.ROT_UV : LsfTables.ROT_V;
+        var rotMin = voiced == 0 ? LsfTables.LSF_ROT_UV_MIN : LsfTables.LSF_ROT_V_MIN;
+        var rotScale = voiced == 0 ? LsfTables.LSF_ROT_UV_SCALE : LsfTables.LSF_ROT_V_SCALE;
+        var rotCond8 = voiced == 0 ? LsfTables.ROT_COND_UV : LsfTables.ROT_COND_V;
+        var rotCondMin = voiced == 0 ? LsfTables.LSF_ROT_COND_UV_MIN : LsfTables.LSF_ROT_COND_V_MIN;
+        var rotCondScale = voiced == 0 ? LsfTables.LSF_ROT_COND_UV_SCALE : LsfTables.LSF_ROT_COND_V_SCALE;
 
-        int order = LsfTables.SMPL_LPC_ORDER;
-        float[][] cbHalf = new float[LsfTables.LSF_CB_CENTROIDS][order];
-        float[][][] we = new float[LsfTables.LSF_CB_CENTROIDS][order][order];
-        for (int c = 0; c < LsfTables.LSF_CB_CENTROIDS; c++) {
-            float[] lsfCb = new float[order];
-            for (int i = 0; i < order; i++) {
+        var order = LsfTables.SMPL_LPC_ORDER;
+        var cbHalf = new float[LsfTables.LSF_CB_CENTROIDS][order];
+        var we = new float[LsfTables.LSF_CB_CENTROIDS][order][order];
+        for (var c = 0; c < LsfTables.LSF_CB_CENTROIDS; c++) {
+            var lsfCb = new float[order];
+            for (var i = 0; i < order; i++) {
                 lsfCb[i] = cbMin + cb16[c][i] * cbScale + mean[i];
                 cbHalf[c][i] = lsfCb[i] * 0.5f;
             }
-            float[][] rot = new float[order][order];
-            for (int i = 0; i < order; i++) {
-                for (int j = 0; j < order; j++) {
+            var rot = new float[order][order];
+            for (var i = 0; i < order; i++) {
+                for (var j = 0; j < order; j++) {
                     rot[i][j] = rotMin + rot8[c][i][j] * rotScale;
                 }
             }
             rotApplyWeight(rot, lsfCb, we[c]);
         }
 
-        float[][][] rotCond = new float[2][order][order];
-        for (int hr = 0; hr < 2; hr++) {
-            for (int i = 0; i < order; i++) {
-                for (int j = 0; j < order; j++) {
+        var rotCond = new float[2][order][order];
+        for (var hr = 0; hr < 2; hr++) {
+            for (var i = 0; i < order; i++) {
+                for (var j = 0; j < order; j++) {
                     rotCond[hr][i][j] = rotCondMin + rotCond8[hr][i][j] * rotCondScale;
                 }
             }
         }
-        int[] stage1Cmf = voiced == 0 ? LsfTables.CMF_UV : LsfTables.CMF_V;
-        int[] stage1CmfCond = voiced == 0 ? LsfTables.CMF_COND_UV : LsfTables.CMF_COND_V;
-        float regCond = LsfTables.REG_COND[voiced];
-        float[] minDist = voiced == 0 ? LsfTables.MIN_DIST_UV : LsfTables.MIN_DIST_V;
+        var stage1Cmf = voiced == 0 ? LsfTables.CMF_UV : LsfTables.CMF_V;
+        var stage1CmfCond = voiced == 0 ? LsfTables.CMF_COND_UV : LsfTables.CMF_COND_V;
+        var regCond = LsfTables.REG_COND[voiced];
+        var minDist = voiced == 0 ? LsfTables.MIN_DIST_UV : LsfTables.MIN_DIST_V;
         return new Stage1(cbHalf, we, rotCond, stage1Cmf, stage1CmfCond, mean, regCond, minDist);
     }
 
@@ -325,14 +325,14 @@ public final class LsfCodebooks {
      * @param we  the destination forward weighting matrix, {@value LsfTables#SMPL_LPC_ORDER} square
      */
     private static void rotApplyWeight(float[][] rot, float[] lsf, float[][] we) {
-        int order = LsfTables.SMPL_LPC_ORDER;
-        float[] weight = laroiaWeights(lsf);
-        float[] sqrtInv = new float[order];
-        for (int i = 0; i < order; i++) {
+        var order = LsfTables.SMPL_LPC_ORDER;
+        var weight = laroiaWeights(lsf);
+        var sqrtInv = new float[order];
+        for (var i = 0; i < order; i++) {
             sqrtInv[i] = 1.0f / FastSqrt.sqrt(weight[i]);
         }
-        for (int i = 0; i < order; i++) {
-            for (int j = 0; j < order; j++) {
+        for (var i = 0; i < order; i++) {
+            for (var j = 0; j < order; j++) {
                 we[i][j] = rot[i][j] * sqrtInv[j];
             }
         }
@@ -350,15 +350,15 @@ public final class LsfCodebooks {
      * @return a freshly allocated weight vector of {@value LsfTables#SMPL_LPC_ORDER} entries
      */
     private static float[] laroiaWeights(float[] lsf) {
-        int order = LsfTables.SMPL_LPC_ORDER;
-        float[] invDelta = new float[order + 1];
+        var order = LsfTables.SMPL_LPC_ORDER;
+        var invDelta = new float[order + 1];
         invDelta[0] = 1.0f / Math.max(lsf[0], LAROIA_MIN_DIST);
-        for (int i = 1; i < order; i++) {
+        for (var i = 1; i < order; i++) {
             invDelta[i] = 1.0f / Math.max(lsf[i] - lsf[i - 1], LAROIA_MIN_DIST);
         }
         invDelta[order] = 1.0f / Math.max(SMPL_PI - lsf[order - 1], LAROIA_MIN_DIST);
-        float[] weight = new float[order];
-        for (int i = 0; i < order; i++) {
+        var weight = new float[order];
+        for (var i = 0; i < order; i++) {
             weight[i] = invDelta[i] + invDelta[i + 1];
         }
         return weight;
@@ -381,8 +381,8 @@ public final class LsfCodebooks {
      * @return a freshly allocated byte array of {@value LsfTables#ST2_ALL_QLVLS_LEN} entries
      */
     private static byte[] packDcmf() {
-        byte[] out = new byte[LsfTables.ST2_ALL_QLVL_DCMFS.length];
-        for (int i = 0; i < out.length; i++) {
+        var out = new byte[LsfTables.ST2_ALL_QLVL_DCMFS.length];
+        for (var i = 0; i < out.length; i++) {
             out[i] = (byte) LsfTables.ST2_ALL_QLVL_DCMFS[i];
         }
         return out;

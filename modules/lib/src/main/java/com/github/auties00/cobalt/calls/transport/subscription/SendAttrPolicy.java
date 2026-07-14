@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import com.github.auties00.cobalt.calls.transport.warp.WarpAttribute;
@@ -81,7 +82,7 @@ public final class SendAttrPolicy {
      * @throws NullPointerException if {@code inputs} is {@code null}
      */
     public Optional<WarpMessage.Piggybacked> choose(Inputs inputs) {
-        java.util.Objects.requireNonNull(inputs, "inputs cannot be null");
+        Objects.requireNonNull(inputs, "inputs cannot be null");
         var attributes = new ArrayList<WarpAttribute>();
         attributes.add(new WarpAttribute.SequenceNumber(nextSequenceNumber()));
 

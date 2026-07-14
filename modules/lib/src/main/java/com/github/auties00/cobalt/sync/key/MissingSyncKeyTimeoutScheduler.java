@@ -190,7 +190,7 @@ public final class MissingSyncKeyTimeoutScheduler {
      *
      * <p>A tracked key may arrive between the moment the timer is armed and the moment it
      * fires, in which case the tracker entry has already been resolved by
-     * {@link SyncKeyRotationService#handleKeyShare(int, java.util.List)} and no fatal is
+     * {@link SyncKeyRotationService#handleKeyShare(int, List)} and no fatal is
      * raised. Keys that are still genuinely absent and older than the timeout cause a
      * {@link WhatsAppWebAppStateSyncException.TimeoutWhileWaitingForMissingKey} to be reported
      * to {@link LinkedWhatsAppClient#handleFailure}. When nothing has actually expired the check
@@ -342,7 +342,7 @@ public final class MissingSyncKeyTimeoutScheduler {
      * Schedules the five-second grace period before
      * {@link #checkForAllDevicesRespondedWithoutKey()} fires.
      *
-     * <p>Called by {@link SyncKeyRotationService#handleKeyShare(int, java.util.List)} when a
+     * <p>Called by {@link SyncKeyRotationService#handleKeyShare(int, List)} when a
      * negative response from a peer brings a tracked key into the missing-on-every-asked-device
      * state. Any previously armed grace period is cancelled first so successive negative
      * responses do not stack independent timers.

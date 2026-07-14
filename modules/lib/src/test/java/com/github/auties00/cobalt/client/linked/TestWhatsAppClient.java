@@ -11,6 +11,7 @@ import com.github.auties00.cobalt.calls.stream.AudioInput;
 import com.github.auties00.cobalt.calls.stream.AudioOutput;
 import com.github.auties00.cobalt.calls.stream.VideoInput;
 import com.github.auties00.cobalt.calls.stream.VideoOutput;
+import com.github.auties00.cobalt.listener.WhatsAppListener;
 import com.github.auties00.cobalt.model.call.Call;
 import com.github.auties00.cobalt.model.call.IncomingCall;
 import com.github.auties00.cobalt.model.call.CallEndReason;
@@ -220,6 +221,7 @@ import com.github.auties00.cobalt.stanza.usync.UsyncResult;
 import com.github.auties00.cobalt.props.ABPropsService;
 import com.github.auties00.cobalt.store.linked.LinkedWhatsAppStore;
 import com.github.auties00.cobalt.sync.SyncPendingMutation;
+import com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingActivity;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -755,12 +757,12 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public java.util.Optional<byte[]> queryTrustedContactToken(JidProvider peerProvider) {
+    public Optional<byte[]> queryTrustedContactToken(JidProvider peerProvider) {
         throw new UnsupportedOperationException("TestWhatsAppClient: queryTrustedContactToken(..) is not stubbed");
     }
 
     @Override
-    public java.util.Optional<byte[]> queryTrustedContactToken(JidProvider peerProvider, java.time.Duration timeout) {
+    public Optional<byte[]> queryTrustedContactToken(JidProvider peerProvider, Duration timeout) {
         throw new UnsupportedOperationException("TestWhatsAppClient: queryTrustedContactToken(..) is not stubbed");
     }
 
@@ -917,7 +919,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public void recordThreadActivity(JidProvider chat, com.github.auties00.cobalt.wam.threadlogging.ThreadLoggingActivity activity) {
+    public void recordThreadActivity(JidProvider chat, ThreadLoggingActivity activity) {
         // Best-effort thread-logging telemetry sink; the test double records nothing.
     }
 
@@ -2103,7 +2105,7 @@ public final class TestWhatsAppClient implements LinkedWhatsAppClient {
     }
 
     @Override
-    public LinkedWhatsAppClient removeListener(com.github.auties00.cobalt.listener.WhatsAppListener listener) {
+    public LinkedWhatsAppClient removeListener(WhatsAppListener listener) {
         throw new UnsupportedOperationException("TestWhatsAppClient: removeListener(..) is not stubbed");
     }
 

@@ -5,6 +5,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.filter.Filters;
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Runs the deterministic MLow decode postfilter chain (the harmonic, LPC, and high pass postfilters) over the
@@ -328,18 +329,18 @@ public final class MlowDecodePostfilter {
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "postfilter chain reset");
         }
-        java.util.Arrays.fill(lpcStateMa, 0.0f);
-        java.util.Arrays.fill(lpcStateAr, 0.0f);
-        java.util.Arrays.fill(hpStateLoEmph1, 0.0f);
-        java.util.Arrays.fill(hpStateLoEmph2, 0.0f);
-        java.util.Arrays.fill(hpStateHp, 0.0f);
-        java.util.Arrays.fill(hpXOld, 0.0f);
-        java.util.Arrays.fill(hpCoefMa, 0.0f);
-        java.util.Arrays.fill(hpCoefAr, 0.0f);
+        Arrays.fill(lpcStateMa, 0.0f);
+        Arrays.fill(lpcStateAr, 0.0f);
+        Arrays.fill(hpStateLoEmph1, 0.0f);
+        Arrays.fill(hpStateLoEmph2, 0.0f);
+        Arrays.fill(hpStateHp, 0.0f);
+        Arrays.fill(hpXOld, 0.0f);
+        Arrays.fill(hpCoefMa, 0.0f);
+        Arrays.fill(hpCoefAr, 0.0f);
         this.hpLagOld = -1.0f;
-        java.util.Arrays.fill(harmStateComb, 0.0f);
-        java.util.Arrays.fill(harmState1, 0.0f);
-        java.util.Arrays.fill(harmLpCoefs, 0.0f);
+        Arrays.fill(harmStateComb, 0.0f);
+        Arrays.fill(harmState1, 0.0f);
+        Arrays.fill(harmLpCoefs, 0.0f);
         this.harmPrevLag = 0;
         this.harmPrevDidFilter = 0;
     }
@@ -379,22 +380,22 @@ public final class MlowDecodePostfilter {
                     "postfilter packet: frames={0} subframes={1} voiced={2} lowRate={3} lpcPostfilter={4}",
                     numFrames, numSubframes, voiced, lowRate, lpcPostfilterEnabled);
         }
-        int frameLength = numSubframes * subframeLength;
-        int lagsPerFrame = frameLength / HARM_LAG_SUBFR_LEN;
-        int packetLen = numFrames * frameLength;
+        var frameLength = numSubframes * subframeLength;
+        var lagsPerFrame = frameLength / HARM_LAG_SUBFR_LEN;
+        var packetLen = numFrames * frameLength;
 
         // The work buffer carries LPC_POST_IMPZ_LEN of leading headroom so the LPC postfilter's negative reads
         // at x[-LPC_ORDER - 1 ..] stay in bounds. The leading samples are scratch the LPC postfilter saves and
         // restores.
-        float[] work = new float[LPC_POST_IMPZ_LEN + packetLen];
+        var work = new float[LPC_POST_IMPZ_LEN + packetLen];
         System.arraycopy(synthesis, 0, work, LPC_POST_IMPZ_LEN, packetLen);
 
-        float avgNormalizedBitrate = 0.0f;
-        for (int frame = 0; frame < numFrames; frame++) {
+        var avgNormalizedBitrate = 0.0f;
+        for (var frame = 0; frame < numFrames; frame++) {
             avgNormalizedBitrate += normalizedBitratePerFrame[frame];
-            int frameOff = LPC_POST_IMPZ_LEN + frame * frameLength;
+            var frameOff = LPC_POST_IMPZ_LEN + frame * frameLength;
             if (lpcPostfilterEnabled) {
-                for (int sf = 0; sf < numSubframes; sf++) {
+                for (var sf = 0; sf < numSubframes; sf++) {
                     lpcPostfilter(work, frameOff + sf * subframeLength, subframeLength, lpc[frame][sf],
                             voiced, lowRate);
                 }
@@ -403,7 +404,7 @@ public final class MlowDecodePostfilter {
             }
             hpPostfilter(work, frameOff, frameLength, lagsPerPacket, frame * lagsPerFrame, lagsPerFrame);
         }
-        int nLags = lagsPerPacket.length;
+        var nLags = lagsPerPacket.length;
         harmPostfilter(work, LPC_POST_IMPZ_LEN, packetLen, lagsPerPacket, nLags, avgNormalizedBitrate / numFrames);
 
         System.arraycopy(work, LPC_POST_IMPZ_LEN, synthesis, 0, packetLen);
@@ -429,40 +430,40 @@ public final class MlowDecodePostfilter {
      * @return the nyquist tilt gain of this subframe
      */
     private float lpcPostfilter(float[] x, int xOff, int len, float[] predcoef, boolean voiced, boolean lowRate) {
-        int rateIx = lowRate ? 1 : 0;
-        int voicedIx = voiced ? 1 : 0;
-        float[] a1 = new float[LPC_ORDER + 1];
-        float[] a2 = new float[LPC_ORDER + 1];
+        var rateIx = lowRate ? 1 : 0;
+        var voicedIx = voiced ? 1 : 0;
+        var a1 = new float[LPC_ORDER + 1];
+        var a2 = new float[LPC_ORDER + 1];
         System.arraycopy(predcoef, 0, a1, 0, LPC_ORDER + 1);
         System.arraycopy(predcoef, 0, a2, 0, LPC_ORDER + 1);
         bweExpand(a1, LPC_ORDER, LPC_POSTFILT_GAMMA[rateIx][voicedIx][0]);
         bweExpand(a2, LPC_ORDER, LPC_POSTFILT_GAMMA[rateIx][voicedIx][1]);
 
         // Impulse response of A1/A2: filter [A1, 0...] through AR(A2).
-        float[] impz = new float[LPC_POST_IMPZ_LEN + LPC_ORDER];
+        var impz = new float[LPC_POST_IMPZ_LEN + LPC_ORDER];
         System.arraycopy(a1, 0, impz, LPC_ORDER, LPC_ORDER + 1);
         // impz[LPC_ORDER + (LPC_ORDER+1) ..] already zero
         Filters.ar16(impz, LPC_ORDER, LPC_POST_IMPZ_LEN, a2, impz, LPC_ORDER);
 
-        float[] h = new float[LPC_POST_IMPZ_LEN];
-        float[] impzFft = new float[LPC_POST_IMPZ_LEN];
+        var h = new float[LPC_POST_IMPZ_LEN];
+        var impzFft = new float[LPC_POST_IMPZ_LEN];
         System.arraycopy(impz, LPC_ORDER, impzFft, 0, LPC_POST_IMPZ_LEN);
         lpcFft.transformOrdered(impzFft, h, null, true);
-        float maxHsq = Math.max(h[0] * h[0], h[1] * h[1]);
-        for (int i = 2; i < LPC_POST_IMPZ_LEN; i += 2) {
+        var maxHsq = Math.max(h[0] * h[0], h[1] * h[1]);
+        for (var i = 2; i < LPC_POST_IMPZ_LEN; i += 2) {
             maxHsq = Math.max(h[i] * h[i] + h[i + 1] * h[i + 1], maxHsq);
         }
-        float g = Math.min(1.0f, 1.0f / (float) Math.sqrt(maxHsq + 1e-30f));
-        float nyquistGain = g * (float) Math.sqrt(h[1] * h[1] + 1e-30f);
+        var g = Math.min(1.0f, 1.0f / (float) Math.sqrt(maxHsq + 1e-30f));
+        var nyquistGain = g * (float) Math.sqrt(h[1] * h[1] + 1e-30f);
 
         // x[-LPC_ORDER - 1 .. -1] hold the prior frame history; save and restore them around the swap in of
         // the postfilter's own moving average and auto regressive memories.
-        float[] stateTmp = new float[LPC_ORDER + 1];
+        var stateTmp = new float[LPC_ORDER + 1];
         System.arraycopy(x, xOff - LPC_ORDER - 1, stateTmp, 0, LPC_ORDER + 1);
 
-        float[] temp = new float[len];
+        var temp = new float[len];
         System.arraycopy(lpcStateMa, 0, x, xOff - LPC_ORDER, LPC_ORDER);
-        for (int i = 0; i < LPC_ORDER + 1; i++) {
+        for (var i = 0; i < LPC_ORDER + 1; i++) {
             a1[i] *= g;
         }
         Filters.ma(x, xOff, len, a1, LPC_ORDER + 1, temp, 0);
@@ -513,20 +514,20 @@ public final class MlowDecodePostfilter {
         // Pre low emphasis AR1, in place.
         Filters.ar1(x, xOff, l, LO_EMPH_COEF, hpStateLoEmph1, 0, x, xOff);
 
-        float lag = 0.0f;
+        var lag = 0.0f;
         if (lags[lagOff] > 0) {
-            float sumWghts = 0.0f;
-            float sumWlags = 0.0f;
-            for (int i = 0; i < nLags; i++) {
+            var sumWghts = 0.0f;
+            var sumWlags = 0.0f;
+            for (var i = 0; i < nLags; i++) {
                 sumWghts += lags[lagOff + i];
                 sumWlags += lags[lagOff + i] * lags[lagOff + i];
             }
             lag = sumWlags / sumWghts;
         }
 
-        boolean overlapAdd = false;
-        float[] yOld = new float[l];
-        float[] yTmp = new float[l];
+        var overlapAdd = false;
+        var yOld = new float[l];
+        var yTmp = new float[l];
         if (hpLagOld < 0.0f) {
             newCoefs(lag);
             hpLagOld = lag;
@@ -535,7 +536,7 @@ public final class MlowDecodePostfilter {
             Filters.arma2(x, xOff, l, hpCoefMa, hpCoefAr, hpStateHp, 0, yOld, 0);
             newCoefs(lag);
             hpLagOld = lag;
-            float[] dummy = new float[l];
+            var dummy = new float[l];
             Filters.arma2(hpXOld, 0, l, hpCoefMa, hpCoefAr, hpStateHp, 0, dummy, 0);
         } else if (lag != hpLagOld) {
             newCoefs(lag);
@@ -546,8 +547,8 @@ public final class MlowDecodePostfilter {
         Filters.arma2(x, xOff, l, hpCoefMa, hpCoefAr, hpStateHp, 0, yTmp, 0);
 
         if (overlapAdd) {
-            float[] ramp = (l == FRAME_LEN) ? hpRampDn20 : hpRampDn10;
-            for (int i = 0; i < l; i++) {
+            var ramp = (l == FRAME_LEN) ? hpRampDn20 : hpRampDn10;
+            for (var i = 0; i < l; i++) {
                 yTmp[i] += (yOld[i] - yTmp[i]) * ramp[i];
             }
         }
@@ -565,11 +566,11 @@ public final class MlowDecodePostfilter {
      */
     private void newCoefs(float lag) {
         if (lag > 0.0f) {
-            float f = 1.0f / lag;
+            var f = 1.0f / lag;
             calcHpCoefs(HP_PITCH_MAF, HP_PITCH_ARF, HP_PITCH_ARR, f, hpCoefMa, hpCoefAr);
         } else {
-            float fcorner = Math.min(Math.max(HP_FCORNER_3DB_HZ, 5.0f), 1500.0f);
-            float f = fcorner / 16000.0f;
+            var fcorner = Math.min(Math.max(HP_FCORNER_3DB_HZ, 5.0f), 1500.0f);
+            var f = fcorner / 16000.0f;
             calcHpCoefs(HP_FALLBACK_MAF, HP_FALLBACK_ARF, HP_FALLBACK_ARR, f, hpCoefMa, hpCoefAr);
         }
     }
@@ -592,13 +593,13 @@ public final class MlowDecodePostfilter {
         coefMa[0] = 1.0f;
         coefMa[1] = -2.0f * cosApprox(2.0f * PI * maf * f);
         coefMa[2] = 1.0f;
-        float far = arf[0] * f + arf[1] * f * f;
-        float rar = arr[0] * f + arr[1] * f * f;
+        var far = arf[0] * f + arf[1] * f * f;
+        var rar = arr[0] * f + arr[1] * f * f;
         coefAr[0] = 1.0f;
         coefAr[1] = -2.0f * cosApprox(2.0f * PI * far) * (1.0f + rar);
         coefAr[2] = 1.0f + (2.0f * rar + rar * rar);
-        float sc = (1.0f - coefAr[1] + coefAr[2]) / (1.0f - coefMa[1] + coefMa[2]);
-        for (int i = 0; i < 3; i++) {
+        var sc = (1.0f - coefAr[1] + coefAr[2]) / (1.0f - coefMa[1] + coefMa[2]);
+        for (var i = 0; i < 3; i++) {
             coefMa[i] *= sc;
         }
     }
@@ -623,10 +624,10 @@ public final class MlowDecodePostfilter {
      * @return the down ramp
      */
     private static float[] buildRampDn(int length) {
-        float[] ramp = new float[length];
-        float dOmega = PI / (2.0f * (length + 1.0f));
-        float omega = dOmega;
-        for (int i = 0; i < length; i++) {
+        var ramp = new float[length];
+        var dOmega = PI / (2.0f * (length + 1.0f));
+        var omega = dOmega;
+        for (var i = 0; i < length; i++) {
             ramp[i] = (float) Math.pow((float) Math.cos(omega), HP_TRANSITION_SPEED);
             omega += dOmega;
         }
@@ -651,21 +652,21 @@ public final class MlowDecodePostfilter {
      */
     private void harmPostfilter(float[] x, int xOff, int xLen, float[] lags, int nLags, float normalizedBitrate) {
         // diffBuf carries 2*FB_DELAY of leading history; the diff window starts at diffBase.
-        float[] diffBuf = new float[FRAME_LEN * MAX_FRAMES_PER_PACKET + 2 * HARM_FB_DELAY];
-        int diffBase = 2 * HARM_FB_DELAY;
+        var diffBuf = new float[FRAME_LEN * MAX_FRAMES_PER_PACKET + 2 * HARM_FB_DELAY];
+        var diffBase = 2 * HARM_FB_DELAY;
 
-        int lag = harmPrevLag;
+        var lag = harmPrevLag;
         System.arraycopy(x, xOff, harmStateComb, MAX_PITCH_LAG + HARM_DELAY, xLen);
 
-        float fbStrength = 1.0f - HARM_FB_STRENGTH * normalizedBitrate;
-        int offset1 = 0;
+        var fbStrength = 1.0f - HARM_FB_STRENGTH * normalizedBitrate;
+        var offset1 = 0;
 
-        int lagCtr = 0;
+        var lagCtr = 0;
         while (lagCtr < nLags) {
-            int offset2 = 0;
+            var offset2 = 0;
             // carry the cross block diff history into the 16 samples before the diff window
             System.arraycopy(harmState1, 0, diffBuf, diffBase - 16, 16);
-            int lagCtrEnd = Math.min(lagCtr + PITCH_NUM_SUBFRAMES, nLags);
+            var lagCtrEnd = Math.min(lagCtr + PITCH_NUM_SUBFRAMES, nLags);
             for (; lagCtr < lagCtrEnd; lagCtr++) {
                 harmPostfilterCore(MAX_PITCH_LAG + offset1, HARM_DELAY + xLen - offset1, lag,
                         diffBuf, diffBase + offset2, x, xOff + offset1, HARM_LAG_SUBFR_LEN, fbStrength);
@@ -705,77 +706,77 @@ public final class MlowDecodePostfilter {
      */
     private void harmPostfilterCore(int combOff, int futureSamples, int lag, float[] diff, int diffOff,
                                     float[] out, int outOff, int l, float fbStrength) {
-        float[] comb = harmStateComb;
-        float[] yHarm = new float[l + 2 * HARM_FB_DELAY];
+        var comb = harmStateComb;
+        var yHarm = new float[l + 2 * HARM_FB_DELAY];
 
-        float xy = 0.0f;
+        var xy = 0.0f;
         if (lag > 0) {
-            int lookforward = l + lag - futureSamples;
+            var lookforward = l + lag - futureSamples;
             if (lookforward > 0) {
-                int l2nd = Math.max(l - lookforward, 0);
-                for (int i = 0; i < l2nd; i++) {
+                var l2nd = Math.max(l - lookforward, 0);
+                for (var i = 0; i < l2nd; i++) {
                     yHarm[i] = comb[combOff - lag + i] + comb[combOff + lag + i];
                 }
-                for (int i = 0; i < l - l2nd; i++) {
+                for (var i = 0; i < l - l2nd; i++) {
                     yHarm[l2nd + i] = comb[combOff + l2nd - lag + i] + comb[combOff + l2nd + i];
                 }
             } else {
-                for (int i = 0; i < l; i++) {
+                for (var i = 0; i < l; i++) {
                     yHarm[i] = comb[combOff - lag + i] + comb[combOff + lag + i];
                 }
             }
-            for (int i = 0; i < l; i++) {
+            for (var i = 0; i < l; i++) {
                 xy += comb[combOff + i] * yHarm[i];
             }
         }
 
         if (lag > 0 && xy > 0.0f) {
-            float xx = 0.0f;
-            for (int i = 0; i < l; i++) {
+            var xx = 0.0f;
+            for (var i = 0; i < l; i++) {
                 xx += comb[combOff + i] * comb[combOff + i];
             }
-            float yy = 0.0f;
-            for (int i = 0; i < l; i++) {
+            var yy = 0.0f;
+            for (var i = 0; i < l; i++) {
                 yy += yHarm[i] * yHarm[i];
             }
             yy *= 0.25f;
-            float strength = 0.5f * xy / Math.max(yy, xx);
-            float highLagReduction = 1.0f - HARM_REDUCTION_FAC
-                    * ((float) (lag - MIN_PITCH_LAG) / (MAX_PITCH_LAG - MIN_PITCH_LAG));
+            var strength = 0.5f * xy / Math.max(yy, xx);
+            var highLagReduction = 1.0f - HARM_REDUCTION_FAC
+                                          * ((float) (lag - MIN_PITCH_LAG) / (MAX_PITCH_LAG - MIN_PITCH_LAG));
             strength *= highLagReduction * HARM_STRENGTH;
-            float half = 0.5f * strength;
-            for (int i = 0; i < l; i++) {
+            var half = 0.5f * strength;
+            for (var i = 0; i < l; i++) {
                 yHarm[i] *= half;
             }
-            for (int i = 0; i < l; i++) {
+            for (var i = 0; i < l; i++) {
                 diff[diffOff + i] = yHarm[i] - strength * comb[combOff + i];
             }
-            float[] lp = harmTables.filter(HarmonicPostfilterTables.lagToFiltIx(lag));
-            for (int i = 0; i < harmLpCoefs.length; i++) {
+            var lp = harmTables.filter(HarmonicPostfilterTables.lagToFiltIx(lag));
+            for (var i = 0; i < harmLpCoefs.length; i++) {
                 harmLpCoefs[i] = lp[i] * fbStrength;
             }
             // symmetric moving average over the diff window; its filter state is the 16 samples before diffOff
             Filters.ma16Sym(diff, diffOff, l, harmLpCoefs, yHarm, 0);
             // add the base signal shifted by FB_DELAY onto the correction
-            for (int i = 0; i < l; i++) {
+            for (var i = 0; i < l; i++) {
                 yHarm[i] += comb[combOff - HARM_FB_DELAY + i];
             }
             harmPrevDidFilter = 1;
         } else {
-            for (int i = 0; i < HARM_LAG_SUBFR_LEN; i++) {
+            for (var i = 0; i < HARM_LAG_SUBFR_LEN; i++) {
                 diff[diffOff + i] = 0.0f;
             }
             if (harmPrevDidFilter != 0) {
                 // zero input response over 2*FB_DELAY samples, added onto the base signal shifted by FB_DELAY
                 Filters.ma16Sym(diff, diffOff, 2 * HARM_FB_DELAY, harmLpCoefs, yHarm, 0);
-                for (int i = 0; i < 2 * HARM_FB_DELAY; i++) {
+                for (var i = 0; i < 2 * HARM_FB_DELAY; i++) {
                     yHarm[i] += comb[combOff - HARM_FB_DELAY + i];
                 }
-                for (int i = 0; i < l - 2 * HARM_FB_DELAY; i++) {
+                for (var i = 0; i < l - 2 * HARM_FB_DELAY; i++) {
                     yHarm[2 * HARM_FB_DELAY + i] = comb[combOff + HARM_FB_DELAY + i];
                 }
             } else {
-                for (int i = 0; i < l; i++) {
+                for (var i = 0; i < l; i++) {
                     yHarm[i] = comb[combOff - HARM_FB_DELAY + i];
                 }
             }
@@ -796,13 +797,13 @@ public final class MlowDecodePostfilter {
      */
     private static void bweExpand(float[] a, int lpcOrder, float bwe) {
         if (bwe <= 0.0f) {
-            for (int i = 1; i < lpcOrder + 1; i++) {
+            for (var i = 1; i < lpcOrder + 1; i++) {
                 a[i] = 0.0f;
             }
             return;
         }
-        float c = bwe;
-        for (int i = 1; i < lpcOrder + 1; i++) {
+        var c = bwe;
+        for (var i = 1; i < lpcOrder + 1; i++) {
             a[i] *= c;
             c *= bwe;
         }

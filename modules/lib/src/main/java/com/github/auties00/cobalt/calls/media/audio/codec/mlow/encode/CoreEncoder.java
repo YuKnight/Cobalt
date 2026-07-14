@@ -6,6 +6,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.tables.EncoderTab
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Turns one packet of 16 kHz mono speech into a range coded MLow payload, the per packet PCM to bitstream
@@ -446,7 +447,7 @@ public final class CoreEncoder {
         this.lowRate = bitRate <= LOW_RATE_THR_60MS_16K;
         this.subfrlen = (lowRate ? 10 : 5) * CELP_FS_KHZ;
         this.numsubfrs = FRAME_LEN_SAMPLES / subfrlen;
-        float[][] hp = computeHpCoefs(HP_FCORNER_3DB_HZ);
+        var hp = computeHpCoefs(HP_FCORNER_3DB_HZ);
         this.hpB2 = hp[0];
         this.hpA2 = hp[1];
         this.lpc = new LpcAnalysis();
@@ -465,7 +466,7 @@ public final class CoreEncoder {
         this.percCorrsPrev = new float[PERC_CORRS_LEN];
         this.nonflatnessState = new float[NON_FLAT_STATE_LEN];
         this.prevVoicedCarry = 0;
-        java.util.Arrays.fill(candidateEnergy, Float.MAX_VALUE);
+        Arrays.fill(candidateEnergy, Float.MAX_VALUE);
         this.candidateInsertIdx = 0;
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "core encoder constructed: bitRate={0} lowRate={1} subfrlen={2} numsubfrs={3}",
@@ -514,15 +515,15 @@ public final class CoreEncoder {
         celp.reset();
         lsfInterp.reset();
         paramEncoder.reset();
-        java.util.Arrays.fill(lpcBufMem, 0.0f);
-        java.util.Arrays.fill(hpState, 0.0f);
-        java.util.Arrays.fill(ltpBuf, 0.0f);
-        java.util.Arrays.fill(percCorrsPrev, 0.0f);
-        java.util.Arrays.fill(nonflatnessState, 0.0f);
+        Arrays.fill(lpcBufMem, 0.0f);
+        Arrays.fill(hpState, 0.0f);
+        Arrays.fill(ltpBuf, 0.0f);
+        Arrays.fill(percCorrsPrev, 0.0f);
+        Arrays.fill(nonflatnessState, 0.0f);
         prevVoicedCarry = 0;
-        java.util.Arrays.fill(candidateEnergy, Float.MAX_VALUE);
-        java.util.Arrays.fill(candidateLowRate, 0);
-        java.util.Arrays.fill(candidateParams, null);
+        Arrays.fill(candidateEnergy, Float.MAX_VALUE);
+        Arrays.fill(candidateLowRate, 0);
+        Arrays.fill(candidateParams, null);
         candidateInsertIdx = 0;
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "core encoder reset");
@@ -548,16 +549,16 @@ public final class CoreEncoder {
      */
     public void encodePacket(short[] pcm, int frameLen, int framesPerPacket, Vad.VadDecision vad,
                              MlowRangeEncoder encoder) {
-        int xLen = framesPerPacket * frameLen;
-        boolean codedAsActiveVoice = vad.codedAsActiveVoice();
+        var xLen = framesPerPacket * frameLen;
+        var codedAsActiveVoice = vad.codedAsActiveVoice();
         // A regular packet always transmits; a SID frame transmits only on the SID interval tick, and an
         // inactive frame between ticks serializes nothing (the caller drops the empty result). The analysis
         // below still runs on a non transmitted frame so the encoder state and the comfort noise candidate
         // list advance.
-        boolean sidFrame = vad.sidFrame();
-        boolean sendPacket = !sidFrame || vad.sendSidFrame();
+        var sidFrame = vad.sidFrame();
+        var sendPacket = !sidFrame || vad.sendSidFrame();
         packetMs = framesPerPacket == 1 ? 20 : framesPerPacket == 3 ? 60 : framesPerPacket == 6 ? 120 : 10;
-        int frameMs = packetMs == 10 ? 10 : 20;
+        var frameMs = packetMs == 10 ? 10 : 20;
 
         if (Log.TRACE) {
             LOGGER.log(Level.TRACE, "core encode packet: packetMs={0} framesPerPacket={1} bitRate={2} "
@@ -565,8 +566,8 @@ public final class CoreEncoder {
                     packetMs, framesPerPacket, bitRate, codedAsActiveVoice, sidFrame, sendPacket);
         }
 
-        float[] x = new float[xLen];
-        for (int i = 0; i < xLen; i++) {
+        var x = new float[xLen];
+        for (var i = 0; i < xLen; i++) {
             x[i] = pcm[i] / 32768.0f;
         }
 
@@ -575,84 +576,84 @@ public final class CoreEncoder {
         // frame's window and the last subframe pair's perceptual model read; the native buffer holds stale
         // data there, but the last frame uses the short window whose taper zeroes that region, so a zeroed
         // tail is exact.
-        float[] xhpPacketBuf = new float[LPC_BUF_MEM_LEN + WINNEXT_WB_LEN + xLen + WINNEXT_WB_LONG_LEN];
+        var xhpPacketBuf = new float[LPC_BUF_MEM_LEN + WINNEXT_WB_LEN + xLen + WINNEXT_WB_LONG_LEN];
         System.arraycopy(lpcBufMem, 0, xhpPacketBuf, 0, LPC_BUF_MEM_LEN + WINNEXT_WB_LEN);
-        int xIn16k = LPC_BUF_MEM_LEN + WINNEXT_WB_LEN;
+        var xIn16k = LPC_BUF_MEM_LEN + WINNEXT_WB_LEN;
         hpArma2(x, 0, xLen, xhpPacketBuf, xIn16k);
 
-        int prevVoiced = 0;
-        int lastVoiced = 0;
+        var prevVoiced = 0;
+        var lastVoiced = 0;
 
-        for (int numframe = 0; numframe < framesPerPacket; numframe++) {
-            int framelen = frameLen;
-            int subfrlen = this.subfrlen;
-            int numsubfrs = this.numsubfrs;
-            int shorter = WINNEXT_WB_LONG_LEN - WINNEXT_WB_LEN;
+        for (var numframe = 0; numframe < framesPerPacket; numframe++) {
+            var framelen = frameLen;
+            var subfrlen = this.subfrlen;
+            var numsubfrs = this.numsubfrs;
+            var shorter = WINNEXT_WB_LONG_LEN - WINNEXT_WB_LEN;
 
-            int bitsBefore = encoder.tell();
+            var bitsBefore = encoder.tell();
 
-            int xhpFrame = xIn16k - WINNEXT_WB_LEN + framelen * numframe;
-            int lpcbuf = xhpFrame + framelen + WINNEXT_WB_LONG_LEN - LPC_BUF_LEN;
+            var xhpFrame = xIn16k - WINNEXT_WB_LEN + framelen * numframe;
+            var lpcbuf = xhpFrame + framelen + WINNEXT_WB_LONG_LEN - LPC_BUF_LEN;
 
             // Frame energy for the comfort noise candidate ranking; the lowest energy inactive candidate
             // becomes the SID frame's comfort noise.
-            float frameEnergy = nrg(xhpPacketBuf, xhpFrame, framelen);
+            var frameEnergy = nrg(xhpPacketBuf, xhpFrame, framelen);
 
-            boolean longWindow = numframe < (framesPerPacket - 1);
+            var longWindow = numframe < (framesPerPacket - 1);
             // TODO: reuse the remaining per frame encode tree scratch (percCorrs, spans, ltpSlice, wnrgs) as
             //  single owner instance fields with out param handoffs. Left as fresh allocations for now because
             //  their length is numsubfrs or framelen dependent rather than a compile time constant; the fixed
             //  size windowed buffer is pooled in windowedScratch, proven fully overwritten by LpcAnalysis.window
             //  before analyze reads it and never aliased past the frame.
-            float[] windowed = windowedScratch;
+            var windowed = windowedScratch;
             lpc.window(xhpPacketBuf, lpcbuf, longWindow, windowed);
-            LpcAnalysis.Result lpcResult = lpc.analyze(windowed, LPC_BUF_LEN);
-            float[] aBuf = lpcResult.lpc();
+            var lpcResult = lpc.analyze(windowed, LPC_BUF_LEN);
+            var aBuf = lpcResult.lpc();
             // The analysis already ran the single 512 point FFT; reuse its power spectrum byproduct rather
             // than transforming the identical windowed buffer again.
-            float[] lpcbufF2 = lpcResult.f2();
+            var lpcbufF2 = lpcResult.f2();
 
             // Perceptual model. The encode path branches on subfrlen: 5 ms subframes (high rate) compute the
             // model for every second subframe over a two subframe span and interpolate the in between subframe
             // from the carried previous result; 10 ms subframes (low rate) compute the model for every subframe
             // directly over its own span and never interpolate (so the percCorrsPrev carry is not touched on
             // the low rate path).
-            float[][] percCorrs = new float[numsubfrs][PERC_CORRS_LEN];
+            var percCorrs = new float[numsubfrs][PERC_CORRS_LEN];
             if (subfrlen == 5 * CELP_FS_KHZ) {
-                for (int numsubfr = 1; numsubfr < numsubfrs; numsubfr += 2) {
-                    int tSubfr = LPC_BUF_LEN - framelen - shorter + (numsubfr - 1) * subfrlen;
-                    int tSubfrLen = 2 * subfrlen + shorter;
-                    boolean isLastSubfr = (numframe == (framesPerPacket - 1)) && (numsubfr == (numsubfrs - 1));
-                    float[] span = new float[tSubfrLen];
+                for (var numsubfr = 1; numsubfr < numsubfrs; numsubfr += 2) {
+                    var tSubfr = LPC_BUF_LEN - framelen - shorter + (numsubfr - 1) * subfrlen;
+                    var tSubfrLen = 2 * subfrlen + shorter;
+                    var isLastSubfr = (numframe == (framesPerPacket - 1)) && (numsubfr == (numsubfrs - 1));
+                    var span = new float[tSubfrLen];
                     System.arraycopy(windowedSpanFromBuf(xhpPacketBuf, lpcbuf + tSubfr, tSubfrLen), 0, span, 0, tSubfrLen);
                     percModel.model(span, tSubfrLen, isLastSubfr, percCorrs[numsubfr], PERC_CORRS_LEN);
-                    for (int i = 0; i < PERC_CORRS_LEN; i++) {
+                    for (var i = 0; i < PERC_CORRS_LEN; i++) {
                         percCorrs[numsubfr - 1][i] = 0.5f * (percCorrs[numsubfr][i] + percCorrsPrev[i]);
                     }
                     System.arraycopy(percCorrs[numsubfr], 0, percCorrsPrev, 0, PERC_CORRS_LEN);
                 }
             } else {
-                for (int numsubfr = 0; numsubfr < numsubfrs; numsubfr++) {
-                    int tSubfr = LPC_BUF_LEN - framelen - shorter + numsubfr * subfrlen;
-                    int tSubfrLen = subfrlen + shorter;
-                    boolean isLastSubfr = (numframe == (framesPerPacket - 1)) && (numsubfr == (numsubfrs - 1));
-                    float[] span = new float[tSubfrLen];
+                for (var numsubfr = 0; numsubfr < numsubfrs; numsubfr++) {
+                    var tSubfr = LPC_BUF_LEN - framelen - shorter + numsubfr * subfrlen;
+                    var tSubfrLen = subfrlen + shorter;
+                    var isLastSubfr = (numframe == (framesPerPacket - 1)) && (numsubfr == (numsubfrs - 1));
+                    var span = new float[tSubfrLen];
                     System.arraycopy(windowedSpanFromBuf(xhpPacketBuf, lpcbuf + tSubfr, tSubfrLen), 0, span, 0, tSubfrLen);
                     percModel.model(span, tSubfrLen, isLastSubfr, percCorrs[numsubfr], PERC_CORRS_LEN);
                 }
             }
 
             // Pitch perceptual weighting filters and weighted speech into ltp_buf.
-            float[][] percWghtRespsPitch = new float[numsubfrs][];
-            for (int i = 0; i < numsubfrs; i++) {
+            var percWghtRespsPitch = new float[numsubfrs][];
+            for (var i = 0; i < numsubfrs; i++) {
                 percWghtRespsPitch[i] = LpcAnalysis.percAc2a(percCorrs[i], EncoderTables.PERC_EMPH_PITCH,
                         PITCH_PERC_RESP_LEN, PERC_REG);
             }
-            int ltpBufLen = framelen + MAX_PITCH_LEN + PITCH_LOOKAHEAD_LEN + PITCH_TOT_INTERPOL_DELAY_LEN;
+            var ltpBufLen = framelen + MAX_PITCH_LEN + PITCH_LOOKAHEAD_LEN + PITCH_TOT_INTERPOL_DELAY_LEN;
             System.arraycopy(ltpBuf, framelen, ltpBuf, 0,
                     MAX_LTP_BUF_LEN - framelen - PITCH_LOOKAHEAD_LEN);
-            int wSpeech = MAX_LTP_BUF_LEN - numsubfrs * subfrlen - PITCH_LOOKAHEAD_LEN;
-            for (int i = 0; i < numsubfrs; i++) {
+            var wSpeech = MAX_LTP_BUF_LEN - numsubfrs * subfrlen - PITCH_LOOKAHEAD_LEN;
+            for (var i = 0; i < numsubfrs; i++) {
                 hpMa16Monic(xhpPacketBuf, xhpFrame + i * subfrlen, subfrlen, percWghtRespsPitch[i],
                         ltpBuf, wSpeech + i * subfrlen);
             }
@@ -660,37 +661,37 @@ public final class CoreEncoder {
                     percWghtRespsPitch[numsubfrs - 1], ltpBuf, MAX_LTP_BUF_LEN - PITCH_LOOKAHEAD_LEN);
 
             // Open loop pitch estimate.
-            float[] ltpSlice = new float[ltpBufLen];
+            var ltpSlice = new float[ltpBufLen];
             System.arraycopy(ltpBuf, MAX_LTP_BUF_LEN - ltpBufLen, ltpSlice, 0, ltpBufLen);
-            OpenLoopPitch.Result pitchResult = pitch.estimate(ltpSlice, ltpBufLen, PITCH_LOOKAHEAD_LEN,
+            var pitchResult = pitch.estimate(ltpSlice, ltpBufLen, PITCH_LOOKAHEAD_LEN,
                     lpcbufF2, codedAsActiveVoice, (framelen / LAG_SUBFRLEN));
-            float[] lags = pitchResult.lags();
+            var lags = pitchResult.lags();
 
             // Voiced vs unvoiced.
-            float spActProb = vad.speechActivityQ8()[numframe] / 256.0f;
-            float voicingStrength = signalMode.classify(pitchResult.pitchCorr(), lags, pitchResult.avgLag(),
+            var spActProb = vad.speechActivityQ8()[numframe] / 256.0f;
+            var voicingStrength = signalMode.classify(pitchResult.pitchCorr(), lags, pitchResult.avgLag(),
                     pitchResult.harmStrength(), lpcbufF2, spActProb);
-            int voiced = (voicingStrength > 0.0f) && codedAsActiveVoice ? 1 : 0;
+            var voiced = (voicingStrength > 0.0f) && codedAsActiveVoice ? 1 : 0;
             if (voiced == 0) {
-                java.util.Arrays.fill(lags, 0, (framelen / LAG_SUBFRLEN), 0.0f);
+                Arrays.fill(lags, 0, (framelen / LAG_SUBFRLEN), 0.0f);
             }
 
             // Per subframe weighted energies.
-            float[] wnrgs = new float[numsubfrs];
-            for (int i = 0; i < numsubfrs; i++) {
+            var wnrgs = new float[numsubfrs];
+            for (var i = 0; i < numsubfrs; i++) {
                 wnrgs[i] = nrg(ltpBuf, wSpeech + i * subfrlen, subfrlen);
             }
 
-            boolean condCoding = (voiced == prevVoiced) && (numframe > 0);
+            var condCoding = (voiced == prevVoiced) && (numframe > 0);
 
-            LbQuantParams params = baseEncode(xhpPacketBuf, xhpFrame, aBuf, lpcResult.lsf(), framelen, numsubfrs,
+            var params = baseEncode(xhpPacketBuf, xhpFrame, aBuf, lpcResult.lsf(), framelen, numsubfrs,
                     subfrlen, numframe, condCoding, voiced, voicingStrength, pitchResult, lags, wnrgs, percCorrs,
                     spActProb, codedAsActiveVoice, prevVoiced);
 
             // Record this frame as a comfort noise candidate when it is inactive (or in hangover) and unvoiced.
             // Only the first frame of a packet is eligible, since the conditional coding of the later frames'
             // line spectral frequencies makes them not self contained.
-            Vad.FrameActivity activity = vad.frameActivities()[numframe];
+            var activity = vad.frameActivities()[numframe];
             if ((activity == Vad.FrameActivity.INACTIVE || activity == Vad.FrameActivity.HANGOVER)
                     && voiced == 0 && numframe == 0) {
                 candidateInsertIdx = (candidateInsertIdx + 1) % DTX_NO_CANDIDATES;
@@ -706,9 +707,9 @@ public final class CoreEncoder {
                 paramEncoder.encodeFrame(encoder, params, framelen, numsubfrs, codedAsActiveVoice, condCoding,
                         lowRate, numframe, prevVoiced, false);
             } else if (sendPacket && sidFrame && numframe == 0) {
-                int minIdx = -1;
-                float minNrg = Float.MAX_VALUE;
-                for (int i = 0; i < DTX_NO_CANDIDATES; i++) {
+                var minIdx = -1;
+                var minNrg = Float.MAX_VALUE;
+                for (var i = 0; i < DTX_NO_CANDIDATES; i++) {
                     if (candidateEnergy[i] < minNrg && candidateLowRate[i] == (lowRate ? 1 : 0)) {
                         minIdx = i;
                         minNrg = candidateEnergy[i];
@@ -724,8 +725,8 @@ public final class CoreEncoder {
             }
 
             // Close the bitrate controller feedback loop with the bits this frame actually spent.
-            int bitsThisFrame = encoder.tell() - bitsBefore;
-            float[] bitsUsed = {0.0f, bitsThisFrame};
+            var bitsThisFrame = encoder.tell() - bitsBefore;
+            var bitsUsed = new float[]{0.0f, bitsThisFrame};
             rateCtrl.updateScale(frameMs, framesPerPacket, bitsUsed, 0, bitRate, codedAsActiveVoice);
             if (Log.TRACE) {
                 LOGGER.log(Level.TRACE, "core encode frame: numframe={0} voiced={1} bits={2}",
@@ -782,38 +783,38 @@ public final class CoreEncoder {
                                      float voicingStrength, OpenLoopPitch.Result pitchResult, float[] lags,
                                      float[] wnrgs, float[][] percCorrs, float spActProb,
                                      boolean codedAsActiveVoice, int prevVoiced) {
-        boolean lowRate = this.lowRate;
-        int lowRateIdx = lowRate ? 1 : 0;
+        var lowRate = this.lowRate;
+        var lowRateIdx = lowRate ? 1 : 0;
         // The rate distortion weight adjustment normalizes against 5000 bps on the low rate path and
         // 14000 bps on the high rate path.
-        float rdwAdj = (float) Math.sqrt(bitRate / (lowRate ? 5000.0f : 14000.0f));
+        var rdwAdj = (float) Math.sqrt(bitRate / (lowRate ? 5000.0f : 14000.0f));
 
         // The conditional quantizer reads the previous LSF the interpolator carries; read it before the
         // interpolate calls, because the commit below advances that carry.
-        LsfQuantizer.QuantizedLsf quant = condCoding
+        var quant = condCoding
                 ? lsfQuantizer.quantCond(LSF_SURV, aBuf, lsfInterp.peekCarry(), lsf, rdwAdj, voiced, lowRateIdx)
                 : lsfQuantizer.quant(LSF_SURV, aBuf, lsf, rdwAdj, voiced, lowRateIdx);
-        float[] qlsf = quant.lsf();
-        float[] wlsf = quant.wlsf();
-        int[] lsfIdx = quant.indices();
+        var qlsf = quant.lsf();
+        var wlsf = quant.wlsf();
+        var lsfIdx = quant.indices();
 
-        int lsfInterpolIdx = 0;
-        EncoderLsfInterp.Candidate cand0 = lsfInterp.interpolate(qlsf, numsubfrs, 0);
-        EncoderLsfInterp.Candidate chosen = cand0;
-        float[][] predcoefs = cand0.lpc();
-        float[] reslpc = computeReslpc(xhpPacketBuf, xhpFrame, predcoefs, numsubfrs, subfrlen);
+        var lsfInterpolIdx = 0;
+        var cand0 = lsfInterp.interpolate(qlsf, numsubfrs, 0);
+        var chosen = cand0;
+        var predcoefs = cand0.lpc();
+        var reslpc = computeReslpc(xhpPacketBuf, xhpFrame, predcoefs, numsubfrs, subfrlen);
 
         // Alternative interpolation search.
         if (codedAsActiveVoice && numsubfrs > 1) {
-            float[] nrgs1 = new float[numsubfrs];
-            for (int i = 0; i < numsubfrs; i++) {
+            var nrgs1 = new float[numsubfrs];
+            for (var i = 0; i < numsubfrs; i++) {
                 nrgs1[i] = (float) Math.sqrt(nrg(reslpc, i * subfrlen, subfrlen) + 1e-30f);
             }
-            EncoderLsfInterp.Candidate cand1 = lsfInterp.interpolate(qlsf, numsubfrs, 1);
-            float[][] predcoefs2 = cand1.lpc();
-            float[] reslpc2 = computeReslpc(xhpPacketBuf, xhpFrame, predcoefs2, numsubfrs, subfrlen);
-            float[] nrgs2 = new float[numsubfrs];
-            for (int i = 0; i < numsubfrs; i++) {
+            var cand1 = lsfInterp.interpolate(qlsf, numsubfrs, 1);
+            var predcoefs2 = cand1.lpc();
+            var reslpc2 = computeReslpc(xhpPacketBuf, xhpFrame, predcoefs2, numsubfrs, subfrlen);
+            var nrgs2 = new float[numsubfrs];
+            for (var i = 0; i < numsubfrs; i++) {
                 nrgs2[i] = (float) Math.sqrt(nrg(reslpc2, i * subfrlen, subfrlen) + 1e-30f);
             }
             if (sumVec(nrgs2, numsubfrs) < sumVec(nrgs1, numsubfrs) * 0.998f) {
@@ -831,23 +832,23 @@ public final class CoreEncoder {
 
         // Perceptual weighting responses for the analysis by synthesis search. The perceptual emphasis is
         // selected by rate class and by the voiced or unvoiced decision.
-        float[][] percWghtResp = new float[numsubfrs][];
-        float[] percEmph = voiced == 1 ? EncoderTables.PERC_EMPH_V : EncoderTables.PERC_EMPH_UV;
-        for (int i = 0; i < numsubfrs; i++) {
+        var percWghtResp = new float[numsubfrs][];
+        var percEmph = voiced == 1 ? EncoderTables.PERC_EMPH_V : EncoderTables.PERC_EMPH_UV;
+        for (var i = 0; i < numsubfrs; i++) {
             percWghtResp[i] = LpcAnalysis.percAc2a(percCorrs[i], percEmph[lowRateIdx], PERC_RESP_LEN, PERC_REG);
         }
 
         // The unvoiced nonflatness threshold is the fixed UV_NONFLATNESS_THR on the low rate path and the
         // bitrate and speech activity dependent value on high rate.
-        float spActProbUsed = 1.0f; // useSpActFlatnessThres == 0
-        float uvNonflatnessThres = lowRate
+        var spActProbUsed = 1.0f; // useSpActFlatnessThres == 0
+        var uvNonflatnessThres = lowRate
                 ? UV_NONFLATNESS_THR
                 : BitrateController.hrNonflatThres(bitRate, spActProbUsed);
-        float nonflat = uvNonflatnessThres + 0.1f;
+        var nonflat = uvNonflatnessThres + 0.1f;
         // Per subframe nonflatness: recompute over each subframe span for unvoiced frames, threading the
         // cross frame state; voiced subframes keep the carried value.
-        float[] nonflatness = new float[numsubfrs];
-        for (int numsubfr = 0; numsubfr < numsubfrs; numsubfr++) {
+        var nonflatness = new float[numsubfrs];
+        for (var numsubfr = 0; numsubfr < numsubfrs; numsubfr++) {
             if (voiced == 0) {
                 nonflat = BitrateController.nonflatness(reslpc, numsubfr * subfrlen, subfrlen, wlsf,
                         nonflatnessState);
@@ -855,73 +856,73 @@ public final class CoreEncoder {
             nonflatness[numsubfr] = nonflat;
         }
 
-        int prevVoicedSf = (numframe == 0) ? prevVoicedCarry : prevVoiced;
-        int lagSfPerFcbSf = subfrlen / LAG_SUBFRLEN;
-        float[] nrgres = new float[numsubfrs];
-        short[] pulses = new short[framelen];
-        int[] sfPulses = new int[numsubfrs];
-        int[] acbgIdx = new int[numsubfrs];
-        int[] fcbgIdx = new int[numsubfrs];
-        boolean voicedBool = voiced == 1;
+        var prevVoicedSf = (numframe == 0) ? prevVoicedCarry : prevVoiced;
+        var lagSfPerFcbSf = subfrlen / LAG_SUBFRLEN;
+        var nrgres = new float[numsubfrs];
+        var pulses = new short[framelen];
+        var sfPulses = new int[numsubfrs];
+        var acbgIdx = new int[numsubfrs];
+        var fcbgIdx = new int[numsubfrs];
+        var voicedBool = voiced == 1;
 
         // TODO: reuse the per subframe Result holders and flatten the boxed param vectors into mutable
         //  single owner holders across CoreEncoder/CelpEncoder/FcbSearch/AcbSearch/OpenLoopPitch/ParamEncoder.
         //  Left as per iteration allocations for now: proving no consumer retains a Result alias across the
         //  next subframe or frame across these kernels was not completed here, and an unproven mutable holder
         //  reuse would fail the MlowBitIdentity golden.
-        for (int numsubfr = 0; numsubfr < numsubfrs; numsubfr++) {
-            float wnrgNext = (numsubfr < (numsubfrs - 1)) ? wnrgs[numsubfr + 1] : wnrgs[numsubfr];
-            BitrateController.Allocation alloc = rateCtrl.control(false, codedAsActiveVoice, spActProb,
+        for (var numsubfr = 0; numsubfr < numsubfrs; numsubfr++) {
+            var wnrgNext = (numsubfr < (numsubfrs - 1)) ? wnrgs[numsubfr + 1] : wnrgs[numsubfr];
+            var alloc = rateCtrl.control(false, codedAsActiveVoice, spActProb,
                     nonflatness[numsubfr], voicingStrength, voiced, wnrgs[numsubfr], wnrgNext, lowRate,
                     framelen, subfrlen, INTERNAL_SAMPLE_RATE, packetMs, 0, bitRate, COMPLEXITY, false,
                     false, SUBFRAME_IMPORTANCE_FACTOR);
-            short[] maxPulses = alloc.maxPulsesPerSubfr().clone();
-            float[] importance = alloc.subfrImportance();
+            var maxPulses = alloc.maxPulsesPerSubfr().clone();
+            var importance = alloc.subfrImportance();
 
             if (voiced == 0 && prevVoicedSf == 0 && nonflatness[numsubfr] < uvNonflatnessThres) {
                 maxPulses[0] = 0;
                 maxPulses[1] = 0;
             }
 
-            int lagind = numsubfr * lagSfPerFcbSf;
-            int totSurv = 1000 * (FCB_TOT_SURV_20MS_MAX * subfrlen) / (20 * 16000);
+            var lagind = numsubfr * lagSfPerFcbSf;
+            var totSurv = 1000 * (FCB_TOT_SURV_20MS_MAX * subfrlen) / (20 * 16000);
             // A low rate voiced subframe scales the survivor budget down toward zero as the pitch lag shrinks
             // below the subframe length.
             if (lowRate && voiced == 1) {
-                float scale = Math.min(lags[lagind + lagSfPerFcbSf - 1] / subfrlen, 1.0f);
+                var scale = Math.min(lags[lagind + lagSfPerFcbSf - 1] / subfrlen, 1.0f);
                 totSurv = Math.round(totSurv * scale);
             }
-            short[] numsurv = distributeFcbSurv(maxPulses[1], totSurv);
+            var numsurv = distributeFcbSurv(maxPulses[1], totSurv);
 
-            float[] subLags = new float[lagSfPerFcbSf];
+            var subLags = new float[lagSfPerFcbSf];
             System.arraycopy(lags, lagind, subLags, 0, lagSfPerFcbSf);
-            CelpEncoder.SubframeExcitation se = celp.encodeSubframe(voicedBool, reslpc, numsubfr * subfrlen,
+            var se = celp.encodeSubframe(voicedBool, reslpc, numsubfr * subfrlen,
                     predcoefs[numsubfr], percWghtResp[numsubfr], subLags, importance, maxPulses, numsurv);
             sfPulses[numsubfr] = se.nPulses();
             acbgIdx[numsubfr] = se.acbgIdx();
             fcbgIdx[numsubfr] = se.fcbgIdx();
-            short[] subPulses = se.pulses();
-            for (int i = 0; i < se.nPulses(); i++) {
-                short signed = subPulses[i];
-                int sign = 1 + 2 * (signed >> 15);
-                int pos = (signed * sign) - 1;
+            var subPulses = se.pulses();
+            for (var i = 0; i < se.nPulses(); i++) {
+                var signed = subPulses[i];
+                var sign = 1 + 2 * (signed >> 15);
+                var pos = (signed * sign) - 1;
                 pulses[numsubfr * subfrlen + pos] += (short) sign;
             }
             nrgres[numsubfr] = voiced == 1 ? 0.0f : nrg(reslpc, numsubfr * subfrlen, subfrlen) / subfrlen;
         }
 
-        int nrgresFrameQi = 0;
-        int nrgresShapeQi = 0;
-        int[] nrgresDbqQ14 = new int[numsubfrs];
+        var nrgresFrameQi = 0;
+        var nrgresShapeQi = 0;
+        var nrgresDbqQ14 = new int[numsubfrs];
         if (voiced == 0) {
-            NrgResQuantizer.Result nr = nrgRes.quantize(nrgres, numsubfrs);
+            var nr = nrgRes.quantize(nrgres, numsubfrs);
             nrgresFrameQi = nr.nrgresFrameQi();
             nrgresShapeQi = nr.nrgresShapeQi();
             nrgresDbqQ14 = nr.nrgresDbqQ14();
         }
 
-        int[] laginds = pitchResult.laginds().clone();
-        int blocksegsIx = pitchResult.blocksegIdx();
+        var laginds = pitchResult.laginds().clone();
+        var blocksegsIx = pitchResult.blocksegIdx();
 
         return new LbQuantParams(voiced == 1, lsfIdx, lsfInterpolIdx, pulses, sfPulses, acbgIdx, fcbgIdx,
                 laginds, blocksegsIx, nrgresFrameQi, nrgresShapeQi, nrgresDbqQ14);
@@ -940,8 +941,8 @@ public final class CoreEncoder {
      */
     private static float[] computeReslpc(float[] xhpPacketBuf, int xhpFrame, float[][] predcoefs, int numsubfrs,
                                          int subfrlen) {
-        float[] reslpc = new float[numsubfrs * subfrlen];
-        for (int i = 0; i < numsubfrs; i++) {
+        var reslpc = new float[numsubfrs * subfrlen];
+        for (var i = 0; i < numsubfrs; i++) {
             hpMa16Monic(xhpPacketBuf, xhpFrame + i * subfrlen, subfrlen, predcoefs[i], reslpc,
                     i * subfrlen);
         }
@@ -960,22 +961,22 @@ public final class CoreEncoder {
      * @return the per stage survivor counts, {@value #NUMSURV_LEN} entries
      */
     private static short[] distributeFcbSurv(int maxPulses, int totSurv) {
-        short[] numsurv = new short[NUMSURV_LEN];
+        var numsurv = new short[NUMSURV_LEN];
         if (maxPulses <= 1) {
             numsurv[0] = 1;
             return numsurv;
         }
-        for (int i = 0; i < maxPulses; i++) {
+        for (var i = 0; i < maxPulses; i++) {
             numsurv[i] = 1;
         }
-        int sumSurv = maxPulses;
-        int extraSurv = totSurv - maxPulses;
-        int extra = Math.min(extraSurv / (maxPulses - 1), FCB_SRV_MAX - 1);
-        for (int i = 0; i < maxPulses - 1; i++) {
+        var sumSurv = maxPulses;
+        var extraSurv = totSurv - maxPulses;
+        var extra = Math.min(extraSurv / (maxPulses - 1), FCB_SRV_MAX - 1);
+        for (var i = 0; i < maxPulses - 1; i++) {
             numsurv[i] += (short) extra;
         }
         sumSurv += extra * (maxPulses - 1);
-        int ix = maxPulses - 2;
+        var ix = maxPulses - 2;
         while (sumSurv < totSurv) {
             if (numsurv[ix] < FCB_SRV_MAX) {
                 numsurv[ix] += 1;
@@ -998,7 +999,7 @@ public final class CoreEncoder {
      * @return a freshly allocated copy of the span
      */
     private static float[] windowedSpanFromBuf(float[] buf, int off, int length) {
-        float[] out = new float[length];
+        var out = new float[length];
         System.arraycopy(buf, off, out, 0, length);
         return out;
     }
@@ -1015,23 +1016,23 @@ public final class CoreEncoder {
      * @return the single precision sum of squares
      */
     private static float nrg(float[] x, int offset, int length) {
-        float lane0 = 0.0f;
-        float lane1 = 0.0f;
-        float lane2 = 0.0f;
-        float lane3 = 0.0f;
-        int vecEnd = length & ~3;
-        for (int n = 0; n < vecEnd; n += 4) {
-            float x0 = x[offset + n];
-            float x1 = x[offset + n + 1];
-            float x2 = x[offset + n + 2];
-            float x3 = x[offset + n + 3];
+        var lane0 = 0.0f;
+        var lane1 = 0.0f;
+        var lane2 = 0.0f;
+        var lane3 = 0.0f;
+        var vecEnd = length & ~3;
+        for (var n = 0; n < vecEnd; n += 4) {
+            var x0 = x[offset + n];
+            var x1 = x[offset + n + 1];
+            var x2 = x[offset + n + 2];
+            var x3 = x[offset + n + 3];
             lane0 += x0 * x0;
             lane1 += x1 * x1;
             lane2 += x2 * x2;
             lane3 += x3 * x3;
         }
-        float total = (lane0 + lane2) + (lane1 + lane3);
-        for (int n = vecEnd; n < length; n++) {
+        var total = (lane0 + lane2) + (lane1 + lane3);
+        for (var n = vecEnd; n < length; n++) {
             total += x[offset + n] * x[offset + n];
         }
         return total;
@@ -1045,8 +1046,8 @@ public final class CoreEncoder {
      * @return the running sum
      */
     private static float sumVec(float[] x, int length) {
-        float sum = 0.0f;
-        for (int i = 0; i < length; i++) {
+        var sum = 0.0f;
+        for (var i = 0; i < length; i++) {
             sum += x[i];
         }
         return sum;
@@ -1065,27 +1066,27 @@ public final class CoreEncoder {
      * @return a two element array {@code {coefMa, coefAr}}, each three single precision taps
      */
     private static float[][] computeHpCoefs(int fcorner3dBHz) {
-        float fc = Math.min(Math.max((float) fcorner3dBHz, 5.0f), 1500.0f);
-        float maf = 0.1f;
-        float arf0 = 0.728508218f;
-        float arf1 = 0.476039848f;
-        float arr0 = -4.363803713f;
-        float arr1 = 8.441854006f;
-        float f = fc / 16000.0f;
-        float pi = 3.1415926535897f;
+        var fc = Math.min(Math.max((float) fcorner3dBHz, 5.0f), 1500.0f);
+        var maf = 0.1f;
+        var arf0 = 0.728508218f;
+        var arf1 = 0.476039848f;
+        var arr0 = -4.363803713f;
+        var arr1 = 8.441854006f;
+        var f = fc / 16000.0f;
+        var pi = 3.1415926535897f;
 
-        float[] coefMa = new float[3];
-        float[] coefAr = new float[3];
+        var coefMa = new float[3];
+        var coefAr = new float[3];
         coefMa[0] = 1.0f;
         coefMa[1] = -2.0f * cosApprox(2.0f * pi * maf * f);
         coefMa[2] = 1.0f;
-        float far = arf0 * f + arf1 * f * f;
-        float rar = arr0 * f + arr1 * f * f;
+        var far = arf0 * f + arf1 * f * f;
+        var rar = arr0 * f + arr1 * f * f;
         coefAr[0] = 1.0f;
         coefAr[1] = -2.0f * cosApprox(2.0f * pi * far) * (1.0f + rar);
         coefAr[2] = 1.0f + (2.0f * rar + rar * rar);
-        float sc = (1.0f - coefAr[1] + coefAr[2]) / (1.0f - coefMa[1] + coefMa[2]);
-        for (int i = 0; i < 3; i++) {
+        var sc = (1.0f - coefAr[1] + coefAr[2]) / (1.0f - coefMa[1] + coefMa[2]);
+        for (var i = 0; i < 3; i++) {
             coefMa[i] *= sc;
         }
         return new float[][]{coefMa, coefAr};
@@ -1150,18 +1151,18 @@ public final class CoreEncoder {
     private static void hpMa2(float[] x, int xOff, int n, float[] coef, float[] state, int stateOff,
                               float[] y, int yOff) {
         if (coef[0] == 1.0f) {
-            for (int i = 0; i < n - 1; i++) {
+            for (var i = 0; i < n - 1; i++) {
                 y[yOff + 1 + i] = x[xOff + 1 + i] + coef[1] * x[xOff + i];
             }
         } else {
-            for (int i = 0; i < n; i++) {
+            for (var i = 0; i < n; i++) {
                 y[yOff + i] = x[xOff + i] * coef[0];
             }
-            for (int i = 0; i < n - 1; i++) {
+            for (var i = 0; i < n - 1; i++) {
                 y[yOff + 1 + i] += coef[1] * x[xOff + i];
             }
         }
-        for (int i = 0; i < n - 2; i++) {
+        for (var i = 0; i < n - 2; i++) {
             y[yOff + 2 + i] += coef[2] * x[xOff + i];
         }
         y[yOff] = (coef[1] * state[stateOff] + coef[2] * state[stateOff + 1]) + coef[0] * x[xOff];
@@ -1198,33 +1199,33 @@ public final class CoreEncoder {
      * @param stateOff the offset of the AR memory in {@code state}
      */
     private static void hpAr2(float[] y, int yOff, int n, float[] coef, float[] state, int stateOff) {
-        float ytmp0 = state[stateOff + 1];
-        float ytmp1 = state[stateOff];
-        float c1 = coef[1];
-        float c2 = coef[2];
-        float ar1 = -c1;
-        float ar2 = -c2;
-        float ar1_2 = ar1 * ar1;
-        float ar1_3 = ar1 * ar1_2;
-        float ar1_4 = ar1 * ar1_3;
-        float imp1 = ar1;
-        float imp2 = ar1_2 - c2;
-        float ymp2 = c1 * c2;
-        float imp3 = (ymp2 + ymp2) + ar1_3;
-        float imp4 = (3.0f * ar1_2 * ar2 + ar1_4) + c2 * c2;
-        float ymp1 = ar2;
-        float ymp3 = (c2 - ar1_2) * c2;
-        float ymp4 = ar2 * imp3;
-        int i = 0;
+        var ytmp0 = state[stateOff + 1];
+        var ytmp1 = state[stateOff];
+        var c1 = coef[1];
+        var c2 = coef[2];
+        var ar1 = -c1;
+        var ar2 = -c2;
+        var ar1_2 = ar1 * ar1;
+        var ar1_3 = ar1 * ar1_2;
+        var ar1_4 = ar1 * ar1_3;
+        var imp1 = ar1;
+        var imp2 = ar1_2 - c2;
+        var ymp2 = c1 * c2;
+        var imp3 = (ymp2 + ymp2) + ar1_3;
+        var imp4 = (3.0f * ar1_2 * ar2 + ar1_4) + c2 * c2;
+        var ymp1 = ar2;
+        var ymp3 = (c2 - ar1_2) * c2;
+        var ymp4 = ar2 * imp3;
+        var i = 0;
         for (; i < n - 3; i += 4) {
-            float x0 = y[yOff + i];
-            float x1 = y[yOff + i + 1];
-            float x2 = y[yOff + i + 2];
-            float x3 = y[yOff + i + 3];
-            float y0 = (imp1 * ytmp1 + ymp1 * ytmp0) + x0;
-            float y1 = (imp2 * ytmp1 + ymp2 * ytmp0) + (imp1 * x0 + x1);
-            float y2 = ((imp3 * ytmp1 + ymp3 * ytmp0) + x2) + (imp1 * x1 + imp2 * x0);
-            float y3 = ((imp4 * ytmp1 + ymp4 * ytmp0) + x3) + ((imp1 * x2 + imp2 * x1) + imp3 * x0);
+            var x0 = y[yOff + i];
+            var x1 = y[yOff + i + 1];
+            var x2 = y[yOff + i + 2];
+            var x3 = y[yOff + i + 3];
+            var y0 = (imp1 * ytmp1 + ymp1 * ytmp0) + x0;
+            var y1 = (imp2 * ytmp1 + ymp2 * ytmp0) + (imp1 * x0 + x1);
+            var y2 = ((imp3 * ytmp1 + ymp3 * ytmp0) + x2) + (imp1 * x1 + imp2 * x0);
+            var y3 = ((imp4 * ytmp1 + ymp4 * ytmp0) + x3) + ((imp1 * x2 + imp2 * x1) + imp3 * x0);
             y[yOff + i] = y0;
             y[yOff + i + 1] = y1;
             y[yOff + i + 2] = y2;
@@ -1233,7 +1234,7 @@ public final class CoreEncoder {
             ytmp1 = y3;
         }
         for (; i < n; i++) {
-            float v = y[yOff + i] + ar1 * ytmp1 + ar2 * ytmp0;
+            var v = y[yOff + i] + ar1 * ytmp1 + ar2 * ytmp0;
             y[yOff + i] = v;
             ytmp0 = ytmp1;
             ytmp1 = v;
@@ -1275,43 +1276,43 @@ public final class CoreEncoder {
      * @param yOff the offset of the first output sample in {@code y}
      */
     private static void hpMa16Monic(float[] x, int xOff, int n, float[] coef, float[] y, int yOff) {
-        float c1 = coef[1];
-        float c2 = coef[2];
-        float c3 = coef[3];
-        float c4 = coef[4];
-        float c5 = coef[5];
-        float c6 = coef[6];
-        float c7 = coef[7];
-        float c8 = coef[8];
-        float c9 = coef[9];
-        float c10 = coef[10];
-        float c11 = coef[11];
-        float c12 = coef[12];
-        float c13 = coef[13];
-        float c14 = coef[14];
-        float c15 = coef[15];
-        float c16 = coef[16];
-        for (int sample = 0; sample < n; sample++) {
-            int idx = xOff + sample;
-            float p1 = c1 * x[idx - 1];
-            float p2 = c2 * x[idx - 2];
-            float p3 = c3 * x[idx - 3];
-            float p4 = c4 * x[idx - 4];
-            float p5 = c5 * x[idx - 5];
-            float p6 = c6 * x[idx - 6];
-            float p7 = c7 * x[idx - 7];
-            float p8 = c8 * x[idx - 8];
-            float p9 = c9 * x[idx - 9];
-            float p10 = c10 * x[idx - 10];
-            float p11 = c11 * x[idx - 11];
-            float p12 = c12 * x[idx - 12];
-            float p13 = c13 * x[idx - 13];
-            float p14 = c14 * x[idx - 14];
-            float p15 = c15 * x[idx - 15];
-            float p16 = c16 * x[idx - 16];
-            float a = p16 + (p13 + (p10 + (p8 + (p2 + p1))));
-            float b = p15 + (p12 + (p9 + (p6 + p5)));
-            float c = x[idx] + (p14 + (p11 + (p7 + (p4 + p3))));
+        var c1 = coef[1];
+        var c2 = coef[2];
+        var c3 = coef[3];
+        var c4 = coef[4];
+        var c5 = coef[5];
+        var c6 = coef[6];
+        var c7 = coef[7];
+        var c8 = coef[8];
+        var c9 = coef[9];
+        var c10 = coef[10];
+        var c11 = coef[11];
+        var c12 = coef[12];
+        var c13 = coef[13];
+        var c14 = coef[14];
+        var c15 = coef[15];
+        var c16 = coef[16];
+        for (var sample = 0; sample < n; sample++) {
+            var idx = xOff + sample;
+            var p1 = c1 * x[idx - 1];
+            var p2 = c2 * x[idx - 2];
+            var p3 = c3 * x[idx - 3];
+            var p4 = c4 * x[idx - 4];
+            var p5 = c5 * x[idx - 5];
+            var p6 = c6 * x[idx - 6];
+            var p7 = c7 * x[idx - 7];
+            var p8 = c8 * x[idx - 8];
+            var p9 = c9 * x[idx - 9];
+            var p10 = c10 * x[idx - 10];
+            var p11 = c11 * x[idx - 11];
+            var p12 = c12 * x[idx - 12];
+            var p13 = c13 * x[idx - 13];
+            var p14 = c14 * x[idx - 14];
+            var p15 = c15 * x[idx - 15];
+            var p16 = c16 * x[idx - 16];
+            var a = p16 + (p13 + (p10 + (p8 + (p2 + p1))));
+            var b = p15 + (p12 + (p9 + (p6 + p5)));
+            var c = x[idx] + (p14 + (p11 + (p7 + (p4 + p3))));
             y[yOff + sample] = c + (a + b);
         }
     }

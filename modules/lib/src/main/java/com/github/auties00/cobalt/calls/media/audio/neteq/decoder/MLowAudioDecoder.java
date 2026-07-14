@@ -1,6 +1,7 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq.decoder;
 
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.MlowDecoder;
+import com.github.auties00.cobalt.calls.media.audio.codec.mlow.MlowTocByte;
 import com.github.auties00.cobalt.calls.media.audio.codec.mlow.postfilter.MlowDecodePostfilter;
 import com.github.auties00.cobalt.log.Log;
 
@@ -200,7 +201,7 @@ public final class MLowAudioDecoder implements AudioDecoder {
             output = conceal(frameSamples);
         } else if (fec) {
             if (payload.length == 0
-                    || !com.github.auties00.cobalt.calls.media.audio.codec.mlow.MlowTocByte.decode(payload[0] & 0xFF).fec()) {
+                    || !MlowTocByte.decode(payload[0] & 0xFF).fec()) {
                 if (Log.DEBUG) LOGGER.log(Level.DEBUG, "mlow decode: fec requested but no redundant copy, concealing");
                 output = conceal(frameSamples);
             } else {
@@ -316,7 +317,7 @@ public final class MLowAudioDecoder implements AudioDecoder {
         }
         if (fec) {
             if (payload.length == 0
-                    || !com.github.auties00.cobalt.calls.media.audio.codec.mlow.MlowTocByte.decode(payload[0] & 0xFF).fec()) {
+                    || !MlowTocByte.decode(payload[0] & 0xFF).fec()) {
                 return concealInto(destination);
             }
             return renderInto(kernel.decodeWithSynthesis(payload, lpcPostfilterEnabled, true), false, destination);

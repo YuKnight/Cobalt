@@ -99,7 +99,7 @@ public final class OpusRepacketizer implements AutoCloseable {
         this.arena = Arena.ofShared();
         try {
             var outHandle = arena.allocate(ValueLayout.ADDRESS);
-            int rc = CobaltOpus.cobalt_opus_repacketizer_create(outHandle);
+            var rc = CobaltOpus.cobalt_opus_repacketizer_create(outHandle);
             this.state = outHandle.get(ValueLayout.ADDRESS, 0);
             if (rc != CobaltOpus.COBALT_OPUS_OK() || state.equals(MemorySegment.NULL)) {
                 throw WhatsAppCallException.Opus.fromErr("cobalt_opus_repacketizer_create", rc);

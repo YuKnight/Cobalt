@@ -12,7 +12,9 @@ import com.github.auties00.cobalt.model.business.catalog.BusinessProductComplian
 import com.github.auties00.cobalt.model.business.catalog.BusinessProductComplianceBuilder;
 import com.github.auties00.cobalt.model.business.catalog.BusinessProductImage;
 import com.github.auties00.cobalt.model.business.catalog.BusinessProductImageBuilder;
+import com.github.auties00.cobalt.model.business.catalog.BusinessProductImporterAddress;
 import com.github.auties00.cobalt.model.business.catalog.BusinessProductImporterAddressBuilder;
+import com.github.auties00.cobalt.model.business.catalog.BusinessProductSalePrice;
 import com.github.auties00.cobalt.model.business.catalog.BusinessProductSalePriceBuilder;
 import com.github.auties00.cobalt.model.business.catalog.BusinessProductVideo;
 import com.github.auties00.cobalt.model.business.catalog.BusinessProductVideoBuilder;
@@ -250,7 +252,7 @@ public final class CatalogProductInfoParser {
      * @param obj the sale-price stanza, possibly {@code null}
      * @return the parsed sale price, or {@code null} when {@code obj} is {@code null} or lacks a price
      */
-    private static com.github.auties00.cobalt.model.business.catalog.BusinessProductSalePrice parseSalePrice(JSONObject obj) {
+    private static BusinessProductSalePrice parseSalePrice(JSONObject obj) {
         if (obj == null) {
             return null;
         }
@@ -300,7 +302,7 @@ public final class CatalogProductInfoParser {
      * @return the parsed importer address, or {@code null} when {@code obj} is {@code null} or lacks a
      *         required first street line, city, or country code
      */
-    private static com.github.auties00.cobalt.model.business.catalog.BusinessProductImporterAddress parseImporterAddress(JSONObject obj) {
+    private static BusinessProductImporterAddress parseImporterAddress(JSONObject obj) {
         if (obj == null) {
             return null;
         }

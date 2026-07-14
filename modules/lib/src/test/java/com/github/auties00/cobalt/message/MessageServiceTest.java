@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.message;
 import com.github.auties00.cobalt.media.transcode.LiveMediaTranscoderService;
+import com.github.auties00.cobalt.message.crypto.SignalCryptoLocks;
+import com.github.auties00.cobalt.message.receive.crypto.MessageDecryption;
+import com.github.auties00.cobalt.message.send.crypto.MessageEncryption;
 import com.github.auties00.cobalt.migration.LiveLidMigrationService;
 
 import com.github.auties00.cobalt.client.linked.TestWhatsAppClient;
@@ -42,9 +45,9 @@ class MessageServiceTest {
                 .withAbPropsService(TestABPropsService.builder().build());
         var session = new SignalSessionCipher(store.signalStore());
         var group = new SignalGroupCipher(store.signalStore());
-        var cryptoLocks = new com.github.auties00.cobalt.message.crypto.SignalCryptoLocks();
-        var encryption = new com.github.auties00.cobalt.message.send.crypto.MessageEncryption(store, session, group, cryptoLocks);
-        var decryption = new com.github.auties00.cobalt.message.receive.crypto.MessageDecryption(store, session, group, cryptoLocks);
+        var cryptoLocks = new SignalCryptoLocks();
+        var encryption = new MessageEncryption(store, session, group, cryptoLocks);
+        var decryption = new MessageDecryption(store, session, group, cryptoLocks);
         var device = StubDeviceService.create();
         var props = client.abPropsService();
         var wam = new LiveWamService(client, props);
@@ -70,9 +73,9 @@ class MessageServiceTest {
                 .withAbPropsService(TestABPropsService.builder().build());
         var session = new SignalSessionCipher(store.signalStore());
         var group = new SignalGroupCipher(store.signalStore());
-        var cryptoLocks = new com.github.auties00.cobalt.message.crypto.SignalCryptoLocks();
-        var encryption = new com.github.auties00.cobalt.message.send.crypto.MessageEncryption(store, session, group, cryptoLocks);
-        var decryption = new com.github.auties00.cobalt.message.receive.crypto.MessageDecryption(store, session, group, cryptoLocks);
+        var cryptoLocks = new SignalCryptoLocks();
+        var encryption = new MessageEncryption(store, session, group, cryptoLocks);
+        var decryption = new MessageDecryption(store, session, group, cryptoLocks);
         var device = StubDeviceService.create();
         var props = client.abPropsService();
         var wam = new LiveWamService(client, props);
@@ -93,9 +96,9 @@ class MessageServiceTest {
                 .withAbPropsService(TestABPropsService.builder().build());
         var session = new SignalSessionCipher(store.signalStore());
         var group = new SignalGroupCipher(store.signalStore());
-        var cryptoLocks = new com.github.auties00.cobalt.message.crypto.SignalCryptoLocks();
-        var encryption = new com.github.auties00.cobalt.message.send.crypto.MessageEncryption(store, session, group, cryptoLocks);
-        var decryption = new com.github.auties00.cobalt.message.receive.crypto.MessageDecryption(store, session, group, cryptoLocks);
+        var cryptoLocks = new SignalCryptoLocks();
+        var encryption = new MessageEncryption(store, session, group, cryptoLocks);
+        var decryption = new MessageDecryption(store, session, group, cryptoLocks);
         var device = StubDeviceService.create();
         var props = client.abPropsService();
         var wam = new LiveWamService(client, props);

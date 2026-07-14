@@ -140,19 +140,19 @@ public final class PitchLagDecoder {
      * @return the {@link #PITCH_NUM_SUBFRAMES} integer lag indices
      */
     public int[] decodeLags(MlowRangeDecoder decoder, int meanAcbgQ14) {
-        int ixJulia = decodeBlocksegIndex(decoder);
-        int blocksegsIx = blocksegIxFromJulia(ixJulia);
+        var ixJulia = decodeBlocksegIndex(decoder);
+        var blocksegsIx = blocksegIxFromJulia(ixJulia);
         lastBlocksegsIx = blocksegsIx;
-        PitchTables.Blockseg seg = data.blocksegs()[blocksegsIx];
+        var seg = data.blocksegs()[blocksegsIx];
 
-        int[] laginds = new int[PITCH_NUM_SUBFRAMES];
-        int blk = seg.blocks()[0];
-        int deltaBlk = blk - prevLagblk;
-        int startSeg = 0;
-        int lagindsIx = 0;
+        var laginds = new int[PITCH_NUM_SUBFRAMES];
+        var blk = seg.blocks()[0];
+        var deltaBlk = blk - prevLagblk;
+        var startSeg = 0;
+        var lagindsIx = 0;
         if (!(prevLagblk > -1 && deltaBlk >= -1 && deltaBlk <= 2)) {
-            int lagind = MlowEntropyWrapper.decodeUniform(decoder, BLOCKSIZE) + blk * BLOCKSIZE;
-            for (int j = 0; j < seg.seglens()[0]; j++) {
+            var lagind = MlowEntropyWrapper.decodeUniform(decoder, BLOCKSIZE) + blk * BLOCKSIZE;
+            for (var j = 0; j < seg.seglens()[0]; j++) {
                 laginds[lagindsIx++] = lagind;
             }
             prevLagblk = blk;
@@ -160,19 +160,19 @@ public final class PitchLagDecoder {
             startSeg = 1;
         }
 
-        int mode = selectMode(meanAcbgQ14);
-        int[] deltaLagCmf = data.deltaLagCmfs()[mode];
-        int[] blocks = seg.blocks();
-        int[] seglens = seg.seglens();
-        for (int k = startSeg; k < seg.nblocks(); k++) {
+        var mode = selectMode(meanAcbgQ14);
+        var deltaLagCmf = data.deltaLagCmfs()[mode];
+        var blocks = seg.blocks();
+        var seglens = seg.seglens();
+        for (var k = startSeg; k < seg.nblocks(); k++) {
             blk = blocks[k];
             deltaBlk = blk - prevLagblk;
-            int prevLagidxMod = prevLagidx - prevLagblk * BLOCKSIZE;
-            int deltaRangeStart = -prevLagidxMod + deltaBlk * BLOCKSIZE;
-            int windowStart = deltaRangeStart + 2 * BLOCKSIZE - 1;
-            int idx = MlowEntropyWrapper.decodeUpdate(decoder, deltaLagCmf, windowStart, BLOCKSIZE + 1);
-            int lagind = idx + deltaRangeStart + prevLagidx;
-            for (int j = 0; j < seglens[k]; j++) {
+            var prevLagidxMod = prevLagidx - prevLagblk * BLOCKSIZE;
+            var deltaRangeStart = -prevLagidxMod + deltaBlk * BLOCKSIZE;
+            var windowStart = deltaRangeStart + 2 * BLOCKSIZE - 1;
+            var idx = MlowEntropyWrapper.decodeUpdate(decoder, deltaLagCmf, windowStart, BLOCKSIZE + 1);
+            var lagind = idx + deltaRangeStart + prevLagidx;
+            for (var j = 0; j < seglens[k]; j++) {
                 laginds[lagindsIx++] = lagind;
             }
             prevLagblk = blk;
@@ -197,11 +197,11 @@ public final class PitchLagDecoder {
         if (prevLagblk < 0) {
             return MlowEntropyWrapper.decodeUpdate(decoder, data.blocksegIdxCmf()) + 1;
         }
-        int block0 = MlowEntropyWrapper.decodeUpdate(decoder, data.blockTransitionCmf()[prevLagblk]);
-        byte[] range = data.firstBlockRange();
-        int startIx = range[block0 * 2] & 0xFF;
-        int rangeEnd = range[block0 * 2 + 1] & 0xFF;
-        int cmfLen = rangeEnd - startIx + 2;
+        var block0 = MlowEntropyWrapper.decodeUpdate(decoder, data.blockTransitionCmf()[prevLagblk]);
+        var range = data.firstBlockRange();
+        var startIx = range[block0 * 2] & 0xFF;
+        var rangeEnd = range[block0 * 2 + 1] & 0xFF;
+        var cmfLen = rangeEnd - startIx + 2;
         return MlowEntropyWrapper.decodeUpdate(decoder, data.blocksegIdxCmf(), startIx, cmfLen) + startIx + 1;
     }
 
@@ -216,8 +216,8 @@ public final class PitchLagDecoder {
      * @throws IllegalStateException if no index maps to {@code ixJulia}
      */
     private int blocksegIxFromJulia(int ixJulia) {
-        byte[] map = data.blocksegs2idx();
-        for (int i = 0; i < map.length; i++) {
+        var map = data.blocksegs2idx();
+        for (var i = 0; i < map.length; i++) {
             if ((map[i] & 0xFF) == ixJulia) {
                 return i;
             }
@@ -240,7 +240,7 @@ public final class PitchLagDecoder {
      * @return the delta lag cumulative mass function class index in {@code [0, 2]}
      */
     private static int selectMode(int meanAcbgQ14) {
-        int[] thr = PitchTables.acbgainThr20Q14();
+        var thr = PitchTables.acbgainThr20Q14();
         if (meanAcbgQ14 < thr[0]) {
             return 0;
         }

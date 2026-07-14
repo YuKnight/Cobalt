@@ -63,17 +63,17 @@ final class EmojiLookup {
          * @throws UncheckedIOException if the legacy resource cannot be read
          */
         private static Map<String, WhatsAppEmoji> buildForms() {
-            List<WhatsAppEmoji> all = EmojiRegistry.ALL;
+            var all = EmojiRegistry.ALL;
             Map<String, WhatsAppEmoji> forms = HashMap.newHashMap(all.size() * 2);
-            for (WhatsAppEmoji emoji : all) {
+            for (var emoji : all) {
                 forms.put(unqualify(emoji.value()), emoji);
             }
-            try (DataInputStream in = EmojiResources.open("emoji_legacy.bin")) {
-                int count = in.readInt();
-                for (int i = 0; i < count; i++) {
-                    String form = EmojiResources.readString(in);
-                    String canonical = EmojiResources.readString(in);
-                    WhatsAppEmoji base = forms.get(unqualify(canonical));
+            try (var in = EmojiResources.open("emoji_legacy.bin")) {
+                var count = in.readInt();
+                for (var i = 0; i < count; i++) {
+                    var form = EmojiResources.readString(in);
+                    var canonical = EmojiResources.readString(in);
+                    var base = forms.get(unqualify(canonical));
                     if (base == null) {
                         base = forms.get(EmojiSkinTones.stripModifiers(unqualify(canonical)));
                     }
@@ -94,7 +94,7 @@ final class EmojiLookup {
          */
         private static Map<EmojiCategory, List<WhatsAppEmoji>> buildCategories() {
             Map<EmojiCategory, List<WhatsAppEmoji>> groups = new EnumMap<>(EmojiCategory.class);
-            for (WhatsAppEmoji emoji : EmojiRegistry.ALL) {
+            for (var emoji : EmojiRegistry.ALL) {
                 groups.computeIfAbsent(emoji.category(), key -> new ArrayList<>()).add(emoji);
             }
             groups.replaceAll((key, list) -> Collections.unmodifiableList(list));
@@ -122,12 +122,12 @@ final class EmojiLookup {
         if (value == null || value.isEmpty()) {
             return Optional.empty();
         }
-        String unqualified = unqualify(value);
-        WhatsAppEmoji direct = Index.BY_FORM.get(unqualified);
+        var unqualified = unqualify(value);
+        var direct = Index.BY_FORM.get(unqualified);
         if (direct != null) {
             return Optional.of(direct);
         }
-        String stripped = EmojiSkinTones.stripModifiers(unqualified);
+        var stripped = EmojiSkinTones.stripModifiers(unqualified);
         if (stripped.equals(unqualified)) {
             return Optional.empty();
         }
@@ -145,16 +145,16 @@ final class EmojiLookup {
         if (value == null || value.isEmpty()) {
             return Optional.empty();
         }
-        String unqualified = unqualify(value);
-        WhatsAppEmoji direct = Index.BY_FORM.get(unqualified);
+        var unqualified = unqualify(value);
+        var direct = Index.BY_FORM.get(unqualified);
         if (direct != null) {
             return Optional.of(direct.value());
         }
-        String stripped = EmojiSkinTones.stripModifiers(unqualified);
+        var stripped = EmojiSkinTones.stripModifiers(unqualified);
         if (stripped.equals(unqualified)) {
             return Optional.empty();
         }
-        WhatsAppEmoji base = Index.BY_FORM.get(stripped);
+        var base = Index.BY_FORM.get(stripped);
         if (base == null) {
             return Optional.empty();
         }

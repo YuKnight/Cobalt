@@ -64,7 +64,7 @@ import java.util.Base64;
  * is the per-customer consent transition applied here, and the signal payloads
  * that WA Web derives from a live ad conversation are synthesised from the
  * customer LID and the host clock. The per-LID IDB row maps to a single per-LID
- * {@link com.github.auties00.cobalt.model.business.ctwa.CtwaDataSharingPreference}
+ * {@link CtwaDataSharingPreference}
  * keyed by raw LID string in the unified store.
  */
 @WhatsAppWebModule(moduleName = "WAWebCtwaPerCustomerDataSharingSync")
@@ -144,7 +144,7 @@ public final class CtwaPerCustomerDataSharingHandler implements WebAppStateActio
      * <p>For SET mutations, validates that {@code indexParts[1]} (the account
      * LID raw string) is present and that the value carries a
      * {@link CtwaPerCustomerDataSharingAction}, then upserts a
-     * {@link com.github.auties00.cobalt.model.business.ctwa.CtwaDataSharingPreference}
+     * {@link CtwaDataSharingPreference}
      * keyed by that LID. When the upsert actually flips the customer's stored
      * preference, the disclosure and signal-sharing WAM telemetry is committed
      * for that LID. For REMOVE mutations, drops the entry by LID. Returns

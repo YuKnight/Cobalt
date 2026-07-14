@@ -122,24 +122,24 @@ public final class PulseEncoder {
             boolean voiced,
             boolean codedAsActiveVoice,
             int[] sfPulses) {
-        int subfrlen = framelen / nSubfr;
-        int voicedFlag = voiced ? 1 : 0;
-        int codedFlag = codedAsActiveVoice ? 1 : 0;
+        var subfrlen = framelen / nSubfr;
+        var voicedFlag = voiced ? 1 : 0;
+        var codedFlag = codedAsActiveVoice ? 1 : 0;
 
-        short[] positions = new short[framelen];
-        int nPositions = 0;
-        for (int sf = 0; sf < nSubfr; sf++) {
+        var positions = new short[framelen];
+        var nPositions = 0;
+        for (var sf = 0; sf < nSubfr; sf++) {
             sfPulses[sf] = 0;
-            int base = sf * subfrlen;
-            for (int i = 0; i < subfrlen; i++) {
+            var base = sf * subfrlen;
+            for (var i = 0; i < subfrlen; i++) {
                 if (pulses[base + i] != 0) {
                     sfPulses[sf] += Math.abs(pulses[base + i]);
                     positions[nPositions++] = (short) (base + i);
                 }
             }
         }
-        int nPulses = 0;
-        for (int i = 0; i < nSubfr; i++) {
+        var nPulses = 0;
+        for (var i = 0; i < nSubfr; i++) {
             nPulses += sfPulses[i];
         }
 
@@ -148,14 +148,14 @@ public final class PulseEncoder {
                     framelen, nSubfr, lowRate, voiced, nPulses);
         }
 
-        int maxPulses = MAX_PULSES_PER_FRAME[lowRate ? 1 : 0][codedFlag + voicedFlag] * framelen / MAX_PULSES_REF_FRAMELEN;
-        int maxSubfrPulses = maxPulses / nSubfr;
+        var maxPulses = MAX_PULSES_PER_FRAME[lowRate ? 1 : 0][codedFlag + voicedFlag] * framelen / MAX_PULSES_REF_FRAMELEN;
+        var maxSubfrPulses = maxPulses / nSubfr;
         if (lowRate) {
             MlowEntropyWrapper.encodeUpdate(encoder, tables.nPulseCmfs()[codedFlag + voicedFlag], nPulses);
         } else {
-            long fl = numPulsesCmf(maxPulses + 1, nPulses);
-            long fh = numPulsesCmf(maxPulses + 1, nPulses + 1);
-            long ft = numPulsesCmf(maxPulses + 1, maxPulses + 1);
+            var fl = numPulsesCmf(maxPulses + 1, nPulses);
+            var fh = numPulsesCmf(maxPulses + 1, nPulses + 1);
+            var ft = numPulsesCmf(maxPulses + 1, maxPulses + 1);
             encoder.encode(fl, fh, ft);
         }
 
@@ -164,14 +164,14 @@ public final class PulseEncoder {
         }
 
         if (nSubfr == 4) {
-            int nPulsesFirsthalf = sfPulses[0] + sfPulses[1];
-            int minSplit = Math.max(nPulses - MAX_PULSES_PER_SF * 2, 0);
-            int minSplit2 = Math.max(nPulses - maxSubfrPulses * 2, 0);
-            int maxSplit2 = nPulses - minSplit;
+            var nPulsesFirsthalf = sfPulses[0] + sfPulses[1];
+            var minSplit = Math.max(nPulses - MAX_PULSES_PER_SF * 2, 0);
+            var minSplit2 = Math.max(nPulses - maxSubfrPulses * 2, 0);
+            var maxSplit2 = nPulses - minSplit;
             if (maxSplit2 > minSplit2) {
-                int cmfIx = nPulsesFirsthalf - minSplit;
-                int[] cmf = tables.splitCmfs()[nPulses - 1];
-                long sub = cmf[minSplit2 - minSplit] & 0xFFFFFFFFL;
+                var cmfIx = nPulsesFirsthalf - minSplit;
+                var cmf = tables.splitCmfs()[nPulses - 1];
+                var sub = cmf[minSplit2 - minSplit] & 0xFFFFFFFFL;
                 encoder.encode((cmf[cmfIx] & 0xFFFFFFFFL) - sub,
                         (cmf[cmfIx + 1] & 0xFFFFFFFFL) - sub,
                         (cmf[maxSplit2 - minSplit + 1] & 0xFFFFFFFFL) - sub);
@@ -211,13 +211,13 @@ public final class PulseEncoder {
             int nPulses,
             int nPulsesFirsthalf,
             int maxSubfrPulses) {
-        int minSplit = Math.max(nPulses - maxSubfrPulses, 0);
-        int maxSplit = nPulses - minSplit;
+        var minSplit = Math.max(nPulses - maxSubfrPulses, 0);
+        var maxSplit = nPulses - minSplit;
         if (maxSplit == minSplit) {
             return;
         }
-        int[] cmf = tables.splitCmfs()[nPulses - 1];
-        long sub = cmf[minSplit] & 0xFFFFFFFFL;
+        var cmf = tables.splitCmfs()[nPulses - 1];
+        var sub = cmf[minSplit] & 0xFFFFFFFFL;
         encoder.encode((cmf[nPulsesFirsthalf] & 0xFFFFFFFFL) - sub,
                 (cmf[nPulsesFirsthalf + 1] & 0xFFFFFFFFL) - sub,
                 (cmf[maxSplit + 1] & 0xFFFFFFFFL) - sub);
@@ -247,24 +247,24 @@ public final class PulseEncoder {
             int subfrlen,
             int nSubfr,
             int[] sfPulses) {
-        int runLengthStep = tables.runLengthStep();
-        int posIx = 0;
-        for (int i = 0; i < nSubfr; i++) {
-            int pulsesLeft = sfPulses[i];
-            int nSamplesLeft = subfrlen;
-            int posPrev = 1;
+        var runLengthStep = tables.runLengthStep();
+        var posIx = 0;
+        for (var i = 0; i < nSubfr; i++) {
+            var pulsesLeft = sfPulses[i];
+            var nSamplesLeft = subfrlen;
+            var posPrev = 1;
             while (pulsesLeft > 0) {
                 int posFrame = positions[posIx++];
-                int nStacked = Math.abs(pulses[posFrame]);
-                int pos = posFrame - subfrlen * i + 1;
-                for (int k = 0; k < nStacked; k++) {
-                    int cmfInd = (nSamplesLeft + runLengthStep - 1) / runLengthStep - 1;
-                    int[] cmfp = tables.runLenCmfs()[cmfInd][pulsesLeft - 1];
-                    int maxSamples = tables.runLenMaxSamples(cmfInd);
-                    int ixStart = maxSamples - nSamplesLeft;
-                    int ix = ixStart + (pos - posPrev);
+                var nStacked = Math.abs(pulses[posFrame]);
+                var pos = posFrame - subfrlen * i + 1;
+                for (var k = 0; k < nStacked; k++) {
+                    var cmfInd = (nSamplesLeft + runLengthStep - 1) / runLengthStep - 1;
+                    var cmfp = tables.runLenCmfs()[cmfInd][pulsesLeft - 1];
+                    var maxSamples = tables.runLenMaxSamples(cmfInd);
+                    var ixStart = maxSamples - nSamplesLeft;
+                    var ix = ixStart + (pos - posPrev);
                     if (ixStart > 0) {
-                        long sub = cmfp[ixStart] & 0xFFFFFFFFL;
+                        var sub = cmfp[ixStart] & 0xFFFFFFFFL;
                         encoder.encode((cmfp[ix] & 0xFFFFFFFFL) - sub,
                                 (cmfp[ix + 1] & 0xFFFFFFFFL) - sub,
                                 (cmfp[maxSamples] & 0xFFFFFFFFL) - sub);
@@ -293,10 +293,10 @@ public final class PulseEncoder {
      * @param nPositions the number of distinct pulse positions
      */
     private static void encodeSigns(MlowRangeEncoder encoder, short[] pulses, short[] positions, int nPositions) {
-        int sym = 0;
-        int signsInSym = 0;
-        for (int i = 0; i < nPositions; i++) {
-            int sgn = pulses[positions[i]] > 0 ? 1 : 0;
+        var sym = 0;
+        var signsInSym = 0;
+        for (var i = 0; i < nPositions; i++) {
+            var sgn = pulses[positions[i]] > 0 ? 1 : 0;
             sym = (sym << 1) + sgn;
             signsInSym++;
             if (signsInSym == MAX_SIGNS_PER_SYMBOL) {

@@ -176,23 +176,23 @@ public final class LpcAnalysis {
      * @param out     the destination for the {@value #LPC_BUF_LEN_20MS}-sample windowed buffer
      */
     public void window(float[] in, int inOff, boolean longWin, float[] out) {
-        int len = LPC_BUF_LEN_20MS;
-        float[] win1 = LpcAnalysisTables.WIN1_20MS;
-        for (int i = 0; i < LPC_WIN1_20MS_LEN; i++) {
+        var len = LPC_BUF_LEN_20MS;
+        var win1 = LpcAnalysisTables.WIN1_20MS;
+        for (var i = 0; i < LPC_WIN1_20MS_LEN; i++) {
             out[i] = in[inOff + i] * win1[i];
         }
-        int midCount = len - LPC_WIN1_20MS_LEN - WIN3_LONG_LEN;
+        var midCount = len - LPC_WIN1_20MS_LEN - WIN3_LONG_LEN;
         System.arraycopy(in, inOff + LPC_WIN1_20MS_LEN, out, LPC_WIN1_20MS_LEN, midCount);
 
-        int win3len = longWin ? WIN3_LONG_LEN : WIN3_SHORT_LEN;
-        float[] win3 = longWin ? LpcAnalysisTables.WIN3_LONG : LpcAnalysisTables.WIN3_SHORT;
-        int tailStart = len - WIN3_LONG_LEN;
-        for (int i = 0; i < win3len; i++) {
+        var win3len = longWin ? WIN3_LONG_LEN : WIN3_SHORT_LEN;
+        var win3 = longWin ? LpcAnalysisTables.WIN3_LONG : LpcAnalysisTables.WIN3_SHORT;
+        var tailStart = len - WIN3_LONG_LEN;
+        for (var i = 0; i < win3len; i++) {
             out[tailStart + i] = in[inOff + tailStart + i] * win3[i];
         }
         if (!longWin) {
-            int zStart = len - WIN3_LONG_LEN + WIN3_SHORT_LEN;
-            for (int i = zStart; i < len; i++) {
+            var zStart = len - WIN3_LONG_LEN + WIN3_SHORT_LEN;
+            for (var i = zStart; i < len; i++) {
                 out[i] = 0.0f;
             }
         }
@@ -225,17 +225,17 @@ public final class LpcAnalysis {
      * @return the raw and bandwidth expanded filters, the line spectral frequencies, and the autocorrelation
      */
     public Result analyze(float[] windowed, int len) {
-        float[] f2 = powerSpectrum(windowed, len);
-        double[] r = bruteDctFromPowerSpectrum(f2);
+        var f2 = powerSpectrum(windowed, len);
+        var r = bruteDctFromPowerSpectrum(f2);
 
-        float[] lpcRaw = new float[LPC_ORDER + 1];
-        float[] rc = ac2rc(r, LPC_ORDER, LPC_REG);
+        var lpcRaw = new float[LPC_ORDER + 1];
+        var rc = ac2rc(r, LPC_ORDER, LPC_REG);
         rc2a(rc, LPC_ORDER, lpcRaw);
 
-        float[] lpc = lpcRaw.clone();
+        var lpc = lpcRaw.clone();
         bweExpand(lpc, LPC_ORDER, LPC_BWE);
 
-        float[] lsf = A2nlsfBridge.a2nlsf(lpc);
+        var lsf = A2nlsfBridge.a2nlsf(lpc);
         if (Log.TRACE) {
             LOGGER.log(Level.TRACE, "lpc analysis: samples={0}", len);
         }
@@ -257,14 +257,14 @@ public final class LpcAnalysis {
      * @return the {@value #NFFT}{@code / 2 + 1}-bin magnitude squared power spectrum
      */
     public float[] powerSpectrum(float[] windowed, int len) {
-        float[] xBuf = new float[NFFT];
+        var xBuf = new float[NFFT];
         System.arraycopy(windowed, 0, xBuf, 0, len);
-        float[] f = new float[NFFT];
+        var f = new float[NFFT];
         fft.transformOrdered(xBuf, f, null, true);
-        float[] f2 = new float[NFFT / 2 + 1];
+        var f2 = new float[NFFT / 2 + 1];
         f2[0] = f[0] * f[0];
         f2[NFFT / 2] = f[1] * f[1];
-        for (int i = 1; i < NFFT / 2; i++) {
+        for (var i = 1; i < NFFT / 2; i++) {
             f2[i] = f[2 * i] * f[2 * i] + f[2 * i + 1] * f[2 * i + 1];
         }
         return f2;
@@ -284,8 +284,8 @@ public final class LpcAnalysis {
      * @return the autocorrelation lags zero through {@value #LPC_ORDER} in {@code double}
      */
     private static double[] bruteDctFromPowerSpectrum(float[] f2) {
-        double[] f2d = new double[NFFT / 2 + 1];
-        for (int i = 0; i < f2d.length; i++) {
+        var f2d = new double[NFFT / 2 + 1];
+        for (var i = 0; i < f2d.length; i++) {
             f2d[i] = f2[i];
         }
         return bruteDct(f2d);
@@ -311,15 +311,15 @@ public final class LpcAnalysis {
      * @return the autocorrelation lags zero through {@value #LPC_ORDER}
      */
     private static double[] bruteDct(double[] f2) {
-        int quarter = NFFT / 4;
-        int half = NFFT / 2;
-        double[] dct = LpcAnalysisTables.DCT;
-        double[] f2dif = new double[quarter];
-        double[] f2sumsum = new double[quarter];
-        double[] f2sumdif = new double[quarter];
-        double sumEven = 0.0;
-        double sumOdd = 0.0;
-        for (int n = 0; n < quarter; n += 2) {
+        var quarter = NFFT / 4;
+        var half = NFFT / 2;
+        var dct = LpcAnalysisTables.DCT;
+        var f2dif = new double[quarter];
+        var f2sumsum = new double[quarter];
+        var f2sumdif = new double[quarter];
+        var sumEven = 0.0;
+        var sumOdd = 0.0;
+        for (var n = 0; n < quarter; n += 2) {
             sumEven += f2[n] + f2[quarter + n];
             sumOdd += f2[n + 1] + f2[quarter + n + 1];
             f2dif[n] = f2[n] - f2[half - n];
@@ -329,18 +329,18 @@ public final class LpcAnalysis {
             f2sumdif[n] = f2[n] + f2[half - n] - f2[quarter + n] - f2[quarter - n];
             f2sumdif[n + 1] = f2[n + 1] + f2[half - n - 1] - f2[quarter + n + 1] - f2[quarter - n - 1];
         }
-        double f2sum = sumEven + sumOdd;
+        var f2sum = sumEven + sumOdd;
         f2dif[0] *= 0.5;
 
-        double[] r = new double[LPC_ORDER + 1];
+        var r = new double[LPC_ORDER + 1];
         r[0] = (2.0 * f2sum - f2[0] + f2[half]) / NFFT;
-        for (int j = 0; j < LPC_ORDER / 2; j++) {
+        for (var j = 0; j < LPC_ORDER / 2; j++) {
             r[1 + j * 2] = dotPaired(dct, j * DCT_ROW_LEN, f2dif);
         }
-        for (int j = 0; j < LPC_ORDER / 4; j++) {
+        for (var j = 0; j < LPC_ORDER / 4; j++) {
             r[2 + j * 4] = dotPaired(dct, (CSUMDIFF_ROW0 + j) * DCT_ROW_LEN, f2sumdif);
         }
-        for (int j = 0; j < LPC_ORDER / 4; j++) {
+        for (var j = 0; j < LPC_ORDER / 4; j++) {
             r[4 + j * 4] = dotPaired(dct, (CSUMSUM_ROW0 + j) * DCT_ROW_LEN, f2sumsum);
         }
         return r;
@@ -359,9 +359,9 @@ public final class LpcAnalysis {
      * @return the dot product of the row and {@code x}
      */
     private static double dotPaired(double[] tab, int base, double[] x) {
-        double accEven = 0.0;
-        double accOdd = 0.0;
-        for (int k = 0; k < x.length; k += 2) {
+        var accEven = 0.0;
+        var accOdd = 0.0;
+        for (var k = 0; k < x.length; k += 2) {
             accEven += tab[base + k] * x[k];
             accOdd += tab[base + k + 1] * x[k + 1];
         }
@@ -388,14 +388,14 @@ public final class LpcAnalysis {
      * @return the {@code order} reflection coefficients in {@code float}
      */
     private static float[] ac2rc(double[] corr, int order, double reg) {
-        double[] c0 = new double[order + 1];
-        double[] c1 = new double[order + 1];
+        var c0 = new double[order + 1];
+        var c1 = new double[order + 1];
         System.arraycopy(corr, 0, c0, 0, order + 1);
         c0[0] *= (1.0 + reg);
         System.arraycopy(c0, 0, c1, 0, order + 1);
 
-        float[] rc = new float[order];
-        for (int k = 0; k < order; k++) {
+        var rc = new float[order];
+        for (var k = 0; k < order; k++) {
             if (c0[k + 1] > c1[0]) {
                 rc[k] = -1.0f;
                 break;
@@ -407,11 +407,11 @@ public final class LpcAnalysis {
             if (c1[0] == 0.0) {
                 break;
             }
-            double rcTmp = -c0[k + 1] / c1[0];
+            var rcTmp = -c0[k + 1] / c1[0];
             rc[k] = (float) rcTmp;
-            for (int n = 0; n < (order - k); n++) {
-                double cTmp1 = c0[n + k + 1];
-                double cTmp2 = c1[n];
+            for (var n = 0; n < (order - k); n++) {
+                var cTmp1 = c0[n + k + 1];
+                var cTmp2 = c1[n];
                 c0[n + k + 1] = cTmp1 + cTmp2 * rcTmp;
                 c1[n] = cTmp2 + cTmp1 * rcTmp;
             }
@@ -430,15 +430,15 @@ public final class LpcAnalysis {
      * @param a     the destination monic filter of at least {@code order + 1} entries
      */
     private static void rc2a(float[] rc, int order, float[] a) {
-        for (int i = 1; i <= order; i++) {
+        for (var i = 1; i <= order; i++) {
             a[i] = 0.0f;
         }
         a[0] = 1.0f;
-        for (int k = 0; k < order; k++) {
-            float rcTmp = rc[k];
-            for (int n = 0; n < (k + 1) / 2; n++) {
-                float tmp1 = a[n + 1];
-                float tmp2 = a[k - n];
+        for (var k = 0; k < order; k++) {
+            var rcTmp = rc[k];
+            for (var n = 0; n < (k + 1) / 2; n++) {
+                var tmp1 = a[n + 1];
+                var tmp2 = a[k - n];
                 a[n + 1] = tmp1 + tmp2 * rcTmp;
                 a[k - n] = tmp2 + tmp1 * rcTmp;
             }
@@ -458,13 +458,13 @@ public final class LpcAnalysis {
      */
     private static void bweExpand(float[] a, int order, float bwe) {
         if (bwe <= 0.0f) {
-            for (int i = 1; i <= order; i++) {
+            for (var i = 1; i <= order; i++) {
                 a[i] = 0.0f;
             }
             return;
         }
-        float c = bwe;
-        for (int i = 1; i < order + 1; i++) {
+        var c = bwe;
+        for (var i = 1; i < order + 1; i++) {
             a[i] *= c;
             c *= bwe;
         }
@@ -493,13 +493,13 @@ public final class LpcAnalysis {
      * @return the monic perceptual weighting filter of {@code respLen} entries
      */
     public static float[] percAc2a(float[] r, float emph, int respLen, float reg) {
-        float[] b = {emph, 1.0f + emph * emph, emph};
-        float[] state = {r[0], r[1]};
-        float[] rEmph = new float[MAX_L_RESP];
+        var b = new float[]{emph, 1.0f + emph * emph, emph};
+        var state = new float[]{r[0], r[1]};
+        var rEmph = new float[MAX_L_RESP];
         Filters.ma2(r, 1, respLen, b, state, 0, rEmph, 0);
 
-        float[] rc = ac2rcFloat(rEmph, respLen - 1, reg);
-        float[] a = new float[MAX_L_RESP];
+        var rc = ac2rcFloat(rEmph, respLen - 1, reg);
+        var a = new float[MAX_L_RESP];
         rc2a(rc, respLen - 1, a);
         if (Log.TRACE) {
             LOGGER.log(Level.TRACE, "perceptual weighting filter: emph={0} respLen={1}", emph, respLen);
@@ -519,8 +519,8 @@ public final class LpcAnalysis {
      * @return the {@code order} reflection coefficients in {@code float}
      */
     private static float[] ac2rcFloat(float[] corr, int order, float reg) {
-        double[] corrDbl = new double[order + 1];
-        for (int i = 0; i < order + 1; i++) {
+        var corrDbl = new double[order + 1];
+        for (var i = 0; i < order + 1; i++) {
             corrDbl[i] = corr[i];
         }
         return ac2rc(corrDbl, order, reg);

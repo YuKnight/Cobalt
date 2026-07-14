@@ -270,25 +270,25 @@ public final class MlowEncoder {
             throw new IllegalArgumentException(
                     "high-band encode (fs " + sampleRateHz + " Hz) is out of low-band scope");
         }
-        int numFrames = frames.length;
-        int packetLenMs = packetLenMsForFrames(numFrames);
-        int framelen = (packetLenMs > 10 ? 2 : 1) * 10 * CELP_FS_KHZ;
-        int numSubfr = 1 << (1 - (lowRate ? 1 : 0) + (packetLenMs > 10 ? 1 : 0));
+        var numFrames = frames.length;
+        var packetLenMs = packetLenMsForFrames(numFrames);
+        var framelen = (packetLenMs > 10 ? 2 : 1) * 10 * CELP_FS_KHZ;
+        var numSubfr = 1 << (1 - (lowRate ? 1 : 0) + (packetLenMs > 10 ? 1 : 0));
 
-        byte[] buffer = new byte[1 + MAX_PAYLOAD_BYTES];
-        MlowRangeEncoder encoder = new MlowRangeEncoder(buffer, 1, MAX_PAYLOAD_BYTES);
+        var buffer = new byte[1 + MAX_PAYLOAD_BYTES];
+        var encoder = new MlowRangeEncoder(buffer, 1, MAX_PAYLOAD_BYTES);
 
-        int prevVoiced = 0;
-        for (int frame = 0; frame < numFrames; frame++) {
-            LbQuantParams params = frames[frame];
-            int voiced = params.voiced() ? 1 : 0;
-            boolean condCoding = (voiced == prevVoiced) && (frame > 0);
+        var prevVoiced = 0;
+        for (var frame = 0; frame < numFrames; frame++) {
+            var params = frames[frame];
+            var voiced = params.voiced() ? 1 : 0;
+            var condCoding = (voiced == prevVoiced) && (frame > 0);
             paramEncoder.encodeFrame(encoder, params, framelen, numSubfr, codedAsActiveVoice, condCoding,
                     lowRate, frame, prevVoiced, false);
             prevVoiced = voiced;
         }
 
-        int ret = (encoder.tell() + 7) >> 3;
+        var ret = (encoder.tell() + 7) >> 3;
         encoder.finish();
         lastFinalRange = encoder.finalRange();
 
@@ -299,7 +299,7 @@ public final class MlowEncoder {
         }
 
         buffer[0] = encodeToc(false, vad, sampleRateHz, packetLenMs, lowRate, fec, codedAsActiveVoice, stereo);
-        byte[] packet = new byte[1 + ret];
+        var packet = new byte[1 + ret];
         System.arraycopy(buffer, 0, packet, 0, 1 + ret);
         return packet;
     }
@@ -334,15 +334,15 @@ public final class MlowEncoder {
             throw new IllegalArgumentException(
                     "PCM-in MLow encode requires a whole number of " + FRAME_LEN + "-sample 20 ms frames");
         }
-        int framesPerPacket = pcm.length / FRAME_LEN;
-        int packetLenMs = packetLenMsForFrames(framesPerPacket);
-        boolean lowRate = this.lowRate;
+        var framesPerPacket = pcm.length / FRAME_LEN;
+        var packetLenMs = packetLenMsForFrames(framesPerPacket);
+        var lowRate = this.lowRate;
 
-        Vad.VadDecision vadDecision = vad.processPacket(pcm, FRAME_LEN, framesPerPacket,
+        var vadDecision = vad.processPacket(pcm, FRAME_LEN, framesPerPacket,
                 Vad.ACTIVITY_NO_DECISION, useDtx);
 
-        byte[] buffer = new byte[1 + MAX_PAYLOAD_BYTES];
-        MlowRangeEncoder encoder = new MlowRangeEncoder(buffer, 1, MAX_PAYLOAD_BYTES);
+        var buffer = new byte[1 + MAX_PAYLOAD_BYTES];
+        var encoder = new MlowRangeEncoder(buffer, 1, MAX_PAYLOAD_BYTES);
 
         coreEncoder.encodePacket(pcm, FRAME_LEN, framesPerPacket, vadDecision, encoder);
 
@@ -355,7 +355,7 @@ public final class MlowEncoder {
             return new byte[0];
         }
 
-        int ret = (encoder.tell() + 7) >> 3;
+        var ret = (encoder.tell() + 7) >> 3;
         encoder.finish();
         lastFinalRange = encoder.finalRange();
 
@@ -365,7 +365,7 @@ public final class MlowEncoder {
 
         buffer[0] = encodeToc(vadDecision.sidFrame(), vadDecision.vad(), 16000, packetLenMs, lowRate, false,
                 vadDecision.codedAsActiveVoice(), false);
-        byte[] packet = new byte[1 + ret];
+        var packet = new byte[1 + ret];
         System.arraycopy(buffer, 0, packet, 0, 1 + ret);
         return packet;
     }
@@ -407,14 +407,14 @@ public final class MlowEncoder {
      */
     static byte encodeToc(boolean sid, boolean vad, int sampleRateHz, int packetLenMs, boolean lowRate,
                           boolean fec, boolean codedAsActiveVoice, boolean stereo) {
-        int b = 0;
+        var b = 0;
         b += (sid ? 1 : 0) << 7;
         b += (vad ? 1 : 0) << 6;
         if (sampleRateHz != 16000 && sampleRateHz != 32000 && sampleRateHz != 48000) {
             throw new IllegalArgumentException("unsupported sample rate: " + sampleRateHz);
         }
         b += sampleRateHz == 16000 ? 0 : (1 << 5);
-        int frameSel = switch (packetLenMs) {
+        var frameSel = switch (packetLenMs) {
             case 10 -> 0;
             case 20 -> 1;
             case 60 -> 2;

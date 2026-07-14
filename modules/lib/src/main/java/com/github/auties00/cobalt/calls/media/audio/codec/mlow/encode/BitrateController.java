@@ -252,7 +252,7 @@ public final class BitrateController {
     public void init() {
         prevVoiced = 0;
         rateContWnrgSmth = 0.0f;
-        for (int r = 0; r < MAX_RATES; r++) {
+        for (var r = 0; r < MAX_RATES; r++) {
             rateContBitrateScale[r] = 0.0f;
             bitrateDeltaSmth[r] = 0.0f;
             rateContBitrate[r] = 0.0f;
@@ -300,12 +300,12 @@ public final class BitrateController {
                               int framelen, int subfrlen, int internalSampleRate, int payloadSizeMs,
                               int fecBitRate, int mainBitRate, int complexity, boolean useDtx,
                               boolean useFecRateCompensation, float subFrameImportanceFactor) {
-        int lowRateIdx = lowRate ? 1 : 0;
+        var lowRateIdx = lowRate ? 1 : 0;
         // The model and threshold tables index the rate class as (lowRate ? 0 : 1), the inverse of the plain
         // low rate flag; only the pulses per frame table lookup uses the flag directly.
-        int modelIdx = lowRate ? 0 : 1;
+        var modelIdx = lowRate ? 0 : 1;
 
-        int bweBitrate = 0;
+        var bweBitrate = 0;
         if (internalSampleRate > 16000) {
             bweBitrate += lowRate ? 450 : 750;
             bweBitrate += payloadSizeMs == 10 ? 450 : 0;
@@ -313,18 +313,18 @@ public final class BitrateController {
 
         rateContWnrgSmth += 0.6f * (wnrg - rateContWnrgSmth);
 
-        int framelenIdx = (payloadSizeMs == 10) ? 0
+        var framelenIdx = (payloadSizeMs == 10) ? 0
                 : payloadSizeMs == 20 ? 1
                 : payloadSizeMs == 60 ? 2 : 3;
 
-        short[] maxPulsesPerSubfr = new short[MAX_RATES];
-        float[] subfrImportance = new float[MAX_RATES];
+        var maxPulsesPerSubfr = new short[MAX_RATES];
+        var subfrImportance = new float[MAX_RATES];
 
-        int startR = startRate(fecBitRate, mainBitRate);
-        for (int r = startR; r <= IDX_MAIN; r++) {
-            float bitRate = (r == IDX_FEC) ? (float) fecBitRate : (float) mainBitRate;
+        var startR = startRate(fecBitRate, mainBitRate);
+        for (var r = startR; r <= IDX_MAIN; r++) {
+            var bitRate = (r == IDX_FEC) ? (float) fecBitRate : (float) mainBitRate;
             bitRate = Math.min(bitRate, 30000.0f);
-            float rateKbps = (bitRate - bweBitrate) / 1000.0f;
+            var rateKbps = (bitRate - bweBitrate) / 1000.0f;
             if (!lowRate) {
                 rateKbps *= complexity == 1 ? 0.9900990f
                         : complexity == 2 ? 0.9900990f
@@ -337,7 +337,7 @@ public final class BitrateController {
             if (bitRate - bweBitrate < rateControlThrs) {
                 pulsesPer20msTargetMax = 1.0f;
             } else {
-                double[] coeff = EncoderTables.RATE_CONTROL_MODEL_COMP5[framelenIdx][modelIdx];
+                var coeff = EncoderTables.RATE_CONTROL_MODEL_COMP5[framelenIdx][modelIdx];
                 if ((r == IDX_FEC) && !lowRate && useFecRateCompensation) {
                     pulsesPer20msTargetMax = Math.max(bitrate2pulsesHrFec(rateKbps, coeff, rateControlThrs), 1.0f);
                 } else {
@@ -345,26 +345,26 @@ public final class BitrateController {
                 }
             }
 
-            float relPulserate = pulsesPer20msTargetMax / 16.0f * (320.0f / framelen);
-            float relPulserateLog = (float) Math.log(relPulserate);
+            var relPulserate = pulsesPer20msTargetMax / 16.0f * (320.0f / framelen);
+            var relPulserateLog = (float) Math.log(relPulserate);
             if (rateContBitrate[r] != bitRate) {
-                float bitrateScale = RATE_CONT_SCALE * relPulserate * (1 + 0.4f * relPulserateLog * relPulserateLog);
+                var bitrateScale = RATE_CONT_SCALE * relPulserate * (1 + 0.4f * relPulserateLog * relPulserateLog);
                 rateContBitrateScale[r] = bitrateScale;
                 rateContBitrate[r] = bitRate;
             }
 
-            int numsubfrs = framelen / subfrlen;
+            var numsubfrs = framelen / subfrlen;
             maxPulsesPerSubfr[r] = (short) (1 + (int) rint(pulsesPer20msTargetMax * (1 + 0.5f) / numsubfrs));
             if (useDtx && dtxSidFrame) {
                 maxPulsesPerSubfr[r] = 0;
             } else {
                 maxPulsesPerSubfr[r] = (short) rint(maxPulsesPerSubfr[r] * (0.5f + 0.5f * (float) Math.sqrt(spActProb + 1e-12f)));
-                int frameType = !codedAsActiveVoice ? 0 : (voiced == 1) ? 2 : 1;
-                int maxPulses = MiscTables.MAX_PULSES_PER_FRAME[lowRateIdx][frameType] * framelen / 320;
+                var frameType = !codedAsActiveVoice ? 0 : (voiced == 1) ? 2 : 1;
+                var maxPulses = MiscTables.MAX_PULSES_PER_FRAME[lowRateIdx][frameType] * framelen / 320;
                 maxPulsesPerSubfr[r] = (short) Math.min(maxPulsesPerSubfr[r], maxPulses / numsubfrs);
             }
 
-            float importance = (wnrg + 0.01f * wnrgNext) / (rateContWnrgSmth + 0.02f * wnrgNext + 1e-12f);
+            var importance = (wnrg + 0.01f * wnrgNext) / (rateContWnrgSmth + 0.02f * wnrgNext + 1e-12f);
             if (voiced != 0) {
                 if (bitRate <= 9000) {
                     importance = (float) Math.sqrt(importance + 1e-12f);
@@ -378,7 +378,7 @@ public final class BitrateController {
             }
             importance *= 0.9f + 0.3f * 1.0f / (1.0f + 25.0f * voicingStrength * voicingStrength);
 
-            float impFactor = subFrameImportanceFactor;
+            var impFactor = subFrameImportanceFactor;
             if (impFactor <= 1.0f) {
                 importance *= (1 - impFactor) + impFactor * (float) Math.sqrt(spActProb + 1e-12f);
             } else if (impFactor <= 2.0f) {
@@ -418,17 +418,17 @@ public final class BitrateController {
      */
     public void updateScale(int frameMs, int framesPerPacket, float[] bitsUsed, int fecBitRate, int mainBitRate,
                             boolean codedAsActiveVoice) {
-        int startR = startRate(fecBitRate, mainBitRate);
-        float externalBits = 8.0f / (float) framesPerPacket / (MAX_RATES - startR);
+        var startR = startRate(fecBitRate, mainBitRate);
+        var externalBits = 8.0f / (float) framesPerPacket / (MAX_RATES - startR);
         externalBits += 4.5f / (float) framesPerPacket / (MAX_RATES - startR);
-        for (int r = startR; r <= IDX_MAIN; r++) {
+        for (var r = startR; r <= IDX_MAIN; r++) {
             if (!codedAsActiveVoice) {
-                float smthCoef = 1.0f - (float) frameMs * 0.00125f;
+                var smthCoef = 1.0f - (float) frameMs * 0.00125f;
                 bitrateDeltaSmth[r] *= smthCoef;
             } else {
-                float bitRate = (r == IDX_FEC) ? (float) fecBitRate : (float) mainBitRate;
-                float measuredBitrate = (bitsUsed[r] + externalBits) * (1000.0f / (float) frameMs);
-                float measuredBitrateDelta = (measuredBitrate - bitRate) / bitRate;
+                var bitRate = (r == IDX_FEC) ? (float) fecBitRate : (float) mainBitRate;
+                var measuredBitrate = (bitsUsed[r] + externalBits) * (1000.0f / (float) frameMs);
+                var measuredBitrateDelta = (measuredBitrate - bitRate) / bitRate;
                 bitrateDeltaSmth[r] += measuredBitrateDelta * RATE_CONT_GAIN * frameMs / 20.0f;
                 bitrateDeltaSmth[r] = Math.max(Math.min(bitrateDeltaSmth[r], RATE_CONT_CLAMP_MAX), RATE_CONT_CLAMP_MIN);
                 adjustmentFactor[r] = Math.max(1.0f - bitrateDeltaSmth[r], 0.0f);
@@ -453,7 +453,7 @@ public final class BitrateController {
      * @return {@value #IDX_FEC} when the FEC point is active, {@value #IDX_MAIN} otherwise
      */
     private static int startRate(int fecBitRate, int mainBitRate) {
-        boolean expr = (IDX_FEC + (fecBitRate == 0 ? 1 : 0)) != 0 || (fecBitRate == mainBitRate);
+        var expr = (IDX_FEC + (fecBitRate == 0 ? 1 : 0)) != 0 || (fecBitRate == mainBitRate);
         return expr ? 1 : 0;
     }
 
@@ -470,14 +470,14 @@ public final class BitrateController {
      * @return the modelled pulses per 20 ms target
      */
     private static float bitrate2pulses(float rateKbps, double[] coeff) {
-        float c0 = (float) coeff[0];
-        float c1 = (float) coeff[1];
-        float c2 = (float) coeff[2];
-        float c3 = (float) coeff[3];
-        float c4 = (float) coeff[4];
-        float c5 = (float) coeff[5];
-        float c6 = (float) coeff[6];
-        float c7 = (float) coeff[7];
+        var c0 = (float) coeff[0];
+        var c1 = (float) coeff[1];
+        var c2 = (float) coeff[2];
+        var c3 = (float) coeff[3];
+        var c4 = (float) coeff[4];
+        var c5 = (float) coeff[5];
+        var c6 = (float) coeff[6];
+        var c7 = (float) coeff[7];
         return c0
                 + c1 * rateKbps
                 + c2 * rateKbps * rateKbps
@@ -505,8 +505,8 @@ public final class BitrateController {
         } else if (onePulseRateBps >= RATE_THRES_KBPS * 1000.0f) {
             return 1.0f;
         } else {
-            float pulsesThres = bitrate2pulses(RATE_THRES_KBPS, coeff);
-            float sc = (RATE_THRES_KBPS - rateKbps) / (RATE_THRES_KBPS - onePulseRateBps / 1000.0f);
+            var pulsesThres = bitrate2pulses(RATE_THRES_KBPS, coeff);
+            var sc = (RATE_THRES_KBPS - rateKbps) / (RATE_THRES_KBPS - onePulseRateBps / 1000.0f);
             return pulsesThres - sc * (pulsesThres - 1.0f);
         }
     }
@@ -524,11 +524,11 @@ public final class BitrateController {
      * @return the clamped nonflatness threshold
      */
     public static float hrNonflatThres(int bitrate, float spActProb) {
-        float[] bitrates = HR_NONFLAT_BITRATES;
-        float[] thresholds = HR_NONFLAT_THRESHOLDS;
-        float a = (thresholds[1] - thresholds[0]) / (bitrates[1] - bitrates[0]);
-        float b = thresholds[0] - a * bitrates[0];
-        int scaledBitrate = (int) (bitrate * (float) Math.sqrt(spActProb + 1e-12f));
+        var bitrates = HR_NONFLAT_BITRATES;
+        var thresholds = HR_NONFLAT_THRESHOLDS;
+        var a = (thresholds[1] - thresholds[0]) / (bitrates[1] - bitrates[0]);
+        var b = thresholds[0] - a * bitrates[0];
+        var scaledBitrate = (int) (bitrate * (float) Math.sqrt(spActProb + 1e-12f));
         return Math.min(Math.max(a * scaledBitrate + b, 0.0f), UV_NONFLATNESS_THR);
     }
 
@@ -548,27 +548,27 @@ public final class BitrateController {
      * @return the combined residual and weighted LSF nonflatness measure
      */
     public static float nonflatness(float[] resLpc, int offset, int length, float[] wlsf, float[] state) {
-        float[] nrgs = new float[NON_FLAT_NRGS_LEN];
-        int n = length / NON_FLAT_SUBFR_LEN;
-        for (int i = 0; i < n; i++) {
+        var nrgs = new float[NON_FLAT_NRGS_LEN];
+        var n = length / NON_FLAT_SUBFR_LEN;
+        for (var i = 0; i < n; i++) {
             nrgs[i + NON_FLAT_STATE_LEN] = nrg(resLpc, offset + i * NON_FLAT_SUBFR_LEN, NON_FLAT_SUBFR_LEN)
                     + NON_FLAT_SUBFR_LEN * 2e-10f;
         }
-        float sumState = 0.0f;
-        float sumNrgs = 0.0f;
-        for (int i = 0; i < NON_FLAT_STATE_LEN; i++) {
+        var sumState = 0.0f;
+        var sumNrgs = 0.0f;
+        for (var i = 0; i < NON_FLAT_STATE_LEN; i++) {
             sumState += state[i];
             sumNrgs += nrgs[i + NON_FLAT_STATE_LEN];
         }
 
-        int run = n;
+        var run = n;
         if (sumState < sumNrgs) {
             System.arraycopy(state, 0, nrgs, 0, NON_FLAT_STATE_LEN);
             run += NON_FLAT_STATE_LEN;
         }
         System.arraycopy(nrgs, length / NON_FLAT_SUBFR_LEN, state, 0, NON_FLAT_STATE_LEN);
 
-        int base = (length / NON_FLAT_SUBFR_LEN) + NON_FLAT_STATE_LEN - run;
+        var base = (length / NON_FLAT_SUBFR_LEN) + NON_FLAT_STATE_LEN - run;
         return nonflat(nrgs, base, run) + 0.05f * nonflat(wlsf, 0, LPC_ORDER);
     }
 
@@ -585,11 +585,11 @@ public final class BitrateController {
      * @return the nonflatness ratio, or {@code -1.0} when the squared sum is not positive
      */
     private static float nonflat(float[] x, int offset, int length) {
-        float sumx = 0.0f;
-        for (int n = 0; n < length; n++) {
+        var sumx = 0.0f;
+        for (var n = 0; n < length; n++) {
             sumx += x[offset + n];
         }
-        float sumxSq = sumx * sumx;
+        var sumxSq = sumx * sumx;
         if (sumxSq <= 0.0f) {
             return -1.0f;
         }
@@ -615,10 +615,10 @@ public final class BitrateController {
         int mainBitRate;
         int fecBitRate;
         if (useInBandFEC && packetLossPercentage >= 1) {
-            float ratio = (packetLossPercentage - 2.0f) / (20.0f - 2.0f);
+            var ratio = (packetLossPercentage - 2.0f) / (20.0f - 2.0f);
             ratio = Math.max(Math.min(ratio, 1.0f), 0.0f);
-            float split = 0.25f + ratio * (0.5f - 0.25f);
-            int minMainBitRate = (int) (12000.0f + ratio * (4500.0f - 12000.0f));
+            var split = 0.25f + ratio * (0.5f - 0.25f);
+            var minMainBitRate = (int) (12000.0f + ratio * (4500.0f - 12000.0f));
             fecBitRate = Math.max((int) rint(bitRate * split), 4500);
             mainBitRate = bitRate - fecBitRate;
             if (mainBitRate < minMainBitRate) {
@@ -659,23 +659,23 @@ public final class BitrateController {
      * @return the single precision sum of squares
      */
     private static float nrg(float[] x, int offset, int length) {
-        float lane0 = 0.0f;
-        float lane1 = 0.0f;
-        float lane2 = 0.0f;
-        float lane3 = 0.0f;
-        int vecEnd = length & ~3;
-        for (int n = 0; n < vecEnd; n += 4) {
-            float x0 = x[offset + n];
-            float x1 = x[offset + n + 1];
-            float x2 = x[offset + n + 2];
-            float x3 = x[offset + n + 3];
+        var lane0 = 0.0f;
+        var lane1 = 0.0f;
+        var lane2 = 0.0f;
+        var lane3 = 0.0f;
+        var vecEnd = length & ~3;
+        for (var n = 0; n < vecEnd; n += 4) {
+            var x0 = x[offset + n];
+            var x1 = x[offset + n + 1];
+            var x2 = x[offset + n + 2];
+            var x3 = x[offset + n + 3];
             lane0 += x0 * x0;
             lane1 += x1 * x1;
             lane2 += x2 * x2;
             lane3 += x3 * x3;
         }
-        float nrg = (lane0 + lane2) + (lane1 + lane3);
-        for (int n = vecEnd; n < length; n++) {
+        var nrg = (lane0 + lane2) + (lane1 + lane3);
+        for (var n = vecEnd; n < length; n++) {
             nrg += x[offset + n] * x[offset + n];
         }
         return nrg;

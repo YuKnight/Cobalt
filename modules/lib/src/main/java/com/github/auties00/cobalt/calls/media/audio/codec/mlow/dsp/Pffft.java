@@ -164,11 +164,11 @@ public final class Pffft {
         this.twiddle = new float[2 * ncvec];
         this.ifac = new int[15];
 
-        for (int k = 0; k < ncvec; ++k) {
-            int i = k / SIMD_SZ;
-            int j = k % SIMD_SZ;
-            for (int m = 0; m < SIMD_SZ - 1; ++m) {
-                float a = (float) (-M_2PI * (m + 1) * k / n);
+        for (var k = 0; k < ncvec; ++k) {
+            var i = k / SIMD_SZ;
+            var j = k % SIMD_SZ;
+            for (var m = 0; m < SIMD_SZ - 1; ++m) {
+                var a = (float) (-M_2PI * (m + 1) * k / n);
                 e[(2 * (i * 3 + m) + 0) * SIMD_SZ + j] = (float) Math.cos(a);
                 e[(2 * (i * 3 + m) + 1) * SIMD_SZ + j] = (float) Math.sin(a);
             }
@@ -179,8 +179,8 @@ public final class Pffft {
             cffti1(n / SIMD_SZ, twiddle, ifac);
         }
 
-        int m = 1;
-        for (int k = 0; k < ifac[1]; ++k) {
+        var m = 1;
+        for (var k = 0; k < ifac[1]; ++k) {
             m *= ifac[2 + k];
         }
         if (m != n / SIMD_SZ) {
@@ -256,14 +256,14 @@ public final class Pffft {
         if (transform == REAL) {
             dk = n / 32;
             if (forward) {
-                for (int k = 0; k < dk; ++k) {
+                for (var k = 0; k < dk; ++k) {
                     interleave2(in, (k * 8 + 0) * 4, in, (k * 8 + 1) * 4, out, (2 * (0 * dk + k) + 0) * 4, out, (2 * (0 * dk + k) + 1) * 4);
                     interleave2(in, (k * 8 + 4) * 4, in, (k * 8 + 5) * 4, out, (2 * (2 * dk + k) + 0) * 4, out, (2 * (2 * dk + k) + 1) * 4);
                 }
                 reversedCopy(dk, in, 2 * 4, 8, out, n / 2);
                 reversedCopy(dk, in, 6 * 4, 8, out, n);
             } else {
-                for (int k = 0; k < dk; ++k) {
+                for (var k = 0; k < dk; ++k) {
                     uninterleave2(in, (2 * (0 * dk + k) + 0) * 4, in, (2 * (0 * dk + k) + 1) * 4, out, (k * 8 + 0) * 4, out, (k * 8 + 1) * 4);
                     uninterleave2(in, (2 * (2 * dk + k) + 0) * 4, in, (2 * (2 * dk + k) + 1) * 4, out, (k * 8 + 4) * 4, out, (k * 8 + 5) * 4);
                 }
@@ -272,13 +272,13 @@ public final class Pffft {
             }
         } else {
             if (forward) {
-                for (int k = 0; k < ncvec; ++k) {
-                    int kk = (k / 4) + (k % 4) * (ncvec / 4);
+                for (var k = 0; k < ncvec; ++k) {
+                    var kk = (k / 4) + (k % 4) * (ncvec / 4);
                     interleave2(in, (k * 2) * 4, in, (k * 2 + 1) * 4, out, (kk * 2) * 4, out, (kk * 2 + 1) * 4);
                 }
             } else {
-                for (int k = 0; k < ncvec; ++k) {
-                    int kk = (k / 4) + (k % 4) * (ncvec / 4);
+                for (var k = 0; k < ncvec; ++k) {
+                    var kk = (k / 4) + (k % 4) * (ncvec / 4);
                     uninterleave2(in, (kk * 2) * 4, in, (kk * 2 + 1) * 4, out, (k * 2) * 4, out, (k * 2 + 1) * 4);
                 }
             }
@@ -299,25 +299,25 @@ public final class Pffft {
      * @param ordered   {@code true} to leave the output in canonical interleaved complex order
      */
     private void transformInternal(float[] finput, float[] foutput, float[] scratch, boolean forward, boolean ordered) {
-        boolean nfOdd = (ifac[1] & 1) != 0;
-        float[] scratchBuf = scratch != null ? scratch : new float[2 * ncvec * SIMD_SZ];
+        var nfOdd = (ifac[1] & 1) != 0;
+        var scratchBuf = scratch != null ? scratch : new float[2 * ncvec * SIMD_SZ];
 
-        float[] buff0 = foutput;
-        float[] buff1 = scratchBuf;
-        int ib = (nfOdd ^ ordered) ? 1 : 0;
+        var buff0 = foutput;
+        var buff1 = scratchBuf;
+        var ib = (nfOdd ^ ordered) ? 1 : 0;
 
         if (forward) {
             ib = ib == 0 ? 1 : 0;
             if (transform == REAL) {
-                float[] r = rfftf1(ncvec * 2, finput, sel(buff0, buff1, ib), sel(buff0, buff1, 1 - ib), twiddle, ifac);
+                var r = rfftf1(ncvec * 2, finput, sel(buff0, buff1, ib), sel(buff0, buff1, 1 - ib), twiddle, ifac);
                 ib = (r == buff0) ? 0 : 1;
                 realFinalize(ncvec, sel(buff0, buff1, ib), sel(buff0, buff1, 1 - ib), e);
             } else {
-                float[] tmp = sel(buff0, buff1, ib);
-                for (int k = 0; k < ncvec; ++k) {
+                var tmp = sel(buff0, buff1, ib);
+                for (var k = 0; k < ncvec; ++k) {
                     uninterleave2(finput, (k * 2) * 4, finput, (k * 2 + 1) * 4, tmp, (k * 2) * 4, tmp, (k * 2 + 1) * 4);
                 }
-                float[] r = cfftf1(ncvec, sel(buff0, buff1, ib), sel(buff0, buff1, 1 - ib), sel(buff0, buff1, ib), twiddle, ifac, -1);
+                var r = cfftf1(ncvec, sel(buff0, buff1, ib), sel(buff0, buff1, 1 - ib), sel(buff0, buff1, ib), twiddle, ifac, -1);
                 ib = (r == buff0) ? 0 : 1;
                 cplxFinalize(ncvec, sel(buff0, buff1, ib), sel(buff0, buff1, 1 - ib), e);
             }
@@ -327,7 +327,7 @@ public final class Pffft {
                 ib = 1 - ib;
             }
         } else {
-            float[] vinput = finput;
+            var vinput = finput;
             if (vinput == sel(buff0, buff1, ib)) {
                 ib = 1 - ib;
             }
@@ -338,30 +338,30 @@ public final class Pffft {
             }
             if (transform == REAL) {
                 realPreprocess(ncvec, vinput, sel(buff0, buff1, ib), e);
-                float[] r = rfftb1(ncvec * 2, sel(buff0, buff1, ib), buff0, buff1, twiddle, ifac);
+                var r = rfftb1(ncvec * 2, sel(buff0, buff1, ib), buff0, buff1, twiddle, ifac);
                 ib = (r == buff0) ? 0 : 1;
             } else {
                 cplxPreprocess(ncvec, vinput, sel(buff0, buff1, ib), e);
-                float[] r = cfftf1(ncvec, sel(buff0, buff1, ib), buff0, buff1, twiddle, ifac, +1);
+                var r = cfftf1(ncvec, sel(buff0, buff1, ib), buff0, buff1, twiddle, ifac, +1);
                 ib = (r == buff0) ? 0 : 1;
-                float[] b = sel(buff0, buff1, ib);
-                for (int k = 0; k < ncvec; ++k) {
+                var b = sel(buff0, buff1, ib);
+                for (var k = 0; k < ncvec; ++k) {
                     interleave2(b, (k * 2) * 4, b, (k * 2 + 1) * 4, b, (k * 2) * 4, b, (k * 2 + 1) * 4);
                 }
             }
         }
 
-        float[] result = sel(buff0, buff1, ib);
+        var result = sel(buff0, buff1, ib);
         if (result != foutput) {
-            for (int k = 0; k < ncvec; ++k) {
-                float a0 = result[(2 * k) * 4 + 0];
-                float a1 = result[(2 * k) * 4 + 1];
-                float a2 = result[(2 * k) * 4 + 2];
-                float a3 = result[(2 * k) * 4 + 3];
-                float b0 = result[(2 * k + 1) * 4 + 0];
-                float b1 = result[(2 * k + 1) * 4 + 1];
-                float b2 = result[(2 * k + 1) * 4 + 2];
-                float b3 = result[(2 * k + 1) * 4 + 3];
+            for (var k = 0; k < ncvec; ++k) {
+                var a0 = result[(2 * k) * 4 + 0];
+                var a1 = result[(2 * k) * 4 + 1];
+                var a2 = result[(2 * k) * 4 + 2];
+                var a3 = result[(2 * k) * 4 + 3];
+                var b0 = result[(2 * k + 1) * 4 + 0];
+                var b1 = result[(2 * k + 1) * 4 + 1];
+                var b2 = result[(2 * k + 1) * 4 + 2];
+                var b3 = result[(2 * k + 1) * 4 + 3];
                 foutput[(2 * k) * 4 + 0] = a0;
                 foutput[(2 * k) * 4 + 1] = a1;
                 foutput[(2 * k) * 4 + 2] = a2;
@@ -455,24 +455,24 @@ public final class Pffft {
      * @param ifac the factorization descriptor to fill
      */
     private static void rffti1(int nn, float[] wa, int[] ifac) {
-        int[] ntryh = {4, 2, 3, 5, 0};
-        int nf = decompose(nn, ifac, ntryh);
-        float argh = (float) (M_2PI / nn);
-        int is = 0;
-        int nfm1 = nf - 1;
-        int l1 = 1;
-        for (int k1 = 1; k1 <= nfm1; k1++) {
-            int ip = ifac[k1 + 1];
-            int ld = 0;
-            int l2 = l1 * ip;
-            int ido = nn / l2;
-            int ipm = ip - 1;
-            for (int j = 1; j <= ipm; ++j) {
-                int i = is;
-                int fi = 0;
+        var ntryh = new int[]{4, 2, 3, 5, 0};
+        var nf = decompose(nn, ifac, ntryh);
+        var argh = (float) (M_2PI / nn);
+        var is = 0;
+        var nfm1 = nf - 1;
+        var l1 = 1;
+        for (var k1 = 1; k1 <= nfm1; k1++) {
+            var ip = ifac[k1 + 1];
+            var ld = 0;
+            var l2 = l1 * ip;
+            var ido = nn / l2;
+            var ipm = ip - 1;
+            for (var j = 1; j <= ipm; ++j) {
+                var i = is;
+                var fi = 0;
                 ld += l1;
-                float argld = ld * argh;
-                for (int ii = 3; ii <= ido; ii += 2) {
+                var argld = ld * argh;
+                for (var ii = 3; ii <= ido; ii += 2) {
                     i += 2;
                     fi += 1;
                     wa[i - 2] = (float) Math.cos(fi * argld);
@@ -496,26 +496,26 @@ public final class Pffft {
      * @param ifac the factorization descriptor to fill
      */
     private static void cffti1(int nn, float[] wa, int[] ifac) {
-        int[] ntryh = {5, 3, 4, 2, 0};
-        int nf = decompose(nn, ifac, ntryh);
-        float argh = (float) (M_2PI / nn);
-        int i = 1;
-        int l1 = 1;
-        for (int k1 = 1; k1 <= nf; k1++) {
-            int ip = ifac[k1 + 1];
-            int ld = 0;
-            int l2 = l1 * ip;
-            int ido = nn / l2;
-            int idot = ido + ido + 2;
-            int ipm = ip - 1;
-            for (int j = 1; j <= ipm; j++) {
-                int i1 = i;
-                int fi = 0;
+        var ntryh = new int[]{5, 3, 4, 2, 0};
+        var nf = decompose(nn, ifac, ntryh);
+        var argh = (float) (M_2PI / nn);
+        var i = 1;
+        var l1 = 1;
+        for (var k1 = 1; k1 <= nf; k1++) {
+            var ip = ifac[k1 + 1];
+            var ld = 0;
+            var l2 = l1 * ip;
+            var ido = nn / l2;
+            var idot = ido + ido + 2;
+            var ipm = ip - 1;
+            for (var j = 1; j <= ipm; j++) {
+                var i1 = i;
+                var fi = 0;
                 wa[i - 1] = 1;
                 wa[i] = 0;
                 ld += l1;
-                float argld = ld * argh;
-                for (int ii = 4; ii <= idot; ii += 2) {
+                var argld = ld * argh;
+                for (var ii = 4; ii <= idot; ii += 2) {
                     i += 2;
                     fi += 1;
                     wa[i - 1] = (float) Math.cos(fi * argld);
@@ -545,17 +545,17 @@ public final class Pffft {
      */
     private static int decompose(int nn, int[] ifac, int[] ntryh) {
         int nl = nn, nf = 0;
-        for (int j = 0; ntryh[j] != 0; ++j) {
-            int ntry = ntryh[j];
+        for (var j = 0; ntryh[j] != 0; ++j) {
+            var ntry = ntryh[j];
             while (nl != 1) {
-                int nq = nl / ntry;
-                int nr = nl - ntry * nq;
+                var nq = nl / ntry;
+                var nr = nl - ntry * nq;
                 if (nr == 0) {
                     ifac[2 + nf++] = ntry;
                     nl = nq;
                     if (ntry == 2 && nf != 1) {
-                        for (int i = 2; i <= nf; ++i) {
-                            int ib = nf - i + 2;
+                        for (var i = 2; i <= nf; ++i) {
+                            var ib = nf - i + 2;
                             ifac[ib + 1] = ifac[ib];
                         }
                         ifac[2] = 2;
@@ -586,16 +586,16 @@ public final class Pffft {
      * @return whichever of {@code work1} or {@code work2} holds the result
      */
     private static float[] rfftf1(int nn, float[] input, float[] work1, float[] work2, float[] wa, int[] ifac) {
-        float[] in = input;
-        float[] out = (in == work2) ? work1 : work2;
-        int nf = ifac[1];
-        int l2 = nn;
-        int iw = nn - 1;
-        for (int k1 = 1; k1 <= nf; ++k1) {
-            int kh = nf - k1;
-            int ip = ifac[kh + 2];
-            int l1 = l2 / ip;
-            int ido = nn / l2;
+        var in = input;
+        var out = (in == work2) ? work1 : work2;
+        var nf = ifac[1];
+        var l2 = nn;
+        var iw = nn - 1;
+        for (var k1 = 1; k1 <= nf; ++k1) {
+            var kh = nf - k1;
+            var ip = ifac[kh + 2];
+            var l1 = l2 / ip;
+            var ido = nn / l2;
             iw -= (ip - 1) * ido;
             switch (ip) {
                 case 5 -> {
@@ -607,7 +607,7 @@ public final class Pffft {
                     radf4(ido, l1, in, out, wa, iw, ix2, ix3);
                 }
                 case 3 -> {
-                    int ix2 = iw + ido;
+                    var ix2 = iw + ido;
                     radf3(ido, l1, in, out, wa, iw, ix2);
                 }
                 case 2 -> radf2(ido, l1, in, out, wa, iw);
@@ -640,15 +640,15 @@ public final class Pffft {
      * @return whichever of {@code work1} or {@code work2} holds the result
      */
     private static float[] rfftb1(int nn, float[] input, float[] work1, float[] work2, float[] wa, int[] ifac) {
-        float[] in = input;
-        float[] out = (in == work2) ? work1 : work2;
-        int nf = ifac[1];
-        int l1 = 1;
-        int iw = 0;
-        for (int k1 = 1; k1 <= nf; k1++) {
-            int ip = ifac[k1 + 1];
-            int l2 = ip * l1;
-            int ido = nn / l2;
+        var in = input;
+        var out = (in == work2) ? work1 : work2;
+        var nf = ifac[1];
+        var l1 = 1;
+        var iw = 0;
+        for (var k1 = 1; k1 <= nf; k1++) {
+            var ip = ifac[k1 + 1];
+            var l2 = ip * l1;
+            var ido = nn / l2;
             switch (ip) {
                 case 5 -> {
                     int ix2 = iw + ido, ix3 = ix2 + ido, ix4 = ix3 + ido;
@@ -659,7 +659,7 @@ public final class Pffft {
                     radb4(ido, l1, in, out, wa, iw, ix2, ix3);
                 }
                 case 3 -> {
-                    int ix2 = iw + ido;
+                    var ix2 = iw + ido;
                     radb3(ido, l1, in, out, wa, iw, ix2);
                 }
                 case 2 -> radb2(ido, l1, in, out, wa, iw);
@@ -694,16 +694,16 @@ public final class Pffft {
      * @return whichever of {@code work1} or {@code work2} holds the result
      */
     private static float[] cfftf1(int nn, float[] input, float[] work1, float[] work2, float[] wa, int[] ifac, int isign) {
-        float[] in = input;
-        float[] out = (in == work2) ? work1 : work2;
-        int nf = ifac[1];
-        int l1 = 1;
-        int iw = 0;
-        for (int k1 = 2; k1 <= nf + 1; k1++) {
-            int ip = ifac[k1];
-            int l2 = ip * l1;
-            int ido = nn / l2;
-            int idot = ido + ido;
+        var in = input;
+        var out = (in == work2) ? work1 : work2;
+        var nf = ifac[1];
+        var l1 = 1;
+        var iw = 0;
+        for (var k1 = 2; k1 <= nf + 1; k1++) {
+            var ip = ifac[k1];
+            var l2 = ip * l1;
+            var ido = nn / l2;
+            var idot = ido + ido;
             switch (ip) {
                 case 5 -> {
                     int ix2 = iw + idot, ix3 = ix2 + idot, ix4 = ix3 + idot;
@@ -714,7 +714,7 @@ public final class Pffft {
                     passf4(idot, l1, in, out, wa, iw, ix2, ix3, isign);
                 }
                 case 3 -> {
-                    int ix2 = iw + idot;
+                    var ix2 = iw + idot;
                     passf3(idot, l1, in, out, wa, iw, ix2, isign);
                 }
                 case 2 -> passf2(idot, l1, in, out, wa, iw, isign);
@@ -855,9 +855,9 @@ public final class Pffft {
      * @param bi the broadcast imaginary twiddle
      */
     private static void rcplxMul(float[] ar, float[] ai, float br, float bi) {
-        for (int l = 0; l < 4; l++) {
+        for (var l = 0; l < 4; l++) {
             float r = ar[l], i = ai[l];
-            float tmp = r * bi;
+            var tmp = r * bi;
             r = r * br;
             r = r - i * bi;
             i = i * br;
@@ -876,9 +876,9 @@ public final class Pffft {
      * @param bi the broadcast imaginary twiddle
      */
     private static void rcplxMulConj(float[] ar, float[] ai, float br, float bi) {
-        for (int l = 0; l < 4; l++) {
+        for (var l = 0; l < 4; l++) {
             float r = ar[l], i = ai[l];
-            float tmp = r * bi;
+            var tmp = r * bi;
             r = r * br;
             r = r + i * bi;
             i = i * br;
@@ -899,10 +899,10 @@ public final class Pffft {
      * @param wa1 the twiddle base offset for this stage
      */
     private static void radf2(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1) {
-        float minusOne = -1.0f;
-        int l1ido = l1 * ido;
+        var minusOne = -1.0f;
+        var l1ido = l1 * ido;
         float[] a = new float[4], b = new float[4], t = new float[4];
-        for (int k = 0; k < l1ido; k += ido) {
+        for (var k = 0; k < l1ido; k += ido) {
             ld(a, cc, k * 4);
             ld(b, cc, (k + l1ido) * 4);
             radd(t, a, b);
@@ -915,8 +915,8 @@ public final class Pffft {
         }
         if (ido != 2) {
             float[] tr2 = new float[4], ti2 = new float[4], br = new float[4], bi = new float[4];
-            for (int k = 0; k < l1ido; k += ido) {
-                for (int i = 2; i < ido; i += 2) {
+            for (var k = 0; k < l1ido; k += ido) {
+                for (var i = 2; i < ido; i += 2) {
                     ld(tr2, cc, (i - 1 + k + l1ido) * 4);
                     ld(ti2, cc, (i + k + l1ido) * 4);
                     ld(br, cc, (i - 1 + k) * 4);
@@ -936,7 +936,7 @@ public final class Pffft {
                 return;
             }
         }
-        for (int k = 0; k < l1ido; k += ido) {
+        for (var k = 0; k < l1ido; k += ido) {
             ld(a, cc, (ido - 1 + k + l1ido) * 4);
             rsvmul(t, minusOne, a);
             st(ch, (2 * k + ido) * 4, t);
@@ -957,12 +957,12 @@ public final class Pffft {
      * @param wa2 the second twiddle base offset
      */
     private static void radf3(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1, int wa2) {
-        float taur = -0.5f;
-        float taui = 0.866025403784439f;
+        var taur = -0.5f;
+        var taui = 0.866025403784439f;
         float[] cr2 = new float[4], dr2 = new float[4], di2 = new float[4], dr3 = new float[4], di3 = new float[4];
         float[] ci2 = new float[4], tr2 = new float[4], ti2 = new float[4], tr3 = new float[4], ti3 = new float[4];
         float[] tA = new float[4], tB = new float[4], tmp = new float[4];
-        for (int k = 0; k < l1; k++) {
+        for (var k = 0; k < l1; k++) {
             ld(tA, cc, (k + l1) * ido * 4);
             ld(tB, cc, (k + 2 * l1) * ido * 4);
             radd(cr2, tA, tB);
@@ -982,9 +982,9 @@ public final class Pffft {
         if (ido == 1) {
             return;
         }
-        for (int k = 0; k < l1; k++) {
-            for (int i = 2; i < ido; i += 2) {
-                int ic = ido - i;
+        for (var k = 0; k < l1; k++) {
+            for (var i = 2; i < ido; i += 2) {
+                var ic = ido - i;
                 ld(dr2, cc, (i - 1 + (k + l1) * ido) * 4);
                 ld(di2, cc, (i + (k + l1) * ido) * 4);
                 rcplxMulConj(dr2, di2, wa[wa1 + i - 2], wa[wa1 + i - 1]);
@@ -1034,8 +1034,8 @@ public final class Pffft {
      * @param wa3 the third twiddle base offset
      */
     private static void radf4(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1, int wa2, int wa3) {
-        float minusHsqt2 = (float) -0.7071067811865475;
-        int l1ido = l1 * ido;
+        var minusHsqt2 = (float) -0.7071067811865475;
+        var l1ido = l1 * ido;
         float[] a0 = new float[4], a1 = new float[4], a2 = new float[4], a3 = new float[4];
         float[] tr1 = new float[4], tr2 = new float[4], t = new float[4];
         {
@@ -1066,10 +1066,10 @@ public final class Pffft {
             float[] cr2 = new float[4], ci2 = new float[4], cr3 = new float[4], ci3 = new float[4];
             float[] cr4 = new float[4], ci4 = new float[4];
             float[] ti1 = new float[4], ti2 = new float[4], tr3 = new float[4], ti3 = new float[4], ti4 = new float[4], tr4 = new float[4];
-            for (int k = 0; k < l1ido; k += ido) {
-                int pc = 1 + k;
-                for (int i = 2; i < ido; i += 2) {
-                    int ic = ido - i;
+            for (var k = 0; k < l1ido; k += ido) {
+                var pc = 1 + k;
+                for (var i = 2; i < ido; i += 2) {
+                    var ic = ido - i;
                     ld(cr2, cc, (pc + 1 * l1ido + 0) * 4);
                     ld(ci2, cc, (pc + 1 * l1ido + 1) * 4);
                     rcplxMulConj(cr2, ci2, wa[wa1 + i - 2], wa[wa1 + i - 1]);
@@ -1113,7 +1113,7 @@ public final class Pffft {
             }
         }
         float[] aa = new float[4], bb = new float[4], cc4 = new float[4], dd = new float[4], ti1 = new float[4];
-        for (int k = 0; k < l1ido; k += ido) {
+        for (var k = 0; k < l1ido; k += ido) {
             ld(aa, cc, (ido - 1 + k + l1ido) * 4);
             ld(bb, cc, (ido - 1 + k + 3 * l1ido) * 4);
             ld(cc4, cc, (ido - 1 + k) * 4);
@@ -1153,8 +1153,8 @@ public final class Pffft {
      */
     private static void radf5(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1, int wa2, int wa3, int wa4) {
         float tr11 = .309016994374947f, ti11 = .951056516295154f, tr12 = -.809016994374947f, ti12 = .587785252292473f;
-        int chOffset = 1 + ido * 6;
-        int ccOffset = 1 + ido * (1 + l1);
+        var chOffset = 1 + ido * 6;
+        var ccOffset = 1 + ido * (1 + l1);
         float[] cr2 = new float[4], ci5 = new float[4], cr3 = new float[4], ci4 = new float[4];
         float[] cr4 = new float[4], cr5 = new float[4], ci2 = new float[4], ci3 = new float[4];
         float[] dr2 = new float[4], di2 = new float[4], dr3 = new float[4], di3 = new float[4];
@@ -1162,7 +1162,7 @@ public final class Pffft {
         float[] tr2 = new float[4], ti2 = new float[4], tr3 = new float[4], ti3 = new float[4];
         float[] tr4 = new float[4], ti4 = new float[4], tr5 = new float[4], ti5 = new float[4];
         float[] tA = new float[4], tB = new float[4], tmp = new float[4], one = new float[4];
-        for (int k = 1; k <= l1; ++k) {
+        for (var k = 1; k <= l1; ++k) {
             ld(tA, cc, (ccRef(ido, l1, 1, k, 5) - ccOffset) * 4);
             ld(tB, cc, (ccRef(ido, l1, 1, k, 2) - ccOffset) * 4);
             radd(cr2, tA, tB);
@@ -1197,10 +1197,10 @@ public final class Pffft {
         if (ido == 1) {
             return;
         }
-        int idp2 = ido + 2;
-        for (int k = 1; k <= l1; ++k) {
-            for (int i = 3; i <= ido; i += 2) {
-                int ic = idp2 - i;
+        var idp2 = ido + 2;
+        for (var k = 1; k <= l1; ++k) {
+            for (var i = 3; i <= ido; i += 2) {
+                var ic = idp2 - i;
                 ldps1(dr2, wa[wa1 + i - 3]);
                 ldps1(di2, wa[wa1 + i - 2]);
                 ldps1(dr3, wa[wa2 + i - 3]);
@@ -1323,10 +1323,10 @@ public final class Pffft {
      * @param obi the imaginary memory offset
      */
     private static void cplxMulConjReg(float[] rr, float[] ri, float[] a, int obr, int obi) {
-        for (int l = 0; l < 4; l++) {
+        for (var l = 0; l < 4; l++) {
             float ar = rr[l], ai = ri[l];
             float br = a[obr + l], bi = a[obi + l];
-            float tmp = ar * bi;
+            var tmp = ar * bi;
             ar = ar * br;
             ar = ar + ai * bi;
             ai = ai * br;
@@ -1347,11 +1347,11 @@ public final class Pffft {
      * @param wa1 the twiddle base offset
      */
     private static void radb2(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1) {
-        float minusTwo = -2.0f;
-        int l1ido = l1 * ido;
+        var minusTwo = -2.0f;
+        var l1ido = l1 * ido;
         float[] a = new float[4], b = new float[4], c = new float[4], d = new float[4];
         float[] tr2 = new float[4], ti2 = new float[4], t = new float[4];
-        for (int k = 0; k < l1ido; k += ido) {
+        for (var k = 0; k < l1ido; k += ido) {
             ld(a, cc, (2 * k) * 4);
             ld(b, cc, (2 * (k + ido) - 1) * 4);
             radd(t, a, b);
@@ -1363,8 +1363,8 @@ public final class Pffft {
             return;
         }
         if (ido != 2) {
-            for (int k = 0; k < l1ido; k += ido) {
-                for (int i = 2; i < ido; i += 2) {
+            for (var k = 0; k < l1ido; k += ido) {
+                for (var i = 2; i < ido; i += 2) {
                     ld(a, cc, (i - 1 + 2 * k) * 4);
                     ld(b, cc, (2 * (k + ido) - i - 1) * 4);
                     ld(c, cc, (i + 0 + 2 * k) * 4);
@@ -1384,7 +1384,7 @@ public final class Pffft {
                 return;
             }
         }
-        for (int k = 0; k < l1ido; k += ido) {
+        for (var k = 0; k < l1ido; k += ido) {
             ld(a, cc, (2 * k + ido - 1) * 4);
             ld(b, cc, (2 * k + ido) * 4);
             radd(t, a, a);
@@ -1411,7 +1411,7 @@ public final class Pffft {
         float[] cr3 = new float[4], ti2 = new float[4], dr2 = new float[4], dr3 = new float[4];
         float[] di2 = new float[4], di3 = new float[4], tA = new float[4], tB = new float[4], taurReg = new float[4];
         ldps1(taurReg, taur);
-        for (int k = 0; k < l1; k++) {
+        for (var k = 0; k < l1; k++) {
             ld(tr2, cc, (ido - 1 + (3 * k + 1) * ido) * 4);
             radd(tr2, tr2, tr2);
             ld(tB, cc, 3 * k * ido * 4);
@@ -1429,9 +1429,9 @@ public final class Pffft {
         if (ido == 1) {
             return;
         }
-        for (int k = 0; k < l1; k++) {
-            for (int i = 2; i < ido; i += 2) {
-                int ic = ido - i;
+        for (var k = 0; k < l1; k++) {
+            for (var i = 2; i < ido; i += 2) {
+                var ic = ido - i;
                 ld(tA, cc, (i - 1 + (3 * k + 2) * ido) * 4);
                 ld(tB, cc, (ic - 1 + (3 * k + 1) * ido) * 4);
                 radd(tr2, tA, tB);
@@ -1483,9 +1483,9 @@ public final class Pffft {
      * @param wa3 the third twiddle base offset
      */
     private static void radb4(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1, int wa2, int wa3) {
-        float minusSqrt2 = (float) -1.414213562373095;
-        float two = 2.0f;
-        int l1ido = l1 * ido;
+        var minusSqrt2 = (float) -1.414213562373095;
+        var two = 2.0f;
+        var l1ido = l1 * ido;
         float[] a = new float[4], b = new float[4], c = new float[4], d = new float[4];
         float[] tr1 = new float[4], tr2 = new float[4], tr3 = new float[4], tr4 = new float[4];
         float[] ti1 = new float[4], ti2 = new float[4], ti3 = new float[4], ti4 = new float[4];
@@ -1518,10 +1518,10 @@ public final class Pffft {
             return;
         }
         if (ido != 2) {
-            for (int k = 0; k < l1ido; k += ido) {
-                int pc = -1 + 4 * k;
-                int ph = k + 1;
-                for (int i = 2; i < ido; i += 2) {
+            for (var k = 0; k < l1ido; k += ido) {
+                var pc = -1 + 4 * k;
+                var ph = k + 1;
+                for (var i = 2; i < ido; i += 2) {
                     ld(a, cc, (pc + i) * 4);
                     ld(b, cc, (pc + 4 * ido - i) * 4);
                     rsub(tr1, a, b);
@@ -1567,8 +1567,8 @@ public final class Pffft {
                 return;
             }
         }
-        for (int k = 0; k < l1ido; k += ido) {
-            int i0 = 4 * k + ido;
+        for (var k = 0; k < l1ido; k += ido) {
+            var i0 = 4 * k + ido;
             ld(c, cc, (i0 - 1) * 4);
             ld(d, cc, (i0 + 2 * ido - 1) * 4);
             ld(a, cc, (i0 + 0) * 4);
@@ -1605,8 +1605,8 @@ public final class Pffft {
      */
     private static void radb5(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1, int wa2, int wa3, int wa4) {
         float tr11 = .309016994374947f, ti11 = .951056516295154f, tr12 = -.809016994374947f, ti12 = .587785252292473f;
-        int chOffset = 1 + ido * (1 + l1);
-        int ccOffset = 1 + ido * 6;
+        var chOffset = 1 + ido * (1 + l1);
+        var ccOffset = 1 + ido * 6;
         float[] ti5 = new float[4], ti4 = new float[4], tr2 = new float[4], tr3 = new float[4];
         float[] ti2 = new float[4], ti3 = new float[4], tr5 = new float[4], tr4 = new float[4];
         float[] cr2 = new float[4], cr3 = new float[4], ci5 = new float[4], ci4 = new float[4];
@@ -1614,7 +1614,7 @@ public final class Pffft {
         float[] dr3 = new float[4], dr4 = new float[4], di3 = new float[4], di4 = new float[4];
         float[] dr5 = new float[4], dr2 = new float[4], di5 = new float[4], di2 = new float[4];
         float[] tA = new float[4], tB = new float[4], tmp = new float[4], one = new float[4];
-        for (int k = 1; k <= l1; ++k) {
+        for (var k = 1; k <= l1; ++k) {
             ld(tA, cc, (ccRefB(ido, 1, 3, k) - ccOffset) * 4);
             radd(ti5, tA, tA);
             ld(tA, cc, (ccRefB(ido, 1, 5, k) - ccOffset) * 4);
@@ -1653,10 +1653,10 @@ public final class Pffft {
         if (ido == 1) {
             return;
         }
-        int idp2 = ido + 2;
-        for (int k = 1; k <= l1; ++k) {
-            for (int i = 3; i <= ido; i += 2) {
-                int ic = idp2 - i;
+        var idp2 = ido + 2;
+        for (var k = 1; k <= l1; ++k) {
+            for (var i = 3; i <= ido; i += 2) {
+                var ic = idp2 - i;
                 ld(tA, cc, (ccRefB(ido, i, 3, k) - ccOffset) * 4);
                 ld(tB, cc, (ccRefB(ido, ic, 2, k) - ccOffset) * 4);
                 radd(ti5, tA, tB);
@@ -1778,11 +1778,11 @@ public final class Pffft {
      * @param fsign the transform sign
      */
     private static void passf2(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1, int fsign) {
-        int l1ido = l1 * ido;
+        var l1ido = l1 * ido;
         float[] a = new float[4], b = new float[4], t = new float[4];
         if (ido <= 2) {
             int ccp = 0, chp = 0;
-            for (int k = 0; k < l1ido; k += ido) {
+            for (var k = 0; k < l1ido; k += ido) {
                 ld(a, cc, (ccp + 0) * 4);
                 ld(b, cc, (ccp + ido + 0) * 4);
                 radd(t, a, b);
@@ -1801,16 +1801,16 @@ public final class Pffft {
         } else {
             float[] tr2 = new float[4], ti2 = new float[4];
             int ccp = 0, chp = 0;
-            for (int k = 0; k < l1ido; k += ido) {
-                for (int i = 0; i < ido - 1; i += 2) {
+            for (var k = 0; k < l1ido; k += ido) {
+                for (var i = 0; i < ido - 1; i += 2) {
                     ld(a, cc, (ccp + i + 0) * 4);
                     ld(b, cc, (ccp + i + ido + 0) * 4);
                     rsub(tr2, a, b);
                     ld(a, cc, (ccp + i + 1) * 4);
                     ld(b, cc, (ccp + i + ido + 1) * 4);
                     rsub(ti2, a, b);
-                    float wr = wa[wa1 + i];
-                    float wi = fsign * wa[wa1 + i + 1];
+                    var wr = wa[wa1 + i];
+                    var wi = fsign * wa[wa1 + i + 1];
                     ld(a, cc, (ccp + i + 0) * 4);
                     ld(b, cc, (ccp + i + ido + 0) * 4);
                     radd(t, a, b);
@@ -1842,15 +1842,15 @@ public final class Pffft {
      * @param fsign the transform sign
      */
     private static void passf3(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1, int wa2, int fsign) {
-        float taur = -0.5f;
-        float taui = 0.866025403784439f * fsign;
-        int l1ido = l1 * ido;
+        var taur = -0.5f;
+        var taui = 0.866025403784439f * fsign;
+        var l1ido = l1 * ido;
         float[] tr2 = new float[4], cr2 = new float[4], ti2 = new float[4], ci2 = new float[4];
         float[] cr3 = new float[4], ci3 = new float[4], dr2 = new float[4], dr3 = new float[4];
         float[] di2 = new float[4], di3 = new float[4], a = new float[4], b = new float[4], t = new float[4];
         int ccp = 0, chp = 0;
-        for (int k = 0; k < l1ido; k += ido) {
-            for (int i = 0; i < ido - 1; i += 2) {
+        for (var k = 0; k < l1ido; k += ido) {
+            for (var i = 0; i < ido - 1; i += 2) {
                 ld(a, cc, (ccp + i + ido) * 4);
                 ld(b, cc, (ccp + i + 2 * ido) * 4);
                 radd(tr2, a, b);
@@ -1909,7 +1909,7 @@ public final class Pffft {
      * @param fsign the transform sign
      */
     private static void passf4(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1, int wa2, int wa3, int fsign) {
-        int l1ido = l1 * ido;
+        var l1ido = l1 * ido;
         float[] a = new float[4], b = new float[4], t = new float[4];
         float[] tr1 = new float[4], tr2 = new float[4], tr3 = new float[4], tr4 = new float[4];
         float[] ti1 = new float[4], ti2 = new float[4], ti3 = new float[4], ti4 = new float[4];
@@ -1917,7 +1917,7 @@ public final class Pffft {
         float[] ci2 = new float[4], ci3 = new float[4], ci4 = new float[4];
         if (ido == 2) {
             int ccp = 0, chp = 0;
-            for (int k = 0; k < l1ido; k += ido) {
+            for (var k = 0; k < l1ido; k += ido) {
                 ld(a, cc, (ccp + 0) * 4);
                 ld(b, cc, (ccp + 2 * ido + 0) * 4);
                 rsub(tr1, a, b);
@@ -1961,8 +1961,8 @@ public final class Pffft {
             }
         } else {
             int ccp = 0, chp = 0;
-            for (int k = 0; k < l1ido; k += ido) {
-                for (int i = 0; i < ido - 1; i += 2) {
+            for (var k = 0; k < l1ido; k += ido) {
+                for (var i = 0; i < ido - 1; i += 2) {
                     ld(a, cc, (ccp + i + 0) * 4);
                     ld(b, cc, (ccp + i + 2 * ido + 0) * 4);
                     rsub(tr1, a, b);
@@ -2033,10 +2033,10 @@ public final class Pffft {
      * @param fsign the transform sign
      */
     private static void passf5(int ido, int l1, float[] cc, float[] ch, float[] wa, int wa1, int wa2, int wa3, int wa4, int fsign) {
-        float tr11 = .309016994374947f;
-        float ti11 = .951056516295154f * fsign;
-        float tr12 = -.809016994374947f;
-        float ti12 = .587785252292473f * fsign;
+        var tr11 = .309016994374947f;
+        var ti11 = .951056516295154f * fsign;
+        var tr12 = -.809016994374947f;
+        var ti12 = .587785252292473f * fsign;
         float[] ti5 = new float[4], ti2 = new float[4], ti4 = new float[4], ti3 = new float[4];
         float[] tr5 = new float[4], tr2 = new float[4], tr4 = new float[4], tr3 = new float[4];
         float[] cr2 = new float[4], ci2 = new float[4], cr3 = new float[4], ci3 = new float[4];
@@ -2045,8 +2045,8 @@ public final class Pffft {
         float[] dr5 = new float[4], dr2 = new float[4], di5 = new float[4], di2 = new float[4];
         float[] a = new float[4], b = new float[4], t = new float[4], u = new float[4];
         int ccp = 0, chp = 0;
-        for (int k = 0; k < l1; ++k) {
-            for (int i = 0; i < ido - 1; i += 2) {
+        for (var k = 0; k < l1; ++k) {
+            for (var i = 0; i < ido - 1; i += 2) {
                 ld(a, cc, (ccp + (2 - 1) * ido + i + 1) * 4);
                 ld(b, cc, (ccp + (5 - 1) * ido + i + 1) * 4);
                 rsub(ti5, a, b);
@@ -2209,8 +2209,8 @@ public final class Pffft {
      * @param e          the twiddle array
      */
     private static void realFinalize(int ncvecParam, float[] in, float[] out, float[] e) {
-        int dk = ncvecParam / SIMD_SZ;
-        float[] zero = new float[4];
+        var dk = ncvecParam / SIMD_SZ;
+        var zero = new float[4];
         float[] cr = new float[4], ci = new float[4], save = new float[4], saveNext = new float[4];
         ld(cr, in, 0 * 4);
         ld(ci, in, (ncvecParam * 2 - 1) * 4);
@@ -2226,10 +2226,10 @@ public final class Pffft {
         out[6 * 4 + 0] = ci[0] - S_HALF * (ci[1] - ci[3]);
         out[7 * 4 + 0] = ci[2] - S_HALF * (ci[1] + ci[3]);
 
-        for (int k = 1; k < dk; ++k) {
+        for (var k = 1; k < dk; ++k) {
             ld(saveNext, in, (8 * k + 7) * 4);
             realFinalize4x4(save, 0, in, (8 * k + 0) * 4, in, (8 * k + 1) * 4, e, k * 6 * 4, out, k * 8 * 4);
-            float[] tmp = save;
+            var tmp = save;
             save = saveNext;
             saveNext = tmp;
         }
@@ -2284,7 +2284,7 @@ public final class Pffft {
         rcplxMulConjReg(r3, i3, e, oe + 16, oe + 20);
         transpose4Regs(r0, r1, r2, r3);
         transpose4Regs(i0, i1, i2, i3);
-        int o = oout;
+        var o = oout;
         if (!first) {
             st(out, o, r0);
             o += 4;
@@ -2317,18 +2317,18 @@ public final class Pffft {
      * @param e          the twiddle array
      */
     private static void realPreprocess(int ncvecParam, float[] in, float[] out, float[] e) {
-        int dk = ncvecParam / SIMD_SZ;
+        var dk = ncvecParam / SIMD_SZ;
         float[] xr = new float[4], xi = new float[4];
-        for (int k = 0; k < 4; ++k) {
+        for (var k = 0; k < 4; ++k) {
             xr[k] = in[8 * k];
             xi[k] = in[8 * k + 4];
         }
         realPreprocess4x4(in, 0, e, 0, out, 1 * 4, true);
-        for (int k = 1; k < dk; ++k) {
+        for (var k = 1; k < dk; ++k) {
             realPreprocess4x4(in, 8 * k * 4, e, k * 6 * 4, out, (-1 + k * 8) * 4, false);
         }
-        int u0 = 0;
-        int uLast = (2 * ncvecParam - 1) * 4;
+        var u0 = 0;
+        var uLast = (2 * ncvecParam - 1) * 4;
         out[u0 + 0] = (xr[0] + xi[0]) + 2 * xr[2];
         out[u0 + 1] = (xr[0] - xi[0]) - 2 * xi[2];
         out[u0 + 2] = (xr[0] + xi[0]) - 2 * xr[2];
@@ -2348,13 +2348,13 @@ public final class Pffft {
      * @param e          the twiddle array
      */
     private static void cplxFinalize(int ncvecParam, float[] in, float[] out, float[] e) {
-        int dk = ncvecParam / SIMD_SZ;
+        var dk = ncvecParam / SIMD_SZ;
         float[] r0 = new float[4], i0 = new float[4], r1 = new float[4], i1 = new float[4];
         float[] r2 = new float[4], i2 = new float[4], r3 = new float[4], i3 = new float[4];
         float[] sr0 = new float[4], dr0 = new float[4], sr1 = new float[4], dr1 = new float[4];
         float[] si0 = new float[4], di0 = new float[4], si1 = new float[4], di1 = new float[4];
-        int o = 0;
-        for (int k = 0; k < dk; ++k) {
+        var o = 0;
+        for (var k = 0; k < dk; ++k) {
             ld(r0, in, (8 * k + 0) * 4);
             ld(i0, in, (8 * k + 1) * 4);
             ld(r1, in, (8 * k + 2) * 4);
@@ -2412,13 +2412,13 @@ public final class Pffft {
      * @param e          the twiddle array
      */
     private static void cplxPreprocess(int ncvecParam, float[] in, float[] out, float[] e) {
-        int dk = ncvecParam / SIMD_SZ;
+        var dk = ncvecParam / SIMD_SZ;
         float[] r0 = new float[4], i0 = new float[4], r1 = new float[4], i1 = new float[4];
         float[] r2 = new float[4], i2 = new float[4], r3 = new float[4], i3 = new float[4];
         float[] sr0 = new float[4], dr0 = new float[4], sr1 = new float[4], dr1 = new float[4];
         float[] si0 = new float[4], di0 = new float[4], si1 = new float[4], di1 = new float[4];
-        int o = 0;
-        for (int k = 0; k < dk; ++k) {
+        var o = 0;
+        for (var k = 0; k < dk; ++k) {
             ld(r0, in, (8 * k + 0) * 4);
             ld(i0, in, (8 * k + 1) * 4);
             ld(r1, in, (8 * k + 2) * 4);
@@ -2508,10 +2508,10 @@ public final class Pffft {
      * @param obi the imaginary twiddle offset
      */
     private static void rcplxMulReg(float[] ar, float[] ai, float[] e, int obr, int obi) {
-        for (int l = 0; l < 4; l++) {
+        for (var l = 0; l < 4; l++) {
             float r = ar[l], i = ai[l];
             float br = e[obr + l], bi = e[obi + l];
-            float tmp = r * bi;
+            var tmp = r * bi;
             r = r * br;
             r = r - i * bi;
             i = i * br;
@@ -2532,10 +2532,10 @@ public final class Pffft {
      * @param obi the imaginary twiddle offset
      */
     private static void rcplxMulConjReg(float[] ar, float[] ai, float[] e, int obr, int obi) {
-        for (int l = 0; l < 4; l++) {
+        for (var l = 0; l < 4; l++) {
             float r = ar[l], i = ai[l];
             float br = e[obr + l], bi = e[obi + l];
-            float tmp = r * bi;
+            var tmp = r * bi;
             r = r * br;
             r = r + i * bi;
             i = i * br;
@@ -2560,13 +2560,13 @@ public final class Pffft {
      */
     private static void reversedCopy(int nn, float[] in, int inBase, int inStride, float[] out, int outVec) {
         float[] g0 = new float[4], g1 = new float[4], h0 = new float[4], h1 = new float[4];
-        int inp = inBase;
-        int outp = outVec;
+        var inp = inBase;
+        var outp = outVec;
         interleave2Regs(in, inp, in, inp + 4, g0, g1);
         inp += inStride * 4;
         outp -= 4;
         vswaphlRegs(out, outp, g0, g1);
-        for (int k = 1; k < nn; ++k) {
+        for (var k = 1; k < nn; ++k) {
             interleave2Regs(in, inp, in, inp + 4, h0, h1);
             inp += inStride * 4;
             outp -= 4;
@@ -2596,12 +2596,12 @@ public final class Pffft {
      */
     private static void unreversedCopy(int nn, float[] in, int inBase, float[] out, int outBase, int outStride) {
         float[] g0 = new float[4], g1 = new float[4], h0 = new float[4], h1 = new float[4];
-        int inp = inBase;
-        int outp = outBase;
+        var inp = inBase;
+        var outp = outBase;
         ld(g0, in, inp);
         System.arraycopy(g0, 0, g1, 0, 4);
         inp += 4;
-        for (int k = 1; k < nn; ++k) {
+        for (var k = 1; k < nn; ++k) {
             ld(h0, in, inp);
             inp += 4;
             ld(h1, in, inp);

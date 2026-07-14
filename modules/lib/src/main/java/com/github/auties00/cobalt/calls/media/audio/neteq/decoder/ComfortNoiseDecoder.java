@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.calls.media.audio.neteq.ComfortNoiseGenerator;
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Objects;
 
 /**
  * Renders RFC 3389 comfort noise as a permitted {@link AudioDecoder}, the pseudo decoder the jitter buffer
@@ -72,7 +73,7 @@ public final class ComfortNoiseDecoder implements AudioDecoder {
      */
     @Override
     public short[] decode(byte[] payload, int frameSamples, boolean fec) {
-        java.util.Objects.requireNonNull(payload, "payload cannot be null");
+        Objects.requireNonNull(payload, "payload cannot be null");
         requireOpen();
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "comfort noise descriptor updated, payload={0} frameSamples={1}",
@@ -102,7 +103,7 @@ public final class ComfortNoiseDecoder implements AudioDecoder {
      */
     @Override
     public boolean packetHasVoiceActivity(byte[] payload) {
-        java.util.Objects.requireNonNull(payload, "payload cannot be null");
+        Objects.requireNonNull(payload, "payload cannot be null");
         return false;
     }
 

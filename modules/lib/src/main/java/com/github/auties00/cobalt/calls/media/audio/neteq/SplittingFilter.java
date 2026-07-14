@@ -1,5 +1,8 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 /**
  * Splits a full band PCM block into frequency sub bands and recombines them, the shared quadrature mirror
  * filter bank the audio processing path uses to run band limited algorithms.
@@ -138,9 +141,9 @@ public final class SplittingFilter {
      * @throws IllegalArgumentException if {@code fullBand} has odd length or an output band is too short
      */
     public void analysis(float[] fullBand, float[] lowBand, float[] highBand) {
-        java.util.Objects.requireNonNull(fullBand, "fullBand cannot be null");
-        java.util.Objects.requireNonNull(lowBand, "lowBand cannot be null");
-        java.util.Objects.requireNonNull(highBand, "highBand cannot be null");
+        Objects.requireNonNull(fullBand, "fullBand cannot be null");
+        Objects.requireNonNull(lowBand, "lowBand cannot be null");
+        Objects.requireNonNull(highBand, "highBand cannot be null");
         if ((fullBand.length & 1) != 0) {
             throw new IllegalArgumentException("fullBand length must be even, got " + fullBand.length);
         }
@@ -179,9 +182,9 @@ public final class SplittingFilter {
      * @throws IllegalArgumentException if the bands differ in length or {@code fullBand} is too short
      */
     public void synthesis(float[] lowBand, float[] highBand, float[] fullBand) {
-        java.util.Objects.requireNonNull(lowBand, "lowBand cannot be null");
-        java.util.Objects.requireNonNull(highBand, "highBand cannot be null");
-        java.util.Objects.requireNonNull(fullBand, "fullBand cannot be null");
+        Objects.requireNonNull(lowBand, "lowBand cannot be null");
+        Objects.requireNonNull(highBand, "highBand cannot be null");
+        Objects.requireNonNull(fullBand, "fullBand cannot be null");
         if (lowBand.length != highBand.length) {
             throw new IllegalArgumentException("lowBand and highBand must be the same length");
         }
@@ -210,10 +213,10 @@ public final class SplittingFilter {
      * <p>Zeroes all four branch state buffers; used when the stream is reconfigured.
      */
     public void reset() {
-        java.util.Arrays.fill(analysisState1, 0.0f);
-        java.util.Arrays.fill(analysisState2, 0.0f);
-        java.util.Arrays.fill(synthesisState1, 0.0f);
-        java.util.Arrays.fill(synthesisState2, 0.0f);
+        Arrays.fill(analysisState1, 0.0f);
+        Arrays.fill(analysisState2, 0.0f);
+        Arrays.fill(synthesisState1, 0.0f);
+        Arrays.fill(synthesisState2, 0.0f);
     }
 
     /**

@@ -111,7 +111,7 @@ public final class PresenceStreamHandler extends SocketStreamHandler.Concurrent 
             adaptation = WhatsAppAdaptation.ADAPTED)
     @Override
     public void handle(Stanza stanza) {
-        SmaxServerUpdateResponse presence = SmaxServerUpdateResponse.of(stanza).orElse(null);
+        var presence = SmaxServerUpdateResponse.of(stanza).orElse(null);
         if (presence == null) {
             if (Log.DEBUG) LOGGER.log(Level.DEBUG, "ignoring unparsable presence stanza {0}", stanza);
             return;

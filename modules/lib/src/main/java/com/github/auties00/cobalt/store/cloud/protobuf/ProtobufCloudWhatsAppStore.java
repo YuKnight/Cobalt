@@ -370,7 +370,7 @@ public final class ProtobufCloudWhatsAppStore implements CloudWhatsAppStore {
         if (Files.notExists(directory)) {
             return;
         }
-        try (Stream<Path> walk = Files.walk(directory)) {
+        try (var walk = Files.walk(directory)) {
             walk.sorted(Comparator.reverseOrder()).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);

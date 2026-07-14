@@ -40,7 +40,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>The sync dispatcher routes incoming {@code userStatusMute} mutations here whenever the user
  * mutes or unmutes another contact's or group's status posts on a linked device. The handler
  * writes the new value to the matching
- * {@link com.github.auties00.cobalt.model.contact.Contact#setStatusMuted(boolean)} record or to
+ * {@link Contact#setStatusMuted(boolean)} record or to
  * {@link GroupMetadata#statusMuted()} on
  * {@link LinkedWhatsAppStore}. Mutations referencing an unknown contact
  * or group are reported as {@link MutationApplicationResult#orphan(String, String)} so a later
@@ -112,7 +112,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      * {@link Jid} and the decoded value must be a {@link UserStatusMuteAction}, otherwise the
      * mutation is reported as malformed. Group JIDs route through
      * {@link LinkedWhatsAppChatStore#applyGroupMetadataEdit(Jid, com.github.auties00.cobalt.model.chat.group.GroupMetadataEdit)};
-     * user JIDs route through {@link com.github.auties00.cobalt.model.contact.Contact#setStatusMuted(boolean)}
+     * user JIDs route through {@link Contact#setStatusMuted(boolean)}
      * on the resolved contact. An unknown group or contact surfaces as
      * {@link MutationApplicationResult#orphan(String, String)} with the model type
      * {@code "UserStatusMute"} so the dispatcher can retry once the missing entity arrives via a
@@ -290,7 +290,7 @@ public final class UserStatusMuteHandler implements WebAppStateActionHandler {
      * @implNote
      * This implementation collapses WA Web's {@code TRUSTED_GROUP_MEMBER} branch to
      * {@link StatusPosterContactType#UNKNOWN} because Cobalt's
-     * {@link com.github.auties00.cobalt.model.chat.group.GroupMetadata} carries no
+     * {@link GroupMetadata} carries no
      * group-trust flag, and reads address-book membership from {@link Contact#fullName()}
      * presence in place of WA Web's {@code getIsMyContact} check.
      *

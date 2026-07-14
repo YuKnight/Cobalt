@@ -319,12 +319,12 @@ public final class MlowRangeEncoder {
      */
     private void carryOut(int c) {
         if ((c & 0xFFFFFFFFL) != EC_SYM_MAX) {
-            int carry = c >> EC_SYM_BITS;
+            var carry = c >> EC_SYM_BITS;
             if (rem >= 0) {
                 writeByte(rem + carry);
             }
             if (Long.compareUnsigned(ext, 0) > 0) {
-                int sym = (int) ((EC_SYM_MAX + carry) & EC_SYM_MAX);
+                var sym = (int) ((EC_SYM_MAX + carry) & EC_SYM_MAX);
                 do {
                     writeByte(sym);
                 } while (Long.compareUnsigned(--ext, 0) > 0);
@@ -369,7 +369,7 @@ public final class MlowRangeEncoder {
      * @param ft the total frequency of the alphabet; must be positive and at most {@code 2^32 - 1}
      */
     public void encode(long fl, long fh, long ft) {
-        long r = celtUdiv(rng, ft);
+        var r = celtUdiv(rng, ft);
         if (fl > 0) {
             val = (val + rng - imul32(r, ft - fl)) & U32;
             rng = imul32(r, fh - fl);
@@ -390,7 +390,7 @@ public final class MlowRangeEncoder {
      * @param bits the base two logarithm of the total frequency; must be in {@code [0, 31]}
      */
     public void encodeBin(long fl, long fh, int bits) {
-        long r = rng >>> bits;
+        var r = rng >>> bits;
         if (fl > 0) {
             val = (val + rng - imul32(r, (1L << bits) - fl)) & U32;
             rng = imul32(r, fh - fl);
@@ -411,9 +411,9 @@ public final class MlowRangeEncoder {
      * @param logp  the negative base two logarithm of the probability of a one bit
      */
     public void encodeBitLogp(int value, int logp) {
-        long r = rng;
-        long l = val;
-        long s = r >>> logp;
+        var r = rng;
+        var l = val;
+        var s = r >>> logp;
         r = (r - s) & U32;
         if (value != 0) {
             val = (l + r) & U32;
@@ -436,7 +436,7 @@ public final class MlowRangeEncoder {
      * @param ftb  the number of bits of precision in the distribution, so {@code ft = 1 << ftb}
      */
     public void encodeIcdf(int s, int[] icdf, int ftb) {
-        long r = rng >>> ftb;
+        var r = rng >>> ftb;
         if (s > 0) {
             val = (val + rng - imul32(r, icdf[s - 1] & 0xFFL)) & U32;
             rng = imul32(r, (icdf[s - 1] & 0xFFL) - (icdf[s] & 0xFFL));
@@ -458,12 +458,12 @@ public final class MlowRangeEncoder {
      * @param ft    one more than the maximum encodable value; must be at least 2 and at most {@code 2^32 - 1}
      */
     public void encodeUint(long value, long ft) {
-        long ftMinus = (ft - 1) & U32;
-        int ftb = ecIlog(ftMinus);
+        var ftMinus = (ft - 1) & U32;
+        var ftb = ecIlog(ftMinus);
         if (ftb > EC_UINT_BITS) {
             ftb -= EC_UINT_BITS;
-            long ftHigh = (ftMinus >>> ftb) + 1;
-            long fl = (value >>> ftb) & U32;
+            var ftHigh = (ftMinus >>> ftb) + 1;
+            var fl = (value >>> ftb) & U32;
             encode(fl, fl + 1, ftHigh);
             encodeBits(value & (((1L << ftb) - 1) & U32), ftb);
         } else {
@@ -483,8 +483,8 @@ public final class MlowRangeEncoder {
      * @param bits  the number of raw bits to write; must be in {@code [1, 25]}
      */
     public void encodeBits(long value, int bits) {
-        long window = endWindow;
-        int used = nendBits;
+        var window = endWindow;
+        var used = nendBits;
         if (used + bits > EC_WINDOW_SIZE) {
             do {
                 writeByteAtEnd((int) (window & EC_SYM_MAX));
@@ -514,8 +514,8 @@ public final class MlowRangeEncoder {
      * @param nbits the number of leading bits to overwrite; must be at most {@link #EC_SYM_BITS}
      */
     public void patchInitialBits(int value, int nbits) {
-        int shift = EC_SYM_BITS - nbits;
-        int mask = ((1 << nbits) - 1) << shift;
+        var shift = EC_SYM_BITS - nbits;
+        var mask = ((1 << nbits) - 1) << shift;
         if (offs > 0) {
             buf[bufBase] = (byte) ((buf[bufBase] & ~mask) | (value << shift));
         } else if (rem >= 0) {
@@ -563,9 +563,9 @@ public final class MlowRangeEncoder {
      * error; otherwise it ORs the partial window into {@code buf[storage - endOffs - 1]}.
      */
     public void finish() {
-        int l = EC_CODE_BITS - ecIlog(rng);
-        long msk = (EC_CODE_TOP - 1) >>> l;
-        long end = (val + msk) & ~msk & U32;
+        var l = EC_CODE_BITS - ecIlog(rng);
+        var msk = (EC_CODE_TOP - 1) >>> l;
+        var end = (val + msk) & ~msk & U32;
         if (Long.compareUnsigned((end | msk) & U32, (val + rng) & U32) >= 0) {
             l++;
             msk >>>= 1;
@@ -579,17 +579,17 @@ public final class MlowRangeEncoder {
         if (rem >= 0 || Long.compareUnsigned(ext, 0) > 0) {
             carryOut(0);
         }
-        long window = endWindow;
-        int used = nendBits;
+        var window = endWindow;
+        var used = nendBits;
         while (used >= EC_SYM_BITS) {
             writeByteAtEnd((int) (window & EC_SYM_MAX));
             window = (window >>> EC_SYM_BITS) & U32;
             used -= EC_SYM_BITS;
         }
         if (error == 0) {
-            int clearFrom = bufBase + offs;
-            int clearLen = storage - offs - endOffs;
-            for (int i = 0; i < clearLen; i++) {
+            var clearFrom = bufBase + offs;
+            var clearLen = storage - offs - endOffs;
+            for (var i = 0; i < clearLen; i++) {
                 buf[clearFrom + i] = 0;
             }
             if (used > 0) {
@@ -609,7 +609,7 @@ public final class MlowRangeEncoder {
                         }
                         error = -1;
                     }
-                    int idx = bufBase + storage - endOffs - 1;
+                    var idx = bufBase + storage - endOffs - 1;
                     buf[idx] = (byte) ((buf[idx] & 0xFF) | (int) window);
                 }
             }
@@ -631,9 +631,9 @@ public final class MlowRangeEncoder {
      * @param s   the symbol index to encode, in {@code [0, cmf.length - 1)}
      */
     public void encodeUpdate(int[] cmf, int s) {
-        int last = cmf.length - 1;
-        long base = cmf[0] & U32;
-        long total = (cmf[last] & U32) - base;
+        var last = cmf.length - 1;
+        var base = cmf[0] & U32;
+        var total = (cmf[last] & U32) - base;
         encode((cmf[s] & U32) - base, (cmf[s + 1] & U32) - base, total);
     }
 
@@ -672,12 +672,12 @@ public final class MlowRangeEncoder {
      * @return the number of bits produced, scaled by 8, as a 32 bit unsigned value
      */
     public long tellFrac() {
-        long nbits = ((long) nbitsTotal << BITRES) & U32;
-        int l = ecIlog(rng);
-        long r = (rng >>> (l - 16)) & U32;
-        long b = (r >>> 12) - 8;
+        var nbits = ((long) nbitsTotal << BITRES) & U32;
+        var l = ecIlog(rng);
+        var r = (rng >>> (l - 16)) & U32;
+        var b = (r >>> 12) - 8;
         b += (Long.compareUnsigned(r, TELL_FRAC_CORRECTION[(int) b]) > 0) ? 1 : 0;
-        long lScaled = ((long) l << BITRES) + b;
+        var lScaled = ((long) l << BITRES) + b;
         return (nbits - lScaled) & U32;
     }
 

@@ -4,6 +4,7 @@ import com.github.auties00.cobalt.calls.media.audio.codec.mlow.dsp.Pffft;
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
+import java.util.Arrays;
 
 /**
  * Perceptual weighting spectral model of the MLow speech encoder.
@@ -149,7 +150,7 @@ public final class PerceptualModel {
         if (Log.DEBUG) {
             LOGGER.log(Level.DEBUG, "perceptual model reset");
         }
-        java.util.Arrays.fill(buffer, 0.0f);
+        Arrays.fill(buffer, 0.0f);
     }
 
     /**
@@ -175,7 +176,7 @@ public final class PerceptualModel {
             LOGGER.log(Level.TRACE, "perceptual model analysis span xsubfrLen={0} isLastSubfr={1} lenR={2}",
                     xsubfrLen, isLastSubfr, lenR);
         }
-        int retain = NFFT - xsubfrLen;
+        var retain = NFFT - xsubfrLen;
         System.arraycopy(buffer, xsubfrLen - SHORTER, buffer, 0, retain);
         System.arraycopy(xsubfr, 0, buffer, retain, xsubfrLen);
 
@@ -184,15 +185,15 @@ public final class PerceptualModel {
         fft.transformOrdered(bufWin, spectrum, null, true);
         spectrum[0] = spectrum[0] * spectrum[0];
         spectrum[1] = spectrum[1] * spectrum[1];
-        for (int i = 1; i < NFFT / 2; i++) {
+        for (var i = 1; i < NFFT / 2; i++) {
             spectrum[2 * i] = spectrum[2 * i] * spectrum[2 * i] + spectrum[2 * i + 1] * spectrum[2 * i + 1];
             spectrum[2 * i + 1] = 0.0f;
         }
         smoothFilter(spectrum);
         fft.transformOrdered(spectrum, bufWin, null, false);
 
-        float scale = 1.0f / NFFT;
-        for (int i = 0; i < lenR; i++) {
+        var scale = 1.0f / NFFT;
+        for (var i = 0; i < lenR; i++) {
             r[i] = bufWin[i] * scale;
         }
     }
@@ -213,24 +214,24 @@ public final class PerceptualModel {
      * @param out         the destination for the {@value #NFFT} sample windowed buffer
      */
     private static void window(float[] in, boolean isLastSubfr, float[] out) {
-        boolean longWin = !isLastSubfr;
-        int len = WIN_LEN_20MS;
-        float[] win1 = PERC_WIN1_20MS;
-        for (int i = 0; i < PERC_WIN1_20MS_LEN; i++) {
+        var longWin = !isLastSubfr;
+        var len = WIN_LEN_20MS;
+        var win1 = PERC_WIN1_20MS;
+        for (var i = 0; i < PERC_WIN1_20MS_LEN; i++) {
             out[i] = in[i] * win1[i];
         }
-        int midCount = len - PERC_WIN1_20MS_LEN - WIN3_LONG_LEN;
+        var midCount = len - PERC_WIN1_20MS_LEN - WIN3_LONG_LEN;
         System.arraycopy(in, PERC_WIN1_20MS_LEN, out, PERC_WIN1_20MS_LEN, midCount);
 
-        int win3len = longWin ? WIN3_LONG_LEN : WIN3_SHORT_LEN;
-        float[] win3 = longWin ? LpcAnalysisTables.WIN3_LONG : LpcAnalysisTables.WIN3_SHORT;
-        int tailStart = len - WIN3_LONG_LEN;
-        for (int i = 0; i < win3len; i++) {
+        var win3len = longWin ? WIN3_LONG_LEN : WIN3_SHORT_LEN;
+        var win3 = longWin ? LpcAnalysisTables.WIN3_LONG : LpcAnalysisTables.WIN3_SHORT;
+        var tailStart = len - WIN3_LONG_LEN;
+        for (var i = 0; i < win3len; i++) {
             out[tailStart + i] = in[tailStart + i] * win3[i];
         }
         if (!longWin) {
-            int zStart = len - WIN3_LONG_LEN + WIN3_SHORT_LEN;
-            for (int i = zStart; i < len; i++) {
+            var zStart = len - WIN3_LONG_LEN + WIN3_SHORT_LEN;
+            for (var i = zStart; i < len; i++) {
                 out[i] = 0.0f;
             }
         }
@@ -250,18 +251,18 @@ public final class PerceptualModel {
      * @param f the interleaved power spectrum to smooth in place, {@value #NFFT} entries
      */
     private static void smoothFilter(float[] f) {
-        int half = NFFT / 2;
-        float[] coef = SMTH_COEF;
-        float smooth = f[0];
-        for (int i = 1; i < half; i++) {
-            float value = f[2 * i];
+        var half = NFFT / 2;
+        var coef = SMTH_COEF;
+        var smooth = f[0];
+        for (var i = 1; i < half; i++) {
+            var value = f[2 * i];
             smooth = value + coef[i] * (smooth - value);
             f[2 * i] = smooth;
         }
         f[1] = f[1] + coef[half] * (smooth - f[1]);
         smooth = f[1];
-        for (int i = half - 1; i > 0; i--) {
-            float value = f[2 * i];
+        for (var i = half - 1; i > 0; i--) {
+            var value = f[2 * i];
             smooth = value + coef[i] * (smooth - value);
             f[2 * i] = smooth;
         }

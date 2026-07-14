@@ -1,5 +1,6 @@
 package com.github.auties00.cobalt.calls.media.audio.neteq.decoder;
 
+import com.github.auties00.cobalt.exception.linked.WhatsAppCallException;
 import com.github.auties00.cobalt.log.Log;
 
 import java.lang.System.Logger.Level;
@@ -240,7 +241,7 @@ public final class DtmfDecoder implements AudioDecoder {
             if (Log.WARNING) {
                 LOGGER.log(Level.WARNING, "dtmf payload too short, length={0}", payload.length);
             }
-            throw new com.github.auties00.cobalt.exception.linked.WhatsAppCallException.Rtp(
+            throw new WhatsAppCallException.Rtp(
                     "DTMF telephone-event payload too short: " + payload.length);
         }
         var event = payload[0] & 0xFF;

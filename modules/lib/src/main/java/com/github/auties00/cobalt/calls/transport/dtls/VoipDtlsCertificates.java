@@ -15,6 +15,7 @@ import java.lang.System.Logger.Level;
 import java.math.BigInteger;
 import java.net.Socket;
 import java.security.GeneralSecurityException;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
@@ -296,7 +297,7 @@ public final class VoipDtlsCertificates {
             var generator = KeyPairGenerator.getInstance(EC_ALGORITHM);
             generator.initialize(new ECGenParameterSpec(P256_CURVE), SECURE_RANDOM);
             return generator.generateKeyPair();
-        } catch (java.security.InvalidAlgorithmParameterException exception) {
+        } catch (InvalidAlgorithmParameterException exception) {
             throw new NoSuchAlgorithmException("EC P-256 key generation unavailable", exception);
         }
     }

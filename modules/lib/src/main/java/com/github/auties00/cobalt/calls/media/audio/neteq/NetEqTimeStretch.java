@@ -114,10 +114,10 @@ public final class NetEqTimeStretch {
      * @return the lag in full rate samples paired with the Q14 peak, both zero when the buffer is too short
      */
     static int[] lagSearch(short[] input, int length, int fsHz) {
-        int factor = fsHz / 4_000;
-        int fsMult = fsHz / 8_000;
+        var factor = fsHz / 4_000;
+        var fsMult = fsHz / 8_000;
         var decimated = new short[ANALYSIS_WINDOW];
-        int produced = NetEqSignalProcessing.downsampleTo4kHz(decimated, input, length, ANALYSIS_WINDOW, fsHz, true);
+        var produced = NetEqSignalProcessing.downsampleTo4kHz(decimated, input, length, ANALYSIS_WINDOW, fsHz, true);
         if (produced < ANALYSIS_WINDOW) {
             return new int[]{0, 0};
         }
@@ -126,8 +126,8 @@ public final class NetEqTimeStretch {
         NetEqSignalProcessing.crossCorrelationScaled(correlation, decimated, ANCHOR_OFFSET,
                 decimated, ANCHOR_OFFSET - MIN_LAG, CORRELATION_LENGTH, CORRELATION_LAGS, -1);
 
-        int maxAbs = NetEqSignalProcessing.maxAbs32(correlation, 0, CORRELATION_LAGS);
-        int shift = maxAbs == 0 ? 17 : Math.max(0, 18 - Integer.numberOfLeadingZeros(maxAbs));
+        var maxAbs = NetEqSignalProcessing.maxAbs32(correlation, 0, CORRELATION_LAGS);
+        var shift = maxAbs == 0 ? 17 : Math.max(0, 18 - Integer.numberOfLeadingZeros(maxAbs));
         var normalized = new short[CORRELATION_LAGS];
         NetEqSignalProcessing.vectorBitShift(normalized, 0, correlation, 0, CORRELATION_LAGS, shift);
 
@@ -135,9 +135,9 @@ public final class NetEqTimeStretch {
         var peakValue = new short[1];
         NetEqSignalProcessing.peakDetection(normalized, CORRELATION_LAGS, fsMult, peakIndex, peakValue);
 
-        int curveLag4k = peakIndex[0] / (fsMult << 1);
-        int lag = (curveLag4k + MIN_LAG) * factor;
-        int peak = Math.min(peakValue[0] & 0xFFFF, Q14_ONE);
+        var curveLag4k = peakIndex[0] / (fsMult << 1);
+        var lag = (curveLag4k + MIN_LAG) * factor;
+        var peak = Math.min(peakValue[0] & 0xFFFF, Q14_ONE);
         return new int[]{lag, peak};
     }
 
@@ -166,22 +166,22 @@ public final class NetEqTimeStretch {
      * @return the accelerate result; the input unchanged when the criterion fails or no period fits
      */
     static Result accelerate(short[] input, int length, int fsHz, boolean activeSpeech, boolean precondition) {
-        int[] search = lagSearch(input, length, fsHz);
-        int bestLag = search[0];
-        int peak = search[1];
-        int fsMult = fsHz / 8_000;
-        int peakWindow = fsMult * PEAK_WINDOW_PER_FS;
-        int threshold = activeSpeech ? 14_746 : 8_192;
-        boolean criterion = peak <= threshold && precondition;
+        var search = lagSearch(input, length, fsHz);
+        var bestLag = search[0];
+        var peak = search[1];
+        var fsMult = fsHz / 8_000;
+        var peakWindow = fsMult * PEAK_WINDOW_PER_FS;
+        var threshold = activeSpeech ? 14_746 : 8_192;
+        var criterion = peak <= threshold && precondition;
         if (!criterion || bestLag <= 0 || peakWindow + 2 * bestLag > length) {
             return new Result(false, input, bestLag);
         }
-        int outLength = length - bestLag;
+        var outLength = length - bestLag;
         var out = new short[outLength];
         System.arraycopy(input, 0, out, 0, peakWindow);
         NetEqSignalProcessing.crossFade(out, peakWindow, input, peakWindow,
                 input, peakWindow + bestLag, bestLag);
-        int tail = length - (peakWindow + 2 * bestLag);
+        var tail = length - (peakWindow + 2 * bestLag);
         System.arraycopy(input, peakWindow + 2 * bestLag, out, peakWindow + bestLag, tail);
         return new Result(true, out, bestLag);
     }
@@ -211,20 +211,20 @@ public final class NetEqTimeStretch {
      */
     static Result preemptiveExpand(short[] input, int length, int fsHz, int oldDataLength, boolean peakOverride,
                                    boolean doStretch) {
-        int[] search = lagSearch(input, length, fsHz);
-        int bestLag = search[0];
-        int fsMult = fsHz / 8_000;
-        int peakWindow = fsMult * PEAK_WINDOW_PER_FS;
-        boolean criterion = !doStretch || (oldDataLength <= peakWindow && peakOverride);
+        var search = lagSearch(input, length, fsHz);
+        var bestLag = search[0];
+        var fsMult = fsHz / 8_000;
+        var peakWindow = fsMult * PEAK_WINDOW_PER_FS;
+        var criterion = !doStretch || (oldDataLength <= peakWindow && peakOverride);
         if (!criterion || bestLag <= 0 || peakWindow + 2 * bestLag > length) {
             return new Result(false, input, bestLag);
         }
-        int outLength = length + bestLag;
+        var outLength = length + bestLag;
         var out = new short[outLength];
         System.arraycopy(input, 0, out, 0, peakWindow + bestLag);
         NetEqSignalProcessing.crossFade(out, peakWindow + bestLag, input, peakWindow + bestLag,
                 input, peakWindow, bestLag);
-        int tail = length - (peakWindow + bestLag);
+        var tail = length - (peakWindow + bestLag);
         System.arraycopy(input, peakWindow + bestLag, out, peakWindow + 2 * bestLag, tail);
         return new Result(true, out, bestLag);
     }

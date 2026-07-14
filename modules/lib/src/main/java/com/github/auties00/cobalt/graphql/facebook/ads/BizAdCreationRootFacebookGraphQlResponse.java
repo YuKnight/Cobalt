@@ -139,7 +139,7 @@ public final class BizAdCreationRootFacebookGraphQlResponse implements FacebookG
             return List.of();
         }
 
-        JSONArray arr = options.getJSONArray("eligible_publisher_platforms");
+        var arr = options.getJSONArray("eligible_publisher_platforms");
         if (arr == null) {
             return List.of();
         }
