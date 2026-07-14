@@ -280,7 +280,7 @@ build_av1() {
         -Denable_tools=false \
         -Denable_tests=false \
         -Db_staticpic=true \
-        -Dc_args="${CFLAGS:-} $C_CODEC_EXTRA_CFLAGS"
+        -Dc_args="${CFLAGS:-} $CODEC_CFLAGS $C_ONLY_CFLAGS"
     ninja -C "$b"
     ninja -C "$b" install
     # Vendor public headers for compiling the shim.
@@ -470,7 +470,7 @@ build_webrtc_apm() {
         --default-library=static \
         --buildtype=release \
         -Db_staticpic=true \
-        -Dcpp_args="${CXXFLAGS:-} $EXTRA_CFLAGS $CXX_HIDDEN_CFLAGS $CXX_LEAN_CFLAGS -include cstdint -include cstddef"
+        -Dcpp_args="${CXXFLAGS:-} $SECTIONS_CFLAGS $CXX_HIDDEN_CFLAGS $CXX_LEAN_CFLAGS -include cstdint -include cstddef"
     if [ "$OS" = windows ]; then
         # abseil's NTDDI_WIN10_NI branch enables WinRT calls undeclared under MinGW.
         local tzsrc
